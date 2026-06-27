@@ -3,6 +3,7 @@ import { templates } from '@griever/shared';
 import type { SendEvent } from '@griever/shared';
 import { sendSMS } from '@griever/sms';
 import { randomUUID } from 'crypto';
+import { recordEvent } from './history.js';
 
 const sendBodySchema = {
   type: 'object',
@@ -51,6 +52,7 @@ export default async function (fastify: FastifyInstance) {
         wakeTime: fields['wakeTime'],
       };
 
+      recordEvent(event);
       return event;
     }
   );

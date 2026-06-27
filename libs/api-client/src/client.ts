@@ -1,4 +1,4 @@
-import type { SendEvent, Template } from '@griever/shared';
+import type { SendEvent, Template, ObituaryRequest, ObituaryResponse } from '@griever/shared';
 
 declare const __VITE_API_URL__: string | undefined;
 
@@ -47,4 +47,11 @@ export function getSendHistory(userId: string): Promise<SendEvent[]> {
 
 export function getTemplates(): Promise<Template[]> {
   return apiFetch<Template[]>('/templates');
+}
+
+export function generateObituary(payload: ObituaryRequest): Promise<ObituaryResponse> {
+  return apiFetch<ObituaryResponse>('/obituary', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

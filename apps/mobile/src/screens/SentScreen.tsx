@@ -1,7 +1,11 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { FlowProps } from '../app/App';
 
-export function SentScreen({ flow }: FlowProps) {
+interface Props extends FlowProps {
+  onViewHistory: () => void;
+}
+
+export function SentScreen({ flow, onViewHistory }: Props) {
   const { selectedContacts, filledFields, reset } = flow;
   const name = filledFields['deceasedName'] ?? '';
 
@@ -19,6 +23,9 @@ export function SentScreen({ flow }: FlowProps) {
       <Text style={styles.condolence}>We are sorry for your loss.</Text>
       <TouchableOpacity onPress={reset} style={styles.link}>
         <Text style={styles.linkText}>Send another message</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onViewHistory} style={styles.historyLink}>
+        <Text style={styles.historyLinkText}>View sent messages</Text>
       </TouchableOpacity>
     </View>
   );
@@ -63,4 +70,6 @@ const styles = StyleSheet.create({
   },
   link: {},
   linkText: { fontSize: 14, color: '#6B7FD4' },
+  historyLink: { marginTop: 8 },
+  historyLinkText: { fontSize: 14, color: '#9ca3af' },
 });

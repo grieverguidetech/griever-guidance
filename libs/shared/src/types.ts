@@ -1,5 +1,7 @@
 export type SendStatus = 'pending' | 'sent' | 'failed';
 
+export type TemplateCategory = 'announcement' | 'service' | 'aftercare';
+
 export interface TemplateField {
   key: string;
   label: string;
@@ -11,6 +13,7 @@ export interface Template {
   id: string;
   name: string;
   description: string;
+  category: TemplateCategory;
   fields: TemplateField[];
   renderMessage(fields: Record<string, string>): string;
 }
@@ -39,4 +42,18 @@ export interface SendEvent {
   serviceDate: string;
   serviceLocation: string;
   wakeTime?: string;
+}
+
+export interface ObituaryRequest {
+  fullName: string;
+  dateOfBirth: string;
+  dateOfPassing: string;
+  cityOfResidence?: string;
+  survivors?: string;
+  career?: string;
+  personalNote?: string;
+}
+
+export interface ObituaryResponse {
+  draft: string;
 }

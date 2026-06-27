@@ -2,9 +2,10 @@ import type { SendFlowState, SendFlowActions } from '@griever/hooks';
 
 interface Props {
   flow: SendFlowState & SendFlowActions;
+  onViewHistory: () => void;
 }
 
-export function SentScreen({ flow }: Props) {
+export function SentScreen({ flow, onViewHistory }: Props) {
   const { selectedContacts, filledFields, reset } = flow;
   const name = filledFields['deceasedName'] ?? '';
 
@@ -30,6 +31,12 @@ export function SentScreen({ flow }: Props) {
         className="text-sm text-[#6B7FD4] hover:underline"
       >
         Send another message
+      </button>
+      <button
+        onClick={onViewHistory}
+        className="text-sm text-gray-400 hover:text-gray-600 mt-2"
+      >
+        View sent messages
       </button>
     </div>
   );
