@@ -6,6 +6,7 @@ type ScreenState = 'form' | 'loading' | 'draft';
 
 interface Props {
   onBack: () => void;
+  onShareLink: () => void;
 }
 
 const EMPTY_FIELDS: ObituaryRequest = {
@@ -18,7 +19,7 @@ const EMPTY_FIELDS: ObituaryRequest = {
   personalNote: '',
 };
 
-export function ObituaryScreen({ onBack }: Props) {
+export function ObituaryScreen({ onBack, onShareLink }: Props) {
   const [screenState, setScreenState] = useState<ScreenState>('form');
   const [fields, setFields] = useState<ObituaryRequest>(EMPTY_FIELDS);
   const [draft, setDraft] = useState('');
@@ -82,8 +83,14 @@ export function ObituaryScreen({ onBack }: Props) {
           rows={12}
         />
         <button
+          onClick={onShareLink}
+          className="w-full mt-6 bg-[#6B7FD4] text-white text-sm font-medium rounded-lg py-3 hover:bg-[#5a6ec2] transition-colors"
+        >
+          Share a link to this obituary
+        </button>
+        <button
           onClick={() => navigator.clipboard.writeText(draft)}
-          className="w-full mt-4 bg-[#6B7FD4] text-white text-sm font-medium rounded-lg py-3 hover:bg-[#5a6ec2] transition-colors"
+          className="w-full mt-3 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg py-3 hover:border-gray-300 transition-colors"
         >
           Copy to clipboard
         </button>

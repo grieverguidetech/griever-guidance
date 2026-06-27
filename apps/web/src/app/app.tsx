@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSendFlow } from '@griever/hooks';
+import { obituaryLink } from '@griever/shared';
 import { TemplatePicker } from '../screens/TemplatePicker';
 import { DetailsForm } from '../screens/DetailsForm';
 import { ContactSelector } from '../screens/ContactSelector';
@@ -25,10 +26,19 @@ export function App() {
   }
 
   if (view === 'obituary') {
+    function handleShareObituaryLink() {
+      flow.setTemplate(obituaryLink);
+      flow.nextStep();
+      setView('flow');
+    }
+
     return (
       <div className="min-h-screen bg-white flex justify-center">
         <div className="w-full max-w-[480px] px-4 py-8">
-          <ObituaryScreen onBack={() => setView('flow')} />
+          <ObituaryScreen
+            onBack={() => setView('flow')}
+            onShareLink={handleShareObituaryLink}
+          />
         </div>
       </div>
     );
