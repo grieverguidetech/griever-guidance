@@ -7,7 +7,7 @@
     "dev:web": "pnpm nx serve web",
     "dev:mobile": "pnpm nx start mobile",
     "dev:marketing": "pnpm nx serve marketing",
-    "dev": "concurrently \"pnpm dev:api\" \"pnpm dev:web\""
+    "dev": "concurrently --names api,web --prefix-colors magenta,cyan \"pnpm dev:api\" \"pnpm dev:web\""
   },
   "private": true,
   "devDependencies": {

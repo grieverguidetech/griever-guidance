@@ -32,4 +32,10 @@ jobs:
 
       - uses: nrwl/nx-set-shas@v4
 
-      - run: pnpm nx affected -t typecheck build --base=$NX_BASE --head=$NX_HEAD --parallel=3
+      # Typecheck everything affected (mobile included — it passes).
+      - run: pnpm nx affected -t typecheck --base=$NX_BASE --head=$NX_HEAD --parallel=3
+
+      # Build everything affected except mobile: `mobile:build` shells out to
+      # the EAS CLI, which isn't available (or configured) in CI. Web/API/
+      # marketing builds are what gate deploys.
+      - run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD --parallel=3 --exclude=mobile
