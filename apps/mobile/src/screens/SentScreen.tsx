@@ -6,8 +6,9 @@ interface Props extends FlowProps {
 }
 
 export function SentScreen({ flow, onViewHistory }: Props) {
-  const { selectedContacts, filledFields, reset } = flow;
-  const name = filledFields['deceasedName'] ?? '';
+  const { selectedContactIds, fields, reset } = flow;
+  const name = fields['deceasedName'] ?? '';
+  const recipientCount = selectedContactIds.length;
 
   return (
     <View style={styles.container}>
@@ -16,8 +17,8 @@ export function SentScreen({ flow, onViewHistory }: Props) {
       </View>
       <Text style={styles.heading}>Your messages have been sent.</Text>
       <Text style={styles.body}>
-        {selectedContacts.length}{' '}
-        {selectedContacts.length === 1 ? 'person' : 'people'} will receive details
+        {recipientCount}{' '}
+        {recipientCount === 1 ? 'person' : 'people'} will receive details
         {name ? ` about ${name}` : ''}.
       </Text>
       <Text style={styles.condolence}>We are sorry for your loss.</Text>

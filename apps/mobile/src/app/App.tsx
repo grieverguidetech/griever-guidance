@@ -8,7 +8,6 @@ import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SentScreen } from '../screens/SentScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
-import type { SendFlowState, SendFlowActions } from '@griever/hooks';
 
 export type RootStackParamList = {
   TemplatePicker: undefined;
@@ -21,7 +20,7 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export type FlowProps = { flow: SendFlowState & SendFlowActions };
+export type FlowProps = { flow: ReturnType<typeof useSendFlow> };
 
 export const App = () => {
   const flow = useSendFlow();
@@ -60,7 +59,7 @@ export const App = () => {
             {() => <ContactSelectorScreen flow={flow} />}
           </Stack.Screen>
         )}
-        {view === 'flow' && flow.step === 'confirm' && (
+        {view === 'flow' && flow.step === 'review' && (
           <Stack.Screen name="Confirm">
             {() => <ConfirmScreen flow={flow} />}
           </Stack.Screen>

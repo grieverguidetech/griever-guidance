@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { generateObituary } from '@griever/api-client';
 import type { ObituaryRequest } from '@griever/shared';
+import { BackButton } from '../lib/ui';
+import { DateField, todayISO } from '../lib/DateField';
 
 type ScreenState = 'form' | 'loading' | 'draft';
 
 interface Props {
   onBack: () => void;
-  onShareLink: () => void;
+  /** Hand the finished obituary to the active session as its obituary link. */
+  onShareLink: (info: { fullName: string; dateOfPassing: string; url: string }) => void;
+}
+
+/** Stand-in for a published-obituary URL (no real hosting yet). */
+function mockObituaryUrl(fullName: string): string {
+  const slug =
+    fullName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'obituary';
+  return `https://obituaries.example.com/${slug}`;
 }
 
 const EMPTY_FIELDS: ObituaryRequest = {
@@ -58,46 +71,53 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
   if (screenState === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-sm text-gray-400">Writing the obituary...</p>
+        <p className="text-[13px] gg-reassure">Writing the obituary…</p>
       </div>
     );
   }
 
   if (screenState === 'draft') {
     return (
-      <div>
-        <button
-          onClick={() => setScreenState('form')}
-          className="text-sm text-gray-400 hover:text-gray-600 mb-6"
-        >
-          ← Edit details
-        </button>
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">Obituary draft</h1>
-        <p className="text-sm text-gray-400 mb-6">
-          Edit the text below as needed, then copy and publish wherever you'd like.
-        </p>
+      <div className="flex flex-col gap-4">
+        <BackButton onClick={() => setScreenState('form')} />
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[22px]">Obituary draft</h1>
+          <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
+            Edit the text below as needed, then copy and publish wherever you'd like.
+          </p>
+        </div>
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:border-[#6B7FD4]"
+          className="gg-input"
           rows={12}
         />
         <button
-          onClick={onShareLink}
-          className="w-full mt-6 bg-[#6B7FD4] text-white text-sm font-medium rounded-lg py-3 hover:bg-[#5a6ec2] transition-colors"
+          type="button"
+          onClick={() =>
+            onShareLink({
+              fullName: fields.fullName,
+              dateOfPassing: fields.dateOfPassing,
+              url: mockObituaryUrl(fields.fullName),
+            })
+          }
+          className="gg-btn gg-btn-primary gg-btn-block"
         >
           Share a link to this obituary
         </button>
         <button
+          type="button"
           onClick={() => navigator.clipboard.writeText(draft)}
-          className="w-full mt-3 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg py-3 hover:border-gray-300 transition-colors"
+          className="gg-btn gg-btn-secondary gg-btn-block"
         >
           Copy to clipboard
         </button>
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center">
           <button
+            type="button"
             onClick={onBack}
-            className="text-sm text-gray-400 hover:text-gray-600"
+            className="gg-btn gg-btn-ghost"
+            style={{ color: 'var(--text-muted)' }}
           >
             Done
           </button>
@@ -107,86 +127,72 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
   }
 
   return (
-    <div>
-      <button
-        onClick={onBack}
-        className="text-sm text-gray-400 hover:text-gray-600 mb-6"
-      >
-        ← Back
-      </button>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Write an obituary</h1>
-      <p className="text-sm text-gray-400 mb-8">
-        Fill in what you know. The required fields are marked below.
-      </p>
+    <div className="flex flex-col gap-4">
+      <BackButton onClick={onBack} />
+      <div className="flex flex-col gap-1">
+        <h1 className="text-[22px]">Write an obituary</h1>
+        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
+          Fill in what you know. The required fields are marked below.
+        </p>
+      </div>
 
-      <div className="flex flex-col gap-5">
-        <Field
-          label="Full name"
-          required
-          placeholder="e.g. Margaret Ellen Hayes"
-          value={fields.fullName}
-          onChange={(v) => setField('fullName', v)}
-        />
-        <Field
-          label="Date of birth"
-          required
-          placeholder="e.g. March 12, 1942"
-          value={fields.dateOfBirth}
-          onChange={(v) => setField('dateOfBirth', v)}
-        />
-        <Field
-          label="Date of passing"
-          required
-          placeholder="e.g. June 3, 2025"
-          value={fields.dateOfPassing}
-          onChange={(v) => setField('dateOfPassing', v)}
-        />
-        <Field
-          label="City of residence"
-          placeholder="e.g. Boston, MA"
-          value={fields.cityOfResidence ?? ''}
-          onChange={(v) => setField('cityOfResidence', v)}
-        />
-        <Field
-          label="Career or vocation"
-          placeholder="e.g. retired schoolteacher"
-          value={fields.career ?? ''}
-          onChange={(v) => setField('career', v)}
-        />
-        <Field
-          label="Survived by"
-          placeholder="e.g. husband John, two daughters"
-          value={fields.survivors ?? ''}
-          onChange={(v) => setField('survivors', v)}
-        />
+      <Field label="Full name" required placeholder="e.g. Margaret Ellen Hayes"
+        value={fields.fullName} onChange={(v) => setField('fullName', v)} />
+      <DateField
+        id="obit-dob"
+        label={<>Date of birth<RequiredMark /></>}
+        value={fields.dateOfBirth}
+        max={todayISO()}
+        required
+        onChange={(v) => setField('dateOfBirth', v)}
+      />
+      <DateField
+        id="obit-dop"
+        label={<>Date of passing<RequiredMark /></>}
+        value={fields.dateOfPassing}
+        max={todayISO()}
+        required
+        onChange={(v) => setField('dateOfPassing', v)}
+      />
+      <Field label="City of residence" placeholder="e.g. Boston, MA"
+        value={fields.cityOfResidence ?? ''} onChange={(v) => setField('cityOfResidence', v)} />
+      <Field label="Career or vocation" placeholder="e.g. retired schoolteacher"
+        value={fields.career ?? ''} onChange={(v) => setField('career', v)} />
+      <Field label="Survived by" placeholder="e.g. husband John, two daughters"
+        value={fields.survivors ?? ''} onChange={(v) => setField('survivors', v)} />
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm text-gray-600">
-            A memory or characteristic to include
-          </label>
-          <textarea
-            placeholder="e.g. She made everyone feel at home the moment they walked through her door."
-            value={fields.personalNote ?? ''}
-            onChange={(e) => setField('personalNote', e.target.value)}
-            rows={3}
-            className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 placeholder-gray-300 resize-none focus:outline-none focus:border-[#6B7FD4]"
-          />
-        </div>
+      <div className="gg-field">
+        <label htmlFor="obit-memory">A memory or characteristic to include</label>
+        <textarea
+          id="obit-memory"
+          className="gg-input"
+          rows={3}
+          placeholder="e.g. She made everyone feel at home the moment they walked through her door."
+          value={fields.personalNote ?? ''}
+          onChange={(e) => setField('personalNote', e.target.value)}
+        />
       </div>
 
       {error && (
-        <p className="text-sm text-red-400 mt-4">{error}</p>
+        <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-2-700)' }}>
+          {error}
+        </p>
       )}
 
       <button
+        type="button"
         onClick={handleSubmit}
         disabled={!canSubmit}
-        className="w-full mt-8 bg-[#6B7FD4] text-white text-sm font-medium rounded-lg py-3 hover:bg-[#5a6ec2] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="gg-btn gg-btn-primary gg-btn-block"
       >
         Write the obituary
       </button>
     </div>
   );
+}
+
+function RequiredMark() {
+  return <span style={{ color: 'var(--text-eyebrow)' }}> *</span>;
 }
 
 interface FieldProps {
@@ -199,17 +205,17 @@ interface FieldProps {
 
 function Field({ label, placeholder, value, onChange, required }: FieldProps) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm text-gray-600">
+    <div className="gg-field">
+      <label>
         {label}
-        {required && <span className="text-gray-400 ml-1">*</span>}
+        {required && <span style={{ color: 'var(--text-eyebrow)' }}> *</span>}
       </label>
       <input
         type="text"
+        className="gg-input"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#6B7FD4]"
       />
     </div>
   );

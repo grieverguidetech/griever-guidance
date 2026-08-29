@@ -1,77 +1,159 @@
-import { useState } from 'react';
-import { useSendFlow } from '@griever/hooks';
-import { obituaryLink } from '@griever/shared';
-import { TemplatePicker } from '../screens/TemplatePicker';
-import { DetailsForm } from '../screens/DetailsForm';
-import { ContactSelector } from '../screens/ContactSelector';
-import { ConfirmScreen } from '../screens/ConfirmScreen';
-import { SentScreen } from '../screens/SentScreen';
+import { useCallback, useMemo, useState } from 'react';
+import { useSessions } from '@griever/hooks';
+import type { SendFlowDraft } from '@griever/hooks';
+import type { SessionDetails } from '@griever/shared';
+import { Landing } from '../screens/Landing';
+import { SessionSetup } from '../screens/SessionSetup';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { ObituaryScreen } from '../screens/ObituaryScreen';
+import { Flow } from './Flow';
 
-type AppView = 'flow' | 'history' | 'obituary';
+type AppView = 'landing' | 'setup' | 'flow' | 'history' | 'obituary';
+
+const browserStorage =
+  typeof window !== 'undefined' ? window.localStorage : undefined;
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
+      <div className="w-full max-w-[420px] px-5 py-8">{children}</div>
+    </div>
+  );
+}
 
 export function App() {
-  const flow = useSendFlow();
-  const [view, setView] = useState<AppView>('flow');
+  const sessions = useSessions(browserStorage);
+  const [view, setView] = useState<AppView>('landing');
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [setupEditing, setSetupEditing] = useState(false);
+
+  const active = useMemo(
+    () => sessions.sessions.find((s) => s.id === activeId) ?? null,
+    [sessions.sessions, activeId],
+  );
+
+  const { updateDraft } = sessions;
+  const onDraftChange = useCallback(
+    (d: SendFlowDraft) => {
+      if (activeId) updateDraft(activeId, d);
+    },
+    [activeId, updateDraft],
+  );
+
+  const activeDetails = useMemo<SessionDetails | null>(
+    () =>
+      active
+        ? {
+            personName: active.personName,
+            dateOfPassing: active.dateOfPassing,
+            senderName: active.senderName,
+            obituaryUrl: active.obituaryUrl,
+          }
+        : null,
+    [active],
+  );
+
+  function startNewSession() {
+    const created = sessions.createSession();
+    setActiveId(created.id);
+    setSetupEditing(false);
+    setView('setup');
+  }
+
+  function continueSession(id: string) {
+    sessions.touchSession(id);
+    setActiveId(id);
+    setView('flow');
+  }
+
+  function finishSetup() {
+    setView('flow');
+  }
+
+  function backFromSetup() {
+    if (setupEditing) {
+      setView('flow');
+      return;
+    }
+    sessions.pruneEmpty();
+    setActiveId(null);
+    setView('landing');
+  }
 
   if (view === 'history') {
     return (
-      <div className="min-h-screen bg-white flex justify-center">
-        <div className="w-full max-w-[480px] px-4 py-8">
-          <HistoryScreen onBack={() => setView('flow')} />
-        </div>
-      </div>
+      <Shell>
+        <HistoryScreen onBack={() => setView(active ? 'flow' : 'landing')} />
+      </Shell>
     );
   }
 
   if (view === 'obituary') {
-    function handleShareObituaryLink() {
-      flow.setTemplate(obituaryLink);
-      flow.nextStep();
-      setView('flow');
-    }
-
     return (
-      <div className="min-h-screen bg-white flex justify-center">
-        <div className="w-full max-w-[480px] px-4 py-8">
-          <ObituaryScreen
-            onBack={() => setView('flow')}
-            onShareLink={handleShareObituaryLink}
-          />
-        </div>
-      </div>
+      <Shell>
+        <ObituaryScreen
+          onBack={() => setView('landing')}
+          onShareLink={({ fullName, dateOfPassing, url }) => {
+            const target =
+              active ??
+              sessions.createSession({ personName: fullName, dateOfPassing });
+            sessions.updateSession(target.id, { obituaryUrl: url });
+            setActiveId(target.id);
+            const ready = Boolean(
+              (target.personName || fullName) &&
+                (target.dateOfPassing || dateOfPassing),
+            );
+            setSetupEditing(ready);
+            setView(ready ? 'flow' : 'setup');
+          }}
+        />
+      </Shell>
+    );
+  }
+
+  if (view === 'setup' && active) {
+    return (
+      <Shell>
+        <SessionSetup
+          session={active}
+          editing={setupEditing}
+          onChange={(patch) => sessions.updateSession(active.id, patch)}
+          onContinue={finishSetup}
+          onBack={backFromSetup}
+        />
+      </Shell>
+    );
+  }
+
+  if (view === 'flow' && active && activeDetails) {
+    return (
+      <Shell>
+        <Flow
+          key={active.id}
+          session={activeDetails}
+          draft={active.draft}
+          onDraftChange={onDraftChange}
+          onExitToLanding={() => setView('landing')}
+          onEditSession={() => {
+            setSetupEditing(true);
+            setView('setup');
+          }}
+          onViewHistory={() => setView('history')}
+        />
+      </Shell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white flex justify-center">
-      <div className="w-full max-w-[480px] px-4 py-8">
-        {flow.step === 'template' && (
-          <div className="flex justify-between mb-4">
-            <button
-              onClick={() => setView('obituary')}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              Write an obituary
-            </button>
-            <button
-              onClick={() => setView('history')}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              View sent messages
-            </button>
-          </div>
-        )}
-        {flow.step === 'template' && <TemplatePicker flow={flow} />}
-        {flow.step === 'details' && <DetailsForm flow={flow} />}
-        {flow.step === 'contacts' && <ContactSelector flow={flow} />}
-        {flow.step === 'confirm' && <ConfirmScreen flow={flow} />}
-        {flow.step === 'sent' && (
-          <SentScreen flow={flow} onViewHistory={() => setView('history')} />
-        )}
-      </div>
-    </div>
+    <Shell>
+      <Landing
+        inProgressSessions={sessions.inProgressSessions}
+        onNewSession={startNewSession}
+        onContinueSession={continueSession}
+        onViewHistory={() => setView('history')}
+        onWriteObituary={() => setView('obituary')}
+      />
+    </Shell>
   );
 }
 

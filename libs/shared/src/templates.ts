@@ -218,17 +218,154 @@ export const obituaryLink: Template = {
   },
 };
 
-export const categoryLabels: Record<TemplateCategory, string> = {
-  announcement: 'Announcements',
-  service:      'Service details',
-  aftercare:    'After the service',
+/**
+ * Flow A — Share the service. Logistics in one message, with an optional
+ * florist line appended (exactly one sentence) when the griever opts in.
+ */
+export const shareService: Template = {
+  id: 'share-service',
+  name: 'Share the service',
+  description: 'Date, time and place, in one message.',
+  category: 'service',
+  // The person's name comes from the session, never asked here.
+  fields: [
+    {
+      key: 'serviceDate',
+      label: 'Service date',
+      placeholder: 'e.g. June 14, 2026',
+      required: true,
+    },
+    {
+      key: 'serviceTime',
+      label: 'Time',
+      placeholder: 'e.g. 2:00 PM',
+      required: true,
+    },
+    {
+      key: 'serviceLocation',
+      label: 'Location',
+      placeholder: 'Start typing a place or address',
+      required: true,
+    },
+    {
+      key: 'serviceNotes',
+      label: 'Notes',
+      placeholder: 'Reception to follow at the house',
+      required: false,
+    },
+  ],
+  renderMessage(fields) {
+    const name = fields['deceasedName']?.trim() || 'Our loved one';
+    const date = fields['serviceDate']?.trim();
+    const time = fields['serviceTime']?.trim();
+    const location = fields['serviceLocation']?.trim();
+    const notes = fields['serviceNotes']?.trim();
+
+    const possessive = /s$/i.test(name) ? `${name}'` : `${name}'s`;
+    let core = `${possessive} service will be held`;
+    if (date) core += ` ${date}`;
+    if (time) core += ` at ${time}`;
+    if (location) core += `, ${location}`;
+    core += '.';
+    if (notes) core += ` ${notes}`;
+
+    const florist = fields['floristName']?.trim();
+    if (florist) {
+      const where =
+        fields['flowerDeliveryTarget'] === 'home'
+          ? "the family's home"
+          : 'the service';
+      core += ` If you'd like to send flowers, ${florist} can deliver to ${where}.`;
+    }
+
+    const url = normalizeUrl(fields['obituaryUrl']);
+    if (url) core += `\n\n${url}`;
+    return core;
+  },
 };
 
+/**
+ * Flow B — Announce the passing. Sendable on name + date alone; never blocks
+ * on service details the griever does not have yet. `tone` selects gentler
+ * phrasing without changing any facts.
+ */
+export const announcePassing: Template = {
+  id: 'announce-passing',
+  name: 'Announce the passing',
+  description: 'A gentle note letting people know.',
+  category: 'announcement',
+  // Name, date, sender and obituary link all come from the session. The only
+  // thing this flow can ask for is an optional extra line.
+  fields: [
+    {
+      key: 'personalNote',
+      label: "Anything you'd like to add",
+      placeholder: 'She was peaceful, and we were with her.',
+      required: false,
+    },
+  ],
+  renderMessage(fields) {
+    const name = fields['deceasedName']?.trim() || 'our loved one';
+    const date = fields['dateOfPassing']?.trim();
+    const note = fields['personalNote']?.trim();
+    const sender = fields['senderName']?.trim();
+    const url = normalizeUrl(fields['obituaryUrl']);
+    const softer = fields['tone'] === 'softer';
+    const serviceDate = fields['serviceDate']?.trim();
+    const serviceTime = fields['serviceTime']?.trim();
+    const serviceLocation = fields['serviceLocation']?.trim();
+    const detailsKnown =
+      fields['serviceDetailsKnown'] === 'yes' &&
+      Boolean(serviceDate || serviceLocation);
+    const detailsFollow =
+      fields['serviceDetailsKnown'] === 'no' ||
+      (fields['serviceDetailsKnown'] === 'yes' && !detailsKnown);
+
+    let body = softer
+      ? `It is with love and a heavy heart that we let you know ${name} passed away`
+      : `With much love, we're letting you know that ${name} passed away`;
+    if (date) body += ` on ${date}`;
+    body += '.';
+
+    if (note) body += ` ${note}`;
+    if (detailsKnown) {
+      const parts: string[] = [];
+      if (serviceDate) parts.push(serviceDate);
+      if (serviceTime) parts.push(`at ${serviceTime}`);
+      if (serviceLocation) parts.push(serviceLocation);
+      body += ` The service will be held ${parts.join(', ')}.`;
+    } else if (detailsFollow) {
+      body += softer
+        ? " We'll share details of the service as soon as we can."
+        : ' Details of the service will follow once we have them.';
+    }
+    if (sender) body += ` — ${sender}`;
+    if (url) body += `\n\n${url}`;
+    return body;
+  },
+};
+
+function normalizeUrl(raw: string | undefined): string {
+  const value = raw?.trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+export const categoryLabels: Record<TemplateCategory, string> = {
+  announcement: 'Announcement',
+  service:      'Service details',
+  aftercare:    'Aftercare',
+};
+
+/** Label for the coloured tag shown against a record in send history. */
+export function historyTagLabel(category: TemplateCategory): string {
+  return category === 'announcement' ? 'Announcement' : 'Service details';
+}
+
 export const templates: Template[] = [
-  funeralAndWake,
-  passingAnnouncement,
-  celebrationOfLife,
+  announcePassing,
+  shareService,
   thankYouNote,
-  serviceReminder,
   obituaryLink,
 ];

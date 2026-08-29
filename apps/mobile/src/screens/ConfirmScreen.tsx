@@ -1,26 +1,31 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { createSendEvent } from '@griever/api-client';
+import { useMockContacts } from '@griever/hooks';
 import type { FlowProps } from '../app/App';
 
 export function ConfirmScreen({ flow }: FlowProps) {
-  const { selectedTemplate, filledFields, selectedContacts, prevStep, nextStep } = flow;
+  const { selectedTemplate, composedFields, composedMessage, selectedContactIds, prevStep, nextStep } = flow;
+  const contacts = useMockContacts();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!selectedTemplate) return null;
 
-  const message = selectedTemplate.renderMessage(filledFields);
+  const message = composedMessage;
+  const recipientCount = selectedContactIds.length;
 
   async function handleSend() {
     setSending(true);
     setError(null);
     try {
       await createSendEvent({
-        userId: 'anonymous',
+        userId: 'local-device',
         templateId: selectedTemplate!.id,
-        contacts: selectedContacts.map((c) => c.phoneNumber),
-        fields: filledFields,
+        contacts: contacts
+          .filter((c) => selectedContactIds.includes(c.id))
+          .map((c) => c.phoneNumber),
+        fields: composedFields,
       });
       nextStep();
     } catch {
@@ -36,8 +41,8 @@ export function ConfirmScreen({ flow }: FlowProps) {
       </TouchableOpacity>
       <Text style={styles.title}>Review your message</Text>
       <Text style={styles.subtitle}>
-        This will be sent to {selectedContacts.length}{' '}
-        {selectedContacts.length === 1 ? 'person' : 'people'}.
+        This will be sent to {recipientCount}{' '}
+        {recipientCount === 1 ? 'person' : 'people'}.
       </Text>
       <View style={styles.messageBox}>
         <Text style={styles.messageText}>{message}</Text>
