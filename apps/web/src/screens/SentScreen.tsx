@@ -1,40 +1,77 @@
-import type { SendFlowState, SendFlowActions } from '@griever/hooks';
+import type { useSendFlow } from '@griever/hooks';
+import { CheckCircle } from '@phosphor-icons/react';
+
+type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
-  flow: SendFlowState & SendFlowActions;
+  flow: Flow;
   onViewHistory: () => void;
 }
 
 export function SentScreen({ flow, onViewHistory }: Props) {
-  const { selectedContacts, filledFields, reset } = flow;
-  const name = filledFields['deceasedName'] ?? '';
+  const isAnnouncement = flow.templateCategory === 'announcement';
+  const name = flow.session?.personName?.trim() || flow.fields['deceasedName']?.trim();
+  const count = flow.selectedContactIds.length;
+  const people = `${count} ${count === 1 ? 'person' : 'people'}`;
 
   return (
-    <div className="flex flex-col items-center text-center pt-16">
-      <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-6">
-        <svg className="w-6 h-6 text-[#6B7FD4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-3">
-        Your messages have been sent.
-      </h2>
-      <p className="text-sm text-gray-500 mb-2">
-        {selectedContacts.length} {selectedContacts.length === 1 ? 'person' : 'people'} will receive details
-        {name ? ` about ${name}` : ''}.
-      </p>
-      <p className="text-sm text-gray-400 mb-10">
-        We are sorry for your loss.
-      </p>
-      <button
-        onClick={reset}
-        className="text-sm text-[#6B7FD4] hover:underline"
+    <div className="flex flex-col items-center text-center gap-3 pt-16">
+      <div
+        className="flex items-center justify-center"
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          background: 'var(--color-accent-100)',
+        }}
       >
-        Send another message
-      </button>
+        <CheckCircle size={28} weight="duotone" style={{ color: 'var(--color-accent-700)' }} />
+      </div>
+
+      <h1 className="text-[22px] m-0">
+        {isAnnouncement ? 'Everyone has been told.' : 'Your message has been sent.'}
+      </h1>
+
+      <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)', maxWidth: '28ch' }}>
+        {isAnnouncement
+          ? `${people} now know about ${name || 'your loved one'}. Nothing else needs doing today.`
+          : `${people} will receive service details${name ? ` for ${name}` : ''}.`}
+      </p>
+
+      <p className="gg-reassure m-0 mb-4 text-[14px]">
+        {isAnnouncement
+          ? "Rest if you can. We'll keep the list for you."
+          : "We're holding you in our thoughts."}
+      </p>
+
+      {isAnnouncement ? (
+        <div className="gg-card w-full text-left">
+          <span className="gg-card-kicker">When you're ready</span>
+          <span className="gg-card-title text-[15px]">Share the service details</span>
+          <p className="gg-card-body">We'll reuse this same list of people.</p>
+          <button
+            type="button"
+            onClick={() => flow.restartForServiceDetails()}
+            className="gg-btn gg-btn-primary gg-btn-block mt-2"
+          >
+            Add service details
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => flow.startAnotherMessage()}
+          className="gg-btn gg-btn-ghost"
+        >
+          Send another message
+        </button>
+      )}
+
       <button
+        type="button"
         onClick={onViewHistory}
-        className="text-sm text-gray-400 hover:text-gray-600 mt-2"
+        className="gg-btn gg-btn-ghost"
+        style={{ color: 'var(--text-muted)' }}
       >
         View sent messages
       </button>

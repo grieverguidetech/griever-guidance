@@ -11,13 +11,13 @@ import {
 import type { FlowProps } from '../app/App';
 
 export function DetailsFormScreen({ flow }: FlowProps) {
-  const { selectedTemplate, filledFields, setField, nextStep, prevStep } = flow;
+  const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
 
   if (!selectedTemplate) return null;
 
   const canProceed = selectedTemplate.fields
     .filter((f) => f.required)
-    .every((f) => filledFields[f.key]?.trim());
+    .every((f) => fields[f.key]?.trim());
 
   return (
     <KeyboardAvoidingView
@@ -39,7 +39,7 @@ export function DetailsFormScreen({ flow }: FlowProps) {
             </Text>
             <TextInput
               style={styles.input}
-              value={filledFields[field.key] ?? ''}
+              value={fields[field.key] ?? ''}
               onChangeText={(val) => setField(field.key, val)}
               placeholder={field.placeholder}
               placeholderTextColor="#9ca3af"

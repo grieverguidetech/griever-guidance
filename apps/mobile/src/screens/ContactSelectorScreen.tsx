@@ -4,17 +4,17 @@ import type { Contact } from '@griever/shared';
 import type { FlowProps } from '../app/App';
 
 export function ContactSelectorScreen({ flow }: FlowProps) {
-  const { selectedContacts, toggleContact, nextStep, prevStep } = flow;
+  const { selectedContactIds, toggleContact, nextStep, prevStep } = flow;
   const contacts = useMockContacts();
 
-  const selectedIds = new Set(selectedContacts.map((c) => c.id));
+  const selectedIds = new Set(selectedContactIds);
 
   function renderContact({ item }: { item: Contact }) {
     const selected = selectedIds.has(item.id);
     return (
       <TouchableOpacity
         style={[styles.row, selected && styles.rowSelected]}
-        onPress={() => toggleContact(item)}
+        onPress={() => toggleContact(item.id)}
         activeOpacity={0.7}
       >
         <View style={styles.rowInfo}>
@@ -45,14 +45,14 @@ export function ContactSelectorScreen({ flow }: FlowProps) {
       />
       <View style={styles.footer}>
         <Text style={styles.count}>
-          {selectedContacts.length === 0
+          {selectedContactIds.length === 0
             ? 'No recipients selected'
-            : `${selectedContacts.length} selected`}
+            : `${selectedContactIds.length} selected`}
         </Text>
         <TouchableOpacity
-          style={[styles.button, selectedContacts.length === 0 && styles.buttonDisabled]}
+          style={[styles.button, selectedContactIds.length === 0 && styles.buttonDisabled]}
           onPress={nextStep}
-          disabled={selectedContacts.length === 0}
+          disabled={selectedContactIds.length === 0}
           activeOpacity={0.8}
         >
           <Text style={styles.buttonText}>Continue</Text>

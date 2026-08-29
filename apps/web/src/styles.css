@@ -1,11 +1,326 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+/* Source Serif 4 is loaded via <link> in index.html (keeps @import rules from
+   tripping over Tailwind's injected layers). */
 
+/* ──────────────────────────────────────────────────────────────────────
+   Broadsheet — design tokens, ported from
+   design_handoff_griever_wizard/design-system/styles.css.
+   The @theme block is the source of truth for colours + the serif face;
+   Tailwind emits these as :root custom properties and as utilities
+   (bg-bg, text-ink, text-accent-700, …).
+   ────────────────────────────────────────────────────────────────────── */
+@theme {
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-ink: #201e1d;
+  --color-accent: #0088b0;
+  --color-accent-2: #d6006c;
+
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #e9f8ff;
+  --color-accent-200: #cbeeff;
+  --color-accent-300: #99e0ff;
+  --color-accent-400: #62c5ee;
+  --color-accent-500: #38a6cf;
+  --color-accent-600: #1186ac;
+  --color-accent-700: #006786;
+  --color-accent-800: #004961;
+  --color-accent-900: #0a303e;
+
+  --color-accent-2-100: #fff1f4;
+  --color-accent-2-200: #ffdee6;
+  --color-accent-2-300: #ffc0d0;
+  --color-accent-2-400: #ff90b1;
+  --color-accent-2-500: #ff458e;
+  --color-accent-2-600: #d82071;
+  --color-accent-2-700: #aa0b56;
+  --color-accent-2-800: #790e3d;
+  --color-accent-2-900: #4b1528;
+}
+
+/* Non-colour tokens + aliases for the component layer below. Plain custom
+   properties (Broadsheet's 1.25× spacing / near-square radii don't map to
+   Tailwind's single-multiplier scales). */
 :root {
-  --accent: #6B7FD4;
+  --color-text: var(--color-ink);
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+
+  --space-1: 5px;
+  --space-2: 10px;
+  --space-3: 15px;
+  --space-4: 20px;
+  --space-6: 30px;
+  --space-8: 40px;
+
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+
+  --text-muted: color-mix(in srgb, var(--color-text) 60%, transparent);
+  --text-hint: color-mix(in srgb, var(--color-text) 50%, transparent);
+  --text-eyebrow: color-mix(in srgb, var(--color-text) 45%, transparent);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #ffffff;
-  color: #1a1a1a;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+}
+
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Component layer — mirrors the Broadsheet design-system classes, scoped
+   to what the wizard screens use. Values copied from the handoff CSS.
+   ────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* — buttons — */
+  .gg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: var(--space-2) calc(var(--space-3) * 1.2);
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.2;
+    color: var(--color-text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .gg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .gg-btn-primary { background: var(--color-accent); color: var(--color-bg); }
+  .gg-btn-primary:not(:disabled):hover { background: var(--color-accent-600); }
+  .gg-btn-primary:not(:disabled):active { background: var(--color-accent-700); }
+  .gg-btn-secondary { border-color: var(--color-divider); }
+  .gg-btn-secondary:not(:disabled):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+  .gg-btn-secondary:not(:disabled):active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+  .gg-btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+  .gg-btn-ghost:not(:disabled):hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+  .gg-btn-ghost:not(:disabled):active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+  .gg-btn-block { width: 100%; }
+
+  /* — cards — */
+  .gg-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+  }
+  .gg-card-selectable { cursor: pointer; }
+  .gg-card-selected { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+  .gg-card-kicker {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+  .gg-card-title {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 17px;
+    line-height: 1.2;
+  }
+  .gg-card-body { margin: 0; font-size: 13px; opacity: 0.8; }
+  .gg-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-hint);
+  }
+  .elev-sm { box-shadow: var(--shadow-sm); }
+  .elev-md { box-shadow: var(--shadow-md); }
+
+  /* — forms — */
+  .gg-field > label {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  }
+  .gg-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--color-text);
+    caret-color: var(--color-accent);
+    background: var(--color-surface);
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-md);
+  }
+  .gg-input::placeholder {
+    color: color-mix(in srgb, var(--color-text) 55%, transparent);
+    opacity: 1;
+  }
+  .gg-input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+  .gg-input:focus-visible { border-color: var(--color-accent); outline: none; }
+  textarea.gg-input { min-height: 76px; resize: vertical; line-height: 1.5; }
+
+  /* — date field: free-text box + native calendar button — */
+  .gg-datebox { position: relative; }
+  .gg-datebox-text { padding-right: 44px; }
+  .gg-datebox-trigger {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    height: calc(100% - 2px);
+    width: 42px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--color-accent-700);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  }
+  .gg-datebox-trigger:hover {
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+  .gg-datebox-trigger:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+  /* The native <input type="date"> exists only to open the OS picker — keep it
+     in the DOM (so showPicker/focus works) but out of sight and out of the way. */
+  .gg-datebox-native {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* — native time field — */
+  .gg-time {
+    cursor: pointer;
+    min-height: 44px;
+    line-height: 1.4;
+  }
+  /* Full-strength ink on the --:-- -- segments, empty or filled, so the
+     control always clears the 4.5:1 contrast bar. */
+  .gg-time::-webkit-datetime-edit { color: var(--color-text); }
+  .gg-time::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+  }
+  .gg-time::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.9;
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+
+  /* — segmented control — */
+  .gg-seg {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-md);
+  }
+  .gg-seg-opt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    color: var(--color-text);
+  }
+  .gg-seg-opt + .gg-seg-opt { border-left: 1px solid var(--color-divider); }
+  .gg-seg-opt-active { background: var(--color-accent); color: var(--color-bg); }
+  .gg-seg-opt:not(.gg-seg-opt-active):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+
+  /* — tags — */
+  .gg-tag {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    padding: 3px 10px;
+    border-radius: calc(var(--radius-md) * 0.75);
+  }
+  .gg-tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+  .gg-tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+
+  /* — switch (flowers toggle) — */
+  .gg-switch {
+    width: 44px;
+    height: 26px;
+    flex: 0 0 auto;
+    border-radius: 13px;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    background: var(--color-neutral-300);
+    border: 0;
+    cursor: pointer;
+    transition: background 160ms ease, justify-content 160ms ease;
+  }
+  .gg-switch-on { background: var(--color-accent); justify-content: flex-end; }
+  .gg-switch > span {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  /* — misc — */
+  .gg-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-eyebrow);
+  }
+  .gg-reassure {
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text-hint);
+  }
 }

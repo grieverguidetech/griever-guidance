@@ -6,9 +6,10 @@
     "name": "web"
   },
   "dependencies": {
-    "@griever/shared": "workspace:*",
+    "@griever/api-client": "workspace:*",
     "@griever/hooks": "workspace:*",
-    "@griever/api-client": "workspace:*"
+    "@griever/shared": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
