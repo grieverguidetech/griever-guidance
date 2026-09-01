@@ -95,6 +95,11 @@ h1, h2, h3, h4, h5, h6 {
 ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* .gg-card-selected lives in @layer components, so its outline can never win
+   against the unlayered `:focus { outline: none }` reset above — the selection
+   ring would vanish the instant a card is clicked (clicking focuses it). Keep
+   it visible while focused too. */
+.gg-card-selected:focus { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
 /* ──────────────────────────────────────────────────────────────────────
    Component layer — mirrors the Broadsheet design-system classes, scoped
