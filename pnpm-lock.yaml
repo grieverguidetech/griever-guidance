@@ -181,7 +181,7 @@ importers:
         specifier: ^4.90.0
         version: 4.90.0(@cloudflare/workers-types@4.20260511.1)
 
-  apps/api:
+  apps/gateway:
     dependencies:
       '@fastify/autoload':
         specifier: ~6.0.3
@@ -198,6 +198,9 @@ importers:
       '@griever/sms':
         specifier: workspace:*
         version: link:../../libs/sms
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.2.6)
       fastify:
         specifier: ~5.2.1
         version: 5.2.2
@@ -288,6 +291,12 @@ importers:
       '@griever/api-client':
         specifier: workspace:*
         version: link:../../libs/api-client
+      '@griever/data-local':
+        specifier: workspace:*
+        version: link:../../libs/data-local
+      '@griever/data-sync':
+        specifier: workspace:*
+        version: link:../../libs/data-sync
       '@griever/hooks':
         specifier: workspace:*
         version: link:../../libs/hooks
@@ -297,9 +306,6 @@ importers:
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      convex:
-        specifier: ^1.45.0
-        version: 1.45.0(react@19.2.6)
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.2.4
@@ -340,9 +346,6 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared
-      convex:
-        specifier: ^1.45.0
-        version: 1.45.0(react@19.2.6)
     devDependencies:
       fake-indexeddb:
         specifier: ^6.2.5

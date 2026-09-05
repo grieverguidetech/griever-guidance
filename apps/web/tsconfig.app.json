@@ -30,13 +30,19 @@
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../../libs/api-client/tsconfig.lib.json"
+      "path": "../../libs/shared/tsconfig.lib.json"
     },
     {
       "path": "../../libs/hooks/tsconfig.lib.json"
     },
     {
-      "path": "../../libs/shared/tsconfig.lib.json"
+      "path": "../../libs/data-sync/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/data-local/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api-client/tsconfig.lib.json"
     }
   ]
 }

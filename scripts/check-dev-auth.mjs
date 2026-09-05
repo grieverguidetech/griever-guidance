@@ -14,7 +14,7 @@ let devAuthValue = "";
 let checkFailed = false;
 try {
   devAuthValue = execSync("npx convex env get GG_DEV_AUTH", {
-    cwd: "apps/web",
+    cwd: "apps/gateway",
     stdio: ["ignore", "pipe", "ignore"],
     timeout: 15_000,
   })

@@ -1,4 +1,5 @@
 export * from "./transport.js";
+export * from "./deviceId.js";
 export * from "./outbox.js";
 export * from "./merge.js";
 export * from "./cursorClient.js";

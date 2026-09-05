@@ -11,6 +11,7 @@ export { openDb, _resetDbConnectionForTests } from "./db.js";
 export * from "./clock.js";
 export * from "./migrations.js";
 export * from "./selectors.js";
+export { metaStore } from "./metaStore.js";
 
 export { sessionStore } from "./sessionStore.js";
 export { accountStore } from "./accountStore.js";

@@ -3,15 +3,15 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev:api": "pnpm nx serve api",
+    "dev:gateway": "pnpm nx serve gateway",
     "dev:web": "pnpm nx serve web",
     "dev:mobile": "pnpm nx start mobile",
     "dev:marketing": "pnpm nx serve marketing",
-    "dev": "concurrently --names api,web --prefix-colors magenta,cyan \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev": "concurrently --names gateway,web --prefix-colors magenta,cyan \"pnpm dev:gateway\" \"pnpm dev:web\"",
     "convex:up": "docker compose -f infra/convex/docker-compose.yml up -d",
-    "convex:dev": "cd apps/web && npx convex dev",
+    "convex:dev": "cd apps/gateway && npx convex dev",
     "convex:reset": "docker compose -f infra/convex/docker-compose.yml down -v",
-    "convex:deploy": "node scripts/check-dev-auth.mjs && cd apps/web && npx convex deploy"
+    "convex:deploy": "node scripts/check-dev-auth.mjs && cd apps/gateway && npx convex deploy"
   },
   "private": true,
   "devDependencies": {

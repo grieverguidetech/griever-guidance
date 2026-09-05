@@ -16,8 +16,7 @@
   },
   "dependencies": {
     "@griever/data-local": "workspace:*",
-    "@griever/shared": "workspace:*",
-    "convex": "^1.45.0"
+    "@griever/shared": "workspace:*"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5"

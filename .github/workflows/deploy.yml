@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  deploy-api:
-    name: Deploy API → Cloudflare Workers
+  deploy-gateway:
+    name: Deploy Gateway → Cloudflare Workers
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,21 @@ jobs:
 
       - run: pnpm nx run-many -t build -p shared sms --parallel=3
 
-      - run: pnpm exec wrangler deploy --config apps/api/wrangler.toml
+      # Guards against a dev-auth stub reaching production (DATA.md §6/§9).
+      # CONVEX_DEPLOY_KEY (not a self-hosted URL) is what points this check
+      # at the Convex Cloud prod deployment — see infra/convex/README.md's
+      # "Production" section.
+      - run: node scripts/check-dev-auth.mjs
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      # Pushes apps/gateway/convex's schema/functions to the Convex Cloud
+      # prod deployment associated with this deploy key.
+      - run: cd apps/gateway && npx convex deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      - run: pnpm exec wrangler deploy --config apps/gateway/wrangler.toml --var CONVEX_URL:${{ secrets.CONVEX_URL }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -51,7 +65,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm nx run-many -t build -p shared hooks api-client ui-web --parallel=3
+      - run: pnpm nx run-many -t build -p shared hooks api-client ui-web data-local data-sync --parallel=3
 
       - run: pnpm nx build web
         env:

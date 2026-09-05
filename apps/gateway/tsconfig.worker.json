@@ -11,7 +11,9 @@
     "src/worker.ts",
     "src/app/app.workers.ts",
     "src/app/plugins/**/*.ts",
-    "src/app/routes/**/*.ts"
+    "src/app/routes/**/*.ts",
+    "src/app/convexClient.ts",
+    "src/app/convexFunctions.ts"
   ],
   "references": [
     { "path": "../../libs/sms/tsconfig.lib.json" },

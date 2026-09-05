@@ -1,9 +1,9 @@
 {
-  "name": "@org/api",
+  "name": "@org/gateway",
   "version": "0.0.1",
   "private": true,
   "nx": {
-    "name": "api",
+    "name": "gateway",
     "targets": {
       "build": {
         "executor": "@nx/esbuild:esbuild",
@@ -13,15 +13,15 @@
         "defaultConfiguration": "production",
         "options": {
           "platform": "node",
-          "outputPath": "apps/api/dist",
+          "outputPath": "apps/gateway/dist",
           "format": [
             "cjs"
           ],
           "bundle": false,
-          "main": "apps/api/src/main.ts",
-          "tsConfig": "apps/api/tsconfig.app.json",
+          "main": "apps/gateway/src/main.ts",
+          "tsConfig": "apps/gateway/tsconfig.app.json",
           "assets": [
-            "apps/api/src/assets"
+            "apps/gateway/src/assets"
           ],
           "esbuildOptions": {
             "sourcemap": true,
@@ -49,8 +49,8 @@
         "cache": true,
         "executor": "@nx/js:prune-lockfile",
         "outputs": [
-          "{workspaceRoot}/apps/api/dist/package.json",
-          "{workspaceRoot}/apps/api/dist/pnpm-lock.yaml"
+          "{workspaceRoot}/apps/gateway/dist/package.json",
+          "{workspaceRoot}/apps/gateway/dist/pnpm-lock.yaml"
         ],
         "options": {
           "buildTarget": "build"
@@ -62,7 +62,7 @@
         ],
         "cache": true,
         "outputs": [
-          "{workspaceRoot}/apps/api/dist/workspace_modules"
+          "{workspaceRoot}/apps/gateway/dist/workspace_modules"
         ],
         "executor": "@nx/js:copy-workspace-modules",
         "options": {
@@ -84,15 +84,15 @@
           "build"
         ],
         "options": {
-          "buildTarget": "api:build",
+          "buildTarget": "gateway:build",
           "runBuildTargetDependencies": false
         },
         "configurations": {
           "development": {
-            "buildTarget": "api:build:development"
+            "buildTarget": "gateway:build:development"
           },
           "production": {
-            "buildTarget": "api:build:production"
+            "buildTarget": "gateway:build:production"
           }
         }
       }
@@ -104,6 +104,7 @@
     "@fastify/sensible": "~6.0.2",
     "@griever/shared": "workspace:*",
     "@griever/sms": "workspace:*",
+    "convex": "^1.45.0",
     "fastify": "~5.2.1",
     "fastify-plugin": "~5.0.1"
   }

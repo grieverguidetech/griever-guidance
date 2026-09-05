@@ -44,10 +44,21 @@ export interface AccountRecord {
   value: string[] | string;
 }
 
-export interface MetaRecord {
-  key: "schemaVersion" | "lastKnownServerTime";
-  value: number;
-}
+/**
+ * `syncCursor`/`lastSyncAt` live here rather than in `localStorage` (DATA.md
+ * §1's own suggestion) because the Service Worker needs to read and write
+ * them too, and a Service Worker has no `localStorage` access at all — only
+ * IndexedDB. `activeSessionId`/`userId` stay in `localStorage` since only the
+ * main thread needs them, synchronously, at boot.
+ *
+ * `deviceId`/`devUserId`/`gatewayUrl` are here for the same reason: the
+ * Service Worker (`apps/web/public/sw.js`) needs them to identify itself and
+ * find the gateway when it wakes on a Background Sync event, and the main
+ * thread is what writes them at boot (see `apps/web/src/lib/registerSync.ts`).
+ */
+export type MetaRecord =
+  | { key: "schemaVersion" | "lastKnownServerTime" | "syncCursor" | "lastSyncAt"; value: number }
+  | { key: "deviceId" | "devUserId" | "gatewayUrl"; value: string };
 
 interface GGSchema extends DBSchema {
   sessions: {

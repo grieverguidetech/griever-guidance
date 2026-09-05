@@ -1,10 +1,11 @@
 import { flush, syncNow } from "./cursorClient.js";
 import type { SyncTransport } from "./transport.js";
-import type { KeyValueStorage } from "./localStorageKeys.js";
 
 const IDLE_MS = 5_000;
 const FOREGROUND_TICK_MS = 60_000;
-const BACKGROUND_SYNC_TAG = "gg-outbox-flush";
+
+/** Also used by `apps/web/public/sw.js` to match the tag it listens for on the `sync` event. */
+export const BACKGROUND_SYNC_TAG = "gg-outbox-flush";
 
 export interface TriggerHandle {
   /** Call after every local edit — drives the "idle 5s after last edit" row of §4.5. */
@@ -33,19 +34,15 @@ async function registerBackgroundSync(): Promise<void> {
  * live transport. Silent throughout — no UI surface (§4.6); failures retry
  * via the caller's own backoff wrapper around `flush`/`syncNow`, not here.
  */
-export function registerSyncTriggers(
-  transport: SyncTransport,
-  deviceId: string,
-  storage?: KeyValueStorage,
-): TriggerHandle {
+export function registerSyncTriggers(transport: SyncTransport, deviceId: string): TriggerHandle {
   const teardowns: Array<() => void> = [];
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   const doFlush = () => {
-    void flush(transport, deviceId, storage);
+    void flush(transport, deviceId);
   };
   const doSyncNow = () => {
-    void syncNow(transport, deviceId, storage);
+    void syncNow(transport, deviceId);
   };
 
   // App boot, online (§4.5 row 1)

@@ -40,7 +40,9 @@ Griever Guidance helps people who have just lost a loved one send funeral and se
 
 ```
 apps/
-  api/        Fastify + TypeScript REST API, port 3001. Owns routing, auth, and DB access.
+  gateway/    Fastify + TypeScript REST API, port 3001. Owns routing, auth, and all access to
+              Convex — the only thing in this repo that talks to Convex directly. Also holds
+              the Convex functions themselves (apps/gateway/convex/).
   web/        React + Vite + Tailwind. Browser send flow and account management.
   mobile/     Expo + React Native. The primary user surface — mobile-first, core RN only.
   marketing/  Astro. Public-facing site. No shared business logic.
@@ -48,10 +50,14 @@ apps/
 libs/
   shared/     Source of truth for all types, interfaces, and message templates.
               Nothing gets duplicated into apps. If it's shared, it lives here.
-  api-client/ All HTTP calls to apps/api. Apps never call fetch directly.
+  api-client/ All HTTP calls to apps/gateway. Apps never call fetch directly.
   sms/        The only place that knows about Twilio. Currently mocked.
   hooks/      Shared React hooks. Zero platform-specific dependencies allowed here.
   ui-web/     Shared React + Tailwind components for web.
+  data-local/ IndexedDB-backed local storage (the screen-keyed session document, outbox,
+              contacts). Browser-only — see DATA.md.
+  data-sync/  The offline sync engine (outbox flush, cursor-based pull/push, merge) that talks
+              to apps/gateway, never to Convex directly. See DATA.md.
 ```
 
 ---
@@ -62,7 +68,8 @@ libs/
 |---|---|
 | Mobile | Expo + React Native (core components only) |
 | Web | React + Vite + Tailwind |
-| API | Fastify + TypeScript |
+| Gateway | Fastify + TypeScript, fronting Convex |
+| Data | Convex — self-hosted via Docker locally, Convex Cloud in production (see infra/convex/README.md) |
 | Marketing | Astro |
 | Package manager | pnpm — never npm or yarn |
 | Monorepo | Nx (task running, code generation) |
@@ -72,11 +79,14 @@ libs/
 ## Running the project
 
 ```sh
-pnpm dev:api        # Fastify on port 3001
+pnpm dev:gateway    # Fastify on port 3001
 pnpm dev:web        # Vite on port 5173
 pnpm dev:mobile     # Expo
 pnpm dev:marketing  # Astro
-pnpm dev            # api + web concurrently
+pnpm dev            # gateway + web concurrently
+
+pnpm convex:up      # start the local Convex backend + dashboard (Docker)
+pnpm convex:dev     # deploy apps/gateway/convex functions, watch for changes
 ```
 
 ---
@@ -88,6 +98,9 @@ Never define a type in an app that anything else might need. If it crosses a bou
 
 **2. All API calls go through libs/api-client.**
 Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app code.
+
+**2a. The gateway is the only thing that talks to Convex.**
+`apps/web` (via `libs/data-sync`) calls `apps/gateway`'s REST endpoints, never Convex directly — no Convex client, URL, or credentials in `apps/web`. This is what makes rule 2 true for sync, not just for `/send`/`/history`/etc.
 
 **3. Twilio is isolated to libs/sms.**
 The API calls `libs/sms`. Nothing else does. When real Twilio credentials are wired in, only `libs/sms` changes. The mock logs to console and returns a fake SID — that's intentional.
@@ -118,22 +131,24 @@ Read from the device on demand via `expo-contacts` (mobile) or `useMockContacts(
 
 ## Database
 
-Supabase, currently mocked. The only things persisted:
+Convex — self-hosted via Docker for local development, Convex Cloud in production (two separate
+deployments; see `infra/convex/README.md`). Schema and functions live in `apps/gateway/convex/`,
+identical in both. See `DATA.md` for the full data architecture (the screen-keyed local session
+document, the cursor-based sync protocol, the merge rule).
 
-- **Users** — id, email, phoneNumber
-- **SendEvents** — who sent, which template, how many recipients, status
-
-Message content and contact details are never stored.
+Contact data is never sent to Convex — only contact *ids* appear in synced session data, never
+a name or number. Message content is never stored — only rendered at send time.
 
 ---
 
 ## Environment variables
 
 ```
-apps/api     PORT, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER,
-             SUPABASE_URL, SUPABASE_SERVICE_KEY
-apps/web     VITE_API_URL
-apps/mobile  EXPO_PUBLIC_API_URL
+apps/gateway  PORT, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, ANTHROPIC_API_KEY,
+              CONVEX_SELF_HOSTED_URL, CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL  (local dev)
+              CONVEX_DEPLOY_KEY, CONVEX_URL                                          (CI/prod only)
+apps/web      VITE_API_URL
+apps/mobile   EXPO_PUBLIC_API_URL
 ```
 
 Never hardcode these. Never commit `.env` files.

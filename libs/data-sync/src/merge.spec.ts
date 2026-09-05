@@ -5,7 +5,6 @@ import { flush } from "./cursorClient.js";
 import { recordScreenEdit } from "./outbox.js";
 import { applyRemoteRow } from "./merge.js";
 import { createFakeServer } from "./testHelpers/fakeServer.js";
-import { createFakeStorage } from "./testHelpers/fakeStorage.js";
 
 function blankSession(sessionId: string): SessionDocument {
   return {
@@ -26,6 +25,7 @@ beforeEach(async () => {
   const db = await openDb();
   await db.clear("sessions");
   await db.clear("outbox");
+  await db.clear("meta");
 });
 
 describe("two-device merge (Test 4)", () => {
@@ -39,8 +39,7 @@ describe("two-device merge (Test 4)", () => {
       status: "complete",
       values: { serviceDate: "June 14, 2026" },
     });
-    const storageA = createFakeStorage();
-    await flush(server.transport, "dev_A", storageA);
+    await flush(server.transport, "dev_A");
 
     // Device B: a separate device, starts from the same (pre-A2) server
     // state via pull, then fills B1 independently, offline, and flushes.
@@ -48,14 +47,14 @@ describe("two-device merge (Test 4)", () => {
     const dbB = await openDb();
     await dbB.clear("sessions");
     await dbB.clear("outbox");
+    await dbB.clear("meta");
     // Device B never saw A2 — it only pulled the row as it existed before A2.
     await sessionStore.put(blankSession(sessionId));
     await recordScreenEdit(sessionId, "B1", {
       status: "complete",
       values: { personalNote: "We were with her." },
     });
-    const storageB = createFakeStorage();
-    await flush(server.transport, "dev_B", storageB);
+    await flush(server.transport, "dev_B");
 
     // The server now has both screens merged onto one row.
     const merged = server.getRow(sessionId);

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { RemoteSessionRow } from "@griever/shared";
-import { openDb, _resetDbConnectionForTests } from "@griever/data-local";
+import { openDb, metaStore, _resetDbConnectionForTests } from "@griever/data-local";
 import { pullLoop } from "./cursorClient.js";
-import { getSyncCursor } from "./localStorageKeys.js";
 import { createFakeServer } from "./testHelpers/fakeServer.js";
-import { createFakeStorage } from "./testHelpers/fakeStorage.js";
 
 function makeRow(seq: number): RemoteSessionRow {
   return {
@@ -30,13 +28,13 @@ beforeEach(async () => {
   const db = await openDb();
   await db.clear("sessions");
   await db.clear("outbox");
+  await db.clear("meta");
 });
 
 describe("cursor gap (Test 2)", () => {
   it("pages through 250 rows with no duplicates, no gaps, and a final cursor at the max seq", async () => {
     const server = createFakeServer();
     server.seedRows(Array.from({ length: 250 }, (_, i) => makeRow(i + 1)));
-    const storage = createFakeStorage();
 
     const seenSeqs: number[] = [];
     const trackingTransport = {
@@ -48,13 +46,13 @@ describe("cursor gap (Test 2)", () => {
       },
     };
 
-    await pullLoop(trackingTransport, storage);
+    await pullLoop(trackingTransport);
 
     expect(server.pullCallCount).toBe(3); // 100 + 100 + 50
     expect(seenSeqs).toHaveLength(250);
     expect(new Set(seenSeqs).size).toBe(250); // no duplicates
     expect(Math.max(...seenSeqs)).toBe(250);
-    expect(getSyncCursor(storage)).toBe(250);
+    expect(await metaStore.getMetaNumber("syncCursor")).toBe(250);
   });
 });
 

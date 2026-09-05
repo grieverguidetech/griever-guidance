@@ -19,7 +19,7 @@
       "path": "./libs/ui-web"
     },
     {
-      "path": "./apps/api"
+      "path": "./apps/gateway"
     },
     {
       "path": "./apps/web-e2e"

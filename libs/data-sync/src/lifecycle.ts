@@ -31,7 +31,7 @@ export async function swapToSession(
 ): Promise<SwapResult> {
   if (currentSessionId) {
     try {
-      await flush(transport, deviceId, storage);
+      await flush(transport, deviceId);
     } catch {
       return { ok: false, reason: SWAP_FLUSH_FAILED_COPY };
     }
