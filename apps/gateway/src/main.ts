@@ -1,16 +1,9 @@
-import Fastify from 'fastify';
-import { app } from './app/app';
+import { serve } from '@hono/node-server';
+import app from './worker.js';
 
 const host = process.env['HOST'] ?? 'localhost';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 3001;
 
-const server = Fastify({ logger: true });
-
-server.register(app);
-
-server.listen({ port, host }, (err) => {
-  if (err) {
-    server.log.error(err);
-    process.exit(1);
-  }
+serve({ fetch: app.fetch, hostname: host, port }, (info) => {
+  console.log(`Gateway listening at http://${host}:${info.port}`);
 });

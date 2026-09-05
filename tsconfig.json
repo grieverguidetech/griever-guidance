@@ -38,6 +38,15 @@
     },
     {
       "path": "./libs/contacts"
+    },
+    {
+      "path": "./libs/gateway-messages"
+    },
+    {
+      "path": "./libs/gateway-auth"
+    },
+    {
+      "path": "./libs/gateway-sync"
     }
   ]
 }

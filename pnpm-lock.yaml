@@ -183,30 +183,18 @@ importers:
 
   apps/gateway:
     dependencies:
-      '@fastify/autoload':
-        specifier: ~6.0.3
-        version: 6.0.3
-      '@fastify/cors':
-        specifier: ^11.2.0
-        version: 11.2.0
-      '@fastify/sensible':
-        specifier: ~6.0.2
-        version: 6.0.4
-      '@griever/shared':
+      '@griever/gateway-auth':
         specifier: workspace:*
-        version: link:../../libs/shared
-      '@griever/sms':
+        version: link:../../libs/gateway-auth
+      '@griever/gateway-messages':
         specifier: workspace:*
-        version: link:../../libs/sms
-      convex:
-        specifier: ^1.45.0
-        version: 1.45.0(react@19.2.6)
-      fastify:
-        specifier: ~5.2.1
-        version: 5.2.2
-      fastify-plugin:
-        specifier: ~5.0.1
-        version: 5.0.1
+        version: link:../../libs/gateway-messages
+      '@griever/gateway-sync':
+        specifier: workspace:*
+        version: link:../../libs/gateway-sync
+      '@hono/node-server':
+        specifier: ^2.1.1
+        version: 2.1.1(hono@4.13.7)
       hono:
         specifier: ^4.13.7
         version: 4.13.7
@@ -365,6 +353,33 @@ importers:
       fake-indexeddb:
         specifier: ^6.2.5
         version: 6.2.5
+
+  libs/gateway-auth:
+    dependencies:
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
+
+  libs/gateway-messages:
+    dependencies:
+      '@griever/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@griever/sms':
+        specifier: workspace:*
+        version: link:../sms
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
+
+  libs/gateway-sync:
+    dependencies:
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.2.6)
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
 
   libs/hooks:
     dependencies:
@@ -1979,9 +1994,6 @@ packages:
   '@fastify/autoload@6.0.3':
     resolution: {integrity: sha512-/wM2pmI7jP2fGah3YuP14i9vuaijpD4gQYLiyd+eD7gUxpA3B4R6/0QIXQS2eJaYD9aIX4ZFRzPmrZsaetfcWw==}
 
-  '@fastify/cors@11.2.0':
-    resolution: {integrity: sha512-LbLHBuSAdGdSFZYTLVA3+Ch2t+sA6nq3Ejc6XLAKiQ6ViS2qFnvicpj0htsx03FyYeLs04HfRNBsz/a8SvbcUw==}
-
   '@fastify/error@4.2.0':
     resolution: {integrity: sha512-RSo3sVDXfHskiBZKBPRgnQTtIqpi/7zhJOEmAxCiBcM7d0uwdGdxLlsCaLzGs8v8NnxIRlfG0N51p5yFaOentQ==}
 
@@ -2002,6 +2014,12 @@ packages:
 
   '@flatten-js/interval-tree@1.1.4':
     resolution: {integrity: sha512-o4emRDDvGdkwX18BSVSXH8q27qAL7Z2WDHSN75C8xyRSE4A8UOkig0mWSGoT5M5KaTHZxoLmalFwOTQmbRusUg==}
+
+  '@hono/node-server@2.1.1':
+    resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -11057,11 +11075,6 @@ snapshots:
 
   '@fastify/autoload@6.0.3': {}
 
-  '@fastify/cors@11.2.0':
-    dependencies:
-      fastify-plugin: 5.0.1
-      toad-cache: 3.7.0
-
   '@fastify/error@4.2.0': {}
 
   '@fastify/fast-json-stringify-compiler@5.0.3':
@@ -11091,6 +11104,10 @@ snapshots:
 
   '@flatten-js/interval-tree@1.1.4':
     optional: true
+
+  '@hono/node-server@2.1.1(hono@4.13.7)':
+    dependencies:
+      hono: 4.13.7
 
   '@humanfs/core@0.19.2':
     dependencies:

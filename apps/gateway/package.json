@@ -99,14 +99,10 @@
     }
   },
   "dependencies": {
-    "@fastify/autoload": "~6.0.3",
-    "@fastify/cors": "^11.2.0",
-    "@fastify/sensible": "~6.0.2",
-    "@griever/shared": "workspace:*",
-    "@griever/sms": "workspace:*",
-    "convex": "^1.45.0",
-    "fastify": "~5.2.1",
-    "fastify-plugin": "~5.0.1",
+    "@griever/gateway-auth": "workspace:*",
+    "@griever/gateway-messages": "workspace:*",
+    "@griever/gateway-sync": "workspace:*",
+    "@hono/node-server": "^2.1.1",
     "hono": "^4.13.7"
   }
 }

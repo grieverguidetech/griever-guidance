@@ -7,13 +7,15 @@
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/worker.ts", "src/app/app.workers.ts"],
   "references": [
     {
-      "path": "../../libs/sms/tsconfig.lib.json"
+      "path": "../../libs/gateway-sync/tsconfig.lib.json"
     },
     {
-      "path": "../../libs/shared/tsconfig.lib.json"
+      "path": "../../libs/gateway-messages/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/gateway-auth/tsconfig.lib.json"
     }
   ]
 }

@@ -40,24 +40,32 @@ Griever Guidance helps people who have just lost a loved one send funeral and se
 
 ```
 apps/
-  gateway/    Fastify + TypeScript REST API, port 3001. Owns routing, auth, and all access to
-              Convex — the only thing in this repo that talks to Convex directly. Also holds
-              the Convex functions themselves (apps/gateway/convex/).
+  gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
+              Composes libs/gateway-auth, libs/gateway-messages, libs/gateway-sync into one HTTP
+              surface (CORS + routing) — this app owns no domain logic itself. Also holds the
+              Convex functions (apps/gateway/convex/).
   web/        React + Vite + Tailwind. Browser send flow and account management.
   mobile/     Expo + React Native. The primary user surface — mobile-first, core RN only.
   marketing/  Astro. Public-facing site. No shared business logic.
 
 libs/
-  shared/     Source of truth for all types, interfaces, and message templates.
-              Nothing gets duplicated into apps. If it's shared, it lives here.
-  api-client/ All HTTP calls to apps/gateway. Apps never call fetch directly.
-  sms/        The only place that knows about Twilio. Currently mocked.
-  hooks/      Shared React hooks. Zero platform-specific dependencies allowed here.
-  ui-web/     Shared React + Tailwind components for web.
-  data-local/ IndexedDB-backed local storage (the screen-keyed session document, outbox,
-              contacts). Browser-only — see DATA.md.
-  data-sync/  The offline sync engine (outbox flush, cursor-based pull/push, merge) that talks
-              to apps/gateway, never to Convex directly. See DATA.md.
+  shared/           Source of truth for all types, interfaces, and message templates.
+                    Nothing gets duplicated into apps. If it's shared, it lives here.
+  api-client/       All HTTP calls to apps/gateway. Apps never call fetch directly.
+  sms/              The only place that knows about Twilio. Currently mocked.
+  hooks/            Shared React hooks. Zero platform-specific dependencies allowed here.
+  ui-web/           Shared React + Tailwind components for web.
+  data-local/       IndexedDB-backed local storage (the screen-keyed session document, outbox,
+                    contacts). Browser-only — see DATA.md.
+  data-sync/        The offline sync engine (outbox flush, cursor-based pull/push, merge) that
+                    talks to apps/gateway, never to Convex directly. See DATA.md.
+  gateway-auth/     Account creation/sign-in routes (Google, Facebook, X, email) — currently a
+                    placeholder, no routes yet; this task is paused.
+  gateway-messages/ Send/templates/history/obituary routes — the SMS-sending domain.
+  gateway-sync/     The gateway's Convex client and the /sync/pull, /sync/push routes.
+
+  Each gateway-* lib owns its own Hono router and business logic, with no cross-imports between
+  them — apps/gateway only composes their routers together (CLAUDE.md rule 2b).
 ```
 
 ---
@@ -68,7 +76,7 @@ libs/
 |---|---|
 | Mobile | Expo + React Native (core components only) |
 | Web | React + Vite + Tailwind |
-| Gateway | Fastify + TypeScript, fronting Convex |
+| Gateway | Hono on Cloudflare Workers, fronting Convex |
 | Data | Convex — self-hosted via Docker locally, Convex Cloud in production (see infra/convex/README.md) |
 | Marketing | Astro |
 | Package manager | pnpm — never npm or yarn |
@@ -79,7 +87,7 @@ libs/
 ## Running the project
 
 ```sh
-pnpm dev:gateway    # Fastify on port 3001
+pnpm dev:gateway    # Hono via @hono/node-server, port 3001
 pnpm dev:web        # Vite on port 5173
 pnpm dev:mobile     # Expo
 pnpm dev:marketing  # Astro
@@ -101,6 +109,9 @@ Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app 
 
 **2a. The gateway is the only thing that talks to Convex.**
 `apps/web` (via `libs/data-sync`) calls `apps/gateway`'s REST endpoints, never Convex directly — no Convex client, URL, or credentials in `apps/web`. This is what makes rule 2 true for sync, not just for `/send`/`/history`/etc.
+
+**2b. Auth, messages, and sync are separate libs — no cross-imports.**
+`libs/gateway-auth`, `libs/gateway-messages`, and `libs/gateway-sync` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and one gateway-* lib never imports another.
 
 **3. Twilio is isolated to libs/sms.**
 The API calls `libs/sms`. Nothing else does. When real Twilio credentials are wired in, only `libs/sms` changes. The mock logs to console and returns a fake SID — that's intentional.
@@ -144,12 +155,16 @@ a name or number. Message content is never stored — only rendered at send time
 ## Environment variables
 
 ```
-apps/gateway  PORT, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, ANTHROPIC_API_KEY,
-              CONVEX_SELF_HOSTED_URL, CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL  (local dev)
-              CONVEX_DEPLOY_KEY, CONVEX_URL                                          (CI/prod only)
+apps/gateway  PORT, CORS_ORIGINS, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER,
+              ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL, CONVEX_SELF_HOSTED_ADMIN_KEY,
+              CONVEX_SITE_URL                                                        (local dev)
+              CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                            (CI/prod only)
 apps/web      VITE_API_URL
 apps/mobile   EXPO_PUBLIC_API_URL
 ```
+
+`CORS_ORIGINS` is comma-separated allowed origins — there is no "allow all" mode; an empty value
+blocks every cross-origin request (see `apps/gateway/src/worker.ts`).
 
 Never hardcode these. Never commit `.env` files.
 
@@ -169,7 +184,8 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No contact data stored anywhere — not the DB, not state, not logs
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
-- No Fastify routes without schema validation
+- No gateway routes without request body/query validation
+- No cross-imports between `libs/gateway-auth`, `libs/gateway-messages`, and `libs/gateway-sync`
 
 ---
 
