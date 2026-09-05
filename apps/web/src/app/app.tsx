@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount, useContacts, useSessions, freshDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
-import type { AuthProvider, Contact, MomentKey, SessionDetails } from '@griever/shared';
+import type { AuthProvider, MomentKey, SessionDetails } from '@griever/shared';
+import { contactStore } from '@griever/data-local';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { AddContactsManual } from '../screens/AddContactsManual';
@@ -44,8 +45,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export function App() {
   const account = useAccount(browserStorage);
-  const contacts = useContacts(browserStorage);
+  const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
+  const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
 
   const [view, setView] = useState<AppView>(() => (account.hasAccount ? 'pathLanding' : 'signup'));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -199,8 +201,8 @@ export function App() {
         <AddContactsManual
           contacts={contacts.contacts}
           onBack={() => setView('createAccount')}
-          onAdd={({ name, phoneNumber, hearsFirst }) =>
-            contacts.addContact({ name, phoneNumber, tier: hearsFirst ? 'first' : 'family' })
+          onAdd={({ name, phone, hearsFirst }) =>
+            contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
           onDone={() => setView('whoHearsFirst')}
         />
@@ -212,9 +214,11 @@ export function App() {
     return (
       <Shell>
         <ImportContacts
+          storedPhones={storedPhones}
           onBack={() => setView('signup')}
-          onContinue={(picked: Contact[]) => {
-            contacts.importContacts(picked);
+          onSwitchToManual={() => setView('addContactsManual')}
+          onContinue={(picked, source) => {
+            contacts.importContacts(picked, source);
             setView('whoHearsFirst');
           }}
         />
@@ -233,7 +237,7 @@ export function App() {
           onSave={(firstIds) => {
             const firstSet = new Set(firstIds);
             for (const c of contacts.contacts) {
-              contacts.setTier(c.id, firstSet.has(c.id) ? 'first' : 'family');
+              contacts.setTier(c.contactId, firstSet.has(c.contactId) ? 'first' : 'family');
             }
             startNewSession();
           }}
@@ -343,7 +347,7 @@ export function App() {
           key={active.id}
           session={activeDetails}
           draft={active.draft}
-          contacts={contacts.contactsWithMobile}
+          contacts={contacts.contacts}
           notifiedContactIds={active.recipientsNotified.announcement ?? []}
           onDraftChange={onDraftChange}
           onExitToLanding={goToPathLanding}
@@ -352,6 +356,7 @@ export function App() {
             setView('setup');
           }}
           onViewHistory={() => setView('history')}
+          onAddContact={({ name, phone }) => contacts.addContact({ name, phone, tier: 'family' })}
         />
       </Shell>
     );

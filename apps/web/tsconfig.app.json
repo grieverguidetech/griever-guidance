@@ -42,6 +42,9 @@
       "path": "../../libs/data-local/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/contacts/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/api-client/tsconfig.lib.json"
     }
   ]

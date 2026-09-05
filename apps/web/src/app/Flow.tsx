@@ -20,6 +20,7 @@ interface Props {
   onExitToLanding: () => void;
   onEditSession: () => void;
   onViewHistory: () => void;
+  onAddContact: (input: { name: string; phone: string }) => Promise<Contact>;
 }
 
 export function Flow({
@@ -31,6 +32,7 @@ export function Flow({
   onExitToLanding,
   onEditSession,
   onViewHistory,
+  onAddContact,
 }: Props) {
   const flow = useSendFlow({ session, draft, onDraftChange });
   const grouped = flow.templateCategory === 'announcement';
@@ -54,7 +56,7 @@ export function Flow({
       return flow.templateCategory === 'obituary' ? (
         <WideningCircle flow={flow} contacts={contacts} notifiedContactIds={notifiedContactIds} />
       ) : (
-        <ContactSelector flow={flow} contacts={contacts} grouped={grouped} />
+        <ContactSelector flow={flow} contacts={contacts} grouped={grouped} onAddContact={onAddContact} />
       );
     case 'review':
       return <ConfirmScreen flow={flow} contacts={contacts} />;

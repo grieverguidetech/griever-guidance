@@ -4,11 +4,19 @@ export type TemplateCategory = 'announcement' | 'service' | 'aftercare' | 'obitu
 
 export type MessageTone = 'plain' | 'softer';
 
-export type ContactGroup = 'family' | 'friends';
-
 export type AuthProvider = 'google' | 'facebook' | 'x' | 'password';
 
-export type ContactSource = 'import' | 'manual';
+/** How the account primarily got its contacts — drives D1's onboarding branch, nothing more. */
+export type AccountContactSource = 'import' | 'manual';
+
+/**
+ * Which adapter fetched one particular contact (tasks/03-contacts.md §3) —
+ * distinct from `AccountContactSource` above, which is an account-wide
+ * classification, not per-contact. "google" stays in this union so the
+ * interface is complete even while the adapter itself is deferred (no
+ * Google auth yet) — see `libs/contacts`.
+ */
+export type ContactRecordSource = 'google' | 'device-picker' | 'native' | 'manual';
 
 /** The only user-assigned grouping — who hears first vs. everyone else (D5). */
 export type ContactTier = 'first' | 'family';
@@ -32,7 +40,7 @@ export interface Moment {
 export interface Account {
   authProvider: AuthProvider;
   /** Derived from `authProvider`: social sign-in imports contacts, email means manual entry. */
-  contactSource: ContactSource;
+  contactSource: AccountContactSource;
   email: string;
   /** Never gates use of the app — confirmation is asynchronous and optional. */
   emailVerified: boolean;
@@ -87,20 +95,29 @@ export interface Template {
   renderMessage(fields: Record<string, string>): string;
 }
 
+/**
+ * What's written to IndexedDB once a contact is chosen — the whole of it
+ * (tasks/03-contacts.md §3). Deliberately narrow: no providerId, photoUrl,
+ * labels, raw payload, or provider `updatedAt`. If a future feature needs a
+ * dropped field, it re-imports; it does not get a wider table.
+ *
+ * Note the intentional absence of `providerLabels` (an earlier draft's
+ * field): B3/C5's richer groupings ("Her church", "Extended family") cannot
+ * be derived from data this app no longer holds. Those sections fall back to
+ * `tier` alone unless the product owner decides the labels are worth
+ * storing — don't quietly re-add the field.
+ */
 export interface Contact {
-  id: string;
+  contactId: string;
   name: string;
-  phoneNumber: string;
-  selected: boolean;
-  /** The only user-assigned grouping (D3/D5); undefined behaves as 'family'. */
-  tier?: ContactTier;
-  source?: ContactSource;
-  /**
-   * Imported provider metadata (e.g. ['Extended family'], ['Her church']) —
-   * never a taxonomy the user builds. Used to render richer sections in
-   * B3/C5 when available; falls back to `tier` grouping otherwise.
-   */
-  providerLabels?: string[];
+  /** E.164, required. */
+  phone: string;
+  /** Optional — the app sends SMS; this is only a fallback for reaching them. */
+  email: string | null;
+  /** The only user-assigned grouping (D5). */
+  tier: ContactTier;
+  source: ContactRecordSource;
+  createdAt: number;
 }
 
 export interface User {

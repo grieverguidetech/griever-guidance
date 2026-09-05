@@ -12,7 +12,7 @@ interface Props {
 
 export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
   const [firstIds, setFirstIds] = useState<Set<string>>(
-    () => new Set(contacts.filter((c) => c.tier === 'first').map((c) => c.id)),
+    () => new Set(contacts.filter((c) => c.tier === 'first').map((c) => c.contactId)),
   );
 
   function toggle(id: string) {
@@ -36,14 +36,14 @@ export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
 
       <div className="flex flex-col gap-3">
         {contacts.map((contact) => {
-          const checked = firstIds.has(contact.id);
+          const checked = firstIds.has(contact.contactId);
           return (
             <label
-              key={contact.id}
+              key={contact.contactId}
               className="flex items-center gap-3 cursor-pointer"
               onClick={(e) => {
                 e.preventDefault();
-                toggle(contact.id);
+                toggle(contact.contactId);
               }}
             >
               {checked ? (
@@ -53,7 +53,7 @@ export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
               )}
               <div>
                 <div className="text-[14px]">{contact.name}</div>
-                <div className="gg-card-meta">{formatPhone(contact.phoneNumber)}</div>
+                <div className="gg-card-meta">{formatPhone(contact.phone)}</div>
               </div>
             </label>
           );

@@ -25,7 +25,7 @@ export function SendingScreen({ flow, contacts }: Props) {
 
   const total = sendJob.recipients.length;
   const delivered = sendJob.recipients.filter((r) => r.status === 'delivered').length;
-  const nameFor = (id: string) => contacts.find((c) => c.id === id)?.name ?? 'Recipient';
+  const nameFor = (id: string) => contacts.find((c) => c.contactId === id)?.name ?? 'Recipient';
 
   return (
     <div className="flex flex-col gap-4 pt-8">

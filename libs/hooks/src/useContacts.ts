@@ -1,86 +1,127 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Contact, ContactTier } from '@griever/shared';
-import { MOCK_CONTACTS } from './useMockContacts.js';
-import type { SendFlowStorage } from './useSendFlow.js';
+import { useCallback, useEffect, useState } from 'react';
+import type { Contact, ContactRecordSource, ContactTier } from '@griever/shared';
 
 export interface NewManualContact {
   name: string;
-  phoneNumber: string;
+  /** Already normalized to E.164 — the screen owns validation before calling this. */
+  phone: string;
   tier: ContactTier;
+}
+
+export interface PickedContact {
+  name: string;
+  /** Already normalized to E.164 (see `@griever/contacts`'s `normalizeFetchedContact`). */
+  phone: string;
+  email: string | null;
+  tier: ContactTier;
+}
+
+/**
+ * The persisted half of the contacts architecture (tasks/03-contacts.md §3) —
+ * a thin async interface so this hook stays platform-agnostic (CLAUDE.md rule 4)
+ * while the real backing store (`@griever/data-local`'s `contactStore`, IndexedDB)
+ * lives only in `apps/web`. Undefined `store` keeps contacts in memory only, for
+ * callers (mobile's mock screens) that haven't wired persistence yet.
+ */
+export interface ContactStore {
+  list(): Promise<Contact[]>;
+  put(contact: Contact): Promise<void>;
+  putMany(contacts: Contact[]): Promise<void>;
+  delete(contactId: string): Promise<void>;
 }
 
 export interface UseContactsResult {
   /** The full roster. Empty until an account has added or imported people. */
   contacts: Contact[];
-  /** The filter every picker needs — "we can only send a text" (D4). */
-  contactsWithMobile: Contact[];
-  addContact: (input: NewManualContact) => void;
-  importContacts: (picked: Contact[]) => void;
-  setTier: (id: string, tier: ContactTier) => void;
+  /** True until the initial load from `store` resolves. */
+  loading: boolean;
+  addContact: (input: NewManualContact) => Promise<Contact>;
+  /** D4's "confirm, then commit" — one call, one write, per contact picked. */
+  importContacts: (picked: PickedContact[], source: ContactRecordSource) => Promise<Contact[]>;
+  setTier: (contactId: string, tier: ContactTier) => void;
+  removeContact: (contactId: string) => void;
 }
 
-const STORAGE_KEY = 'gg.contacts.v1';
-
-function load(storage: SendFlowStorage | undefined): Contact[] {
-  if (!storage) return [];
-  try {
-    const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Contact[]) : [];
-  } catch {
-    return [];
-  }
+function newContactId(): string {
+  return `ct_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function save(storage: SendFlowStorage | undefined, contacts: Contact[]): void {
-  if (!storage) return;
-  try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(contacts));
-  } catch {
-    // storage unavailable — contacts still work for this tab's lifetime
-  }
-}
-
-function newId(): string {
-  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-export function useContacts(storage?: SendFlowStorage): UseContactsResult {
-  const [contacts, setContacts] = useState<Contact[]>(() => load(storage));
+export function useContacts(store?: ContactStore): UseContactsResult {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    save(storage, contacts);
-  }, [storage, contacts]);
-
-  const addContact = useCallback(({ name, phoneNumber, tier }: NewManualContact) => {
-    setContacts((list) => [
-      ...list,
-      { id: newId(), name, phoneNumber, selected: false, tier, source: 'manual' },
-    ]);
-  }, []);
-
-  const importContacts = useCallback((picked: Contact[]) => {
-    setContacts((list) => {
-      const existingIds = new Set(list.map((c) => c.id));
-      const additions = picked
-        .filter((c) => !existingIds.has(c.id))
-        .map((c) => ({ ...c, source: 'import' as const }));
-      return [...list, ...additions];
+    let cancelled = false;
+    if (!store) {
+      setLoading(false);
+      return;
+    }
+    store.list().then((loaded) => {
+      if (!cancelled) {
+        setContacts(loaded);
+        setLoading(false);
+      }
     });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
 
-  const setTier = useCallback((id: string, tier: ContactTier) => {
-    setContacts((list) => list.map((c) => (c.id === id ? { ...c, tier } : c)));
-  }, []);
-
-  const contactsWithMobile = useMemo(
-    () => contacts.filter((c) => c.phoneNumber.trim() !== ''),
-    [contacts],
+  const addContact = useCallback(
+    async ({ name, phone, tier }: NewManualContact) => {
+      const contact: Contact = {
+        contactId: newContactId(),
+        name,
+        phone,
+        email: null,
+        tier,
+        source: 'manual',
+        createdAt: Date.now(),
+      };
+      setContacts((list) => [...list, contact]);
+      await store?.put(contact);
+      return contact;
+    },
+    [store],
   );
 
-  return { contacts, contactsWithMobile, addContact, importContacts, setTier };
-}
+  const importContacts = useCallback(
+    async (picked: PickedContact[], source: ContactRecordSource) => {
+      const created: Contact[] = picked.map((p) => ({
+        contactId: newContactId(),
+        name: p.name,
+        phone: p.phone,
+        email: p.email,
+        tier: p.tier,
+        source,
+        createdAt: Date.now(),
+      }));
+      setContacts((list) => [...list, ...created]);
+      await store?.putMany(created);
+      return created;
+    },
+    [store],
+  );
 
-/** Seed data for a fresh manual-entry roster (see `useMockContacts`). */
-export const CONTACT_SEED = MOCK_CONTACTS;
+  const setTier = useCallback(
+    (contactId: string, tier: ContactTier) => {
+      setContacts((list) => {
+        const next = list.map((c) => (c.contactId === contactId ? { ...c, tier } : c));
+        const updated = next.find((c) => c.contactId === contactId);
+        if (updated) void store?.put(updated);
+        return next;
+      });
+    },
+    [store],
+  );
+
+  const removeContact = useCallback(
+    (contactId: string) => {
+      setContacts((list) => list.filter((c) => c.contactId !== contactId));
+      void store?.delete(contactId);
+    },
+    [store],
+  );
+
+  return { contacts, loading, addContact, importContacts, setTier, removeContact };
+}

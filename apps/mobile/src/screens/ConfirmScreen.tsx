@@ -23,8 +23,8 @@ export function ConfirmScreen({ flow }: FlowProps) {
         userId: 'local-device',
         templateId: selectedTemplate!.id,
         contacts: contacts
-          .filter((c) => selectedContactIds.includes(c.id))
-          .map((c) => c.phoneNumber),
+          .filter((c) => selectedContactIds.includes(c.contactId))
+          .map((c) => c.phone),
         fields: composedFields,
       });
       nextStep();

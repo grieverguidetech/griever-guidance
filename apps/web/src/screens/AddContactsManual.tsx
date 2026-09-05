@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Contact } from '@griever/shared';
+import { detectDeviceRegion, toE164 } from '@griever/contacts';
 import { CheckCircle, Circle, Plus } from '@phosphor-icons/react';
 import { BackButton } from '../lib/ui';
 import { formatPhone } from '../lib/format';
@@ -7,22 +8,29 @@ import { formatPhone } from '../lib/format';
 interface Props {
   contacts: Contact[];
   onBack: () => void;
-  onAdd: (input: { name: string; phoneNumber: string; hearsFirst: boolean }) => void;
+  onAdd: (input: { name: string; phone: string; hearsFirst: boolean }) => void;
   onDone: () => void;
 }
 
 export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
   const [name, setName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
   const [hearsFirst, setHearsFirst] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canAdd = name.trim() !== '' && phoneNumber.trim() !== '';
+  const canAdd = name.trim() !== '' && phoneInput.trim() !== '';
 
   function handleAdd() {
     if (!canAdd) return;
-    onAdd({ name: name.trim(), phoneNumber: phoneNumber.trim(), hearsFirst });
+    const phone = toE164(phoneInput, detectDeviceRegion());
+    if (!phone) {
+      setError("That number doesn't look right — check the area code and digits.");
+      return;
+    }
+    setError(null);
+    onAdd({ name: name.trim(), phone, hearsFirst });
     setName('');
-    setPhoneNumber('');
+    setPhoneInput('');
     setHearsFirst(false);
   }
 
@@ -55,9 +63,17 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
           className="gg-input"
           type="tel"
           placeholder="(617) 555-0148"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          value={phoneInput}
+          onChange={(e) => {
+            setPhoneInput(e.target.value);
+            setError(null);
+          }}
         />
+        {error && (
+          <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+            {error}
+          </p>
+        )}
       </div>
 
       <label
@@ -89,10 +105,10 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
         <div className="flex flex-col gap-2 pt-2">
           <p className="gg-eyebrow m-0">Added so far — {contacts.length}</p>
           {contacts.map((c) => (
-            <div key={c.id} className="flex items-center justify-between">
+            <div key={c.contactId} className="flex items-center justify-between">
               <div>
                 <div className="text-[14px]">{c.name}</div>
-                <div className="gg-card-meta">{formatPhone(c.phoneNumber)}</div>
+                <div className="gg-card-meta">{formatPhone(c.phone)}</div>
               </div>
               <span className={`gg-tag ${c.tier === 'first' ? 'gg-tag-accent' : 'gg-tag-neutral'}`}>
                 {c.tier === 'first' ? 'Hears first' : 'Friends & family'}

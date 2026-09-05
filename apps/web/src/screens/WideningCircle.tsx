@@ -26,12 +26,10 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
   const notified = new Set(notifiedContactIds);
 
   const sections = useMemo<Section[]>(() => {
-    const eligible = contacts.filter((c) => !notified.has(c.id));
+    const eligible = contacts.filter((c) => !notified.has(c.contactId));
     const byLabel = new Map<string, Contact[]>();
     for (const contact of eligible) {
-      const label =
-        contact.providerLabels?.[0] ??
-        (contact.tier === 'first' ? 'Close family' : 'Friends & family');
+      const label = contact.tier === 'first' ? 'Close family' : 'Friends & family';
       const list = byLabel.get(label) ?? [];
       list.push(contact);
       byLabel.set(label, list);
@@ -68,7 +66,7 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
             <p className="gg-eyebrow m-0">{section.label}</p>
             <button
               type="button"
-              onClick={() => selectContacts(section.items.map((c) => c.id))}
+              onClick={() => selectContacts(section.items.map((c) => c.contactId))}
               className="gg-btn gg-btn-ghost !min-h-0 !py-0 !px-0 text-[12px]"
             >
               Select all
@@ -76,10 +74,10 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
           </div>
           {section.items.map((contact) => (
             <ContactRow
-              key={contact.id}
+              key={contact.contactId}
               contact={contact}
-              selected={selected.has(contact.id)}
-              onToggle={() => toggleContact(contact.id)}
+              selected={selected.has(contact.contactId)}
+              onToggle={() => toggleContact(contact.contactId)}
             />
           ))}
         </div>

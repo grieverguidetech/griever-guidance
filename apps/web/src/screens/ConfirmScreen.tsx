@@ -39,8 +39,8 @@ export function ConfirmScreen({ flow, contacts }: Props) {
     setError(null);
     try {
       const phoneNumbers = contacts
-        .filter((c) => flow.selectedContactIds.includes(c.id))
-        .map((c) => c.phoneNumber);
+        .filter((c) => flow.selectedContactIds.includes(c.contactId))
+        .map((c) => c.phone);
       await createSendEvent({
         userId: LOCAL_USER_ID,
         templateId: flow.selectedTemplate!.id,

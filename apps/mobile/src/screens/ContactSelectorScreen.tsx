@@ -10,16 +10,16 @@ export function ContactSelectorScreen({ flow }: FlowProps) {
   const selectedIds = new Set(selectedContactIds);
 
   function renderContact({ item }: { item: Contact }) {
-    const selected = selectedIds.has(item.id);
+    const selected = selectedIds.has(item.contactId);
     return (
       <TouchableOpacity
         style={[styles.row, selected && styles.rowSelected]}
-        onPress={() => toggleContact(item.id)}
+        onPress={() => toggleContact(item.contactId)}
         activeOpacity={0.7}
       >
         <View style={styles.rowInfo}>
           <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.phone}>{item.phoneNumber}</Text>
+          <Text style={styles.phone}>{item.phone}</Text>
         </View>
         <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
           {selected && <Text style={styles.checkmark}>✓</Text>}
@@ -39,7 +39,7 @@ export function ContactSelectorScreen({ flow }: FlowProps) {
       </View>
       <FlatList
         data={contacts}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.contactId}
         renderItem={renderContact}
         contentContainerStyle={styles.list}
       />

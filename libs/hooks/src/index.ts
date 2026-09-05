@@ -5,6 +5,5 @@ export * from './usePathMoments.js';
 export * from './useAccount.js';
 export * from './useContacts.js';
 export * from './useMockContacts.js';
-export * from './useMockProviderContacts.js';
 export * from './useMockPlaces.js';
 export * from './useMockFlorists.js';

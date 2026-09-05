@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from "idb";
-import type { SessionDocument } from "@griever/shared";
+import type { Contact, SessionDocument } from "@griever/shared";
 
 /** DATA.md §1 — the outbox op the client appends before applying any local change. */
 export interface OutboxOp {
@@ -19,16 +19,6 @@ export interface OutboxOp {
   baseUpdatedAt: number;
   createdAt: number;
   attempts: number;
-}
-
-/** A local contact — the account-level roster that never leaves the device (DATA.md §5). */
-export interface LocalContact {
-  contactId: string;
-  name: string;
-  phoneNumber: string;
-  tier: "first" | "family";
-  source: "import" | "manual";
-  providerLabels?: string[];
 }
 
 /** DATA.md §1's `sendJobs` store — ephemeral per-send delivery progress, never synced. */
@@ -68,7 +58,7 @@ interface GGSchema extends DBSchema {
   };
   contacts: {
     key: string; // contactId
-    value: LocalContact;
+    value: Contact;
     indexes: { byTier: string; bySource: string };
   };
   outbox: {

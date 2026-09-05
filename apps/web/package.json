@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@griever/api-client": "workspace:*",
+    "@griever/contacts": "workspace:*",
     "@griever/data-local": "workspace:*",
     "@griever/data-sync": "workspace:*",
     "@griever/hooks": "workspace:*",

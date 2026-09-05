@@ -48,10 +48,15 @@ export async function swapToSession(
 /**
  * A pulled session may only become resident on a device that can resolve its
  * recipients (DATA.md §2's "a device with no contacts does not restore a
- * session"). This assumes contact ids are, or resolve to, normalized E.164
- * numbers — consistent with §5 (contacts never send a name or number to the
- * server) but the exact id scheme is one of §8's still-open questions, not
- * settled here.
+ * session"). Now confirmed broken as written: tasks/03-contacts.md §3 makes
+ * `contactId` a local ULID — "nothing provider-shaped is retained" — so it
+ * cannot match across devices at all, which contradicts DATA.md §8.4's
+ * framing of this as an E.164-number-drift problem. As it stands, a session
+ * pulled onto a second device with the *same* contacts re-imported (fresh
+ * ids) will never resolve as openable by this function. Cross-device
+ * recipient matching needs its own resolution — out of scope here — this
+ * function is left correct for same-device continuity only until that
+ * lands; do not paper over it with fuzzy matching.
  */
 export function isSessionOpenable(
   row: Pick<RemoteSessionRow, "screens">,

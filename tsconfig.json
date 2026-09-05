@@ -35,6 +35,9 @@
     },
     {
       "path": "./libs/data-sync"
+    },
+    {
+      "path": "./libs/contacts"
     }
   ]
 }
