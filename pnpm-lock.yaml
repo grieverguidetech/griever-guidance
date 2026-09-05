@@ -198,6 +198,10 @@ importers:
       hono:
         specifier: ^4.13.7
         version: 4.13.7
+    devDependencies:
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.2.6)
 
   apps/marketing:
     dependencies:
