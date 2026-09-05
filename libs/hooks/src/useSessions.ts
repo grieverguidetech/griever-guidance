@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SessionDetails } from '@griever/shared';
+import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
+
+export interface ReminderEntry {
+  momentKey: MomentKey;
+  dueAt: string;
+  dismissed: boolean;
+}
 
 /**
  * A session is keyed to one person the griever has lost. Their details are
@@ -13,6 +19,16 @@ export interface Session extends SessionDetails {
   lastOpenedAt: string;
   /** Persisted wizard state; `null` once nothing is in progress. */
   draft: SendFlowDraft | null;
+  /** Set by the C2 gate's "Yes, we've set a date" choice. */
+  serviceReady: boolean;
+  /**
+   * Contact IDs already messaged per moment — the source of both "done" status
+   * and C5's dedup ("nobody gets this twice"). Lives only here, client-local,
+   * never sent to the API: contact identities are never persisted to the DB.
+   */
+  recipientsNotified: Partial<Record<TemplateCategory, string[]>>;
+  momentCompletedAt: Partial<Record<MomentKey, string>>;
+  remindersScheduled: ReminderEntry[];
 }
 
 export interface UseSessionsResult {
@@ -24,6 +40,10 @@ export interface UseSessionsResult {
   touchSession: (id: string) => void;
   deleteSession: (id: string) => void;
   pruneEmpty: () => void;
+  setServiceReady: (id: string, ready: boolean) => void;
+  scheduleReminder: (id: string, momentKey: MomentKey, dueAt: string) => void;
+  /** Marks a moment done and records who was notified, for dedup. */
+  recordMomentComplete: (id: string, category: TemplateCategory, contactIds: string[]) => void;
 }
 
 const STORAGE_KEY = 'gg.sessions.v1';
@@ -53,6 +73,13 @@ function newId(): string {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
+  announcement: 'announce',
+  service: 'service',
+  obituary: 'obituary',
+  aftercare: 'thanks',
+};
+
 export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));
 
@@ -72,6 +99,10 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
       createdAt: now,
       lastOpenedAt: now,
       draft: null,
+      serviceReady: false,
+      recipientsNotified: {},
+      momentCompletedAt: {},
+      remindersScheduled: [],
     };
     setSessions((list) => [session, ...list]);
     return session;
@@ -111,6 +142,54 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     );
   }, []);
 
+  const setServiceReady = useCallback((id: string, ready: boolean) => {
+    setSessions((list) =>
+      list.map((s) => (s.id === id ? { ...s, serviceReady: ready } : s)),
+    );
+  }, []);
+
+  const scheduleReminder = useCallback(
+    (id: string, momentKey: MomentKey, dueAt: string) => {
+      setSessions((list) =>
+        list.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                remindersScheduled: [
+                  ...s.remindersScheduled.filter((r) => r.momentKey !== momentKey),
+                  { momentKey, dueAt, dismissed: false },
+                ],
+              }
+            : s,
+        ),
+      );
+    },
+    [],
+  );
+
+  const recordMomentComplete = useCallback(
+    (id: string, category: TemplateCategory, contactIds: string[]) => {
+      setSessions((list) =>
+        list.map((s) => {
+          if (s.id !== id) return s;
+          const momentKey = MOMENT_KEY_BY_CATEGORY[category];
+          if (!momentKey) return s;
+          const already = s.recipientsNotified[category] ?? [];
+          const notified = Array.from(new Set([...already, ...contactIds]));
+          return {
+            ...s,
+            recipientsNotified: { ...s.recipientsNotified, [category]: notified },
+            momentCompletedAt: {
+              ...s.momentCompletedAt,
+              [momentKey]: s.momentCompletedAt[momentKey] ?? new Date().toISOString(),
+            },
+          };
+        }),
+      );
+    },
+    [],
+  );
+
   const inProgressSessions = useMemo(
     () =>
       sessions
@@ -132,5 +211,8 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     touchSession,
     deleteSession,
     pruneEmpty,
+    setServiceReady,
+    scheduleReminder,
+    recordMomentComplete,
   };
 }

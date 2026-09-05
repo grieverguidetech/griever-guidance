@@ -1,18 +1,18 @@
 import { useEffect } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { useMockContacts } from '@griever/hooks';
+import type { Contact } from '@griever/shared';
 import { CheckCircle, CircleDashed } from '@phosphor-icons/react';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
+  contacts: Contact[];
 }
 
 const TICK_MS = 700;
 
-export function SendingScreen({ flow }: Props) {
-  const contacts = useMockContacts();
+export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, tickSendJob } = flow;
 
   useEffect(() => {

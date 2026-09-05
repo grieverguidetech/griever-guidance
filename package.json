@@ -7,7 +7,11 @@
     "dev:web": "pnpm nx serve web",
     "dev:mobile": "pnpm nx start mobile",
     "dev:marketing": "pnpm nx serve marketing",
-    "dev": "concurrently --names api,web --prefix-colors magenta,cyan \"pnpm dev:api\" \"pnpm dev:web\""
+    "dev": "concurrently --names api,web --prefix-colors magenta,cyan \"pnpm dev:api\" \"pnpm dev:web\"",
+    "convex:up": "docker compose -f infra/convex/docker-compose.yml up -d",
+    "convex:dev": "cd apps/web && npx convex dev",
+    "convex:reset": "docker compose -f infra/convex/docker-compose.yml down -v",
+    "convex:deploy": "node scripts/check-dev-auth.mjs && cd apps/web && npx convex deploy"
   },
   "private": true,
   "devDependencies": {
@@ -48,6 +52,7 @@
     "tailwindcss": "^4.2.4",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
+    "fake-indexeddb": "^6.2.5",
     "vite": "^8.0.0",
     "vitest": "~4.1.0",
     "wrangler": "^4.90.0"

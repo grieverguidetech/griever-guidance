@@ -1,11 +1,12 @@
 import { useSendFlow } from '@griever/hooks';
 import type { SendFlowDraft } from '@griever/hooks';
-import type { SessionDetails } from '@griever/shared';
+import type { Contact, SessionDetails } from '@griever/shared';
 import { TemplatePicker } from '../screens/TemplatePicker';
 import { AnnounceForm } from '../screens/AnnounceForm';
 import { ServiceKnownScreen } from '../screens/ServiceKnownScreen';
 import { DetailsForm } from '../screens/DetailsForm';
 import { ContactSelector } from '../screens/ContactSelector';
+import { WideningCircle } from '../screens/WideningCircle';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { SentScreen } from '../screens/SentScreen';
@@ -13,6 +14,8 @@ import { SentScreen } from '../screens/SentScreen';
 interface Props {
   session: SessionDetails;
   draft: SendFlowDraft | null;
+  contacts: Contact[];
+  notifiedContactIds: string[];
   onDraftChange: (draft: SendFlowDraft) => void;
   onExitToLanding: () => void;
   onEditSession: () => void;
@@ -22,6 +25,8 @@ interface Props {
 export function Flow({
   session,
   draft,
+  contacts,
+  notifiedContactIds,
   onDraftChange,
   onExitToLanding,
   onEditSession,
@@ -46,11 +51,15 @@ export function Flow({
     case 'details':
       return <DetailsForm flow={flow} />;
     case 'contacts':
-      return <ContactSelector flow={flow} grouped={grouped} />;
+      return flow.templateCategory === 'obituary' ? (
+        <WideningCircle flow={flow} contacts={contacts} notifiedContactIds={notifiedContactIds} />
+      ) : (
+        <ContactSelector flow={flow} contacts={contacts} grouped={grouped} />
+      );
     case 'review':
-      return <ConfirmScreen flow={flow} />;
+      return <ConfirmScreen flow={flow} contacts={contacts} />;
     case 'sending':
-      return <SendingScreen flow={flow} />;
+      return <SendingScreen flow={flow} contacts={contacts} />;
     case 'sent':
       return <SentScreen flow={flow} onViewHistory={onViewHistory} />;
     default:

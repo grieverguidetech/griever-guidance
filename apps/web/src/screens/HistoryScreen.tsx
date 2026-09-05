@@ -57,11 +57,11 @@ export function HistoryScreen({ onBack }: Props) {
       <div className="flex flex-col gap-2">
         {events.map((event) => {
           const category = categoryFor(event.templateId);
-          const isAnnouncement = category === 'announcement';
+          const isMagenta = category === 'announcement' || category === 'obituary';
           return (
             <div key={event.id} className="gg-card">
               <span
-                className={`gg-tag ${isAnnouncement ? 'gg-tag-accent-2' : 'gg-tag-accent'}`}
+                className={`gg-tag ${isMagenta ? 'gg-tag-accent-2' : 'gg-tag-accent'}`}
               >
                 {historyTagLabel(category)}
               </span>

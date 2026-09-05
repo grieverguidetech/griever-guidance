@@ -71,3 +71,6 @@ web-build/
 cache/
 
 .cursorindexingignore
+STUFF
+DATA.md
+design_specs

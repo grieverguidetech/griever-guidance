@@ -1,10 +1,43 @@
 export type SendStatus = 'pending' | 'sent' | 'failed';
 
-export type TemplateCategory = 'announcement' | 'service' | 'aftercare';
+export type TemplateCategory = 'announcement' | 'service' | 'aftercare' | 'obituary';
 
 export type MessageTone = 'plain' | 'softer';
 
 export type ContactGroup = 'family' | 'friends';
+
+export type AuthProvider = 'google' | 'facebook' | 'x' | 'password';
+
+export type ContactSource = 'import' | 'manual';
+
+/** The only user-assigned grouping — who hears first vs. everyone else (D5). */
+export type ContactTier = 'first' | 'family';
+
+/** The four fixed moments in the real-world funeral-planning order (C1). */
+export type MomentKey = 'announce' | 'service' | 'obituary' | 'thanks';
+
+export type MomentStatus = 'done' | 'next' | 'later';
+
+export interface Moment {
+  key: MomentKey;
+  status: MomentStatus;
+  completedAt?: string;
+  recipientCount?: number;
+}
+
+/**
+ * The signed-in griever's account. Sign-in is mocked (see D1/D2) — no real
+ * OAuth or password storage, matching the rest of this app's mocked backends.
+ */
+export interface Account {
+  authProvider: AuthProvider;
+  /** Derived from `authProvider`: social sign-in imports contacts, email means manual entry. */
+  contactSource: ContactSource;
+  email: string;
+  /** Never gates use of the app — confirmation is asynchronous and optional. */
+  emailVerified: boolean;
+  senderName: string;
+}
 
 /** A place chosen from the (mocked) address typeahead in the details form. */
 export interface Place {
@@ -34,6 +67,8 @@ export interface SessionDetails {
   dateOfPassing: string;
   senderName: string;
   obituaryUrl: string;
+  /** Optional — e.g. "The Waltham Register" (C4). */
+  obituaryPublisher?: string;
 }
 
 export interface TemplateField {
@@ -57,8 +92,15 @@ export interface Contact {
   name: string;
   phoneNumber: string;
   selected: boolean;
-  /** Circle the contact belongs to; undefined contacts fall into "Everyone else". */
-  group?: ContactGroup;
+  /** The only user-assigned grouping (D3/D5); undefined behaves as 'family'. */
+  tier?: ContactTier;
+  source?: ContactSource;
+  /**
+   * Imported provider metadata (e.g. ['Extended family'], ['Her church']) —
+   * never a taxonomy the user builds. Used to render richer sections in
+   * B3/C5 when available; falls back to `tier` grouping otherwise.
+   */
+  providerLabels?: string[];
 }
 
 export interface User {

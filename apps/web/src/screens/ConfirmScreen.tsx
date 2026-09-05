@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { useMockContacts, useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
+import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
 import { composeMessage } from '@griever/shared';
+import type { Contact } from '@griever/shared';
 import { createSendEvent } from '@griever/api-client';
 import { PencilSimple, CheckCircle, Circle } from '@phosphor-icons/react';
 import { BackButton } from '../lib/ui';
@@ -11,10 +12,10 @@ type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
+  contacts: Contact[];
 }
 
-export function ConfirmScreen({ flow }: Props) {
-  const contacts = useMockContacts();
+export function ConfirmScreen({ flow, contacts }: Props) {
   const florists = useMockFlorists(flow.place);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +25,7 @@ export function ConfirmScreen({ flow }: Props) {
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
+  const hasSendProgress = isAnnouncement || flow.templateCategory === 'obituary';
   const recipientCount = flow.selectedContactIds.length;
 
   const selectedFlorist = florists.find((f) => f.id === flow.floristId) ?? null;
@@ -45,7 +47,7 @@ export function ConfirmScreen({ flow }: Props) {
         contacts: phoneNumbers,
         fields,
       });
-      if (isAnnouncement) {
+      if (hasSendProgress) {
         flow.startSendJob();
       } else {
         flow.nextStep();

@@ -186,7 +186,7 @@ export const obituaryLink: Template = {
   id: 'obituary-link',
   name: 'Share an obituary',
   description: 'Share a link to an obituary with a personal message.',
-  category: 'aftercare',
+  category: 'obituary',
   fields: [
     {
       key: 'deceasedName',
@@ -345,7 +345,7 @@ export const announcePassing: Template = {
   },
 };
 
-function normalizeUrl(raw: string | undefined): string {
+export function normalizeUrl(raw: string | undefined): string {
   const value = raw?.trim();
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
@@ -356,11 +356,13 @@ export const categoryLabels: Record<TemplateCategory, string> = {
   announcement: 'Announcement',
   service:      'Service details',
   aftercare:    'Aftercare',
+  obituary:     'Obituary',
 };
 
 /** Label for the coloured tag shown against a record in send history. */
 export function historyTagLabel(category: TemplateCategory): string {
-  return category === 'announcement' ? 'Announcement' : 'Service details';
+  if (category === 'announcement' || category === 'obituary') return categoryLabels[category];
+  return 'Service details';
 }
 
 export const templates: Template[] = [

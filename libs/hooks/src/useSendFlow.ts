@@ -116,6 +116,12 @@ const initialState: SendFlowState = {
   sendJob: null,
 };
 
+/** A fresh draft, for callers that need to hand a session a pre-set starting step (e.g. C4 → C5). */
+export function freshDraft(patch: Partial<SendFlowDraft>): SendFlowDraft {
+  const { sendJob: _sendJob, ...draft } = initialState;
+  return { ...draft, ...patch };
+}
+
 function fromDraft(draft: SendFlowDraft): SendFlowState {
   const restored: SendFlowState = { ...initialState, ...draft, sendJob: null };
   if (restored.step === 'sending') restored.step = 'review';
@@ -179,6 +185,11 @@ function stepsFor(state: SendFlowState, template: Template | null): SendFlowStep
       'sending',
       'sent',
     ];
+  }
+  if (category === 'obituary') {
+    // The one required field (the link) is gathered on the session in C4,
+    // not a per-flow details form — skip straight to recipients.
+    return ['template', 'contacts', 'review', 'sending', 'sent'];
   }
   return ['template', 'details', 'contacts', 'review', 'sent'];
 }

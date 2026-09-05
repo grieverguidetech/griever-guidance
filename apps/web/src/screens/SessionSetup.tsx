@@ -61,25 +61,6 @@ export function SessionSetup({ session, editing, onChange, onContinue, onBack }:
         />
       </div>
 
-      <div className="gg-field">
-        <label htmlFor="s-obit">
-          Link to the obituary
-          <span style={{ color: 'var(--text-eyebrow)' }}> (optional)</span>
-        </label>
-        <input
-          id="s-obit"
-          className="gg-input"
-          type="text"
-          inputMode="url"
-          placeholder="Paste a link, if there is one"
-          value={session.obituaryUrl}
-          onChange={(e) => onChange({ obituaryUrl: e.target.value })}
-        />
-        <p className="m-0 mt-1 text-[12px] leading-[1.5]" style={{ color: 'var(--text-hint)' }}>
-          You can add this later — it'll be included in messages once you do.
-        </p>
-      </div>
-
       <button
         type="button"
         onClick={onContinue}

@@ -1,6 +1,5 @@
 import type { useSendFlow } from '@griever/hooks';
-import { useMockContacts } from '@griever/hooks';
-import type { Contact, ContactGroup } from '@griever/shared';
+import type { Contact, ContactTier } from '@griever/shared';
 import { CheckCircle, Circle } from '@phosphor-icons/react';
 import { BackButton } from '../lib/ui';
 import { formatPhone } from '../lib/format';
@@ -9,28 +8,27 @@ type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
+  contacts: Contact[];
   grouped: boolean;
 }
 
-const GROUP_LABELS: Record<ContactGroup | 'none', string> = {
-  family: 'Close family',
-  friends: 'Friends & neighbours',
-  none: 'Everyone else',
+const TIER_LABELS: Record<ContactTier, string> = {
+  first: 'Close family',
+  family: 'Friends & neighbours',
 };
 
-const GROUP_ORDER: (ContactGroup | 'none')[] = ['family', 'friends', 'none'];
+const TIER_ORDER: ContactTier[] = ['first', 'family'];
 
-export function ContactSelector({ flow, grouped }: Props) {
-  const contacts = useMockContacts();
+export function ContactSelector({ flow, contacts, grouped }: Props) {
   const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep } = flow;
   const selected = new Set(selectedContactIds);
   const count = selectedContactIds.length;
 
   const sections = grouped
-    ? GROUP_ORDER.map((key) => ({
-        key,
-        label: GROUP_LABELS[key],
-        items: contacts.filter((c) => (c.group ?? 'none') === key),
+    ? TIER_ORDER.map((tier) => ({
+        key: tier,
+        label: TIER_LABELS[tier],
+        items: contacts.filter((c) => (c.tier ?? 'family') === tier),
       })).filter((s) => s.items.length > 0)
     : [{ key: 'all' as const, label: null, items: contacts }];
 
@@ -38,9 +36,7 @@ export function ContactSelector({ flow, grouped }: Props) {
     <div className="flex flex-col gap-4">
       <BackButton onClick={prevStep} />
       <div className="flex flex-col gap-1">
-        <h1 className="text-[22px]">
-          {grouped ? 'Who should hear first?' : 'Who should know?'}
-        </h1>
+        <h1 className="text-[22px]">Who should know?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
           {grouped
             ? "Send to close family now, everyone else when you're ready."
@@ -90,7 +86,7 @@ export function ContactSelector({ flow, grouped }: Props) {
   );
 }
 
-function ContactRow({
+export function ContactRow({
   contact,
   selected,
   onToggle,
