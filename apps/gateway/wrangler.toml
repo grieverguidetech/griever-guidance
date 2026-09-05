@@ -1,16 +1,17 @@
 name = "griever-guidance-gateway"
 main = "src/worker.ts"
 compatibility_date = "2025-09-01"
-# nodejs_compat: needed for @fastify/autoload and friends.
-# enable_nodejs_http_server_modules: Fastify's constructor calls http.createServer()
-# unconditionally (even in inject-only mode, see src/worker.ts) — without this flag
-# every request 500s with "[unenv] http.createServer is not implemented yet!". Implied
-# by compatibility_date >= 2025-09-01, listed explicitly so it survives a future bump.
-compatibility_flags = ["nodejs_compat", "enable_nodejs_http_server_modules"]
+# nodejs_compat: src/worker.ts (Hono) uses node:crypto's randomUUID, and the
+# Convex SDK needs it too.
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Comma-separated list of allowed CORS origins.
-# Example: "https://app.griever.guide,https://griever.guide"
-# An empty string means origin: false in @fastify/cors — every cross-origin request is
-# blocked, not allowed. There is no "allow all" mode here; always set this explicitly.
-CORS_ORIGINS = "https://griever-guidance-web.pages.dev"
+# Cloudflare appended a random suffix to this project's pages.dev domain
+# (the plain "griever-guidance-web.pages.dev" was already taken elsewhere) —
+# confirm the real one with `wrangler pages deployment list --project-name
+# griever-guidance-web` before changing this, rather than guessing the name.
+# An empty string means no origin ever matches in src/worker.ts's Hono `cors()`
+# middleware — every cross-origin request is blocked, not allowed. There is
+# no "allow all" mode here; always set this explicitly.
+CORS_ORIGINS = "https://griever-guidance-web-1c3.pages.dev"
