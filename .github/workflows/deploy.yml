@@ -27,7 +27,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm nx run-many -t build -p shared sms --parallel=3
+      - run: pnpm nx run-many -t build -p shared --parallel=3
 
       # Guards against a dev-auth stub reaching production (DATA.md §6/§9).
       # CONVEX_DEPLOY_KEY (not a self-hosted URL) is what points this check

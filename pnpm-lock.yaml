@@ -369,9 +369,6 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared
-      '@griever/sms':
-        specifier: workspace:*
-        version: link:../sms
       hono:
         specifier: ^4.13.7
         version: 4.13.7
@@ -392,12 +389,6 @@ importers:
         version: link:../shared
 
   libs/shared:
-    dependencies:
-      tslib:
-        specifier: ^2.3.0
-        version: 2.8.1
-
-  libs/sms:
     dependencies:
       tslib:
         specifier: ^2.3.0

@@ -1,38 +1,12 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { createSendEvent } from '@griever/api-client';
-import { useMockContacts } from '@griever/hooks';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { FlowProps } from '../app/App';
 
 export function ConfirmScreen({ flow }: FlowProps) {
-  const { selectedTemplate, composedFields, composedMessage, selectedContactIds, prevStep, nextStep } = flow;
-  const contacts = useMockContacts();
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob } = flow;
 
   if (!selectedTemplate) return null;
 
-  const message = composedMessage;
   const recipientCount = selectedContactIds.length;
-
-  async function handleSend() {
-    setSending(true);
-    setError(null);
-    try {
-      await createSendEvent({
-        userId: 'local-device',
-        templateId: selectedTemplate!.id,
-        contacts: contacts
-          .filter((c) => selectedContactIds.includes(c.contactId))
-          .map((c) => c.phone),
-        fields: composedFields,
-      });
-      nextStep();
-    } catch {
-      setError('Something went wrong. Please try again.');
-      setSending(false);
-    }
-  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -41,24 +15,19 @@ export function ConfirmScreen({ flow }: FlowProps) {
       </TouchableOpacity>
       <Text style={styles.title}>Review your message</Text>
       <Text style={styles.subtitle}>
-        This will be sent to {recipientCount}{' '}
-        {recipientCount === 1 ? 'person' : 'people'}.
+        You'll text each of {recipientCount} {recipientCount === 1 ? 'person' : 'people'} from
+        your own number, one at a time.
       </Text>
       <View style={styles.messageBox}>
-        <Text style={styles.messageText}>{message}</Text>
+        <Text style={styles.messageText}>{composedMessage}</Text>
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
       <TouchableOpacity
-        style={[styles.button, sending && styles.buttonDisabled]}
-        onPress={handleSend}
-        disabled={sending}
+        style={styles.button}
+        onPress={startSendJob}
+        disabled={recipientCount === 0}
         activeOpacity={0.8}
       >
-        {sending ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.buttonText}>Send messages</Text>
-        )}
+        <Text style={styles.buttonText}>Text these people</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -80,13 +49,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   messageText: { fontSize: 14, color: '#374151', lineHeight: 22 },
-  error: { fontSize: 13, color: '#ef4444', marginBottom: 12 },
   button: {
     backgroundColor: '#6B7FD4',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
 });

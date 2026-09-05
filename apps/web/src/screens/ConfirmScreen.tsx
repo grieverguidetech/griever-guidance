@@ -2,30 +2,23 @@ import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
 import { composeMessage } from '@griever/shared';
-import type { Contact } from '@griever/shared';
-import { createSendEvent } from '@griever/api-client';
 import { PencilSimple, CheckCircle, Circle } from '@phosphor-icons/react';
 import { BackButton } from '../lib/ui';
-import { LOCAL_USER_ID } from '../lib/format';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
-  contacts: Contact[];
 }
 
-export function ConfirmScreen({ flow, contacts }: Props) {
+export function ConfirmScreen({ flow }: Props) {
   const florists = useMockFlorists(flow.place);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
 
   if (!flow.selectedTemplate) return null;
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
-  const hasSendProgress = isAnnouncement || flow.templateCategory === 'obituary';
   const recipientCount = flow.selectedContactIds.length;
 
   const selectedFlorist = florists.find((f) => f.id === flow.floristId) ?? null;
@@ -34,28 +27,15 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const fields = composedFieldsWithFlorist(flow, floristName);
   const message = flow.messageOverride ?? composeMessage(flow.selectedTemplate, fields);
 
-  async function handleSend() {
-    setSending(true);
-    setError(null);
-    try {
-      const phoneNumbers = contacts
-        .filter((c) => flow.selectedContactIds.includes(c.contactId))
-        .map((c) => c.phone);
-      await createSendEvent({
-        userId: LOCAL_USER_ID,
-        templateId: flow.selectedTemplate!.id,
-        contacts: phoneNumbers,
-        fields,
-      });
-      if (hasSendProgress) {
-        flow.startSendJob();
-      } else {
-        flow.nextStep();
-      }
-    } catch {
-      setError('Something went wrong. Please try again.');
-      setSending(false);
-    }
+  function handleSend() {
+    // Pin the exact text reviewed here — including a canned (non-custom)
+    // florist's name, which only exists in this screen's local `message`,
+    // not yet in flow state — so SendingScreen's sms: links carry precisely
+    // what the griever just read, not a recomputation that could drift.
+    if (!flow.messageOverride) flow.setMessageOverride(message);
+    // Texting each person from their own number happens one at a time on the
+    // next screen — nothing to send from here (no backend call at all).
+    flow.startSendJob();
   }
 
   return (
@@ -117,30 +97,20 @@ export function ConfirmScreen({ flow, contacts }: Props) {
         </div>
       )}
 
-      {error && (
-        <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-2-700)' }}>
-          {error}
-        </p>
-      )}
-
       <button
         type="button"
         onClick={handleSend}
-        disabled={sending || recipientCount === 0}
+        disabled={recipientCount === 0}
         className="gg-btn gg-btn-primary gg-btn-block"
       >
-        {sending
-          ? 'Sending…'
-          : isAnnouncement
-            ? `Send to ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}`
-            : 'Send messages'}
+        {isAnnouncement
+          ? `Text ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}`
+          : 'Text these people'}
       </button>
 
-      {isAnnouncement && (
-        <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
-          You'll be able to see who received it.
-        </p>
-      )}
+      <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
+        You'll text each person from your own number, one at a time.
+      </p>
     </div>
   );
 }

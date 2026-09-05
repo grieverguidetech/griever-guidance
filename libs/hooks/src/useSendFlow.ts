@@ -68,7 +68,10 @@ export interface SendFlowActions {
   setTone: (tone: MessageTone) => void;
   setMessageOverride: (value: string | null) => void;
   startSendJob: () => void;
-  tickSendJob: () => void;
+  /** The active recipient's own Messages app was opened and (we assume) sent — advance the queue. */
+  markActiveSent: () => void;
+  /** The griever chose not to text this person right now — advance the queue without marking sent. */
+  markActiveSkipped: () => void;
   nextStep: () => void;
   prevStep: () => void;
   reset: () => void;
@@ -191,7 +194,7 @@ function stepsFor(state: SendFlowState, template: Template | null): SendFlowStep
     // not a per-flow details form — skip straight to recipients.
     return ['template', 'contacts', 'review', 'sending', 'sent'];
   }
-  return ['template', 'details', 'contacts', 'review', 'sent'];
+  return ['template', 'details', 'contacts', 'review', 'sending', 'sent'];
 }
 
 /**
@@ -363,25 +366,27 @@ export function useSendFlow(
       step: 'sending',
       sendJob: {
         id: `job-${Date.now()}`,
-        recipients: s.selectedContactIds.map((contactId) => ({
+        // Only the first recipient is "active" (sms: link ready to open) —
+        // the rest wait their turn. One contact at a time, never a bulk send.
+        recipients: s.selectedContactIds.map((contactId, i) => ({
           contactId,
-          status: 'sending' as RecipientDeliveryStatus,
+          status: (i === 0 ? 'sending' : 'queued') as RecipientDeliveryStatus,
         })),
       },
     }));
   }, []);
 
-  const tickSendJob = useCallback(() => {
+  const advanceActive = useCallback((status: 'delivered' | 'skipped') => {
     setState((s) => {
       if (!s.sendJob) return s;
       const idx = s.sendJob.recipients.findIndex((r) => r.status === 'sending');
-      if (idx === -1) {
-        return s.step === 'sending' ? { ...s, step: 'sent' } : s;
-      }
-      const recipients = s.sendJob.recipients.map((r, i) =>
-        i === idx ? { ...r, status: 'delivered' as RecipientDeliveryStatus } : r,
-      );
-      const allDone = recipients.every((r) => r.status === 'delivered');
+      if (idx === -1) return s;
+      const recipients = s.sendJob.recipients.map((r, i) => {
+        if (i === idx) return { ...r, status };
+        if (i === idx + 1) return { ...r, status: 'sending' as RecipientDeliveryStatus };
+        return r;
+      });
+      const allDone = recipients.every((r) => r.status === 'delivered' || r.status === 'skipped');
       return {
         ...s,
         sendJob: { ...s.sendJob, recipients },
@@ -389,6 +394,9 @@ export function useSendFlow(
       };
     });
   }, []);
+
+  const markActiveSent = useCallback(() => advanceActive('delivered'), [advanceActive]);
+  const markActiveSkipped = useCallback(() => advanceActive('skipped'), [advanceActive]);
 
   const nextStep = useCallback(() => {
     setState((s) => {
@@ -446,7 +454,8 @@ export function useSendFlow(
     setTone,
     setMessageOverride,
     startSendJob,
-    tickSendJob,
+    markActiveSent,
+    markActiveSkipped,
     nextStep,
     prevStep,
     reset,

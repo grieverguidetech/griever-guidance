@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow } from '@griever/hooks';
@@ -6,16 +5,16 @@ import { TemplatePickerScreen } from '../screens/TemplatePickerScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
+import { SendingScreen } from '../screens/SendingScreen';
 import { SentScreen } from '../screens/SentScreen';
-import { HistoryScreen } from '../screens/HistoryScreen';
 
 export type RootStackParamList = {
   TemplatePicker: undefined;
   DetailsForm: undefined;
   ContactSelector: undefined;
   Confirm: undefined;
+  Sending: undefined;
   Sent: undefined;
-  History: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,7 +23,6 @@ export type FlowProps = { flow: ReturnType<typeof useSendFlow> };
 
 export const App = () => {
   const flow = useSendFlow();
-  const [view, setView] = useState<'flow' | 'history'>('flow');
 
   return (
     <NavigationContainer>
@@ -34,45 +32,25 @@ export const App = () => {
           contentStyle: { backgroundColor: '#ffffff' },
         }}
       >
-        {view === 'history' && (
-          <Stack.Screen name="History">
-            {() => <HistoryScreen onBack={() => setView('flow')} />}
-          </Stack.Screen>
+        {flow.step === 'template' && (
+          <Stack.Screen name="TemplatePicker">{() => <TemplatePickerScreen flow={flow} />}</Stack.Screen>
         )}
-        {view === 'flow' && flow.step === 'template' && (
-          <Stack.Screen name="TemplatePicker">
-            {() => (
-              <TemplatePickerScreen
-                flow={flow}
-                onViewHistory={() => setView('history')}
-              />
-            )}
-          </Stack.Screen>
+        {flow.step === 'details' && (
+          <Stack.Screen name="DetailsForm">{() => <DetailsFormScreen flow={flow} />}</Stack.Screen>
         )}
-        {view === 'flow' && flow.step === 'details' && (
-          <Stack.Screen name="DetailsForm">
-            {() => <DetailsFormScreen flow={flow} />}
-          </Stack.Screen>
-        )}
-        {view === 'flow' && flow.step === 'contacts' && (
+        {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
             {() => <ContactSelectorScreen flow={flow} />}
           </Stack.Screen>
         )}
-        {view === 'flow' && flow.step === 'review' && (
-          <Stack.Screen name="Confirm">
-            {() => <ConfirmScreen flow={flow} />}
-          </Stack.Screen>
+        {flow.step === 'review' && (
+          <Stack.Screen name="Confirm">{() => <ConfirmScreen flow={flow} />}</Stack.Screen>
         )}
-        {view === 'flow' && flow.step === 'sent' && (
-          <Stack.Screen name="Sent">
-            {() => (
-              <SentScreen
-                flow={flow}
-                onViewHistory={() => setView('history')}
-              />
-            )}
-          </Stack.Screen>
+        {flow.step === 'sending' && (
+          <Stack.Screen name="Sending">{() => <SendingScreen flow={flow} />}</Stack.Screen>
+        )}
+        {flow.step === 'sent' && (
+          <Stack.Screen name="Sent">{() => <SentScreen flow={flow} />}</Stack.Screen>
         )}
       </Stack.Navigator>
     </NavigationContainer>

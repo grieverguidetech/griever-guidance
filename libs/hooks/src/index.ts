@@ -1,5 +1,6 @@
 export * from './useTemplates.js';
 export * from './useSendFlow.js';
+export * from './smsLink.js';
 export * from './useSessions.js';
 export * from './usePathMoments.js';
 export * from './useAccount.js';

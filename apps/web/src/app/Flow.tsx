@@ -19,7 +19,6 @@ interface Props {
   onDraftChange: (draft: SendFlowDraft) => void;
   onExitToLanding: () => void;
   onEditSession: () => void;
-  onViewHistory: () => void;
   onAddContact: (input: { name: string; phone: string }) => Promise<Contact>;
 }
 
@@ -31,7 +30,6 @@ export function Flow({
   onDraftChange,
   onExitToLanding,
   onEditSession,
-  onViewHistory,
   onAddContact,
 }: Props) {
   const flow = useSendFlow({ session, draft, onDraftChange });
@@ -59,11 +57,11 @@ export function Flow({
         <ContactSelector flow={flow} contacts={contacts} grouped={grouped} onAddContact={onAddContact} />
       );
     case 'review':
-      return <ConfirmScreen flow={flow} contacts={contacts} />;
+      return <ConfirmScreen flow={flow} />;
     case 'sending':
       return <SendingScreen flow={flow} contacts={contacts} />;
     case 'sent':
-      return <SentScreen flow={flow} onViewHistory={onViewHistory} />;
+      return <SentScreen flow={flow} />;
     default:
       return null;
   }

@@ -1,4 +1,4 @@
-import type { SendEvent, Template, ObituaryRequest, ObituaryResponse } from '@griever/shared';
+import type { ObituaryRequest, ObituaryResponse } from '@griever/shared';
 
 declare const __VITE_API_URL__: string | undefined;
 
@@ -25,28 +25,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`API ${res.status}: ${text}`);
   }
   return res.json() as Promise<T>;
-}
-
-export interface CreateSendEventPayload {
-  userId: string;
-  templateId: string;
-  contacts: string[];
-  fields: Record<string, string>;
-}
-
-export function createSendEvent(payload: CreateSendEventPayload): Promise<SendEvent> {
-  return apiFetch<SendEvent>('/send', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function getSendHistory(userId: string): Promise<SendEvent[]> {
-  return apiFetch<SendEvent[]>(`/history/${encodeURIComponent(userId)}`);
-}
-
-export function getTemplates(): Promise<Template[]> {
-  return apiFetch<Template[]>('/templates');
 }
 
 export function generateObituary(payload: ObituaryRequest): Promise<ObituaryResponse> {

@@ -63,7 +63,7 @@ export interface Florist {
 }
 
 /** Per-recipient delivery state shown on the sending-progress screen. */
-export type RecipientDeliveryStatus = 'queued' | 'sending' | 'delivered' | 'failed';
+export type RecipientDeliveryStatus = 'queued' | 'sending' | 'delivered' | 'skipped' | 'failed';
 
 /**
  * The person a session is about, captured once at session setup and carried

@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@griever/shared": "workspace:*",
-    "@griever/sms": "workspace:*",
     "hono": "^4.13.7"
   }
 }

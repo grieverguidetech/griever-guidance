@@ -13,7 +13,6 @@ import { PathLanding } from '../screens/PathLanding';
 import { Gate } from '../screens/Gate';
 import { WhatYoullNeed } from '../screens/WhatYoullNeed';
 import { ShareObituary } from '../screens/ShareObituary';
-import { HistoryScreen } from '../screens/HistoryScreen';
 import { ObituaryScreen } from '../screens/ObituaryScreen';
 import { Flow } from './Flow';
 
@@ -29,7 +28,6 @@ type AppView =
   | 'whatYoullNeed'
   | 'shareObituary'
   | 'flow'
-  | 'history'
   | 'obituary';
 
 const browserStorage =
@@ -248,14 +246,6 @@ export function App() {
 
   // ---- Standalone views ----
 
-  if (view === 'history') {
-    return (
-      <Shell>
-        <HistoryScreen onBack={() => setView(active ? 'pathLanding' : 'signup')} />
-      </Shell>
-    );
-  }
-
   if (view === 'obituary') {
     return (
       <Shell>
@@ -355,7 +345,6 @@ export function App() {
             setSetupEditing(true);
             setView('setup');
           }}
-          onViewHistory={() => setView('history')}
           onAddContact={({ name, phone }) => contacts.addContact({ name, phone, tier: 'family' })}
         />
       </Shell>
@@ -370,7 +359,6 @@ export function App() {
           otherSessions={sortedSessions.filter((s) => s.id !== active.id)}
           onStartMoment={startMoment}
           onWhatYoullNeed={() => setView('whatYoullNeed')}
-          onViewHistory={() => setView('history')}
           onNewSession={startNewSession}
         />
       </Shell>

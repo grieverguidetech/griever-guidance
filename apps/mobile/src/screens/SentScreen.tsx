@@ -1,14 +1,11 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { FlowProps } from '../app/App';
 
-interface Props extends FlowProps {
-  onViewHistory: () => void;
-}
-
-export function SentScreen({ flow, onViewHistory }: Props) {
-  const { selectedContactIds, fields, reset } = flow;
+export function SentScreen({ flow }: FlowProps) {
+  const { fields, reset, sendJob } = flow;
   const name = fields['deceasedName'] ?? '';
-  const recipientCount = selectedContactIds.length;
+  const recipients = sendJob?.recipients ?? [];
+  const recipientCount = recipients.filter((r) => r.status === 'delivered').length;
 
   return (
     <View style={styles.container}>
@@ -18,15 +15,16 @@ export function SentScreen({ flow, onViewHistory }: Props) {
       <Text style={styles.heading}>Your messages have been sent.</Text>
       <Text style={styles.body}>
         {recipientCount}{' '}
-        {recipientCount === 1 ? 'person' : 'people'} will receive details
+        {recipientCount === 1 ? 'person' : 'people'} have details
         {name ? ` about ${name}` : ''}.
       </Text>
       <Text style={styles.condolence}>We are sorry for your loss.</Text>
+      <Text style={styles.noSave}>
+        We don't keep a copy of what was sent — it's already where it belongs, in your own
+        Messages app.
+      </Text>
       <TouchableOpacity onPress={reset} style={styles.link}>
         <Text style={styles.linkText}>Send another message</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onViewHistory} style={styles.historyLink}>
-        <Text style={styles.historyLinkText}>View sent messages</Text>
       </TouchableOpacity>
     </View>
   );
@@ -67,10 +65,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 16,
+  },
+  noSave: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 16,
   },
   link: {},
   linkText: { fontSize: 14, color: '#6B7FD4' },
-  historyLink: { marginTop: 8 },
-  historyLinkText: { fontSize: 14, color: '#9ca3af' },
 });

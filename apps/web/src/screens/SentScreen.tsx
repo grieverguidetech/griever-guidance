@@ -5,13 +5,14 @@ type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
-  onViewHistory: () => void;
 }
 
-export function SentScreen({ flow, onViewHistory }: Props) {
+export function SentScreen({ flow }: Props) {
   const isAnnouncement = flow.templateCategory === 'announcement';
   const name = flow.session?.personName?.trim() || flow.fields['deceasedName']?.trim();
-  const count = flow.selectedContactIds.length;
+  const recipients = flow.sendJob?.recipients ?? [];
+  const count = recipients.filter((r) => r.status === 'delivered').length;
+  const skipped = recipients.filter((r) => r.status === 'skipped').length;
   const people = `${count} ${count === 1 ? 'person' : 'people'}`;
 
   return (
@@ -34,9 +35,16 @@ export function SentScreen({ flow, onViewHistory }: Props) {
 
       <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)', maxWidth: '28ch' }}>
         {isAnnouncement
-          ? `${people} now know about ${name || 'your loved one'}. Nothing else needs doing today.`
-          : `${people} will receive service details${name ? ` for ${name}` : ''}.`}
+          ? `${people} now ${count === 1 ? 'knows' : 'know'} about ${name || 'your loved one'}. Nothing else needs doing today.`
+          : `${people} ${count === 1 ? 'has' : 'have'} service details${name ? ` for ${name}` : ''}.`}
       </p>
+
+      {skipped > 0 && (
+        <p className="text-[12px] m-0" style={{ color: 'var(--text-hint)' }}>
+          {skipped} {skipped === 1 ? 'person was' : 'people were'} skipped — you can text them any
+          time from your own Messages app.
+        </p>
+      )}
 
       <p className="gg-reassure m-0 mb-4 text-[14px]">
         {isAnnouncement
@@ -67,14 +75,10 @@ export function SentScreen({ flow, onViewHistory }: Props) {
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={onViewHistory}
-        className="gg-btn gg-btn-ghost"
-        style={{ color: 'var(--text-muted)' }}
-      >
-        View sent messages
-      </button>
+      <p className="text-[12px] m-0" style={{ color: 'var(--text-hint)' }}>
+        We don't keep a copy of what was sent — it's already where it belongs, in your own
+        Messages app.
+      </p>
     </div>
   );
 }

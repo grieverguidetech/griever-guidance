@@ -32,7 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Griever Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
+Griever Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
 
 ---
 
@@ -52,8 +52,8 @@ libs/
   shared/           Source of truth for all types, interfaces, and message templates.
                     Nothing gets duplicated into apps. If it's shared, it lives here.
   api-client/       All HTTP calls to apps/gateway. Apps never call fetch directly.
-  sms/              The only place that knows about Twilio. Currently mocked.
   hooks/            Shared React hooks. Zero platform-specific dependencies allowed here.
+                    Also owns the sms: deep-link builder (buildSmsLink) — see "The send flow".
   ui-web/           Shared React + Tailwind components for web.
   data-local/       IndexedDB-backed local storage (the screen-keyed session document, outbox,
                     contacts). Browser-only — see DATA.md.
@@ -61,7 +61,8 @@ libs/
                     talks to apps/gateway, never to Convex directly. See DATA.md.
   gateway-auth/     Account creation/sign-in routes (Google, Facebook, X, email) — currently a
                     placeholder, no routes yet; this task is paused.
-  gateway-messages/ Send/templates/history/obituary routes — the SMS-sending domain.
+  gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
+                    sending happens entirely on-device (see "The send flow").
   gateway-sync/     The gateway's Convex client and the /sync/pull, /sync/push routes.
 
   Each gateway-* lib owns its own Hono router and business logic, with no cross-imports between
@@ -113,8 +114,8 @@ Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app 
 **2b. Auth, messages, and sync are separate libs — no cross-imports.**
 `libs/gateway-auth`, `libs/gateway-messages`, and `libs/gateway-sync` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and one gateway-* lib never imports another.
 
-**3. Twilio is isolated to libs/sms.**
-The API calls `libs/sms`. Nothing else does. When real Twilio credentials are wired in, only `libs/sms` changes. The mock logs to console and returns a fake SID — that's intentional.
+**3. Messages are sent from the user's own phone, never a backend.**
+There is no server-side SMS provider (no Twilio, no `libs/sms`) — a bulk send from a business number reads as impersonal for a grief app. Sending is an `sms:` deep link (`buildSmsLink()` in `libs/hooks`) that opens the device's native Messages app with one contact and the message pre-filled; the user taps Send themselves, one contact at a time. Nothing in this repo may add a backend message-sending path.
 
 **4. hooks in libs/hooks must be platform-agnostic.**
 No React Native APIs in `libs/hooks`. If a hook needs device APIs, it belongs in `apps/mobile`.
@@ -127,10 +128,22 @@ No screen-level `useState` duplicating send flow logic. One hook owns it.
 ## The send flow
 
 ```
-Template picker → Details form → Contact selector → Confirm → Sent
+Template picker → Details form → Contact selector → Confirm → Sending → Sent
 ```
 
 This is the core user journey. It is driven by `useSendFlow()` from `libs/hooks`. Any change to this flow touches `libs/hooks`, `apps/web`, and `apps/mobile`.
+
+**Sending is one contact at a time, from the user's own number — never a bulk send.** The Sending
+step steps through `selectedContactIds` one at a time: "Open Messages" fires an `sms:` deep link
+(`buildSmsLink()`) to the device's native Messages app with that contact and the composed message
+pre-filled; the user taps Send there themselves — no web page or app can send an SMS on someone's
+behalf, by OS design. Returning to the app (detected via the Page Visibility API on web, `AppState`
+on mobile) assumes it went through and auto-advances to the next contact after a short undo window,
+rather than asking "did that send?" for every person in what could be a long list. Nothing is
+recorded as sent to a backend, and there is no delivery receipt — the user's own Messages thread
+with that contact is the only record, which is *more* trustworthy to a grieving person than an
+opaque "delivered ✓" from a service they've never heard of. The app itself keeps no history of what
+was sent (see "What not to do").
 
 ---
 
@@ -148,17 +161,18 @@ identical in both. See `DATA.md` for the full data architecture (the screen-keye
 document, the cursor-based sync protocol, the merge rule).
 
 Contact data is never sent to Convex — only contact *ids* appear in synced session data, never
-a name or number. Message content is never stored — only rendered at send time.
+a name or number. Message content is never stored anywhere, by anything — not Convex, not a send
+history, not a log — only composed client-side and handed to the device's own Messages app at
+send time (see "The send flow").
 
 ---
 
 ## Environment variables
 
 ```
-apps/gateway  PORT, CORS_ORIGINS, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER,
-              ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL, CONVEX_SELF_HOSTED_ADMIN_KEY,
-              CONVEX_SITE_URL                                                        (local dev)
-              CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                            (CI/prod only)
+apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
+              CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL                          (local dev)
+              CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL
 apps/mobile   EXPO_PUBLIC_API_URL
 ```
@@ -179,9 +193,10 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 ## What not to do
 
 - No third-party UI component libraries in `apps/mobile` (no NativeBase, React Native Paper, Tamagui, etc.) — use core RN components
-- No Twilio calls outside `libs/sms`
+- No backend SMS-sending path (no Twilio, no `libs/sms`, no server-side send route) — see rule 3
 - No shared types defined in apps
 - No contact data stored anywhere — not the DB, not state, not logs
+- No message content stored anywhere — not the DB, not state, not logs, not a send history; nothing to view or restore once sent (the user's own Messages app is the only record)
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation

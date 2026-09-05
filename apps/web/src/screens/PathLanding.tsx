@@ -33,7 +33,6 @@ interface Props {
   otherSessions: Session[];
   onStartMoment: (key: MomentKey) => void;
   onWhatYoullNeed: () => void;
-  onViewHistory: () => void;
   onNewSession: () => void;
 }
 
@@ -42,7 +41,6 @@ export function PathLanding({
   otherSessions,
   onStartMoment,
   onWhatYoullNeed,
-  onViewHistory,
   onNewSession,
 }: Props) {
   const moments = usePathMoments(session);
@@ -78,14 +76,6 @@ export function PathLanding({
         <button type="button" onClick={onWhatYoullNeed} className="gg-btn gg-btn-ghost !px-0 self-start">
           <ListChecks size={16} weight="duotone" />
           What you'll need
-        </button>
-        <button
-          type="button"
-          onClick={onViewHistory}
-          className="gg-btn gg-btn-ghost !px-0 self-start"
-          style={{ color: 'var(--color-neutral-700)' }}
-        >
-          Messages I've sent
         </button>
         <button
           type="button"
