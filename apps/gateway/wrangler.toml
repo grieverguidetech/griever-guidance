@@ -1,11 +1,16 @@
 name = "griever-guidance-gateway"
 main = "src/worker.ts"
-compatibility_date = "2024-11-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2025-09-01"
+# nodejs_compat: needed for @fastify/autoload and friends.
+# enable_nodejs_http_server_modules: Fastify's constructor calls http.createServer()
+# unconditionally (even in inject-only mode, see src/worker.ts) — without this flag
+# every request 500s with "[unenv] http.createServer is not implemented yet!". Implied
+# by compatibility_date >= 2025-09-01, listed explicitly so it survives a future bump.
+compatibility_flags = ["nodejs_compat", "enable_nodejs_http_server_modules"]
 
 [vars]
 # Comma-separated list of allowed CORS origins.
-# Set this to your Pages domains via the Cloudflare dashboard or wrangler secret.
 # Example: "https://app.griever.guide,https://griever.guide"
-# Leave empty to allow all origins (not recommended for production).
-CORS_ORIGINS = ""
+# An empty string means origin: false in @fastify/cors — every cross-origin request is
+# blocked, not allowed. There is no "allow all" mode here; always set this explicitly.
+CORS_ORIGINS = "https://griever-guidance-web.pages.dev"
