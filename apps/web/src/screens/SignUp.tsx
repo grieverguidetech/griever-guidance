@@ -1,8 +1,8 @@
 import type { AuthProvider } from '@griever/shared';
-import { GoogleLogo, FacebookLogo, XLogo, EnvelopeSimple } from '@phosphor-icons/react';
+import { GoogleLogo, FacebookLogo, InstagramLogo, XLogo, EnvelopeSimple } from '@phosphor-icons/react';
 
 interface Props {
-  onContinueWithProvider: (provider: Extract<AuthProvider, 'google' | 'facebook' | 'x'>) => void;
+  onContinueWithProvider: (provider: Extract<AuthProvider, 'facebook' | 'instagram'>) => void;
   onUseEmail: () => void;
 }
 
@@ -20,14 +20,6 @@ export function SignUp({ onContinueWithProvider, onUseEmail }: Props) {
         <p className="gg-eyebrow m-0">Fastest — brings your contacts with you</p>
         <button
           type="button"
-          onClick={() => onContinueWithProvider('google')}
-          className="gg-btn gg-btn-secondary gg-btn-block"
-        >
-          <GoogleLogo size={18} weight="duotone" />
-          Continue with Google
-        </button>
-        <button
-          type="button"
           onClick={() => onContinueWithProvider('facebook')}
           className="gg-btn gg-btn-secondary gg-btn-block"
         >
@@ -36,11 +28,33 @@ export function SignUp({ onContinueWithProvider, onUseEmail }: Props) {
         </button>
         <button
           type="button"
-          onClick={() => onContinueWithProvider('x')}
+          onClick={() => onContinueWithProvider('instagram')}
           className="gg-btn gg-btn-secondary gg-btn-block"
         >
+          <InstagramLogo size={18} weight="duotone" />
+          Continue with Instagram
+        </button>
+        <p className="text-[12px] m-0" style={{ color: 'var(--text-hint)' }}>
+          Instagram requires a Business or Creator account — a personal account can't sign in this
+          way yet.
+        </p>
+        <button
+          type="button"
+          disabled
+          title="Coming soon"
+          className="gg-btn gg-btn-secondary gg-btn-block opacity-50 cursor-not-allowed"
+        >
+          <GoogleLogo size={18} weight="duotone" />
+          Continue with Google — coming soon
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Coming soon"
+          className="gg-btn gg-btn-secondary gg-btn-block opacity-50 cursor-not-allowed"
+        >
           <XLogo size={18} weight="duotone" />
-          Continue with X
+          Continue with X — coming soon
         </button>
       </div>
 

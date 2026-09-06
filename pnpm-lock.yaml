@@ -387,6 +387,9 @@ importers:
 
   libs/hooks:
     dependencies:
+      '@griever/api-client':
+        specifier: workspace:*
+        version: link:../api-client
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared

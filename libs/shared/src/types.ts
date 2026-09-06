@@ -33,20 +33,6 @@ export interface Moment {
   recipientCount?: number;
 }
 
-/**
- * The signed-in griever's account. Sign-in is mocked (see D1/D2) — no real
- * OAuth or password storage, matching the rest of this app's mocked backends.
- */
-export interface Account {
-  authProvider: AuthProvider;
-  /** Derived from `authProvider`: social sign-in imports contacts, email means manual entry. */
-  contactSource: AccountContactSource;
-  email: string;
-  /** Never gates use of the app — confirmation is asynchronous and optional. */
-  emailVerified: boolean;
-  senderName: string;
-}
-
 /** A place chosen from the (mocked) address typeahead in the details form. */
 export interface Place {
   placeId: string;

@@ -4,14 +4,17 @@ import { BackButton } from '../lib/ui';
 interface Props {
   onBack: () => void;
   onCreate: (input: { name: string; email: string; password: string }) => void;
+  /** Surfaced from the real sign-up call — e.g. "An account with that email already exists." */
+  error?: string | null;
+  isSubmitting?: boolean;
 }
 
-export function CreateAccount({ onBack, onCreate }: Props) {
+export function CreateAccount({ onBack, onCreate, error, isSubmitting }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const canContinue = name.trim() && email.trim() && password.length >= 8;
+  const canContinue = name.trim() && email.trim() && password.length >= 8 && !isSubmitting;
 
   return (
     <div className="flex flex-col gap-4">
@@ -59,13 +62,19 @@ export function CreateAccount({ onBack, onCreate }: Props) {
         />
       </div>
 
+      {error && (
+        <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+          {error}
+        </p>
+      )}
+
       <button
         type="button"
         onClick={() => onCreate({ name: name.trim(), email: email.trim(), password })}
         disabled={!canContinue}
         className="gg-btn gg-btn-primary gg-btn-block"
       >
-        Continue
+        {isSubmitting ? 'Creating account…' : 'Continue'}
       </button>
       <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-muted)' }}>
         You can start writing straight away — confirm your email whenever you like.

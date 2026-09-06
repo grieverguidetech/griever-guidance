@@ -35,9 +35,13 @@ export default defineSchema({
       v.literal("x"),
       v.literal("password"),
     ),
-    providerSub: v.string(), // provider subject / hashed email for password accounts
+    providerSub: v.string(), // provider subject; the lowercased email for password accounts
     email: v.union(v.string(), v.null()), // Instagram never supplies one — stays null
     emailVerified: v.boolean(), // recorded, NEVER gates anything (README D2)
+    // Only set when authProvider is "password" — PBKDF2-SHA256 (libs/identity/src/password.ts),
+    // hashed and salted server-side in the gateway, never stored or transmitted in the clear.
+    passwordHash: v.optional(v.string()),
+    passwordSalt: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_userId", ["userId"])

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAccount, useContacts, useSessions, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
+import { useIdentity, useContacts, useSessions, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
-import type { AuthProvider, MomentKey, SessionDetails } from '@griever/shared';
+import type { MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
+import { setSyncUserId } from '../lib/registerSync';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { AddContactsManual } from '../screens/AddContactsManual';
@@ -42,14 +43,41 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
-  const account = useAccount(browserStorage);
+  const account = useIdentity(browserStorage);
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
 
-  const [view, setView] = useState<AppView>(() => (account.hasAccount ? 'pathLanding' : 'signup'));
+  const [view, setView] = useState<AppView>('signup');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [setupEditing, setSetupEditing] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+
+  // Consumes a Facebook/Instagram sign-in's `#token=…` (or `#error=…`)
+  // fragment, if this page load is one — runs once, before the view below
+  // has a chance to render "signup" and flash it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handled = account.completeOAuthCallback(window.location.hash);
+    if (handled) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A real sign-in resolves asynchronously (the boot-time /auth/session
+  // check, or the OAuth callback above) — unlike the client-only mock this
+  // replaced, so this can't be decided synchronously in useState's initializer.
+  useEffect(() => {
+    if (account.isSignedIn && view === 'signup') setView('pathLanding');
+  }, [account.isSignedIn, view]);
+
+  // Keeps libs/data-sync attributed to whoever is actually signed in. See
+  // registerSync.ts's setSyncUserId for exactly what this does (and does
+  // not yet) make real in production.
+  useEffect(() => {
+    void setSyncUserId(account.identity?.userId ?? null);
+  }, [account.identity?.userId]);
 
   const sortedSessions = useMemo(
     () =>
@@ -60,7 +88,7 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!account.hasAccount || activeId) return;
+    if (!account.isSignedIn || activeId) return;
     if (sortedSessions.length > 0) {
       setActiveId(sortedSessions[0].id);
       return;
@@ -75,7 +103,7 @@ export function App() {
       setView('setup');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account.hasAccount, activeId, sortedSessions, view]);
+  }, [account.isSignedIn, activeId, sortedSessions, view]);
 
   const active = useMemo<Session | null>(
     () => sessions.sessions.find((s) => s.id === activeId) ?? null,
@@ -186,18 +214,29 @@ export function App() {
     setView('flow');
   }
 
+  // While a previously-stored session token is being confirmed
+  // (/auth/session), render nothing rather than flash "signup" first.
+  if (account.isLoading) {
+    return <Shell>{null}</Shell>;
+  }
+
   // ---- Flow D: account + contacts onboarding ----
 
   if (view === 'signup') {
     return (
       <Shell>
         <SignUp
-          onContinueWithProvider={(provider: Extract<AuthProvider, 'google' | 'facebook' | 'x'>) => {
-            account.createAccount(provider);
-            setView('importContacts');
+          onContinueWithProvider={(provider) => {
+            const redirectTo = window.location.origin + window.location.pathname;
+            window.location.href = account.oauthStartUrl(provider, redirectTo);
           }}
           onUseEmail={() => setView('createAccount')}
         />
+        {account.error && (
+          <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+            {account.error}
+          </p>
+        )}
       </Shell>
     );
   }
@@ -207,9 +246,13 @@ export function App() {
       <Shell>
         <CreateAccount
           onBack={() => setView('signup')}
-          onCreate={({ name, email }) => {
-            account.createAccount('password', { senderName: name, email });
-            setView('addContactsManual');
+          error={account.error}
+          isSubmitting={isCreatingAccount}
+          onCreate={async ({ name, email, password }) => {
+            setIsCreatingAccount(true);
+            const ok = await account.signUpWithPassword({ email, password, senderName: name });
+            setIsCreatingAccount(false);
+            if (ok) setView('addContactsManual');
           }}
         />
       </Shell>
@@ -253,7 +296,7 @@ export function App() {
         <WhoHearsFirst
           contacts={contacts.contacts}
           onBack={() =>
-            setView(account.account?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts')
+            setView(account.identity?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts')
           }
           onSave={(firstIds) => {
             const firstSet = new Set(firstIds);
