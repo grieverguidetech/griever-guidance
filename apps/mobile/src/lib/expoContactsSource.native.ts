@@ -20,50 +20,30 @@ export const expoContactsSource: ContactSource = {
   id: 'native',
 
   async isAvailable() {
-    try {
-      const response = await getPermissionsAsync();
-      return response.granted || response.canAskAgain;
-    } catch (err) {
-      // The native module (`ExpoContactsNext`, only in expo-contacts 56.0.6+)
-      // isn't present — most likely an Expo Go build older than this
-      // dependency. Log the real error so it shows up in the Metro terminal;
-      // the caller treats "unavailable" the same as "not on this device."
-      console.error('[expoContactsSource] isAvailable() failed:', err);
-      return false;
-    }
+    const response = await getPermissionsAsync();
+    return response.granted || response.canAskAgain;
   },
 
   async fetch() {
-    let response;
-    try {
-      response = await requestPermissionsAsync();
-    } catch (err) {
-      console.error('[expoContactsSource] requestPermissionsAsync() failed:', err);
-      throw err;
-    }
+    const response = await requestPermissionsAsync();
     if (!response.granted) {
       // A denial is "nothing chosen," same as backing out of a picker —
       // not a scary error to surface (source.ts's Cancelled contract).
       throw new Cancelled();
     }
 
-    try {
-      const details = await Contact.getAllDetails([
-        ContactField.FULL_NAME,
-        ContactField.PHONES,
-        ContactField.EMAILS,
-      ]);
+    const details = await Contact.getAllDetails([
+      ContactField.FULL_NAME,
+      ContactField.PHONES,
+      ContactField.EMAILS,
+    ]);
 
-      return details.map((c, i): FetchedContact => ({
-        key: c.id || `native_${i}`,
-        displayName: c.fullName?.trim() || 'Unnamed',
-        phones: (c.phones ?? []).map((p) => p.number ?? '').filter(Boolean),
-        emails: (c.emails ?? []).map((e) => e.address ?? '').filter(Boolean),
-      }));
-    } catch (err) {
-      console.error('[expoContactsSource] Contact.getAllDetails() failed:', err);
-      throw err;
-    }
+    return details.map((c, i): FetchedContact => ({
+      key: c.id || `native_${i}`,
+      displayName: c.fullName?.trim() || 'Unnamed',
+      phones: (c.phones ?? []).map((p) => p.number ?? '').filter(Boolean),
+      emails: (c.emails ?? []).map((e) => e.address ?? '').filter(Boolean),
+    }));
   },
 
   preselected: false,

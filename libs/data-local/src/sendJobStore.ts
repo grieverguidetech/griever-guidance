@@ -1,16 +1,10 @@
 import { openDb, type LocalSendJob } from "./db.js";
 
-/** A local handoff log (DATA.md §1) — never synced, no server-side delivery state. */
+/** Ephemeral per-send delivery progress (DATA.md §1) — never synced (§5: server-owned already). */
 
 export async function get(jobId: string): Promise<LocalSendJob | undefined> {
   const db = await openDb();
   return db.get("sendJobs", jobId);
-}
-
-/** For resuming after a crash/relaunch — find the in-progress job for this session's moment, if any. */
-export async function listBySessionId(sessionId: string): Promise<LocalSendJob[]> {
-  const db = await openDb();
-  return db.getAllFromIndex("sendJobs", "bySessionId", sessionId);
 }
 
 export async function put(job: LocalSendJob): Promise<void> {
@@ -23,4 +17,4 @@ export async function remove(jobId: string): Promise<void> {
   await db.delete("sendJobs", jobId);
 }
 
-export const sendJobStore = { get, listBySessionId, put, delete: remove };
+export const sendJobStore = { get, put, delete: remove };

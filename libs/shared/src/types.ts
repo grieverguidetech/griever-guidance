@@ -63,12 +63,7 @@ export interface Florist {
 }
 
 /** Per-recipient delivery state shown on the sending-progress screen. */
-/**
- * `confirmed` comes only from the user answering "did that go through?" —
- * never inferred from elapsed time or backgrounding (tasks/04-sending.md §4).
- * There is no `delivered`: nothing here is ever confirmed by a network.
- */
-export type RecipientDeliveryStatus = 'queued' | 'handed_off' | 'confirmed' | 'skipped' | 'failed';
+export type RecipientDeliveryStatus = 'queued' | 'sending' | 'delivered' | 'skipped' | 'failed';
 
 /**
  * The person a session is about, captured once at session setup and carried

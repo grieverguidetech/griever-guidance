@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { templates, composeMessage, MOMENT_KEY_BY_CATEGORY } from '@griever/shared';
+import { templates, composeMessage } from '@griever/shared';
 import type {
   Template,
   TemplateCategory,
   MessageTone,
-  MomentKey,
   Place,
   RecipientDeliveryStatus,
   SessionDetails,
@@ -22,38 +21,14 @@ export type SendFlowStep =
 
 export type ServiceDetailsKnown = 'yes' | 'no' | null;
 
-/**
- * One entry per recipient in the one-at-a-time `sms:` handoff loop
- * (tasks/04-sending.md §2/§4). `confirmed` is set only by the user
- * answering "did that go through?" — never inferred from elapsed time or
- * from the app being backgrounded.
- */
-export interface SendJobEntry {
+export interface RecipientProgress {
   contactId: string;
   status: RecipientDeliveryStatus;
-  handedOffAt?: number;
-  confirmedAt?: number;
 }
 
 export interface SendJob {
-  jobId: string;
-  sessionId: string;
-  momentKey: MomentKey;
-  entries: SendJobEntry[];
-  cursorIndex: number;
-  createdAt: number;
-}
-
-/**
- * The persisted half of the send job — a local handoff log only (DATA.md
- * §1: "Device capabilities ... Never mirrored to the server"). Injected so
- * this hook stays platform-agnostic (CLAUDE.md rule 4): web passes
- * `@griever/data-local`'s IndexedDB-backed `sendJobStore`, whose `put`/
- * `listBySessionId` already match this shape structurally.
- */
-export interface SendJobStore {
-  listBySessionId(sessionId: string): Promise<SendJob[]>;
-  put(job: SendJob): Promise<void>;
+  id: string;
+  recipients: RecipientProgress[];
 }
 
 export interface SendFlowState {
@@ -93,18 +68,10 @@ export interface SendFlowActions {
   setTone: (tone: MessageTone) => void;
   setMessageOverride: (value: string | null) => void;
   startSendJob: () => void;
-  /**
-   * Marks the active recipient `handed_off` and **persists that before
-   * returning** — the caller must `await` this before setting
-   * `location.href`, not after (tasks/04-sending.md §2: the loop position
-   * has to survive a force-quit that happens mid-handoff, not just
-   * mid-review).
-   */
-  handOffActive: () => Promise<void>;
-  /** The user answered "did that go through?" — advances to the next recipient either way. */
-  confirmActive: (confirmed: boolean) => void;
-  /** Skips the active recipient (before any handoff) and advances. */
-  skipActive: () => void;
+  /** The active recipient's own Messages app was opened and (we assume) sent — advance the queue. */
+  markActiveSent: () => void;
+  /** The griever chose not to text this person right now — advance the queue without marking sent. */
+  markActiveSkipped: () => void;
   nextStep: () => void;
   prevStep: () => void;
   reset: () => void;
@@ -160,9 +127,6 @@ export function freshDraft(patch: Partial<SendFlowDraft>): SendFlowDraft {
 
 function fromDraft(draft: SendFlowDraft): SendFlowState {
   const restored: SendFlowState = { ...initialState, ...draft, sendJob: null };
-  // A real in-progress job (if any) is restored asynchronously from
-  // `sendJobStore` right after mount — this is just the synchronous-render
-  // fallback for the moment before that lookup resolves.
   if (restored.step === 'sending') restored.step = 'review';
   return restored;
 }
@@ -226,9 +190,9 @@ function stepsFor(state: SendFlowState, template: Template | null): SendFlowStep
     ];
   }
   if (category === 'obituary') {
-    // No sms: loop here — the review screen shares directly via
-    // navigator.share() (tasks/04-sending.md §3), so there's no 'sending' step.
-    return ['template', 'contacts', 'review', 'sent'];
+    // The one required field (the link) is gathered on the session in C4,
+    // not a per-flow details form — skip straight to recipients.
+    return ['template', 'contacts', 'review', 'sending', 'sent'];
   }
   return ['template', 'details', 'contacts', 'review', 'sending', 'sent'];
 }
@@ -270,29 +234,21 @@ export function composedFieldsWithFlorist(
   return buildComposedFields(state, floristName, state.session ?? null);
 }
 
-function newJobId(): string {
-  return `job_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export interface UseSendFlowOptions {
   /** The person every message in this flow is about. */
   session?: SessionDetails | null;
-  /** The session's id — required to key/resume a persisted send job. */
-  sessionId?: string;
   /** Draft to restore (from the session). Overrides `storage` when present. */
   draft?: SendFlowDraft | null;
   /** Called on every state change so the caller can persist the draft. */
   onDraftChange?: (draft: SendFlowDraft) => void;
   /** Fallback persistence when there is no session (standalone / mobile). */
   storage?: SendFlowStorage;
-  /** The local handoff log — omit to run the send job in memory only (no crash resume). */
-  sendJobStore?: SendJobStore;
 }
 
 export function useSendFlow(
   options: UseSendFlowOptions = {},
 ): SendFlowState & SendFlowActions & SendFlowDerived {
-  const { session = null, sessionId, draft = null, onDraftChange, storage, sendJobStore } = options;
+  const { session = null, draft = null, onDraftChange, storage } = options;
 
   const [state, setState] = useState<SendFlowState>(() =>
     draft ? fromDraft(draft) : loadState(storage),
@@ -305,33 +261,6 @@ export function useSendFlow(
       persist(storage, state);
     }
   }, [state, onDraftChange, storage]);
-
-  // Resume an in-progress send job after a crash/relaunch (tasks/04-sending.md
-  // §2's "force-quitting ... resumes the loop at the right person"). Runs
-  // once per (sessionId, sendJobStore) — i.e. once per mount, since Flow.tsx
-  // keys the whole flow by session id already.
-  useEffect(() => {
-    if (!sendJobStore || !sessionId) return;
-    let cancelled = false;
-    (async () => {
-      const category = resolveTemplate(state)?.category ?? state.templateCategory;
-      const momentKey = category ? MOMENT_KEY_BY_CATEGORY[category] : null;
-      if (!momentKey) return;
-      const jobs = await sendJobStore.listBySessionId(sessionId);
-      const incomplete = jobs.find(
-        (j) => j.momentKey === momentKey && j.cursorIndex < j.entries.length,
-      );
-      if (!cancelled && incomplete) {
-        setState((s) => ({ ...s, sendJob: incomplete, step: 'sending' }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Deliberately only re-runs when the store/session identity changes —
-    // this is a one-time-per-mount resume check, not a live subscription.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sendJobStore, sessionId]);
 
   const selectedTemplate = useMemo(() => resolveTemplate(state), [state]);
   const steps = useMemo(
@@ -431,80 +360,43 @@ export function useSendFlow(
     setState((s) => ({ ...s, messageOverride: value }));
   }, []);
 
-  // Reads `state` directly (not the setState-functional form) so the
-  // `sendJobStore.put()` side effect below runs exactly once — React 18
-  // StrictMode double-invokes a functional updater to catch exactly this
-  // class of bug (a side effect inside `setState(s => ...)` fires twice and
-  // silently wrote two jobs for one tap the first time this was tried here).
   const startSendJob = useCallback(() => {
-    const category = resolveTemplate(state)?.category ?? state.templateCategory;
-    const momentKey = category ? MOMENT_KEY_BY_CATEGORY[category] : null;
-    if (!momentKey || !sessionId) return;
-    const job: SendJob = {
-      jobId: newJobId(),
-      sessionId,
-      momentKey,
-      entries: state.selectedContactIds.map((contactId) => ({
-        contactId,
-        status: 'queued' as RecipientDeliveryStatus,
-      })),
-      cursorIndex: 0,
-      createdAt: Date.now(),
-    };
-    void sendJobStore?.put(job);
-    setState((s) => ({ ...s, step: 'sending', sendJob: job }));
-  }, [state, sessionId, sendJobStore]);
+    setState((s) => ({
+      ...s,
+      step: 'sending',
+      sendJob: {
+        id: `job-${Date.now()}`,
+        // Only the first recipient is "active" (sms: link ready to open) —
+        // the rest wait their turn. One contact at a time, never a bulk send.
+        recipients: s.selectedContactIds.map((contactId, i) => ({
+          contactId,
+          status: (i === 0 ? 'sending' : 'queued') as RecipientDeliveryStatus,
+        })),
+      },
+    }));
+  }, []);
 
-  // Reused by confirmActive/skipActive: optionally writes the active entry's
-  // new status (omit to leave it as-is — "Not yet" keeps it `handed_off`),
-  // advances the cursor, persists, and completes the loop once every entry
-  // has an answer. Same reasoning as `startSendJob` above for reading
-  // `state.sendJob` directly rather than persisting inside the updater.
-  const advanceActive = useCallback(
-    (status?: 'confirmed' | 'skipped') => {
-      const job = state.sendJob;
-      if (!job) return;
-      const { cursorIndex, entries } = job;
-      if (cursorIndex >= entries.length) return;
-      const updatedEntries = entries.map((entry, i) => {
-        if (i !== cursorIndex) return entry;
-        if (!status) return entry;
-        return {
-          ...entry,
-          status,
-          ...(status === 'confirmed' ? { confirmedAt: Date.now() } : {}),
-        };
+  const advanceActive = useCallback((status: 'delivered' | 'skipped') => {
+    setState((s) => {
+      if (!s.sendJob) return s;
+      const idx = s.sendJob.recipients.findIndex((r) => r.status === 'sending');
+      if (idx === -1) return s;
+      const recipients = s.sendJob.recipients.map((r, i) => {
+        if (i === idx) return { ...r, status };
+        if (i === idx + 1) return { ...r, status: 'sending' as RecipientDeliveryStatus };
+        return r;
       });
-      const nextCursor = cursorIndex + 1;
-      const updatedJob: SendJob = { ...job, entries: updatedEntries, cursorIndex: nextCursor };
-      void sendJobStore?.put(updatedJob);
-      const allDone = nextCursor >= updatedJob.entries.length;
-      setState((s) => ({ ...s, sendJob: updatedJob, step: allDone ? 'sent' : s.step }));
-    },
-    [state.sendJob, sendJobStore],
-  );
+      const allDone = recipients.every((r) => r.status === 'delivered' || r.status === 'skipped');
+      return {
+        ...s,
+        sendJob: { ...s.sendJob, recipients },
+        step: allDone ? 'sent' : s.step,
+      };
+    });
+  }, []);
 
-  const handOffActive = useCallback(async () => {
-    if (!state.sendJob) return;
-    const { cursorIndex, entries } = state.sendJob;
-    if (cursorIndex >= entries.length) return;
-    const updatedEntries = entries.map((entry, i) =>
-      i === cursorIndex ? { ...entry, status: 'handed_off' as RecipientDeliveryStatus, handedOffAt: Date.now() } : entry,
-    );
-    const job: SendJob = { ...state.sendJob, entries: updatedEntries };
-    // Persist BEFORE the caller navigates away — this is the one place the
-    // await genuinely has to happen first, not "eventually" (tasks/04-sending
-    // .md §2).
-    await sendJobStore?.put(job);
-    setState((s) => (s.sendJob ? { ...s, sendJob: job } : s));
-  }, [state.sendJob, sendJobStore]);
-
-  const confirmActive = useCallback(
-    (confirmed: boolean) => advanceActive(confirmed ? 'confirmed' : undefined),
-    [advanceActive],
-  );
-
-  const skipActive = useCallback(() => advanceActive('skipped'), [advanceActive]);
+  const markActiveSent = useCallback(() => advanceActive('delivered'), [advanceActive]);
+  const markActiveSkipped = useCallback(() => advanceActive('skipped'), [advanceActive]);
 
   const nextStep = useCallback(() => {
     setState((s) => {
@@ -562,9 +454,8 @@ export function useSendFlow(
     setTone,
     setMessageOverride,
     startSendJob,
-    handOffActive,
-    confirmActive,
-    skipActive,
+    markActiveSent,
+    markActiveSkipped,
     nextStep,
     prevStep,
     reset,

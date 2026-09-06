@@ -4,8 +4,8 @@ import type { FlowProps } from '../app/App';
 export function SentScreen({ flow }: FlowProps) {
   const { fields, reset, sendJob } = flow;
   const name = fields['deceasedName'] ?? '';
-  const entries = sendJob?.entries ?? [];
-  const recipientCount = entries.filter((e) => e.status === 'confirmed').length;
+  const recipients = sendJob?.recipients ?? [];
+  const recipientCount = recipients.filter((r) => r.status === 'delivered').length;
 
   return (
     <View style={styles.container}>

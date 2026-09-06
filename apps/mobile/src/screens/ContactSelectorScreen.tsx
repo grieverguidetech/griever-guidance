@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -29,7 +29,6 @@ type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] }
 export function ContactSelectorScreen({ flow, contacts }: Props) {
   const { selectedContactIds, toggleContact, nextStep, prevStep } = flow;
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
-  const [importAvailable, setImportAvailable] = useState<boolean | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
@@ -38,16 +37,6 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   const [manualError, setManualError] = useState<string | null>(null);
 
   const selectedIds = new Set(selectedContactIds);
-
-  useEffect(() => {
-    let cancelled = false;
-    expoContactsSource.isAvailable().then((available) => {
-      if (!cancelled) setImportAvailable(available);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleImport() {
     setImporting(true);
@@ -59,8 +48,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
       setMode({ kind: 'reviewing', fresh: result.fresh });
     } catch (err) {
       if (!(err instanceof Cancelled)) {
-        console.error('[ContactSelectorScreen] import failed:', err);
-        setImportError('We could not read your contacts on this device. You can add people by hand instead.');
+        setImportError('We could not read your contacts. You can add people by hand instead.');
       }
     } finally {
       setImporting(false);
@@ -232,21 +220,14 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
         }
       />
       {importError && <Text style={[styles.errorText, styles.errorSpacing]}>{importError}</Text>}
-      {importAvailable === false && (
-        <Text style={[styles.empty, styles.errorSpacing]}>
-          This device can't bring contacts across automatically — add people by hand instead.
-        </Text>
-      )}
       <View style={styles.addRow}>
-        {importAvailable !== false && (
-          <TouchableOpacity style={styles.addButton} onPress={handleImport} disabled={importing} activeOpacity={0.8}>
-            {importing ? (
-              <ActivityIndicator color="#6B7FD4" size="small" />
-            ) : (
-              <Text style={styles.addButtonText}>Import from contacts</Text>
-            )}
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.addButton} onPress={handleImport} disabled={importing} activeOpacity={0.8}>
+          {importing ? (
+            <ActivityIndicator color="#6B7FD4" size="small" />
+          ) : (
+            <Text style={styles.addButtonText}>Import from contacts</Text>
+          )}
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setMode({ kind: 'adding' })}
