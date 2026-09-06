@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAccount, useContacts, useSessions, freshDraft } from '@griever/hooks';
+import { useAccount, useContacts, useSessions, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import type { AuthProvider, MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
@@ -82,13 +82,35 @@ export function App() {
     [sessions.sessions, activeId],
   );
 
-  const { updateDraft, recordMomentComplete } = sessions;
+  const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
     (d: SendFlowDraft) => {
-      if (activeId) updateDraft(activeId, d);
+      if (!activeId) return;
+      updateDraft(activeId, d);
+      // The service date lives in the flow draft's free-text fields (whatever
+      // form asked for it — the "service" template or the announcement's
+      // "yes, I have them" branch); persist it onto the session itself so it
+      // survives past this one draft and can anchor contact retention (see
+      // getContactsRetentionExpiry) even after the draft is reset.
+      const serviceDate = d.fields['serviceDate']?.trim();
+      if (serviceDate && serviceDate !== active?.serviceDate) {
+        updateSession(activeId, { serviceDate });
+      }
     },
-    [activeId, updateDraft],
+    [activeId, updateDraft, updateSession, active?.serviceDate],
   );
+
+  // Retention: the saved contact list is cleared 30 days past the latest
+  // known service date across all sessions (the family may still want it
+  // right up until the service is behind them) — see CONTACT_RETENTION_DAYS.
+  useEffect(() => {
+    if (contacts.loading || contacts.contacts.length === 0) return;
+    const expiry = getContactsRetentionExpiry(sessions.sessions);
+    if (expiry && Date.now() >= expiry.getTime()) {
+      void contacts.clearAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts.loading, sessions.sessions]);
 
   // Once a send job finishes, record who was told for dedup + the path view.
   const activeStep = active?.draft?.step;
@@ -109,6 +131,7 @@ export function App() {
             senderName: active.senderName,
             obituaryUrl: active.obituaryUrl,
             obituaryPublisher: active.obituaryPublisher,
+            serviceDate: active.serviceDate,
           }
         : null,
     [active],

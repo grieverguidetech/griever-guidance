@@ -59,6 +59,10 @@ libs/
                     contacts). Browser-only — see DATA.md.
   data-sync/        The offline sync engine (outbox flush, cursor-based pull/push, merge) that
                     talks to apps/gateway, never to Convex directly. See DATA.md.
+  contacts/         Platform-agnostic contact-import logic shared by web and mobile: the
+                    `ContactSource` adapter interface, normalize/dedupe/rank, and the
+                    fetch → review → commit pipeline. Device-specific adapters (the web Contact
+                    Picker, mobile's expo-contacts) live in the app that owns that device API.
   gateway-auth/     Account creation/sign-in routes (Google, Facebook, X, email) — currently a
                     placeholder, no routes yet; this task is paused.
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
@@ -149,7 +153,21 @@ was sent (see "What not to do").
 
 ## Contacts
 
-Read from the device on demand via `expo-contacts` (mobile) or `useMockContacts()` in development. Contact data is never stored — not in the database, not in state beyond the active send session.
+Read from the device on demand — `expo-contacts` on mobile (`apps/mobile/src/lib/expoContactsSource.native.ts`;
+`.web.ts` is a no-op stub, since expo-contacts has no web implementation and importing it there
+crashes on load), the Contact Picker API on Android Chrome web, manual entry everywhere else
+(`libs/contacts`, shared adapter logic behind the `ContactSource` interface). Never *raw* provider
+data — only 6 fields survive past the picker/import screen: `contactId`, `name`, `phone`, `email`,
+`tier`, `source` (see `Contact` in `libs/shared`).
+
+Contacts are persisted on-device only (IndexedDB on web via `libs/data-local`, AsyncStorage on
+mobile via `apps/mobile/src/lib/contactStore.ts` — same `ContactStore` interface, so `useContacts`
+is shared) — never sent to Convex, never to the gateway. They are **not** kept forever: the saved
+list is cleared 30 days after the latest known service date (`CONTACT_RETENTION_DAYS` in
+`libs/hooks/src/useSessions.ts`), on the theory the family may want to reuse it right up until the
+service is behind them, but has no reason to once it is. No service date yet set → no expiry
+computed → contacts are kept. Mobile has no multi-session model yet, so it anchors this to a single
+stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRetention.ts`).
 
 ---
 
@@ -195,7 +213,8 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No third-party UI component libraries in `apps/mobile` (no NativeBase, React Native Paper, Tamagui, etc.) — use core RN components
 - No backend SMS-sending path (no Twilio, no `libs/sms`, no server-side send route) — see rule 3
 - No shared types defined in apps
-- No contact data stored anywhere — not the DB, not state, not logs
+- No contact data reaches the gateway or Convex — on-device storage only (see "Contacts"), and never more than the 6 named `Contact` fields
+- No raw provider payload (photo, provider ID, labels, etc.) kept past the picker/import screen — normalize down to the 6 `Contact` fields immediately
 - No message content stored anywhere — not the DB, not state, not logs, not a send history; nothing to view or restore once sent (the user's own Messages app is the only record)
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only

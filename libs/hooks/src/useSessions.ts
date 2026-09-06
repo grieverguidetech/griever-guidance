@@ -1,6 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
+import { addDays, parseLooseDate } from '@griever/shared';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
+
+/** How long a saved contact list outlives the last known service date. */
+export const CONTACT_RETENTION_DAYS = 30;
+
+/**
+ * The saved contact list (a single pool shared across every session — see
+ * `useContacts`) is kept until 30 days after the *latest* service date across
+ * all sessions, so it stays available as long as any session is still active.
+ * `null` means no session has a service date yet — nothing to expire against,
+ * so the list is kept indefinitely until one is set.
+ */
+export function getContactsRetentionExpiry(sessions: Session[]): Date | null {
+  const dates = sessions
+    .map((s) => parseLooseDate(s.serviceDate))
+    .filter((d): d is Date => d !== null);
+  if (dates.length === 0) return null;
+  const latest = new Date(Math.max(...dates.map((d) => d.getTime())));
+  return addDays(latest, CONTACT_RETENTION_DAYS);
+}
 
 export interface ReminderEntry {
   momentKey: MomentKey;

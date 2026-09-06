@@ -75,7 +75,8 @@ export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
         Save and continue
       </button>
       <p className="text-[12px] text-center italic m-0" style={{ color: 'var(--text-muted)' }}>
-        You can change this whenever you want.
+        You can change this whenever you want. We'll keep this list on your device until a month
+        after the service, in case you need it again.
       </p>
     </div>
   );

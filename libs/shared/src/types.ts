@@ -77,6 +77,15 @@ export interface SessionDetails {
   obituaryUrl: string;
   /** Optional — e.g. "The Waltham Register" (C4). */
   obituaryPublisher?: string;
+  /**
+   * Set once the family enters it on a "service" or "share service details"
+   * form (same free-text convention as `dateOfPassing` — parse with
+   * `parseLooseDate` before doing date math). Anchors contact retention: the
+   * saved contact list is cleared 30 days after this date (see
+   * `getContactsRetentionExpiry`), since the family may want to reuse it
+   * right up until the service is behind them.
+   */
+  serviceDate?: string;
 }
 
 export interface TemplateField {

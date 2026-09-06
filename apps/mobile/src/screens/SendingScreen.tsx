@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Linking, Platform, AppState, StyleSheet } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import { buildSmsLink } from '@griever/hooks';
-import { useMockContacts } from '@griever/hooks';
+import type { UseContactsResult } from '@griever/hooks';
 import type { FlowProps } from '../app/App';
 
 const UNDO_WINDOW_MS = 2000;
+
+interface Props extends FlowProps {
+  contacts: UseContactsResult;
+}
 
 /**
  * One contact at a time, texted from the griever's own number — not a bulk
@@ -15,15 +19,14 @@ const UNDO_WINDOW_MS = 2000;
  * of the web's visibilitychange) assumes it went through and auto-advances
  * after a short undo window.
  */
-export function SendingScreen({ flow }: FlowProps) {
+export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
-  const contacts = useMockContacts();
   const [pendingAdvance, setPendingAdvance] = useState(false);
   const awaitingReturnRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
-  const activeContact = active ? contacts.find((c) => c.contactId === active.contactId) : null;
+  const activeContact = active ? contacts.contacts.find((c) => c.contactId === active.contactId) : null;
 
   useEffect(() => {
     function handleAppStateChange(next: AppStateStatus) {

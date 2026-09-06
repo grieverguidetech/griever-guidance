@@ -46,4 +46,10 @@ export async function listPhones(): Promise<Set<string>> {
   return new Set(contacts.map((c) => c.phone));
 }
 
-export const contactStore = { list, get, put, putMany, delete: remove, listPhones };
+/** Retention expiry (30 days past the latest known service date) — see `useSessions`. */
+export async function clearAll(): Promise<void> {
+  const db = await openDb();
+  await db.clear("contacts");
+}
+
+export const contactStore = { list, get, put, putMany, delete: remove, listPhones, clearAll };

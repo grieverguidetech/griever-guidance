@@ -28,6 +28,7 @@ export interface ContactStore {
   put(contact: Contact): Promise<void>;
   putMany(contacts: Contact[]): Promise<void>;
   delete(contactId: string): Promise<void>;
+  clearAll(): Promise<void>;
 }
 
 export interface UseContactsResult {
@@ -40,6 +41,8 @@ export interface UseContactsResult {
   importContacts: (picked: PickedContact[], source: ContactRecordSource) => Promise<Contact[]>;
   setTier: (contactId: string, tier: ContactTier) => void;
   removeContact: (contactId: string) => void;
+  /** Retention expiry (30 days past the latest known service date) — see `useSessions`. */
+  clearAll: () => Promise<void>;
 }
 
 function newContactId(): string {
@@ -123,5 +126,10 @@ export function useContacts(store?: ContactStore): UseContactsResult {
     [store],
   );
 
-  return { contacts, loading, addContact, importContacts, setTier, removeContact };
+  const clearAll = useCallback(async () => {
+    setContacts([]);
+    await store?.clearAll();
+  }, [store]);
+
+  return { contacts, loading, addContact, importContacts, setTier, removeContact, clearAll };
 }
