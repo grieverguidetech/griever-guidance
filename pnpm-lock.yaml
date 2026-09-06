@@ -183,15 +183,15 @@ importers:
 
   apps/gateway:
     dependencies:
-      '@griever/gateway-auth':
-        specifier: workspace:*
-        version: link:../../libs/gateway-auth
       '@griever/gateway-messages':
         specifier: workspace:*
         version: link:../../libs/gateway-messages
       '@griever/gateway-sync':
         specifier: workspace:*
         version: link:../../libs/gateway-sync
+      '@griever/identity':
+        specifier: workspace:*
+        version: link:../../libs/identity
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.7)
@@ -367,12 +367,6 @@ importers:
         specifier: ^6.2.5
         version: 6.2.5
 
-  libs/gateway-auth:
-    dependencies:
-      hono:
-        specifier: ^4.13.7
-        version: 4.13.7
-
   libs/gateway-messages:
     dependencies:
       '@griever/shared':
@@ -396,6 +390,15 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared
+
+  libs/identity:
+    dependencies:
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.2.6)
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
 
   libs/shared:
     dependencies:
