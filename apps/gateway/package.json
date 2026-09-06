@@ -99,7 +99,7 @@
     }
   },
   "dependencies": {
-    "@griever/gateway-auth": "workspace:*",
+    "@griever/identity": "workspace:*",
     "@griever/gateway-messages": "workspace:*",
     "@griever/gateway-sync": "workspace:*",
     "@hono/node-server": "^2.1.1",

@@ -38,6 +38,18 @@ This also writes `CONVEX_URL` (and `CONVEX_SITE_URL`) to `apps/gateway/.env.loca
 that's what the gateway's own runtime (`apps/gateway/src/app/convexClient.ts`) reads to reach
 Convex. `apps/web` never sees any of this; it only ever calls the gateway (CLAUDE.md rule 2a).
 
+One more variable this deployment needs, set directly on Convex rather than in a `.env` file —
+`convex/identity.ts`'s functions read it from `process.env`, not from an argument, so it never
+travels over the wire:
+
+```bash
+npx convex env set IDENTITY_SERVICE_SECRET <same value as apps/gateway's IDENTITY_SERVICE_SECRET>
+```
+
+This must be the exact same string as `apps/gateway/.env`'s `IDENTITY_SERVICE_SECRET` — it's how
+`identity.ts` tells a call from the gateway (which has already verified a Facebook/Instagram sign-in)
+apart from an arbitrary call from a browser (see `libs/identity`'s CLAUDE.md section).
+
 ## Production (Convex Cloud)
 
 Production does **not** use the self-hosted Docker backend — it uses Convex's own managed cloud

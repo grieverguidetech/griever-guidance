@@ -40,7 +40,7 @@
       "path": "./libs/gateway-messages"
     },
     {
-      "path": "./libs/gateway-auth"
+      "path": "./libs/identity"
     },
     {
       "path": "./libs/gateway-sync"

@@ -41,7 +41,7 @@ Griever Guidance helps people who have just lost a loved one send funeral and se
 ```
 apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
-              Composes libs/gateway-auth, libs/gateway-messages, libs/gateway-sync into one HTTP
+              Composes libs/identity, libs/gateway-messages, libs/gateway-sync into one HTTP
               surface (CORS + routing) — this app owns no domain logic itself. Also holds the
               Convex functions (apps/gateway/convex/).
   web/        React + Vite + Tailwind. Browser send flow and account management.
@@ -63,14 +63,16 @@ libs/
                     `ContactSource` adapter interface, normalize/dedupe/rank, and the
                     fetch → review → commit pipeline. Device-specific adapters (the web Contact
                     Picker, mobile's expo-contacts) live in the app that owns that device API.
-  gateway-auth/     Account creation/sign-in routes (Google, Facebook, X, email) — currently a
-                    placeholder, no routes yet; this task is paused.
+  identity/         Sign-up/sign-in (Facebook, Instagram, and — once built — Google/X/email) and
+                    the session bearer token. Owns its own Hono router, mounted by apps/gateway.
+                    See "Identity" below — this is who a user is, never their friends or contacts.
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
                     sending happens entirely on-device (see "The send flow").
   gateway-sync/     The gateway's Convex client and the /sync/pull, /sync/push routes.
 
-  Each gateway-* lib owns its own Hono router and business logic, with no cross-imports between
-  them — apps/gateway only composes their routers together (CLAUDE.md rule 2b).
+  identity, gateway-messages, and gateway-sync each own their own Hono router and business logic,
+  with no cross-imports between them — apps/gateway only composes their routers together
+  (CLAUDE.md rule 2b).
 ```
 
 ---
@@ -115,8 +117,8 @@ Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app 
 **2a. The gateway is the only thing that talks to Convex.**
 `apps/web` (via `libs/data-sync`) calls `apps/gateway`'s REST endpoints, never Convex directly — no Convex client, URL, or credentials in `apps/web`. This is what makes rule 2 true for sync, not just for `/send`/`/history`/etc.
 
-**2b. Auth, messages, and sync are separate libs — no cross-imports.**
-`libs/gateway-auth`, `libs/gateway-messages`, and `libs/gateway-sync` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and one gateway-* lib never imports another.
+**2b. Identity, messages, and sync are separate libs — no cross-imports.**
+`libs/identity`, `libs/gateway-messages`, and `libs/gateway-sync` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of the three ever imports another (each keeps its own tiny Convex client rather than sharing one).
 
 **3. Messages are sent from the user's own phone, never a backend.**
 There is no server-side SMS provider (no Twilio, no `libs/sms`) — a bulk send from a business number reads as impersonal for a grief app. Sending is an `sms:` deep link (`buildSmsLink()` in `libs/hooks`) that opens the device's native Messages app with one contact and the message pre-filled; the user taps Send themselves, one contact at a time. Nothing in this repo may add a backend message-sending path.
@@ -171,6 +173,50 @@ stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRete
 
 ---
 
+## Identity
+
+Sign-up/sign-in lives in `libs/identity`, mounted by `apps/gateway` (`GET/POST /auth/*`) — it is
+the only lib that ever writes to Convex's `identities` table, and the only thing in this repo that
+talks to Facebook's or Instagram's OAuth endpoints. It answers exactly one question — **who is
+this** — and nothing else:
+
+- **Facebook Login** (`public_profile` + `email`, no app review needed) and **Instagram's
+  "Business Login for Instagram"** (a separate app/credential pair; Instagram accounts must be
+  Business or Creator — personal accounts have had no login API since Basic Display's Dec-2024
+  shutdown, and Instagram never supplies an email address, by platform limitation).
+- The OAuth `state` param and the session itself are both short signed tokens
+  (`libs/identity/src/token.ts`, HMAC-SHA256, no JWT library) — not cookies, since the gateway and
+  `apps/web` are different origins and a cross-site cookie would need `SameSite=None; Secure`,
+  which breaks on plain-HTTP local dev. The session token comes back to the browser in the
+  callback redirect's URL fragment (`#token=…`, never a query string, so it never reaches server
+  logs) and the client sends it back as `Authorization: Bearer <token>`.
+- `/auth/:provider/start` only ever redirects to a `redirectTo` matching `CORS_ORIGINS` — an
+  unchecked redirect target is a real vector for leaking someone's session token to another site
+  (see `libs/identity/src/router.ts`'s `isAllowedRedirect`).
+
+**Identity data and app-state data are two separate Convex tables, joined by `userId`** —
+`identities` (authProvider, providerSub, email, emailVerified — nothing else) and `profiles`
+(senderName, contactSource, checklistTicks). `sessions.userId` is a second foreign key onto the
+same `identities.userId`. Nothing but `libs/identity`'s Convex functions
+(`apps/gateway/convex/identity.ts`) may read or write `identities`/`profiles` directly — everything
+else in this repo reaches a user only by their opaque `userId`.
+
+**What Facebook/Instagram sign-in is not, and cannot become:** it does not, and cannot, give this
+app a friends list or a way to message someone's contacts. Facebook's `user_friends` permission
+only ever returns friends who *also* use this app and have separately granted it — never a
+person's real friend list. Neither platform has an API for a personal account to DM another
+personal account without that mechanism first requiring a Page/Business identity and the recipient
+messaging first. Verify before disagreeing — this has been checked twice against current Meta
+documentation. Sign-in with Facebook or Instagram is identity only; reaching a person's contacts is
+still the device/manual/Share-sheet path described under "Contacts" and "The send flow" — the two
+never merge.
+
+`apps/web`'s `SignUp` screen and `useAccount` hook are still the pre-existing mocked, client-only
+stand-in (no gateway call at all) — wiring the real `/auth/*` flow into that screen is a distinct,
+not-yet-done follow-up, not part of what `libs/identity` itself provides.
+
+---
+
 ## Database
 
 Convex — self-hosted via Docker for local development, Convex Cloud in production (two separate
@@ -189,10 +235,15 @@ send time (see "The send flow").
 
 ```
 apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
-              CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL                          (local dev)
+              CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL,
+              FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET,
+              GATEWAY_BASE_URL, IDENTITY_SESSION_SECRET, IDENTITY_SERVICE_SECRET (local dev)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL
 apps/mobile   EXPO_PUBLIC_API_URL
+
+Convex (set via `npx convex env set`, never a `.env` file — see infra/convex/README.md)
+              IDENTITY_SERVICE_SECRET  (must match apps/gateway's value exactly)
 ```
 
 `CORS_ORIGINS` is comma-separated allowed origins — there is no "allow all" mode; an empty value
@@ -219,7 +270,8 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation
-- No cross-imports between `libs/gateway-auth`, `libs/gateway-messages`, and `libs/gateway-sync`
+- No cross-imports between `libs/identity`, `libs/gateway-messages`, and `libs/gateway-sync`
+- No friends-list or peer-to-peer DM API calls to Facebook or Instagram — see "Identity"; neither platform allows either for a personal contact, regardless of OAuth
 
 ---
 
