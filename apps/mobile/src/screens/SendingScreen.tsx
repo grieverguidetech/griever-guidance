@@ -20,12 +20,12 @@ interface Props extends FlowProps {
  * after a short undo window.
  */
 export function SendingScreen({ flow, contacts }: Props) {
-  const { sendJob, markActiveSent, markActiveSkipped } = flow;
+  const { sendJob, confirmActive, skipActive, handOffActive } = flow;
   const [pendingAdvance, setPendingAdvance] = useState(false);
   const awaitingReturnRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
+  const active = sendJob?.entries[sendJob.cursorIndex] ?? null;
   const activeContact = active ? contacts.contacts.find((c) => c.contactId === active.contactId) : null;
 
   useEffect(() => {
@@ -35,12 +35,12 @@ export function SendingScreen({ flow, contacts }: Props) {
       setPendingAdvance(true);
       timerRef.current = setTimeout(() => {
         setPendingAdvance(false);
-        markActiveSent();
+        confirmActive(true);
       }, UNDO_WINDOW_MS);
     }
     const sub = AppState.addEventListener('change', handleAppStateChange);
     return () => sub.remove();
-  }, [markActiveSent]);
+  }, [confirmActive]);
 
   useEffect(() => {
     setPendingAdvance(false);
@@ -57,16 +57,17 @@ export function SendingScreen({ flow, contacts }: Props) {
 
   if (!sendJob) return null;
 
-  const total = sendJob.recipients.length;
-  const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
+  const total = sendJob.entries.length;
+  const activeIndex = sendJob.cursorIndex;
 
   function undo() {
     if (timerRef.current) clearTimeout(timerRef.current);
     setPendingAdvance(false);
   }
 
-  function openMessages() {
+  async function openMessages() {
     if (!active || !activeContact) return;
+    await handOffActive();
     const link = buildSmsLink(activeContact.phone, flow.composedMessage, Platform.OS === 'ios');
     awaitingReturnRef.current = true;
     Linking.openURL(link);
@@ -99,7 +100,7 @@ export function SendingScreen({ flow, contacts }: Props) {
               <TouchableOpacity style={styles.primaryButton} onPress={openMessages} activeOpacity={0.8}>
                 <Text style={styles.primaryButtonText}>Open Messages</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.skipButton} onPress={markActiveSkipped} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.skipButton} onPress={skipActive} activeOpacity={0.8}>
                 <Text style={styles.skipButtonText}>Skip</Text>
               </TouchableOpacity>
             </View>

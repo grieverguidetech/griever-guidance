@@ -1,5 +1,5 @@
 import { useSendFlow } from '@griever/hooks';
-import type { SendFlowDraft } from '@griever/hooks';
+import type { SendFlowDraft, SendJobStore } from '@griever/hooks';
 import type { Contact, SessionDetails } from '@griever/shared';
 import { TemplatePicker } from '../screens/TemplatePicker';
 import { AnnounceForm } from '../screens/AnnounceForm';
@@ -12,6 +12,7 @@ import { SendingScreen } from '../screens/SendingScreen';
 import { SentScreen } from '../screens/SentScreen';
 
 interface Props {
+  sessionId: string;
   session: SessionDetails;
   draft: SendFlowDraft | null;
   contacts: Contact[];
@@ -20,9 +21,11 @@ interface Props {
   onExitToLanding: () => void;
   onEditSession: () => void;
   onAddContact: (input: { name: string; phone: string }) => Promise<Contact>;
+  sendJobStore: SendJobStore;
 }
 
 export function Flow({
+  sessionId,
   session,
   draft,
   contacts,
@@ -31,8 +34,9 @@ export function Flow({
   onExitToLanding,
   onEditSession,
   onAddContact,
+  sendJobStore,
 }: Props) {
-  const flow = useSendFlow({ session, draft, onDraftChange });
+  const flow = useSendFlow({ session, sessionId, draft, onDraftChange, sendJobStore });
   const grouped = flow.templateCategory === 'announcement';
 
   switch (flow.step) {

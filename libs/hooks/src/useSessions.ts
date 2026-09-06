@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
-import { addDays, parseLooseDate } from '@griever/shared';
+import { addDays, parseLooseDate, MOMENT_KEY_BY_CATEGORY } from '@griever/shared';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
 
 /** How long a saved contact list outlives the last known service date. */
@@ -92,13 +92,6 @@ function save(storage: SendFlowStorage | undefined, sessions: Session[]): void {
 function newId(): string {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
-
-const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
-  announcement: 'announce',
-  service: 'service',
-  obituary: 'obituary',
-  aftercare: 'thanks',
-};
 
 export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));

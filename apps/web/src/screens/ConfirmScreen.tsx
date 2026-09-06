@@ -14,11 +14,14 @@ interface Props {
 export function ConfirmScreen({ flow }: Props) {
   const florists = useMockFlorists(flow.place);
   const [editing, setEditing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   if (!flow.selectedTemplate) return null;
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
+  const isObituary = flow.templateCategory === 'obituary';
   const recipientCount = flow.selectedContactIds.length;
 
   const selectedFlorist = florists.find((f) => f.id === flow.floristId) ?? null;
@@ -36,6 +39,32 @@ export function ConfirmScreen({ flow }: Props) {
     // Texting each person from their own number happens one at a time on the
     // next screen — nothing to send from here (no backend call at all).
     flow.startSendJob();
+  }
+
+  // The widening circle is one broadcast, not a per-contact loop — the
+  // native share sheet (tasks/04-sending.md §3), or a clipboard copy where
+  // it's unavailable. No second composer: `message` above is the same text
+  // either path sends. The obituary link is already inlined into `message`
+  // by the template itself, so it isn't passed again as a separate `url` —
+  // duplicating it risks some share targets showing the link twice.
+  function handleShare() {
+    setShareError(null);
+    if (navigator.share) {
+      // No await before this call — navigator.share() must fire directly
+      // from the click's own gesture, not after any async work.
+      navigator.share({ text: message }).then(
+        () => flow.nextStep(),
+        (err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return; // dismissed, not a failure
+          setShareError("That didn't go through. You can try again.");
+        },
+      );
+      return;
+    }
+    navigator.clipboard
+      .writeText(message)
+      .then(() => setCopied(true))
+      .catch(() => setShareError('Could not copy the message. You can select and copy it yourself.'));
   }
 
   return (
@@ -97,20 +126,54 @@ export function ConfirmScreen({ flow }: Props) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleSend}
-        disabled={recipientCount === 0}
-        className="gg-btn gg-btn-primary gg-btn-block"
-      >
-        {isAnnouncement
-          ? `Text ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}`
-          : 'Text these people'}
-      </button>
+      {isObituary ? (
+        <>
+          {shareError && (
+            <p className="text-[13px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+              {shareError}
+            </p>
+          )}
+          {copied ? (
+            <>
+              <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-700)' }}>
+                Copied. Paste it into a message, email, or post wherever you'd like.
+              </p>
+              <button type="button" onClick={() => flow.nextStep()} className="gg-btn gg-btn-primary gg-btn-block">
+                Done
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={recipientCount === 0}
+              className="gg-btn gg-btn-primary gg-btn-block"
+            >
+              Share
+            </button>
+          )}
+          <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
+            Opens your phone's share options — Messages, email, or wherever you'd like to post it.
+          </p>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={recipientCount === 0}
+            className="gg-btn gg-btn-primary gg-btn-block"
+          >
+            {isAnnouncement
+              ? `Text ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}`
+              : 'Text these people'}
+          </button>
 
-      <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
-        You'll text each person from your own number, one at a time.
-      </p>
+          <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
+            You'll text each person from your own number, one at a time.
+          </p>
+        </>
+      )}
     </div>
   );
 }

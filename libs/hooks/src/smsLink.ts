@@ -22,3 +22,27 @@ export function buildSmsLink(phone: string, message: string, isIOS: boolean): st
 export function isIOSUserAgent(userAgent: string): boolean {
   return /iPad|iPhone|iPod/.test(userAgent);
 }
+
+/**
+ * There's no direct way to feature-detect "can this device open sms: links
+ * and does it likely have a Messages app" — a laptop can technically have a
+ * `sms:` protocol handler registered and a phone technically might not, so
+ * this is a plausibility signal, not a guarantee (tasks/04-sending.md §5:
+ * "detect by whether sms: handoff is plausible, and say it plainly rather
+ * than showing a disabled button"). A coarse pointer (touchscreen) is the
+ * primary signal; the UA check is a fallback for browsers that don't
+ * support the media query.
+ */
+export function smsHandoffPlausible(
+  userAgent: string,
+  matchMediaFn?: (query: string) => { matches: boolean },
+): boolean {
+  if (matchMediaFn) {
+    try {
+      return matchMediaFn('(pointer: coarse)').matches;
+    } catch {
+      // matchMedia unavailable in this environment — fall through to the UA check
+    }
+  }
+  return /iPhone|iPad|iPod|Android/i.test(userAgent);
+}

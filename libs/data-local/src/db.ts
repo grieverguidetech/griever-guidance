@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from "idb";
-import type { Contact, SessionDocument } from "@griever/shared";
+import type { Contact, MomentKey, RecipientDeliveryStatus, SessionDocument } from "@griever/shared";
 
 /** DATA.md §1 — the outbox op the client appends before applying any local change. */
 export interface OutboxOp {
@@ -21,11 +21,24 @@ export interface OutboxOp {
   attempts: number;
 }
 
-/** DATA.md §1's `sendJobs` store — ephemeral per-send delivery progress, never synced. */
+/**
+ * DATA.md §1's `sendJobs` store — a local handoff log, never synced (§1's own
+ * table: "Device capabilities ... Never mirrored to the server"). No
+ * server-side delivery state exists; `confirmed` is the user's own answer,
+ * nothing else (tasks/04-sending.md §4).
+ */
+export interface LocalSendJobEntry {
+  contactId: string;
+  status: RecipientDeliveryStatus;
+  handedOffAt?: number;
+  confirmedAt?: number;
+}
 export interface LocalSendJob {
   jobId: string;
   sessionId: string;
-  recipients: { contactId: string; status: "queued" | "sending" | "delivered" | "failed" }[];
+  momentKey: MomentKey;
+  entries: LocalSendJobEntry[];
+  cursorIndex: number;
   createdAt: number;
 }
 

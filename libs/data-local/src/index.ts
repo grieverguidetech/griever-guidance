@@ -1,4 +1,4 @@
-export type { GGSchema, OutboxOp, LocalSendJob, AccountRecord, MetaRecord } from "./db.js";
+export type { GGSchema, OutboxOp, LocalSendJob, LocalSendJobEntry, AccountRecord, MetaRecord } from "./db.js";
 export { openDb, _resetDbConnectionForTests } from "./db.js";
 
 export * from "./clock.js";

@@ -9,10 +9,14 @@ interface Props {
 
 export function SentScreen({ flow }: Props) {
   const isAnnouncement = flow.templateCategory === 'announcement';
+  const isObituary = flow.templateCategory === 'obituary';
   const name = flow.session?.personName?.trim() || flow.fields['deceasedName']?.trim();
-  const recipients = flow.sendJob?.recipients ?? [];
-  const count = recipients.filter((r) => r.status === 'delivered').length;
-  const skipped = recipients.filter((r) => r.status === 'skipped').length;
+  const entries = flow.sendJob?.entries ?? [];
+  // The obituary path shares once via navigator.share() — no per-contact
+  // sendJob at all, so everyone selected counts as told (there's no
+  // per-recipient confirmation to read for a single broadcast).
+  const count = isObituary ? flow.selectedContactIds.length : entries.filter((e) => e.status === 'confirmed').length;
+  const skipped = isObituary ? 0 : entries.filter((e) => e.status === 'skipped').length;
   const people = `${count} ${count === 1 ? 'person' : 'people'}`;
 
   return (
@@ -30,13 +34,15 @@ export function SentScreen({ flow }: Props) {
       </div>
 
       <h1 className="text-[22px] m-0">
-        {isAnnouncement ? 'Everyone has been told.' : 'Your message has been sent.'}
+        {isAnnouncement ? 'Everyone has been told.' : isObituary ? 'Shared.' : 'Your message has been sent.'}
       </h1>
 
       <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)', maxWidth: '28ch' }}>
         {isAnnouncement
           ? `${people} now ${count === 1 ? 'knows' : 'know'} about ${name || 'your loved one'}. Nothing else needs doing today.`
-          : `${people} ${count === 1 ? 'has' : 'have'} service details${name ? ` for ${name}` : ''}.`}
+          : isObituary
+            ? `The obituary is on its way to ${people}.`
+            : `${people} ${count === 1 ? 'has' : 'have'} service details${name ? ` for ${name}` : ''}.`}
       </p>
 
       {skipped > 0 && (

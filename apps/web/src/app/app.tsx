@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useContacts, useSessions, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import type { AuthProvider, MomentKey, SessionDetails } from '@griever/shared';
-import { contactStore } from '@griever/data-local';
+import { contactStore, sendJobStore } from '@griever/data-local';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { AddContactsManual } from '../screens/AddContactsManual';
@@ -82,6 +82,23 @@ export function App() {
     [sessions.sessions, activeId],
   );
 
+  // A full reload resets `view` to its initial guess (`pathLanding`) —
+  // `activeId`/`view` live only in React state, not localStorage. Without
+  // this, force-quitting mid-send (tasks/04-sending.md §2's own DoD) would
+  // strand the user on the path-landing screen instead of back inside the
+  // Flow component that can actually resume the send loop — the resume
+  // logic in useSendFlow never gets a chance to run if Flow never remounts.
+  // Runs once per session becoming active, not on every deliberate exit
+  // back to path-landing from within the flow itself.
+  const restoredViewRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!active?.id || restoredViewRef.current === active.id) return;
+    restoredViewRef.current = active.id;
+    if (view === 'pathLanding' && active.draft && active.draft.step !== 'sent') {
+      setView('flow');
+    }
+  }, [active, view]);
+
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
     (d: SendFlowDraft) => {
@@ -113,12 +130,33 @@ export function App() {
   }, [contacts.loading, sessions.sessions]);
 
   // Once a send job finishes, record who was told for dedup + the path view.
+  // The obituary path is one navigator.share() broadcast (tasks/04-sending.md
+  // §3) — there's no per-contact confirmation to read, so everyone selected
+  // counts as told. Every other category went through the one-at-a-time sms:
+  // loop, where "told" means the user actually answered "yes" for that
+  // person — read the just-completed job's entries rather than assuming the
+  // full original selection went through.
   const activeStep = active?.draft?.step;
   const activeCategory = active?.draft?.templateCategory;
   useEffect(() => {
-    if (activeId && activeStep === 'sent' && activeCategory && active) {
+    if (!activeId || activeStep !== 'sent' || !activeCategory || !active) return;
+    if (activeCategory === 'obituary') {
       recordMomentComplete(activeId, activeCategory, active.draft?.selectedContactIds ?? []);
+      return;
     }
+    let cancelled = false;
+    void sendJobStore.listBySessionId(activeId).then((jobs) => {
+      if (cancelled) return;
+      const completed = jobs
+        .filter((j) => j.cursorIndex >= j.entries.length)
+        .sort((a, b) => b.createdAt - a.createdAt)[0];
+      const confirmedIds =
+        completed?.entries.filter((e) => e.status === 'confirmed').map((e) => e.contactId) ?? [];
+      recordMomentComplete(activeId, activeCategory, confirmedIds);
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, activeStep, activeCategory]);
 
@@ -358,6 +396,7 @@ export function App() {
       <Shell>
         <Flow
           key={active.id}
+          sessionId={active.id}
           session={activeDetails}
           draft={active.draft}
           contacts={contacts.contacts}
@@ -369,6 +408,7 @@ export function App() {
             setView('setup');
           }}
           onAddContact={({ name, phone }) => contacts.addContact({ name, phone, tier: 'family' })}
+          sendJobStore={sendJobStore}
         />
       </Shell>
     );

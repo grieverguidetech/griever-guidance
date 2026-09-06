@@ -137,17 +137,36 @@ Template picker → Details form → Contact selector → Confirm → Sending �
 
 This is the core user journey. It is driven by `useSendFlow()` from `libs/hooks`. Any change to this flow touches `libs/hooks`, `apps/web`, and `apps/mobile`.
 
-**Sending is one contact at a time, from the user's own number — never a bulk send.** The Sending
-step steps through `selectedContactIds` one at a time: "Open Messages" fires an `sms:` deep link
-(`buildSmsLink()`) to the device's native Messages app with that contact and the composed message
-pre-filled; the user taps Send there themselves — no web page or app can send an SMS on someone's
-behalf, by OS design. Returning to the app (detected via the Page Visibility API on web, `AppState`
-on mobile) assumes it went through and auto-advances to the next contact after a short undo window,
-rather than asking "did that send?" for every person in what could be a long list. Nothing is
-recorded as sent to a backend, and there is no delivery receipt — the user's own Messages thread
-with that contact is the only record, which is *more* trustworthy to a grieving person than an
-opaque "delivered ✓" from a service they've never heard of. The app itself keeps no history of what
-was sent (see "What not to do").
+**Sending is one contact at a time, from the user's own number — never a bulk send, and it happens
+on `apps/web` (mobile web), not the native Expo app.** The Sending step (`SendingScreen.tsx`, web
+only) steps through a persisted `SendJob`'s `entries` one at a time via `useSendFlow`'s
+`handOffActive()`/`confirmActive()`/`skipActive()`: "Open Messages" calls `handOffActive()` — which
+**persists the loop position to `@griever/data-local`'s `sendJobStore` (IndexedDB) before returning**
+— then fires an `sms:` deep link (`buildSmsLink()`) to the device's native Messages app with that
+contact and the composed message pre-filled. The user taps Send there themselves — no web page or
+app can send an SMS on someone's behalf, by OS design. There is no auto-advance and no inferred
+delivery: the app asks once, quietly, "did that go through?" with **Yes** (confirmed, advance) /
+**Not yet** (leaves it unconfirmed, advance — revisit later) / **Try again** (re-opens Messages for
+the same contact, doesn't advance). `confirmed` is set *only* by that answer — never by a timer or
+by the tab being backgrounded. Because the position is persisted before every handoff, force-quitting
+mid-loop and relaunching resumes at the exact right person (`useSendFlow`'s own rehydration effect,
+keyed by session + moment). Nothing is recorded as sent to a backend, and there is no delivery
+receipt — the user's own Messages thread with that contact is the only record, which is *more*
+trustworthy to a grieving person than an opaque "delivered ✓" from a service they've never heard of.
+The app itself keeps no history of message content (see "What not to do") — only which `contactId`s
+were actually confirmed, for the "you told N people" summary and the widening-circle dedup.
+
+**The widening circle (the obituary path) is a single broadcast via `navigator.share()`, not a
+per-contact loop.** `ConfirmScreen.tsx`'s obituary branch calls `navigator.share({ text })`
+synchronously from the button's own click (no `await` before it — the API throws otherwise), falling
+back to `navigator.clipboard.writeText()` with a plain "Copied" confirmation where `navigator.share`
+doesn't exist (desktop, some browsers). An `AbortError` means the user dismissed the share sheet —
+swallow it, don't show an error, don't change state. There is no separate composer for the share
+text; it's the same `composeMessage()` used everywhere else, and the obituary link is already
+inlined into that text by the template, so it is never passed a second time as `navigator.share`'s
+`url` field. On desktop (or anywhere `sms:` handoff isn't plausible — see `smsHandoffPlausible()` in
+`libs/hooks`), the Sending screen shows "open this on your phone" instead of a dead or disabled
+button; nothing about the flow up to that point requires a phone.
 
 ---
 
@@ -216,6 +235,8 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No contact data reaches the gateway or Convex — on-device storage only (see "Contacts"), and never more than the 6 named `Contact` fields
 - No raw provider payload (photo, provider ID, labels, etc.) kept past the picker/import screen — normalize down to the 6 `Contact` fields immediately
 - No message content stored anywhere — not the DB, not state, not logs, not a send history; nothing to view or restore once sent (the user's own Messages app is the only record)
+- No claiming, implying, or inferring delivery — `confirmed` is set only by the user answering "did that go through?", never by a timer, by backgrounding, or by `navigator.share()` resolving for a specific recipient (it can't — it's a broadcast)
+- No `sms:` link with more than one recipient in it
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation

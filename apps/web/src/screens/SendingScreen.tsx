@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { buildSmsLink, isIOSUserAgent } from '@griever/hooks';
+import { buildSmsLink, isIOSUserAgent, smsHandoffPlausible } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
 import { CheckCircle, CircleDashed, MinusCircle } from '@phosphor-icons/react';
 
@@ -11,78 +11,50 @@ interface Props {
   contacts: Contact[];
 }
 
-const UNDO_WINDOW_MS = 2000;
-
 /**
  * One contact at a time, texted from the griever's own number — not a bulk
  * send. Tapping "Open Messages" hands off to the device's own Messages app
  * (an sms: link) with the contact and message pre-filled; the griever taps
- * Send there themselves, which is the one thing no web page can do on their
- * behalf. Returning to this tab (detected via visibilitychange) assumes it
- * went through and auto-advances after a short undo window, rather than
- * asking "did that send?" for every one of what could be a dozen people.
+ * Send there themselves, which is the one thing no page can do on their
+ * behalf. There is no delivery signal to read, so the app asks once,
+ * quietly: "did that go through?" — Yes / Not yet / Try again. Never
+ * inferred from a timer or from the tab being backgrounded
+ * (tasks/04-sending.md §4).
  */
 export function SendingScreen({ flow, contacts }: Props) {
-  const { sendJob, markActiveSent, markActiveSkipped } = flow;
-  const [pendingAdvance, setPendingAdvance] = useState(false);
-  const awaitingReturnRef = useRef(false);
-  const timerRef = useRef<number | null>(null);
-
-  const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
-  const activeContact = active ? contacts.find((c) => c.contactId === active.contactId) : null;
-
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState !== 'visible' || !awaitingReturnRef.current) return;
-      awaitingReturnRef.current = false;
-      setPendingAdvance(true);
-      timerRef.current = window.setTimeout(() => {
-        setPendingAdvance(false);
-        markActiveSent();
-      }, UNDO_WINDOW_MS);
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [markActiveSent]);
-
-  // A fresh recipient became active (after the previous one advanced) —
-  // any pending toast/timer belonged to the last person, not this one.
-  useEffect(() => {
-    setPendingAdvance(false);
-    awaitingReturnRef.current = false;
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, [active?.contactId]);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    },
-    [],
-  );
+  const { sendJob, handOffActive, confirmActive, skipActive } = flow;
+  const [error, setError] = useState<string | null>(null);
 
   if (!sendJob) return null;
 
-  const total = sendJob.recipients.length;
-  const done = sendJob.recipients.filter((r) => r.status === 'delivered' || r.status === 'skipped').length;
-  const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
+  const { entries, cursorIndex } = sendJob;
+  const active = entries[cursorIndex] ?? null;
+  const activeContact = active ? contacts.find((c) => c.contactId === active.contactId) : null;
+  const total = entries.length;
+  const done = entries.filter((e) => e.status === 'confirmed' || e.status === 'skipped').length;
   const nameFor = (id: string) => contacts.find((c) => c.contactId === id)?.name ?? 'Recipient';
 
-  function undo() {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    setPendingAdvance(false);
+  if (!smsHandoffPlausible(navigator.userAgent, typeof matchMedia === 'function' ? matchMedia : undefined)) {
+    return (
+      <div className="flex flex-col gap-4 pt-8">
+        <h1 className="text-[22px]">Open this on your phone to send</h1>
+        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
+          Texting each person from your own number only works from a phone with Messages installed.
+          Everything up to here is saved — pick up where you left off on your phone.
+        </p>
+      </div>
+    );
   }
 
-  function openMessages() {
+  async function openMessages() {
     if (!active || !activeContact) return;
-    const link = buildSmsLink(activeContact.phone, flow.composedMessage, isIOSUserAgent(navigator.userAgent));
-    awaitingReturnRef.current = true;
-    window.location.href = link;
+    setError(null);
+    try {
+      await handOffActive();
+      window.location.href = buildSmsLink(activeContact.phone, flow.composedMessage, isIOSUserAgent(navigator.userAgent));
+    } catch {
+      setError("We couldn't open Messages. You can try again.");
+    }
   }
 
   return (
@@ -112,7 +84,7 @@ export function SendingScreen({ flow, contacts }: Props) {
         <div className="gg-card flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <span className="gg-eyebrow m-0">
-              {activeIndex + 1} of {total}
+              {cursorIndex + 1} of {total}
             </span>
             <span className="gg-card-title text-[16px]">{activeContact.name}</span>
           </div>
@@ -120,21 +92,35 @@ export function SendingScreen({ flow, contacts }: Props) {
             {flow.composedMessage}
           </p>
 
-          {pendingAdvance ? (
-            <div className="flex items-center justify-between">
-              <span className="text-[13px]" style={{ color: 'var(--color-accent-700)' }}>
-                Sent to {activeContact.name}
+          {error && (
+            <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+              {error}
+            </p>
+          )}
+
+          {active.status === 'handed_off' ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                Did that go through?
               </span>
-              <button type="button" onClick={undo} className="gg-btn gg-btn-ghost !min-h-0">
-                Undo
-              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => confirmActive(true)} className="gg-btn gg-btn-primary flex-1">
+                  Yes
+                </button>
+                <button type="button" onClick={() => confirmActive(false)} className="gg-btn gg-btn-secondary flex-1">
+                  Not yet
+                </button>
+                <button type="button" onClick={openMessages} className="gg-btn gg-btn-ghost">
+                  Try again
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex gap-2">
               <button type="button" onClick={openMessages} className="gg-btn gg-btn-primary flex-1">
                 Open Messages
               </button>
-              <button type="button" onClick={markActiveSkipped} className="gg-btn gg-btn-secondary">
+              <button type="button" onClick={skipActive} className="gg-btn gg-btn-secondary">
                 Skip
               </button>
             </div>
@@ -143,20 +129,25 @@ export function SendingScreen({ flow, contacts }: Props) {
       )}
 
       <div className="flex flex-col gap-2">
-        {sendJob.recipients.map((r) => {
-          if (r.contactId === active?.contactId) return null;
+        {entries.map((entry, i) => {
+          if (i === cursorIndex) return null;
           return (
-            <div key={r.contactId} className="flex items-center justify-between text-[14px]">
-              <span>{nameFor(r.contactId)}</span>
-              {r.status === 'delivered' ? (
+            <div key={entry.contactId} className="flex items-center justify-between text-[14px]">
+              <span>{nameFor(entry.contactId)}</span>
+              {entry.status === 'confirmed' ? (
                 <span className="flex items-center gap-[6px]" style={{ color: 'var(--color-accent-700)' }}>
                   <CheckCircle size={16} weight="duotone" />
                   Sent
                 </span>
-              ) : r.status === 'skipped' ? (
+              ) : entry.status === 'skipped' ? (
                 <span className="flex items-center gap-[6px]" style={{ color: 'var(--text-hint)' }}>
                   <MinusCircle size={16} weight="duotone" />
                   Skipped
+                </span>
+              ) : entry.status === 'handed_off' ? (
+                <span className="flex items-center gap-[6px]" style={{ color: 'var(--text-hint)' }}>
+                  <MinusCircle size={16} weight="duotone" />
+                  Not confirmed
                 </span>
               ) : (
                 <span className="flex items-center gap-[6px]" style={{ color: 'var(--text-hint)' }}>
