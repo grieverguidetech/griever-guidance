@@ -193,6 +193,26 @@ this** — and nothing else:
 - `/auth/:provider/start` only ever redirects to a `redirectTo` matching `CORS_ORIGINS` — an
   unchecked redirect target is a real vector for leaking someone's session token to another site
   (see `libs/identity/src/router.ts`'s `isAllowedRedirect`).
+- Email/password (`POST /auth/password/signup` / `/signin`) is real too, not mocked — passwords are
+  hashed server-side (PBKDF2-SHA256, `libs/identity/src/password.ts`) before Convex ever sees them,
+  and sign-in returns the same generic "Incorrect email or password." whether the email doesn't
+  exist or the password is wrong, so a failed attempt never confirms which one.
+- `apps/web`'s `useIdentity` hook (`libs/hooks`) is the real thing now — it replaced `useAccount`
+  (deleted, along with the `Account` type it was the only user of). Signing in via
+  Facebook/Instagram is a full-page redirect (there's no popup/iframe flow), so the callback's
+  `#token=…` fragment is consumed once at boot (`apps/web/src/app/app.tsx`) rather than through any
+  client-side routing.
+- **This does not, by itself, make `/sync/pull`/`/sync/push` work in production.** Those routes
+  still authenticate via `convex/auth.ts`'s `requireUser` dev stub (`GG_DEV_AUTH`), a separate,
+  older mechanism from this session's Bearer token — `apps/web/src/lib/registerSync.ts`'s
+  `setSyncUserId` feeds the real signed-in `userId` into that stub's `x-gg-user` header (correct in
+  local dev, where `GG_DEV_AUTH=1`), but a real deployment never sets `GG_DEV_AUTH` (enforced by
+  `scripts/check-dev-auth.mjs`), so `requireUser` still throws there regardless of who's signed in.
+  Verifying the real session token server-side and replacing the stub with it is separate,
+  not-yet-done work. Separately, nothing in `apps/web`'s actual send flow (`useSessions`,
+  `useSendFlow`) writes into `libs/data-local`'s screen-keyed store yet, so even where sync *can*
+  authenticate, the outbox it would flush is currently always empty — see DATA.md for the intended
+  shape; wiring the two together is its own task, not started.
 
 **Identity data and app-state data are two separate Convex tables, joined by `userId`** —
 `identities` (authProvider, providerSub, email, emailVerified — nothing else) and `profiles`
@@ -211,9 +231,10 @@ documentation. Sign-in with Facebook or Instagram is identity only; reaching a p
 still the device/manual/Share-sheet path described under "Contacts" and "The send flow" — the two
 never merge.
 
-`apps/web`'s `SignUp` screen and `useAccount` hook are still the pre-existing mocked, client-only
-stand-in (no gateway call at all) — wiring the real `/auth/*` flow into that screen is a distinct,
-not-yet-done follow-up, not part of what `libs/identity` itself provides.
+`apps/web`'s `SignUp`/`CreateAccount` screens call the real `/auth/*` flow via `useIdentity` — see
+the bullets above. Google and X are still shown, disabled ("coming soon"): no backend exists for
+either, and leaving them silently mocked (as Facebook/Instagram/password used to be) would recreate
+the exact "signed up, nothing in Convex" gap this replaced.
 
 ---
 

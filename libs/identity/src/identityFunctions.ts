@@ -40,3 +40,27 @@ export const getIdentityAndProfile = makeFunctionReference<
   GetIdentityAndProfileArgs,
   GetIdentityAndProfileResult
 >('identity:getIdentityAndProfile');
+
+export type SignUpWithPasswordArgs = {
+  serviceSecret: string;
+  email: string;
+  passwordHash: string;
+  passwordSalt: string;
+  senderName: string;
+};
+export type SignUpWithPasswordResult = { userId: string; isNewIdentity: boolean };
+
+export type GetPasswordCredentialArgs = { serviceSecret: string; email: string };
+export type GetPasswordCredentialResult = { userId: string; passwordHash: string; passwordSalt: string } | null;
+
+export const signUpWithPassword = makeFunctionReference<
+  'mutation',
+  SignUpWithPasswordArgs,
+  SignUpWithPasswordResult
+>('identity:signUpWithPassword');
+
+export const getPasswordCredential = makeFunctionReference<
+  'query',
+  GetPasswordCredentialArgs,
+  GetPasswordCredentialResult
+>('identity:getPasswordCredential');

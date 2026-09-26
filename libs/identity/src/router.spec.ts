@@ -125,6 +125,106 @@ describe('GET /auth/:provider/callback', () => {
   });
 });
 
+describe('POST /auth/password/signup', () => {
+  it('400s on a short password', async () => {
+    const { router } = buildRouter();
+    const res = await router.request('/auth/password/signup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'a@example.com', password: 'short', senderName: 'Ada' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('400s with no name or email', async () => {
+    const { router } = buildRouter();
+    const res = await router.request('/auth/password/signup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: '', password: 'longenough', senderName: '' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('hashes the password before it ever reaches Convex, and returns a session token', async () => {
+    const mutation = vi.fn().mockResolvedValue({ userId: 'usr_new', isNewIdentity: true });
+    const { router } = buildRouter({ convex: { mutation, query: vi.fn() } });
+    const res = await router.request('/auth/password/signup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'Ada@Example.com', password: 'longenoughpw', senderName: 'Ada' }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.token).toBeTruthy();
+    expect(body.userId).toBe('usr_new');
+    const [, args] = mutation.mock.calls[0] as [unknown, { passwordHash: string; email: string }];
+    expect(args.passwordHash).not.toBe('longenoughpw');
+    expect(args.email).toBe('Ada@Example.com');
+  });
+
+  it('409s when Convex reports the email is already taken', async () => {
+    const mutation = vi.fn().mockRejectedValue(new Error('An account with that email already exists.'));
+    const { router } = buildRouter({ convex: { mutation, query: vi.fn() } });
+    const res = await router.request('/auth/password/signup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'a@example.com', password: 'longenoughpw', senderName: 'Ada' }),
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already exists/);
+  });
+});
+
+describe('POST /auth/password/signin', () => {
+  it('401s with a generic message when the email has no account', async () => {
+    const { router } = buildRouter({ convex: { mutation: vi.fn(), query: vi.fn().mockResolvedValue(null) } });
+    const res = await router.request('/auth/password/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'nobody@example.com', password: 'whatever1' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('401s with the same generic message on a wrong password (no user-enumeration hint)', async () => {
+    const { hashPassword } = await import('./password.js');
+    const { hash, salt } = await hashPassword('the-real-password');
+    const query = vi.fn().mockResolvedValue({ userId: 'usr_1', passwordHash: hash, passwordSalt: salt });
+    const { router } = buildRouter({ convex: { mutation: vi.fn(), query } });
+    const wrongRes = await router.request('/auth/password/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'a@example.com', password: 'not-the-password' }),
+    });
+    const missingRes = await router.request('/auth/password/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'nobody@example.com', password: 'not-the-password' }),
+    });
+    expect(wrongRes.status).toBe(401);
+    expect(missingRes.status).toBe(401);
+    expect(await wrongRes.json()).toEqual(await missingRes.json());
+  });
+
+  it('signs in with the correct password and returns a session token', async () => {
+    const { hashPassword } = await import('./password.js');
+    const { hash, salt } = await hashPassword('the-real-password');
+    const query = vi.fn().mockResolvedValue({ userId: 'usr_1', passwordHash: hash, passwordSalt: salt });
+    const { router } = buildRouter({ convex: { mutation: vi.fn(), query } });
+    const res = await router.request('/auth/password/signin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'a@example.com', password: 'the-real-password' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.token).toBeTruthy();
+    expect(body.userId).toBe('usr_1');
+  });
+});
+
 describe('GET /auth/session', () => {
   it('401s with no bearer token', async () => {
     const { router } = buildRouter();

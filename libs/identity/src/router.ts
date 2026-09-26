@@ -1,7 +1,16 @@
 import { Hono } from 'hono';
 import type { OAuthProvider } from './oauthProvider.js';
 import { signToken, verifyToken } from './token.js';
-import { findOrCreateIdentity, getIdentityAndProfile } from './identityFunctions.js';
+import { hashPassword, verifyPassword } from './password.js';
+import {
+  findOrCreateIdentity,
+  getIdentityAndProfile,
+  signUpWithPassword,
+  getPasswordCredential,
+} from './identityFunctions.js';
+
+const MIN_PASSWORD_LENGTH = 8;
+const GENERIC_SIGNIN_ERROR = 'Incorrect email or password.';
 
 const STATE_TTL_SECONDS = 10 * 60; // long enough to pick a Facebook/Instagram account, short if leaked
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
@@ -145,6 +154,71 @@ export function createIdentityRouter(config: IdentityRouterConfig) {
   // to revoke yet. Kept as a real route (rather than left client-only) so
   // adding revocation later doesn't change the API shape apps/web calls.
   router.post('/auth/signout', (c) => c.json({ ok: true }));
+
+  router.post('/auth/password/signup', async (c) => {
+    if (!config.sessionSecret || !config.serviceSecret) {
+      return c.json({ error: 'Sign-in is not configured.' }, 500);
+    }
+    const body = await c.req.json().catch(() => null);
+    const email = typeof body?.email === 'string' ? body.email.trim() : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+    const senderName = typeof body?.senderName === 'string' ? body.senderName.trim() : '';
+    if (!email || !senderName) {
+      return c.json({ error: 'Name and email are required.' }, 400);
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return c.json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` }, 400);
+    }
+
+    const client = config.getConvexClient();
+    if (!client) return c.json({ error: 'Sign-in is not configured.' }, 500);
+
+    try {
+      const { hash, salt } = await hashPassword(password);
+      const result = (await client.mutation(signUpWithPassword, {
+        serviceSecret: config.serviceSecret,
+        email,
+        passwordHash: hash,
+        passwordSalt: salt,
+        senderName,
+      })) as { userId: string; isNewIdentity: boolean };
+
+      const sessionToken = await signToken({ userId: result.userId }, config.sessionSecret, SESSION_TTL_SECONDS);
+      return c.json({ token: sessionToken, userId: result.userId, isNewIdentity: result.isNewIdentity }, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not create an account.';
+      // The only error signUpWithPassword ever throws is the duplicate-email
+      // case — safe to surface verbatim, unlike the OAuth callback's catch.
+      return c.json({ error: message }, 409);
+    }
+  });
+
+  router.post('/auth/password/signin', async (c) => {
+    if (!config.sessionSecret || !config.serviceSecret) {
+      return c.json({ error: 'Sign-in is not configured.' }, 500);
+    }
+    const body = await c.req.json().catch(() => null);
+    const email = typeof body?.email === 'string' ? body.email.trim() : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+    if (!email || !password) {
+      return c.json({ error: GENERIC_SIGNIN_ERROR }, 401);
+    }
+
+    const client = config.getConvexClient();
+    if (!client) return c.json({ error: 'Sign-in is not configured.' }, 500);
+
+    const credential = (await client.query(getPasswordCredential, {
+      serviceSecret: config.serviceSecret,
+      email,
+    })) as { userId: string; passwordHash: string; passwordSalt: string } | null;
+    if (!credential) return c.json({ error: GENERIC_SIGNIN_ERROR }, 401);
+
+    const valid = await verifyPassword(password, credential.passwordHash, credential.passwordSalt);
+    if (!valid) return c.json({ error: GENERIC_SIGNIN_ERROR }, 401);
+
+    const sessionToken = await signToken({ userId: credential.userId }, config.sessionSecret, SESSION_TTL_SECONDS);
+    return c.json({ token: sessionToken, userId: credential.userId, isNewIdentity: false });
+  });
 
   return router;
 }
