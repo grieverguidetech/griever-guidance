@@ -204,6 +204,19 @@ libs/
 
 ---
 
+### Domain and hosting
+
+**`grieversguidance.com` is the official domain** — every public URL (marketing, web app, gateway,
+OAuth redirects, `CORS_ORIGINS`) should live under it. The DNS zone and all deploys are on the
+Tumultywebservices Cloudflare account; the old Grieverguidetech account is retired.
+`*.pages.dev` / `*.workers.dev` addresses are deploy targets behind the custom domains, never
+URLs to hand users or hardcode.
+
+Subdomain assignment is not final. Today `web.grieversguidance.com` is a CNAME to the web app's
+Pages project; the gateway and marketing custom domains are not yet attached.
+
+---
+
 ### Running the project
 
 ```sh
