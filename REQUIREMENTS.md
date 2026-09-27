@@ -45,6 +45,9 @@ These are not features; breaking one is a defect regardless of what it enables.
 
 ### 3.1 Account & identity (Flow D)
 
+**All of this is hidden behind `VITE_FEATURE_AUTH` until the app has users** (off by default; see
+"Identity" in §6). The statuses below describe the code, not what users see.
+
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
 | ID-1 | Sign up / sign in with Facebook | Done | Not started | `libs/identity` |
@@ -53,7 +56,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | ID-4 | Google sign-in | Not started | Not started | Shown disabled, "coming soon" |
 | ID-5 | X sign-in | Not started | Not started | Shown disabled, "coming soon" |
 | ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Not started | — | Blocks production sync |
-| ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done | Partial | DATA.md "Settled" |
+| ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done (flag on only) | Partial | DATA.md "Settled"; suspended while auth is flagged off |
 
 ### 3.2 Contacts (Flow D)
 
@@ -85,7 +88,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | SF-3 | Sending steps through contacts one at a time with a pre-filled `sms:` link | Done | Done | `buildSmsLink()` |
 | SF-4 | On return to the app, auto-advance after a short undo window (no "did it send?" per contact) | Done | Done | Page Visibility / `AppState` |
 | SF-5 | Share button (OS share sheet) with clipboard fallback, same undo toast | Done | Not started | |
-| SF-6 | AI-drafted obituary | Done | Not started | `libs/gateway-messages` |
+| SF-6 | AI-drafted obituary | Partial — flagged off (`VITE_FEATURE_OBITUARY_DRAFTING`), button disabled with an "in beta" tooltip; no screen links to `ObituaryScreen` since `52e5c4e` | Not started | `libs/gateway-messages` |
 | SF-7 | Announcement form has no required fields — read-only session recap + optional note | Done | Not started | |
 
 ### 3.5 Sync & data
@@ -308,6 +311,13 @@ stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRete
 
 ### Identity
 
+**Auth is feature-flagged off until the app has users.** `apps/web` shows sign-up/sign-in only
+when built with `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`; anything else is off).
+With it off, onboarding starts at adding contacts, `useIdentity` never reads a stored token or
+calls `/auth/*`, and sync never starts (it needs a signed-in `userId`). The gateway still mounts
+the `/auth` routes, and none of the code below is removed; turning the flag on restores it as
+described.
+
 Sign-up/sign-in lives in `libs/identity`, mounted by `apps/gateway` (`GET/POST /auth/*`) — it is
 the only lib that ever writes to Convex's `identities` table, and the only thing in this repo that
 talks to Facebook's or Instagram's OAuth endpoints. It answers exactly one question — **who is
@@ -393,7 +403,8 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
               FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET,
               GATEWAY_BASE_URL, IDENTITY_SESSION_SECRET, IDENTITY_SERVICE_SECRET (local dev)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
-apps/web      VITE_API_URL
+apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
+              VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
 apps/mobile   EXPO_PUBLIC_API_URL
 
 Convex (set via `npx convex env set`, never a `.env` file — see infra/convex/README.md)

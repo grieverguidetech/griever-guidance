@@ -1,4 +1,23 @@
+import { useId } from 'react';
+import type { ReactElement } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react';
+
+/**
+ * Shows `text` above its child on hover or focus. The child is expected to
+ * reference it via `aria-describedby={id}` (passed through the render prop), so
+ * screen readers announce it too.
+ */
+export function Tooltip({ text, children }: { text: string; children: (id: string) => ReactElement }) {
+  const id = useId();
+  return (
+    <span className="gg-tooltip">
+      {children(id)}
+      <span id={id} role="tooltip" className="gg-tooltip-text">
+        {text}
+      </span>
+    </span>
+  );
+}
 
 /** Ghost "Back" affordance — flush left, zero left padding, per the handoff. */
 export function BackButton({ onClick }: { onClick: () => void }) {

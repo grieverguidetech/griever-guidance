@@ -4,6 +4,7 @@ import type { Session, SendFlowDraft } from '@griever/hooks';
 import type { MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
+import { AUTH_ENABLED } from '../lib/features';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { AddContactsManual } from '../screens/AddContactsManual';
@@ -43,12 +44,21 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
-  const account = useIdentity(browserStorage);
+  // With auth flagged off, useIdentity gets no storage: no stored token is
+  // ever read, so it never calls /auth/session and never reports loading.
+  const account = useIdentity(AUTH_ENABLED ? browserStorage : undefined);
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
+  // Without auth there is no account gate — everyone is let straight in.
+  const isSignedIn = AUTH_ENABLED ? account.isSignedIn : true;
 
-  const [view, setView] = useState<AppView>('signup');
+  const [view, setView] = useState<AppView>(() => {
+    if (AUTH_ENABLED) return 'signup';
+    // useSessions reads storage synchronously, so a returning visitor goes
+    // straight to their session; a first visit starts at adding contacts.
+    return sessions.sessions.some((s) => s.personName.trim() !== '') ? 'pathLanding' : 'addContactsManual';
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [setupEditing, setSetupEditing] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
@@ -57,7 +67,7 @@ export function App() {
   // fragment, if this page load is one — runs once, before the view below
   // has a chance to render "signup" and flash it.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!AUTH_ENABLED || typeof window === 'undefined') return;
     const handled = account.completeOAuthCallback(window.location.hash);
     if (handled) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -69,8 +79,8 @@ export function App() {
   // check, or the OAuth callback above) — unlike the client-only mock this
   // replaced, so this can't be decided synchronously in useState's initializer.
   useEffect(() => {
-    if (account.isSignedIn && view === 'signup') setView('pathLanding');
-  }, [account.isSignedIn, view]);
+    if (isSignedIn && view === 'signup') setView('pathLanding');
+  }, [isSignedIn, view]);
 
   // Keeps libs/data-sync attributed to whoever is actually signed in. See
   // registerSync.ts's setSyncUserId for exactly what this does (and does
@@ -88,7 +98,7 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!account.isSignedIn || activeId) return;
+    if (!isSignedIn || activeId) return;
     if (sortedSessions.length > 0) {
       setActiveId(sortedSessions[0].id);
       return;
@@ -103,7 +113,7 @@ export function App() {
       setView('setup');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account.isSignedIn, activeId, sortedSessions, view]);
+  }, [isSignedIn, activeId, sortedSessions, view]);
 
   const active = useMemo<Session | null>(
     () => sessions.sessions.find((s) => s.id === activeId) ?? null,
@@ -222,7 +232,7 @@ export function App() {
 
   // ---- Flow D: account + contacts onboarding ----
 
-  if (view === 'signup') {
+  if (AUTH_ENABLED && view === 'signup') {
     return (
       <Shell>
         <SignUp
@@ -241,7 +251,7 @@ export function App() {
     );
   }
 
-  if (view === 'createAccount') {
+  if (AUTH_ENABLED && view === 'createAccount') {
     return (
       <Shell>
         <CreateAccount
@@ -264,7 +274,7 @@ export function App() {
       <Shell>
         <AddContactsManual
           contacts={contacts.contacts}
-          onBack={() => setView('createAccount')}
+          onBack={AUTH_ENABLED ? () => setView('createAccount') : undefined}
           onAdd={({ name, phone, hearsFirst }) =>
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
@@ -279,7 +289,7 @@ export function App() {
       <Shell>
         <ImportContacts
           storedPhones={storedPhones}
-          onBack={() => setView('signup')}
+          onBack={() => setView(AUTH_ENABLED ? 'signup' : 'addContactsManual')}
           onSwitchToManual={() => setView('addContactsManual')}
           onContinue={(picked, source) => {
             contacts.importContacts(picked, source);
@@ -296,7 +306,9 @@ export function App() {
         <WhoHearsFirst
           contacts={contacts.contacts}
           onBack={() =>
-            setView(account.identity?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts')
+            setView(
+              !AUTH_ENABLED || account.identity?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts',
+            )
           }
           onSave={(firstIds) => {
             const firstSet = new Set(firstIds);

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { generateObituary } from '@griever/api-client';
+import { OBITUARY_DRAFTING_ENABLED } from '../lib/features';
 import type { ObituaryRequest } from '@griever/shared';
-import { BackButton } from '../lib/ui';
+import { BackButton, Tooltip } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
 
 type ScreenState = 'form' | 'loading' | 'draft';
@@ -48,6 +49,7 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
   }
 
   async function handleSubmit() {
+    if (!OBITUARY_DRAFTING_ENABLED) return;
     setError('');
     setScreenState('loading');
     try {
@@ -179,14 +181,31 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-        className="gg-btn gg-btn-primary gg-btn-block"
-      >
-        Write the obituary
-      </button>
+      {OBITUARY_DRAFTING_ENABLED ? (
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="gg-btn gg-btn-primary gg-btn-block"
+        >
+          Write the obituary
+        </button>
+      ) : (
+        // aria-disabled rather than disabled: a disabled button gets no hover
+        // or focus events, so its tooltip could never show.
+        <Tooltip text="in beta">
+          {(tipId) => (
+            <button
+              type="button"
+              aria-disabled="true"
+              aria-describedby={tipId}
+              className="gg-btn gg-btn-primary gg-btn-block"
+            >
+              Write the obituary
+            </button>
+          )}
+        </Tooltip>
+      )}
     </div>
   );
 }
