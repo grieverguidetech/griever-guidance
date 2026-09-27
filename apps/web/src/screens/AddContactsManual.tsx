@@ -7,7 +7,8 @@ import { formatPhone } from '../lib/format';
 
 interface Props {
   contacts: Contact[];
-  onBack: () => void;
+  /** Omitted when this is the first screen (no account step before it). */
+  onBack?: () => void;
   onAdd: (input: { name: string; phone: string; hearsFirst: boolean }) => void;
   onDone: () => void;
 }
@@ -36,7 +37,7 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      {onBack && <BackButton onClick={onBack} />}
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Who should we be able to reach?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
