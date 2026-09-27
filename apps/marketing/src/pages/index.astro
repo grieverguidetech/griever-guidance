@@ -1,3 +1,6 @@
+---
+const webUrl = import.meta.env.PUBLIC_WEB_URL ?? 'https://web.grieversguidance.com/';
+---
 <!doctype html>
 <html lang="en">
   <head>
@@ -39,7 +42,7 @@
         know, from your phone, in minutes.
       </p>
       <a
-        href="https://griever-guidance-web.pages.dev/"
+        href={webUrl}
         style="display: inline-block; background: #6B7FD4; color: #fff; padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 500;"
       >
         Download the app

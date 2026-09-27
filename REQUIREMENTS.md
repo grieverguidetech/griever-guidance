@@ -212,8 +212,15 @@ Tumultywebservices Cloudflare account; the old Grieverguidetech account is retir
 `*.pages.dev` / `*.workers.dev` addresses are deploy targets behind the custom domains, never
 URLs to hand users or hardcode.
 
-Subdomain assignment is not final. Today `web.grieversguidance.com` is a CNAME to the web app's
-Pages project; the gateway and marketing custom domains are not yet attached.
+| Address | Serves | Configured in |
+|---|---|---|
+| `grieversguidance.com`, `www.` | marketing (Pages project `griever-guidance-marketing`) | Pages → Custom domains |
+| `web.grieversguidance.com` | web app (Pages project `griever-guidance-web`) | Pages → Custom domains |
+| `api.grieversguidance.com` | gateway (Worker `griever-guidance-gateway`) | `apps/gateway/wrangler.toml` `routes` |
+
+`VITE_API_URL` and `PUBLIC_WEB_URL` are set in `.github/workflows/deploy.yml`; `CORS_ORIGINS` and
+`GATEWAY_BASE_URL` in `apps/gateway/wrangler.toml`. Facebook's and Instagram's registered OAuth
+redirect URIs must be `https://api.grieversguidance.com/auth/<provider>/callback`.
 
 ---
 

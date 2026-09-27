@@ -5,13 +5,21 @@ compatibility_date = "2025-09-01"
 # Convex SDK needs it too.
 compatibility_flags = ["nodejs_compat"]
 
+# grieversguidance.com is the official domain (REQUIREMENTS.md §6). Wrangler
+# creates the DNS record and certificate for this on deploy.
+routes = [
+  { pattern = "api.grieversguidance.com", custom_domain = true }
+]
+
 [vars]
-# Comma-separated list of allowed CORS origins.
-# Cloudflare appended a random suffix to this project's pages.dev domain
-# (the plain "griever-guidance-web.pages.dev" was already taken elsewhere) —
-# confirm the real one with `wrangler pages deployment list --project-name
-# griever-guidance-web` before changing this, rather than guessing the name.
+# Comma-separated list of allowed CORS origins — the web app, which is the only
+# browser client that calls the gateway.
 # An empty string means no origin ever matches in src/worker.ts's Hono `cors()`
 # middleware — every cross-origin request is blocked, not allowed. There is
 # no "allow all" mode here; always set this explicitly.
-CORS_ORIGINS = "https://griever-guidance-web-1c3.pages.dev"
+CORS_ORIGINS = "https://web.grieversguidance.com"
+
+# Public base URL of this gateway; OAuth callbacks are built from it
+# (`${GATEWAY_BASE_URL}/auth/<provider>/callback`) and must match the redirect
+# URIs registered with Facebook and Instagram exactly.
+GATEWAY_BASE_URL = "https://api.grieversguidance.com"
