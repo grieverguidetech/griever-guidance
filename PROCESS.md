@@ -52,8 +52,12 @@ update this file (via `SELF_IMPROVEMENT.md`'s promote step) in the same PR.
 
 ## 3. Branching
 
-- Never commit directly to `main`. Branch as `feat/<area>-<short-name>`, `fix/<area>-<short-name>`,
-  or `refactor/<area>-<short-name>`.
+- **Work on `main` unless told otherwise.** Make changes directly on `main`; only create a branch
+  when the product owner asks for one.
+- Pushing to `main` deploys (`.github/workflows/deploy.yml`), so every push to `main` must be
+  shippable. Push only when asked.
+- When a branch is requested, name it `feat/<area>-<short-name>`, `fix/<area>-<short-name>`, or
+  `refactor/<area>-<short-name>`.
 - `<area>` matches the commit scope: `web`, `mobile`, `gateway`, `identity`, `send`, `contacts`,
   `sync`, `data`, `marketing`, `ci`.
 
