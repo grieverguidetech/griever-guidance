@@ -1,26 +1,18 @@
 import { useState } from 'react';
 import { generateObituary } from '@griever/api-client';
 import { OBITUARY_DRAFTING_ENABLED } from '../lib/features';
-import type { ObituaryRequest } from '@griever/shared';
+import type { ObituaryRequest, SessionDetails } from '@griever/shared';
 import { BackButton, Tooltip } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
 
 type ScreenState = 'form' | 'loading' | 'draft';
 
 interface Props {
+  /** The session's person — their name and date of passing prefill the form. */
+  session: SessionDetails | null;
   onBack: () => void;
-  /** Hand the finished obituary to the active session as its obituary link. */
-  onShareLink: (info: { fullName: string; dateOfPassing: string; url: string }) => void;
-}
-
-/** Stand-in for a published-obituary URL (no real hosting yet). */
-function mockObituaryUrl(fullName: string): string {
-  const slug =
-    fullName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'obituary';
-  return `https://obituaries.example.com/${slug}`;
+  /** Finished with the draft — back to "Has the obituary been published?". */
+  onDone: () => void;
 }
 
 const EMPTY_FIELDS: ObituaryRequest = {
@@ -33,9 +25,15 @@ const EMPTY_FIELDS: ObituaryRequest = {
   personalNote: '',
 };
 
-export function ObituaryScreen({ onBack, onShareLink }: Props) {
+export function ObituaryScreen({ session, onBack, onDone }: Props) {
   const [screenState, setScreenState] = useState<ScreenState>('form');
-  const [fields, setFields] = useState<ObituaryRequest>(EMPTY_FIELDS);
+  // Asked once at session setup, so never asked again here — only prefilled.
+  const [fields, setFields] = useState<ObituaryRequest>(() => ({
+    ...EMPTY_FIELDS,
+    fullName: session?.personName ?? '',
+    dateOfPassing: session?.dateOfPassing ?? '',
+  }));
+  const [handOff, setHandOff] = useState<'copied' | 'shared' | null>(null);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
 
@@ -70,6 +68,33 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
     }
   }
 
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  function copyDraft() {
+    navigator.clipboard.writeText(draft).then(
+      () => {
+        setError('');
+        setHandOff('copied');
+      },
+      () => setError('Could not copy the text. You can select and copy it yourself.'),
+    );
+  }
+
+  // For sending the draft to the funeral home or the paper. No await before
+  // share(): it has to run inside the tap's own gesture.
+  function shareDraft() {
+    navigator.share({ text: draft }).then(
+      () => {
+        setError('');
+        setHandOff('shared');
+      },
+      (err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setError("That didn't go through. You can copy the text instead.");
+      },
+    );
+  }
+
   if (screenState === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -85,7 +110,8 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px]">Obituary draft</h1>
           <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-            Edit the text below as needed, then copy and publish wherever you'd like.
+            Read it through and change anything you like. Then send it to the funeral home or the
+            paper — they publish it.
           </p>
         </div>
         <textarea
@@ -94,30 +120,33 @@ export function ObituaryScreen({ onBack, onShareLink }: Props) {
           className="gg-input"
           rows={12}
         />
+        {error && (
+          <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-2-700)' }}>
+            {error}
+          </p>
+        )}
+        {handOff && (
+          <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-700)' }}>
+            {handOff === 'copied' ? 'Copied.' : 'Shared.'} Once it has been published, come back and add the
+            link so you can send it to people.
+          </p>
+        )}
+        {canShare && (
+          <button type="button" onClick={shareDraft} className="gg-btn gg-btn-primary gg-btn-block">
+            Share it
+          </button>
+        )}
         <button
           type="button"
-          onClick={() =>
-            onShareLink({
-              fullName: fields.fullName,
-              dateOfPassing: fields.dateOfPassing,
-              url: mockObituaryUrl(fields.fullName),
-            })
-          }
-          className="gg-btn gg-btn-primary gg-btn-block"
+          onClick={copyDraft}
+          className={`gg-btn gg-btn-block ${canShare ? 'gg-btn-secondary' : 'gg-btn-primary'}`}
         >
-          Share a link to this obituary
-        </button>
-        <button
-          type="button"
-          onClick={() => navigator.clipboard.writeText(draft)}
-          className="gg-btn gg-btn-secondary gg-btn-block"
-        >
-          Copy to clipboard
+          Copy the text
         </button>
         <div className="flex justify-center">
           <button
             type="button"
-            onClick={onBack}
+            onClick={onDone}
             className="gg-btn gg-btn-ghost"
             style={{ color: 'var(--text-muted)' }}
           >

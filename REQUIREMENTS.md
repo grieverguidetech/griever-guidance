@@ -88,7 +88,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | SF-3 | Sending steps through contacts one at a time with a pre-filled `sms:` link | Done | Done | `buildSmsLink()` |
 | SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact | Done | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop) |
 | SF-5 | Share button (OS share sheet) with clipboard fallback, same undo toast | Done | Not started | |
-| SF-6 | AI-drafted obituary | Partial — flagged off (`VITE_FEATURE_OBITUARY_DRAFTING`), button disabled with an "in beta" tooltip; no screen links to `ObituaryScreen` since `52e5c4e` | Not started | `libs/gateway-messages` |
+| SF-6 | AI-drafted obituary, reached from "Has the obituary been published?" ("Help me write it"); name and date of passing prefilled from the session; the draft is copied or shared to the funeral home or paper, never published or stored by the app | Partial — UI built; flagged off (`VITE_FEATURE_OBITUARY_DRAFTING`), so "Help me write it" shows disabled with an "in beta" tooltip. Turning it on needs a valid `ANTHROPIC_API_KEY` on the Worker. | Not started | `libs/gateway-messages` |
 | SF-7 | Announcement form has no required fields — read-only session recap + optional note | Done | Not started | |
 
 ### 3.5 Sync & data

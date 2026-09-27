@@ -1,15 +1,18 @@
 import type { SessionDetails } from '@griever/shared';
 import { normalizeUrl } from '@griever/shared';
-import { BackButton, Eyebrow } from '../lib/ui';
+import { BackButton, Eyebrow, Tooltip } from '../lib/ui';
+import { OBITUARY_DRAFTING_ENABLED } from '../lib/features';
 
 interface Props {
   session: SessionDetails;
   onBack: () => void;
   onChange: (patch: Partial<SessionDetails>) => void;
   onContinue: () => void;
+  /** Not written yet — open the drafting screen. */
+  onDraft: () => void;
 }
 
-export function ShareObituary({ session, onBack, onChange, onContinue }: Props) {
+export function ShareObituary({ session, onBack, onChange, onContinue, onDraft }: Props) {
   const canContinue = session.obituaryUrl.trim() !== '';
   const url = normalizeUrl(session.obituaryUrl);
   const name = session.personName.trim() || 'Their';
@@ -75,6 +78,33 @@ export function ShareObituary({ session, onBack, onChange, onContinue }: Props) 
       <p className="gg-reassure text-center m-0 text-[12px]">
         Not published yet? We'll wait — the paper usually wants it 1–3 days before the service.
       </p>
+
+      <div className="gg-card flex flex-col gap-2">
+        <span className="gg-card-title text-[15px]">Not written yet?</span>
+        <p className="gg-card-body m-0 text-[13px]">
+          We can help you draft it. You review it, then send it to the funeral home or the paper.
+        </p>
+        {OBITUARY_DRAFTING_ENABLED ? (
+          <button type="button" onClick={onDraft} className="gg-btn gg-btn-secondary gg-btn-block">
+            Help me write it
+          </button>
+        ) : (
+          // Disabled here rather than on the form, so nobody fills in a whole
+          // form only to find the last button doesn't work.
+          <Tooltip text="in beta">
+            {(tipId) => (
+              <button
+                type="button"
+                aria-disabled="true"
+                aria-describedby={tipId}
+                className="gg-btn gg-btn-secondary gg-btn-block"
+              >
+                Help me write it
+              </button>
+            )}
+          </Tooltip>
+        )}
+      </div>
     </div>
   );
 }

@@ -328,14 +328,9 @@ export function App() {
     return (
       <Shell>
         <ObituaryScreen
-          onBack={() => goToPathLanding()}
-          onShareLink={({ fullName, dateOfPassing, url }) => {
-            const target =
-              active ?? sessions.createSession({ personName: fullName, dateOfPassing });
-            sessions.updateSession(target.id, { obituaryUrl: url });
-            setActiveId(target.id);
-            goToPathLanding();
-          }}
+          session={activeDetails}
+          onBack={() => setView('shareObituary')}
+          onDone={() => setView('shareObituary')}
         />
       </Shell>
     );
@@ -389,6 +384,7 @@ export function App() {
             );
             setView('flow');
           }}
+          onDraft={() => setView('obituary')}
         />
       </Shell>
     );
