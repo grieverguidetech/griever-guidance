@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { buildSmsLink, isIOSUserAgent } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
@@ -11,7 +11,8 @@ interface Props {
   contacts: Contact[];
 }
 
-const UNDO_WINDOW_MS = 2000;
+/** How this contact's message was handed off, once it has been. */
+type HandOff = 'sms' | 'shared' | 'copied';
 
 /**
  * One contact at a time, from the griever's own accounts — not a bulk send.
@@ -23,85 +24,40 @@ const UNDO_WINDOW_MS = 2000;
  * message to a personal contact — there's no way to open either one already
  * addressed to a specific person the way sms: addresses a phone number, so
  * this is the one generic action rather than separate per-platform buttons.
- * Returning to this tab (detected via visibilitychange) assumes an sms:
- * handoff went through and auto-advances after a short undo window, rather
- * than asking "did that send?" for every one of what could be a dozen
- * people; a share sheet gives an actual resolve/dismiss signal, so that path
- * advances directly off the share (or copy) completing.
+ * Once a message has been handed off, "Next" moves on to the next person.
+ * It's one tap, not a "did that send?" question, and the griever moves on when
+ * they're ready. The app never infers a send from the tab being hidden and
+ * shown again, which doesn't happen reliably (e.g. on a desktop, where
+ * Messages opens beside the browser).
  */
 export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
-  const [pendingAdvance, setPendingAdvance] = useState(false);
-  const [advanceLabel, setAdvanceLabel] = useState<'sent' | 'shared' | 'copied'>('sent');
+  const [handOff, setHandOff] = useState<HandOff | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const awaitingReturnRef = useRef(false);
-  const timerRef = useRef<number | null>(null);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
   const activeContact = active ? contacts.find((c) => c.contactId === active.contactId) : null;
 
-  // Shared by the sms: return path and the share/copy success path — same
-  // "Sent to X · Undo" toast either way, so a share/clipboard hand-off gets
-  // the same visible confirmation and change-your-mind window a text does,
-  // instead of silently advancing.
-  function startAdvanceToast(label: 'sent' | 'shared' | 'copied') {
-    setAdvanceLabel(label);
-    setPendingAdvance(true);
-    timerRef.current = window.setTimeout(() => {
-      setPendingAdvance(false);
-      markActiveSent();
-    }, UNDO_WINDOW_MS);
-  }
-
+  // A fresh recipient became active — the hand-off state and any error
+  // belonged to the last person, not this one.
   useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState !== 'visible' || !awaitingReturnRef.current) return;
-      awaitingReturnRef.current = false;
-      startAdvanceToast('sent');
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markActiveSent]);
-
-  // A fresh recipient became active (after the previous one advanced) —
-  // any pending toast/timer/error belonged to the last person, not this one.
-  useEffect(() => {
-    setPendingAdvance(false);
+    setHandOff(null);
     setShareError(null);
-    awaitingReturnRef.current = false;
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
   }, [active?.contactId]);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    },
-    [],
-  );
 
   if (!sendJob) return null;
 
   const total = sendJob.recipients.length;
   const done = sendJob.recipients.filter((r) => r.status === 'delivered' || r.status === 'skipped').length;
   const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
+  const isLast = activeIndex === total - 1;
   const nameFor = (id: string) => contacts.find((c) => c.contactId === id)?.name ?? 'Recipient';
-
-  function undo() {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    setPendingAdvance(false);
-  }
+  const canShare = typeof navigator.share === 'function';
 
   function openMessages() {
     if (!active || !activeContact) return;
     const link = buildSmsLink(activeContact.phone, flow.composedMessage, isIOSUserAgent(navigator.userAgent));
-    awaitingReturnRef.current = true;
+    setHandOff('sms');
     window.location.href = link;
   }
 
@@ -114,11 +70,11 @@ export function SendingScreen({ flow, contacts }: Props) {
   function shareMessage() {
     if (!active) return;
     setShareError(null);
-    if (typeof navigator.share === 'function') {
+    if (canShare) {
       // No await before this call — navigator.share() must fire directly
       // from the click's own gesture, not after any async work.
       navigator.share({ text: flow.composedMessage }).then(
-        () => startAdvanceToast('shared'),
+        () => setHandOff('shared'),
         (err: unknown) => {
           if (err instanceof DOMException && err.name === 'AbortError') return; // dismissed, not a failure
           setShareError("That didn't go through. You can try again.");
@@ -128,9 +84,16 @@ export function SendingScreen({ flow, contacts }: Props) {
     }
     navigator.clipboard
       .writeText(flow.composedMessage)
-      .then(() => startAdvanceToast('copied'))
+      .then(() => setHandOff('copied'))
       .catch(() => setShareError('Could not copy the message. You can select and copy it yourself.'));
   }
+
+  const handOffNote =
+    handOff === 'sms'
+      ? `Send it in Messages, then come back and tap ${isLast ? 'Done' : 'Next'}.`
+      : handOff === 'shared'
+        ? `Shared for ${activeContact?.name ?? 'them'}.`
+        : 'Copied. Paste it wherever you reach them.';
 
   return (
     <div className="flex flex-col gap-4 pt-8">
@@ -174,17 +137,20 @@ export function SendingScreen({ flow, contacts }: Props) {
             </p>
           )}
 
-          {pendingAdvance ? (
-            <div className="flex items-center justify-between">
-              <span className="text-[13px]" style={{ color: 'var(--color-accent-700)' }}>
-                {advanceLabel === 'copied'
-                  ? 'Copied'
-                  : advanceLabel === 'shared'
-                    ? `Shared for ${activeContact.name}`
-                    : `Sent to ${activeContact.name}`}
-              </span>
-              <button type="button" onClick={undo} className="gg-btn gg-btn-ghost !min-h-0">
-                Undo
+          {handOff ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-700)' }}>
+                {handOffNote}
+              </p>
+              <button type="button" onClick={markActiveSent} className="gg-btn gg-btn-primary gg-btn-block">
+                {isLast ? 'Done' : 'Next'}
+              </button>
+              <button
+                type="button"
+                onClick={handOff === 'sms' ? openMessages : shareMessage}
+                className="gg-btn gg-btn-ghost self-center !min-h-0"
+              >
+                {handOff === 'sms' ? 'Open Messages again' : canShare ? 'Share again' : 'Copy again'}
               </button>
             </div>
           ) : (
@@ -194,7 +160,7 @@ export function SendingScreen({ flow, contacts }: Props) {
               </button>
               <button type="button" onClick={shareMessage} className="gg-btn gg-btn-secondary flex-1">
                 <ShareNetwork size={16} weight="regular" />
-                {typeof navigator.share === 'function' ? 'Share' : 'Copy message'}
+                {canShare ? 'Share' : 'Copy message'}
               </button>
               <button type="button" onClick={markActiveSkipped} className="gg-btn gg-btn-ghost">
                 Skip
