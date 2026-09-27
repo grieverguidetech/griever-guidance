@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform, AppState, StyleSheet } from 'react-native';
-import type { AppStateStatus } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import type { FlowProps } from '../app/App';
-
-const UNDO_WINDOW_MS = 2000;
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -15,60 +12,32 @@ interface Props extends FlowProps {
  * One contact at a time, texted from the griever's own number — not a bulk
  * send. "Open Messages" hands off to the device's native Messages app (an
  * sms: link) with the contact and message pre-filled; the griever taps Send
- * there themselves. Returning to this screen (via AppState, RN's equivalent
- * of the web's visibilitychange) assumes it went through and auto-advances
- * after a short undo window.
+ * there themselves, comes back, and taps "Next" to move on. It's one tap, not a
+ * "did that send?" question. Nothing is inferred from the app going to the
+ * background and coming back.
  */
 export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
-  const [pendingAdvance, setPendingAdvance] = useState(false);
-  const awaitingReturnRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [handedOff, setHandedOff] = useState(false);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
   const activeContact = active ? contacts.contacts.find((c) => c.contactId === active.contactId) : null;
 
+  // A fresh recipient became active — the hand-off belonged to the last person.
   useEffect(() => {
-    function handleAppStateChange(next: AppStateStatus) {
-      if (next !== 'active' || !awaitingReturnRef.current) return;
-      awaitingReturnRef.current = false;
-      setPendingAdvance(true);
-      timerRef.current = setTimeout(() => {
-        setPendingAdvance(false);
-        markActiveSent();
-      }, UNDO_WINDOW_MS);
-    }
-    const sub = AppState.addEventListener('change', handleAppStateChange);
-    return () => sub.remove();
-  }, [markActiveSent]);
-
-  useEffect(() => {
-    setPendingAdvance(false);
-    awaitingReturnRef.current = false;
-    if (timerRef.current) clearTimeout(timerRef.current);
+    setHandedOff(false);
   }, [active?.contactId]);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
-  );
 
   if (!sendJob) return null;
 
   const total = sendJob.recipients.length;
   const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
-
-  function undo() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setPendingAdvance(false);
-  }
+  const isLast = activeIndex === total - 1;
 
   function openMessages() {
     if (!active || !activeContact) return;
     const link = buildSmsLink(activeContact.phone, flow.composedMessage, Platform.OS === 'ios');
-    awaitingReturnRef.current = true;
+    setHandedOff(true);
     Linking.openURL(link);
   }
 
@@ -87,11 +56,16 @@ export function SendingScreen({ flow, contacts }: Props) {
           <Text style={styles.name}>{activeContact.name}</Text>
           <Text style={styles.message}>{flow.composedMessage}</Text>
 
-          {pendingAdvance ? (
-            <View style={styles.row}>
-              <Text style={styles.sentText}>Sent to {activeContact.name}</Text>
-              <TouchableOpacity onPress={undo}>
-                <Text style={styles.undoText}>Undo</Text>
+          {handedOff ? (
+            <View>
+              <Text style={styles.sentText}>
+                Send it in Messages, then come back and tap {isLast ? 'Done' : 'Next'}.
+              </Text>
+              <TouchableOpacity style={[styles.primaryButton, styles.nextButton]} onPress={markActiveSent} activeOpacity={0.8}>
+                <Text style={styles.primaryButtonText}>{isLast ? 'Done' : 'Next'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openMessages} style={styles.againButton}>
+                <Text style={styles.undoText}>Open Messages again</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -142,5 +116,7 @@ const styles = StyleSheet.create({
   },
   skipButtonText: { color: '#6b7280', fontSize: 14 },
   sentText: { fontSize: 14, color: '#3d8a5f' },
+  nextButton: { flex: 0, marginTop: 12 },
+  againButton: { alignItems: 'center', paddingVertical: 12 },
   undoText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
 });

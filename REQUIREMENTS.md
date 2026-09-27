@@ -86,7 +86,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | SF-1 | Template picker → Details → Contacts → Confirm → Sending → Sent, driven by `useSendFlow()` | Done | Done | |
 | SF-2 | Close family hears first, from a small hand-picked group; wider circle later | Done | Not started | `WhoHearsFirst`, `WideningCircle` |
 | SF-3 | Sending steps through contacts one at a time with a pre-filled `sms:` link | Done | Done | `buildSmsLink()` |
-| SF-4 | On return to the app, auto-advance after a short undo window (no "did it send?" per contact) | Done | Done | Page Visibility / `AppState` |
+| SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact | Done | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop) |
 | SF-5 | Share button (OS share sheet) with clipboard fallback, same undo toast | Done | Not started | |
 | SF-6 | AI-drafted obituary | Partial — flagged off (`VITE_FEATURE_OBITUARY_DRAFTING`), button disabled with an "in beta" tooltip; no screen links to `ObituaryScreen` since `52e5c4e` | Not started | `libs/gateway-messages` |
 | SF-7 | Announcement form has no required fields — read-only session recap + optional note | Done | Not started | |
@@ -135,9 +135,10 @@ them in code by assumption — raise them.
    unresolved. Tolerable? (DATA.md §8.4)
 4. **Mobile multi-session** — when does mobile get the session model web already has, and does it
    share `libs/data-local`'s shape or keep AsyncStorage?
-5. **Explicit send confirmation vs. auto-advance** — an explicit Yes / Not yet / Try again model was
-   built and reverted (`039e459`). Auto-advance with undo is the current decision; revisit only if
-   the product owner asks.
+5. **Moving to the next person** — settled (Sep 2026) on one "Next" tap after the hand-off. Auto-advance
+   on return to the app was dropped because it never fired when the tab stayed visible. The
+   Yes / Not yet / Try again prompt (`039e459`, reverted) stays rejected, because it asks a question
+   about every person.
 
 ---
 
@@ -279,9 +280,11 @@ This is the core user journey. It is driven by `useSendFlow()` from `libs/hooks`
 step steps through `selectedContactIds` one at a time: "Open Messages" fires an `sms:` deep link
 (`buildSmsLink()`) to the device's native Messages app with that contact and the composed message
 pre-filled; the user taps Send there themselves — no web page or app can send an SMS on someone's
-behalf, by OS design. Returning to the app (detected via the Page Visibility API on web, `AppState`
-on mobile) assumes it went through and auto-advances to the next contact after a short undo window,
-rather than asking "did that send?" for every person in what could be a long list. Nothing is
+behalf, by OS design. Once the message has been handed off (Messages opened, shared, or copied),
+the card shows "Next" ("Done" for the last person) and a way to reopen it. One tap moves on, with
+no "did that send?" question for every person in what could be a long list. Nothing is inferred from
+the app going to the background and coming back: that signal is unreliable, and on a desktop, where
+Messages opens beside the browser, it never fires. Nothing is
 recorded as sent to a backend, and there is no delivery receipt — the user's own Messages thread
 with that contact is the only record, which is *more* trustworthy to a grieving person than an
 opaque "delivered ✓" from a service they've never heard of. The app itself keeps no history of what
