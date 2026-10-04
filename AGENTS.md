@@ -31,7 +31,10 @@ human playing a role). **`PROCESS.md` says *when*; this file says *who* and *how
 13. **Simple, readable code the human can defend.** Small functions, plain names, comments only
     where the *why* isn't obvious. Point out the risky parts in the PR.
 14. **Calm copy.** No exclamation points, no celebratory microcopy (C7). Read it aloud as the user.
-15. **Log real process problems** in `SELF_IMPROVEMENT.md`. Every entry ends in a rule.
+15. **Never run e2e on a local machine.** No `pnpm e2e`, `nx e2e`, or `playwright test` locally,
+    including against production. E2E runs in CI (and on the dedicated e2e server once #18
+    lands); read results with `gh pr checks` / `gh run view --log-failed`.
+16. **Log real process problems** in `SELF_IMPROVEMENT.md`. Every entry ends in a rule.
 
 ## Roles
 
@@ -45,9 +48,9 @@ the role's brief.
 | **architect** | Docs only | Decides where code goes per §6 and what it deliberately doesn't do. Updates `REQUIREMENTS.md` §6 / `DATA.md` in the ticket that changes the facts. |
 | **ticketer** | No | Splits approved work into small tickets with disjoint `files_touched`, checkable acceptance criteria, and planned tests. Creates nothing until G1. |
 | **developer** | Yes | Implements exactly one ticket in its worktree, with tests. Runs the checks and reports the output. Commits; doesn't push or open the PR. |
-| **tester** | Tests only | Finds untested requirements and constraints; writes tests-only PRs; maintains the e2e suite; runs e2e against production after deploys; lists `HUMAN TODO` checks. |
+| **tester** | Tests only | Finds untested requirements and constraints; writes tests-only PRs; maintains the e2e suite; reads the CI/server e2e results against production after deploys; lists `HUMAN TODO` checks. |
 | **reviewer** | No (read-only) | Diff review: acceptance criteria, correctness, constraints C1–C10, copy tone, tests that would fail if the code broke, security/privacy, scope creep. Ranks blocker / should-fix / nit. Gives 2–3 "read this closely" items. |
-| **a11y-auditor** | No (read-only) | Any UI change: keyboard flow, focus, labels, roles/states, contrast (computed, not guessed), touch targets, reduced motion, screen-reader announcements. Runs the Playwright + axe suite. |
+| **a11y-auditor** | No (read-only) | Any UI change: keyboard flow, focus, labels, roles/states, contrast (computed, not guessed), touch targets, reduced motion, screen-reader announcements. Reads the CI Playwright + axe results (never runs e2e locally). |
 
 ### Models
 
@@ -78,9 +81,7 @@ the role's brief.
   Each project's `tsconfig.spec.json` (output in `out-tsc/vitest`) typechecks them in `pnpm typecheck`.
 - **Husky isn't installed here**, so CI is the only gate. Run `pnpm check:affected` before you
   report done.
-- **E2E needs browsers once per machine:** `pnpm exec playwright install chromium webkit`.
-- **Parallel e2e runs:** each worktree uses port 4300 by default. Set `E2E_PORT` per worktree
-  when running e2e in more than one at a time.
+- **E2E runs in CI only** (rule 15). Don't install Playwright browsers or run e2e locally.
 - **Native-only modules** (`expo-contacts`) need a `.web.ts` stub or they crash the web bundle.
 - **`CORS_ORIGINS`** must match the deployed origin exactly; take URLs from the deployment, never
   infer them.

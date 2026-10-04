@@ -120,8 +120,8 @@ Merging to `main` runs CI; when CI passes, `deploy.yml` deploys exactly that com
 smoke-tests production. Watch it with `gh run list` / `gh run watch`. On failure, read the logs,
 open a `bug` ticket, and log the cause in `SELF_IMPROVEMENT.md`.
 
-**tester** then confirms the change on the live site where it can (`BASE_URL=https://web.grieversguidance.com pnpm e2e`
-runs the e2e suite against production) and lists what only a human can check (a real iPhone's
+**tester** then confirms the change on the live site where it can (from the deploy's smoke job
+and, once #18 lands, an e2e run against production on the e2e server; never locally) and lists what only a human can check (a real iPhone's
 Messages hand-off, VoiceOver) as `HUMAN TODO` on the issue.
 
 ### Learn
@@ -209,7 +209,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
 |---|---|---|---|
 | Unit | Vitest | `libs/*/src/**/*.spec.ts` | `pnpm test`, CI |
 | Integration | Vitest + React Testing Library (web), Hono `app.request` (gateway) | `apps/web/src/**/*.spec.tsx`, `apps/gateway/src/*.spec.ts` | `pnpm test`, CI |
-| E2E | Playwright + axe | `apps/web-e2e/src/*.spec.ts` | `pnpm e2e`, CI |
+| E2E | Playwright + axe | `apps/web-e2e/src/*.spec.ts` | CI only (never locally) |
 
 - Every lib/app Vitest config builds on `vitest.base.mts`, which resolves workspace packages from
   **source** (`@org/source`), so tests never run against a stale or missing `dist/`.
@@ -217,6 +217,8 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
   (`pnpm typecheck`, which re-runs when a spec changes); specs stay excluded from
   `tsconfig.lib.json`/`tsconfig.app.json` so they don't ship in `dist/`.
 - Web tests get a fresh in-memory IndexedDB and empty `localStorage` per test (`apps/web/src/test-setup.ts`).
+- **E2E never runs on a local machine.** It runs in CI's `e2e` job (and on the dedicated e2e
+  server once #18 lands). Read results with `gh pr checks` and `gh run view --log-failed`.
 - E2E builds the web app and serves it on its own port (`4300`, override with `E2E_PORT`) and
   **never reuses** a running server, so a `pnpm dev` or another worktree's run can't be tested by
   mistake. It runs on desktop Chrome, Pixel 7, and iPhone 15 (WebKit). The person this is for is
@@ -233,7 +235,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
 ```sh
 pnpm check            # typecheck + every unit/integration test + every build (mobile excluded)
 pnpm check:affected   # same, only what your branch touched
-pnpm e2e              # Playwright, when the web flow changed (first time: pnpm exec playwright install chromium webkit)
+# E2E: never locally. Push the branch and read the PR's `e2e` job (gh pr checks / gh run view --log-failed).
 ```
 
 Then go beyond the tests where the change warrants it:

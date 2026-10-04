@@ -11,7 +11,7 @@ You are the orchestrator. Follow PROCESS.md §1 step by step.
 - Every ticket is a GitHub issue on project 4 (owner ptums) with Status, Size and Role set, and labels ticket + area:* + size:*.
 - Create worktrees with `git worktree add .worktrees/<issue#> -b <type>/<area>-<slug> origin/main`. Remove them after merge.
 - Launch independent developer subagents in the same turn. Default cap: 2.
-- Independent check: re-run `pnpm check:affected` (and `pnpm e2e` for web changes) in the worktree yourself. Confirm only files_touched changed, tests were added, and no secrets are in the diff. Never relay an agent's green claim without re-running it.
+- Independent check: re-run `pnpm check:affected` in the worktree yourself; for web changes read the PR's CI `e2e` job (`gh pr checks`, `gh run view --log-failed`). Never run e2e locally. Confirm only files_touched changed, tests were added, and no secrets are in the diff. Never relay an agent's green claim without re-running it.
 - Then reviewer (always) and a11y-auditor (UI) in parallel, read-only. Max 2 fix rounds, then label blocked.
 - Push the branch and open the PR from the template. Never merge, never push to main.
 
