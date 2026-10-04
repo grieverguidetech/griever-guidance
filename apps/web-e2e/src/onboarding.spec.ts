@@ -22,6 +22,9 @@ test.describe('first visit', () => {
     await addContacts(page, [CAROL, BOB]);
     await expect(page.getByText('Hears first')).toHaveCount(1);
     await expect(page.getByText('Friends & family')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Done for now' }).click();
+    await expect(page.getByRole('checkbox', { name: /Aunt Carol/ })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: /Bob Smith/ })).not.toBeChecked();
   });
 
   test('reaches one next thing: announcing the passing', async ({ page }) => {

@@ -40,16 +40,28 @@ export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
           return (
             <label
               key={contact.contactId}
-              className="flex items-center gap-3 cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault();
-                toggle(contact.contactId);
-              }}
+              className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-accent)]"
             >
+              <input
+                type="checkbox"
+                className="absolute inset-0 w-full h-full m-0 opacity-0 cursor-pointer"
+                checked={checked}
+                onChange={() => toggle(contact.contactId)}
+              />
               {checked ? (
-                <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-accent)' }} />
+                <CheckCircle
+                  aria-hidden="true"
+                  size={20}
+                  weight="fill"
+                  style={{ color: 'var(--color-accent)' }}
+                />
               ) : (
-                <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-400)' }} />
+                <Circle
+                  aria-hidden="true"
+                  size={20}
+                  weight="regular"
+                  style={{ color: 'var(--color-neutral-400)' }}
+                />
               )}
               <div>
                 <div className="text-[14px]">{contact.name}</div>

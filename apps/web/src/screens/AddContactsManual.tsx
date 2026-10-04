@@ -77,17 +77,27 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
         )}
       </div>
 
-      <label
-        className="flex items-center gap-3 cursor-pointer"
-        onClick={(e) => {
-          e.preventDefault();
-          setHearsFirst((v) => !v);
-        }}
-      >
+      <label className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-accent)]">
+        <input
+          type="checkbox"
+          className="absolute inset-0 w-full h-full m-0 opacity-0 cursor-pointer"
+          checked={hearsFirst}
+          onChange={(e) => setHearsFirst(e.target.checked)}
+        />
         {hearsFirst ? (
-          <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-accent)' }} />
+          <CheckCircle
+            aria-hidden="true"
+            size={20}
+            weight="fill"
+            style={{ color: 'var(--color-accent)' }}
+          />
         ) : (
-          <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-400)' }} />
+          <Circle
+            aria-hidden="true"
+            size={20}
+            weight="regular"
+            style={{ color: 'var(--color-neutral-400)' }}
+          />
         )}
         <span className="text-[14px]">One of the people who should hear first</span>
       </label>
