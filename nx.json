@@ -93,6 +93,15 @@
           "fields": ["extends", "files", "include"]
         }
       ]
+    },
+    "typecheck": {
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ]
     }
   }
 }

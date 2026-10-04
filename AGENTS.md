@@ -74,8 +74,8 @@ the role's brief.
 
 - **Inferred Nx `test` targets don't build dependencies first.** A Vitest config that doesn't
   extend `vitest.base.mts` resolves workspace packages to `dist/` and fails on a clean checkout.
-- **Spec files are excluded from `tsconfig.lib.json`** so they don't ship in `dist/`. They aren't
-  typechecked yet. Model fixtures on the real types anyway.
+- **Spec files are excluded from `tsconfig.lib.json`** so they don't ship in `dist/`.
+  Each project's `tsconfig.spec.json` (output in `out-tsc/vitest`) typechecks them in `pnpm typecheck`.
 - **Husky isn't installed here**, so CI is the only gate. Run `pnpm check:affected` before you
   report done.
 - **E2E needs browsers once per machine:** `pnpm exec playwright install chromium webkit`.

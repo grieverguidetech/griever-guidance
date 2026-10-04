@@ -16,7 +16,10 @@ async function loadApp(env: Record<string, string | undefined> = {}) {
   vi.stubEnv('IDENTITY_SESSION_SECRET', 'test-session-secret');
   vi.stubEnv('IDENTITY_SERVICE_SECRET', 'test-service-secret');
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value ?? '');
-  return (await import('./worker.js')).default;
+  // Under nodenext the CJS-typed module nests its default export one level deeper than Vite
+  // actually delivers it; the cast restores the real shape (the Hono app).
+  const mod = await import('./worker.js');
+  return mod.default as unknown as typeof mod.default.default;
 }
 
 const json = (body: unknown) => ({
