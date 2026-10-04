@@ -40,33 +40,41 @@ export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
           return (
             <label
               key={contact.contactId}
-              className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-accent)]"
+              className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md"
             >
               <input
                 type="checkbox"
-                className="absolute inset-0 w-full h-full m-0 opacity-0 cursor-pointer"
+                className="peer absolute inset-0 w-full h-full m-0 appearance-none opacity-0 cursor-pointer"
+                aria-labelledby={`${contact.contactId}-name`}
+                aria-describedby={`${contact.contactId}-phone`}
                 checked={checked}
                 onChange={() => toggle(contact.contactId)}
               />
-              {checked ? (
-                <CheckCircle
-                  aria-hidden="true"
-                  size={20}
-                  weight="fill"
-                  style={{ color: 'var(--color-accent)' }}
-                />
-              ) : (
-                <Circle
-                  aria-hidden="true"
-                  size={20}
-                  weight="regular"
-                  style={{ color: 'var(--color-neutral-400)' }}
-                />
-              )}
-              <div>
-                <div className="text-[14px]">{contact.name}</div>
-                <div className="gg-card-meta">{formatPhone(contact.phone)}</div>
-              </div>
+              <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)]">
+                {checked ? (
+                  <CheckCircle
+                    aria-hidden="true"
+                    size={20}
+                    weight="fill"
+                    style={{ color: 'var(--color-accent)' }}
+                  />
+                ) : (
+                  <Circle
+                    aria-hidden="true"
+                    size={20}
+                    weight="regular"
+                    style={{ color: 'var(--text-muted)' }}
+                  />
+                )}
+                <div>
+                  <div id={`${contact.contactId}-name`} className="text-[14px]">
+                    {contact.name}
+                  </div>
+                  <div id={`${contact.contactId}-phone`} className="gg-card-meta">
+                    {formatPhone(contact.phone)}
+                  </div>
+                </div>
+              </span>
             </label>
           );
         })}

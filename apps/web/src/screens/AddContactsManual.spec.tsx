@@ -29,7 +29,9 @@ describe('AddContactsManual hears-first checkbox', () => {
     await user.click(box);
     expect(box).toBeChecked();
     await fillAndAdd(user);
-    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ name: 'Aunt Carol', hearsFirst: true }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Aunt Carol', hearsFirst: true }),
+    );
     expect(box).not.toBeChecked();
   });
 

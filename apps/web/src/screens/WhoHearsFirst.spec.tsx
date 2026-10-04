@@ -27,24 +27,29 @@ function setup() {
 describe('WhoHearsFirst checkboxes', () => {
   it('shows a checkbox per contact, checked for those who already hear first', () => {
     setup();
-    expect(screen.getByRole('checkbox', { name: /Aunt Carol/ })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /Bob Smith/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Aunt Carol' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Bob Smith' })).not.toBeChecked();
+  });
+
+  it('names each checkbox by the contact and describes it with the number', () => {
+    setup();
+    expect(screen.getByRole('checkbox', { name: 'Aunt Carol' })).toHaveAccessibleDescription(
+      '(617) 555-0148',
+    );
   });
 
   it('toggles with a click and saves the ticked ids', async () => {
     const { onSave, user } = setup();
-    await user.click(screen.getByRole('checkbox', { name: /Bob Smith/ }));
-    await user.click(screen.getByRole('checkbox', { name: /Aunt Carol/ }));
+    await user.click(screen.getByRole('checkbox', { name: 'Bob Smith' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Aunt Carol' }));
     await user.click(screen.getByRole('button', { name: 'Save and continue' }));
     expect(onSave).toHaveBeenCalledWith(['b']);
   });
 
   it('is reachable by Tab and toggles with Space', async () => {
     const { onSave, user } = setup();
-    await user.tab(); // Back button
-    await user.tab(); // Aunt Carol
-    await user.tab(); // Bob Smith
-    const bob = screen.getByRole('checkbox', { name: /Bob Smith/ });
+    const bob = screen.getByRole('checkbox', { name: 'Bob Smith' });
+    for (let i = 0; i < 10 && bob !== document.activeElement; i++) await user.tab();
     expect(bob).toHaveFocus();
     await user.keyboard(' ');
     expect(bob).toBeChecked();

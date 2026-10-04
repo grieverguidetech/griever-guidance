@@ -77,29 +77,31 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
         )}
       </div>
 
-      <label className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-accent)]">
+      <label className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md">
         <input
           type="checkbox"
-          className="absolute inset-0 w-full h-full m-0 opacity-0 cursor-pointer"
+          className="peer absolute inset-0 w-full h-full m-0 appearance-none opacity-0 cursor-pointer"
           checked={hearsFirst}
           onChange={(e) => setHearsFirst(e.target.checked)}
         />
-        {hearsFirst ? (
-          <CheckCircle
-            aria-hidden="true"
-            size={20}
-            weight="fill"
-            style={{ color: 'var(--color-accent)' }}
-          />
-        ) : (
-          <Circle
-            aria-hidden="true"
-            size={20}
-            weight="regular"
-            style={{ color: 'var(--color-neutral-400)' }}
-          />
-        )}
-        <span className="text-[14px]">One of the people who should hear first</span>
+        <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)]">
+          {hearsFirst ? (
+            <CheckCircle
+              aria-hidden="true"
+              size={20}
+              weight="fill"
+              style={{ color: 'var(--color-accent)' }}
+            />
+          ) : (
+            <Circle
+              aria-hidden="true"
+              size={20}
+              weight="regular"
+              style={{ color: 'var(--text-muted)' }}
+            />
+          )}
+          <span className="text-[14px]">One of the people who should hear first</span>
+        </span>
       </label>
 
       <button
