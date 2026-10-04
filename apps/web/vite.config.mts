@@ -1,6 +1,7 @@
 import { defineConfig, type PluginOption } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { vitestConfig } from '../../vitest.base.mts';
 
 const WEB_PORT = 5173;
 
@@ -25,6 +26,7 @@ function announcePort(): PluginOption {
 }
 
 export default defineConfig(() => ({
+  ...vitestConfig('jsdom', { test: { setupFiles: ['src/test-setup.ts'] } }),
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/web',
   server: {

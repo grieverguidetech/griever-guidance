@@ -17,5 +17,12 @@
     {
       "path": "../../libs/identity/tsconfig.lib.json"
     }
+  ],
+  "exclude": [
+    "dist",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.tsx"
   ]
 }

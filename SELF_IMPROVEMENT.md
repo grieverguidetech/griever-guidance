@@ -66,3 +66,49 @@ to read in a minute; it is a staging area, not an archive.
   than once; both are impossible for personal accounts, confirmed twice against Meta's docs.
 - **Rule:** verify a platform capability in current official docs before building on it, and
   record what was checked in the commit body.
+
+### 2026-10-03 — The e2e suite was a dead scaffold, and CI never ran tests
+- **What happened:** `apps/web-e2e` still held the Nx generator's example (expects an `h1`
+  containing "Welcome", on port 4200, while the app serves 5173). CI ran only typecheck and build,
+  so neither the 4 Vitest suites nor e2e ever gated a merge. Replaced in `feat/ci-agentic-dev-setup`.
+- **Why:** generated scaffolds look like coverage. Nothing failed, because nothing ran them.
+- **Rule:** a test that isn't run by CI doesn't exist. Every new test target must show up in a CI
+  run before the PR that adds it merges.
+
+### 2026-10-03 — Lib tests resolved to stale `dist/`, and would fail on a clean checkout
+- **What happened:** inferred `test` targets don't depend on `^build`, so a spec importing
+  `@griever/shared` loaded `dist/`. With `dist/` removed, `data-sync`'s suite failed:
+  `Failed to resolve entry for package "@griever/shared"`. Locally it silently tested whatever was
+  last built.
+- **Why:** the `@org/source` export condition (which points at `src/`) was set for TypeScript but
+  not for Vite/Vitest.
+- **Rule:** every Vitest config extends `vitest.base.mts`. **Promoted → AGENTS.md "Known gotchas".**
+
+### 2026-10-03 — Deploy didn't wait for CI
+- **What happened:** `ci.yml` and `deploy.yml` both triggered on push to `main` and started at the
+  same second (`gh run list`), so a red CI never stopped a deploy.
+- **Rule:** deploy runs on `workflow_run` of CI with `conclusion == success` and checks out the
+  exact SHA CI tested. **Promoted → PROCESS.md §1 "Deploy → Verify".**
+
+### 2026-10-03 — A new test found a latent header bug in `apiFetch`
+- **What happened:** `libs/api-client`'s `apiFetch` spread `...init` after its merged `headers`,
+  so a caller passing `headers` dropped `Content-Type`. No caller hit it yet. A test reproduced it
+  (1 failed), then the fix passed (6/6).
+- **Rule:** when spreading options over defaults, spread the caller's object first and the merged
+  fields last, and pin it with a test.
+
+### 2026-10-03 — Helper text and the brand accent fail WCAG AA contrast
+- **What happened:** axe flagged `--text-muted` at 4.24:1 on `--color-bg` (AA needs 4.5:1).
+  Raising the mix from 60% to 65% gives 4.95:1 (computed, `PROCESS.md` §8). The brand accent
+  `#0088b0` (3.65:1 on primary buttons and links), `--text-eyebrow` (2.74:1) and `.gg-reassure`
+  (3.16:1) also fail. Those are design decisions, tracked on the board, with a `test.fail()` in
+  `apps/web-e2e/src/a11y.spec.ts` that turns red once fixed.
+- **Rule:** colour tokens get a computed contrast ratio against every background they sit on,
+  before they ship.
+
+### 2026-10-03 — Accessible names hid state on custom toggles
+- **What happened:** "One of the people who should hear first" (AddContactsManual) and each row of
+  WhoHearsFirst are `<label onClick={preventDefault}>` with an icon, not checkboxes, so assistive
+  tech hears plain text with no checked state. Tracked on the board.
+- **Rule:** a toggle is a `<button aria-pressed>` or a real `<input type="checkbox">`. Never a
+  label with `preventDefault`. The a11y-auditor checks for this pattern.

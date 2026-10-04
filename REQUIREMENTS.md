@@ -205,6 +205,8 @@ libs/
 | Marketing | Astro |
 | Package manager | pnpm — never npm or yarn |
 | Monorepo | Nx (task running, code generation) |
+| Tests | Vitest (+ React Testing Library) for unit and integration; Playwright (+ axe) for e2e — see `PROCESS.md` §7 |
+| CI/CD | GitHub Actions: `ci.yml` gates PRs and `main`; `deploy.yml` deploys only after CI passes on `main` |
 
 ---
 
