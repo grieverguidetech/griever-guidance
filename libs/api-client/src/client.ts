@@ -16,9 +16,10 @@ function getBaseUrl(): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  // `...init` goes first so a caller's `headers` can't replace the merged set.
   const res = await fetch(`${getBaseUrl()}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

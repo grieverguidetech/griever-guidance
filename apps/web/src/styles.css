@@ -71,7 +71,9 @@
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 
-  --text-muted: color-mix(in srgb, var(--color-text) 60%, transparent);
+  /* 65%, not 60%: 60% measured 4.24:1 on --color-bg, under WCAG AA's 4.5:1
+     for body text. 65% gives 4.95:1 on --color-bg and 5.18:1 on white. */
+  --text-muted: color-mix(in srgb, var(--color-text) 65%, transparent);
   --text-hint: color-mix(in srgb, var(--color-text) 50%, transparent);
   --text-eyebrow: color-mix(in srgb, var(--color-text) 45%, transparent);
 }

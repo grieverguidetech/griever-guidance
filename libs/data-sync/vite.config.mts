@@ -1,12 +1,4 @@
-/// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite';
+import { vitestConfig } from '../../vitest.base.mts';
 
-export default defineConfig({
-  test: {
-    watch: false,
-    globals: true,
-    environment: "node",
-    include: ["src/**/*.{test,spec}.ts"],
-    setupFiles: ["src/test-setup.ts"],
-  },
-});
+export default defineConfig(vitestConfig('node', { test: { setupFiles: ['src/test-setup.ts'] } }));
