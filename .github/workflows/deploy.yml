@@ -1,24 +1,49 @@
 name: Deploy
 
+# Continuous deployment: runs only after CI succeeds for a push to main, and
+# deploys exactly the commit CI tested. `workflow_dispatch` re-deploys main by
+# hand (e.g. after a Cloudflare outage) — it skips the CI gate, so use it only
+# for a commit CI already passed.
+
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   actions: read
   contents: read
 
+# Never run two deploys at once, and never cancel one halfway through.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
 jobs:
+  gate:
+    name: CI passed on a push to main
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    steps:
+      - run: echo "Deploying ${{ env.DEPLOY_SHA }}"
+
   deploy-gateway:
     name: Deploy Gateway → Cloudflare Workers
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -50,13 +75,14 @@ jobs:
 
   deploy-web:
     name: Deploy Web → Cloudflare Pages
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -83,13 +109,14 @@ jobs:
 
   deploy-marketing:
     name: Deploy Marketing → Cloudflare Pages
+    needs: gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -113,3 +140,17 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  smoke:
+    name: Smoke-test production
+    needs: [deploy-gateway, deploy-web, deploy-marketing]
+    runs-on: ubuntu-latest
+    steps:
+      # Asserts on the body, not just the status: a 200 from an error page
+      # or a parked domain would otherwise pass.
+      - name: Gateway /health
+        run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors https://api.grieversguidance.com/health | grep -q '"ok":true'
+      - name: Web app serves the app shell
+        run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors https://web.grieversguidance.com/ | grep -q 'id="root"'
+      - name: Marketing site responds
+        run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors -o /dev/null https://grieversguidance.com/

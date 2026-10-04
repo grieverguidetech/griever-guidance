@@ -1,5 +1,8 @@
 name: CI
 
+# Gates every PR and every push to main. Deploy (.github/workflows/deploy.yml)
+# runs only after this workflow succeeds on main, so a red CI never ships.
+
 on:
   push:
     branches:
@@ -10,8 +13,13 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  main:
+  check:
+    name: Typecheck, unit + integration tests, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,23 +27,73 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
+      # Version comes from package.json's "packageManager".
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
       - uses: nrwl/nx-set-shas@v4
 
-      # Typecheck everything affected (mobile included — it passes).
+      # A focused or skipped test passes CI while testing nothing.
+      # (Playwright's test.fail() is allowed: it marks a tracked known failure
+      # and turns red once the failure is fixed.)
+      - name: Forbid .only, .skip and .todo in tests
+        run: |
+          if grep -rEn --include='*.spec.ts' --include='*.spec.tsx' --include='*.test.ts' --include='*.test.tsx' \
+              '\b(it|test|describe)\.(only|skip|todo)\(' apps libs --exclude-dir=node_modules; then
+            echo "::error::Remove .only/.skip/.todo from tests"; exit 1
+          fi
+
       - run: pnpm nx affected -t typecheck --base=$NX_BASE --head=$NX_HEAD --parallel=3
 
-      # Build everything affected except mobile: `mobile:build` shells out to
-      # the EAS CLI, which isn't available (or configured) in CI. Web/API/
-      # marketing builds are what gate deploys.
+      - run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --parallel=3
+
+      # mobile:build shells out to the EAS CLI, which isn't available (or
+      # configured) in CI. Web/gateway/marketing builds are what gate deploys.
       - run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD --parallel=3 --exclude=mobile
+
+  e2e:
+    name: Playwright e2e (desktop, Android, iPhone)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium webkit
+
+      # Always runs (not `affected`): it is the only check that the whole
+      # journey works in a real browser, and it takes about a minute.
+      - run: pnpm nx e2e web-e2e
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web-e2e/test-output
+            dist/.playwright
+          retention-days: 14
