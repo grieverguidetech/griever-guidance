@@ -37,7 +37,9 @@ export async function addContacts(page: Page, contacts: TestContact[]) {
   for (const c of contacts) {
     await page.getByLabel('Name').fill(c.name);
     await page.getByLabel('Mobile number').fill(c.phone);
-    if (c.hearsFirst) await page.getByText('One of the people who should hear first').click();
+    if (c.hearsFirst) {
+      await page.getByRole('checkbox', { name: 'One of the people who should hear first' }).check();
+    }
     await page.getByRole('button', { name: 'Add and start another' }).click();
   }
   await expect(page.getByText(`Added so far — ${contacts.length}`)).toBeVisible();

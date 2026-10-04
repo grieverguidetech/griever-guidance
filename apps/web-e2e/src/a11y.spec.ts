@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { onboard } from './support';
+import { addContacts, BOB, CAROL, onboard } from './support';
 
 /**
  * Automated WCAG 2.2 A/AA checks with axe on each main screen. Axe finds only
@@ -23,6 +23,11 @@ async function violations(page: Page, { contrastOnly = false } = {}) {
 const screens: Record<string, (page: Page) => Promise<void>> = {
   'add contacts': async (page) => {
     await page.goto('/');
+  },
+  'who hears first': async (page) => {
+    await page.goto('/');
+    await addContacts(page, [CAROL, BOB]);
+    await page.getByRole('button', { name: 'Done for now' }).click();
   },
   'path landing': async (page) => {
     await onboard(page);
