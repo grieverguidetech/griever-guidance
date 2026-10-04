@@ -1,0 +1,64 @@
+name: Ticket
+description: One behavior, one branch, one PR (~300 changed lines or fewer). See PROCESS.md §4.
+title: "[area] "
+labels: [ticket]
+projects: [ptums/4]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this matters to the griever, and links to the requirement row or design spec.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable by someone who didn't see the discussion.
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: input
+    id: requirements
+    attributes:
+      label: REQUIREMENTS.md rows
+      placeholder: e.g. SF-3, ID-6
+  - type: input
+    id: constraints
+    attributes:
+      label: Constraints touched (C1–C10)
+      placeholder: e.g. C2, C7 — or "none"
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: files_touched
+      description: Globs. Tickets that run in parallel must not overlap.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests this ticket adds
+      placeholder: |
+        - unit:
+        - integration:
+        - e2e:
+    validations:
+      required: true
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      placeholder: "#12, #14 — or none"
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options: [S, M, L]
+    validations:
+      required: true

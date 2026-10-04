@@ -1,0 +1,29 @@
+name: Bug
+description: Something is broken or behaves differently than REQUIREMENTS.md says.
+title: "[bug] "
+labels: [bug]
+projects: [ptums/4]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what should have happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Device and browser, and which screen. Never paste contact details or message text from a real family.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      placeholder: web.grieversguidance.com on iPhone Safari / local dev / CI run URL
+  - type: input
+    id: constraints
+    attributes:
+      label: Does it break a constraint (C1–C10)?
+      placeholder: e.g. C2 — message text found in localStorage

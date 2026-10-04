@@ -77,3 +77,6 @@ STUFF
 apps/gateway/convex/_generated/
 DATA.md
 design_specs
+
+# agent worktrees (PROCESS.md §3)
+.worktrees/
