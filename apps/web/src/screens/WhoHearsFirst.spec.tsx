@@ -15,7 +15,7 @@ function contact(id: string, name: string, tier: Contact['tier']): Contact {
   };
 }
 
-const CONTACTS = [contact('a', 'Aunt Carol', 'first'), contact('b', 'Bob Smith', 'friends')];
+const CONTACTS = [contact('a', 'Aunt Carol', 'first'), contact('b', 'Bob Smith', 'family')];
 
 function setup() {
   const onSave = vi.fn();
