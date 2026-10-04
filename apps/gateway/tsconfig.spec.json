@@ -2,15 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "module": "esnext",
-    "moduleResolution": "bundler",
     "outDir": "out-tsc/vitest",
     "tsBuildInfoFile": "out-tsc/vitest/tsconfig.spec.tsbuildinfo",
     "emitDeclarationOnly": true,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.spec.ts", "src/**/*.test.ts"],
   "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
     {
       "path": "../../libs/gateway-sync/tsconfig.lib.json"
     },

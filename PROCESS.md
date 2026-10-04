@@ -214,7 +214,8 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
 - Every lib/app Vitest config builds on `vitest.base.mts`, which resolves workspace packages from
   **source** (`@org/source`), so tests never run against a stale or missing `dist/`.
 - Tests resolve against source and are typechecked by each project's `tsconfig.spec.json`
-  (`pnpm typecheck`); specs stay excluded from `tsconfig.lib.json`/`tsconfig.app.json` so they don't ship in `dist/`.
+  (`pnpm typecheck`, which re-runs when a spec changes); specs stay excluded from
+  `tsconfig.lib.json`/`tsconfig.app.json` so they don't ship in `dist/`.
 - Web tests get a fresh in-memory IndexedDB and empty `localStorage` per test (`apps/web/src/test-setup.ts`).
 - E2E builds the web app and serves it on its own port (`4300`, override with `E2E_PORT`) and
   **never reuses** a running server, so a `pnpm dev` or another worktree's run can't be tested by
