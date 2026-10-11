@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { FlowProps, RootStackParamList } from '../app/App';
+import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
 
 export function DetailsFormScreen({ flow }: FlowProps) {
   const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
@@ -54,7 +55,7 @@ export function DetailsFormScreen({ flow }: FlowProps) {
               value={fields[field.key] ?? ''}
               onChangeText={(val) => setField(field.key, val)}
               placeholder={field.placeholder}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={MUTED}
             />
           </View>
         ))}
@@ -76,17 +77,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  backButton: {},
-  backText: { fontSize: 14, color: '#9ca3af' },
-  whatYoullNeedLink: {},
-  whatYoullNeedText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
+  backButton: { minHeight: 44, justifyContent: 'center' },
+  backText: { fontSize: 14, color: MUTED },
+  whatYoullNeedLink: { minHeight: 44, justifyContent: 'center' },
+  whatYoullNeedText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 24 },
   fieldGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },
-  optional: { fontWeight: '400', color: '#9ca3af' },
+  optional: { fontWeight: '400', color: MUTED },
   input: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: FIELD_BORDER,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -94,7 +95,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   button: {
-    backgroundColor: '#6B7FD4',
+    backgroundColor: ACCENT,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',

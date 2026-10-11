@@ -19,6 +19,7 @@ import {
 import type { Contact } from '@griever/shared';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
+import { ACCENT, ACCENT_TINT, ERROR, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -169,7 +170,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
             value={manualName}
             onChangeText={setManualName}
             placeholder="e.g. Aunt Carol"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={MUTED}
           />
           <Text style={styles.label}>Mobile number</Text>
           <TextInput
@@ -180,7 +181,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
               setManualError(null);
             }}
             placeholder="(617) 555-0148"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={MUTED}
             keyboardType="phone-pad"
           />
           {manualError && <Text style={styles.errorText}>{manualError}</Text>}
@@ -213,7 +214,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           contacts.loading ? (
-            <ActivityIndicator color="#9ca3af" style={{ marginTop: 24 }} />
+            <ActivityIndicator color={MUTED} style={{ marginTop: 24 }} />
           ) : (
             <Text style={styles.empty}>No one saved yet — bring people across or add them by hand.</Text>
           )
@@ -223,7 +224,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
       <View style={styles.addRow}>
         <TouchableOpacity style={styles.addButton} onPress={handleImport} disabled={importing} activeOpacity={0.8}>
           {importing ? (
-            <ActivityIndicator color="#6B7FD4" size="small" />
+            <ActivityIndicator color={ACCENT} size="small" />
           ) : (
             <Text style={styles.addButtonText}>Import from contacts</Text>
           )}
@@ -258,11 +259,11 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
-  backText: { fontSize: 14, color: '#9ca3af', marginBottom: 24 },
+  backText: { fontSize: 14, color: MUTED, marginBottom: 24 },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#9ca3af' },
+  subtitle: { fontSize: 14, color: MUTED },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
-  empty: { fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 24 },
+  empty: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,20 +274,20 @@ const styles = StyleSheet.create({
     borderColor: '#f3f4f6',
     marginBottom: 8,
   },
-  rowSelected: { borderColor: '#6B7FD4', backgroundColor: '#eef0fb' },
+  rowSelected: { borderColor: ACCENT, backgroundColor: ACCENT_TINT },
   rowInfo: { flex: 1 },
   name: { fontSize: 14, fontWeight: '500', color: '#111827' },
-  phone: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  phone: { fontSize: 12, color: MUTED_STRONG, marginTop: 2 },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: FIELD_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxSelected: { backgroundColor: '#6B7FD4', borderColor: '#6B7FD4' },
+  checkboxSelected: { backgroundColor: ACCENT, borderColor: ACCENT },
   checkmark: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
   addRow: {
     flexDirection: 'row',
@@ -297,13 +298,13 @@ const styles = StyleSheet.create({
   addButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: FIELD_BORDER,
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
   },
-  addButtonText: { color: '#6B7FD4', fontSize: 13, fontWeight: '500' },
-  errorText: { fontSize: 12, color: '#ef4444' },
+  addButtonText: { color: ACCENT, fontSize: 13, fontWeight: '500' },
+  errorText: { fontSize: 12, color: ERROR },
   errorSpacing: { paddingHorizontal: 24, marginBottom: 8 },
   footer: {
     flexDirection: 'row',
@@ -313,9 +314,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
   },
-  count: { fontSize: 14, color: '#6b7280' },
+  count: { fontSize: 14, color: MUTED },
   button: {
-    backgroundColor: '#6B7FD4',
+    backgroundColor: ACCENT,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -327,7 +328,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6, marginTop: 16 },
   input: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: FIELD_BORDER,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,

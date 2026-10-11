@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { FlowProps } from '../app/App';
+import { ACCENT, MUTED } from '../components/colors';
 
 export function ConfirmScreen({ flow }: FlowProps) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob } = flow;
@@ -37,9 +38,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   backButton: { marginBottom: 24 },
-  backText: { fontSize: 14, color: '#9ca3af' },
+  backText: { fontSize: 14, color: MUTED },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#9ca3af', marginBottom: 24 },
+  subtitle: { fontSize: 14, color: MUTED, marginBottom: 24 },
   messageBox: {
     backgroundColor: '#f9fafb',
     borderWidth: 1,
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
   },
   messageText: { fontSize: 14, color: '#374151', lineHeight: 22 },
   button: {
-    backgroundColor: '#6B7FD4',
+    backgroundColor: ACCENT,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'rea
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import type { FlowProps } from '../app/App';
+import { ACCENT, FIELD_BORDER, MUTED, SUCCESS } from '../components/colors';
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -87,7 +88,7 @@ export function SendingScreen({ flow, contacts }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff', padding: 24, paddingTop: 60 },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#9ca3af', marginBottom: 24 },
+  subtitle: { fontSize: 14, color: MUTED, marginBottom: 24 },
   card: {
     backgroundColor: '#f9fafb',
     borderWidth: 1,
@@ -95,13 +96,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
   },
-  eyebrow: { fontSize: 12, color: '#9ca3af', marginBottom: 4 },
+  eyebrow: { fontSize: 12, color: MUTED, marginBottom: 4 },
   name: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 12 },
   message: { fontSize: 13, color: '#374151', lineHeight: 20, marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#6B7FD4',
+    backgroundColor: ACCENT,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -112,11 +113,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: FIELD_BORDER,
   },
-  skipButtonText: { color: '#6b7280', fontSize: 14 },
-  sentText: { fontSize: 14, color: '#3d8a5f' },
+  skipButtonText: { color: MUTED, fontSize: 14 },
+  sentText: { fontSize: 14, color: SUCCESS },
   nextButton: { flex: 0, marginTop: 12 },
   againButton: { alignItems: 'center', paddingVertical: 12 },
-  undoText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
+  undoText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
 });
