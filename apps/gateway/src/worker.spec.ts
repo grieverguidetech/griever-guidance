@@ -21,7 +21,7 @@ async function makeKeys(kid = 'key-1') {
 async function signJwt(privateKey: Awaited<ReturnType<typeof makeKeys>>['privateKey'], kid: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid }));
-  const payload = b64url(JSON.stringify({ sub: USER_ID, aud: 'authenticated', iat: now, exp: now + 3600 }));
+  const payload = b64url(JSON.stringify({ iss: 'https://proj.supabase.test/auth/v1', sub: USER_ID, aud: 'authenticated', iat: now, exp: now + 3600 }));
   const sig = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     privateKey,

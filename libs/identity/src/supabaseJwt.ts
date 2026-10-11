@@ -93,9 +93,10 @@ async function refetchOnUnknownKid(supabaseUrl: string, token: string): Promise<
 }
 
 /**
- * Verifies a Supabase access token (ES256, audience "authenticated") against
+ * Verifies a Supabase access token (ES256, audience "authenticated",
+ * issuer `${SUPABASE_URL}/auth/v1`) against
  * the project's JWKS and exposes `sub` as `userId`.
- *   missing / malformed / expired / wrong audience / bad signature -> 401
+ *   missing / malformed / expired / wrong audience / wrong or missing issuer / bad signature -> 401
  *   JWKS unreachable -> 503 (the token may be fine; we just cannot tell)
  *   SUPABASE_URL or SUPABASE_ANON_KEY unset -> 503
  */
@@ -106,16 +107,19 @@ export function supabaseAuth(getConfig: () => SupabaseConfig | null): Middleware
       return c.json({ error: 'Accounts are not available right now.' }, 503);
     }
 
+    // A trailing slash on SUPABASE_URL must not change the JWKS URL or the issuer.
+    const baseUrl = config.url.replace(/\/+$/, '');
     const verify = jwk({
-      keys: () => loadJwks(config.url),
+      keys: () => loadJwks(baseUrl),
       alg: ['ES256'],
-      verification: { aud: 'authenticated' },
+      // hono rejects a token whose iss is missing or not exactly this string.
+      verification: { aud: 'authenticated', iss: `${baseUrl}/auth/v1` },
     });
 
     let verified = false;
     try {
       const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header('Authorization') ?? '');
-      if (bearer?.[1]) await refetchOnUnknownKid(config.url, bearer[1]);
+      if (bearer?.[1]) await refetchOnUnknownKid(baseUrl, bearer[1]);
       await verify(c, async () => {
         verified = true;
       });

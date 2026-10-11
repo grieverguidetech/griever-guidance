@@ -23,7 +23,14 @@ export async function signJwt(
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid }));
   const payload = b64url(
-    JSON.stringify({ sub: USER_ID, aud: 'authenticated', iat: now, exp: now + 3600, ...claims }),
+    JSON.stringify({
+      iss: `${SUPABASE_URL}/auth/v1`,
+      sub: USER_ID,
+      aud: 'authenticated',
+      iat: now,
+      exp: now + 3600,
+      ...claims,
+    }),
   );
   const sig = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
