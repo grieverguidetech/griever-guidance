@@ -6,16 +6,7 @@ import {
   type TriggerHandle,
 } from '@griever/data-sync';
 import { metaStore } from '@griever/data-local';
-
-function resolveGatewayUrl(): string {
-  try {
-    const viteUrl = (import.meta as { env?: Record<string, string> }).env?.['VITE_API_URL'];
-    if (viteUrl) return viteUrl;
-  } catch {
-    // not in a Vite context
-  }
-  return 'http://localhost:3001';
-}
+import { API_URL } from './configureApi';
 
 let triggerHandle: TriggerHandle | null = null;
 
@@ -31,7 +22,7 @@ let triggerHandle: TriggerHandle | null = null;
  */
 export async function registerSync(): Promise<void> {
   await getOrCreateDeviceId();
-  await metaStore.setMetaString('gatewayUrl', resolveGatewayUrl());
+  await metaStore.setMetaString('gatewayUrl', API_URL);
 
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
 
@@ -71,6 +62,6 @@ export async function setSyncUserId(userId: string | null): Promise<void> {
   if (!userId) return;
 
   const deviceId = await getOrCreateDeviceId();
-  const transport = createGatewayTransport({ baseUrl: resolveGatewayUrl(), devUserId: userId });
+  const transport = createGatewayTransport({ baseUrl: API_URL, devUserId: userId });
   triggerHandle = registerSyncTriggers(transport, deviceId);
 }
