@@ -34,7 +34,7 @@ export function CreateAccount({ onBack, onSubmit, error }: Props) {
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} aria-busy={pending}>
+    <form className="flex flex-col gap-4" onSubmit={submit}>
       <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Sign in</h1>
@@ -76,7 +76,7 @@ export function CreateAccount({ onBack, onSubmit, error }: Props) {
         {error}
       </div>
 
-      <button type="submit" disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
+      <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
         {pending ? 'Signing you in…' : 'Sign in'}
       </button>
     </form>

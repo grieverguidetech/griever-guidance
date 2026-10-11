@@ -23,6 +23,21 @@ describe('Profile', () => {
     expect(await screen.findByText('Your name is saved.')).toBeInTheDocument();
   });
 
+  it('blocks a name of only spaces', async () => {
+    const onSave = vi.fn(async () => true);
+    const user = userEvent.setup();
+    render(<Profile senderName={null} onBack={vi.fn()} onSave={onSave} onSignOut={vi.fn()} error={null} />);
+    await user.type(screen.getByLabelText('Your name'), '  ');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText('Please enter your name.')).toBeInTheDocument();
+  });
+
+  it('asks what to call the person when the account has no name', () => {
+    render(<Profile asksName senderName={null} onBack={vi.fn()} onSave={vi.fn()} onSignOut={vi.fn()} error={null} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'What should we call you?' })).toBeInTheDocument();
+  });
+
   it('keeps the typed name when saving fails', async () => {
     const user = userEvent.setup();
     render(

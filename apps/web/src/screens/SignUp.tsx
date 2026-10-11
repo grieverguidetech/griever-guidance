@@ -7,6 +7,11 @@ export interface SignUpInput {
   password: string;
 }
 
+/** Shown under the password field. The Supabase minimum is a pending product decision. */
+export const PASSWORD_HINT = 'Use at least 8 characters.';
+
+const NAME_REQUIRED = 'Please enter your name.';
+
 interface Props {
   /** Resolves true when the account was created. A false result keeps everything typed. */
   onSubmit: (input: SignUpInput) => Promise<boolean>;
@@ -23,10 +28,16 @@ export function SignUp({ onSubmit, onSignIn, error }: Props) {
   const [pending, setPending] = useState(false);
   // Still on screen after a successful sign-up means there is no session yet: email confirmation.
   const [checkEmail, setCheckEmail] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (pending) return;
+    if (!name.trim()) {
+      setNameError(NAME_REQUIRED);
+      return;
+    }
+    setNameError(null);
     setPending(true);
     try {
       const ok = await onSubmit({ name: name.trim(), email: email.trim(), password });
@@ -36,8 +47,17 @@ export function SignUp({ onSubmit, onSignIn, error }: Props) {
     }
   }
 
+  // One polite region carries every message, so each is announced.
+  const message =
+    nameError ??
+    error ??
+    (checkEmail
+      ? 'Please check your email to finish setting up your account, then come back here and sign in.'
+      : null);
+  const isProblem = Boolean(nameError ?? error);
+
   return (
-    <form className="flex flex-col gap-4 pt-[52px] min-h-full" onSubmit={submit} aria-busy={pending}>
+    <form className="flex flex-col gap-4 pt-[52px] min-h-full" onSubmit={submit}>
       <div className="flex flex-col gap-1">
         <h1 className="text-[28px] leading-[1.1]">Grievers Guidance</h1>
         <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
@@ -52,9 +72,13 @@ export function SignUp({ onSubmit, onSignIn, error }: Props) {
           className="gg-input"
           type="text"
           autoComplete="name"
+          autoCapitalize="words"
           required
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setNameError(null);
+          }}
         />
       </div>
 
@@ -81,25 +105,35 @@ export function SignUp({ onSubmit, onSignIn, error }: Props) {
           className="gg-input"
           type="password"
           autoComplete="new-password"
+          aria-describedby={`${ids}-password-hint`}
+          minLength={8}
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-      </div>
-
-      <div aria-live="polite" className="text-[13px]" style={{ color: 'var(--color-danger, #b91c1c)' }}>
-        {error}
-      </div>
-      {checkEmail && !error && (
-        <p role="status" className="text-[13px] m-0">
-          Please check your email to finish setting up your account.
+        <p id={`${ids}-password-hint`} className="text-[12px] m-0 mt-1" style={{ color: 'var(--text-muted)' }}>
+          {PASSWORD_HINT}
         </p>
-      )}
+      </div>
 
-      <button type="submit" disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
+      <div
+        aria-live="polite"
+        className="text-[13px]"
+        style={isProblem ? { color: 'var(--color-danger, #b91c1c)' } : undefined}
+      >
+        {message}
+      </div>
+
+      {/* The primary button's contrast is tracked in #8. */}
+      <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
         {pending ? 'Creating your account…' : 'Create account'}
       </button>
-      <button type="button" onClick={onSignIn} className="gg-btn gg-btn-ghost gg-btn-block">
+      <button
+        type="button"
+        onClick={onSignIn}
+        className="gg-btn gg-btn-ghost gg-btn-block"
+        style={{ color: 'var(--color-accent-700)' }}
+      >
         I already have an account
       </button>
 

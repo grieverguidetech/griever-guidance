@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SignUp } from './SignUp';
+import { SignUp, PASSWORD_HINT } from './SignUp';
 
 function setup(onSubmit = vi.fn(async () => false), error: string | null = null) {
   const user = userEvent.setup();
@@ -19,6 +19,23 @@ describe('SignUp', () => {
     expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'new-password');
   });
 
+  it('describes the password field with the hint and asks for 8 characters', () => {
+    setup();
+    const password = screen.getByLabelText('Password');
+    expect(password).toHaveAccessibleDescription(PASSWORD_HINT);
+    expect(password).toHaveAttribute('minlength', '8');
+  });
+
+  it('blocks a name of only spaces and says so', async () => {
+    const { user, onSubmit } = setup();
+    await user.type(screen.getByLabelText('Your name'), '   ');
+    await user.type(screen.getByLabelText('Email'), 'a@b.co');
+    await user.type(screen.getByLabelText('Password'), 'secret-pass');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Please enter your name.')).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('shows the error in a polite live region', () => {
     setup(undefined, 'Please choose a stronger password.');
     expect(screen.getByText('Please choose a stronger password.')).toHaveAttribute('aria-live', 'polite');
@@ -33,9 +50,9 @@ describe('SignUp', () => {
     await user.type(screen.getByLabelText('Password'), 'secret-pass');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(screen.getByRole('button', { name: 'Creating your account…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Creating your account…' })).toHaveAttribute('aria-disabled', 'true');
     finish(false);
-    expect(await screen.findByRole('button', { name: 'Create account' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Create account' })).toHaveAttribute('aria-disabled', 'false');
     expect(onSubmit).toHaveBeenCalledWith({ name: 'Anna', email: 'a@b.co', password: 'secret-pass' });
     expect(screen.getByLabelText('Password')).toHaveValue('secret-pass');
   });
@@ -46,6 +63,6 @@ describe('SignUp', () => {
     await user.type(screen.getByLabelText('Email'), 'a@b.co');
     await user.type(screen.getByLabelText('Password'), 'secret-pass');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(await screen.findByText('Please check your email to finish setting up your account.')).toBeInTheDocument();
+    expect(await screen.findByText('Please check your email to finish setting up your account, then come back here and sign in.')).toBeInTheDocument();
   });
 });

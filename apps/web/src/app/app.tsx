@@ -8,7 +8,7 @@ import {
   getContactsRetentionExpiry,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever/hooks';
-import type { AuthClient } from '@griever/api-client/auth';
+import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
@@ -50,26 +50,57 @@ const browserStorage =
 
 // Defined at module scope: a component declared inside App would be a new
 // type on every render, remounting the screen and wiping what was typed.
-function Shell({ children, onWhatYoullNeed }: { children: React.ReactNode; onWhatYoullNeed: () => void }) {
+function Shell({
+  children,
+  onWhatYoullNeed,
+  notice,
+}: {
+  children: React.ReactNode;
+  onWhatYoullNeed: () => void;
+  notice?: ReactNode;
+}) {
   return (
     <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
       <div className="w-full max-w-[420px] px-5 py-8">
+        {notice}
         <WhatYoullNeedProvider onWhatYoullNeed={onWhatYoullNeed}>{children}</WhatYoullNeedProvider>
       </div>
     </div>
   );
 }
 
-function WithIdentity({ client, children }: { client: AuthClient; children: (auth: UseSupabaseIdentityResult) => ReactNode }) {
-  return <>{children(useSupabaseIdentity({ client, storage: browserStorage }))}</>;
+function WithIdentity({
+  client,
+  children,
+}: {
+  client: AuthClient;
+  children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode;
+}) {
+  return <>{children(useSupabaseIdentity({ client, storage: browserStorage }), client)}</>;
+}
+
+/** An always-present status region; the words appear only after a pause, so a quick load never flashes. */
+function Loading() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShow(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div role="status" className="text-[14px] pt-[52px]" style={{ color: 'var(--text-muted)' }}>
+      {show ? 'Loading…' : ''}
+    </div>
+  );
 }
 
 /**
  * Loads the Supabase client (its own chunk) and only then mounts the identity hook, which needs
  * a client at render time. Rendered only when AUTH_ENABLED is on.
  */
-function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult) => ReactNode }) {
+function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode }) {
   const [loaded, setLoaded] = useState<AuthClientResult | null>(null);
+  // Bumped by "Try again"; loadAuthClient forgets a failed load, so this runs it afresh.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -79,15 +110,34 @@ function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult) =>
     return () => {
       live = false;
     };
-  }, []);
+  }, [attempt]);
 
-  if (!loaded) return <Shell onWhatYoullNeed={noop}>{null}</Shell>;
+  if (!loaded) {
+    return (
+      <Shell onWhatYoullNeed={noop}>
+        <Loading />
+      </Shell>
+    );
+  }
   if (!loaded.available) {
     return (
       <Shell onWhatYoullNeed={noop}>
-        <p role="status" className="text-[14px] leading-[1.6] pt-[52px] m-0">
-          Accounts aren't available right now.
-        </p>
+        <div className="flex flex-col gap-3 pt-[52px]">
+          <h1 className="text-[22px]">Accounts aren't available right now</h1>
+          <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
+            Nothing you've written is lost. You can try again in a moment.
+          </p>
+          <button
+            type="button"
+            className="gg-btn gg-btn-secondary gg-btn-block"
+            onClick={() => {
+              setLoaded(null);
+              setAttempt((n) => n + 1);
+            }}
+          >
+            Try again
+          </button>
+        </div>
       </Shell>
     );
   }
@@ -101,10 +151,20 @@ function noop() {
 export function App() {
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
   if (!AUTH_ENABLED) return <AppBody auth={null} />;
-  return <AuthGate>{(auth) => <AppBody auth={auth} />}</AuthGate>;
+  return <AuthGate>{(auth, client) => <AppBody auth={auth} client={client} />}</AuthGate>;
 }
 
-function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
+/** True when the signed-in account has no name yet (or the name is blank). */
+function lacksName(result: ProfileResult): boolean {
+  if (result.ok) return !result.profile.senderName?.trim();
+  return result.reason === 'no_profile';
+}
+
+function isAccountView(view: AppView): boolean {
+  return view === 'signup' || view === 'createAccount';
+}
+
+function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; client?: AuthClient }) {
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
@@ -121,29 +181,78 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
   const [setupEditing, setSetupEditing] = useState(false);
   // The name typed at sign-up, saved once the new account has a session.
   const [pendingName, setPendingName] = useState<string | null>(null);
+  // True while a sign-in is checking whether the account has a name yet.
+  const [settling, setSettling] = useState(false);
+  // The account has no name: Profile opens with a "What should we call you?" prompt.
+  const [needsName, setNeedsName] = useState(false);
+  const [askingName, setAskingName] = useState(false);
+  // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
+  const [leftOnPurpose, setLeftOnPurpose] = useState(false);
   const openWhatYoullNeed = useCallback(() => setView('whatYoullNeed'), []);
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
   const updateSenderName = auth?.updateSenderName;
+  const clearError = auth?.clearError;
+
+  const openProfile = useCallback(
+    (asksName: boolean) => {
+      // A stale error from another screen would otherwise show here without being announced.
+      clearError?.();
+      setAskingName(asksName);
+      setNeedsName(false);
+      setView('profile');
+    },
+    [clearError],
+  );
 
   // Sign-in resolves asynchronously (the boot-time session check, or a form), so the next view
   // can't be decided in useState's initializer. A new account goes on to add contacts.
   useEffect(() => {
-    if (!signedIn || (view !== 'signup' && view !== 'createAccount')) return;
+    if (!signedIn || !isAccountView(view) || settling) return;
     if (pendingName !== null && updateSenderName) {
-      void updateSenderName(pendingName);
+      void updateSenderName(pendingName).then((saved) => {
+        if (saved) return;
+        // The prompt below asks again, so the failure message need not linger.
+        clearError?.();
+        setNeedsName(true);
+      });
       setPendingName(null);
       setView('addContactsManual');
+    } else if (needsName) {
+      openProfile(true);
     } else {
       setView('pathLanding');
     }
-  }, [signedIn, view, pendingName, updateSenderName]);
+  }, [signedIn, view, settling, pendingName, needsName, updateSenderName, clearError, openProfile]);
 
-  // Signing out, or a session that ended, returns to the account screens.
+  // A name that could not be saved at sign-up: ask for it once the account is in use.
   useEffect(() => {
-    if (signedOut && view !== 'signup' && view !== 'createAccount') setView('signup');
-  }, [signedOut, view]);
+    if (signedIn && needsName && !isAccountView(view) && view !== 'profile') openProfile(true);
+  }, [signedIn, needsName, view, openProfile]);
+
+  // Only the Sign out button sends the person back to sign-up. A session that ended some other
+  // way keeps them where they are (C5), with a note.
+  useEffect(() => {
+    if (signedOut && leftOnPurpose && !isAccountView(view)) {
+      setLeftOnPurpose(false);
+      setView('signup');
+    }
+  }, [signedOut, leftOnPurpose, view]);
+  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
+  const endedNote = sessionEnded ? (
+    <div role="status" className="flex flex-col gap-1 mb-4 text-[13px]">
+      <p className="m-0">You've been signed out. Your work on this device is safe. Sign in again when you're ready.</p>
+      <button
+        type="button"
+        onClick={() => setView('createAccount')}
+        className="gg-btn gg-btn-ghost self-start !px-0"
+        style={{ color: 'var(--color-accent-700)' }}
+      >
+        Sign in
+      </button>
+    </div>
+  ) : null;
 
   // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
   // (#39), so the Supabase user id is deliberately not passed in.
@@ -288,14 +397,18 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   // While a stored session is being checked, render nothing rather than flash "signup" first.
   if (auth?.isLoading) {
-    return <Shell onWhatYoullNeed={openWhatYoullNeed}>{null}</Shell>;
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+        <Loading />
+      </Shell>
+    );
   }
 
   // ---- Flow D: account + contacts onboarding ----
 
   if (auth && view === 'signup') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <SignUp
           error={auth.error}
           onSignIn={() => {
@@ -315,18 +428,25 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (auth && view === 'createAccount') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <CreateAccount
           error={auth.error}
           onBack={() => {
             auth.clearError();
             setView('signup');
           }}
-          onSubmit={({ email, password }) => {
+          onSubmit={async ({ email, password }) => {
             // A name left over from a sign-up that is still waiting on email confirmation
             // must not overwrite the name on an existing account.
             setPendingName(null);
-            return auth.signIn(email, password);
+            setSettling(true);
+            try {
+              const ok = await auth.signIn(email, password);
+              if (ok && client && lacksName(await client.getProfile())) setNeedsName(true);
+              return ok;
+            } finally {
+              setSettling(false);
+            }
           }}
         />
       </Shell>
@@ -335,16 +455,28 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (auth && view === 'profile') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Profile
+          asksName={askingName}
           senderName={auth.profile?.senderName ?? null}
           error={auth.error}
           onBack={() => {
             auth.clearError();
+            setAskingName(false);
             goToPathLanding();
           }}
-          onSave={auth.updateSenderName}
-          onSignOut={() => void auth.signOut()}
+          onSave={async (name) => {
+            const saved = await auth.updateSenderName(name);
+            if (saved && askingName) {
+              setAskingName(false);
+              goToPathLanding();
+            }
+            return saved;
+          }}
+          onSignOut={() => {
+            setLeftOnPurpose(true);
+            void auth.signOut();
+          }}
         />
       </Shell>
     );
@@ -352,10 +484,10 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'addContactsManual') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <AddContactsManual
           contacts={contacts.contacts}
-          onBack={auth ? () => setView('signup') : undefined}
+          onBack={auth ? goToPathLanding : undefined}
           onAdd={({ name, phone, hearsFirst }) =>
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
@@ -367,10 +499,10 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'importContacts') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <ImportContacts
           storedPhones={storedPhones}
-          onBack={() => setView(auth ? 'signup' : 'addContactsManual')}
+          onBack={() => (auth ? goToPathLanding() : setView('addContactsManual'))}
           onSwitchToManual={() => setView('addContactsManual')}
           onContinue={(picked, source) => {
             contacts.importContacts(picked, source);
@@ -383,7 +515,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'whoHearsFirst') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <WhoHearsFirst
           contacts={contacts.contacts}
           onBack={() =>
@@ -407,7 +539,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'obituary') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <ObituaryScreen
           session={activeDetails}
           onBack={() => setView('shareObituary')}
@@ -419,7 +551,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'whatYoullNeed') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <WhatYoullNeed onBack={() => goToPathLanding()} onEmailList={() => goToPathLanding()} />
       </Shell>
     );
@@ -427,7 +559,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'gate' && active) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Gate
           title="Have the arrangements been made?"
           subtitle="This message needs a date, time and place from the funeral home."
@@ -453,7 +585,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'shareObituary' && active && activeDetails) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <ShareObituary
           session={activeDetails}
           onBack={() => goToPathLanding()}
@@ -473,7 +605,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'setup' && active) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <SessionSetup
           session={active}
           editing={setupEditing}
@@ -487,7 +619,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'flow' && active && activeDetails) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Flow
           key={active.id}
           session={activeDetails}
@@ -508,7 +640,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   if (view === 'pathLanding' && active) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <PathLanding
           session={active}
           otherSessions={sortedSessions.filter((s) => s.id !== active.id)}
@@ -519,8 +651,9 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
         {auth && (
           <button
             type="button"
-            onClick={() => setView('profile')}
+            onClick={() => openProfile(false)}
             className="gg-btn gg-btn-ghost gg-btn-block mt-4"
+            style={{ color: 'var(--color-accent-700)' }}
           >
             Your account
           </button>
@@ -531,7 +664,7 @@ function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
 
   // No active session yet (fresh account, or the active one was pruned) —
   // the effect above creates one and moves to 'setup'.
-  return <Shell onWhatYoullNeed={openWhatYoullNeed}>{null}</Shell>;
+  return <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>{null}</Shell>;
 }
 
 export default App;

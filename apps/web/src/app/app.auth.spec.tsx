@@ -2,7 +2,7 @@
  * The account flow on the real App with a stub auth client (no network, no supabase-js).
  * The feature flag and the client loader are mocked so each test picks its own setup.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AuthClient } from '@griever/api-client/auth';
 import type { AuthClientResult } from '../lib/authClient';
@@ -22,7 +22,13 @@ vi.mock('../lib/authClient', () => ({ loadAuthClient: mocks.load }));
 
 import { App } from './app';
 
-const PROFILE = { senderName: 'Anna', contactSource: null, updatedAt: '2026-10-11T00:00:00.000Z' };
+const PROFILE = {
+  id: 'u1',
+  senderName: 'Anna',
+  contactSource: null,
+  createdAt: '2026-10-11T00:00:00.000Z',
+  updatedAt: '2026-10-11T00:00:00.000Z',
+};
 
 function stubClient(overrides: Partial<AuthClient> = {}): AuthClient {
   let signedIn = false;
@@ -87,7 +93,7 @@ describe('flag on', () => {
   it('shows a calm message, not a crash, when the client cannot be made', async () => {
     mocks.load.mockResolvedValue({ available: false });
     render(<App />);
-    expect(await screen.findByText("Accounts aren't available right now.")).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: "Accounts aren't available right now" })).toBeInTheDocument();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
   });
 
@@ -136,7 +142,9 @@ describe('flag on', () => {
   });
 
   it('signs in and lands on the existing path', async () => {
-    const client = stubClient();
+    const client = stubClient({
+      getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })),
+    });
     useClient(client);
     const user = userEvent.setup();
     render(<App />);
@@ -146,7 +154,7 @@ describe('flag on', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(client.signIn).toHaveBeenCalledWith('anna@example.com', 'a-long-password');
-    await waitFor(() => expect(screen.queryByLabelText('Password')).not.toBeInTheDocument());
+    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
     expect(client.updateProfile).not.toHaveBeenCalled();
   });
 
@@ -189,5 +197,105 @@ describe('flag on', () => {
 
     expect(client.updateProfile).toHaveBeenLastCalledWith({ senderName: 'Anna Reyes' });
     expect(await screen.findByText('Your name is saved.')).toBeInTheDocument();
+  });
+  it('goes back to sign-up only after an explicit sign out', async () => {
+    useClient(stubClient());
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('button', { name: 'Create account' })).toBeInTheDocument();
+  });
+
+  it('keeps the person where they are, with a note, when the session ends elsewhere', async () => {
+    const client = stubClient({
+      updateProfile: vi.fn(async () => ({ ok: false as const, reason: 'signed_out' as const })),
+    });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    // The background name save above already hit the ended session; the person is still here.
+    expect(
+      await screen.findByText("You've been signed out. Your work on this device is safe. Sign in again when you're ready."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('does not reuse the sign-up name after email confirmation, and asks for a name', async () => {
+    const client = stubClient({
+      signUp: vi.fn(async () => ({ ok: true as const, userId: 'u1' })),
+    });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(
+      await screen.findByText('Please check your email to finish setting up your account, then come back here and sign in.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'I already have an account' }));
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument();
+    expect(client.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('asks for a name when the background save after sign-up fails', async () => {
+    const client = stubClient({
+      updateProfile: vi.fn(async () => ({ ok: false as const, reason: 'offline' as const })),
+    });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument();
+  });
+
+  it('reaches the app offline with a stored session (C5)', async () => {
+    useClient(stubClient({ getSession: vi.fn(async () => ({ status: 'offline' as const })) }));
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  });
+
+  it('retries the load from the unavailable state', async () => {
+    const client = stubClient();
+    mocks.load.mockResolvedValueOnce({ available: false });
+    mocks.load.mockResolvedValue({ available: true, client });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByLabelText('Password')).toBeInTheDocument();
+    expect(mocks.load).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a calm loading status only after a pause', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.load.mockReturnValue(new Promise(() => undefined));
+      render(<App />);
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Loading…');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
