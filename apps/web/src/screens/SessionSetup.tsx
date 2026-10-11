@@ -1,5 +1,5 @@
 import type { Session } from '@griever/hooks';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
 
 interface Props {
@@ -16,7 +16,7 @@ export function SessionSetup({ session, editing, onChange, onContinue, onBack }:
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">
           {editing ? 'Edit their details' : 'Who are we writing about?'}

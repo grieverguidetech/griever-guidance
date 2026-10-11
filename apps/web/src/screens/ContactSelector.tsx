@@ -3,7 +3,7 @@ import type { useSendFlow } from '@griever/hooks';
 import type { Contact, ContactTier } from '@griever/shared';
 import { detectDeviceRegion, toE164 } from '@griever/contacts';
 import { CheckCircle, Circle, Plus } from '@phosphor-icons/react';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 import { formatPhone } from '../lib/format';
 
 type Flow = ReturnType<typeof useSendFlow>;
@@ -57,7 +57,7 @@ export function ContactSelector({ flow, contacts, grouped, onAddContact }: Props
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={prevStep} />
+      <TopBar onBack={prevStep} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Who should know?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

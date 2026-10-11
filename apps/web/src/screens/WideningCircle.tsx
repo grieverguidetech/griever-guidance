@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 import { ContactRow } from './ContactSelector';
 
 type Flow = ReturnType<typeof useSendFlow>;
@@ -44,7 +44,7 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={prevStep} />
+      <TopBar onBack={prevStep} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Who hasn't heard yet?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

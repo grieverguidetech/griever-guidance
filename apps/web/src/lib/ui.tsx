@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { ReactElement } from 'react';
-import { ArrowLeft } from '@phosphor-icons/react';
+import { ArrowLeft, ListChecks } from '@phosphor-icons/react';
+import { useWhatYoullNeed } from './whatYoullNeedContext';
 
 /**
  * Shows `text` above its child on hover or focus. The child is expected to
@@ -26,6 +27,28 @@ export function BackButton({ onClick }: { onClick: () => void }) {
       <ArrowLeft size={16} weight="regular" />
       Back
     </button>
+  );
+}
+
+/**
+ * Persistent top bar for every flow screen: back button on the left,
+ * "What you'll need" link on the right. Keeps the checklist reachable
+ * from anywhere in the flow per the demo-feedback ticket.
+ */
+export function TopBar({ onBack }: { onBack: () => void }) {
+  const onWhatYoullNeed = useWhatYoullNeed();
+  return (
+    <div className="flex items-center justify-between w-full">
+      <BackButton onClick={onBack} />
+      <button
+        type="button"
+        onClick={onWhatYoullNeed}
+        className="gg-btn gg-btn-ghost !px-0"
+      >
+        <ListChecks size={16} weight="duotone" />
+        What you'll need
+      </button>
+    </div>
   );
 }
 

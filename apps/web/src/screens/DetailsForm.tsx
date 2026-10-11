@@ -3,7 +3,7 @@ import type { useSendFlow } from '@griever/hooks';
 import { useMockPlaces } from '@griever/hooks';
 import { shareService } from '@griever/shared';
 import { MapPin } from '@phosphor-icons/react';
-import { BackButton, Eyebrow } from '../lib/ui';
+import { TopBar, Eyebrow } from '../lib/ui';
 import { DateInput } from '../lib/DateField';
 import { TimeInput } from '../lib/TimeField';
 
@@ -34,7 +34,7 @@ export function DetailsForm({ flow }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={prevStep} />
+      <TopBar onBack={prevStep} />
       <div className="flex flex-col gap-1">
         {showEyebrow && <Eyebrow name={name} accent2={serviceMode} />}
         <h1 className="text-[22px]">

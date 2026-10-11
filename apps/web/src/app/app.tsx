@@ -5,6 +5,7 @@ import type { MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED } from '../lib/features';
+import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { AddContactsManual } from '../screens/AddContactsManual';
@@ -35,15 +36,18 @@ type AppView =
 const browserStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
-      <div className="w-full max-w-[420px] px-5 py-8">{children}</div>
-    </div>
-  );
-}
-
 export function App() {
+  function Shell({ children }: { children: React.ReactNode }) {
+    return (
+      <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
+        <div className="w-full max-w-[420px] px-5 py-8">
+          <WhatYoullNeedProvider onWhatYoullNeed={() => setView('whatYoullNeed')}>
+            {children}
+          </WhatYoullNeedProvider>
+        </div>
+      </div>
+    );
+  }
   // With auth flagged off, useIdentity gets no storage: no stored token is
   // ever read, so it never calls /auth/session and never reports loading.
   const account = useIdentity(AUTH_ENABLED ? browserStorage : undefined);
