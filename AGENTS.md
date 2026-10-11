@@ -87,7 +87,7 @@ the role's brief.
   Failure details are in the `e2e` job log (list reporter); repeat runs use the `E2E stress` workflow.
 - **Clean up before handing back.** Stop Nx daemons (`pnpm nx daemon --stop`) and any server you
   started. An empty or "placeholder" hand-back means not done.
-- **A PR with red CI is a draft** (or labeled `do-not-merge`) until fixed.
+- **Draft PRs.** Open every PR with `gh pr create --draft`; run `gh pr ready` only after `gh pr checks` is green.
 - **Project subagents load only at session start**; see `PROCESS.md` §3.
 - **Native-only modules** (`expo-contacts`) need a `.web.ts` stub or they crash the web bundle.
 - **`CORS_ORIGINS`** must match the deployed origin exactly; take URLs from the deployment, never

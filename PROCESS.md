@@ -78,7 +78,8 @@ template, adds it to the board, sets Status/Size/Role, and labels it `ticket` + 
 
 For each Ready ticket, up to the parallelism cap (default **2**; the human may raise it):
 
-1. `git fetch && git worktree add .worktrees/<issue#> -b <type>/<area>-<slug> origin/main`.
+1. `git fetch && git worktree add .worktrees/<issue#> -b <type>/<area>-<slug> origin/main`, then
+   `pnpm -C .worktrees/<issue#> install --frozen-lockfile --prefer-offline`.
    Move the card to **In progress** and label `in-progress`.
 2. Spawn **developer** with: the issue text, its `files_touched`, the worktree path, and which docs
    apply. Launch independent developers **in the same turn** so they really run in parallel.
@@ -110,7 +111,7 @@ Push the branch and open the PR from the template: `Closes #N`, what changed and
 output, reviewer verdict, **2–3 "read this closely" items** (file, function, what could be wrong,
 how to check), and what was *not* verified. Move the card to **In review**.
 
-A PR whose CI is red is a **draft** (or labeled `do-not-merge`) until it is fixed.
+Open every PR with `gh pr create --draft`; run `gh pr ready` only after `gh pr checks` is green.
 
 Then alert the human with every open PR **in recommended merge order**, one line each plus the
 read-closely items. The human is accountable for every line; say which parts most deserve their
@@ -137,12 +138,12 @@ rules into this file or `REQUIREMENTS.md` §6 in a PR labeled `process`.
 ## 2. Operating rules
 
 **Autonomous (no asking):** reading files; creating branches and worktrees; writing code, tests and
-docs inside a ticket; running typecheck/tests/builds/e2e; `gh` and `git` reads; creating issues,
+docs inside a ticket; running typecheck/tests/builds; reading CI e2e results; `gh` and `git` reads; creating issues,
 labels and board items for approved work; opening PRs; commenting on issues; watching CI.
 
 **Ask first (a gate or a question):** approving scope; merging; pushing to `main`; changing
 GitHub secrets/variables or Cloudflare/Convex settings; manual deploys (`workflow_dispatch`);
-deleting files you didn't create; adding a dependency outside the ticket that planned it; anything
+deleting files you didn't create; dispatching the `E2E stress` workflow (propose a `repeat_each` when asking); adding a dependency outside the ticket that planned it; anything
 that costs money; changing design tokens or brand colors.
 
 **Never:** bypass CI or checks (`--no-verify`, `.only`/`.skip`, weakening an assertion to pass);
@@ -238,6 +239,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
   `sms:` link, every gateway route rejects bad input).
 - **Stress and repeat runs happen in CI**, via the manual `E2E stress` workflow
   (`.github/workflows/e2e-stress.yml`, input `repeat_each`, all three projects). Never on a laptop.
+  Dispatching it is ask-first (§2); propose a `repeat_each` when asking.
 - Axe is a floor, not a claim. Known, tracked failures use Playwright's `test.fail()` with the
   issue named, which turns red once fixed. `.skip` is never allowed.
 - Gateway tests never call Convex or Anthropic; stub `fetch` and env.

@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type ReporterDescription } from '@playwright/test';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
 
@@ -22,7 +22,7 @@ export default defineConfig({
   // preset's reporters (HTML, blob) only show a count there, and stay for the
   // uploaded artifact.
   reporter: process.env['CI']
-    ? [['list'], ...(preset.reporter as never[])]
+    ? [['list'], ...(preset.reporter as ReporterDescription[])]
     : preset.reporter,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,

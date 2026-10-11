@@ -17,7 +17,7 @@
 - Never read `.env*` other than `.env.example`, and never print environment variables.
 - Subagents in `.claude/agents/` load only at session start: in the session that creates or edits
   them, dispatch general-purpose agents told to follow the role file. Treat an empty or
-  "placeholder" hand-back as not done and inspect the worktree. Mark a PR with red CI as draft.
+  "placeholder" hand-back as not done and inspect the worktree. Open every PR with `gh pr create --draft`; run `gh pr ready` only after `gh pr checks` is green.
 - Never use `--no-verify`, `gh pr merge`, or push to `main` unless the human asks in this session.
 - Ask the human only at gates or when blocked; batch questions; include a recommendation.
 - Edits on `main` are for small changes the product owner explicitly asks for. Everything else

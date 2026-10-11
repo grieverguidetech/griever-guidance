@@ -120,7 +120,7 @@ to read in a minute; it is a staging area, not an archive.
   "1 failed" with no detail, twice; #15 merged with red CI and turned `main` red (fixed in #16; the
   deploy gate held); agents left Nx daemons and servers running; a newly created `.claude/agents/`
   wasn't loaded until the next session.
-- **Why:** the worktree note was written for npm; checks were run one way; red CI had no visible marker.
+- **Why:** the worktree note was written for npm; checks were run one way; red CI had no visible marker; hand-backs came back empty because nothing required a report and a placeholder looked like one; subagents weren't loaded because role files are read once at session start.
 - **Rule:** install in every new worktree; run one cached check; an empty hand-back is not done;
   CI prints failure detail; red-CI PRs are drafts; agents stop daemons and servers; dispatch new
   roles as general-purpose agents in the session that creates them. **Promoted → PROCESS.md §1, §3, §7; AGENTS.md "Known gotchas".**
