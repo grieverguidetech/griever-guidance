@@ -92,6 +92,10 @@ export interface AuthClient {
   getSession(): Promise<SessionState>;
   /** Forces a token refresh. `offline` covers no network and 5xx; only a rejected refresh is `signed_out`. */
   refreshSession(): Promise<SessionState>;
+  /** Resumes background token refresh. Safe to call repeatedly: supabase-js restarts its one timer. */
+  startAutoRefresh(): Promise<void>;
+  /** Pauses background token refresh (the app is in the background). */
+  stopAutoRefresh(): Promise<void>;
   getProfile(): Promise<ProfileResult>;
   updateProfile(update: ProfileUpdate): Promise<ProfileResult>;
 }
@@ -164,8 +168,8 @@ function signInFailure(
  * contact and message data never pass through here (C3, C4).
  *
  * Session handling: `persistSession` is on and `storage` is injected by the app. `autoRefreshToken`
- * is left at the supabase-js default (on); apps that run in the background should call
- * `client.auth.stopAutoRefresh()` themselves. Pass `client` only in tests.
+ * is left at the supabase-js default (on). Apps that can run in the background (mobile) call
+ * `stopAutoRefresh()` / `startAutoRefresh()` as the app leaves and returns to the foreground. Pass `client` only in tests.
  */
 export function createAuthClient(
   config: AuthClientConfig,
@@ -284,6 +288,9 @@ export function createAuthClient(
           : { status: 'signed_out' };
       }
     },
+
+    startAutoRefresh: () => supabase.auth.startAutoRefresh(),
+    stopAutoRefresh: () => supabase.auth.stopAutoRefresh(),
 
     getProfile: () => profileCall(),
 

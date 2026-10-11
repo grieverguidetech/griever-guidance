@@ -4,6 +4,7 @@ import { useSupabaseIdentity } from '@griever/hooks';
 import type { UseSupabaseIdentityResult } from '@griever/hooks';
 import type { AuthClient } from '@griever/api-client/auth';
 import { createProfileCache } from './authStorage';
+import { useAutoRefreshWithAppState } from './useAutoRefreshWithAppState';
 
 /** null means accounts are unavailable (missing configuration). */
 const AccountContext = createContext<UseSupabaseIdentityResult | null>(null);
@@ -56,6 +57,7 @@ function IdentityRunner({
  */
 function Identity({ client, children }: { client: AuthClient; children: ReactNode }) {
   const storage = useMemo(() => createProfileCache(), []);
+  useAutoRefreshWithAppState(client);
   const [ready, setReady] = useState(false);
   const [identity, setIdentity] = useState<UseSupabaseIdentityResult>(LOADING);
   useEffect(() => {

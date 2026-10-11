@@ -34,6 +34,8 @@ function stubClient(over: Partial<AuthClient> = {}): AuthClient {
     signOut: async () => ({ ok: true, serverRevoked: true }),
     getSession: async () => signedIn,
     refreshSession: async () => signedIn,
+    startAutoRefresh: async () => undefined,
+    stopAutoRefresh: async () => undefined,
     getProfile: async () => ({ ok: true, profile: profile('Peter') }),
     updateProfile: async () => ({ ok: true, profile: profile('Pete') }),
     ...over,

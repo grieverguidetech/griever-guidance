@@ -15,6 +15,8 @@ const auth = {
   signOut: vi.fn(),
   getSession: vi.fn(),
   refreshSession: vi.fn(),
+  startAutoRefresh: vi.fn(),
+  stopAutoRefresh: vi.fn(),
 };
 const stub = { auth } as unknown as SupabaseClient;
 const make = () =>
@@ -302,6 +304,19 @@ describe('refreshSession', () => {
     expect(await make().refreshSession()).toEqual({ status: 'offline' });
     auth.refreshSession.mockRejectedValueOnce(new TypeError('fetch failed'));
     expect(await make().refreshSession()).toEqual({ status: 'offline' });
+  });
+});
+
+describe('auto refresh', () => {
+  it('delegates start and stop to supabase-js', async () => {
+    auth.startAutoRefresh.mockResolvedValue(undefined);
+    auth.stopAutoRefresh.mockResolvedValue(undefined);
+    const client = make();
+    await client.startAutoRefresh();
+    expect(auth.startAutoRefresh).toHaveBeenCalledTimes(1);
+    expect(auth.stopAutoRefresh).not.toHaveBeenCalled();
+    await client.stopAutoRefresh();
+    expect(auth.stopAutoRefresh).toHaveBeenCalledTimes(1);
   });
 });
 
