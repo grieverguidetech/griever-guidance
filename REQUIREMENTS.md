@@ -33,7 +33,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | C3 | Contact data never reaches the gateway or Convex. Only contact *ids* appear in synced session data. | §6 "Contacts" |
 | C4 | Only the 6 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`) survive past the import screen. | §6 "Contacts" |
 | C5 | Offline-first: nothing after sign-up may block on a network round-trip. The device is authoritative. | DATA.md posture |
-| C6 | Sign-in with Facebook/Instagram is identity only — never a friends list, never a DM path. | §6 "Identity" |
+| C6 | Sign-in (email today, Facebook later) is identity only — never a friends list, never a DM path. | §6 "Identity" |
 | C7 | All user-facing copy is calm and plain. No exclamation points, no celebratory microcopy. | §6 "Tone and copy" |
 | C8 | Every gateway route validates its request body/query. | §6 "What not to do" |
 | C9 | Deletion is never offered inside a flow or as a swipe action — only in settings. | DATA.md §7 |
@@ -45,17 +45,17 @@ These are not features; breaking one is a defect regardless of what it enables.
 
 ### 3.1 Account & identity (Flow D)
 
-**All of this is hidden behind `VITE_FEATURE_AUTH` until the app has users** (off by default; see
-"Identity" in §6). The statuses below describe the code, not what users see.
+**All of this is hidden behind `VITE_FEATURE_AUTH` (apps/web) and `EXPO_PUBLIC_FEATURE_AUTH`
+(apps/mobile) until the app has users** (off by default; see "Identity" in §6). The statuses below describe the code, not what users see.
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| ID-1 | Sign up / sign in with Facebook | Done | Not started | `libs/identity` |
-| ID-2 | Sign up / sign in with Instagram (Business/Creator accounts only) | Done | Not started | Personal IG accounts have no login API |
-| ID-3 | Email/password sign-up and sign-in, hashed server-side, non-enumerating errors | Done | Not started | PBKDF2-SHA256 |
+| ID-1 | Sign up / sign in with Facebook | Not started | Not started | Planned later (#36); the old Convex-backed path is removed |
+| ID-2 | Sign up / sign in with Instagram | Dropped | Dropped | Personal IG accounts have no login API; Business/Creator only, and no email |
+| ID-3 | Email/password sign-up and sign-in on Supabase Auth, non-enumerating errors | Done (flag on only) | Done (flag on only) | `@griever/api-client/auth`, `useSupabaseIdentity`; passwords never reach the gateway |
 | ID-4 | Google sign-in | Not started | Not started | Shown disabled, "coming soon" |
 | ID-5 | X sign-in | Not started | Not started | Shown disabled, "coming soon" |
-| ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Not started | — | Blocks production sync |
+| ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); applying it to `/sync/*` is #20/#39. Blocks production sync |
 | ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done (flag on only) | Partial | DATA.md "Settled"; suspended while auth is flagged off |
 
 ### 3.2 Contacts (Flow D)
@@ -116,8 +116,8 @@ These are not features; breaking one is a defect regardless of what it enables.
 - **Accessibility:** tap targets and type sized for tired eyes and shaky hands; focus outlines
   visible; date/time fields keyboard- and screen-reader-accessible.
 - **Reliability:** a force-quit at any point loses at most seconds of typing, never a session.
-- **Privacy:** see C2–C4. Session tokens travel in URL fragments and `Authorization` headers, never
-  query strings or cookies. OAuth `redirectTo` must match `CORS_ORIGINS`.
+- **Privacy:** see C2–C4. Session tokens travel in `Authorization` headers, never query strings or
+  cookies, and never in logs.
 - **Platforms:** mobile (Expo) is the primary surface; web is a full peer; marketing is static.
 
 ---
@@ -180,8 +180,8 @@ libs/
                     `ContactSource` adapter interface, normalize/dedupe/rank, and the
                     fetch → review → commit pipeline. Device-specific adapters (the web Contact
                     Picker, mobile's expo-contacts) live in the app that owns that device API.
-  identity/         Sign-up/sign-in (Facebook, Instagram, and — once built — Google/X/email) and
-                    the session bearer token. Owns its own Hono router, mounted by apps/gateway.
+  identity/         The gateway's side of Supabase accounts: verifies the Supabase JWT and serves
+                    GET/PUT /me/profile. Owns its own Hono router, mounted by apps/gateway.
                     See "Identity" below — this is who a user is, never their friends or contacts.
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
                     sending happens entirely on-device (see "The send flow").
@@ -213,7 +213,7 @@ libs/
 ### Domain and hosting
 
 **`grieversguidance.com` is the official domain** — every public URL (marketing, web app, gateway,
-OAuth redirects, `CORS_ORIGINS`) should live under it. The DNS zone and all deploys are on the
+`CORS_ORIGINS`) should live under it. The DNS zone and all deploys are on the
 Tumultywebservices Cloudflare account; the old Grieverguidetech account is retired.
 `*.pages.dev` / `*.workers.dev` addresses are deploy targets behind the custom domains, never
 URLs to hand users or hardcode.
@@ -225,8 +225,7 @@ URLs to hand users or hardcode.
 | `api.grieversguidance.com` | gateway (Worker `griever-guidance-gateway`) | `apps/gateway/wrangler.toml` `routes` |
 
 `VITE_API_URL` and `PUBLIC_WEB_URL` are set in `.github/workflows/deploy.yml`; `CORS_ORIGINS` and
-`GATEWAY_BASE_URL` in `apps/gateway/wrangler.toml`. Facebook's and Instagram's registered OAuth
-redirect URIs must be `https://api.grieversguidance.com/auth/<provider>/callback`.
+`SUPABASE_URL` / `SUPABASE_ANON_KEY` in `apps/gateway/wrangler.toml`.
 
 ---
 
@@ -317,73 +316,46 @@ stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRete
 ### Identity
 
 **Auth is feature-flagged off until the app has users.** `apps/web` shows sign-up/sign-in only
-when built with `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`; anything else is off).
-With it off, onboarding starts at adding contacts, `useIdentity` never reads a stored token or
-calls `/auth/*`, and sync never starts (it needs a signed-in `userId`). The gateway still mounts
-the `/auth` routes, and none of the code below is removed; turning the flag on restores it as
-described.
+when built with `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`), and `apps/mobile` only
+with `EXPO_PUBLIC_FEATURE_AUTH=true` (`apps/mobile/src/lib/features.ts`); anything else is off.
+With it off, onboarding starts at adding contacts, `useSupabaseIdentity` is not used, and sync
+never starts (it needs a signed-in `userId`).
 
-Sign-up/sign-in lives in `libs/identity`, mounted by `apps/gateway` (`GET/POST /auth/*`) — it is
-the only lib that ever writes to Convex's `identities` table, and the only thing in this repo that
-talks to Facebook's or Instagram's OAuth endpoints. It answers exactly one question — **who is
-this** — and nothing else:
+Accounts are Supabase Auth, email and password only. The client signs up, signs in, and signs out
+through `@griever/api-client/auth` (supabase-js); the session lives in the client and is read
+through the `useSupabaseIdentity` hook (`libs/hooks`), which web and mobile share. Facebook
+sign-in is planned later (#36); Instagram is dropped (personal accounts have no login API, and
+Instagram never supplies an email); Google and X are not built. Nothing in this repo talks to
+Facebook's or Instagram's OAuth endpoints today.
 
-- **Facebook Login** (`public_profile` + `email`, no app review needed) and **Instagram's
-  "Business Login for Instagram"** (a separate app/credential pair; Instagram accounts must be
-  Business or Creator — personal accounts have had no login API since Basic Display's Dec-2024
-  shutdown, and Instagram never supplies an email address, by platform limitation).
-- The OAuth `state` param and the session itself are both short signed tokens
-  (`libs/identity/src/token.ts`, HMAC-SHA256, no JWT library) — not cookies, since the gateway and
-  `apps/web` are different origins and a cross-site cookie would need `SameSite=None; Secure`,
-  which breaks on plain-HTTP local dev. The session token comes back to the browser in the
-  callback redirect's URL fragment (`#token=…`, never a query string, so it never reaches server
-  logs) and the client sends it back as `Authorization: Bearer <token>`.
-- `/auth/:provider/start` only ever redirects to a `redirectTo` matching `CORS_ORIGINS` — an
-  unchecked redirect target is a real vector for leaking someone's session token to another site
-  (see `libs/identity/src/router.ts`'s `isAllowedRedirect`).
-- Email/password (`POST /auth/password/signup` / `/signin`) is real too, not mocked — passwords are
-  hashed server-side (PBKDF2-SHA256, `libs/identity/src/password.ts`) before Convex ever sees them,
-  and sign-in returns the same generic "Incorrect email or password." whether the email doesn't
-  exist or the password is wrong, so a failed attempt never confirms which one.
-- `apps/web`'s `useIdentity` hook (`libs/hooks`) is the real thing now — it replaced `useAccount`
-  (deleted, along with the `Account` type it was the only user of). Signing in via
-  Facebook/Instagram is a full-page redirect (there's no popup/iframe flow), so the callback's
-  `#token=…` fragment is consumed once at boot (`apps/web/src/app/app.tsx`) rather than through any
-  client-side routing.
+`libs/identity` is the gateway's side, and it answers one question, **who is this**:
+
+- `supabaseAuth` (`supabaseJwt.ts`) verifies the caller's Supabase access token against the
+  project's JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
+- `profileRouter` serves `GET/PUT /me/profile` (the sender name) against Supabase PostgREST as the
+  signed-in caller (anon key plus their JWT, so row-level security applies). There is no
+  service-role key. With `SUPABASE_URL` or `SUPABASE_ANON_KEY` unset the routes answer 503.
+- Sign-in errors use one generic message whether the email exists or not, so a failed attempt never
+  confirms which one (the copy lives in `useSupabaseIdentity`).
 - **This does not, by itself, make `/sync/pull`/`/sync/push` work in production.** Those routes
-  still authenticate via `convex/auth.ts`'s `requireUser` dev stub (`GG_DEV_AUTH`), a separate,
-  older mechanism from this session's Bearer token — `apps/web/src/lib/registerSync.ts`'s
-  `setSyncUserId` feeds the real signed-in `userId` into that stub's `x-gg-user` header (correct in
-  local dev, where `GG_DEV_AUTH=1`), but a real deployment never sets `GG_DEV_AUTH` (enforced by
-  `scripts/check-dev-auth.mjs`), so `requireUser` still throws there regardless of who's signed in.
-  Verifying the real session token server-side and replacing the stub with it is separate,
-  not-yet-done work. Separately, nothing in `apps/web`'s actual send flow (`useSessions`,
-  `useSendFlow`) writes into `libs/data-local`'s screen-keyed store yet, so even where sync *can*
-  authenticate, the outbox it would flush is currently always empty — see DATA.md for the intended
-  shape; wiring the two together is its own task, not started.
+  still authenticate via `convex/auth.ts`'s `requireUser` dev stub (`GG_DEV_AUTH`), and a real
+  deployment never sets `GG_DEV_AUTH` (enforced by `scripts/check-dev-auth.mjs`), so `requireUser`
+  throws there regardless of who is signed in. Verifying the Supabase session on `/sync/*` and
+  mapping `auth.users.id` to `sessions.userId` is separate work (#20, #39). Separately, nothing in
+  the web send flow (`useSessions`, `useSendFlow`) writes into `libs/data-local`'s screen-keyed
+  store yet, so the outbox sync would flush is currently empty; see DATA.md.
 
-**Identity data and app-state data are two separate Convex tables, joined by `userId`** —
-`identities` (authProvider, providerSub, email, emailVerified — nothing else) and `profiles`
-(senderName, contactSource, checklistTicks). `sessions.userId` is a second foreign key onto the
-same `identities.userId`. Nothing but `libs/identity`'s Convex functions
-(`apps/gateway/convex/identity.ts`) may read or write `identities`/`profiles` directly — everything
-else in this repo reaches a user only by their opaque `userId`. (Under `AUTH_ENABLED`, new accounts
-use Supabase `profiles` instead; see "Supabase boundary" under Database.)
+**Accounts live in Supabase `profiles`** (see "Supabase boundary" under Database). The Convex
+`identities` and `profiles` tables, and their functions in `apps/gateway/convex/identity.ts`,
+have no caller and are removed in #37. Everything else in
+this repo reaches a user only by their opaque `userId`.
 
-**What Facebook/Instagram sign-in is not, and cannot become:** it does not, and cannot, give this
-app a friends list or a way to message someone's contacts. Facebook's `user_friends` permission
-only ever returns friends who *also* use this app and have separately granted it — never a
-person's real friend list. Neither platform has an API for a personal account to DM another
-personal account without that mechanism first requiring a Page/Business identity and the recipient
-messaging first. Verify before disagreeing — this has been checked twice against current Meta
-documentation. Sign-in with Facebook or Instagram is identity only; reaching a person's contacts is
-still the device/manual/Share-sheet path described under "Contacts" and "The send flow" — the two
-never merge.
-
-`apps/web`'s `SignUp`/`CreateAccount` screens call the real `/auth/*` flow via `useIdentity` — see
-the bullets above. Google and X are still shown, disabled ("coming soon"): no backend exists for
-either, and leaving them silently mocked (as Facebook/Instagram/password used to be) would recreate
-the exact "signed up, nothing in Convex" gap this replaced.
+**What sign-in is not, and cannot become:** it does not, and cannot, give this app a friends list
+or a way to message someone's contacts. Facebook's `user_friends` permission only ever returns
+friends who *also* use this app and have separately granted it, never a person's real friend list,
+and neither Facebook nor Instagram has an API for a personal account to DM another personal
+account. Sign-in is identity only; reaching a person's contacts is still the device/manual/Share-sheet
+path described under "Contacts" and "The send flow". The two never merge.
 
 ---
 
@@ -401,11 +373,11 @@ send time (see "The send flow").
 
 **Supabase boundary (accounts).** App state tied to an account (the `profiles` row: sender name and
 contact source; the email lives in Supabase Auth) is stored in Supabase Postgres, with row-level
-security so a user reaches only their own row and no delete policy (C9). Convex's deploy and tables are
+security so a user reaches only their own row and no delete policy (C9). Convex's deploy is
 unchanged; session sync (still dev-only) stays there. Contacts and message content stay on the device and reach no
 server (C2, C3, C4). Migrations and pgTAP tests live in `infra/supabase/`; migrations must stay backward-compatible
-with the live gateway. Under `AUTH_ENABLED`, Supabase `profiles` replaces the Convex
-`identities`/`profiles` for new accounts; the Convex tables stay until the follow-up (#37).
+with the live gateway. Supabase is the only account path: the Convex `identities`/`profiles`
+tables have no caller and are removed in #37.
 `checklistTicks` is not carried over yet, and how `auth.users.id` maps to Convex `sessions.userId`
 is open (owned by #20/#39).
 
@@ -416,8 +388,6 @@ is open (owned by #20/#39).
 ```
 apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
               CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL,
-              FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET,
-              GATEWAY_BASE_URL, IDENTITY_SESSION_SECRET, IDENTITY_SERVICE_SECRET (local dev)
               SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
@@ -425,7 +395,7 @@ apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; d
 apps/mobile   EXPO_PUBLIC_API_URL
 
 Convex (set via `npx convex env set`, never a `.env` file — see infra/convex/README.md)
-              IDENTITY_SERVICE_SECRET  (must match apps/gateway's value exactly)
+              IDENTITY_SERVICE_SECRET  (read only by convex/identity.ts; goes with #37)
 ```
 
 `CORS_ORIGINS` is comma-separated allowed origins — there is no "allow all" mode; an empty value
@@ -453,7 +423,7 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation
 - No cross-imports between `libs/identity`, `libs/gateway-messages`, and `libs/gateway-sync`
-- No friends-list or peer-to-peer DM API calls to Facebook or Instagram — see "Identity"; neither platform allows either for a personal contact, regardless of OAuth
+- No friends-list or peer-to-peer DM API calls to Facebook or Instagram — see "Identity"; neither platform allows either for a personal contact, regardless of sign-in
 
 ---
 

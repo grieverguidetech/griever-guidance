@@ -41,8 +41,6 @@ async function loadApp(env: Record<string, string | undefined> = {}) {
   vi.stubEnv('CONVEX_URL', '');
   vi.stubEnv('CONVEX_SELF_HOSTED_URL', '');
   vi.stubEnv('ANTHROPIC_API_KEY', '');
-  vi.stubEnv('IDENTITY_SESSION_SECRET', 'test-session-secret');
-  vi.stubEnv('IDENTITY_SERVICE_SECRET', 'test-service-secret');
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value ?? '');
   // Under nodenext the CJS-typed module nests its default export one level deeper than Vite
   // actually delivers it; the cast restores the real shape (the Hono app).
@@ -122,19 +120,13 @@ describe('gateway: every route validates its input (REQUIREMENTS C8)', () => {
     const app = await loadApp({ ANTHROPIC_API_KEY: 'test-key' });
     expect((await app.request('/obituary', json(body))).status).toBe(400);
   });
+});
 
-  it('password sign-up rejects a missing name and a short password', async () => {
+describe('gateway: the removed /auth routes', () => {
+  it('no longer exist', async () => {
     const app = await loadApp();
-    expect((await app.request('/auth/password/signup', json({ email: 'a@b.c', password: 'longenough1' }))).status).toBe(400);
-    const short = await app.request('/auth/password/signup', json({ email: 'a@b.c', password: 'x', senderName: 'P' }));
-    expect(short.status).toBe(400);
-  });
-
-  it('session requires a bearer token', async () => {
-    const app = await loadApp();
-    expect((await app.request('/auth/session')).status).toBe(401);
-    const bad = await app.request('/auth/session', { headers: { Authorization: 'Bearer not-a-token' } });
-    expect(bad.status).toBe(401);
+    expect((await app.request('/auth/session')).status).toBe(404);
+    expect((await app.request('/auth/password/signin', json({ email: 'a@b.c', password: 'longenough1' }))).status).toBe(404);
   });
 });
 
@@ -150,11 +142,6 @@ describe('gateway: unconfigured services fail closed with a plain message', () =
     const app = await loadApp();
     const res = await app.request('/obituary', json({ fullName: 'A', dateOfBirth: '1', dateOfPassing: '2' }));
     expect(res.status).toBe(500);
-  });
-
-  it('sign-in without its secrets', async () => {
-    const app = await loadApp({ IDENTITY_SESSION_SECRET: '' });
-    expect((await app.request('/auth/session')).status).toBe(500);
   });
 });
 

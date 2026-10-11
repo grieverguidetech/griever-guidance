@@ -3,7 +3,6 @@ export * from './useSendFlow.js';
 export * from './smsLink.js';
 export * from './useSessions.js';
 export * from './usePathMoments.js';
-export * from './useIdentity.js';
 export * from './useContacts.js';
 export * from './useMockContacts.js';
 export * from './useMockPlaces.js';
