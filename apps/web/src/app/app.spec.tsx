@@ -17,6 +17,7 @@ describe('App onboarding', () => {
   it('starts a first visit at adding contacts, with no account step', () => {
     render(<App />);
     expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
@@ -57,8 +58,9 @@ describe('App onboarding', () => {
     const cont = screen.getByRole('button', { name: 'Continue' });
     expect(cont).toBeDisabled();
     await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
-    await user.type(screen.getByLabelText('Date they passed'), 'May 29, 2026');
+    // Date of death is optional (#21): a name alone is enough to continue.
     expect(cont).toBeEnabled();
+    await user.type(screen.getByLabelText('Date they passed (optional)'), 'May 29, 2026');
     await user.click(cont);
 
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();

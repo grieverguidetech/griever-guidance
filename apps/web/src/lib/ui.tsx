@@ -35,11 +35,11 @@ export function BackButton({ onClick }: { onClick: () => void }) {
  * "What you'll need" link on the right. Keeps the checklist reachable
  * from anywhere in the flow per the demo-feedback ticket.
  */
-export function TopBar({ onBack }: { onBack: () => void }) {
+export function TopBar({ onBack }: { onBack?: () => void }) {
   const onWhatYoullNeed = useWhatYoullNeed();
   return (
     <div className="flex items-center justify-between w-full">
-      <BackButton onClick={onBack} />
+      {onBack && <BackButton onClick={onBack} />}
       <button
         type="button"
         onClick={onWhatYoullNeed}

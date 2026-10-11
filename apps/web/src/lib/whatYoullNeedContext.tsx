@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
 /**
  * Lets any screen in the flow open the "What you'll need" checklist
@@ -10,7 +10,7 @@ export function WhatYoullNeedProvider({
   children,
   onWhatYoullNeed,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onWhatYoullNeed: () => void;
 }) {
   return (

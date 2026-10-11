@@ -37,7 +37,7 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {onBack && <TopBar onBack={onBack} />}
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Who should we be able to reach?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
