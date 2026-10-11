@@ -1,106 +1,212 @@
-# New Nx Repository
+# Grievers Guidance
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+Grievers Guidance helps someone who has just lost a loved one tell people when and where the
+service is. The person using it is tired, overwhelmed, and on a phone. The app shows one next thing
+and keeps everything else out of the way. Messages are texted from the user's own phone, one
+contact at a time.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+Product requirements are in [REQUIREMENTS.md](REQUIREMENTS.md). Architecture rules are in its
+section 6.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/js?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
-## Finish your Nx platform setup
+## Constraints that shape the code
 
-🚀 [Finish setting up your workspace](https://cloud.nx.app/connect/U90X46lZ7F) to get faster builds with remote caching, distributed task execution, and self-healing CI. [Learn more about Nx Cloud](https://nx.dev/ci/intro/why-nx-cloud).
-## Generate a library
+These are in [REQUIREMENTS.md section 2](REQUIREMENTS.md#2-non-negotiable-constraints). Breaking one
+is a defect. The ones you will meet first:
+
+- **Offline-first (C5).** Nothing after sign-up may wait on the network. The device is the source
+  of truth.
+- **Contacts stay on the device (C3, C4).** They never reach the gateway or Convex. Only contact
+  ids appear in synced data, and only six fields are kept.
+- **Messages go out through `sms:` deep links (C1).** One contact at a time, from the user's own
+  phone. There is no backend SMS path.
+- **Message content is never stored (C2).**
+- **Calm copy (C7).** No exclamation points and no celebratory text.
+- **Every gateway route validates its input (C8).**
+
+## Layout
+
+### Apps (`apps/`)
+
+| App | What it is |
+|---|---|
+| `web` | React, Vite and Tailwind. The browser send flow and account screens. Dev port 5173. |
+| `mobile` | Expo and React Native, core components only. The main user surface. |
+| `gateway` | Hono on Cloudflare Workers (locally on `@hono/node-server`, port 3001). It composes the identity, messages and sync routers into one HTTP surface. It also holds the Convex functions in `apps/gateway/convex/`. |
+| `marketing` | Astro. The public site. |
+| `web-e2e` | Playwright end-to-end tests for the web app. Run in CI only. |
+
+### Libraries (`libs/`)
+
+| Library | What it is for |
+|---|---|
+| `shared` | Types, interfaces and message templates used by more than one project. |
+| `api-client` | All HTTP calls to the gateway, and the Supabase sign-up and sign-in calls. Apps do not call `fetch` themselves. |
+| `hooks` | Shared React hooks, such as `useSendFlow` and `useSupabaseIdentity`. Also the `sms:` link builder, `buildSmsLink`. No platform-specific code. |
+| `ui-web` | Shared React and Tailwind components for web. |
+| `data-local` | IndexedDB storage in the browser: the session document, the outbox, and contacts. |
+| `data-sync` | The offline sync engine. It flushes the outbox and pulls and pushes changes through the gateway. |
+| `contacts` | Contact import logic shared by web and mobile: the source interface, normalizing, de-duplicating, and the review-and-commit steps. |
+| `identity` | The gateway's account side. It verifies the Supabase access token and serves `GET` and `PUT /me/profile`. |
+| `gateway-messages` | The gateway's AI-drafted obituary route. Nothing here sends messages. |
+| `gateway-sync` | The gateway's Convex client and the `/sync/pull` and `/sync/push` routes. |
+
+`identity`, `gateway-messages` and `gateway-sync` each own a Hono router and do not import each
+other. `apps/gateway` only mounts them.
+
+Other folders: `infra/supabase/` (migrations and database tests), `infra/convex/` (local Convex in
+Docker, see its [README](infra/convex/README.md)), `scripts/` (deploy guard).
+
+## Stack
+
+- **pnpm and Nx.** Never npm or yarn.
+- **Web:** React, Vite, Tailwind.
+- **Mobile:** Expo SDK 54 and React Native 0.81. React is pinned to 19.1.0 (a root pnpm override).
+- **Gateway:** Hono on Cloudflare Workers.
+- **Accounts:** Supabase Auth and Postgres, with row-level security. Email and password only.
+- **Session sync:** Convex. It is dev-only today: `/sync/*` is not usable in production yet.
+- **Marketing:** Astro.
+- **Tests:** Vitest and React Testing Library, jest-expo for mobile, pgTAP for the database,
+  Playwright and axe for end-to-end.
+
+## Local setup
+
+You need:
+
+- Node 22.
+- pnpm 10.34.1. The `packageManager` field in `package.json` pins it; Corepack picks it up.
+- Docker, for local Supabase and local Convex.
+- The [Supabase CLI](https://supabase.com/docs/guides/cli). CI uses 2.116.0.
+
+Then:
 
 ```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
+pnpm install
 ```
 
-## Run tasks
-
-To build the library use:
+Run things from the repo root:
 
 ```sh
-npx nx build pkg1
+pnpm dev            # gateway and web together
+pnpm dev:gateway    # gateway on port 3001
+pnpm dev:web        # web on port 5173
+pnpm dev:mobile     # Expo
+pnpm dev:marketing  # Astro
 ```
 
-To run any task with Nx use:
+Copy each `.env.example` to the file named inside it and fill in your own values. Do not commit
+them. See [Environment variables](#environment-variables).
+
+### Local Supabase
+
+Accounts live in Supabase. The config and migrations are in `infra/supabase/`, so the CLI needs
+`--workdir infra`:
 
 ```sh
-npx nx <target> <project-name>
+supabase start --workdir infra      # start local Postgres and Auth (needs Docker)
+supabase test db --workdir infra    # run the pgTAP row-level security tests
+supabase stop --workdir infra
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Versioning and releasing
-
-To version and release the library use
-
-```
-npx nx release
-```
-
-Pass `--dry-run` to see what would happen without actually releasing the library.
-
-[Learn more about Nx release &raquo;](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Keep TypeScript project references up to date
-
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
-
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
+### Local Convex (only for session sync)
 
 ```sh
-npx nx sync
+pnpm convex:up      # start the self-hosted backend in Docker
+pnpm convex:dev     # deploy apps/gateway/convex and watch for changes
+pnpm convex:reset   # stop it and delete its data
 ```
 
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
+The admin key steps are in [infra/convex/README.md](infra/convex/README.md).
+
+### Feature flags
+
+Both are off unless set to exactly `true`, at build time.
+
+| Flag | Where | Turns on |
+|---|---|---|
+| `VITE_FEATURE_AUTH` | web | Sign-up and sign-in screens. |
+| `EXPO_PUBLIC_FEATURE_AUTH` | mobile | Sign-up and sign-in screens. |
+| `VITE_FEATURE_OBITUARY_DRAFTING` | web | AI obituary drafting. Without it the button is disabled. |
+
+With auth off, onboarding starts at adding contacts and sync never starts.
+
+## Environment variables
+
+Names only. Never commit values. The examples live in `apps/*/.env.example`.
+
+**`apps/gateway`**
+- `PORT`
+- `CORS_ORIGINS` (comma-separated allowed origins; empty blocks every cross-origin request)
+- `ANTHROPIC_API_KEY`
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public; the production values are in `wrangler.toml`. There
+  is no service-role key. If either is unset, `/me/*` answers 503.)
+- `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_SITE_URL` (local Convex only)
+- `CONVEX_DEPLOY_KEY`, `CONVEX_URL` (CI and production only)
+
+**`apps/web`**
+- `VITE_API_URL`
+- `VITE_FEATURE_AUTH`, `VITE_FEATURE_OBITUARY_DRAFTING`
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (read only when `VITE_FEATURE_AUTH` is `true`)
+
+**`apps/mobile`**
+- `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_FEATURE_AUTH`
+- `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+**`apps/marketing`**
+- `PUBLIC_WEB_URL` (set in the deploy workflow)
+
+## Testing
 
 ```sh
-npx nx sync:check
+pnpm check            # typecheck, test and build everything (build skips mobile)
+pnpm check:affected   # the same, only for projects changed since main
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
+- Libraries and web use **Vitest** with React Testing Library and `fake-indexeddb`.
+- Mobile uses **jest-expo** (`pnpm nx test mobile`).
+- The database uses **pgTAP** (`supabase test db --workdir infra`).
+- Tests must not use `.only`, `.skip` or `.todo`. CI fails if they do.
 
-## Nx Cloud
+**End-to-end tests run only in CI. Never run them on your machine** (no `pnpm e2e`, `nx e2e`, or
+`playwright test`, including against production). Read results with `gh pr checks` and
+`gh run view --log-failed`. The `E2E stress` workflow repeats the suite to find flaky tests. It is
+started by hand, so ask first.
 
-Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+The `Mobile bundle` workflow checks that the Android bundle still builds with Metro. It is
+separate from `ci.yml` so a mobile-only failure cannot block a deploy, and it is advisory for now.
+`nx build mobile` needs the EAS CLI, so `pnpm build` leaves mobile out.
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## CI and deploy
 
-### Set up CI (non-Github Actions CI)
+**`ci.yml`** runs on every pull request and every push to `main`. It has three jobs:
 
-**Note:** This is only required if your CI provider is not GitHub Actions.
+1. Check: forbid `.only`/`.skip`/`.todo`, then affected typecheck, test and build.
+2. Supabase: start a local database and run `supabase test db`.
+3. E2E: Playwright on desktop, Android and iPhone profiles.
 
-Use the following command to configure a CI workflow for your workspace:
+**`mobile-bundle.yml`** runs on the same triggers and exports the Android bundle. It does not gate
+deploys.
 
-```sh
-npx nx g ci-workflow
-```
+**`deploy.yml`** runs only after CI succeeds on a push to `main` (or by hand). It deploys:
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+- The gateway to Cloudflare Workers, after running Supabase migrations (`supabase db push`, skipped
+  if the Supabase secrets are not set) and `convex deploy`. `scripts/check-dev-auth.mjs` stops the
+  deploy if the dev auth stub is enabled.
+- The web app to Cloudflare Pages.
+- The marketing site to Cloudflare Pages.
 
-## Install Nx Console
+A smoke test then checks `api.grieversguidance.com/health`, `web.grieversguidance.com` and
+`grieversguidance.com`. Migrations must stay compatible with the gateway that is already live.
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+Live addresses: `grieversguidance.com`, `web.grieversguidance.com`,
+`api.grieversguidance.com/health`.
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## How work is done here
 
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/nx-api/js?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+- [AGENTS.md](AGENTS.md): ground rules, roles, and commands.
+- [PROCESS.md](PROCESS.md): the loop from request to deploy, and the testing rules.
+- Work is tracked on GitHub Project #4 (owned by `ptums`). One ticket is one branch and one pull
+  request, and the pull request links its issue. Only a person merges.
