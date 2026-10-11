@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@griever/shared": "workspace:*",
+    "@supabase/supabase-js": "2.117.3",
     "tslib": "^2.3.0"
   }
 }

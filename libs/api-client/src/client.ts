@@ -15,7 +15,18 @@ function getBaseUrl(): string {
   return 'http://localhost:3001';
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+/** Carries the HTTP status so callers can tell "signed out" (401) from other failures. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   // `...init` goes first so a caller's `headers` can't replace the merged set.
   const res = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
@@ -30,7 +41,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // body wasn't JSON — fall back to the raw text/status above
     }
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
   return res.json() as Promise<T>;
 }
