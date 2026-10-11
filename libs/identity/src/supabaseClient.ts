@@ -1,8 +1,10 @@
 import type { SupabaseConfig } from './supabaseJwt.js';
 
 /**
- * Same shape as `Profile` in @griever/shared (that lib is not a dependency of
- * this one). This is the contract the web and mobile clients consume.
+ * Local mirror of `Profile` in libs/shared/src/types.ts, the contract the web
+ * and mobile clients consume. It is duplicated because @griever/shared is not
+ * a dependency of this lib (package.json was off limits in #29).
+ * Follow-up: add the dependency and import `Profile` instead.
  */
 export interface ProfileDto {
   id: string;
@@ -58,6 +60,30 @@ export function createProfilesClient(config: SupabaseConfig, accessToken: string
     return (await res.json()) as ProfileRow[];
   }
 
+  function send(url: string, method: 'PATCH' | 'POST', body: Record<string, unknown>) {
+    return fetch(url, {
+      method,
+      headers: { ...headers, Prefer: 'return=representation' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function firstRow(rows: ProfileRow[]): ProfileDto {
+    if (!rows[0]) throw new Error('profiles write returned no row');
+    return toDto(rows[0]);
+  }
+
+  /** Updates the caller's row; null when there is no row yet. */
+  async function patch(userId: string, columns: Record<string, unknown>): Promise<ProfileDto | null> {
+    const res = await send(`${endpoint}?id=eq.${encodeURIComponent(userId)}`, 'PATCH', columns);
+    const rows = await readRows(res);
+    return rows[0] ? toDto(rows[0]) : null;
+  }
+
+  async function insert(userId: string, columns: Record<string, unknown>): Promise<ProfileDto> {
+    return firstRow(await readRows(await send(endpoint, 'POST', { id: userId, ...columns })));
+  }
+
   return {
     async get(userId) {
       const res = await fetch(`${endpoint}?id=eq.${encodeURIComponent(userId)}&select=*`, { headers });
@@ -66,20 +92,32 @@ export function createProfilesClient(config: SupabaseConfig, accessToken: string
     },
 
     async upsert(userId, fields) {
-      // Only the columns the caller sent are written, so a PUT with just
-      // senderName leaves contact_source alone on an existing row.
-      const body: Record<string, unknown> = { id: userId };
-      if (fields.senderName !== undefined) body['sender_name'] = fields.senderName;
-      if (fields.contactSource !== undefined) body['contact_source'] = fields.contactSource;
+      // Not a single ON CONFLICT upsert: that would SET id too, and the table
+      // grants UPDATE only on (sender_name, contact_source). So: update the
+      // caller's row, and insert it only if there was none (RLS pins both to
+      // the caller's own id).
+      const columns: Record<string, unknown> = {};
+      if (fields.senderName !== undefined) columns['sender_name'] = fields.senderName;
+      if (fields.contactSource !== undefined) columns['contact_source'] = fields.contactSource;
 
-      const res = await fetch(`${endpoint}?on_conflict=id`, {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify(body),
-      });
-      const rows = await readRows(res);
-      if (!rows[0]) throw new Error('profiles upsert returned no row');
-      return toDto(rows[0]);
+      // Nothing to change: return the current row, or create an empty one.
+      if (Object.keys(columns).length === 0) {
+        const existing = await this.get(userId);
+        if (existing) return existing;
+        return insert(userId, columns);
+      }
+
+      const updated = await patch(userId, columns);
+      if (updated) return updated;
+
+      const insertRes = await send(endpoint, 'POST', { id: userId, ...columns });
+      if (insertRes.status === 409) {
+        // Another first save won the race; the row exists now.
+        const retried = await patch(userId, columns);
+        if (retried) return retried;
+        throw new Error('profiles row missing after conflict');
+      }
+      return firstRow(await readRows(insertRes));
     },
   };
 }

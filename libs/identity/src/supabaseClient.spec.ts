@@ -35,15 +35,70 @@ describe('profiles client', () => {
     expect(await client().get(USER_ID)).toBeNull();
   });
 
-  it('upserts only the sent columns and asks for the row back', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([ROW], 201));
-    vi.stubGlobal('fetch', fetchMock);
-    await client().upsert(USER_ID, { senderName: 'Ada' });
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe(`${SUPABASE_URL}/rest/v1/profiles?on_conflict=id`);
-    expect(init.method).toBe('POST');
-    expect(init.headers.Prefer).toBe('resolution=merge-duplicates,return=representation');
-    expect(JSON.parse(init.body)).toEqual({ id: USER_ID, sender_name: 'Ada' });
+  describe('upsert', () => {
+    const res = (body: unknown, status = 200) => jsonResponse(body, status);
+    const calls = (m: ReturnType<typeof vi.fn>) =>
+      m.mock.calls.map(([url, init]) => `${init?.method ?? 'GET'} ${String(url).replace(SUPABASE_URL, '')}`);
+
+    it('updates an existing row with only the sent columns', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(res([ROW]));
+      vi.stubGlobal('fetch', fetchMock);
+      const out = await client().upsert(USER_ID, { senderName: 'Ada' });
+      expect(out.senderName).toBe('Ada');
+      expect(calls(fetchMock)).toEqual([`PATCH /rest/v1/profiles?id=eq.${USER_ID}`]);
+      const init = fetchMock.mock.calls[0][1];
+      expect(init.headers.Prefer).toBe('return=representation');
+      expect(JSON.parse(init.body)).toEqual({ sender_name: 'Ada' });
+    });
+
+    it('inserts when the update matched no row', async () => {
+      const fetchMock = vi.fn().mockResolvedValueOnce(res([])).mockResolvedValueOnce(res([ROW], 201));
+      vi.stubGlobal('fetch', fetchMock);
+      await client().upsert(USER_ID, { senderName: 'Ada' });
+      expect(calls(fetchMock)).toEqual([`PATCH /rest/v1/profiles?id=eq.${USER_ID}`, 'POST /rest/v1/profiles']);
+      expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ id: USER_ID, sender_name: 'Ada' });
+    });
+
+    it('retries the update once when the insert hits a 409 race', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(res([]))
+        .mockResolvedValueOnce(res({ code: '23505' }, 409))
+        .mockResolvedValueOnce(res([ROW]));
+      vi.stubGlobal('fetch', fetchMock);
+      await client().upsert(USER_ID, { senderName: 'Ada' });
+      expect(calls(fetchMock).map((c) => c.split(' ')[0])).toEqual(['PATCH', 'POST', 'PATCH']);
+    });
+
+    it('fails if the row is still missing after a 409', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(res([]))
+        .mockResolvedValueOnce(res({}, 409))
+        .mockResolvedValueOnce(res([]));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(client().upsert(USER_ID, { senderName: 'Ada' })).rejects.toThrow();
+    });
+
+    it.each([403, 500])('throws on a %i from PostgREST', async (status) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res({}, status)));
+      await expect(client().upsert(USER_ID, { senderName: 'Ada' })).rejects.toThrow();
+    });
+
+    it('empty body on an existing user: reads, never PATCHes', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(res([ROW]));
+      vi.stubGlobal('fetch', fetchMock);
+      await client().upsert(USER_ID, {});
+      expect(calls(fetchMock)).toEqual([`GET /rest/v1/profiles?id=eq.${USER_ID}&select=*`]);
+    });
+
+    it('empty body on a new user: inserts with the id only', async () => {
+      const fetchMock = vi.fn().mockResolvedValueOnce(res([])).mockResolvedValueOnce(res([ROW], 201));
+      vi.stubGlobal('fetch', fetchMock);
+      await client().upsert(USER_ID, {});
+      expect(calls(fetchMock)).toEqual([`GET /rest/v1/profiles?id=eq.${USER_ID}&select=*`, 'POST /rest/v1/profiles']);
+      expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ id: USER_ID });
+    });
   });
 
   it('throws on a non-OK answer', async () => {

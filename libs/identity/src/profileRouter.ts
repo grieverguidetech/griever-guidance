@@ -4,6 +4,8 @@ import { createProfilesClient, type ProfileFields, type ProfilesClient } from '.
 
 const MAX_SENDER_NAME_LENGTH = 100;
 const ALLOWED_KEYS = ['senderName', 'contactSource'];
+// Any PostgREST failure (403, 5xx, network) is reported as 503: from the user's side the
+// answer is the same, try again later. The gateway never sends a write RLS would refuse.
 const UNAVAILABLE = 'Your details could not be reached right now. Please try again in a moment.';
 
 export interface ProfileRouterConfig {
