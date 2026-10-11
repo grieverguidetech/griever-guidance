@@ -4,3 +4,4 @@ export * from './messageCompose.js';
 export * from './sessionDocument.js';
 export * from './dates.js';
 export * from './brand.js';
+export * from './shareSnapshot.js';
