@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { identityRouter, profileRouter } from '@griever/identity';
+import { profileRouter } from '@griever/identity';
 import { messagesRouter } from '@griever/gateway-messages';
 import { syncRouter } from '@griever/gateway-sync';
 
@@ -34,7 +34,6 @@ app.use(
 );
 
 app.get('/health', (c) => c.json({ ok: true }));
-app.route('/', identityRouter);
 app.route('/', profileRouter);
 app.route('/', messagesRouter);
 app.route('/', syncRouter);
