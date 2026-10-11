@@ -9,6 +9,10 @@ import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { SentScreen } from '../screens/SentScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
+import { AccountScreen } from '../screens/AccountScreen';
+import { AccountProvider } from '../lib/AccountProvider';
+import { authClient } from '../lib/authClient';
+import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { shouldPurgeContacts, recordServiceDate } from '../lib/contactRetention';
 
@@ -20,13 +24,14 @@ export type RootStackParamList = {
   Sending: undefined;
   Sent: undefined;
   WhatYoullNeed: undefined;
+  Account: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export type FlowProps = { flow: ReturnType<typeof useSendFlow> };
 
-export const App = () => {
+const SendApp = () => {
   const flow = useSendFlow();
   const contacts = useContacts(mobileContactStore);
   const purgedOnBoot = useRef(false);
@@ -80,9 +85,24 @@ export const App = () => {
         <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
           {() => <WhatYoullNeedScreen />}
         </Stack.Screen>
+        {AUTH_ENABLED && (
+          <Stack.Screen name="Account">
+            {({ navigation }) => <AccountScreen onBack={navigation.goBack} />}
+          </Stack.Screen>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
+
+// With the flag off this is exactly the send flow; no account code runs.
+export const App = () =>
+  AUTH_ENABLED ? (
+    <AccountProvider client={authClient}>
+      <SendApp />
+    </AccountProvider>
+  ) : (
+    <SendApp />
+  );
 
 export default App;

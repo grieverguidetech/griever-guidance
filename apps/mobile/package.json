@@ -6,7 +6,24 @@
     "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/mobile"
   },
   "nx": {
-    "name": "mobile"
+    "name": "mobile",
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "inputs": [
+          "default",
+          "^production"
+        ],
+        "outputs": [
+          "{projectRoot}/coverage"
+        ],
+        "options": {
+          "command": "jest --config jest.config.cjs",
+          "cwd": "apps/mobile"
+        }
+      }
+    }
   },
   "dependencies": {
     "@expo/metro-config": "*",
@@ -33,5 +50,10 @@
     "react-native-svg": "*",
     "react-native-svg-transformer": "*",
     "react-native-web": "*"
+  },
+  "devDependencies": {
+    "@jest/globals": "29.7.0",
+    "jest": "29.7.0",
+    "react-test-renderer": "19.2.6"
   }
 }
