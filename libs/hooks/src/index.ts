@@ -8,3 +8,4 @@ export * from './useContacts.js';
 export * from './useMockContacts.js';
 export * from './useMockPlaces.js';
 export * from './useMockFlorists.js';
+export * from './useSupabaseIdentity.js';
