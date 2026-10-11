@@ -23,3 +23,10 @@ CORS_ORIGINS = "https://web.grieversguidance.com"
 # (`${GATEWAY_BASE_URL}/auth/<provider>/callback`) and must match the redirect
 # URIs registered with Facebook and Instagram exactly.
 GATEWAY_BASE_URL = "https://api.grieversguidance.com"
+
+# Supabase project (accounts). The gateway verifies the caller's session token
+# against ${SUPABASE_URL}/auth/v1/.well-known/jwks.json and talks to PostgREST
+# with the anon key plus that token, so RLS applies. The anon key is public by
+# design; there is no service-role key. Empty means /me/* answers 503.
+SUPABASE_URL = ""
+SUPABASE_ANON_KEY = ""

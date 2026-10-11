@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { identityRouter } from '@griever/identity';
+import { identityRouter, profileRouter } from '@griever/identity';
 import { messagesRouter } from '@griever/gateway-messages';
 import { syncRouter } from '@griever/gateway-sync';
 
@@ -29,12 +29,13 @@ app.use(
     // header is ever sent. There is no "allow all" mode; CORS_ORIGINS must
     // be set explicitly (see apps/gateway/wrangler.toml and .env.local).
     origin: corsOrigins,
-    allowMethods: ['GET', 'POST'],
+    allowMethods: ['GET', 'POST', 'PUT'],
   }),
 );
 
 app.get('/health', (c) => c.json({ ok: true }));
 app.route('/', identityRouter);
+app.route('/', profileRouter);
 app.route('/', messagesRouter);
 app.route('/', syncRouter);
 
