@@ -73,9 +73,9 @@ These are not features; breaking one is a defect regardless of what it enables.
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| SE-1 | Ask for the deceased person's details once per session; every flow reads from it | Done | Not started | Session model |
-| SE-2 | Sessions survive app close and restore on relaunch; landing offers "continue" first | Done | Not started | |
-| SE-3 | Multiple sessions ("Someone else I've lost") | Done | Not started | Mobile has no multi-session model |
+| SE-1 | Ask for the deceased person's details once per session; every flow reads from it | Done | Partial | Mobile: each person's name and date are kept as a session; templates still ask for the name on their own form |
+| SE-2 | Sessions survive app close and restore on relaunch; landing offers "continue" first | Done | Partial | Mobile restores people and the open one from AsyncStorage; no "continue" prompt yet |
+| SE-3 | Multiple sessions ("Someone else I've lost") | Done | Done | Mobile: on-device only (#20); no delete (C9); no server sync yet |
 | SE-4 | Guided path landing (C1) ordered around the real planning sequence | Done | Not started | |
 | SE-5 | Checklist ticks persist silently per *account* | Partial | Not started | `profiles.checklistTicks` |
 
@@ -133,8 +133,9 @@ them in code by assumption — raise them.
    exposure acceptable? (DATA.md §8.3)
 3. **Contact re-match on re-import** — a contact whose number changed between devices falls back to
    unresolved. Tolerable? (DATA.md §8.4)
-4. **Mobile multi-session** — when does mobile get the session model web already has, and does it
-   share `libs/data-local`'s shape or keep AsyncStorage?
+4. **Mobile multi-session** — settled (Oct 2026, #20). Mobile uses the same `useSessions` hook as web,
+   over an AsyncStorage-backed cache (`apps/mobile/src/lib/deviceCache.ts`) with the same
+   `gg.sessions.v1` shape. Server sync of sessions is a later ticket.
 5. **Moving to the next person** — settled (Sep 2026) on one "Next" tap after the hand-off. Auto-advance
    on return to the app was dropped because it never fired when the tab stayed visible. The
    Yes / Not yet / Try again prompt (`039e459`, reverted) stays rejected, because it asks a question
@@ -308,7 +309,7 @@ is shared) — never sent to Convex, never to the gateway. They are **not** kept
 list is cleared 30 days after the latest known service date (`CONTACT_RETENTION_DAYS` in
 `libs/hooks/src/useSessions.ts`), on the theory the family may want to reuse it right up until the
 service is behind them, but has no reason to once it is. No service date yet set → no expiry
-computed → contacts are kept. Mobile has no multi-session model yet, so it anchors this to a single
+computed → contacts are kept. Mobile now keeps sessions too (#20), but still anchors this to a single
 stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRetention.ts`).
 
 ---

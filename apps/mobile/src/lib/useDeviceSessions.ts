@@ -1,0 +1,52 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSessions } from '@griever/hooks';
+import type { Session } from '@griever/hooks';
+import { createDeviceCache } from './deviceCache';
+
+// The key `useSessions` stores its list under, and ours for which person is open.
+export const SESSIONS_KEY = 'gg.sessions.v1';
+export const ACTIVE_KEY = 'gg.activeSession.v1';
+
+export const createSessionCache = () => createDeviceCache([SESSIONS_KEY, ACTIVE_KEY]);
+
+/**
+ * The same `useSessions` the web uses, over the device cache, plus which person is open.
+ * There is deliberately no way to delete a person here (C9). A first blank person is made
+ * on first launch so the send flow always has somewhere to keep its draft.
+ */
+export function useDeviceSessions(cache: ReturnType<typeof createSessionCache>) {
+  const store = useSessions(cache);
+  const { sessions, createSession, pruneEmpty, touchSession } = store;
+  const [savedId, setSavedId] = useState(() => cache.getItem(ACTIVE_KEY));
+  const active: Session | null = sessions.find((s) => s.id === savedId) ?? sessions[0] ?? null;
+
+  const select = useCallback(
+    (id: string) => {
+      cache.setItem(ACTIVE_KEY, id);
+      setSavedId(id);
+    },
+    [cache],
+  );
+
+  const created = useRef(false);
+  useEffect(() => {
+    if (sessions.length > 0 || created.current) return;
+    created.current = true;
+    select(createSession().id);
+  }, [sessions.length, createSession, select]);
+
+  const switchTo = useCallback(
+    (id: string) => {
+      select(id);
+      touchSession(id);
+    },
+    [select, touchSession],
+  );
+
+  const addPerson = useCallback(() => {
+    pruneEmpty(); // a blank person nobody filled in is not worth keeping
+    select(createSession().id);
+  }, [pruneEmpty, createSession, select]);
+
+  return { ...store, active, switchTo, addPerson };
+}

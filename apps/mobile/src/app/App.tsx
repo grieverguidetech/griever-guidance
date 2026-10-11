@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts } from '@griever/hooks';
+import type { Session, SendFlowDraft } from '@griever/hooks';
 import { TemplatePickerScreen } from '../screens/TemplatePickerScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
@@ -15,6 +17,8 @@ import { authClient } from '../lib/authClient';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { shouldPurgeContacts, recordServiceDate } from '../lib/contactRetention';
+import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
+import { PersonBar, PersonSwitcher } from '../components/PersonSwitcher';
 
 export type RootStackParamList = {
   TemplatePicker: undefined;
@@ -31,8 +35,46 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export type FlowProps = { flow: ReturnType<typeof useSendFlow> };
 
-const SendApp = () => {
-  const flow = useSendFlow();
+type SessionProps = {
+  session: Session;
+  contacts: ReturnType<typeof useContacts>;
+  onDraftChange: (id: string, draft: SendFlowDraft) => void;
+  onDetails: (id: string, details: { personName: string; dateOfPassing: string }) => void;
+  onOpenSwitcher: () => void;
+};
+
+// One person's send flow. Keyed by session id in SendApp, so switching people starts the flow
+// from that person's own saved draft and nothing carries over from the previous person.
+const SendSession = ({ session, contacts, onDraftChange, onDetails, onOpenSwitcher }: SessionProps) => {
+  const { id } = session;
+  const saveDraft = useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]);
+  const flow = useSendFlow({ session, draft: session.draft, onDraftChange: saveDraft });
+
+  // The name and date typed in the flow become this person's details, so the switcher can list them.
+  const name = flow.fields['deceasedName'] ?? '';
+  const passed = flow.fields['dateOfPassing'] ?? '';
+  useEffect(() => {
+    if (name.trim()) onDetails(id, { personName: name, dateOfPassing: passed });
+  }, [id, name, passed, onDetails]);
+
+  useEffect(() => {
+    const serviceDate = flow.fields['serviceDate'];
+    if (serviceDate?.trim()) void recordServiceDate(serviceDate);
+  }, [flow.fields]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <Navigation flow={flow} contacts={contacts} />
+      </View>
+      {flow.step === 'template' && <PersonBar active={session} onOpen={onOpenSwitcher} />}
+    </View>
+  );
+};
+
+const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
+  const { sessions, active, switchTo, addPerson, updateDraft, updateSession } = useDeviceSessions(cache);
+  const [switching, setSwitching] = useState(false);
   const contacts = useContacts(mobileContactStore);
   const purgedOnBoot = useRef(false);
 
@@ -49,11 +91,43 @@ const SendApp = () => {
     });
   }, [contacts.loading, clearAll]);
 
-  useEffect(() => {
-    const serviceDate = flow.fields['serviceDate'];
-    if (serviceDate?.trim()) void recordServiceDate(serviceDate);
-  }, [flow.fields]);
+  if (!active) return null;
+  if (switching) {
+    return (
+      <PersonSwitcher
+        sessions={sessions}
+        activeId={active.id}
+        onPick={(id) => {
+          switchTo(id);
+          setSwitching(false);
+        }}
+        onAdd={() => {
+          addPerson();
+          setSwitching(false);
+        }}
+        onClose={() => setSwitching(false)}
+      />
+    );
+  }
+  return (
+    <SendSession
+      key={active.id}
+      session={active}
+      contacts={contacts}
+      onDraftChange={updateDraft}
+      onDetails={updateSession}
+      onOpenSwitcher={() => setSwitching(true)}
+    />
+  );
+};
 
+const Navigation = ({
+  flow,
+  contacts,
+}: {
+  flow: ReturnType<typeof useSendFlow>;
+  contacts: ReturnType<typeof useContacts>;
+}) => {
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -95,14 +169,24 @@ const SendApp = () => {
   );
 };
 
+// People are read from the phone before anything shows, so a relaunch never flashes an empty start.
+const SendAppWhenReady = () => {
+  const [cache] = useState(createSessionCache);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    void cache.hydrate().then(() => setReady(true));
+  }, [cache]);
+  return ready ? <SendApp cache={cache} /> : null;
+};
+
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () =>
   AUTH_ENABLED ? (
     <AccountProvider client={authClient}>
-      <SendApp />
+      <SendAppWhenReady />
     </AccountProvider>
   ) : (
-    <SendApp />
+    <SendAppWhenReady />
   );
 
 export default App;
