@@ -85,6 +85,23 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Password'), 'a-long-password');
 }
 
+// From the screen right after signing in or up to the signed-out sign-up screen, via a saved
+// session (the only way to reach "Your account").
+async function nameSomeoneAndSignOut(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(await screen.findByRole('button', { name: 'Your account' }));
+  await user.click(screen.getByRole('button', { name: 'Sign out' }));
+}
+
+async function signInAgainAs(user: ReturnType<typeof userEvent.setup>, email: string) {
+  await user.click(await screen.findByRole('button', { name: 'I already have an account' }));
+  await user.type(screen.getByLabelText('Email'), email);
+  await user.type(screen.getByLabelText('Password'), 'a-long-password');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  await screen.findByRole('button', { name: 'Your account' });
+}
+
 beforeEach(() => {
   mocks.authEnabled = false;
   mocks.load.mockReset();
@@ -338,6 +355,67 @@ describe('flag on', () => {
     await user.type(screen.getByLabelText('Password'), 'a-long-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+  });
+
+  it('ignores a slow "no name" answer for the first account after a second one signs in', async () => {
+    // Account A's name check (the second profile request after signing in; the hook makes the
+    // first) answers "no name" only when released. B's answers straight away.
+    const waiting: Array<() => void> = [];
+    let account = '';
+    let askedForA = 0;
+    const getProfile = vi.fn(async () => {
+      if (account !== 'a@example.com') return { ok: true as const, profile: PROFILE };
+      askedForA += 1;
+      if (askedForA > 1) await new Promise<void>((resolve) => waiting.push(resolve));
+      return { ok: false as const, reason: 'no_profile' as const };
+    });
+    const base = stubClient();
+    const signIn = vi.fn(async (email: string) => {
+      account = email;
+      return base.signIn(email, 'a-long-password');
+    });
+    useClient({ ...base, getProfile, signIn } as AuthClient);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'I already have an account' }));
+    await user.type(screen.getByLabelText('Email'), 'a@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await nameSomeoneAndSignOut(user);
+    await signInAgainAs(user, 'b@example.com');
+    await waitFor(() => expect(waiting.length).toBeGreaterThan(0));
+
+    await act(async () => {
+      waiting.forEach((release) => release());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Your account' })).toBeInTheDocument();
+  });
+
+  it('ignores a failed name save from a sign-up when another account has signed in since', async () => {
+    let failSave: (value: { ok: false; reason: 'offline' }) => void = () => undefined;
+    const updateProfile = vi.fn(
+      () => new Promise<{ ok: false; reason: 'offline' }>((resolve) => (failSave = resolve)),
+    );
+    useClient(stubClient({ updateProfile, getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })) }));
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await waitFor(() => expect(updateProfile).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await nameSomeoneAndSignOut(user);
+    await signInAgainAs(user, 'b@example.com');
+
+    await act(async () => {
+      failSave({ ok: false, reason: 'offline' });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
   });
 
   it('goes straight to the path from adding contacts, without showing sign-up again', async () => {

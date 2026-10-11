@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   useSupabaseIdentity,
@@ -204,6 +204,9 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   // The account has no name: Profile opens with a "What should we call you?" prompt.
   const [needsName, setNeedsName] = useState(false);
   const [askingName, setAskingName] = useState(false);
+  // Bumped on every sign-in attempt and every sign-out. A name check started under an earlier
+  // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
+  const accountGeneration = useRef(0);
   // Where the prompt interrupted, so Save or Back returns there and onboarding carries on.
   const [returnTo, setReturnTo] = useState<AppView>('pathLanding');
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
@@ -232,8 +235,9 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   useEffect(() => {
     if (!signedIn || !isAccountView(view)) return;
     if (pendingName !== null && updateSenderName) {
+      const generation = accountGeneration.current;
       void updateSenderName(pendingName).then((saved) => {
-        if (saved) return;
+        if (saved || generation !== accountGeneration.current) return;
         // The prompt below asks again, so the failure message need not linger. If the save failed
         // because the session ended, the effect further down drops the request instead.
         clearError?.();
@@ -254,7 +258,9 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
 
   // No session, no prompt: it would be stale by the next sign-in.
   useEffect(() => {
-    if (signedOut && needsName) setNeedsName(false);
+    if (!signedOut) return;
+    accountGeneration.current += 1;
+    if (needsName) setNeedsName(false);
   }, [signedOut, needsName]);
 
   // Only the Sign out button sends the person back to sign-up. A session that ended some other
@@ -471,11 +477,17 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
             // A name left over from a sign-up that is still waiting on email confirmation
             // must not overwrite the name on an existing account.
             setPendingName(null);
+            accountGeneration.current += 1;
+            const generation = accountGeneration.current;
             const ok = await auth.signIn(email, password);
             // Signing in never waits on a second request: the name check runs in the background
             // and, if the account has no name, opens the prompt afterwards. It also clears a
             // prompt left over from an earlier session.
-            if (ok && client) void accountLacksName(client).then(setNeedsName);
+            if (ok && client) {
+              void accountLacksName(client).then((lacks) => {
+                if (generation === accountGeneration.current) setNeedsName(lacks);
+              });
+            }
             return ok;
           }}
         />
@@ -504,6 +516,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
             return saved;
           }}
           onSignOut={() => {
+            accountGeneration.current += 1;
             setLeftOnPurpose(true);
             void auth.signOut();
           }}
