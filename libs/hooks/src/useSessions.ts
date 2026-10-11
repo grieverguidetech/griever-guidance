@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
-import { addDays, parseLooseDate } from '@griever/shared';
+import { addDays, parseCompleteDate } from '@griever/shared';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
 
 /** How long a saved contact list outlives the last known service date. */
@@ -15,7 +15,7 @@ export const CONTACT_RETENTION_DAYS = 30;
  */
 export function getContactsRetentionExpiry(sessions: Session[]): Date | null {
   const dates = sessions
-    .map((s) => parseLooseDate(s.serviceDate))
+    .map((s) => parseCompleteDate(s.serviceDate))
     .filter((d): d is Date => d !== null);
   if (dates.length === 0) return null;
   const latest = new Date(Math.max(...dates.map((d) => d.getTime())));

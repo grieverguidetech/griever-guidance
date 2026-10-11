@@ -67,7 +67,7 @@ export interface SessionDetails {
   /**
    * Set once the family enters it on a "service" or "share service details"
    * form (same free-text convention as `dateOfPassing` — parse with
-   * `parseLooseDate` before doing date math). Anchors contact retention: the
+   * `parseCompleteDate` before doing retention math). Anchors contact retention: the
    * saved contact list is cleared 30 days after this date (see
    * `getContactsRetentionExpiry`), since the family may want to reuse it
    * right up until the service is behind them.

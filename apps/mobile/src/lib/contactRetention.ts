@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { addDays, parseLooseDate } from '@griever/shared';
+import { addDays, parseCompleteDate } from '@griever/shared';
 import { CONTACT_RETENTION_DAYS } from '@griever/hooks';
 
 /**
@@ -26,7 +26,7 @@ export async function recordServiceDate(value: string): Promise<void> {
  */
 export async function shouldPurgeContacts(): Promise<boolean> {
   const stored = await AsyncStorage.getItem(SERVICE_DATE_KEY);
-  const serviceDate = parseLooseDate(stored);
+  const serviceDate = parseCompleteDate(stored);
   if (!serviceDate) return false;
   const expiry = addDays(serviceDate, CONTACT_RETENTION_DAYS);
   if (Date.now() < expiry.getTime()) return false;
