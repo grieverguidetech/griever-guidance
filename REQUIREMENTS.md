@@ -367,7 +367,8 @@ this** — and nothing else:
 (senderName, contactSource, checklistTicks). `sessions.userId` is a second foreign key onto the
 same `identities.userId`. Nothing but `libs/identity`'s Convex functions
 (`apps/gateway/convex/identity.ts`) may read or write `identities`/`profiles` directly — everything
-else in this repo reaches a user only by their opaque `userId`.
+else in this repo reaches a user only by their opaque `userId`. (Under `AUTH_ENABLED`, new accounts
+use Supabase `profiles` instead; see "Supabase boundary" under Database.)
 
 **What Facebook/Instagram sign-in is not, and cannot become:** it does not, and cannot, give this
 app a friends list or a way to message someone's contacts. Facebook's `user_friends` permission
@@ -400,9 +401,13 @@ send time (see "The send flow").
 
 **Supabase boundary (accounts).** App state tied to an account (the `profiles` row: sender name and
 contact source; the email lives in Supabase Auth) is stored in Supabase Postgres, with row-level
-security so a user reaches only their own row and no delete policy (C9). Convex is unchanged and
-keeps session sync and analytics. Contacts and message content stay on the device and reach no
-server (C2, C3, C4). Migrations and pgTAP tests live in `infra/supabase/`.
+security so a user reaches only their own row and no delete policy (C9). Convex's deploy and tables are
+unchanged; session sync (still dev-only) stays there. Contacts and message content stay on the device and reach no
+server (C2, C3, C4). Migrations and pgTAP tests live in `infra/supabase/`; migrations must stay backward-compatible
+with the live gateway. Under `AUTH_ENABLED`, Supabase `profiles` replaces the Convex
+`identities`/`profiles` for new accounts; the Convex tables stay until the follow-up (#37).
+`checklistTicks` is not carried over yet, and how `auth.users.id` maps to Convex `sessions.userId`
+is open (owned by #20/#39).
 
 ---
 

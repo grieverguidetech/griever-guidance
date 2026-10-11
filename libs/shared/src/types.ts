@@ -152,7 +152,8 @@ export interface ObituaryResponse {
 /**
  * One row per signed-in account (Supabase `public.profiles`). App state only:
  * no contact or message fields ever belong here (C2, C3, C4). Email lives in
- * Supabase Auth, not on the profile.
+ * Supabase Auth, not on the profile. Timestamps are ISO strings (Convex uses
+ * epoch ms; the gateway slice maps between them).
  */
 export interface Profile {
   id: string;
