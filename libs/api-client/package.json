@@ -8,6 +8,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     "./package.json": "./package.json",
+    "./auth": {
+      "@org/source": "./src/supabaseAuth.ts",
+      "types": "./dist/supabaseAuth.d.ts",
+      "import": "./dist/supabaseAuth.js",
+      "default": "./dist/supabaseAuth.js"
+    },
     ".": {
       "@org/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
@@ -20,6 +26,7 @@
   },
   "dependencies": {
     "@griever/shared": "workspace:*",
+    "@supabase/supabase-js": "2.117.3",
     "tslib": "^2.3.0"
   }
 }
