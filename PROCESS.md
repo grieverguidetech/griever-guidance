@@ -80,7 +80,8 @@ For each Ready ticket, up to the parallelism cap (default **2**; the human may r
 
 1. `git fetch && git worktree add .worktrees/<issue#> -b <type>/<area>-<slug> origin/main`, then
    `pnpm -C .worktrees/<issue#> install --frozen-lockfile --prefer-offline`.
-   Move the card to **In progress** and label `in-progress`.
+   Move the card to **In progress** and label `in-progress`. In zsh, don't rely on word splitting
+   (`set -- $x`); use `${x%%:*}` / `${x#*:}` or one explicit command per worktree.
 2. Spawn **developer** with: the issue text, its `files_touched`, the worktree path, and which docs
    apply. Launch independent developers **in the same turn** so they really run in parallel.
 3. The developer implements with tests, runs the checks (§5), commits in the worktree, and reports
@@ -94,6 +95,10 @@ once **with** the Nx cache (as CI does) and not only with `--skip-nx-cache`; a c
 shows a cache that ignores some inputs. An empty or "placeholder" hand-back means **not done**:
 inspect the worktree (`git status`, `git log`, the diff) before believing or dismissing it. Also confirm:
 
+- the independent check is the repo's `pnpm check:affected`, not hand-rolled `nx affected` commands
+  (mobile's EAS build target is excluded on purpose and shows up as a false failure);
+- for a safety guard (C5 sign-out paths, RLS, contrast, account binding), mutate the guard once
+  (delete or invert it), confirm a test fails, restore it, and quote that in the PR;
 - only the ticket's `files_touched` changed: `git diff --stat origin/main...HEAD`;
 - new behavior has tests, and there's no `.only` / `.skip` / `.todo`;
 - no secrets, tokens, or `.env` contents in the diff.
@@ -117,7 +122,8 @@ Then alert the human with every open PR **in recommended merge order**, one line
 read-closely items. The human is accountable for every line; say which parts most deserve their
 own eyes. Don't pretend agent review replaces that.
 
-On "merged": `git fetch`, remove merged worktrees (`git worktree remove`), rebase any open branch
+On "merged": first confirm `gh pr view N --json state` is `MERGED`; the human has said "merged" for
+an open PR before. Then `git fetch`, remove merged worktrees (`git worktree remove`), rebase any open branch
 that now conflicts, mark newly unblocked tickets Ready, and dispatch them.
 
 ### Deploy → Verify (G3)
@@ -149,6 +155,10 @@ that costs money; changing design tokens or brand colors.
 **Never:** bypass CI or checks (`--no-verify`, `.only`/`.skip`, weakening an assertion to pass);
 read or print `.env*` (other than `.env.example`) or secrets; paste secrets into issues, PRs,
 commits, or prompts; merge your own PR; force-push to `main`.
+
+**Asking for a secret.** State the exact format or prefix (e.g. `SUPABASE_ACCESS_TOKEN` is an
+`sbp_` personal access token from Account → Access Tokens) and give a local check command
+(`supabase login`) to run before setting it.
 
 **Asking well.** One message per gate: what was done (3–6 lines), what you need decided, your
 recommendation, and the exact next step if approved. Batch questions. Don't ask what the docs
@@ -258,8 +268,13 @@ Then go beyond the tests where the change warrants it:
   `pnpm convex:dev`) and say what you called and what came back.
 - **UI changes:** run the app (`pnpm dev`, `pnpm dev:mobile`) and walk the affected screens on a
   phone-width viewport. Type-checking is not the same as working.
+- **Supabase/PostgREST changes:** stubbed tests don't see grants or RLS. Run the code once against
+  the real migrations (`supabase start --workdir infra`, minimal services) before review, and quote
+  the output in the PR.
 - **Gateway/deploy changes:** `apps/gateway` runs the Convex CLI from its own directory under pnpm's
   strict isolation, and `CORS_ORIGINS` must match the real deployed origin exactly.
+- **Mobile dependencies:** pin Expo/React Native packages to the SDK's `bundledNativeModules`
+  versions; never `"*"`.
 - **Mobile device-API changes:** check the `.web.ts` stub still loads. Native-only modules crash
   the web bundle on import.
 - **Numbers** (contrast ratios, sizes, timings): compute them with a command you show, never

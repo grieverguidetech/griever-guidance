@@ -124,3 +124,52 @@ to read in a minute; it is a staging area, not an archive.
 - **Rule:** install in every new worktree; run one cached check; an empty hand-back is not done;
   CI prints failure detail; red-CI PRs are drafts; agents stop daemons and servers; dispatch new
   roles as general-purpose agents in the session that creates them. **Promoted → PROCESS.md §1, §3, §7; AGENTS.md "Known gotchas".**
+
+### 2026-10-11 — Stubbed tests passed; the PostgREST upsert failed live (#29, #27)
+- **What happened:** #29's upsert passed every stubbed unit test, then failed live with
+  `403 42501` against #27's column grants.
+- **Why:** `ON CONFLICT DO UPDATE` sets every payload column, including `id`, which the grants
+  don't allow. A stub can't see grants.
+- **Rule:** code that calls Supabase/PostgREST gets one local run against the real migrations
+  (`supabase start --workdir infra`, minimal services) before review; the PR quotes the output.
+  **Promoted → PROCESS.md §8.**
+
+### 2026-10-11 — Guards could be deleted without failing any test
+- **What happened:** several times a developer's tests passed while the guard under test could be
+  removed with nothing failing. The orchestrator caught it by mutating the guard.
+- **Why:** the tests exercised the happy path, not the guard.
+- **Rule:** for safety guards (C5 sign-out paths, RLS, contrast, account binding), the orchestrator
+  mutates the guard once and confirms a test fails; the PR quotes it.
+  **Promoted → PROCESS.md "Independent check".**
+
+### 2026-10-11 — zsh doesn't word-split; a loop made a bad worktree and branch
+- **What happened:** a loop using `set -- $x` created a worktree at a path containing a space and a
+  local branch literally named `origin/main`. Both were removed.
+- **Why:** bash splits unquoted variables; zsh doesn't.
+- **Rule:** in zsh, don't rely on word splitting; use `${x%%:*}` / `${x#*:}` or one explicit command
+  per worktree. **Promoted → PROCESS.md "Build".**
+
+### 2026-10-11 — "Merged" was reported for PRs that weren't (#40, #41, #42)
+- **What happened:** three times the human said a PR was merged when it was still open.
+- **Rule:** confirm `gh pr view N --json state` is `MERGED` before removing worktrees or moving
+  cards. **Promoted → PROCESS.md "PR (G2)".**
+
+### 2026-10-11 — `SUPABASE_ACCESS_TOKEN` was set to a non-PAT value, twice
+- **What happened:** every gateway deploy failed with "Invalid access token format".
+- **Why:** the request for the secret didn't say what format it must have.
+- **Rule:** when asking the human for a secret, state the exact format or prefix (e.g. an `sbp_`
+  personal access token from Account → Access Tokens) and give a local check (`supabase login`)
+  before setting it. **Promoted → PROCESS.md §2.**
+
+### 2026-10-11 — Mobile dependencies declared as `"*"` drifted
+- **What happened:** React 19.2.6 against React Native's 19.1.0 renderer, and expo-contacts 57 code
+  on SDK 54, hid a startup crash and a contacts API break.
+- **Why:** `"*"` resolves to whatever is latest, not what the SDK supports.
+- **Rule:** pin Expo/RN dependencies to the SDK's `bundledNativeModules` versions; never `"*"`.
+  **Promoted → PROCESS.md §8.**
+
+### 2026-10-11 — A hand-rolled `nx affected -t build` "failed" on mobile's EAS target
+- **What happened:** the orchestrator's `nx affected -t build` reported a failure that was mobile's
+  EAS build target, which `check:affected` deliberately excludes.
+- **Rule:** use the repo's `pnpm check:affected`, not hand-rolled nx commands, for the independent
+  check. **Promoted → PROCESS.md "Independent check".**
