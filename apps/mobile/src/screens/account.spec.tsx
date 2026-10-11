@@ -8,6 +8,7 @@ import { AccountProvider, useAccount } from '../lib/AccountProvider';
 
 // Jest has no native view tree, so the real findNodeHandle returns null for every component. The
 // heading focus test needs a handle to exist; only this one function is replaced.
+// This path is specific to react-native 0.81 (Expo SDK 54). Re-check it when react-native is upgraded.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
   findNodeHandle: () => 1,
