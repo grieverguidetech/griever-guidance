@@ -6,6 +6,14 @@ import type { AuthClient, ProfileResult, SessionState, SignInResult, SignUpResul
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { AccountProvider, useAccount } from '../lib/AccountProvider';
 
+// Jest has no native view tree, so the real findNodeHandle returns null for every component. The
+// heading focus test needs a handle to exist; only this one function is replaced.
+// This path is specific to react-native 0.81 (Expo SDK 54). Re-check it when react-native is upgraded.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
+
 const signedIn: SessionState = { status: 'signed_in', session: { userId: 'u1', email: 'a@b.co', accessToken: 't' } };
 const noProfile: ProfileResult = { ok: false, reason: 'no_profile' };
 const profileWith = (senderName: string | null): ProfileResult => ({

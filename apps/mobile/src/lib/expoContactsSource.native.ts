@@ -1,4 +1,4 @@
-import { Contact, ContactField, getPermissionsAsync, requestPermissionsAsync } from 'expo-contacts';
+import { Fields, getContactsAsync, getPermissionsAsync, requestPermissionsAsync } from 'expo-contacts';
 import { Cancelled } from '@griever/contacts';
 import type { ContactSource, FetchedContact } from '@griever/contacts';
 
@@ -10,11 +10,9 @@ import type { ContactSource, FetchedContact } from '@griever/contacts';
  * in-app review/select step (the same one every non-preselected source uses)
  * is still required.
  *
- * Uses expo-contacts' current class-based API (`Contact.getAllDetails`), not
- * the deprecated `getContactsAsync`/`Fields` module-level API from older
- * SDKs — verified against the installed expo-contacts version's own type
- * definitions rather than assumed from prior knowledge, since the API was
- * substantially redesigned.
+ * Uses expo-contacts' module-level API (`getContactsAsync` / `Fields`), which is what the pinned
+ * Expo SDK 54 version (15.x) ships. The class-based `Contact.getAllDetails` API only exists in
+ * later SDKs; move to it when the SDK is upgraded.
  */
 export const expoContactsSource: ContactSource = {
   id: 'native',
@@ -32,17 +30,13 @@ export const expoContactsSource: ContactSource = {
       throw new Cancelled();
     }
 
-    const details = await Contact.getAllDetails([
-      ContactField.FULL_NAME,
-      ContactField.PHONES,
-      ContactField.EMAILS,
-    ]);
+    const { data } = await getContactsAsync({ fields: [Fields.Name, Fields.PhoneNumbers, Fields.Emails] });
 
-    return details.map((c, i): FetchedContact => ({
+    return data.map((c, i): FetchedContact => ({
       key: c.id || `native_${i}`,
-      displayName: c.fullName?.trim() || 'Unnamed',
-      phones: (c.phones ?? []).map((p) => p.number ?? '').filter(Boolean),
-      emails: (c.emails ?? []).map((e) => e.address ?? '').filter(Boolean),
+      displayName: c.name?.trim() || 'Unnamed',
+      phones: (c.phoneNumbers ?? []).map((p) => p.number ?? '').filter(Boolean),
+      emails: (c.emails ?? []).map((e) => e.email ?? '').filter(Boolean),
     }));
   },
 
