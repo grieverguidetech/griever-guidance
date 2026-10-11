@@ -4,8 +4,6 @@ export type TemplateCategory = 'announcement' | 'service' | 'aftercare' | 'obitu
 
 export type MessageTone = 'plain' | 'softer';
 
-export type AuthProvider = 'google' | 'facebook' | 'instagram' | 'x' | 'password';
-
 /** How the account primarily got its contacts — drives D1's onboarding branch, nothing more. */
 export type AccountContactSource = 'import' | 'manual';
 

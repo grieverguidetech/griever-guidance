@@ -1,18 +1,5 @@
+import type { Profile } from '@griever/shared';
 import type { SupabaseConfig } from './supabaseJwt.js';
-
-/**
- * Local mirror of `Profile` in libs/shared/src/types.ts, the contract the web
- * and mobile clients consume. It is duplicated because @griever/shared is not
- * a dependency of this lib (package.json was off limits in #29).
- * Follow-up: add the dependency and import `Profile` instead.
- */
-export interface ProfileDto {
-  id: string;
-  senderName: string | null;
-  contactSource: 'import' | 'manual' | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface ProfileFields {
   senderName?: string | null;
@@ -20,8 +7,8 @@ export interface ProfileFields {
 }
 
 export interface ProfilesClient {
-  get(userId: string): Promise<ProfileDto | null>;
-  upsert(userId: string, fields: ProfileFields): Promise<ProfileDto>;
+  get(userId: string): Promise<Profile | null>;
+  upsert(userId: string, fields: ProfileFields): Promise<Profile>;
 }
 
 interface ProfileRow {
@@ -32,7 +19,7 @@ interface ProfileRow {
   updated_at: string;
 }
 
-function toDto(row: ProfileRow): ProfileDto {
+function toDto(row: ProfileRow): Profile {
   return {
     id: row.id,
     senderName: row.sender_name,
@@ -68,13 +55,13 @@ export function createProfilesClient(config: SupabaseConfig, accessToken: string
     });
   }
 
-  function firstRow(rows: ProfileRow[]): ProfileDto {
+  function firstRow(rows: ProfileRow[]): Profile {
     if (!rows[0]) throw new Error('profiles write returned no row');
     return toDto(rows[0]);
   }
 
   /** Updates the caller's row; null when there is no row yet. */
-  async function patch(userId: string, columns: Record<string, unknown>): Promise<ProfileDto | null> {
+  async function patch(userId: string, columns: Record<string, unknown>): Promise<Profile | null> {
     const res = await send(`${endpoint}?id=eq.${encodeURIComponent(userId)}`, 'PATCH', columns);
     const rows = await readRows(res);
     return rows[0] ? toDto(rows[0]) : null;
@@ -97,7 +84,7 @@ export function createProfilesClient(config: SupabaseConfig, accessToken: string
       if (fields.contactSource !== undefined) columns['contact_source'] = fields.contactSource;
 
       // Insert, and if another first save won the race (409), read back with `again`.
-      async function insertOrAgain(again: () => Promise<ProfileDto | null>): Promise<ProfileDto> {
+      async function insertOrAgain(again: () => Promise<Profile | null>): Promise<Profile> {
         const res = await send(endpoint, 'POST', { id: userId, ...columns });
         if (res.status === 409) {
           const row = await again();

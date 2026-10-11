@@ -15,4 +15,7 @@ root.render(
   </StrictMode>,
 );
 
+// Drop the token key left by the old identity system.
+localStorage.removeItem('gg.identity.token.v1');
+
 void registerSync();

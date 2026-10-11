@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearJwksCache } from './supabaseJwt.js';
 import { createProfileRouter, parseProfileBody } from './profileRouter.js';
-import type { ProfilesClient, ProfileDto } from './supabaseClient.js';
+import type { Profile } from '@griever/shared';
+import type { ProfilesClient } from './supabaseClient.js';
 import { SUPABASE_URL, USER_ID, jsonResponse, makeKeys, signJwt } from './testSupabase.js';
 
-const PROFILE: ProfileDto = {
+const PROFILE: Profile = {
   id: USER_ID,
   senderName: 'Ada',
   contactSource: 'manual',
