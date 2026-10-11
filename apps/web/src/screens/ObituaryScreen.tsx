@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { generateObituary } from '@griever/api-client';
 import { OBITUARY_DRAFTING_ENABLED } from '../lib/features';
 import type { ObituaryRequest, SessionDetails } from '@griever/shared';
-import { BackButton, Tooltip } from '../lib/ui';
+import { TopBar, Tooltip } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
 
 type ScreenState = 'form' | 'loading' | 'draft';
@@ -37,10 +37,10 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
 
+  // Date of passing is optional — the obituary can be drafted without it.
   const canSubmit =
     fields.fullName.trim() !== '' &&
-    fields.dateOfBirth.trim() !== '' &&
-    fields.dateOfPassing.trim() !== '';
+    fields.dateOfBirth.trim() !== '';
 
   function setField(key: keyof ObituaryRequest, value: string) {
     setFields((prev) => ({ ...prev, [key]: value }));
@@ -106,7 +106,7 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
   if (screenState === 'draft') {
     return (
       <div className="flex flex-col gap-4">
-        <BackButton onClick={() => setScreenState('form')} />
+        <TopBar onBack={() => setScreenState('form')} />
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px]">Obituary draft</h1>
           <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
@@ -159,7 +159,7 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Write an obituary</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

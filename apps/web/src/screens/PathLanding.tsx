@@ -55,6 +55,15 @@ export function PathLanding({
         </p>
       </div>
 
+      <button
+        type="button"
+        onClick={onWhatYoullNeed}
+        className="gg-btn gg-btn-secondary gg-btn-block"
+      >
+        <ListChecks size={18} weight="duotone" />
+        What you'll need
+      </button>
+
       <div className="flex flex-col gap-2">
         {moments.map((moment) => (
           <MomentRow key={moment.key} moment={moment} onStart={() => onStartMoment(moment.key)} />
@@ -73,10 +82,6 @@ export function PathLanding({
       )}
 
       <div className="flex flex-col" style={{ gap: '2px', marginTop: 'auto', paddingTop: 'var(--space-4)' }}>
-        <button type="button" onClick={onWhatYoullNeed} className="gg-btn gg-btn-ghost !px-0 self-start">
-          <ListChecks size={16} weight="duotone" />
-          What you'll need
-        </button>
         <button
           type="button"
           onClick={onNewSession}

@@ -3,7 +3,7 @@ import type { useSendFlow } from '@griever/hooks';
 import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
 import { composeMessage } from '@griever/shared';
 import { PencilSimple, CheckCircle, Circle } from '@phosphor-icons/react';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -40,7 +40,7 @@ export function ConfirmScreen({ flow }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={flow.prevStep} />
+      <TopBar onBack={flow.prevStep} />
 
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">

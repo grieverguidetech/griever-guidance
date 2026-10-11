@@ -1,6 +1,6 @@
 import type { useSendFlow } from '@griever/hooks';
 import { PencilSimple } from '@phosphor-icons/react';
-import { BackButton, Eyebrow } from '../lib/ui';
+import { TopBar, Eyebrow } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -26,7 +26,7 @@ export function AnnounceForm({ flow, onEditSession }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={prevStep} />
+      <TopBar onBack={prevStep} />
       <div className="flex flex-col gap-1">
         <Eyebrow name={name} accent2 />
         <h1 className="text-[22px]">Announce the passing</h1>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -26,7 +26,7 @@ export function ServiceKnownScreen({ flow }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={flow.prevStep} />
+      <TopBar onBack={flow.prevStep} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Do you know the service details?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

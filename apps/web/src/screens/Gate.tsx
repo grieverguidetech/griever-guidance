@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 
 export interface GateOption {
   title: string;
@@ -22,7 +22,7 @@ export function Gate({ title, subtitle, notYet, ready, reassurance, onBack, onCh
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">{title}</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

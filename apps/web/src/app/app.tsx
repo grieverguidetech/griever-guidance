@@ -5,6 +5,7 @@ import type { MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED } from '../lib/features';
+import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { AddContactsManual } from '../screens/AddContactsManual';
@@ -35,10 +36,14 @@ type AppView =
 const browserStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
 
-function Shell({ children }: { children: React.ReactNode }) {
+// Defined at module scope: a component declared inside App would be a new
+// type on every render, remounting the screen and wiping what was typed.
+function Shell({ children, onWhatYoullNeed }: { children: React.ReactNode; onWhatYoullNeed: () => void }) {
   return (
     <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
-      <div className="w-full max-w-[420px] px-5 py-8">{children}</div>
+      <div className="w-full max-w-[420px] px-5 py-8">
+        <WhatYoullNeedProvider onWhatYoullNeed={onWhatYoullNeed}>{children}</WhatYoullNeedProvider>
+      </div>
     </div>
   );
 }
@@ -62,6 +67,7 @@ export function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [setupEditing, setSetupEditing] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const openWhatYoullNeed = useCallback(() => setView('whatYoullNeed'), []);
 
   // Consumes a Facebook/Instagram sign-in's `#token=…` (or `#error=…`)
   // fragment, if this page load is one — runs once, before the view below
@@ -227,14 +233,14 @@ export function App() {
   // While a previously-stored session token is being confirmed
   // (/auth/session), render nothing rather than flash "signup" first.
   if (account.isLoading) {
-    return <Shell>{null}</Shell>;
+    return <Shell onWhatYoullNeed={openWhatYoullNeed}>{null}</Shell>;
   }
 
   // ---- Flow D: account + contacts onboarding ----
 
   if (AUTH_ENABLED && view === 'signup') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <SignUp
           onContinueWithProvider={(provider) => {
             const redirectTo = window.location.origin + window.location.pathname;
@@ -253,7 +259,7 @@ export function App() {
 
   if (AUTH_ENABLED && view === 'createAccount') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <CreateAccount
           onBack={() => setView('signup')}
           error={account.error}
@@ -271,7 +277,7 @@ export function App() {
 
   if (view === 'addContactsManual') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <AddContactsManual
           contacts={contacts.contacts}
           onBack={AUTH_ENABLED ? () => setView('createAccount') : undefined}
@@ -286,7 +292,7 @@ export function App() {
 
   if (view === 'importContacts') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <ImportContacts
           storedPhones={storedPhones}
           onBack={() => setView(AUTH_ENABLED ? 'signup' : 'addContactsManual')}
@@ -302,7 +308,7 @@ export function App() {
 
   if (view === 'whoHearsFirst') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <WhoHearsFirst
           contacts={contacts.contacts}
           onBack={() =>
@@ -326,7 +332,7 @@ export function App() {
 
   if (view === 'obituary') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <ObituaryScreen
           session={activeDetails}
           onBack={() => setView('shareObituary')}
@@ -338,7 +344,7 @@ export function App() {
 
   if (view === 'whatYoullNeed') {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <WhatYoullNeed onBack={() => goToPathLanding()} onEmailList={() => goToPathLanding()} />
       </Shell>
     );
@@ -346,7 +352,7 @@ export function App() {
 
   if (view === 'gate' && active) {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <Gate
           title="Have the arrangements been made?"
           subtitle="This message needs a date, time and place from the funeral home."
@@ -372,7 +378,7 @@ export function App() {
 
   if (view === 'shareObituary' && active && activeDetails) {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <ShareObituary
           session={activeDetails}
           onBack={() => goToPathLanding()}
@@ -392,7 +398,7 @@ export function App() {
 
   if (view === 'setup' && active) {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <SessionSetup
           session={active}
           editing={setupEditing}
@@ -406,7 +412,7 @@ export function App() {
 
   if (view === 'flow' && active && activeDetails) {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <Flow
           key={active.id}
           session={activeDetails}
@@ -427,7 +433,7 @@ export function App() {
 
   if (view === 'pathLanding' && active) {
     return (
-      <Shell>
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <PathLanding
           session={active}
           otherSessions={sortedSessions.filter((s) => s.id !== active.id)}
@@ -441,7 +447,7 @@ export function App() {
 
   // No active session yet (fresh account, or the active one was pruned) —
   // the effect above creates one and moves to 'setup'.
-  return <Shell>{null}</Shell>;
+  return <Shell onWhatYoullNeed={openWhatYoullNeed}>{null}</Shell>;
 }
 
 export default App;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Contact } from '@griever/shared';
 import { CheckCircle, Circle } from '@phosphor-icons/react';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 import { formatPhone } from '../lib/format';
 
 interface Props {
@@ -26,7 +26,7 @@ export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Who should hear first?</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

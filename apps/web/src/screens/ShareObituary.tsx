@@ -1,6 +1,6 @@
 import type { SessionDetails } from '@griever/shared';
 import { normalizeUrl } from '@griever/shared';
-import { BackButton, Eyebrow, Tooltip } from '../lib/ui';
+import { TopBar, Eyebrow, Tooltip } from '../lib/ui';
 import { OBITUARY_DRAFTING_ENABLED } from '../lib/features';
 
 interface Props {
@@ -20,7 +20,7 @@ export function ShareObituary({ session, onBack, onChange, onContinue, onDraft }
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <Eyebrow name={session.personName || 'them'} accent2 />
         <h1 className="text-[22px]">Has the obituary been published?</h1>

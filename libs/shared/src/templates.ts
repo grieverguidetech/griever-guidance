@@ -58,9 +58,9 @@ export const passingAnnouncement: Template = {
     },
     {
       key: 'dateOfPassing',
-      label: 'Date of passing',
+      label: 'Date of passing (optional)',
       placeholder: 'e.g. June 7, 2025',
-      required: true,
+      required: false,
     },
     {
       key: 'briefMessage',
@@ -71,8 +71,10 @@ export const passingAnnouncement: Template = {
   ],
   renderMessage(fields) {
     const message = fields['briefMessage'] ? ` ${fields['briefMessage']}` : '';
+    const date = fields['dateOfPassing']?.trim();
+    const dateClause = date ? ` passed away on ${date}.` : ' passed away.';
     return (
-      `We are writing to share the news that ${fields['deceasedName']} passed away on ${fields['dateOfPassing']}.` +
+      `We are writing to share the news that ${fields['deceasedName']}${dateClause}` +
       message +
       `\n\nMore details about services will follow. Thank you for your love and support.`
     );

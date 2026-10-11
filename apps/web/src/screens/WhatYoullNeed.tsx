@@ -1,5 +1,5 @@
 import { CheckCircle, Circle } from '@phosphor-icons/react';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 
 interface ChecklistItem {
   label: string;
@@ -23,7 +23,7 @@ interface Props {
 export function WhatYoullNeed({ onBack, onEmailList }: Props) {
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">What you'll need</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

@@ -1,7 +1,7 @@
 import type { useSendFlow } from '@griever/hooks';
 import type { TemplateCategory } from '@griever/shared';
 import { PencilSimple } from '@phosphor-icons/react';
-import { BackButton, Eyebrow } from '../lib/ui';
+import { TopBar, Eyebrow } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -44,7 +44,7 @@ export function TemplatePicker({ flow, onBack, onEditPerson }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
 
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3">

@@ -1,5 +1,5 @@
 import type { Session } from '@griever/hooks';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
 
 interface Props {
@@ -11,13 +11,12 @@ interface Props {
 }
 
 export function SessionSetup({ session, editing, onChange, onContinue, onBack }: Props) {
-  const canContinue = Boolean(
-    session.personName.trim() && session.dateOfPassing.trim(),
-  );
+  // Date of death is optional — pre-planning and recent losses both need to proceed.
+  const canContinue = Boolean(session.personName.trim());
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">
           {editing ? 'Edit their details' : 'Who are we writing about?'}
@@ -41,8 +40,8 @@ export function SessionSetup({ session, editing, onChange, onContinue, onBack }:
 
       <DateField
         id="s-date"
-        label="Date they passed"
-        value={session.dateOfPassing}
+        label="Date they passed (optional)"
+        value={session.dateOfPassing ?? ''}
         max={todayISO()}
         onChange={(dateOfPassing) => onChange({ dateOfPassing })}
       />

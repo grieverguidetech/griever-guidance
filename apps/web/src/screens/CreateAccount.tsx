@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BackButton } from '../lib/ui';
+import { TopBar } from '../lib/ui';
 
 interface Props {
   onBack: () => void;
@@ -18,7 +18,7 @@ export function CreateAccount({ onBack, onCreate, error, isSubmitting }: Props) 
 
   return (
     <div className="flex flex-col gap-4">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">Create an account</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>

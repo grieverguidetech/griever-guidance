@@ -3,11 +3,15 @@ import { useTemplates } from '@griever/hooks';
 import { categoryLabels } from '@griever/shared';
 import type { TemplateCategory } from '@griever/shared';
 import type { FlowProps } from '../app/App';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import type { RootStackParamList } from '../app/App';
 
 const CATEGORY_ORDER: TemplateCategory[] = ['announcement', 'service', 'aftercare'];
 
 export function TemplatePickerScreen({ flow }: FlowProps) {
   const templates = useTemplates();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
     category: cat,
@@ -16,10 +20,19 @@ export function TemplatePickerScreen({ flow }: FlowProps) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Griever Guidance</Text>
+      <Text style={styles.title}>Grievers Guidance</Text>
       <Text style={styles.subtitle}>
         Choose the type of message you would like to send.
       </Text>
+
+      <TouchableOpacity
+        onPress={() => navigation.navigate('WhatYoullNeed')}
+        style={styles.whatYoullNeedLink}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.whatYoullNeedText}>What you'll need</Text>
+      </TouchableOpacity>
+
       {grouped.map(({ category, templates: group }) => (
         <View key={category} style={styles.group}>
           <Text style={styles.categoryHeading}>{categoryLabels[category]}</Text>
@@ -66,4 +79,6 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: '500', color: '#111827', marginBottom: 4 },
   cardDescription: { fontSize: 14, color: '#6b7280' },
+  whatYoullNeedLink: { alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 24 },
+  whatYoullNeedText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
 });

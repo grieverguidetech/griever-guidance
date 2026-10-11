@@ -1,4 +1,4 @@
-// Griever Guidance — background outbox flush.
+// Grievers Guidance — background outbox flush.
 //
 // Wakes on the Background Sync event registered by
 // apps/web/src/lib/registerSync.ts (tag: "gg-outbox-flush", DATA.md §4.5) and

@@ -8,10 +8,13 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import type { FlowProps } from '../app/App';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { FlowProps, RootStackParamList } from '../app/App';
 
 export function DetailsFormScreen({ flow }: FlowProps) {
   const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   if (!selectedTemplate) return null;
 
@@ -25,9 +28,18 @@ export function DetailsFormScreen({ flow }: FlowProps) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <TouchableOpacity onPress={prevStep} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={prevStep} style={styles.backButton}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('WhatYoullNeed')}
+            style={styles.whatYoullNeedLink}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.whatYoullNeedText}>What you'll need</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.title}>{selectedTemplate.name}</Text>
         {selectedTemplate.fields.map((field) => (
           <View key={field.key} style={styles.fieldGroup}>
@@ -63,8 +75,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  backButton: { marginBottom: 24 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  backButton: {},
   backText: { fontSize: 14, color: '#9ca3af' },
+  whatYoullNeedLink: {},
+  whatYoullNeedText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 24 },
   fieldGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },

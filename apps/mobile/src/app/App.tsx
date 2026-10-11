@@ -8,6 +8,7 @@ import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { SentScreen } from '../screens/SentScreen';
+import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { mobileContactStore } from '../lib/contactStore';
 import { shouldPurgeContacts, recordServiceDate } from '../lib/contactRetention';
 
@@ -18,6 +19,7 @@ export type RootStackParamList = {
   Confirm: undefined;
   Sending: undefined;
   Sent: undefined;
+  WhatYoullNeed: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -75,6 +77,9 @@ export const App = () => {
         {flow.step === 'sent' && (
           <Stack.Screen name="Sent">{() => <SentScreen flow={flow} />}</Stack.Screen>
         )}
+        <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
+          {() => <WhatYoullNeedScreen />}
+        </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
   );
