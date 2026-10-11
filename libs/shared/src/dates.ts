@@ -11,6 +11,59 @@ export function parseLooseDate(value: string | undefined | null): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
+
+function monthFromName(name: string): number | null {
+  const lower = name.toLowerCase().replace(/\.$/, '');
+  if (lower === 'sept') return 9;
+  const index = MONTHS.findIndex((m) => m === lower || (lower.length === 3 && m.startsWith(lower)));
+  return index === -1 ? null : index + 1;
+}
+
+/**
+ * Strict counterpart to `parseLooseDate`, for anything that DELETES or
+ * EXPIRES data (contact retention). Returns a Date only for a complete date:
+ * an explicit four-digit year in 2000-2100, a real month and a real day.
+ * Accepted: "2026-05-29" (zero-padded), "5/29/2026", "May 29, 2026" (also "May 29 2026",
+ * "Sept. 5, 2026"). Anything partial that someone may still be typing
+ * ("6", "6/12", "May 2", "May 29, 202") is null, because `new Date` would
+ * fill in a year like 2001 and a wrong, long-past date must never start a
+ * deletion clock.
+ */
+export function parseCompleteDate(value: string | undefined | null): Date | null {
+  const text = value?.trim();
+  if (!text) return null;
+
+  let year: number;
+  let month: number | null;
+  let day: number;
+
+  let match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (match) {
+    [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  } else if ((match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text))) {
+    [month, day, year] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  } else if ((match = /^([A-Za-z]+\.?)\s+(\d{1,2}),?\s+(\d{4})$/.exec(text))) {
+    [month, day, year] = [monthFromName(match[1]), Number(match[2]), Number(match[3])];
+  } else {
+    return null;
+  }
+
+  if (month === null || year < MIN_YEAR || year > MAX_YEAR) return null;
+  const date = new Date(year, month - 1, day);
+  // Rejects overflow such as Feb 30 or month 13 rolling into the next period.
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);

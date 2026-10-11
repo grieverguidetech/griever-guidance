@@ -1,4 +1,4 @@
-import { addDays, mergeSessionScreens, parseLooseDate, type SessionDocument } from './index.js';
+import { addDays, mergeSessionScreens, parseCompleteDate, parseLooseDate, type SessionDocument } from './index.js';
 
 describe('parseLooseDate', () => {
   it('parses what a family types and ISO dates', () => {
@@ -11,6 +11,54 @@ describe('parseLooseDate', () => {
     expect(parseLooseDate(null)).toBeNull();
     expect(parseLooseDate('  ')).toBeNull();
     expect(parseLooseDate('next Tuesday-ish')).toBeNull();
+  });
+});
+
+describe('parseCompleteDate', () => {
+  const ymd = (d: Date | null) => d && [d.getFullYear(), d.getMonth() + 1, d.getDate()];
+
+  it('parses complete dates in the formats the app produces', () => {
+    expect(ymd(parseCompleteDate('May 29, 2026'))).toEqual([2026, 5, 29]);
+    expect(ymd(parseCompleteDate('2026-05-29'))).toEqual([2026, 5, 29]);
+    expect(ymd(parseCompleteDate('5/29/2026'))).toEqual([2026, 5, 29]);
+    expect(ymd(parseCompleteDate('  September 5, 2026 '))).toEqual([2026, 9, 5]);
+    expect(ymd(parseCompleteDate('Sept. 5 2026'))).toEqual([2026, 9, 5]);
+    expect(ymd(parseCompleteDate('dec 1, 2000'))).toEqual([2000, 12, 1]);
+    expect(ymd(parseCompleteDate('12/31/2100'))).toEqual([2100, 12, 31]);
+  });
+
+  it.each(['6', '6/12', 'May 2', 'May 29, 2', 'May 29, 202', 'May 29,', 'May', '2026', '2026-05', '2026-05-2', '5/29/26'])(
+    'is null for the partial input %j that parseLooseDate wrongly accepts',
+    (input) => {
+      expect(parseCompleteDate(input)).toBeNull();
+    },
+  );
+
+  it('is null for every prefix of a date typed one character at a time, except the full value', () => {
+    for (const full of ['May 29, 2026', '5/29/2026', '2026-05-29']) {
+      for (let i = 0; i < full.length; i++) {
+        expect(parseCompleteDate(full.slice(0, i))).toBeNull();
+      }
+      expect(parseCompleteDate(full)).not.toBeNull();
+    }
+  });
+
+  it('is null for years outside 2000-2100 and for impossible dates', () => {
+    expect(parseCompleteDate('May 29, 1999')).toBeNull();
+    expect(parseCompleteDate('May 29, 2101')).toBeNull();
+    expect(parseCompleteDate('May 29, 0202')).toBeNull();
+    expect(parseCompleteDate('1999-12-31')).toBeNull();
+    expect(parseCompleteDate('13/1/2026')).toBeNull();
+    expect(parseCompleteDate('2/30/2026')).toBeNull();
+    expect(parseCompleteDate('2026-02-30')).toBeNull();
+    expect(parseCompleteDate('Foo 5, 2026')).toBeNull();
+    expect(parseCompleteDate('Tuesday, June 10 at 11:00 AM')).toBeNull();
+  });
+
+  it('is null for empty input', () => {
+    expect(parseCompleteDate(undefined)).toBeNull();
+    expect(parseCompleteDate(null)).toBeNull();
+    expect(parseCompleteDate('  ')).toBeNull();
   });
 });
 
