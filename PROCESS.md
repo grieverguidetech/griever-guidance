@@ -78,7 +78,8 @@ template, adds it to the board, sets Status/Size/Role, and labels it `ticket` + 
 
 For each Ready ticket, up to the parallelism cap (default **2**; the human may raise it):
 
-1. `git fetch && git worktree add .worktrees/<issue#> -b <type>/<area>-<slug> origin/main`.
+1. `git fetch && git worktree add .worktrees/<issue#> -b <type>/<area>-<slug> origin/main`, then
+   `pnpm -C .worktrees/<issue#> install --frozen-lockfile --prefer-offline`.
    Move the card to **In progress** and label `in-progress`.
 2. Spawn **developer** with: the issue text, its `files_touched`, the worktree path, and which docs
    apply. Launch independent developers **in the same turn** so they really run in parallel.
@@ -88,7 +89,10 @@ For each Ready ticket, up to the parallelism cap (default **2**; the human may r
 ### Independent check
 
 The orchestrator re-runs the checks in the worktree itself. **Don't trust a green claim.** If an
-agent said "passes" and it doesn't, record that in `SELF_IMPROVEMENT.md`. Also confirm:
+agent said "passes" and it doesn't, record that in `SELF_IMPROVEMENT.md`. Run `pnpm check:affected`
+once **with** the Nx cache (as CI does) and not only with `--skip-nx-cache`; a cached run is what
+shows a cache that ignores some inputs. An empty or "placeholder" hand-back means **not done**:
+inspect the worktree (`git status`, `git log`, the diff) before believing or dismissing it. Also confirm:
 
 - only the ticket's `files_touched` changed: `git diff --stat origin/main...HEAD`;
 - new behavior has tests, and there's no `.only` / `.skip` / `.todo`;
@@ -106,6 +110,8 @@ known follow-ups (with an issue).
 Push the branch and open the PR from the template: `Closes #N`, what changed and why, check
 output, reviewer verdict, **2–3 "read this closely" items** (file, function, what could be wrong,
 how to check), and what was *not* verified. Move the card to **In review**.
+
+Open every PR with `gh pr create --draft`; run `gh pr ready` only after `gh pr checks` is green.
 
 Then alert the human with every open PR **in recommended merge order**, one line each plus the
 read-closely items. The human is accountable for every line; say which parts most deserve their
@@ -132,12 +138,12 @@ rules into this file or `REQUIREMENTS.md` §6 in a PR labeled `process`.
 ## 2. Operating rules
 
 **Autonomous (no asking):** reading files; creating branches and worktrees; writing code, tests and
-docs inside a ticket; running typecheck/tests/builds/e2e; `gh` and `git` reads; creating issues,
+docs inside a ticket; running typecheck/tests/builds; reading CI e2e results; `gh` and `git` reads; creating issues,
 labels and board items for approved work; opening PRs; commenting on issues; watching CI.
 
 **Ask first (a gate or a question):** approving scope; merging; pushing to `main`; changing
 GitHub secrets/variables or Cloudflare/Convex settings; manual deploys (`workflow_dispatch`);
-deleting files you didn't create; adding a dependency outside the ticket that planned it; anything
+deleting files you didn't create; dispatching the `E2E stress` workflow (propose a `repeat_each` when asking); adding a dependency outside the ticket that planned it; anything
 that costs money; changing design tokens or brand colors.
 
 **Never:** bypass CI or checks (`--no-verify`, `.only`/`.skip`, weakening an assertion to pass);
@@ -164,8 +170,13 @@ failed), never from memory or another agent's report. Always state what you did 
   `identity`, `send`, `contacts`, `sync`, `data`, `marketing`, `ci`.
 - **Direct commits to `main` only when the product owner asks for it** for a small change. Push
   only when asked. Pushing to `main` deploys (after CI), so every commit on `main` must be shippable.
-- `.worktrees/` is git-ignored and lives inside the repo, so worktrees resolve the root
-  `node_modules`. Don't run `pnpm install` in a worktree unless the ticket changes dependencies.
+- `.worktrees/` is git-ignored, but under pnpm a new worktree has no per-package `node_modules`
+  links. Run `pnpm install --frozen-lockfile --prefer-offline` in every new worktree (about 8s).
+  It doesn't change dependencies; the lockfile stays as is.
+- Project subagents (`.claude/agents/`) load only at session start. In the session that creates or
+  edits a role file, dispatch the role as a general-purpose agent told to follow that file.
+- Before handing back, an agent stops what it started in its worktree: `pnpm nx daemon --stop` and
+  any dev or test server.
 
 ## 4. Tickets
 
@@ -226,6 +237,9 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
 - Test what the user experiences: role- and label-based locators, real copy. Constraints C1–C10
   get tests where they can be checked by code (e.g. no `!` in any template, one recipient per
   `sms:` link, every gateway route rejects bad input).
+- **Stress and repeat runs happen in CI**, via the manual `E2E stress` workflow
+  (`.github/workflows/e2e-stress.yml`, input `repeat_each`, all three projects). Never on a laptop.
+  Dispatching it is ask-first (§2); propose a `repeat_each` when asking.
 - Axe is a floor, not a claim. Known, tracked failures use Playwright's `test.fail()` with the
   issue named, which turns red once fixed. `.skip` is never allowed.
 - Gateway tests never call Convex or Anthropic; stub `fetch` and env.

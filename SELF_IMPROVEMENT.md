@@ -112,3 +112,15 @@ to read in a minute; it is a staging area, not an archive.
   tech hears plain text with no checked state. Tracked on the board.
 - **Rule:** a toggle is a `<button aria-pressed>` or a real `<input type="checkbox">`. Never a
   label with `preventDefault`. The a11y-auditor checks for this pattern.
+
+### 2026-10-04 — First multi-agent run: process gaps (#9, #10, #15)
+- **What happened:** worktrees had no per-package `node_modules` (PROCESS.md said they resolved the
+  root's); a `--skip-nx-cache`-only check hid that Nx's typecheck cache ignored spec files, and the
+  reviewer caught it; hand-backs came back empty or "placeholder"; the e2e summary showed
+  "1 failed" with no detail, twice; #15 merged with red CI and turned `main` red (fixed in #16; the
+  deploy gate held); agents left Nx daemons and servers running; a newly created `.claude/agents/`
+  wasn't loaded until the next session.
+- **Why:** the worktree note was written for npm; checks were run one way; red CI had no visible marker; hand-backs came back empty because nothing required a report and a placeholder looked like one; subagents weren't loaded because role files are read once at session start.
+- **Rule:** install in every new worktree; run one cached check; an empty hand-back is not done;
+  CI prints failure detail; red-CI PRs are drafts; agents stop daemons and servers; dispatch new
+  roles as general-purpose agents in the session that creates them. **Promoted → PROCESS.md §1, §3, §7; AGENTS.md "Known gotchas".**

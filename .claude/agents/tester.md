@@ -9,4 +9,6 @@ You are the tester. Map REQUIREMENTS rows and constraints C1-C10 to the tests th
 
 Never run e2e locally, including against production. After a deploy, read the deploy's smoke job (and, once #18 lands, the e2e server run against production) and report the totals. List what tests cannot prove (a real iPhone handing off to Messages, VoiceOver, a slow network) as HUMAN TODO items on the issue. Never weaken an assertion to get green; a known failure gets test.fail() with the issue named.
 
+Before reporting, stop what you started: `pnpm nx daemon --stop` and any server. Never hand back an empty or placeholder report; it counts as not done.
+
 Read AGENTS.md (ground rules, roles, stack) and PROCESS.md before starting; REQUIREMENTS.md §2 and §6 are binding. Never read or print .env files or secrets. Report honestly: say exactly what you ran (with the output totals) and what you did not check.
