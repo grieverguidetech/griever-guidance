@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useIdentity, useContacts, useSessions, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
-import type { Session, SendFlowDraft } from '@griever/hooks';
+import type { ReactNode } from 'react';
+import {
+  useSupabaseIdentity,
+  useContacts,
+  useSessions,
+  freshDraft,
+  getContactsRetentionExpiry,
+} from '@griever/hooks';
+import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever/hooks';
+import type { AuthClient } from '@griever/api-client/auth';
 import type { MomentKey, SessionDetails } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED } from '../lib/features';
+import { loadAuthClient } from '../lib/authClient';
+import type { AuthClientResult } from '../lib/authClient';
 import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
+import { Profile } from '../screens/Profile';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
@@ -22,6 +33,7 @@ import { Flow } from './Flow';
 type AppView =
   | 'signup'
   | 'createAccount'
+  | 'profile'
   | 'addContactsManual'
   | 'importContacts'
   | 'whoHearsFirst'
@@ -48,15 +60,56 @@ function Shell({ children, onWhatYoullNeed }: { children: React.ReactNode; onWha
   );
 }
 
+function WithIdentity({ client, children }: { client: AuthClient; children: (auth: UseSupabaseIdentityResult) => ReactNode }) {
+  return <>{children(useSupabaseIdentity({ client, storage: browserStorage }))}</>;
+}
+
+/**
+ * Loads the Supabase client (its own chunk) and only then mounts the identity hook, which needs
+ * a client at render time. Rendered only when AUTH_ENABLED is on.
+ */
+function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult) => ReactNode }) {
+  const [loaded, setLoaded] = useState<AuthClientResult | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void loadAuthClient().then((result) => {
+      if (live) setLoaded(result);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!loaded) return <Shell onWhatYoullNeed={noop}>{null}</Shell>;
+  if (!loaded.available) {
+    return (
+      <Shell onWhatYoullNeed={noop}>
+        <p role="status" className="text-[14px] leading-[1.6] pt-[52px] m-0">
+          Accounts aren't available right now.
+        </p>
+      </Shell>
+    );
+  }
+  return <WithIdentity client={loaded.client}>{children}</WithIdentity>;
+}
+
+function noop() {
+  // The checklist is not reachable before the app has loaded.
+}
+
 export function App() {
-  // With auth flagged off, useIdentity gets no storage: no stored token is
-  // ever read, so it never calls /auth/session and never reports loading.
-  const account = useIdentity(AUTH_ENABLED ? browserStorage : undefined);
+  // With the flag off nothing auth-related loads or renders, and the app is as it was.
+  if (!AUTH_ENABLED) return <AppBody auth={null} />;
+  return <AuthGate>{(auth) => <AppBody auth={auth} />}</AuthGate>;
+}
+
+function AppBody({ auth }: { auth: UseSupabaseIdentityResult | null }) {
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
   // Without auth there is no account gate — everyone is let straight in.
-  const isSignedIn = AUTH_ENABLED ? account.isSignedIn : true;
+  const isSignedIn = auth ? auth.isSignedIn : true;
 
   const [view, setView] = useState<AppView>(() => {
     if (AUTH_ENABLED) return 'signup';
@@ -66,34 +119,37 @@ export function App() {
   });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [setupEditing, setSetupEditing] = useState(false);
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  // The name typed at sign-up, saved once the new account has a session.
+  const [pendingName, setPendingName] = useState<string | null>(null);
   const openWhatYoullNeed = useCallback(() => setView('whatYoullNeed'), []);
 
-  // Consumes a Facebook/Instagram sign-in's `#token=…` (or `#error=…`)
-  // fragment, if this page load is one — runs once, before the view below
-  // has a chance to render "signup" and flash it.
+  const signedIn = auth?.isSignedIn ?? false;
+  const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
+  const updateSenderName = auth?.updateSenderName;
+
+  // Sign-in resolves asynchronously (the boot-time session check, or a form), so the next view
+  // can't be decided in useState's initializer. A new account goes on to add contacts.
   useEffect(() => {
-    if (!AUTH_ENABLED || typeof window === 'undefined') return;
-    const handled = account.completeOAuthCallback(window.location.hash);
-    if (handled) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (!signedIn || (view !== 'signup' && view !== 'createAccount')) return;
+    if (pendingName !== null && updateSenderName) {
+      void updateSenderName(pendingName);
+      setPendingName(null);
+      setView('addContactsManual');
+    } else {
+      setView('pathLanding');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn, view, pendingName, updateSenderName]);
+
+  // Signing out, or a session that ended, returns to the account screens.
+  useEffect(() => {
+    if (signedOut && view !== 'signup' && view !== 'createAccount') setView('signup');
+  }, [signedOut, view]);
+
+  // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
+  // (#39), so the Supabase user id is deliberately not passed in.
+  useEffect(() => {
+    void setSyncUserId(null);
   }, []);
-
-  // A real sign-in resolves asynchronously (the boot-time /auth/session
-  // check, or the OAuth callback above) — unlike the client-only mock this
-  // replaced, so this can't be decided synchronously in useState's initializer.
-  useEffect(() => {
-    if (isSignedIn && view === 'signup') setView('pathLanding');
-  }, [isSignedIn, view]);
-
-  // Keeps libs/data-sync attributed to whoever is actually signed in. See
-  // registerSync.ts's setSyncUserId for exactly what this does (and does
-  // not yet) make real in production.
-  useEffect(() => {
-    void setSyncUserId(account.identity?.userId ?? null);
-  }, [account.identity?.userId]);
 
   const sortedSessions = useMemo(
     () =>
@@ -230,46 +286,65 @@ export function App() {
     setView('flow');
   }
 
-  // While a previously-stored session token is being confirmed
-  // (/auth/session), render nothing rather than flash "signup" first.
-  if (account.isLoading) {
+  // While a stored session is being checked, render nothing rather than flash "signup" first.
+  if (auth?.isLoading) {
     return <Shell onWhatYoullNeed={openWhatYoullNeed}>{null}</Shell>;
   }
 
   // ---- Flow D: account + contacts onboarding ----
 
-  if (AUTH_ENABLED && view === 'signup') {
+  if (auth && view === 'signup') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <SignUp
-          onContinueWithProvider={(provider) => {
-            const redirectTo = window.location.origin + window.location.pathname;
-            window.location.href = account.oauthStartUrl(provider, redirectTo);
+          error={auth.error}
+          onSignIn={() => {
+            auth.clearError();
+            setView('createAccount');
           }}
-          onUseEmail={() => setView('createAccount')}
+          onSubmit={async ({ name, email, password }) => {
+            setPendingName(name);
+            const ok = await auth.signUp(email, password);
+            if (!ok) setPendingName(null);
+            return ok;
+          }}
         />
-        {account.error && (
-          <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
-            {account.error}
-          </p>
-        )}
       </Shell>
     );
   }
 
-  if (AUTH_ENABLED && view === 'createAccount') {
+  if (auth && view === 'createAccount') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <CreateAccount
-          onBack={() => setView('signup')}
-          error={account.error}
-          isSubmitting={isCreatingAccount}
-          onCreate={async ({ name, email, password }) => {
-            setIsCreatingAccount(true);
-            const ok = await account.signUpWithPassword({ email, password, senderName: name });
-            setIsCreatingAccount(false);
-            if (ok) setView('addContactsManual');
+          error={auth.error}
+          onBack={() => {
+            auth.clearError();
+            setView('signup');
           }}
+          onSubmit={({ email, password }) => {
+            // A name left over from a sign-up that is still waiting on email confirmation
+            // must not overwrite the name on an existing account.
+            setPendingName(null);
+            return auth.signIn(email, password);
+          }}
+        />
+      </Shell>
+    );
+  }
+
+  if (auth && view === 'profile') {
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+        <Profile
+          senderName={auth.profile?.senderName ?? null}
+          error={auth.error}
+          onBack={() => {
+            auth.clearError();
+            goToPathLanding();
+          }}
+          onSave={auth.updateSenderName}
+          onSignOut={() => void auth.signOut()}
         />
       </Shell>
     );
@@ -280,7 +355,7 @@ export function App() {
       <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <AddContactsManual
           contacts={contacts.contacts}
-          onBack={AUTH_ENABLED ? () => setView('createAccount') : undefined}
+          onBack={auth ? () => setView('signup') : undefined}
           onAdd={({ name, phone, hearsFirst }) =>
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
@@ -295,7 +370,7 @@ export function App() {
       <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <ImportContacts
           storedPhones={storedPhones}
-          onBack={() => setView(AUTH_ENABLED ? 'signup' : 'addContactsManual')}
+          onBack={() => setView(auth ? 'signup' : 'addContactsManual')}
           onSwitchToManual={() => setView('addContactsManual')}
           onContinue={(picked, source) => {
             contacts.importContacts(picked, source);
@@ -313,7 +388,7 @@ export function App() {
           contacts={contacts.contacts}
           onBack={() =>
             setView(
-              !AUTH_ENABLED || account.identity?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts',
+              !auth || auth.profile?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts',
             )
           }
           onSave={(firstIds) => {
@@ -441,6 +516,15 @@ export function App() {
           onWhatYoullNeed={() => setView('whatYoullNeed')}
           onNewSession={startNewSession}
         />
+        {auth && (
+          <button
+            type="button"
+            onClick={() => setView('profile')}
+            className="gg-btn gg-btn-ghost gg-btn-block mt-4"
+          >
+            Your account
+          </button>
+        )}
       </Shell>
     );
   }
