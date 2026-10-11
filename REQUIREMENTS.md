@@ -418,6 +418,7 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
               CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL,
               FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET,
               GATEWAY_BASE_URL, IDENTITY_SESSION_SECRET, IDENTITY_SERVICE_SECRET (local dev)
+              SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)

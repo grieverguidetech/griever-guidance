@@ -2,6 +2,7 @@ import { createFacebookProvider } from './facebookProvider.js';
 import { createInstagramProvider } from './instagramProvider.js';
 import { getConvexClient } from './convexClient.js';
 import { createIdentityRouter } from './router.js';
+import { createProfileRouter } from './profileRouter.js';
 import type { OAuthProvider } from './oauthProvider.js';
 
 export { createIdentityRouter } from './router.js';
@@ -10,6 +11,12 @@ export type { OAuthProvider, OAuthProfile, OAuthExchangeResult } from './oauthPr
 export { createFacebookProvider } from './facebookProvider.js';
 export { createInstagramProvider } from './instagramProvider.js';
 export { signToken, verifyToken } from './token.js';
+export { createProfileRouter, parseProfileBody } from './profileRouter.js';
+export type { ProfileRouterConfig } from './profileRouter.js';
+export { supabaseAuth, clearJwksCache } from './supabaseJwt.js';
+export type { SupabaseConfig, SupabaseAuthVariables } from './supabaseJwt.js';
+export { createProfilesClient } from './supabaseClient.js';
+export type { ProfileDto, ProfileFields, ProfilesClient } from './supabaseClient.js';
 
 function buildProviders(): Record<string, OAuthProvider> {
   const providers: Record<string, OAuthProvider> = {};
@@ -46,4 +53,17 @@ export const identityRouter = createIdentityRouter({
   serviceSecret: process.env['IDENTITY_SERVICE_SECRET'],
   gatewayBaseUrl: process.env['GATEWAY_BASE_URL'],
   allowedRedirectOrigins,
+});
+
+/**
+ * GET/PUT /me/profile against Supabase, as the signed-in caller (anon key plus
+ * their JWT, so row-level security applies). Env is read per request; unset
+ * means these routes answer 503 rather than the gateway failing to start.
+ */
+export const profileRouter = createProfileRouter({
+  getConfig: () => {
+    const url = process.env['SUPABASE_URL'];
+    const anonKey = process.env['SUPABASE_ANON_KEY'];
+    return url && anonKey ? { url: url.replace(/\/+$/, ''), anonKey } : null;
+  },
 });
