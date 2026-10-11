@@ -31,7 +31,7 @@ is a defect. The ones you will meet first:
 |---|---|
 | `web` | React, Vite and Tailwind. The browser send flow and account screens. Dev port 5173. |
 | `mobile` | Expo and React Native, core components only. The main user surface. |
-| `gateway` | Hono on Cloudflare Workers (locally on `@hono/node-server`, port 3001). It composes the identity, messages and sync routers into one HTTP surface. It also holds the Convex functions in `apps/gateway/convex/`. |
+| `gateway` | Hono on Cloudflare Workers (locally on `@hono/node-server`, port 3001). It composes the identity, messages and sync routers into one HTTP surface. It also holds the Convex functions in `apps/gateway/convex/`. `convex/identity.ts` is dead code and is removed in #37. |
 | `marketing` | Astro. The public site. |
 | `web-e2e` | Playwright end-to-end tests for the web app. Run in CI only. |
 
@@ -40,9 +40,9 @@ is a defect. The ones you will meet first:
 | Library | What it is for |
 |---|---|
 | `shared` | Types, interfaces and message templates used by more than one project. |
-| `api-client` | All HTTP calls to the gateway, and the Supabase sign-up and sign-in calls. Apps do not call `fetch` themselves. |
+| `api-client` | Gateway HTTP calls for the app, and the Supabase auth calls. Sync traffic goes through `data-sync` (and the web service worker). |
 | `hooks` | Shared React hooks, such as `useSendFlow` and `useSupabaseIdentity`. Also the `sms:` link builder, `buildSmsLink`. No platform-specific code. |
-| `ui-web` | Shared React and Tailwind components for web. |
+| `ui-web` | Unused generator placeholder; being removed in #71. |
 | `data-local` | IndexedDB storage in the browser: the session document, the outbox, and contacts. |
 | `data-sync` | The offline sync engine. It flushes the outbox and pulls and pushes changes through the gateway. |
 | `contacts` | Contact import logic shared by web and mobile: the source interface, normalizing, de-duplicating, and the review-and-commit steps. |
@@ -73,15 +73,19 @@ Docker, see its [README](infra/convex/README.md)), `scripts/` (deploy guard).
 You need:
 
 - Node 22.
-- pnpm 10.34.1. The `packageManager` field in `package.json` pins it; Corepack picks it up.
+- pnpm 10.34.1. The `packageManager` field in `package.json` pins it; run `corepack enable` once so Corepack uses that version.
 - Docker, for local Supabase and local Convex.
 - The [Supabase CLI](https://supabase.com/docs/guides/cli). CI uses 2.116.0.
 
 Then:
 
 ```sh
+corepack enable
 pnpm install
 ```
+
+`pnpm install && pnpm dev` is enough for the default flow (auth off). Supabase and Convex are
+only needed for accounts and sync.
 
 Run things from the repo root:
 
@@ -93,8 +97,13 @@ pnpm dev:mobile     # Expo
 pnpm dev:marketing  # Astro
 ```
 
-Copy each `.env.example` to the file named inside it and fill in your own values. Do not commit
-them. See [Environment variables](#environment-variables).
+Env files, with your own values (never commit them):
+
+- Web and mobile: copy `apps/<app>/.env.example` to `apps/<app>/.env.local`.
+- Gateway: `apps/gateway/.env.local` for `CORS_ORIGINS` and the Supabase variables. The Convex
+  admin key goes in `apps/gateway/.env` (see [infra/convex/README.md](infra/convex/README.md)).
+
+ See [Environment variables](#environment-variables).
 
 ### Local Supabase
 
@@ -106,6 +115,10 @@ supabase start --workdir infra      # start local Postgres and Auth (needs Docke
 supabase test db --workdir infra    # run the pgTAP row-level security tests
 supabase stop --workdir infra
 ```
+
+After `supabase start`, put its API URL and anon key in the gateway's `SUPABASE_URL` and
+`SUPABASE_ANON_KEY`, and in the web app's `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Also set
+`VITE_FEATURE_AUTH=true` to see the account screens.
 
 ### Local Convex (only for session sync)
 
@@ -119,7 +132,7 @@ The admin key steps are in [infra/convex/README.md](infra/convex/README.md).
 
 ### Feature flags
 
-Both are off unless set to exactly `true`, at build time.
+Each is off unless set to exactly `true`, at build time.
 
 | Flag | Where | Turns on |
 |---|---|---|
@@ -137,10 +150,11 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 - `PORT`
 - `CORS_ORIGINS` (comma-separated allowed origins; empty blocks every cross-origin request)
 - `ANTHROPIC_API_KEY`
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public; the production values are in `wrangler.toml`. There
-  is no service-role key. If either is unset, `/me/*` answers 503.)
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public; there is no service-role key. The production slots are in
+  `wrangler.toml` `[vars]` and are empty today, so `/me/*` answers 503 in production until they
+  are set, see #45. Locally, unset also means 503.)
 - `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_SITE_URL` (local Convex only)
-- `CONVEX_DEPLOY_KEY`, `CONVEX_URL` (CI and production only)
+- `CONVEX_DEPLOY_KEY`, `CONVEX_URL` (GitHub secrets; CI and production only)
 
 **`apps/web`**
 - `VITE_API_URL`
@@ -190,7 +204,7 @@ separate from `ci.yml` so a mobile-only failure cannot block a deploy, and it is
 **`mobile-bundle.yml`** runs on the same triggers and exports the Android bundle. It does not gate
 deploys.
 
-**`deploy.yml`** runs only after CI succeeds on a push to `main` (or by hand). It deploys:
+**`deploy.yml`** runs only after CI succeeds on a push to `main` (or by hand; a manual run skips the CI gate). It deploys:
 
 - The gateway to Cloudflare Workers, after running Supabase migrations (`supabase db push`, skipped
   if the Supabase secrets are not set) and `convex deploy`. `scripts/check-dev-auth.mjs` stops the
@@ -201,7 +215,7 @@ deploys.
 A smoke test then checks `api.grieversguidance.com/health`, `web.grieversguidance.com` and
 `grieversguidance.com`. Migrations must stay compatible with the gateway that is already live.
 
-Live addresses: `grieversguidance.com`, `web.grieversguidance.com`,
+Live addresses: `grieversguidance.com`, `www.grieversguidance.com`, `web.grieversguidance.com`,
 `api.grieversguidance.com/health`.
 
 ## How work is done here
