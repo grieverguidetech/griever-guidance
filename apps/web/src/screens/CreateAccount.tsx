@@ -1,84 +1,84 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import type { FormEvent } from 'react';
 import { TopBar } from '../lib/ui';
+
+export interface SignInInput {
+  email: string;
+  password: string;
+}
 
 interface Props {
   onBack: () => void;
-  onCreate: (input: { name: string; email: string; password: string }) => void;
-  /** Surfaced from the real sign-up call — e.g. "An account with that email already exists." */
-  error?: string | null;
-  isSubmitting?: boolean;
+  /** Resolves true when signed in. A false result keeps everything typed. */
+  onSubmit: (input: SignInInput) => Promise<boolean>;
+  /** The identity hook's own calm copy, shown as-is. */
+  error: string | null;
 }
 
-export function CreateAccount({ onBack, onCreate, error, isSubmitting }: Props) {
-  const [name, setName] = useState('');
+/** The sign-in screen. The file keeps its old name; sign-up lives in SignUp. */
+export function CreateAccount({ onBack, onSubmit, error }: Props) {
+  const ids = useId();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [pending, setPending] = useState(false);
 
-  const canContinue = name.trim() && email.trim() && password.length >= 8 && !isSubmitting;
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (pending) return;
+    setPending(true);
+    try {
+      await onSubmit({ email: email.trim(), password });
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <div className="flex flex-col gap-4">
+    <form className="flex flex-col gap-4" onSubmit={submit}>
       <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
-        <h1 className="text-[22px]">Create an account</h1>
+        <h1 className="text-[22px]">Sign in</h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          So nothing you write gets lost.
+          Pick up where you left off.
         </p>
       </div>
 
       <div className="gg-field">
-        <label htmlFor="ca-name">Your name</label>
+        <label htmlFor={`${ids}-email`}>Email</label>
         <input
-          id="ca-name"
-          className="gg-input"
-          type="text"
-          placeholder="e.g. Anna"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-
-      <div className="gg-field">
-        <label htmlFor="ca-email">Email</label>
-        <input
-          id="ca-email"
+          id={`${ids}-email`}
           className="gg-input"
           type="email"
-          placeholder="you@example.com"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
 
       <div className="gg-field">
-        <label htmlFor="ca-password">Password</label>
+        <label htmlFor={`${ids}-password`}>Password</label>
         <input
-          id="ca-password"
+          id={`${ids}-password`}
           className="gg-input"
           type="password"
-          placeholder="At least 8 characters"
+          autoComplete="current-password"
+          required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
       </div>
 
-      {error && (
-        <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
-          {error}
-        </p>
-      )}
+      <div aria-live="polite" className="text-[13px]" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+        {error}
+      </div>
 
-      <button
-        type="button"
-        onClick={() => onCreate({ name: name.trim(), email: email.trim(), password })}
-        disabled={!canContinue}
-        className="gg-btn gg-btn-primary gg-btn-block"
-      >
-        {isSubmitting ? 'Creating account…' : 'Continue'}
+      <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
+        {pending ? 'Signing you in…' : 'Sign in'}
       </button>
-      <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-muted)' }}>
-        You can start writing straight away — confirm your email whenever you like.
-      </p>
-    </div>
+    </form>
   );
 }

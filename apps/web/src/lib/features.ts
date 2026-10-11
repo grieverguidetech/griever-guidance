@@ -4,9 +4,9 @@
  */
 
 /**
- * Sign-up/sign-in (Facebook, Instagram, email/password). Off until the app has
+ * Sign-up/sign-in (email and password, on Supabase). Off until the app has
  * users: with it off, nobody is asked for an account, onboarding starts at
- * adding contacts, and nothing calls the gateway's /auth routes.
+ * adding contacts, and the auth client (supabase-js) is never loaded.
  */
 export const AUTH_ENABLED = import.meta.env['VITE_FEATURE_AUTH'] === 'true';
 
