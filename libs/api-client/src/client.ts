@@ -1,18 +1,24 @@
 import type { ObituaryRequest, ObituaryResponse } from '@griever/shared';
 
-declare const __VITE_API_URL__: string | undefined;
+const DEFAULT_BASE_URL = 'http://localhost:3001';
+
+let configuredBaseUrl: string | undefined;
+
+/**
+ * Sets the gateway URL. Each app calls this once at startup with its own env var. This lib must not
+ * read `import.meta` (Hermes can't parse it), so the bundler-specific read lives in the app.
+ * An empty or missing value leaves the fallbacks in place.
+ */
+export function configureApiClient(options: { baseUrl?: string | undefined }): void {
+  configuredBaseUrl = options.baseUrl?.trim() || undefined;
+}
 
 function getBaseUrl(): string {
+  if (configuredBaseUrl) return configuredBaseUrl;
   if (typeof process !== 'undefined' && process.env['EXPO_PUBLIC_API_URL']) {
     return process.env['EXPO_PUBLIC_API_URL'];
   }
-  try {
-    const viteUrl = (import.meta as { env?: Record<string, string> }).env?.['VITE_API_URL'];
-    if (viteUrl) return viteUrl;
-  } catch {
-    // not in a Vite context
-  }
-  return 'http://localhost:3001';
+  return DEFAULT_BASE_URL;
 }
 
 /** Carries the HTTP status so callers can tell "signed out" (401) from other failures. */
