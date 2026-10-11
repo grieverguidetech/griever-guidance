@@ -6,6 +6,7 @@ import type { FlowProps } from '../app/App';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../app/App';
+import { AUTH_ENABLED } from '../lib/features';
 
 const CATEGORY_ORDER: TemplateCategory[] = ['announcement', 'service', 'aftercare'];
 
@@ -32,6 +33,17 @@ export function TemplatePickerScreen({ flow }: FlowProps) {
       >
         <Text style={styles.whatYoullNeedText}>What you'll need</Text>
       </TouchableOpacity>
+
+      {AUTH_ENABLED && (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Account')}
+          style={styles.whatYoullNeedLink}
+          accessibilityRole="button"
+          activeOpacity={0.7}
+        >
+          <Text style={styles.whatYoullNeedText}>Your account</Text>
+        </TouchableOpacity>
+      )}
 
       {grouped.map(({ category, templates: group }) => (
         <View key={category} style={styles.group}>
