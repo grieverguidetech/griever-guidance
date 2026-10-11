@@ -31,8 +31,6 @@ describe('buildShareSnapshot', () => {
         '- Not yet: Share the service',
         '- Not yet: Share the obituary',
         '- Not yet: Send thank-yous',
-        '',
-        'This is a read-only copy. It has no contact information.',
       ].join('\n'),
     });
   });

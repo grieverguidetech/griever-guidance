@@ -61,7 +61,7 @@ export function PathLanding({
         onClick={onWhatYoullNeed}
         className="gg-btn gg-btn-secondary gg-btn-block"
       >
-        <ListChecks size={18} weight="duotone" />
+        <ListChecks size={18} weight="duotone" aria-hidden="true" />
         What you'll need
       </button>
 

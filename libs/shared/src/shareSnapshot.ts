@@ -72,7 +72,6 @@ export function buildShareSnapshot(
     const lines = checklist.map((item) => `- ${item.done ? 'Done' : 'Not yet'}: ${item.label}`);
     sections.push(['Checklist, in order:', ...lines].join('\n'));
   }
-  sections.push('This is a read-only copy. It has no contact information.');
 
   return { title, text: sections.join('\n\n') };
 }
