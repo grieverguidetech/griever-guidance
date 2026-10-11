@@ -15,6 +15,8 @@ export function configureApiClient(options: { baseUrl?: string | undefined }): v
 
 function getBaseUrl(): string {
   if (configuredBaseUrl) return configuredBaseUrl;
+  // Only works in Node/Vitest. Hermes' runtime process.env doesn't carry EXPO_PUBLIC_* (Metro inlines
+  // it at the call site), so apps must call configureApiClient.
   if (typeof process !== 'undefined' && process.env['EXPO_PUBLIC_API_URL']) {
     return process.env['EXPO_PUBLIC_API_URL'];
   }

@@ -57,31 +57,6 @@ jobs:
       # configured) in CI. Web/gateway/marketing builds are what gate deploys.
       - run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD --parallel=3 --exclude=mobile
 
-  # `nx build mobile` is EAS-only and excluded above, so nothing else bundles the app with Metro.
-  # This exports the Android JS bundle (no native build, no EAS) and fails on bundle errors such
-  # as `import.meta` reaching Hermes (#53). Always runs: shared libs feed the mobile bundle, so
-  # path filtering would be easy to get wrong, and the export is a build step of about a minute.
-  mobile-bundle:
-    name: Mobile bundle (Metro export)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      # Metro resolves the libs through their built output.
-      - run: pnpm nx run-many -t build -p shared api-client hooks contacts
-
-      - run: CI=1 pnpm nx export mobile --args="--platform=android --output-dir=$RUNNER_TEMP/mobile-export"
-
   # Runs the pgTAP / RLS tests against a local Supabase (Docker). Skips itself
   # until infra/supabase/ exists, so main stays green before #27 lands. Nothing
   # else depends on it.

@@ -3,7 +3,10 @@ import { configureApiClient } from '@griever/api-client';
 
 import App from './src/app/App';
 
-// Dot access: Expo only inlines `process.env.EXPO_PUBLIC_*` when it is written this way.
+// Must stay dot access in this file: Expo only inlines `process.env.EXPO_PUBLIC_*` when written this way.
+if (!__DEV__ && !process.env.EXPO_PUBLIC_API_URL) {
+  console.error('EXPO_PUBLIC_API_URL is not set; API calls will go to localhost');
+}
 configureApiClient({ baseUrl: process.env.EXPO_PUBLIC_API_URL });
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
