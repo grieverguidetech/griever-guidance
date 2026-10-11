@@ -1,6 +1,8 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AccessibilityInfo, BackHandler, findNodeHandle, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Session } from '@griever/hooks';
-import { PrimaryButton, ScreenHeader, authStyles } from './authForm';
+import { PrimaryButton, ScreenHeader, announce, authStyles } from './authForm';
 import { ACCENT, MUTED } from './colors';
 
 export const ADD_PERSON = "Someone else I've lost";
@@ -8,12 +10,35 @@ const UNNAMED = 'Someone new';
 
 export const personLabel = (s: Session) => s.personName.trim() || UNNAMED;
 
-/** Always-visible way in, shown on the first screen. Calm: a name and one plain link. */
-export function PersonBar({ active, onOpen }: { active: Session; onOpen: () => void }) {
+/**
+ * Sits at the top of the first screen: a name and one plain link. When the person has just come
+ * back from the switcher, it moves screen-reader focus to the link and says who is now open.
+ */
+export function PersonBar({
+  active,
+  onOpen,
+  arrived,
+  onArrived,
+}: {
+  active: Session;
+  onOpen: () => void;
+  arrived: boolean;
+  onArrived: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const ref = useRef<View>(null);
+  useEffect(() => {
+    if (!arrived) return;
+    const handle = ref.current ? findNodeHandle(ref.current) : null;
+    if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    announce(`Now writing about ${personLabel(active)}`);
+    onArrived();
+  }, [arrived, active, onArrived]);
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { paddingTop: insets.top + 8 }]}>
       <Text style={styles.barText}>Writing about {personLabel(active)}</Text>
       <Pressable
+        ref={ref}
         style={styles.link}
         onPress={onOpen}
         accessibilityRole="button"
@@ -39,8 +64,21 @@ export function PersonSwitcher({
   onAdd: () => void;
   onClose: () => void;
 }) {
+  // Android's back button and the iOS two-finger "escape" both mean Back.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onClose]);
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      accessible={false}
+      onAccessibilityEscape={onClose}
+    >
       <ScreenHeader>Who are you writing about?</ScreenHeader>
       <Text style={authStyles.body}>Each person is kept separately on this phone.</Text>
       {sessions.map((s) => {
@@ -52,10 +90,11 @@ export function PersonSwitcher({
             onPress={() => onPick(s.id)}
             accessibilityRole="button"
             accessibilityState={{ selected: current }}
-            accessibilityLabel={`${personLabel(s)}${s.dateOfPassing ? `, ${s.dateOfPassing}` : ''}${current ? ', current' : ''}`}
+            accessibilityLabel={`${personLabel(s)}${s.dateOfPassing ? `, ${s.dateOfPassing}` : ''}`}
           >
             <Text style={styles.rowName}>{personLabel(s)}</Text>
             {s.dateOfPassing ? <Text style={styles.rowMeta}>{s.dateOfPassing}</Text> : null}
+            {current ? <Text style={styles.rowCurrentText}>Current</Text> : null}
           </Pressable>
         );
       })}
@@ -93,5 +132,6 @@ const styles = StyleSheet.create({
   },
   rowCurrent: { borderColor: ACCENT, borderWidth: 2 },
   rowName: { fontSize: 16, color: ACCENT, fontWeight: '500' },
+  rowCurrentText: { fontSize: 13, color: ACCENT, fontWeight: '600', marginTop: 2 },
   rowMeta: { fontSize: 13, color: MUTED, marginTop: 2 },
 });

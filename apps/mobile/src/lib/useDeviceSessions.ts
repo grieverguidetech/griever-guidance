@@ -7,7 +7,16 @@ import { createDeviceCache } from './deviceCache';
 export const SESSIONS_KEY = 'gg.sessions.v1';
 export const ACTIVE_KEY = 'gg.activeSession.v1';
 
-export const createSessionCache = () => createDeviceCache([SESSIONS_KEY, ACTIVE_KEY]);
+export const createSessionCache = () =>
+  createDeviceCache([
+    { key: SESSIONS_KEY, json: true },
+    { key: ACTIVE_KEY, json: false },
+  ]);
+
+// Nothing typed, nothing chosen: a person who has not been filled in yet.
+const isBlank = (s: Session) =>
+  !s.personName.trim() &&
+  (!s.draft || (s.draft.step === 'template' && !s.draft.templateCategory && Object.keys(s.draft.fields).length === 0));
 
 /**
  * The same `useSessions` the web uses, over the device cache, plus which person is open.
@@ -16,7 +25,7 @@ export const createSessionCache = () => createDeviceCache([SESSIONS_KEY, ACTIVE_
  */
 export function useDeviceSessions(cache: ReturnType<typeof createSessionCache>) {
   const store = useSessions(cache);
-  const { sessions, createSession, pruneEmpty, touchSession } = store;
+  const { sessions, createSession, touchSession } = store;
   const [savedId, setSavedId] = useState(() => cache.getItem(ACTIVE_KEY));
   const active: Session | null = sessions.find((s) => s.id === savedId) ?? sessions[0] ?? null;
 
@@ -43,10 +52,11 @@ export function useDeviceSessions(cache: ReturnType<typeof createSessionCache>) 
     [select, touchSession],
   );
 
+  // If the open person is still blank, "Someone else" keeps them rather than adding another blank one.
   const addPerson = useCallback(() => {
-    pruneEmpty(); // a blank person nobody filled in is not worth keeping
+    if (active && isBlank(active)) return;
     select(createSession().id);
-  }, [pruneEmpty, createSession, select]);
+  }, [active, createSession, select]);
 
   return { ...store, active, switchTo, addPerson };
 }

@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { App } from './App';
 import { createSessionCache, SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
+import { freshDraft } from '@griever/hooks';
+import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 
 const NAME_PLACEHOLDER = 'e.g. Margaret Ellen Hayes';
 
@@ -33,7 +35,8 @@ describe('people kept on the phone', () => {
 
     fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
-    expect(screen.getByLabelText('Ben, current')).toBeTruthy();
+    expect(screen.getByLabelText('Ben')).toBeTruthy();
+    expect(screen.getByText('Current')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Anna'));
     expect(await screen.findByText('Writing about Anna')).toBeTruthy();
 
@@ -42,6 +45,53 @@ describe('people kept on the phone', () => {
       const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string }[];
       expect(saved.map((p) => p.personName).sort()).toEqual(['Anna', 'Ben']);
     });
+  });
+
+  it("starts the next person's form empty, even after the first was filled in", async () => {
+    render(<App />);
+    await startWith('Anna');
+    await addPerson();
+    fireEvent.press(await screen.findByText('Thank-you note'));
+    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('');
+  });
+
+  it('restores a half-finished draft, not just the names', async () => {
+    const first = render(<App />);
+    await startWith('Anna');
+    fireEvent.press(screen.getByText('Thank-you note'));
+    fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Lee');
+    await waitFor(async () => expect((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '').toContain('Anna Lee'));
+    first.unmount();
+
+    render(<App />);
+    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
+  });
+
+  it('does not keep a finished send as a draft', async () => {
+    const sent = { ...freshDraft({}), step: 'sent' as const, templateCategory: 'aftercare' as const, fields: { deceasedName: 'Anna' } };
+    const person = { id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x', draft: sent, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] };
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
+    const first = render(<App />);
+    await waitFor(async () => {
+      const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
+      expect(saved.draft.step).toBe('template');
+      expect(saved.draft.fields).toEqual({});
+      expect(saved.personName).toBe('Anna');
+    });
+    first.unmount();
+    render(<App />);
+    expect(await screen.findByText('Writing about Anna')).toBeTruthy();
+  });
+
+  it('reuses a blank person instead of adding another', async () => {
+    render(<App />);
+    expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
+    await addPerson();
+    expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
+    await screen.findByText('Who are you writing about?');
+    expect(screen.getAllByLabelText('Someone new')).toHaveLength(1);
   });
 
   it('restores both people and the open one after a relaunch', async () => {
@@ -56,7 +106,8 @@ describe('people kept on the phone', () => {
     expect(await screen.findByText('Writing about Ben')).toBeTruthy();
     fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
-    expect(screen.getByLabelText('Ben, current')).toBeTruthy();
+    expect(screen.getByLabelText('Ben')).toBeTruthy();
+    expect(screen.getByText('Current')).toBeTruthy();
   });
 
   it('makes no network calls', async () => {
@@ -75,6 +126,50 @@ describe('people kept on the phone', () => {
     await screen.findByText('Who are you writing about?');
     expect(screen.queryByText(/delete|remove/i)).toBeNull();
     expect(screen.queryByLabelText(/delete|remove/i)).toBeNull();
+  });
+});
+
+describe('when saved people cannot be read', () => {
+  const saved = JSON.stringify([
+    { id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x', draft: null, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] },
+    { id: 's-2', personName: 'Ben', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x', draft: null, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] },
+  ]);
+
+  it('never overwrites them after a failed read', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, saved);
+    await AsyncStorage.setItem(ACTIVE_KEY, 's-2');
+    const real = AsyncStorage.getItem.bind(AsyncStorage);
+    jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(async () => {
+      throw new Error('read failed');
+    });
+    render(<App />);
+    await screen.findByText('Writing about Someone new'); // works in memory for this run
+    await startWith('Cara');
+    jest.restoreAllMocks();
+    expect(await real(SESSIONS_KEY)).toBe(saved);
+    expect(await real(ACTIVE_KEY)).toBe('s-2');
+  });
+
+  it('never overwrites corrupt data', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, '{not json');
+    render(<App />);
+    await screen.findByText('Writing about Someone new');
+    await startWith('Cara');
+    expect(await AsyncStorage.getItem(SESSIONS_KEY)).toBe('{not json');
+  });
+
+  it('opens memory-only when storage does not answer in time', async () => {
+    jest.useFakeTimers();
+    await AsyncStorage.setItem(SESSIONS_KEY, saved);
+    jest.spyOn(AsyncStorage, 'getItem').mockImplementation(() => new Promise<string | null>(() => undefined));
+    const cache = createSessionCache();
+    const hydrating = cache.hydrate();
+    jest.advanceTimersByTime(HYDRATE_TIMEOUT_MS);
+    await hydrating;
+    cache.setItem(SESSIONS_KEY, '[]');
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+    expect(await AsyncStorage.getItem(SESSIONS_KEY)).toBe(saved);
   });
 });
 
