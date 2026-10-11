@@ -1,0 +1,5 @@
+# Minimal config for `supabase start` / `supabase test db` (run with --workdir infra).
+project_id = "griever-guidance"
+
+[db]
+major_version = 17
