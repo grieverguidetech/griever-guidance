@@ -57,6 +57,38 @@ jobs:
       # configured) in CI. Web/gateway/marketing builds are what gate deploys.
       - run: pnpm nx affected -t build --base=$NX_BASE --head=$NX_HEAD --parallel=3 --exclude=mobile
 
+  # Runs the pgTAP / RLS tests against a local Supabase (Docker). Skips itself
+  # until infra/supabase/ exists, so main stays green before #27 lands. Nothing
+  # else depends on it.
+  supabase:
+    name: Supabase RLS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Look for infra/supabase/config.toml
+        id: detect
+        run: |
+          if [ -f infra/supabase/config.toml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::infra/supabase/config.toml not found; skipping Supabase tests"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.detect.outputs.present == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      # Applies infra/supabase/migrations to a throwaway local database.
+      - if: steps.detect.outputs.present == 'true'
+        run: supabase db start --workdir infra
+
+      - if: steps.detect.outputs.present == 'true'
+        run: supabase test db --workdir infra
+
   e2e:
     name: Playwright e2e (desktop, Android, iPhone)
     runs-on: ubuntu-latest
