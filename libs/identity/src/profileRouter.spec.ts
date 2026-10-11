@@ -21,6 +21,13 @@ describe('parseProfileBody', () => {
       fields: { senderName: null, contactSource: null },
     });
     expect(parseProfileBody({ senderName: 'x'.repeat(100) })).toHaveProperty('fields');
+    // The DB counts characters, not UTF-16 units: 100 emoji fit, 101 do not.
+    expect(parseProfileBody({ senderName: '😀'.repeat(100) })).toHaveProperty('fields');
+    expect(parseProfileBody({ senderName: '😀'.repeat(101) })).toHaveProperty('error');
+  });
+
+  it('uses a fixed message for unknown keys and does not echo the input', () => {
+    expect(parseProfileBody({ sneaky: 1 })).toEqual({ error: 'Only your name and contact source can be saved.' });
   });
 
   it.each([

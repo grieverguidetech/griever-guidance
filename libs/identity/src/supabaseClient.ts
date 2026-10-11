@@ -80,10 +80,6 @@ export function createProfilesClient(config: SupabaseConfig, accessToken: string
     return rows[0] ? toDto(rows[0]) : null;
   }
 
-  async function insert(userId: string, columns: Record<string, unknown>): Promise<ProfileDto> {
-    return firstRow(await readRows(await send(endpoint, 'POST', { id: userId, ...columns })));
-  }
-
   return {
     async get(userId) {
       const res = await fetch(`${endpoint}?id=eq.${encodeURIComponent(userId)}&select=*`, { headers });
@@ -100,24 +96,25 @@ export function createProfilesClient(config: SupabaseConfig, accessToken: string
       if (fields.senderName !== undefined) columns['sender_name'] = fields.senderName;
       if (fields.contactSource !== undefined) columns['contact_source'] = fields.contactSource;
 
+      // Insert, and if another first save won the race (409), read back with `again`.
+      async function insertOrAgain(again: () => Promise<ProfileDto | null>): Promise<ProfileDto> {
+        const res = await send(endpoint, 'POST', { id: userId, ...columns });
+        if (res.status === 409) {
+          const row = await again();
+          if (row) return row;
+          throw new Error('profiles row missing after conflict');
+        }
+        return firstRow(await readRows(res));
+      }
+
       // Nothing to change: return the current row, or create an empty one.
       if (Object.keys(columns).length === 0) {
         const existing = await this.get(userId);
-        if (existing) return existing;
-        return insert(userId, columns);
+        return existing ?? insertOrAgain(() => this.get(userId));
       }
 
       const updated = await patch(userId, columns);
-      if (updated) return updated;
-
-      const insertRes = await send(endpoint, 'POST', { id: userId, ...columns });
-      if (insertRes.status === 409) {
-        // Another first save won the race; the row exists now.
-        const retried = await patch(userId, columns);
-        if (retried) return retried;
-        throw new Error('profiles row missing after conflict');
-      }
-      return firstRow(await readRows(insertRes));
+      return updated ?? insertOrAgain(() => patch(userId, columns));
     },
   };
 }

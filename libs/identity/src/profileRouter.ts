@@ -22,12 +22,12 @@ export function parseProfileBody(body: unknown): { fields: ProfileFields } | { e
   }
   const input = body as Record<string, unknown>;
   const unknown = Object.keys(input).find((key) => !ALLOWED_KEYS.includes(key));
-  if (unknown) return { error: `We do not recognise "${unknown}".` };
+  if (unknown) return { error: 'Only your name and contact source can be saved.' };
 
   const fields: ProfileFields = {};
   if ('senderName' in input) {
     const name = input['senderName'];
-    if (name !== null && (typeof name !== 'string' || name.length > MAX_SENDER_NAME_LENGTH)) {
+    if (name !== null && (typeof name !== 'string' || [...name].length > MAX_SENDER_NAME_LENGTH)) {
       return { error: `Your name can be up to ${MAX_SENDER_NAME_LENGTH} characters.` };
     }
     fields.senderName = name as string | null;

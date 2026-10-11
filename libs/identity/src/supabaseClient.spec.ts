@@ -92,6 +92,18 @@ describe('profiles client', () => {
       expect(calls(fetchMock)).toEqual([`GET /rest/v1/profiles?id=eq.${USER_ID}&select=*`]);
     });
 
+    it('empty body, concurrent first save (409): reads the row instead of failing', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(res([]))
+        .mockResolvedValueOnce(res({ code: '23505' }, 409))
+        .mockResolvedValueOnce(res([ROW]));
+      vi.stubGlobal('fetch', fetchMock);
+      const out = await client().upsert(USER_ID, {});
+      expect(out.id).toBe(USER_ID);
+      expect(calls(fetchMock).map((c) => c.split(' ')[0])).toEqual(['GET', 'POST', 'GET']);
+    });
+
     it('empty body on a new user: inserts with the id only', async () => {
       const fetchMock = vi.fn().mockResolvedValueOnce(res([])).mockResolvedValueOnce(res([ROW], 201));
       vi.stubGlobal('fetch', fetchMock);

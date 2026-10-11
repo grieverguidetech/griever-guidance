@@ -27,6 +27,8 @@ const jwksCache = new Map<string, CachedJwks>();
 /** Test hook: forget cached keys so each test starts clean. */
 export function clearJwksCache(): void {
   jwksCache.clear();
+  lastForcedRefetch.clear();
+  inFlight.clear();
 }
 
 /**
@@ -38,21 +40,56 @@ function jwksUnavailable(): Error {
   return new Error('jwks_unavailable');
 }
 
+const FORCED_REFETCH_MIN_INTERVAL_MS = 30 * 1000;
+const lastForcedRefetch = new Map<string, number>();
+const inFlight = new Map<string, Promise<HonoJsonWebKey[]>>();
+
+/** One shared request per URL at a time, so concurrent callers do not stampede Supabase. */
+function fetchJwks(supabaseUrl: string): Promise<HonoJsonWebKey[]> {
+  const pending = inFlight.get(supabaseUrl);
+  if (pending) return pending;
+  const request = (async () => {
+    let keys: unknown;
+    try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
+      if (!res.ok) throw jwksUnavailable();
+      keys = ((await res.json()) as { keys?: unknown }).keys;
+    } catch {
+      throw jwksUnavailable();
+    }
+    if (!Array.isArray(keys)) throw jwksUnavailable();
+    jwksCache.set(supabaseUrl, { keys: keys as HonoJsonWebKey[], fetchedAt: Date.now() });
+    return keys as HonoJsonWebKey[];
+  })().finally(() => inFlight.delete(supabaseUrl));
+  inFlight.set(supabaseUrl, request);
+  return request;
+}
+
 async function loadJwks(supabaseUrl: string): Promise<HonoJsonWebKey[]> {
   const cached = jwksCache.get(supabaseUrl);
   if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) return cached.keys;
+  return fetchJwks(supabaseUrl);
+}
 
-  let keys: unknown;
+/**
+ * Key rotation: when a token names a kid we do not have, refetch once, at most
+ * every 30 s per project. A failed refetch is ignored; the old keys still decide.
+ */
+async function refetchOnUnknownKid(supabaseUrl: string, token: string): Promise<void> {
+  let kid: unknown;
   try {
-    const res = await fetch(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
-    if (!res.ok) throw jwksUnavailable();
-    keys = ((await res.json()) as { keys?: unknown }).keys;
+    const header = JSON.parse(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')));
+    kid = header?.kid;
   } catch {
-    throw jwksUnavailable();
+    return; // malformed: hono/jwk will answer 401
   }
-  if (!Array.isArray(keys)) throw jwksUnavailable();
-  jwksCache.set(supabaseUrl, { keys: keys as HonoJsonWebKey[], fetchedAt: Date.now() });
-  return keys as HonoJsonWebKey[];
+  if (typeof kid !== 'string') return;
+  const keys = await loadJwks(supabaseUrl);
+  if (keys.some((key) => key.kid === kid)) return;
+  const last = lastForcedRefetch.get(supabaseUrl) ?? 0;
+  if (Date.now() - last < FORCED_REFETCH_MIN_INTERVAL_MS) return;
+  lastForcedRefetch.set(supabaseUrl, Date.now());
+  await fetchJwks(supabaseUrl).catch(() => undefined);
 }
 
 /**
@@ -77,6 +114,8 @@ export function supabaseAuth(getConfig: () => SupabaseConfig | null): Middleware
 
     let verified = false;
     try {
+      const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header('Authorization') ?? '');
+      if (bearer?.[1]) await refetchOnUnknownKid(config.url, bearer[1]);
       await verify(c, async () => {
         verified = true;
       });
@@ -88,8 +127,9 @@ export function supabaseAuth(getConfig: () => SupabaseConfig | null): Middleware
     }
     if (!verified) return c.json({ error: 'Please sign in again.' }, 401);
 
-    const payload = c.get('jwtPayload') as { sub?: unknown } | undefined;
-    if (typeof payload?.sub !== 'string' || payload.sub === '') {
+    // hono accepts tokens with no exp; Supabase always sets one, so require it.
+    const payload = c.get('jwtPayload') as { sub?: unknown; exp?: unknown } | undefined;
+    if (typeof payload?.exp !== 'number' || typeof payload.sub !== 'string' || payload.sub === '') {
       return c.json({ error: 'Please sign in again.' }, 401);
     }
     c.set('userId', payload.sub);

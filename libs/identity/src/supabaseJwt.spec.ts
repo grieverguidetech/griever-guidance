@@ -72,6 +72,76 @@ describe('supabaseAuth', () => {
     expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
   });
 
+  it('401 for an HS256 token that uses the real kid (symmetric algorithms are refused)', async () => {
+    const enc = (v: unknown) =>
+      btoa(JSON.stringify(v)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const now = Math.floor(Date.now() / 1000);
+    const signingInput = `${enc({ alg: 'HS256', typ: 'JWT', kid: keys.kid })}.${enc({
+      sub: USER_ID,
+      aud: 'authenticated',
+      exp: now + 3600,
+    })}`;
+    const hmacKey = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode('anon'),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const mac = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(signingInput)));
+    const sig = btoa(String.fromCharCode(...mac)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const res = await buildApp().request('/who', bearer(`${signingInput}.${sig}`));
+    expect(res.status).toBe(401);
+  });
+
+  it('401 for a validly signed token with no sub', async () => {
+    const token = await signJwt(keys.privateKey, keys.kid, { sub: undefined });
+    expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
+  });
+
+  it('401 for a validly signed token with no exp', async () => {
+    const token = await signJwt(keys.privateKey, keys.kid, { exp: undefined });
+    expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
+  });
+
+  describe('key rotation', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('refetches once for an unknown kid and then accepts the new key', async () => {
+      const app = buildApp();
+      await app.request('/who', bearer(await signJwt(keys.privateKey, keys.kid))); // primes the cache
+      const rotated = await makeKeys('key-2');
+      fetchMock.mockImplementation(async () => jsonResponse({ keys: [...keys.jwks.keys, ...rotated.jwks.keys] }));
+
+      const res = await app.request('/who', bearer(await signJwt(rotated.privateKey, 'key-2')));
+      expect(res.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not refetch again for another unknown kid within 30 seconds', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const app = buildApp();
+      const stranger = await makeKeys('stranger');
+      const token = await signJwt(stranger.privateKey, 'stranger');
+      expect((await app.request('/who', bearer(token))).status).toBe(401); // load + forced refetch
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((await app.request('/who', bearer(token))).status).toBe(401);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      vi.advanceTimersByTime(31_000);
+      expect((await app.request('/who', bearer(token))).status).toBe(401);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('shares one in-flight JWKS request between concurrent calls', async () => {
+      const app = buildApp();
+      const token = await signJwt(keys.privateKey, keys.kid);
+      const results = await Promise.all([1, 2, 3].map(() => app.request('/who', bearer(token))));
+      expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('503 (not 401) when the JWKS request fails', async () => {
     fetchMock.mockRejectedValue(new TypeError('network down'));
     const token = await signJwt(keys.privateKey, keys.kid);
