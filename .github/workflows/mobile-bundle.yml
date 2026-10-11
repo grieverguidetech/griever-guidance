@@ -1,0 +1,44 @@
+name: Mobile bundle
+
+# Separate from ci.yml on purpose: deploy.yml deploys only when the "CI" workflow succeeds, so a
+# mobile-only flake here must not block web or gateway deploys. Advisory until branch protection
+# (#12) requires it.
+#
+# `nx build mobile` is EAS-only and excluded from CI, so nothing else bundles the app with Metro.
+# This exports the Android JS bundle (no native build, no EAS) and fails on bundle errors such as
+# `import.meta` reaching Hermes (#53).
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-bundle-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  mobile-bundle:
+    name: Mobile bundle (Metro export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Metro resolves the libs through their built output.
+      - run: pnpm nx run-many -t build -p shared api-client hooks contacts
+
+      - run: CI=1 pnpm nx export mobile --args="--platform=android --output-dir=$RUNNER_TEMP/mobile-export"

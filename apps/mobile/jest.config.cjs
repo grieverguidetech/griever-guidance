@@ -17,8 +17,7 @@ module.exports = {
         caller: { name: 'metro', bundler: 'metro', platform: 'ios' },
         configFile: false,
         babelrc: false,
-        // libs/api-client reads `import.meta`, which Hermes can't run (tracked in #53, with the Metro side).
-        presets: [['babel-preset-expo', { unstable_transformImportMeta: true }]],
+        presets: ['babel-preset-expo'],
       },
     ],
   },

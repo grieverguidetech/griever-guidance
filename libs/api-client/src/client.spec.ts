@@ -1,4 +1,4 @@
-import { apiFetch, generateObituary } from './client.js';
+import { apiFetch, configureApiClient, generateObituary } from './client.js';
 
 const fetchMock = vi.fn();
 
@@ -48,5 +48,45 @@ describe('api-client', () => {
   it('falls back to the status text on an empty error body', async () => {
     respond(500, '');
     await expect(apiFetch('/x')).rejects.toThrow('Status');
+  });
+});
+
+describe('configureApiClient', () => {
+  const body = { fullName: 'A', dateOfBirth: '1', dateOfPassing: '2' };
+  const urlCalled = () => fetchMock.mock.calls[0][0] as string;
+
+  afterEach(() => {
+    configureApiClient({});
+    vi.unstubAllEnvs();
+  });
+
+  it('uses the configured URL', async () => {
+    respond(200, {});
+    configureApiClient({ baseUrl: 'https://api.example.test' });
+    await generateObituary(body);
+    expect(urlCalled()).toBe('https://api.example.test/obituary');
+  });
+
+  it('prefers the configured URL over EXPO_PUBLIC_API_URL', async () => {
+    respond(200, {});
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://expo.example.test');
+    configureApiClient({ baseUrl: 'https://api.example.test' });
+    await generateObituary(body);
+    expect(urlCalled()).toBe('https://api.example.test/obituary');
+  });
+
+  it('falls back to EXPO_PUBLIC_API_URL when nothing is configured', async () => {
+    respond(200, {});
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://expo.example.test');
+    configureApiClient({ baseUrl: undefined });
+    await generateObituary(body);
+    expect(urlCalled()).toBe('https://expo.example.test/obituary');
+  });
+
+  it('falls back to localhost when nothing is set, and ignores an empty value', async () => {
+    respond(200, {});
+    configureApiClient({ baseUrl: '  ' });
+    await generateObituary(body);
+    expect(urlCalled()).toBe('http://localhost:3001/obituary');
   });
 });
