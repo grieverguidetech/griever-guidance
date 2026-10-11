@@ -334,7 +334,9 @@ Facebook's or Instagram's OAuth endpoints today.
   project's JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`). It also checks
   `iss = ${SUPABASE_URL}/auth/v1`; a wrong or missing issuer is a 401.
 - Supabase signing-key rotation must use the standby-key step (publish the new key first, then
-  switch), because the gateway refetches the JWKS on an unknown `kid` at most every 30 s.
+  switch), because the gateway refetches the JWKS on an unknown `kid` at most every 30 s. Cached
+  keys also live for 5 minutes (`JWKS_TTL_MS`), so a revoked key can still verify tokens for up to
+  5 minutes per isolate; keep that in mind for an emergency revoke.
 - `profileRouter` serves `GET/PUT /me/profile` (the sender name) against Supabase PostgREST as the
   signed-in caller (anon key plus their JWT, so row-level security applies). There is no
   service-role key. With `SUPABASE_URL` or `SUPABASE_ANON_KEY` unset the routes answer 503.
