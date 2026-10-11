@@ -148,3 +148,19 @@ export interface ObituaryRequest {
 export interface ObituaryResponse {
   draft: string;
 }
+
+/**
+ * One row per signed-in account (Supabase `public.profiles`). App state only:
+ * no contact or message fields ever belong here (C2, C3, C4). Email lives in
+ * Supabase Auth, not on the profile.
+ */
+export interface Profile {
+  id: string;
+  senderName: string | null;
+  contactSource: AccountContactSource | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What a user may change on their own profile. */
+export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource'>>;

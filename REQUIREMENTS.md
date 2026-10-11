@@ -398,6 +398,12 @@ a name or number. Message content is never stored anywhere, by anything — not 
 history, not a log — only composed client-side and handed to the device's own Messages app at
 send time (see "The send flow").
 
+**Supabase boundary (accounts).** App state tied to an account (the `profiles` row: sender name and
+contact source; the email lives in Supabase Auth) is stored in Supabase Postgres, with row-level
+security so a user reaches only their own row and no delete policy (C9). Convex is unchanged and
+keeps session sync and analytics. Contacts and message content stay on the device and reach no
+server (C2, C3, C4). Migrations and pgTAP tests live in `infra/supabase/`.
+
 ---
 
 ### Environment variables
