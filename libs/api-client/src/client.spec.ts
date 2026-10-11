@@ -36,8 +36,8 @@ describe('api-client', () => {
   });
 
   it("surfaces the gateway's error message", async () => {
-    respond(400, { error: 'That email is already in use.' });
-    await expect(apiFetch('/x', { method: 'POST' })).rejects.toThrow('That email is already in use.');
+    respond(400, { error: 'Something went wrong.' });
+    await expect(apiFetch('/x', { method: 'POST' })).rejects.toThrow('Something went wrong.');
   });
 
   it('falls back to raw text when the error body is not JSON', async () => {

@@ -122,6 +122,14 @@ describe('gateway: every route validates its input (REQUIREMENTS C8)', () => {
   });
 });
 
+describe('gateway: the removed /auth routes', () => {
+  it('no longer exist', async () => {
+    const app = await loadApp();
+    expect((await app.request('/auth/session')).status).toBe(404);
+    expect((await app.request('/auth/password/signin', json({ email: 'a@b.c', password: 'longenough1' }))).status).toBe(404);
+  });
+});
+
 describe('gateway: unconfigured services fail closed with a plain message', () => {
   it('sync without Convex', async () => {
     const app = await loadApp();

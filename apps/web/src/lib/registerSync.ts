@@ -26,8 +26,8 @@ let triggerHandle: TriggerHandle | null = null;
  *
  * Deliberately does not start the foreground sync triggers itself — those
  * are scoped to a signed-in user (see `setSyncUserId` below), and at boot
- * nobody is signed in yet until `useIdentity`'s `/auth/session` check
- * resolves (or doesn't).
+ * nobody is signed in yet until `useSupabaseIdentity` resolves the stored
+ * session (or finds none).
  */
 export async function registerSync(): Promise<void> {
   await getOrCreateDeviceId();
@@ -50,8 +50,8 @@ export async function registerSync(): Promise<void> {
 /**
  * Called from `apps/web/src/app/app.tsx` whenever the real signed-in
  * identity resolves or changes (sign-in, sign-out, or the initial
- * `/auth/session` check settling) — `userId` is the real `identities.userId`
- * from `libs/identity`, or null when signed out.
+ * session check settling) — `userId` is the Supabase user id, or null when
+ * signed out.
  *
  * This still writes to the `devUserId` meta key and sends the same
  * `x-gg-user` header `createGatewayTransport` always has (see its own

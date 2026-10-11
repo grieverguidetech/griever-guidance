@@ -45,14 +45,14 @@ These are not features; breaking one is a defect regardless of what it enables.
 
 ### 3.1 Account & identity (Flow D)
 
-**All of this is hidden behind `VITE_FEATURE_AUTH` until the app has users** (off by default; see
-"Identity" in §6). The statuses below describe the code, not what users see.
+**All of this is hidden behind `VITE_FEATURE_AUTH` (apps/web) and `EXPO_PUBLIC_FEATURE_AUTH`
+(apps/mobile) until the app has users** (off by default; see "Identity" in §6). The statuses below describe the code, not what users see.
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
 | ID-1 | Sign up / sign in with Facebook | Not started | Not started | Planned later (#36); the old Convex-backed path is removed |
 | ID-2 | Sign up / sign in with Instagram | Dropped | Dropped | Personal IG accounts have no login API; Business/Creator only, and no email |
-| ID-3 | Email/password sign-up and sign-in on Supabase Auth, non-enumerating errors | Done | Done | `@griever/api-client/auth`, `useSupabaseIdentity`; passwords never reach the gateway |
+| ID-3 | Email/password sign-up and sign-in on Supabase Auth, non-enumerating errors | Done (flag on only) | Done (flag on only) | `@griever/api-client/auth`, `useSupabaseIdentity`; passwords never reach the gateway |
 | ID-4 | Google sign-in | Not started | Not started | Shown disabled, "coming soon" |
 | ID-5 | X sign-in | Not started | Not started | Shown disabled, "coming soon" |
 | ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); applying it to `/sync/*` is #20/#39. Blocks production sync |
@@ -316,7 +316,8 @@ stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRete
 ### Identity
 
 **Auth is feature-flagged off until the app has users.** `apps/web` shows sign-up/sign-in only
-when built with `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`; anything else is off).
+when built with `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`), and `apps/mobile` only
+with `EXPO_PUBLIC_FEATURE_AUTH=true` (`apps/mobile/src/lib/features.ts`); anything else is off.
 With it off, onboarding starts at adding contacts, `useSupabaseIdentity` is not used, and sync
 never starts (it needs a signed-in `userId`).
 
@@ -334,8 +335,8 @@ Facebook's or Instagram's OAuth endpoints today.
 - `profileRouter` serves `GET/PUT /me/profile` (the sender name) against Supabase PostgREST as the
   signed-in caller (anon key plus their JWT, so row-level security applies). There is no
   service-role key. With `SUPABASE_URL` or `SUPABASE_ANON_KEY` unset the routes answer 503.
-- Sign-in errors stay generic ("Incorrect email or password.") whether the email exists or not, so a
-  failed attempt never confirms which one.
+- Sign-in errors use one generic message whether the email exists or not, so a failed attempt never
+  confirms which one (the copy lives in `useSupabaseIdentity`).
 - **This does not, by itself, make `/sync/pull`/`/sync/push` work in production.** Those routes
   still authenticate via `convex/auth.ts`'s `requireUser` dev stub (`GG_DEV_AUTH`), and a real
   deployment never sets `GG_DEV_AUTH` (enforced by `scripts/check-dev-auth.mjs`), so `requireUser`
@@ -346,7 +347,7 @@ Facebook's or Instagram's OAuth endpoints today.
 
 **Accounts live in Supabase `profiles`** (see "Supabase boundary" under Database). The Convex
 `identities` and `profiles` tables, and their functions in `apps/gateway/convex/identity.ts`,
-have no caller left in the app; they stay only until their removal ticket (#37). Everything else in
+have no caller and are removed in #37. Everything else in
 this repo reaches a user only by their opaque `userId`.
 
 **What sign-in is not, and cannot become:** it does not, and cannot, give this app a friends list
@@ -372,11 +373,11 @@ send time (see "The send flow").
 
 **Supabase boundary (accounts).** App state tied to an account (the `profiles` row: sender name and
 contact source; the email lives in Supabase Auth) is stored in Supabase Postgres, with row-level
-security so a user reaches only their own row and no delete policy (C9). Convex's deploy and tables are
+security so a user reaches only their own row and no delete policy (C9). Convex's deploy is
 unchanged; session sync (still dev-only) stays there. Contacts and message content stay on the device and reach no
 server (C2, C3, C4). Migrations and pgTAP tests live in `infra/supabase/`; migrations must stay backward-compatible
-with the live gateway. Under `AUTH_ENABLED`, Supabase `profiles` replaces the Convex
-`identities`/`profiles` for new accounts; the Convex tables stay until the follow-up (#37).
+with the live gateway. Supabase is the only account path: the Convex `identities`/`profiles`
+tables have no caller and are removed in #37.
 `checklistTicks` is not carried over yet, and how `auth.users.id` maps to Convex `sessions.userId`
 is open (owned by #20/#39).
 
