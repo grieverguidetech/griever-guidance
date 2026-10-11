@@ -58,7 +58,8 @@ export type RecipientDeliveryStatus = 'queued' | 'sending' | 'delivered' | 'skip
  */
 export interface SessionDetails {
   personName: string;
-  dateOfPassing: string;
+  /** Optional — pre-planning and recent losses both need to proceed. */
+  dateOfPassing: string | null;
   senderName: string;
   obituaryUrl: string;
   /** Optional — e.g. "The Waltham Register" (C4). */

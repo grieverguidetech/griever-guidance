@@ -37,10 +37,10 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
 
+  // Date of passing is optional — the obituary can be drafted without it.
   const canSubmit =
     fields.fullName.trim() !== '' &&
-    fields.dateOfBirth.trim() !== '' &&
-    fields.dateOfPassing.trim() !== '';
+    fields.dateOfBirth.trim() !== '';
 
   function setField(key: keyof ObituaryRequest, value: string) {
     setFields((prev) => ({ ...prev, [key]: value }));

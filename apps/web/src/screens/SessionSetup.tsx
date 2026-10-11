@@ -11,9 +11,8 @@ interface Props {
 }
 
 export function SessionSetup({ session, editing, onChange, onContinue, onBack }: Props) {
-  const canContinue = Boolean(
-    session.personName.trim() && session.dateOfPassing.trim(),
-  );
+  // Date of death is optional — pre-planning and recent losses both need to proceed.
+  const canContinue = Boolean(session.personName.trim());
 
   return (
     <div className="flex flex-col gap-4">
@@ -41,8 +40,8 @@ export function SessionSetup({ session, editing, onChange, onContinue, onBack }:
 
       <DateField
         id="s-date"
-        label="Date they passed"
-        value={session.dateOfPassing}
+        label="Date they passed (optional)"
+        value={session.dateOfPassing ?? ''}
         max={todayISO()}
         onChange={(dateOfPassing) => onChange({ dateOfPassing })}
       />
