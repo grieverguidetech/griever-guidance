@@ -71,11 +71,12 @@
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 
-  /* 65%, not 60%: 60% measured 4.24:1 on --color-bg, under WCAG AA's 4.5:1
-     for body text. 65% gives 4.95:1 on --color-bg and 5.18:1 on white. */
-  --text-muted: color-mix(in srgb, var(--color-text) 65%, transparent);
-  --text-hint: color-mix(in srgb, var(--color-text) 50%, transparent);
-  --text-eyebrow: color-mix(in srgb, var(--color-text) 45%, transparent);
+  /* Every text tone clears WCAG AA 4.5:1 on --color-bg, --color-surface and
+     --color-accent-100 (the three backgrounds text sits on). Measured: 72% is
+     6.2:1+, 68% is 5.25:1 on the darkest of them (surface). Below ~62% fails. */
+  --text-muted: color-mix(in srgb, var(--color-text) 72%, transparent);
+  --text-hint: color-mix(in srgb, var(--color-text) 68%, transparent);
+  --text-eyebrow: color-mix(in srgb, var(--color-text) 68%, transparent);
 }
 
 body {
@@ -149,13 +150,15 @@ h1, h2, h3, h4, h5, h6 {
   }
   .gg-btn:disabled,
   .gg-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
-  .gg-btn-primary { background: var(--color-accent); color: var(--color-bg); }
-  .gg-btn-primary:not(:disabled):not([aria-disabled='true']):hover { background: var(--color-accent-600); }
-  .gg-btn-primary:not(:disabled):not([aria-disabled='true']):active { background: var(--color-accent-700); }
+  /* Fills behind text use accent-700 (5.72:1 with the page colour); the base
+     accent (#0088b0) is only 3.65:1 and stays for decorative uses. */
+  .gg-btn-primary { background: var(--color-accent-700); color: var(--color-bg); }
+  .gg-btn-primary:not(:disabled):not([aria-disabled='true']):hover { background: var(--color-accent-800); }
+  .gg-btn-primary:not(:disabled):not([aria-disabled='true']):active { background: var(--color-accent-900); }
   .gg-btn-secondary { border-color: var(--color-divider); }
   .gg-btn-secondary:not(:disabled):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
   .gg-btn-secondary:not(:disabled):active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
-  .gg-btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+  .gg-btn-ghost { color: var(--color-accent-700); padding-inline: var(--space-1); }
   .gg-btn-ghost:not(:disabled):hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
   .gg-btn-ghost:not(:disabled):active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
   .gg-btn-block { width: 100%; }
@@ -175,7 +178,7 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 10px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--color-accent);
+    color: var(--color-accent-700);
   }
   .gg-card-title {
     font-family: var(--font-serif);
@@ -214,7 +217,7 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: var(--radius-md);
   }
   .gg-input::placeholder {
-    color: color-mix(in srgb, var(--color-text) 55%, transparent);
+    color: color-mix(in srgb, var(--color-text) 68%, transparent);
     opacity: 1;
   }
   .gg-input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
@@ -300,7 +303,7 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--color-text);
   }
   .gg-seg-opt + .gg-seg-opt { border-left: 1px solid var(--color-divider); }
-  .gg-seg-opt-active { background: var(--color-accent); color: var(--color-bg); }
+  .gg-seg-opt-active { background: var(--color-accent-700); color: var(--color-bg); }
   .gg-seg-opt:not(.gg-seg-opt-active):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
 
   /* — tags — */

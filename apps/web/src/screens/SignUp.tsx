@@ -132,7 +132,6 @@ export function SignUp({ onSubmit, onSignIn, error }: Props) {
         type="button"
         onClick={onSignIn}
         className="gg-btn gg-btn-ghost gg-btn-block"
-        style={{ color: 'var(--color-accent-700)' }}
       >
         I already have an account
       </button>

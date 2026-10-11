@@ -6,9 +6,8 @@ import { addContacts, BOB, CAROL, onboard } from './support';
  * Automated WCAG 2.2 A/AA checks with axe on each main screen. Axe finds only
  * part of the real problems; it is a floor, not a claim of accessibility.
  *
- * Colour contrast is checked separately below: the brand accent (#0088b0)
- * and the eyebrow/reassure text tokens are known to fall under 4.5:1, and
- * fixing them is a design decision tracked on the board (label `a11y`).
+ * Colour contrast is checked separately below (the test names say so) so a
+ * contrast regression is reported on its own.
  */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
@@ -51,10 +50,6 @@ test('add contacts: text meets AA contrast', async ({ page }) => {
 });
 
 test('path landing and announce form: text meets AA contrast', async ({ page }) => {
-  // Known failure: accent #0088b0 is 3.65:1 on the page background. When the
-  // design tokens are fixed this starts "passing", which fails the run —
-  // remove this line then.
-  test.fail(true, 'Brand accent and eyebrow tokens are under 4.5:1 — see the a11y contrast issue on the board');
   await screens['announce form'](page);
   expect(await violations(page, { contrastOnly: true })).toEqual([]);
 });
