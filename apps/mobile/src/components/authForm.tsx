@@ -42,6 +42,7 @@ type InputProps = Pick<
   | 'autoCorrect'
   | 'returnKeyType'
   | 'onSubmitEditing'
+  | 'editable'
 >;
 
 export function Field({

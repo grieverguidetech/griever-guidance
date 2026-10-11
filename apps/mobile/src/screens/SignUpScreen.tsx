@@ -8,7 +8,7 @@ type Props = {
   identity: UseSupabaseIdentityResult;
   onSwitchToSignIn: () => void;
   /** Called once the account exists, with the typed name. The account route saves it (see AccountScreen). */
-  onCreated: (name: string) => void;
+  onCreated: (name: string, email: string) => void;
 };
 
 export const MIN_PASSWORD_LENGTH = 8;
@@ -33,7 +33,7 @@ export function SignUpScreen({ identity, onSwitchToSignIn, onCreated }: Props) {
     setLocalError(null);
     setPending(true);
     try {
-      if (await identity.signUp(email.trim(), password)) onCreated(name.trim());
+      if (await identity.signUp(email.trim(), password)) onCreated(name.trim(), email.trim());
     } finally {
       setPending(false);
     }

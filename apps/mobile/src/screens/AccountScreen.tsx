@@ -12,8 +12,11 @@ export const UNAVAILABLE = "Accounts aren't available right now.";
 export const CHECK_EMAIL = 'Please check your email to finish setting up your account.';
 
 // A name typed at sign-up stays here until it is saved, even if the person leaves this screen.
+// It is tied to the sign-up email so it can never be applied to a different account.
 // In memory only, for this app session.
-let unsavedName: string | null = null;
+type Unsaved = { email: string; name: string };
+const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+let unsavedName: Unsaved | null = null;
 export function resetUnsavedName() {
   unsavedName = null;
 }
@@ -37,16 +40,16 @@ function CheckEmail({ onSignIn }: { onSignIn: () => void }) {
  */
 function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
-  const [pendingName, setPendingNameState] = useState<string | null>(unsavedName);
+  const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
   const [awaitingEmail, setAwaitingEmail] = useState(false);
   const [ended, setEnded] = useState(false);
   const explicitSignOut = useRef(false);
-  const attempted = useRef<string | null>(null);
+  const attempted = useRef<Unsaved | null>(null);
   const { isSignedIn, updateSenderName, clearError, signOut } = identity;
 
-  function setPendingName(name: string | null) {
-    unsavedName = name;
-    setPendingNameState(name);
+  function setPendingName(next: Unsaved | null) {
+    unsavedName = next;
+    setPendingNameState(next);
   }
 
   // A sign-out nobody asked for (the server ended the session) keeps the view and says so.
@@ -58,30 +61,32 @@ function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
       setEnded(false);
     } else {
       setAwaitingEmail(false);
-      if (explicitSignOut.current) explicitSignOut.current = false;
-      else setEnded(true);
+      if (!explicitSignOut.current) setEnded(true);
     }
   }
+  // Reset outside render; it only matters between a sign-out and the next sign-in.
+  useEffect(() => {
+    if (isSignedIn) explicitSignOut.current = false;
+  }, [isSignedIn]);
 
   useEffect(() => {
     if (!pendingName || !isSignedIn || attempted.current === pendingName) return;
     attempted.current = pendingName;
-    void updateSenderName(pendingName).then((ok) => {
-      if (ok) {
-        setPendingName(null);
-        attempted.current = null;
-      }
+    void updateSenderName(pendingName.name).then((ok) => {
+      if (ok) clearPending();
     });
   }, [pendingName, isSignedIn, updateSenderName]);
 
   // Once the account holds the name, the in-memory copy has done its job.
   const savedName = identity.profile?.senderName;
   useEffect(() => {
-    if (pendingName && savedName === pendingName) {
-      unsavedName = null;
-      setPendingNameState(null);
-    }
+    if (pendingName && savedName === pendingName.name) clearPending();
   }, [pendingName, savedName]);
+
+  function clearPending() {
+    attempted.current = null;
+    setPendingName(null);
+  }
 
   function switchMode(next: 'signIn' | 'signUp') {
     clearError();
@@ -94,10 +99,12 @@ function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
     return (
       <ProfileScreen
         identity={identity}
-        initialName={pendingName}
+        initialName={pendingName?.name}
+        onSaved={clearPending}
         sessionEnded={ended}
         onSignOut={() => {
           explicitSignOut.current = true;
+          clearPending();
           void signOut();
         }}
         onSignInAgain={() => {
@@ -114,14 +121,23 @@ function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
       <SignUpScreen
         identity={identity}
         onSwitchToSignIn={() => switchMode('signIn')}
-        onCreated={(name) => {
-          setPendingName(name);
+        onCreated={(name, email) => {
+          setPendingName({ name, email });
           setAwaitingEmail(true);
         }}
       />
     );
   }
-  return <SignInScreen identity={identity} onSwitchToSignUp={() => switchMode('signUp')} />;
+  return (
+    <SignInScreen
+      identity={identity}
+      onSwitchToSignUp={() => switchMode('signUp')}
+      onAttempt={(email) => {
+        // Signing in as someone else: the sign-up name is not theirs.
+        if (pendingName && !sameEmail(pendingName.email, email)) clearPending();
+      }}
+    />
+  );
 }
 
 function LoadingOrUnavailable({ text }: { text: string }) {
@@ -139,7 +155,7 @@ export function AccountScreen({ onBack }: { onBack: () => void }) {
   const clearError = identity?.clearError;
   useEffect(() => clearError?.(), []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'android' ? 'height' : undefined}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}

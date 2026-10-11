@@ -37,12 +37,15 @@ function IdentityRunner({
   storage: ReturnType<typeof createProfileCache>;
   onIdentity: (identity: UseSupabaseIdentityResult) => void;
 }) {
-  const identity = useSupabaseIdentity({ client, storage });
-  useEffect(() => {
-    onIdentity(identity);
-    // `identity` is a new object every render; these fields are what can change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity.status, identity.offline, identity.profile, identity.error, identity.signUp, identity.signIn, identity.signOut, identity.updateSenderName, identity.clearError, onIdentity]);
+  const hook = useSupabaseIdentity({ client, storage });
+  // The hook returns a new object every render; rebuild only when one of its fields changes.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const identity = useMemo(
+    () => hook,
+    [hook.status, hook.offline, hook.profile, hook.error, hook.signUp, hook.signIn, hook.signOut, hook.updateSenderName, hook.clearError],
+  );
+  /* eslint-enable react-hooks/exhaustive-deps */
+  useEffect(() => onIdentity(identity), [identity, onIdentity]);
   return null;
 }
 

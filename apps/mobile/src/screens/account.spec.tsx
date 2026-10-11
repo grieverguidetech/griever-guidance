@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Platform } from 'react-native';
+import { AccessibilityInfo, Platform, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { AuthClient, ProfileResult, SessionState, SignInResult, SignUpResult } from '@griever/api-client/auth';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
-import { AccountProvider } from '../lib/AccountProvider';
+import { AccountProvider, useAccount } from '../lib/AccountProvider';
 
 const signedIn: SessionState = { status: 'signed_in', session: { userId: 'u1', email: 'a@b.co', accessToken: 't' } };
 const noProfile: ProfileResult = { ok: false, reason: 'no_profile' };
@@ -129,6 +130,62 @@ describe('sign up', () => {
     await screen.findByDisplayValue('Sam');
   });
 
+  it('never applies the sign-up name to a different account', async () => {
+    const client = stubClient();
+    await openSignUp(client);
+    type('Your name', 'Sam');
+    type('Email', 'a@x.co');
+    type('Password', 'a-long-password');
+    press('Create account');
+    await screen.findByText('Please check your email to finish setting up your account.');
+    // Someone else signs in on this phone.
+    client.getSession.mockResolvedValue(signedIn);
+    press('Sign in');
+    await screen.findByLabelText('Email');
+    type('Email', 'b@x.co');
+    type('Password', 'another-password');
+    press('Sign in');
+    await screen.findByRole('header', { name: 'What should we call you?' });
+    expect(client.updateProfile).not.toHaveBeenCalled();
+    expect(value('Your name')).toBe('');
+  });
+
+  it('still saves the sign-up name when the same email signs in after confirming', async () => {
+    const client = stubClient();
+    await openSignUp(client);
+    fill();
+    press('Create account');
+    await screen.findByText('Please check your email to finish setting up your account.');
+    client.getSession.mockResolvedValue(signedIn);
+    press('Sign in');
+    await screen.findByLabelText('Email');
+    type('Email', ' SAM@x.co ');
+    type('Password', 'a-long-password');
+    press('Sign in');
+    await waitFor(() => expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Sam' }));
+  });
+
+  it('does not let an old unsaved name overwrite a newer saved one', async () => {
+    const client = clientSignedInAfterAuth({
+      updateProfile: jest
+        .fn<(u: { senderName?: string | null }) => Promise<ProfileResult>>()
+        .mockResolvedValueOnce({ ok: false, reason: 'offline' })
+        .mockImplementation(async (u) => profileWith(u.senderName ?? '')),
+    });
+    await openSignUp(client);
+    fill();
+    press('Create account');
+    await screen.findByText(OFFLINE);
+    type('Your name', 'Samantha');
+    press('Save');
+    await screen.findByText('Saved.');
+    screen.unmount();
+    renderAccount(client);
+    await screen.findByLabelText('Your name');
+    expect(screen.queryByDisplayValue('Sam')).toBeNull();
+    expect(client.updateProfile.mock.calls.map((c) => c[0])).toEqual([{ senderName: 'Sam' }, { senderName: 'Samantha' }]);
+  });
+
   it('asks for a name when the profile still has none after sign-up', async () => {
     const client = clientSignedInAfterAuth({ updateProfile: jest.fn(async () => profileWith('')) });
     await openSignUp(client);
@@ -214,12 +271,28 @@ describe('sign up', () => {
     const client = stubClient();
     await openSignUp(client);
     fill();
+    focus.mockClear();
     press('Create account');
     await screen.findByText('Please check your email to finish setting up your account.');
     expect(screen.getByRole('header', { name: 'Check your email' })).toBeTruthy();
     expect(announce).toHaveBeenCalledWith('Please check your email to finish setting up your account.');
-    expect(focus).toHaveBeenCalled();
+    expect(focus).toHaveBeenCalledTimes(1);
     expect(client.updateProfile).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountProvider', () => {
+  it('renders the app right away while the profile cache loads', () => {
+    jest.spyOn(AsyncStorage, 'getItem').mockReturnValue(new Promise(() => undefined));
+    function Probe() {
+      return <Text>{`app visible, accounts ${useAccount()?.status}`}</Text>;
+    }
+    render(
+      <AccountProvider client={stubClient()}>
+        <Probe />
+      </AccountProvider>,
+    );
+    expect(screen.getByText('app visible, accounts loading')).toBeTruthy();
   });
 });
 
@@ -247,12 +320,15 @@ describe('profile', () => {
     stubClient({ getSession: jest.fn(async () => signedIn), getProfile: jest.fn(async () => profileWith('Sam')), ...overrides });
 
   it('edits and saves the sender name', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    announce.mockClear();
     const client = signedInClient();
     renderAccount(client);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
     await screen.findByText('Saved.');
     expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Samantha' });
+    expect(announce).toHaveBeenCalledWith('Saved.');
   });
 
   it('shows "Saved." on the first save, when the account had no profile yet', async () => {

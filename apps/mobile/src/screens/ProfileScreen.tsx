@@ -12,11 +12,13 @@ type Props = {
   initialName?: string | null;
   /** The server ended the session: keep the typed name and offer sign in. */
   sessionEnded?: boolean;
+  /** Called after any successful save, so an older unsaved name can never overwrite it. */
+  onSaved: () => void;
   onSignOut: () => void;
   onSignInAgain: () => void;
 };
 
-export function ProfileScreen({ identity, initialName, sessionEnded, onSignOut, onSignInAgain }: Props) {
+export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, onSignOut, onSignInAgain }: Props) {
   const savedName = identity.profile?.senderName?.trim() ?? '';
   const source = initialName ?? savedName;
   const [name, setName] = useState(source);
@@ -41,7 +43,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSignOut, 
     try {
       const ok = await identity.updateSenderName(name.trim());
       setSaved(ok);
-      if (ok) announce('Saved.');
+      if (ok) {
+        announce('Saved.');
+        onSaved();
+      }
     } finally {
       setPending(false);
     }
@@ -67,6 +72,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSignOut, 
         autoComplete="name"
         autoCapitalize="words"
         returnKeyType="go"
+        editable={!sessionEnded}
         onSubmitEditing={sessionEnded ? undefined : save}
       />
       <ErrorText message={localError ?? (sessionEnded ? null : identity.error)} />

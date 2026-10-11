@@ -7,10 +7,12 @@ import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, authStyles }
 type Props = {
   identity: UseSupabaseIdentityResult;
   onSwitchToSignUp: () => void;
+  /** Called with the email just before signing in, so the route can drop state tied to another account. */
+  onAttempt: (email: string) => void;
 };
 
 // On success the account route re-renders into the profile, so no "done" callback is needed.
-export function SignInScreen({ identity, onSwitchToSignUp }: Props) {
+export function SignInScreen({ identity, onSwitchToSignUp, onAttempt }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
@@ -20,6 +22,7 @@ export function SignInScreen({ identity, onSwitchToSignUp }: Props) {
     if (pending) return;
     setPending(true);
     try {
+      onAttempt(email.trim());
       await identity.signIn(email.trim(), password);
     } finally {
       setPending(false);
