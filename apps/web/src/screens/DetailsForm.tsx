@@ -3,7 +3,7 @@ import type { useSendFlow } from '@griever/hooks';
 import { useMockPlaces } from '@griever/hooks';
 import { shareService } from '@griever/shared';
 import { MapPin } from '@phosphor-icons/react';
-import { TopBar, Eyebrow } from '../lib/ui';
+import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 import { DateInput } from '../lib/DateField';
 import { TimeInput } from '../lib/TimeField';
 
@@ -132,6 +132,7 @@ export function DetailsForm({ flow }: Props) {
       >
         Continue
       </button>
+      <SavedNote />
     </div>
   );
 }

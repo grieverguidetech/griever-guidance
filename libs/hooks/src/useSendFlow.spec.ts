@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import type { SessionDetails } from '@griever/shared';
-import { freshDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
+import { freshDraft, hasDraftInProgress, resumeDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
 
 const session: SessionDetails = {
   personName: 'Margaret Hayes',
@@ -123,5 +123,42 @@ describe('useSendFlow — storage fallback', () => {
     const storage = { getItem: () => '{not json', setItem: vi.fn(), removeItem: vi.fn() };
     const { result } = renderHook(() => useSendFlow({ storage }));
     expect(result.current.step).toBe('template');
+  });
+});
+
+describe('hasDraftInProgress', () => {
+  it('is true once a template is chosen and the message is not yet sent', () => {
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'service', step: 'details' }))).toBe(true);
+  });
+
+  it('is false with no draft, no template yet, or a finished message', () => {
+    expect(hasDraftInProgress(null)).toBe(false);
+    expect(hasDraftInProgress(freshDraft({}))).toBe(false);
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sent' }))).toBe(false);
+  });
+
+  it('is false while sending, because the send job is not saved', () => {
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sending' }))).toBe(false);
+  });
+});
+
+describe('resuming', () => {
+  it('moves a draft off the template picker to the first form, keeping its fields', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'template', fields: { personalNote: 'hi' } });
+    expect(resumeDraft(draft)).toMatchObject({ step: 'announce', fields: { personalNote: 'hi' } });
+    expect(resumeDraft({ ...draft, templateCategory: 'service' }).step).toBe('details');
+  });
+
+  it('leaves a draft that is past the picker alone', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'contacts' });
+    expect(resumeDraft(draft)).toBe(draft);
+  });
+
+  it('keeps what was typed when the same category is chosen again', () => {
+    const { result } = announcement({ step: 'template', fields: { personalNote: 'hi' } });
+    act(() => result.current.setTemplateCategory('announcement'));
+    expect(result.current.fields).toEqual({ personalNote: 'hi' });
+    act(() => result.current.setTemplateCategory('service'));
+    expect(result.current.fields).toEqual({});
   });
 });

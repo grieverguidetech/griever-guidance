@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { TopBar } from '../lib/ui';
+import { TopBar, SavedNote } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -22,7 +21,8 @@ const OPTIONS = [
 ];
 
 export function ServiceKnownScreen({ flow }: Props) {
-  const [choice, setChoice] = useState<'yes' | 'no'>(flow.serviceDetailsKnown ?? 'no');
+  // 'Not yet' is the shown default; picking either option is written straight away.
+  const choice = flow.serviceDetailsKnown ?? 'no';
 
   return (
     <div className="flex flex-col gap-4">
@@ -39,7 +39,7 @@ export function ServiceKnownScreen({ flow }: Props) {
           <button
             key={option.value}
             type="button"
-            onClick={() => setChoice(option.value)}
+            onClick={() => flow.setServiceDetailsKnown(option.value)}
             aria-pressed={choice === option.value}
             className={`gg-card elev-sm gg-card-selectable text-left ${
               choice === option.value ? 'gg-card-selected' : ''
@@ -54,13 +54,15 @@ export function ServiceKnownScreen({ flow }: Props) {
       <button
         type="button"
         onClick={() => {
-          flow.setServiceDetailsKnown(choice);
+          // Also covers leaving the default untouched, which has no click to save it.
+          if (flow.serviceDetailsKnown !== choice) flow.setServiceDetailsKnown(choice);
           flow.nextStep();
         }}
         className="gg-btn gg-btn-primary gg-btn-block"
       >
         Continue
       </button>
+      <SavedNote />
     </div>
   );
 }

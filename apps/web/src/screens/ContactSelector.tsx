@@ -3,7 +3,7 @@ import type { useSendFlow } from '@griever/hooks';
 import type { Contact, ContactTier } from '@griever/shared';
 import { detectDeviceRegion, toE164 } from '@griever/contacts';
 import { CheckCircle, Circle, Plus } from '@phosphor-icons/react';
-import { TopBar } from '../lib/ui';
+import { TopBar, SavedNote } from '../lib/ui';
 import { formatPhone } from '../lib/format';
 
 type Flow = ReturnType<typeof useSendFlow>;
@@ -172,6 +172,7 @@ export function ContactSelector({ flow, contacts, grouped, onAddContact }: Props
           Continue
         </button>
       </div>
+      <SavedNote />
     </div>
   );
 }

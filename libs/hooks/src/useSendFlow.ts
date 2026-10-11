@@ -125,6 +125,25 @@ export function freshDraft(patch: Partial<SendFlowDraft>): SendFlowDraft {
   return { ...draft, ...patch };
 }
 
+/**
+ * True when a saved draft has a message under way (a template chosen, nothing being sent), so
+ * reopening the app should put the person back in it rather than start the message over.
+ * 'sending' is never resumed: the send job isn't saved, and resuming would offer the whole list
+ * again. 'sent' is finished.
+ */
+export function hasDraftInProgress(draft: SendFlowDraft | null | undefined): draft is SendFlowDraft {
+  return !!draft && draft.templateCategory !== null && draft.step !== 'sending' && draft.step !== 'sent';
+}
+
+/**
+ * The draft to resume with. A draft sitting on the template picker moves on to the moment's first
+ * form, so the picker can't be reached and overwrite what was typed. Fields are left untouched.
+ */
+export function resumeDraft(draft: SendFlowDraft): SendFlowDraft {
+  if (draft.step !== 'template') return draft;
+  return { ...draft, step: draft.templateCategory === 'announcement' ? 'announce' : 'details' };
+}
+
 function fromDraft(draft: SendFlowDraft): SendFlowState {
   const restored: SendFlowState = { ...initialState, ...draft, sendJob: null };
   if (restored.step === 'sending') restored.step = 'review';
@@ -278,12 +297,12 @@ export function useSendFlow(
     : composeMessage(selectedTemplate, composedFields);
 
   const setTemplateCategory = useCallback((category: TemplateCategory) => {
-    setState(() => ({
-      ...initialState,
-      step: 'template',
-      templateCategory: category,
-      templateOverrideId: null,
-    }));
+    setState((s) =>
+      // Choosing what is already chosen keeps what was typed.
+      s.templateCategory === category && s.templateOverrideId === null
+        ? s
+        : { ...initialState, step: 'template', templateCategory: category, templateOverrideId: null },
+    );
   }, []);
 
   const setTemplate = useCallback((template: Template) => {

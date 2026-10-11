@@ -6,10 +6,13 @@ import {
   useSessions,
   freshDraft,
   getContactsRetentionExpiry,
+  hasDraftInProgress,
+  resumeDraft,
+  namedSessionsByRecent,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever/hooks';
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
-import type { MomentKey, SessionDetails } from '@griever/shared';
+import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED } from '../lib/features';
@@ -44,6 +47,12 @@ type AppView =
   | 'shareObituary'
   | 'flow'
   | 'obituary';
+
+const CATEGORY_BY_MOMENT: Partial<Record<MomentKey, TemplateCategory>> = {
+  announce: 'announcement',
+  service: 'service',
+  thanks: 'aftercare',
+};
 
 const browserStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
@@ -180,6 +189,12 @@ async function accountLacksName(client: AuthClient): Promise<boolean> {
   }
 }
 
+/** A message left half-written reopens where it was (#25); otherwise the path. */
+function viewForReturning(sessionList: Session[]): AppView {
+  const latest = namedSessionsByRecent(sessionList)[0];
+  return latest && hasDraftInProgress(latest.draft) ? 'flow' : 'pathLanding';
+}
+
 function isAccountView(view: AppView): boolean {
   return view === 'signup' || view === 'createAccount';
 }
@@ -187,6 +202,7 @@ function isAccountView(view: AppView): boolean {
 function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; client?: AuthClient }) {
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
+  const sessionList = sessions.sessions;
   const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
   // Without auth there is no account gate — everyone is let straight in.
   const isSignedIn = auth ? auth.isSignedIn : true;
@@ -195,7 +211,9 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
     if (AUTH_ENABLED) return 'signup';
     // useSessions reads storage synchronously, so a returning visitor goes
     // straight to their session; a first visit starts at adding contacts.
-    return sessions.sessions.some((s) => s.personName.trim() !== '') ? 'pathLanding' : 'addContactsManual';
+    return namedSessionsByRecent(sessions.sessions).length === 0
+      ? 'addContactsManual'
+      : viewForReturning(sessions.sessions);
   });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [setupEditing, setSetupEditing] = useState(false);
@@ -242,9 +260,9 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
       setPendingName(null);
       setView('addContactsManual');
     } else {
-      setView('pathLanding');
+      setView(viewForReturning(sessionList));
     }
-  }, [signedIn, view, pendingName, updateSenderName, clearError]);
+  }, [signedIn, view, pendingName, updateSenderName, clearError, sessionList]);
 
   // An account with no name (a failed save at sign-up, or a sign-in to one): ask for it, then
   // return to wherever this interrupted.
@@ -291,13 +309,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
     void setSyncUserId(null);
   }, []);
 
-  const sortedSessions = useMemo(
-    () =>
-      [...sessions.sessions]
-        .filter((s) => s.personName.trim() !== '')
-        .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt)),
-    [sessions.sessions],
-  );
+  const sortedSessions = useMemo(() => namedSessionsByRecent([...sessions.sessions]), [sessions.sessions]);
 
   useEffect(() => {
     // While the name prompt is about to open, don't also start a session (the two would race).
@@ -404,6 +416,12 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
 
   function startMoment(key: MomentKey) {
     if (!active) return;
+    // Starting a moment that is already under way resumes it; a fresh draft would wipe what was typed.
+    if (hasDraftInProgress(active.draft) && active.draft.templateCategory === CATEGORY_BY_MOMENT[key]) {
+      if (active.draft.step === 'template') sessions.updateDraft(active.id, resumeDraft(active.draft));
+      setView('flow');
+      return;
+    }
     if (key === 'announce') {
       sessions.updateDraft(active.id, freshDraft({ templateCategory: 'announcement', step: 'announce' }));
       setView('flow');

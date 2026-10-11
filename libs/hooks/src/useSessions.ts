@@ -66,6 +66,13 @@ export interface UseSessionsResult {
   recordMomentComplete: (id: string, category: TemplateCategory, contactIds: string[]) => void;
 }
 
+/** Sessions with a person's name, most recently opened first. The first is the one that reopens. */
+export function namedSessionsByRecent(sessions: Session[]): Session[] {
+  return sessions
+    .filter((s) => s.personName.trim() !== '')
+    .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
+}
+
 const STORAGE_KEY = 'gg.sessions.v1';
 
 function load(storage: SendFlowStorage | undefined): Session[] {

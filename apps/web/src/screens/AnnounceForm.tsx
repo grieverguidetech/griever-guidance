@@ -1,6 +1,6 @@
 import type { useSendFlow } from '@griever/hooks';
 import { PencilSimple } from '@phosphor-icons/react';
-import { TopBar, Eyebrow } from '../lib/ui';
+import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -72,9 +72,7 @@ export function AnnounceForm({ flow, onEditSession }: Props) {
       >
         Continue
       </button>
-      <p className="gg-reassure text-center m-0 text-[12px]">
-        Everything is saved as you go. You can stop and come back.
-      </p>
+      <SavedNote />
     </div>
   );
 }

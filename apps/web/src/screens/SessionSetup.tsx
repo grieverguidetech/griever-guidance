@@ -1,5 +1,5 @@
 import type { Session } from '@griever/hooks';
-import { TopBar } from '../lib/ui';
+import { TopBar, SavedNote } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
 
 interface Props {
@@ -68,9 +68,7 @@ export function SessionSetup({ session, editing, onChange, onContinue, onBack }:
       >
         Continue
       </button>
-      <p className="gg-reassure text-center m-0 text-[12px]">
-        Everything is saved as you go. You can stop and come back.
-      </p>
+      <SavedNote />
     </div>
   );
 }
