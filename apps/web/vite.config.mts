@@ -17,7 +17,7 @@ function announcePort(): PluginOption {
           typeof address === 'object' && address ? address.port : WEB_PORT;
         const url = `http://localhost:${port}/`;
         server.config.logger.info(
-          `\n  \x1b[36m\x1b[1m➜  Griever Guidance web is running:\x1b[0m \x1b[36m${url}\x1b[0m\n`,
+          `\n  \x1b[36m\x1b[1m➜  Grievers Guidance web is running:\x1b[0m \x1b[36m${url}\x1b[0m\n`,
         );
       };
       server.httpServer?.once('listening', show);

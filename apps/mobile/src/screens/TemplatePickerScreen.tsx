@@ -16,7 +16,7 @@ export function TemplatePickerScreen({ flow }: FlowProps) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Griever Guidance</Text>
+      <Text style={styles.title}>Grievers Guidance</Text>
       <Text style={styles.subtitle}>
         Choose the type of message you would like to send.
       </Text>

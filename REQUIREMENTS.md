@@ -1,4 +1,4 @@
-# Requirements — Griever Guidance
+# Requirements — Grievers Guidance
 
 What the product must do, what it must never do, and where each requirement stands today.
 §1–§5 are the checklist of *what has to be true*; §6 is the architecture and the standing rules
@@ -149,7 +149,7 @@ section in the same PR.
 
 ### What this is
 
-Griever Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
+Grievers Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
 
 ---
 

@@ -10,7 +10,7 @@ export function SignUp({ onContinueWithProvider, onUseEmail }: Props) {
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
       <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.1]">Griever Guidance</h1>
+        <h1 className="text-[28px] leading-[1.1]">Grievers Guidance</h1>
         <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
           We'll help you tell people what they need to know. First, somewhere safe to keep it.
         </p>
