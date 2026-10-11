@@ -12,10 +12,49 @@ export function useAccount(): UseSupabaseIdentityResult | null {
   return useContext(AccountContext);
 }
 
+/** What the account screen sees while the profile cache loads. Every action does nothing. */
+const LOADING: UseSupabaseIdentityResult = {
+  status: 'loading',
+  isSignedIn: false,
+  isLoading: true,
+  offline: false,
+  profile: null,
+  error: null,
+  clearError: () => undefined,
+  signUp: async () => false,
+  signIn: async () => false,
+  signOut: async () => undefined,
+  updateSenderName: async () => false,
+};
+
+/** Calls the hook and hands the result up. Renders nothing. */
+function IdentityRunner({
+  client,
+  storage,
+  onIdentity,
+}: {
+  client: AuthClient;
+  storage: ReturnType<typeof createProfileCache>;
+  onIdentity: (identity: UseSupabaseIdentityResult) => void;
+}) {
+  const identity = useSupabaseIdentity({ client, storage });
+  useEffect(() => {
+    onIdentity(identity);
+    // `identity` is a new object every render; these fields are what can change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.status, identity.offline, identity.profile, identity.error, identity.signUp, identity.signIn, identity.signOut, identity.updateSenderName, identity.clearError, onIdentity]);
+  return null;
+}
+
+/**
+ * The children (the send flow) always render straight away. The identity hook starts after the
+ * profile cache has loaded, because it reads that cache once at mount; until then accounts show
+ * as loading. The send flow never waits on accounts.
+ */
 function Identity({ client, children }: { client: AuthClient; children: ReactNode }) {
   const storage = useMemo(() => createProfileCache(), []);
   const [ready, setReady] = useState(false);
-  // The hook reads its cache once at mount, so the cache is filled before the hook mounts.
+  const [identity, setIdentity] = useState<UseSupabaseIdentityResult>(LOADING);
   useEffect(() => {
     let live = true;
     void storage.hydrate().then(() => live && setReady(true));
@@ -23,21 +62,12 @@ function Identity({ client, children }: { client: AuthClient; children: ReactNod
       live = false;
     };
   }, [storage]);
-  if (!ready) return null;
-  return <Hooked client={client} storage={storage}>{children}</Hooked>;
-}
-
-function Hooked({
-  client,
-  storage,
-  children,
-}: {
-  client: AuthClient;
-  storage: ReturnType<typeof createProfileCache>;
-  children: ReactNode;
-}) {
-  const identity = useSupabaseIdentity({ client, storage });
-  return <AccountContext.Provider value={identity}>{children}</AccountContext.Provider>;
+  return (
+    <>
+      {ready ? <IdentityRunner client={client} storage={storage} onIdentity={setIdentity} /> : null}
+      <AccountContext.Provider value={identity}>{children}</AccountContext.Provider>
+    </>
+  );
 }
 
 export function AccountProvider({ client, children }: { client: AuthClient | null; children: ReactNode }) {

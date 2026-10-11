@@ -1,37 +1,92 @@
-import { useEffect } from 'react';
-import type { ComponentProps } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import type { ComponentProps, Ref } from 'react';
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import type { ReactNode } from 'react';
+import { ACCENT, MUTED } from './colors';
+
+/** iOS only: Android reads the live region / alert role, so announcing there would say it twice. */
+export function announce(message: string) {
+  if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+}
+
+/** A screen heading that takes screen-reader focus when it appears (after a screen swap). */
+export function ScreenHeader({ children }: { children: ReactNode }) {
+  const ref = useRef<Text>(null);
+  useEffect(() => {
+    const handle = ref.current ? findNodeHandle(ref.current) : null;
+    if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+  }, []);
+  return (
+    <Text ref={ref} accessibilityRole="header" style={authStyles.title}>
+      {children}
+    </Text>
+  );
+}
 
 type InputProps = Pick<
   ComponentProps<typeof TextInput>,
-  'textContentType' | 'autoComplete' | 'keyboardType' | 'secureTextEntry' | 'autoCapitalize' | 'autoCorrect'
+  | 'textContentType'
+  | 'autoComplete'
+  | 'keyboardType'
+  | 'secureTextEntry'
+  | 'autoCapitalize'
+  | 'autoCorrect'
+  | 'returnKeyType'
+  | 'onSubmitEditing'
 >;
 
 export function Field({
   label,
   value,
   onChangeText,
+  hint,
+  inputRef,
   ...input
-}: { label: string; value: string; onChangeText: (v: string) => void } & InputProps) {
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  hint?: string;
+  inputRef?: Ref<TextInput>;
+} & InputProps) {
   return (
     <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{label}</Text>
+      {/* The input carries the label for screen readers; this copy is only for sighted users. */}
+      <Text style={styles.label} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {label}
+      </Text>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         accessibilityLabel={label}
+        accessibilityHint={hint}
         value={value}
         onChangeText={onChangeText}
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor={MUTED}
         {...input}
       />
+      {hint ? (
+        <Text style={styles.hint} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-/** Shows the message in a polite live region and announces it on iOS, where live regions do not exist. */
+/** Shows the message in a polite live region and announces it on iOS. */
 export function ErrorText({ message }: { message: string | null }) {
   useEffect(() => {
-    if (message) AccessibilityInfo.announceForAccessibility(message);
+    if (message) announce(message);
   }, [message]);
   return (
     <View accessibilityLiveRegion="polite" style={styles.errorBox}>
@@ -68,16 +123,17 @@ export function LinkButton({ label, onPress }: { label: string; onPress: () => v
 
 export const authStyles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  body: { fontSize: 14, color: '#6b7280', marginBottom: 24 },
+  body: { fontSize: 14, color: MUTED, marginBottom: 24 },
 });
 
 const styles = StyleSheet.create({
   fieldGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },
+  hint: { fontSize: 13, color: MUTED, marginTop: 6 },
   input: {
     minHeight: 44,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: MUTED,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -88,7 +144,7 @@ const styles = StyleSheet.create({
   error: { fontSize: 14, color: '#b91c1c' },
   button: {
     minHeight: 44,
-    backgroundColor: '#6B7FD4',
+    backgroundColor: ACCENT,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
@@ -98,5 +154,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 12 },
-  linkText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
+  linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
 });

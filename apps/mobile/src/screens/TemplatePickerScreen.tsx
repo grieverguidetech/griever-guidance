@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../app/App';
 import { AUTH_ENABLED } from '../lib/features';
+import { ACCENT } from '../components/colors';
 
 const CATEGORY_ORDER: TemplateCategory[] = ['announcement', 'service', 'aftercare'];
 
@@ -37,11 +38,11 @@ export function TemplatePickerScreen({ flow }: FlowProps) {
       {AUTH_ENABLED && (
         <TouchableOpacity
           onPress={() => navigation.navigate('Account')}
-          style={styles.whatYoullNeedLink}
+          style={styles.accountLink}
           accessibilityRole="button"
           activeOpacity={0.7}
         >
-          <Text style={styles.whatYoullNeedText}>Your account</Text>
+          <Text style={styles.accountLinkText}>Your account</Text>
         </TouchableOpacity>
       )}
 
@@ -92,5 +93,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '500', color: '#111827', marginBottom: 4 },
   cardDescription: { fontSize: 14, color: '#6b7280' },
   whatYoullNeedLink: { alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 24 },
+  accountLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginBottom: 16 },
+  accountLinkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
   whatYoullNeedText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
 });
