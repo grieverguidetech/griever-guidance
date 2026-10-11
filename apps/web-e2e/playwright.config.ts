@@ -14,8 +14,16 @@ import { workspaceRoot } from '@nx/devkit';
 const PORT = Number(process.env['E2E_PORT'] ?? 4300);
 const baseURL = process.env['BASE_URL'] ?? `http://127.0.0.1:${PORT}`;
 
+const preset = nxE2EPreset(__filename, { testDir: './src' });
+
 export default defineConfig({
-  ...nxE2EPreset(__filename, { testDir: './src' }),
+  ...preset,
+  // In CI, also print each failing test with its error to the job log. The
+  // preset's reporters (HTML, blob) only show a count there, and stay for the
+  // uploaded artifact.
+  reporter: process.env['CI']
+    ? [['list'], ...(preset.reporter as never[])]
+    : preset.reporter,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   use: {

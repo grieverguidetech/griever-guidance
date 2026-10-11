@@ -1,0 +1,56 @@
+name: E2E stress
+
+# Manual repeat runs of the whole e2e suite, to find flaky tests. E2E never runs
+# on a local machine (AGENTS.md rule 15), so this is where repeats happen.
+# Same setup as the e2e job in ci.yml; retries are off so a flake shows as a failure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeat_each:
+        description: Run each test this many times
+        type: number
+        default: 3
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-stress:
+    name: Playwright e2e x${{ inputs.repeat_each }} (desktop, Android, iPhone)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium webkit
+
+      - run: pnpm nx e2e web-e2e -- --repeat-each=${{ inputs.repeat_each }} --retries=0
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web-e2e/test-output
+            dist/.playwright
+          retention-days: 14

@@ -79,9 +79,16 @@ the role's brief.
   extend `vitest.base.mts` resolves workspace packages to `dist/` and fails on a clean checkout.
 - **Spec files are excluded from `tsconfig.lib.json`** so they don't ship in `dist/`.
   Each project's `tsconfig.spec.json` (output in `out-tsc/vitest`) typechecks them in `pnpm typecheck`.
+- **Worktrees need their own install.** pnpm links each package's `node_modules`, so a fresh
+  worktree fails until you run `pnpm install --frozen-lockfile --prefer-offline` in it.
 - **Husky isn't installed here**, so CI is the only gate. Run `pnpm check:affected` before you
   report done.
 - **E2E runs in CI only** (rule 15). Don't install Playwright browsers or run e2e locally.
+  Failure details are in the `e2e` job log (list reporter); repeat runs use the `E2E stress` workflow.
+- **Clean up before handing back.** Stop Nx daemons (`pnpm nx daemon --stop`) and any server you
+  started. An empty or "placeholder" hand-back means not done.
+- **A PR with red CI is a draft** (or labeled `do-not-merge`) until fixed.
+- **Project subagents load only at session start**; see `PROCESS.md` §3.
 - **Native-only modules** (`expo-contacts`) need a `.web.ts` stub or they crash the web bundle.
 - **`CORS_ORIGINS`** must match the deployed origin exactly; take URLs from the deployment, never
   infer them.
