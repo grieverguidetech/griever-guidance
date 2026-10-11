@@ -1,4 +1,8 @@
-import { createClient, isAuthRetryableFetchError } from '@supabase/supabase-js';
+import {
+  createClient,
+  isAuthRefreshDiscardedError,
+  isAuthRetryableFetchError,
+} from '@supabase/supabase-js';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import type { Profile, ProfileUpdate } from '@griever/shared';
 import { ApiError, apiFetch } from './client.js';
@@ -269,6 +273,8 @@ export function createAuthClient(
       try {
         const { data, error } = await supabase.auth.refreshSession();
         if (data.session) return toSignedIn(data.session);
+        // Another tab rotated the token mid-refresh (409). The session is fine: read what it stored.
+        if (isAuthRefreshDiscardedError(error)) return readSession();
         return error && reachability(error)
           ? { status: 'offline' }
           : { status: 'signed_out' };

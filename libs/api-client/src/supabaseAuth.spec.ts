@@ -1,4 +1,8 @@
-import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js';
+import {
+  AuthApiError,
+  AuthRefreshDiscardedError,
+  AuthRetryableFetchError,
+} from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAuthClient } from './supabaseAuth.js';
 
@@ -262,6 +266,21 @@ describe('refreshSession', () => {
     expect(await make().refreshSession()).toEqual({
       status: 'signed_in',
       session: { userId: 'u1', email: null, accessToken: 'new' },
+    });
+  });
+
+  it('reads the stored session, not signed_out, when another tab rotated the token mid-refresh', async () => {
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: new AuthRefreshDiscardedError(),
+    });
+    auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'rotated', user: { id: 'u1', email: null } } },
+      error: null,
+    });
+    expect(await make().refreshSession()).toEqual({
+      status: 'signed_in',
+      session: { userId: 'u1', email: null, accessToken: 'rotated' },
     });
   });
 

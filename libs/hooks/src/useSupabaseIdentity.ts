@@ -19,6 +19,7 @@ export interface UseSupabaseIdentityOptions {
    * create the client once (module scope or a ref), not on every render.
    */
   client: AuthClient;
+  /** Read once at mount, like `client`; a later `storage` prop is ignored. */
   storage?: SendFlowStorage;
 }
 
@@ -124,9 +125,11 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
    * Runs a profile call. On `signed_out` (a 401) it refreshes the token once and retries once.
    * A refresh that cannot reach the network is reported as `offline`, never as signed out (C5).
    */
-  const callWithRefresh = useCallback(async (call: () => Promise<ProfileResult>): Promise<ProfileResult> => {
+  const callWithRefresh = useCallback(async (g: number, call: () => Promise<ProfileResult>): Promise<ProfileResult> => {
     const first = await call();
     if (first.ok || first.reason !== 'signed_out') return first;
+    // Superseded (for example by sign-out) while waiting: skip the refresh, the caller drops this.
+    if (g !== gen.current) return first;
     const refreshed = await clientRef.current.refreshSession();
     if (refreshed.status === 'offline') return { ok: false, reason: 'offline' };
     if (refreshed.status === 'signed_out') return first;
@@ -139,9 +142,10 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
     clearAll();
   }, [clearAll]);
 
+  /** Does not bump `gen`, so only `checkSession` (which just did) may call it. */
   const refreshProfile = useCallback(async () => {
     const g = gen.current;
-    const result = await callWithRefresh(() => clientRef.current.getProfile());
+    const result = await callWithRefresh(g, () => clientRef.current.getProfile());
     if (!mounted.current || g !== gen.current) return;
     if (result.ok) {
       setOffline(false);
@@ -221,8 +225,9 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
     async (name: string) => {
       setError(null);
       const g = ++gen.current;
-      const result = await callWithRefresh(() => clientRef.current.updateProfile({ senderName: name }));
-      if (!mounted.current || g !== gen.current) return false;
+      const result = await callWithRefresh(g, () => clientRef.current.updateProfile({ senderName: name }));
+      // A superseded call sets no error and changes nothing; it reports only whether the server saved it.
+      if (!mounted.current || g !== gen.current) return result.ok;
       if (result.ok) {
         keepProfile(toCached(result.profile));
         return true;

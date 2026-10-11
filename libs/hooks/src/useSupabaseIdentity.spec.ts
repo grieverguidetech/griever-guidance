@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { AuthClient, ProfileResult, SessionState } from '@griever/api-client/auth';
 import type { Profile } from '@griever/shared';
-import { PROFILE_STORAGE_KEY, useSupabaseIdentity } from './useSupabaseIdentity.js';
+import { PROFILE_STORAGE_KEY, identityErrorMessage, useSupabaseIdentity } from './useSupabaseIdentity.js';
 import type { SendFlowStorage } from './useSendFlow.js';
 
 const signedIn: SessionState = {
@@ -434,17 +434,39 @@ describe('useSupabaseIdentity lifecycle and storage', () => {
     expect(getSession).toHaveBeenCalledTimes(1);
   });
 
-  it('unmounting before boot resolves causes no update and no throw', async () => {
+  it('unmounting before boot resolves updates nothing and makes no profile call', async () => {
     const pending = deferred<SessionState>();
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const client = stubClient({ getSession: () => pending.promise });
-    const { unmount } = renderHook(() => useSupabaseIdentity({ client, storage: memoryStorage() }));
+    const getProfile = vi.fn(async (): Promise<ProfileResult> => ({ ok: true, profile: profile('Peter') }));
+    const storage = memoryStorage();
+    const client = stubClient({ getSession: () => pending.promise, getProfile });
+    const { unmount } = renderHook(() => useSupabaseIdentity({ client, storage }));
     unmount();
     await act(async () => {
       pending.resolve(signedIn);
     });
-    expect(errors).not.toHaveBeenCalled();
-    errors.mockRestore();
+    expect(getProfile).not.toHaveBeenCalled();
+    expect(storage.data[PROFILE_STORAGE_KEY]).toBeUndefined();
+  });
+
+  it('identityErrorMessage maps unknown and inherited names to the unavailable copy', () => {
+    const copy = "We can't reach your account right now. Please try again in a little while.";
+    expect(identityErrorMessage('toString')).toBe(copy);
+    expect(identityErrorMessage('constructor')).toBe(copy);
+  });
+
+  it('skips the refresh when sign-out happened while a profile call was in flight', async () => {
+    const pending = deferred<ProfileResult>();
+    const refreshSession = vi.fn(async (): Promise<SessionState> => signedIn);
+    const client = stubClient({ getProfile: () => pending.promise, refreshSession });
+    const { result } = renderHook(() => useSupabaseIdentity({ client, storage: memoryStorage() }));
+    await waitFor(() => expect(result.current.isSignedIn).toBe(true));
+    await act(async () => {
+      await result.current.signOut();
+    });
+    await act(async () => {
+      pending.resolve(unauth);
+    });
+    expect(refreshSession).not.toHaveBeenCalled();
   });
 
   it('tolerates storage that throws on get, set and remove', async () => {
