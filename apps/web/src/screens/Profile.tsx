@@ -53,7 +53,7 @@ export function Profile({ asksName, senderName, onBack, onSave, onSignOut, error
       <h1 className="text-[22px]">{asksName ? 'What should we call you?' : 'Your account'}</h1>
       {asksName && (
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          Your name goes on the messages you send.
+          This is the name on your account.
         </p>
       )}
 

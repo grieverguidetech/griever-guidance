@@ -63,6 +63,8 @@ describe('SignUp', () => {
     await user.type(screen.getByLabelText('Email'), 'a@b.co');
     await user.type(screen.getByLabelText('Password'), 'secret-pass');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(await screen.findByText('Please check your email to finish setting up your account, then come back here and sign in.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Please check your email to finish setting up your account, then come back here and sign in.'),
+    ).toHaveAttribute('aria-live', 'polite');
   });
 });

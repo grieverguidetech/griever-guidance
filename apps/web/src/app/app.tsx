@@ -160,6 +160,26 @@ function lacksName(result: ProfileResult): boolean {
   return result.reason === 'no_profile';
 }
 
+const NAME_CHECK_TIMEOUT_MS = 5000;
+
+/**
+ * Asks the server whether the account has a name, in the background. A slow or failed answer
+ * counts as "has a name": it must never hold anyone back (C5), and Profile is always reachable.
+ */
+async function accountLacksName(client: AuthClient): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), NAME_CHECK_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([client.getProfile().then(lacksName), timedOut]);
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function isAccountView(view: AppView): boolean {
   return view === 'signup' || view === 'createAccount';
 }
@@ -181,11 +201,11 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   const [setupEditing, setSetupEditing] = useState(false);
   // The name typed at sign-up, saved once the new account has a session.
   const [pendingName, setPendingName] = useState<string | null>(null);
-  // True while a sign-in is checking whether the account has a name yet.
-  const [settling, setSettling] = useState(false);
   // The account has no name: Profile opens with a "What should we call you?" prompt.
   const [needsName, setNeedsName] = useState(false);
   const [askingName, setAskingName] = useState(false);
+  // Where the prompt interrupted, so Save or Back returns there and onboarding carries on.
+  const [returnTo, setReturnTo] = useState<AppView>('pathLanding');
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
   const openWhatYoullNeed = useCallback(() => setView('whatYoullNeed'), []);
@@ -196,10 +216,11 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   const clearError = auth?.clearError;
 
   const openProfile = useCallback(
-    (asksName: boolean) => {
+    (asksName: boolean, from: AppView = 'pathLanding') => {
       // A stale error from another screen would otherwise show here without being announced.
       clearError?.();
       setAskingName(asksName);
+      setReturnTo(from);
       setNeedsName(false);
       setView('profile');
     },
@@ -209,27 +230,32 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   // Sign-in resolves asynchronously (the boot-time session check, or a form), so the next view
   // can't be decided in useState's initializer. A new account goes on to add contacts.
   useEffect(() => {
-    if (!signedIn || !isAccountView(view) || settling) return;
+    if (!signedIn || !isAccountView(view)) return;
     if (pendingName !== null && updateSenderName) {
       void updateSenderName(pendingName).then((saved) => {
         if (saved) return;
-        // The prompt below asks again, so the failure message need not linger.
+        // The prompt below asks again, so the failure message need not linger. If the save failed
+        // because the session ended, the effect further down drops the request instead.
         clearError?.();
         setNeedsName(true);
       });
       setPendingName(null);
       setView('addContactsManual');
-    } else if (needsName) {
-      openProfile(true);
     } else {
       setView('pathLanding');
     }
-  }, [signedIn, view, settling, pendingName, needsName, updateSenderName, clearError, openProfile]);
+  }, [signedIn, view, pendingName, updateSenderName, clearError]);
 
-  // A name that could not be saved at sign-up: ask for it once the account is in use.
+  // An account with no name (a failed save at sign-up, or a sign-in to one): ask for it, then
+  // return to wherever this interrupted.
   useEffect(() => {
-    if (signedIn && needsName && !isAccountView(view) && view !== 'profile') openProfile(true);
+    if (signedIn && needsName && !isAccountView(view) && view !== 'profile') openProfile(true, view);
   }, [signedIn, needsName, view, openProfile]);
+
+  // No session, no prompt: it would be stale by the next sign-in.
+  useEffect(() => {
+    if (signedOut && needsName) setNeedsName(false);
+  }, [signedOut, needsName]);
 
   // Only the Sign out button sends the person back to sign-up. A session that ended some other
   // way keeps them where they are (C5), with a note.
@@ -240,17 +266,22 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
     }
   }, [signedOut, leftOnPurpose, view]);
   const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
-  const endedNote = sessionEnded ? (
-    <div role="status" className="flex flex-col gap-1 mb-4 text-[13px]">
-      <p className="m-0">You've been signed out. Your work on this device is safe. Sign in again when you're ready.</p>
-      <button
-        type="button"
-        onClick={() => setView('createAccount')}
-        className="gg-btn gg-btn-ghost self-start !px-0"
-        style={{ color: 'var(--color-accent-700)' }}
-      >
-        Sign in
-      </button>
+  // One polite region that is always there, so the note is announced when its text appears.
+  const endedNote = auth ? (
+    <div role="status" aria-live="polite" className="text-[13px]">
+      {sessionEnded && (
+        <div className="flex flex-col gap-1 mb-4">
+          <p className="m-0">You've been signed out. Your work on this device is safe. Sign in again when you're ready.</p>
+          <button
+            type="button"
+            onClick={() => setView('createAccount')}
+            className="gg-btn gg-btn-ghost self-start !px-0"
+            style={{ color: 'var(--color-accent-700)' }}
+          >
+            Sign in
+          </button>
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -269,7 +300,8 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   );
 
   useEffect(() => {
-    if (!isSignedIn || activeId) return;
+    // While the name prompt is about to open, don't also start a session (the two would race).
+    if (!isSignedIn || activeId || needsName) return;
     if (sortedSessions.length > 0) {
       setActiveId(sortedSessions[0].id);
       return;
@@ -284,7 +316,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
       setView('setup');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, activeId, sortedSessions, view]);
+  }, [isSignedIn, activeId, sortedSessions, view, needsName]);
 
   const active = useMemo<Session | null>(
     () => sessions.sessions.find((s) => s.id === activeId) ?? null,
@@ -439,14 +471,12 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
             // A name left over from a sign-up that is still waiting on email confirmation
             // must not overwrite the name on an existing account.
             setPendingName(null);
-            setSettling(true);
-            try {
-              const ok = await auth.signIn(email, password);
-              if (ok && client && lacksName(await client.getProfile())) setNeedsName(true);
-              return ok;
-            } finally {
-              setSettling(false);
-            }
+            const ok = await auth.signIn(email, password);
+            // Signing in never waits on a second request: the name check runs in the background
+            // and, if the account has no name, opens the prompt afterwards. It also clears a
+            // prompt left over from an earlier session.
+            if (ok && client) void accountLacksName(client).then(setNeedsName);
+            return ok;
           }}
         />
       </Shell>
@@ -463,13 +493,13 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
           onBack={() => {
             auth.clearError();
             setAskingName(false);
-            goToPathLanding();
+            setView(askingName ? returnTo : 'pathLanding');
           }}
           onSave={async (name) => {
             const saved = await auth.updateSenderName(name);
             if (saved && askingName) {
               setAskingName(false);
-              goToPathLanding();
+              setView(returnTo);
             }
             return saved;
           }}
@@ -648,7 +678,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
           onWhatYoullNeed={() => setView('whatYoullNeed')}
           onNewSession={startNewSession}
         />
-        {auth && (
+        {auth && !sessionEnded && (
           <button
             type="button"
             onClick={() => openProfile(false)}

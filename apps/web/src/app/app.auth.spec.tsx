@@ -10,7 +10,22 @@ import type { AuthClientResult } from '../lib/authClient';
 const mocks = vi.hoisted(() => ({
   authEnabled: false,
   load: vi.fn<() => Promise<AuthClientResult>>(),
+  realClearError: null as null | (() => void),
+  clearError: vi.fn(() => mocks.realClearError?.()),
 }));
+
+// Wraps the real hook only to see when the app asks it to clear its error.
+vi.mock('@griever/hooks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@griever/hooks')>();
+  return {
+    ...actual,
+    useSupabaseIdentity: (options: Parameters<typeof actual.useSupabaseIdentity>[0]) => {
+      const result = actual.useSupabaseIdentity(options);
+      mocks.realClearError = result.clearError;
+      return { ...result, clearError: mocks.clearError };
+    },
+  };
+});
 
 vi.mock('../lib/features', () => ({
   get AUTH_ENABLED() {
@@ -73,6 +88,7 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   mocks.authEnabled = false;
   mocks.load.mockReset();
+  mocks.clearError.mockClear();
 });
 
 describe('flag off', () => {
@@ -264,6 +280,110 @@ describe('flag on', () => {
     await fillSignUp(user);
     await user.click(screen.getByRole('button', { name: 'Create account' }));
     expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument();
+  });
+
+  it('returns to adding contacts after the name prompt, so onboarding is not skipped', async () => {
+    const updateProfile = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, reason: 'offline' })
+      .mockImplementation(async (update: { senderName?: string }) => ({
+        ok: true,
+        profile: { ...PROFILE, senderName: update.senderName ?? null },
+      }));
+    useClient(stubClient({ updateProfile }));
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { name: 'What should we call you?' });
+    await user.type(screen.getByLabelText('Your name'), 'Anna');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' }),
+    ).toBeInTheDocument();
+  });
+
+  it('drops the name prompt when the save failed because the session ended', async () => {
+    const client = stubClient({
+      updateProfile: vi.fn(async () => ({ ok: false as const, reason: 'signed_out' as const })),
+      // Never answers, so only dropping the old request can keep the prompt away.
+      getProfile: vi.fn(() => new Promise<never>(() => undefined)),
+    });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await user.click(await screen.findByRole('button', { name: 'Sign in' }));
+
+    await user.type(screen.getByLabelText('Email'), 'other@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+    await waitFor(() => expect(client.getProfile).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
+  });
+
+  it('signs in without waiting on the name check', async () => {
+    const client = stubClient({ getProfile: vi.fn(() => new Promise<never>(() => undefined)) });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'I already have an account' }));
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+  });
+
+  it('goes straight to the path from adding contacts, without showing sign-up again', async () => {
+    useClient(stubClient());
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+
+    let signUpShown = false;
+    const watcher = new MutationObserver(() => {
+      if (screen.queryByRole('button', { name: 'Create account' })) signUpShown = true;
+    });
+    watcher.observe(document.body, { childList: true, subtree: true });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByRole('heading', { name: 'Who are we writing about?' });
+    watcher.disconnect();
+    expect(signUpShown).toBe(false);
+  });
+
+  it('clears the hook error when Profile opens', async () => {
+    useClient(stubClient());
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    const open = await screen.findByRole('button', { name: 'Your account' });
+    mocks.clearError.mockClear();
+    await user.click(open);
+    expect(mocks.clearError).toHaveBeenCalled();
+  });
+
+  it('hides "Your account" while the signed-out note is showing', async () => {
+    useClient(stubClient({ updateProfile: vi.fn(async () => ({ ok: false as const, reason: 'signed_out' as const })) }));
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    const note = await screen.findByText(/You've been signed out/);
+    expect(note.closest('[aria-live="polite"]')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
   });
 
   it('reaches the app offline with a stored session (C5)', async () => {
