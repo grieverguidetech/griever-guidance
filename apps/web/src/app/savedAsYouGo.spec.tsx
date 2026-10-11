@@ -132,4 +132,79 @@ describe('saved as you go', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('keeps the note after Back, Back and Start (resuming never resets the draft)', async () => {
+    const user = userEvent.setup();
+    await startAnnouncement(user);
+    await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
+    await user.click(screen.getByRole('button', { name: 'Back' })); // the template picker
+    await user.click(screen.getByRole('button', { name: 'Back' })); // the path landing
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue(note);
+  });
+
+  it('opens the landing, not Review, when the last draft was mid-send', async () => {
+    const user = userEvent.setup();
+    const view = await startAnnouncement(user);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
+
+    reload(view);
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    expect(await screen.findByRole('heading', { name: 'Announce the passing' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Read it once before it goes' })).not.toBeInTheDocument();
+  });
+
+  describe('which session reopens', () => {
+    function seed(drafts: Array<{ name: string; openedAt: string; step: string }>) {
+      const list = drafts.map((d, i) => ({
+        id: `s-${i}`,
+        personName: d.name,
+        dateOfPassing: '',
+        senderName: '',
+        obituaryUrl: '',
+        createdAt: d.openedAt,
+        lastOpenedAt: d.openedAt,
+        draft: {
+          step: d.step,
+          templateCategory: 'announcement',
+          templateOverrideId: null,
+          fields: { personalNote: `note for ${d.name}` },
+          serviceDetailsKnown: null,
+          selectedContactIds: [],
+          place: null,
+          includeFlowers: false,
+          floristId: null,
+          customFlorist: '',
+          flowerDeliveryTarget: 'service',
+          tone: 'plain',
+          messageOverride: null,
+        },
+        serviceReady: false,
+        recipientsNotified: {},
+        momentCompletedAt: {},
+        remindersScheduled: [],
+      }));
+      window.localStorage.setItem('gg.sessions.v1', JSON.stringify(list));
+    }
+
+    it('reopens the most recently opened of two named sessions', async () => {
+      seed([
+        { name: 'Older Person', openedAt: '2026-01-01T00:00:00.000Z', step: 'announce' },
+        { name: 'Newer Person', openedAt: '2026-02-01T00:00:00.000Z', step: 'announce' },
+      ]);
+      render(<App />);
+      expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note for Newer Person');
+    });
+
+    it('opens the landing when the last message was already sent', async () => {
+      seed([{ name: 'Margaret Hayes', openedAt: '2026-02-01T00:00:00.000Z', step: 'sent' }]);
+      render(<App />);
+      expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    });
+  });
 });
