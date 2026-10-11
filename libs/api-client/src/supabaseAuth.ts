@@ -1,5 +1,5 @@
 import { createClient, isAuthRetryableFetchError } from '@supabase/supabase-js';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import type { Profile, ProfileUpdate } from '@griever/shared';
 import { ApiError, apiFetch } from './client.js';
 
@@ -86,6 +86,8 @@ export interface AuthClient {
   /** Ends this device's session only (`scope: 'local'`). */
   signOut(): Promise<SignOutResult>;
   getSession(): Promise<SessionState>;
+  /** Forces a token refresh. `offline` covers no network and 5xx; only a rejected refresh is `signed_out`. */
+  refreshSession(): Promise<SessionState>;
   getProfile(): Promise<ProfileResult>;
   updateProfile(update: ProfileUpdate): Promise<ProfileResult>;
 }
@@ -175,20 +177,21 @@ export function createAuthClient(
       },
     });
 
+  function toSignedIn(session: Session): SessionState {
+    return {
+      status: 'signed_in',
+      session: {
+        userId: session.user.id,
+        email: session.user.email ?? null,
+        accessToken: session.access_token,
+      },
+    };
+  }
+
   async function readSession(): Promise<SessionState> {
     try {
       const { data, error } = await supabase.auth.getSession();
-      if (data.session) {
-        const { session } = data;
-        return {
-          status: 'signed_in',
-          session: {
-            userId: session.user.id,
-            email: session.user.email ?? null,
-            accessToken: session.access_token,
-          },
-        };
-      }
+      if (data.session) return toSignedIn(data.session);
       // An expired session that could not refresh because there is no network is not "signed out".
       return error && reachability(error)
         ? { status: 'offline' }
@@ -261,6 +264,20 @@ export function createAuthClient(
     },
 
     getSession: readSession,
+
+    async refreshSession() {
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (data.session) return toSignedIn(data.session);
+        return error && reachability(error)
+          ? { status: 'offline' }
+          : { status: 'signed_out' };
+      } catch (error) {
+        return reachability(error)
+          ? { status: 'offline' }
+          : { status: 'signed_out' };
+      }
+    },
 
     getProfile: () => profileCall(),
 

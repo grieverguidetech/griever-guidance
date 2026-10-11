@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AccountContactSource } from '@griever/shared';
-import type { AuthClient } from '@griever/api-client/auth';
+import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { SendFlowStorage } from './useSendFlow.js';
 
 export const PROFILE_STORAGE_KEY = 'gg.profile.v1';
@@ -14,6 +14,10 @@ export interface CachedProfile {
 export type IdentityStatus = 'loading' | 'signed_in' | 'signed_out';
 
 export interface UseSupabaseIdentityOptions {
+  /**
+   * Read once at mount. Passing a new client object later does not re-run the boot check, so
+   * create the client once (module scope or a ref), not on every render.
+   */
   client: AuthClient;
   storage?: SendFlowStorage;
 }
@@ -42,12 +46,21 @@ const MESSAGES = {
   rate_limited: 'Too many tries. Please wait a few minutes and try again.',
   offline: "You need a connection to do this. Nothing you've typed is lost.",
   unavailable: "We can't reach your account right now. Please try again in a little while.",
-  weak_password: 'Please choose a longer password.',
+  weak_password: 'Please choose a stronger password.',
 } as const;
 
 /** Maps any failure reason from the auth client to calm copy (C7). */
 export function identityErrorMessage(reason: string): string {
-  return reason in MESSAGES ? MESSAGES[reason as keyof typeof MESSAGES] : MESSAGES.unavailable;
+  return Object.hasOwn(MESSAGES, reason) ? MESSAGES[reason as keyof typeof MESSAGES] : MESSAGES.unavailable;
+}
+
+function isCachedProfile(value: unknown): value is CachedProfile {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const { senderName, contactSource } = value as Record<string, unknown>;
+  return (
+    (senderName === null || typeof senderName === 'string') &&
+    (contactSource === null || contactSource === 'import' || contactSource === 'manual')
+  );
 }
 
 function readCache(storage: SendFlowStorage | undefined): CachedProfile | null {
@@ -55,8 +68,10 @@ function readCache(storage: SendFlowStorage | undefined): CachedProfile | null {
   try {
     const raw = storage.getItem(PROFILE_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CachedProfile>;
-    return { senderName: parsed.senderName ?? null, contactSource: parsed.contactSource ?? null };
+    const parsed: unknown = JSON.parse(raw);
+    return isCachedProfile(parsed)
+      ? { senderName: parsed.senderName, contactSource: parsed.contactSource }
+      : null;
   } catch {
     return null;
   }
@@ -72,44 +87,67 @@ function writeCache(storage: SendFlowStorage | undefined, profile: CachedProfile
   }
 }
 
+function toCached(profile: { senderName: string | null; contactSource: CachedProfile['contactSource'] }): CachedProfile {
+  return { senderName: profile.senderName, contactSource: profile.contactSource };
+}
+
 export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOptions): UseSupabaseIdentityResult {
   const [status, setStatus] = useState<IdentityStatus>('loading');
   const [offline, setOffline] = useState(false);
   const [profile, setProfile] = useState<CachedProfile | null>(() => readCache(storage));
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const clientRef = useRef(client);
+  const storageRef = useRef(storage);
+  // Bumped by anything that decides state (boot, sign-out, a profile edit). A slower, older
+  // request compares its captured value and drops its result instead of overwriting newer state.
+  const gen = useRef(0);
 
   const clearAll = useCallback(() => {
-    writeCache(storage, null);
+    gen.current += 1;
+    writeCache(storageRef.current, null);
     setProfile(null);
     setOffline(false);
     setStatus('signed_out');
-  }, [storage]);
+  }, []);
 
-  const keepProfile = useCallback(
-    (next: CachedProfile | null) => {
-      writeCache(storage, next);
-      setProfile(next);
-    },
-    [storage],
-  );
+  const keepProfile = useCallback((next: CachedProfile | null) => {
+    writeCache(storageRef.current, next);
+    setProfile(next);
+  }, []);
 
-  /** Refreshes the profile from the gateway. Only `signed_out` ends the session (C5). */
+  const fail = useCallback((reason: string) => {
+    if (mounted.current) setError(identityErrorMessage(reason));
+  }, []);
+
+  /**
+   * Runs a profile call. On `signed_out` (a 401) it refreshes the token once and retries once.
+   * A refresh that cannot reach the network is reported as `offline`, never as signed out (C5).
+   */
+  const callWithRefresh = useCallback(async (call: () => Promise<ProfileResult>): Promise<ProfileResult> => {
+    const first = await call();
+    if (first.ok || first.reason !== 'signed_out') return first;
+    const refreshed = await clientRef.current.refreshSession();
+    if (refreshed.status === 'offline') return { ok: false, reason: 'offline' };
+    if (refreshed.status === 'signed_out') return first;
+    return call();
+  }, []);
+
+  /** The session is really gone: end it on the server in the background and clear this device. */
+  const endSession = useCallback(() => {
+    void clientRef.current.signOut();
+    clearAll();
+  }, [clearAll]);
+
   const refreshProfile = useCallback(async () => {
-    const result = await client.getProfile();
-    if (!mounted.current) return;
+    const g = gen.current;
+    const result = await callWithRefresh(() => clientRef.current.getProfile());
+    if (!mounted.current || g !== gen.current) return;
     if (result.ok) {
       setOffline(false);
-      keepProfile({ senderName: result.profile.senderName, contactSource: result.profile.contactSource });
+      keepProfile(toCached(result.profile));
     } else if (result.reason === 'signed_out') {
-      clearAll();
+      endSession();
     } else if (result.reason === 'no_profile') {
       setOffline(false);
       keepProfile(null);
@@ -117,11 +155,12 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
       setOffline(true);
     }
     // unavailable / invalid / failed: keep what we have, stay signed in.
-  }, [client, keepProfile, clearAll]);
+  }, [callWithRefresh, keepProfile, endSession]);
 
   const checkSession = useCallback(async () => {
-    const state = await client.getSession();
-    if (!mounted.current) return;
+    const g = ++gen.current;
+    const state = await clientRef.current.getSession();
+    if (!mounted.current || g !== gen.current) return;
     if (state.status === 'signed_out') {
       clearAll();
       return;
@@ -132,61 +171,67 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
       return;
     }
     setOffline(false);
-    await refreshProfile();
-  }, [client, clearAll, refreshProfile]);
+    void refreshProfile();
+  }, [clearAll, refreshProfile]);
 
   useEffect(() => {
+    mounted.current = true;
     void checkSession();
+    return () => {
+      mounted.current = false;
+    };
   }, [checkSession]);
 
   const signUp = useCallback(
     async (email: string, password: string) => {
       setError(null);
-      const result = await client.signUp(email, password);
+      const result = await clientRef.current.signUp(email, password);
       if (!result.ok) {
-        setError(identityErrorMessage(result.reason));
+        fail(result.reason);
         return false;
       }
       // With email confirmation on there is no session yet; this stays signed out.
       await checkSession();
       return true;
     },
-    [client, checkSession],
+    [fail, checkSession],
   );
 
   const signIn = useCallback(
     async (email: string, password: string) => {
       setError(null);
-      const result = await client.signIn(email, password);
+      const result = await clientRef.current.signIn(email, password);
       if (!result.ok) {
-        setError(identityErrorMessage(result.reason));
+        fail(result.reason);
         return false;
       }
       await checkSession();
       return true;
     },
-    [client, checkSession],
+    [fail, checkSession],
   );
 
   const signOut = useCallback(async () => {
-    await client.signOut();
-    if (mounted.current) clearAll();
-  }, [client, clearAll]);
+    // Local state first, so signing out never waits on the network.
+    clearAll();
+    await clientRef.current.signOut();
+  }, [clearAll]);
 
   const updateSenderName = useCallback(
     async (name: string) => {
       setError(null);
-      const result = await client.updateProfile({ senderName: name });
-      if (!mounted.current) return false;
+      const g = ++gen.current;
+      const result = await callWithRefresh(() => clientRef.current.updateProfile({ senderName: name }));
+      if (!mounted.current || g !== gen.current) return false;
       if (result.ok) {
-        keepProfile({ senderName: result.profile.senderName, contactSource: result.profile.contactSource });
+        keepProfile(toCached(result.profile));
         return true;
       }
-      if (result.reason === 'signed_out') clearAll();
-      else setError(identityErrorMessage(result.reason));
+      if (result.reason === 'signed_out') endSession();
+      else fail(result.reason);
       return false;
     },
-    [client, keepProfile, clearAll],
+    [callWithRefresh, keepProfile, endSession, fail],
   );
 
   const clearError = useCallback(() => setError(null), []);

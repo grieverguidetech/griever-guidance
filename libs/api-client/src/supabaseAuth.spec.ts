@@ -10,6 +10,7 @@ const auth = {
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   getSession: vi.fn(),
+  refreshSession: vi.fn(),
 };
 const stub = { auth } as unknown as SupabaseClient;
 const make = () =>
@@ -249,6 +250,39 @@ describe('getSession', () => {
       error: offlineError(),
     });
     expect(await make().getSession()).toEqual({ status: 'offline' });
+  });
+});
+
+describe('refreshSession', () => {
+  it('returns signed_in with a summary when the refresh works', async () => {
+    auth.refreshSession.mockResolvedValue({
+      data: { session: { access_token: 'new', user: { id: 'u1', email: null } } },
+      error: null,
+    });
+    expect(await make().refreshSession()).toEqual({
+      status: 'signed_in',
+      session: { userId: 'u1', email: null, accessToken: 'new' },
+    });
+  });
+
+  it('returns signed_out when the refresh is rejected', async () => {
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: apiError(400, 'refresh_token_not_found'),
+    });
+    expect(await make().refreshSession()).toEqual({ status: 'signed_out' });
+  });
+
+  it('returns offline, never signed_out, for no network, a 5xx, or a thrown fetch error', async () => {
+    auth.refreshSession.mockResolvedValueOnce({ data: { session: null }, error: offlineError() });
+    expect(await make().refreshSession()).toEqual({ status: 'offline' });
+    auth.refreshSession.mockResolvedValueOnce({
+      data: { session: null },
+      error: new AuthRetryableFetchError('down', 503),
+    });
+    expect(await make().refreshSession()).toEqual({ status: 'offline' });
+    auth.refreshSession.mockRejectedValueOnce(new TypeError('fetch failed'));
+    expect(await make().refreshSession()).toEqual({ status: 'offline' });
   });
 });
 
