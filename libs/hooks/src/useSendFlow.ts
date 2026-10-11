@@ -125,6 +125,14 @@ export function freshDraft(patch: Partial<SendFlowDraft>): SendFlowDraft {
   return { ...draft, ...patch };
 }
 
+/**
+ * True when a saved draft has a message under way (a template chosen, not yet sent), so reopening
+ * the app should put the person back in it rather than start the message over.
+ */
+export function hasDraftInProgress(draft: SendFlowDraft | null | undefined): draft is SendFlowDraft {
+  return !!draft && draft.templateCategory !== null && draft.step !== 'sent';
+}
+
 function fromDraft(draft: SendFlowDraft): SendFlowState {
   const restored: SendFlowState = { ...initialState, ...draft, sendJob: null };
   if (restored.step === 'sending') restored.step = 'review';

@@ -68,3 +68,12 @@ export function Eyebrow({ name, accent2 = false }: { name: string; accent2?: boo
     </p>
   );
 }
+
+/** The one reassurance line (DS-3): everything typed is already on this device. */
+export function SavedNote() {
+  return (
+    <p className="gg-reassure text-center m-0 text-[12px]">
+      Everything is saved on this phone as you go. You can stop and come back.
+    </p>
+  );
+}

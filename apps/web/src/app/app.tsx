@@ -6,10 +6,11 @@ import {
   useSessions,
   freshDraft,
   getContactsRetentionExpiry,
+  hasDraftInProgress,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever/hooks';
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
-import type { MomentKey, SessionDetails } from '@griever/shared';
+import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED } from '../lib/features';
@@ -44,6 +45,12 @@ type AppView =
   | 'shareObituary'
   | 'flow'
   | 'obituary';
+
+const CATEGORY_BY_MOMENT: Partial<Record<MomentKey, TemplateCategory>> = {
+  announce: 'announcement',
+  service: 'service',
+  thanks: 'aftercare',
+};
 
 const browserStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
@@ -195,7 +202,11 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
     if (AUTH_ENABLED) return 'signup';
     // useSessions reads storage synchronously, so a returning visitor goes
     // straight to their session; a first visit starts at adding contacts.
-    return sessions.sessions.some((s) => s.personName.trim() !== '') ? 'pathLanding' : 'addContactsManual';
+    const named = sessions.sessions.filter((s) => s.personName.trim() !== '');
+    if (named.length === 0) return 'addContactsManual';
+    // A message left half-written reopens where it was (#25); the active session is the most recent.
+    const latest = [...named].sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt))[0];
+    return hasDraftInProgress(latest.draft) ? 'flow' : 'pathLanding';
   });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [setupEditing, setSetupEditing] = useState(false);
@@ -404,6 +415,11 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
 
   function startMoment(key: MomentKey) {
     if (!active) return;
+    // Starting a moment that is already under way resumes it; a fresh draft would wipe what was typed.
+    if (hasDraftInProgress(active.draft) && active.draft.templateCategory === CATEGORY_BY_MOMENT[key]) {
+      setView('flow');
+      return;
+    }
     if (key === 'announce') {
       sessions.updateDraft(active.id, freshDraft({ templateCategory: 'announcement', step: 'announce' }));
       setView('flow');

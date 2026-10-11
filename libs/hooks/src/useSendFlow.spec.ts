@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import type { SessionDetails } from '@griever/shared';
-import { freshDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
+import { freshDraft, hasDraftInProgress, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
 
 const session: SessionDetails = {
   personName: 'Margaret Hayes',
@@ -123,5 +123,17 @@ describe('useSendFlow — storage fallback', () => {
     const storage = { getItem: () => '{not json', setItem: vi.fn(), removeItem: vi.fn() };
     const { result } = renderHook(() => useSendFlow({ storage }));
     expect(result.current.step).toBe('template');
+  });
+});
+
+describe('hasDraftInProgress', () => {
+  it('is true once a template is chosen and the message is not yet sent', () => {
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'service', step: 'details' }))).toBe(true);
+  });
+
+  it('is false with no draft, no template yet, or a finished message', () => {
+    expect(hasDraftInProgress(null)).toBe(false);
+    expect(hasDraftInProgress(freshDraft({}))).toBe(false);
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sent' }))).toBe(false);
   });
 });
