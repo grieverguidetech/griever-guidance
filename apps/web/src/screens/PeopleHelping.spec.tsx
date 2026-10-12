@@ -69,8 +69,9 @@ describe('PeopleHelping as an owner', () => {
     await user.click(screen.getByRole('button', { name: 'Send an invitation' }));
     expect(onInvite).not.toHaveBeenCalled();
     const error = screen.getByText("That email doesn't look right.");
-    expect(error).toHaveAttribute('role', 'status');
     expect(field).toHaveAttribute('aria-describedby', error.id);
+    expect(field).toHaveAccessibleDescription("That email doesn't look right.");
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(field).toHaveFocus();
     expect(field).toHaveValue('not-an-email');
   });
@@ -84,13 +85,28 @@ describe('PeopleHelping as an owner', () => {
     expect(screen.getByLabelText('Their email')).toHaveValue('a@b.co');
   });
 
-  it('cancels an invitation, announces it and moves focus to the email field', async () => {
+  it('cancels an invitation, announces it and moves focus to the Invited heading, not the field', async () => {
     const user = userEvent.setup();
     const { onRevoke } = setup();
+    const field = screen.getByLabelText('Their email');
+    await user.type(field, 'bad');
+    await user.click(screen.getByRole('button', { name: 'Send an invitation' }));
     await user.click(screen.getByRole('button', { name: /Cancel this invitation/ }));
     expect(onRevoke).toHaveBeenCalledWith('i1');
     expect(await screen.findByText('Invitation cancelled.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Their email')).toHaveFocus();
+    expect(screen.getByRole('heading', { level: 3, name: 'Invited' })).toHaveFocus();
+    expect(field).not.toHaveAttribute('aria-invalid');
+    expect(field).not.toHaveAccessibleDescription('Invitation cancelled.');
+  });
+
+  it('moves focus to the section heading when no invitations are left', async () => {
+    const user = userEvent.setup();
+    const onRevoke = vi.fn(async () => true);
+    const props = { status: 'ready' as const, message: null, onInvite: vi.fn(), onRevoke };
+    const { rerender } = render(<PeopleHelping view={owner} {...props} />);
+    await user.click(screen.getByRole('button', { name: /Cancel this invitation/ }));
+    rerender(<PeopleHelping view={{ ...owner, invites: [] }} {...props} />);
+    expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toHaveFocus();
   });
 
   it('sends one revoke for a double tap', async () => {

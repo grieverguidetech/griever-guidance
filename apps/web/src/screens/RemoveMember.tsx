@@ -28,7 +28,10 @@ export function RemoveMember({ members, message, onRemove }: Props) {
   const focusAfterClose = useRef<FocusTarget>(null);
   // Once shown, the section stays so the last removal can still be announced and hold focus.
   const hadMembers = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   if (members.length > 0) hadMembers.current = true;
+
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   // Focus follows the swap: into the confirm step when it opens, back out when it closes.
   useEffect(() => {
@@ -60,75 +63,99 @@ export function RemoveMember({ members, message, onRemove }: Props) {
     } finally {
       setPending(false);
     }
-    const next: Result = ok ? { kind: 'removed', name: member.name ?? member.email } : { kind: 'failed' };
-    setTimeout(() => setResult(next), 50);
+    const next: Result = ok
+      ? { kind: 'removed', name: member.name ?? member.email }
+      : { kind: 'failed' };
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setResult(next), 50);
     close(ok ? 'heading' : { row: member.id });
   }
 
-  const status = result?.kind === 'removed' ? `${result.name} has been removed.` : result?.kind === 'failed' ? (message ?? '') : '';
+  const status =
+    result?.kind === 'removed'
+      ? `${result.name} has been removed.`
+      : result?.kind === 'failed'
+        ? (message ?? '')
+        : '';
 
   return (
-    <section aria-labelledby="remove-member-heading" className="flex flex-col gap-3">
-      <h2 id="remove-member-heading" ref={headingRef} tabIndex={-1} className="text-[16px] m-0" style={{ outline: 'none' }}>
+    <section
+      aria-labelledby="remove-member-heading"
+      className="flex flex-col gap-3"
+    >
+      <h2
+        id="remove-member-heading"
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-[16px] m-0"
+        style={{ outline: 'none' }}
+      >
         People helping you
       </h2>
       <div role="status" aria-live="polite" className="text-[13px]">
         {status}
       </div>
-      <ul className="flex flex-col gap-3 m-0 p-0 list-none">
-        {members.map((m) => {
-          const name = m.name ?? m.email;
-          return (
-            <li key={m.id} className="flex flex-col gap-3">
-              {confirmingId === m.id ? (
-                <div
-                  ref={confirmRef}
-                  tabIndex={-1}
-                  role="group"
-                  aria-labelledby={`remove-member-${m.id}`}
-                  className="flex flex-col gap-3"
-                  style={{ outline: 'none' }}
-                >
-                  <p id={`remove-member-${m.id}`} className="text-[14px] leading-[1.6] m-0">
-                    {name} won't see the people you're writing about any more.
-                  </p>
-                  <button
-                    type="button"
-                    className="gg-btn gg-btn-primary gg-btn-block"
-                    aria-disabled={pending}
-                    onClick={() => void remove(m)}
+      {members.length > 0 && (
+        <ul className="flex flex-col gap-3 m-0 p-0 list-none">
+          {members.map((m) => {
+            const name = m.name ?? m.email;
+            return (
+              <li key={m.id} className="flex flex-col gap-3">
+                {confirmingId === m.id ? (
+                  <div
+                    ref={confirmRef}
+                    tabIndex={-1}
+                    role="group"
+                    aria-labelledby={`remove-member-${m.id}`}
+                    className="flex flex-col gap-3"
+                    style={{ outline: 'none' }}
                   >
-                    Remove
-                  </button>
+                    <p
+                      id={`remove-member-${m.id}`}
+                      className="text-[14px] leading-[1.6] m-0"
+                    >
+                      {name} won't see the people you're writing about any more.
+                    </p>
+                    <button
+                      type="button"
+                      className="gg-btn gg-btn-primary gg-btn-block"
+                      aria-disabled={pending}
+                      onClick={() => void remove(m)}
+                    >
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      className="gg-btn gg-btn-secondary gg-btn-block"
+                      aria-disabled={pending}
+                      onClick={() => {
+                        if (!pending) close({ row: m.id });
+                      }}
+                    >
+                      Keep
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
+                    ref={(el) => {
+                      if (el) rowButtons.current.set(m.id, el);
+                      else rowButtons.current.delete(m.id);
+                    }}
                     className="gg-btn gg-btn-secondary gg-btn-block"
-                    disabled={pending}
-                    onClick={() => close({ row: m.id })}
+                    onClick={() => {
+                      setResult(null);
+                      setConfirmingId(m.id);
+                    }}
                   >
-                    Keep
+                    Remove {name}
                   </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  ref={(el) => {
-                    if (el) rowButtons.current.set(m.id, el);
-                    else rowButtons.current.delete(m.id);
-                  }}
-                  className="gg-btn gg-btn-secondary gg-btn-block"
-                  onClick={() => {
-                    setResult(null);
-                    setConfirmingId(m.id);
-                  }}
-                >
-                  Remove {name}
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

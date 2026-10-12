@@ -76,5 +76,19 @@ describe('RemoveMember', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Sam Lee has been removed.'));
     expect(heading).toHaveFocus();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('ignores Keep and a second Remove while a removal is running, and unmounting is safe', async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn(() => new Promise<boolean>(() => undefined));
+    const { unmount } = render(<RemoveMember members={members} message={null} onRemove={onRemove} />);
+    await user.click(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: 'Keep' }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Keep' })).toHaveAttribute('aria-disabled', 'true');
+    unmount();
   });
 });

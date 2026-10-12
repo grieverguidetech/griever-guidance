@@ -21,9 +21,21 @@ interface Props {
 }
 
 /** Shown inside Profile. Emails are typed, never picked from contacts (C3, C6). */
-export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Props) {
+export function PeopleHelping({
+  view,
+  status,
+  message,
+  onInvite,
+  onRevoke,
+}: Props) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const invitedRef = useRef<HTMLHeadingElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Set after a successful cancel: the view the cancel started from, until a newer one arrives.
+  const focusAfterRevoke = useRef<MembersView | null | 'none'>('none');
+  const [revoked, setRevoked] = useState(0);
   const latestMessage = useRef(message);
   latestMessage.current = message;
   const [email, setEmail] = useState('');
@@ -34,13 +46,26 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
 
   // Emptied first, then set after a tick, so a repeat of the same message is read out again.
   function say(text: string) {
+    clearTimeout(timer.current);
     setLive('');
-    if (text) setTimeout(() => setLive(text), 50);
+    if (text) timer.current = setTimeout(() => setLive(text), 50);
   }
 
+  useEffect(() => () => clearTimeout(timer.current), []);
+
   useEffect(() => {
+    if (message) setInvalid(false);
     say(message ?? '');
   }, [message]);
+
+  // After a cancel, focus the list that is left, or the section heading if it is empty. Not the email
+  // field: on a phone that opens the keyboard.
+  useEffect(() => {
+    if (focusAfterRevoke.current === 'none') return;
+    const hasInvites = view?.role === 'owner' && view.invites.length > 0;
+    (hasInvites ? invitedRef.current : headingRef.current)?.focus();
+    if (view !== focusAfterRevoke.current) focusAfterRevoke.current = 'none';
+  }, [view, revoked]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -48,7 +73,6 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
     const parsed = parseInviteEmail(email);
     if (!parsed) {
       setInvalid(true);
-      setLive(EMAIL_INVALID);
       inputRef.current?.focus();
       return;
     }
@@ -68,6 +92,7 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
   async function revoke(inviteId: string) {
     if (revokingId) return;
     setRevokingId(inviteId);
+    setInvalid(false);
     say('');
     let ok = false;
     try {
@@ -76,7 +101,10 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
       setRevokingId(null);
     }
     say(ok ? INVITE_CANCELLED : (latestMessage.current ?? ''));
-    if (ok) inputRef.current?.focus();
+    if (ok) {
+      focusAfterRevoke.current = view;
+      setRevoked((n) => n + 1);
+    }
   }
 
   const owner = view?.role === 'owner' ? view : null;
@@ -84,12 +112,25 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
   return (
     <div className="flex flex-col gap-3">
       {owner && (
-        <>
-          <h2 id={`${id}-heading`} className="text-[16px] m-0">
+        <section
+          aria-labelledby={`${id}-heading`}
+          className="flex flex-col gap-3"
+        >
+          <h2
+            id={`${id}-heading`}
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-[16px] m-0"
+            style={{ outline: 'none' }}
+          >
             People helping you
           </h2>
-          <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
-            They can see the people you're writing about and send their own messages from their own phone.
+          <p
+            className="text-[14px] leading-[1.6] m-0"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            They can see the people you're writing about and send their own
+            messages from their own phone.
           </p>
           <form className="flex flex-col gap-3" onSubmit={submit} noValidate>
             <div className="gg-field">
@@ -102,38 +143,46 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
                 autoComplete="off"
                 value={email}
                 aria-invalid={invalid || undefined}
-                aria-describedby={invalid ? `${id}-live` : undefined}
+                aria-describedby={invalid ? `${id}-error` : undefined}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  if (invalid) {
-                    setInvalid(false);
-                    setLive('');
-                  }
+                  if (invalid) setInvalid(false);
                 }}
               />
+              {invalid && (
+                <p
+                  id={`${id}-error`}
+                  className="m-0 text-[13px]"
+                  style={{ color: 'var(--color-danger, #b91c1c)' }}
+                >
+                  {EMAIL_INVALID}
+                </p>
+              )}
             </div>
-            <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-secondary gg-btn-block">
+            <button
+              type="submit"
+              aria-disabled={pending}
+              className="gg-btn gg-btn-secondary gg-btn-block"
+            >
               {pending ? 'Sending…' : 'Send an invitation'}
             </button>
           </form>
-        </>
+        </section>
       )}
       {view?.role === 'member' && (
-        <p className="text-[14px] leading-[1.6] m-0">You're helping {view.owner.name ?? 'someone'}.</p>
+        <p className="text-[14px] leading-[1.6] m-0">
+          You're helping {view.owner.name ?? 'someone'}.
+        </p>
       )}
 
-      {/* One region, always mounted at this spot. It also carries the email error the field points to. */}
-      <div
-        id={`${id}-live`}
-        role="status"
-        aria-live="polite"
-        className="text-[13px]"
-        style={invalid ? { color: 'var(--color-danger, #b91c1c)' } : undefined}
-      >
+      {/* One region, always mounted at this spot, for announcements only. */}
+      <div role="status" aria-live="polite" className="text-[13px]">
         {live}
       </div>
 
-      {!view && status === 'loading' && <p className="text-[13px] m-0">Loading…</p>}
+      {!view && status === 'loading' && (
+        <p className="text-[13px] m-0">Loading…</p>
+      )}
 
       {owner && owner.members.length > 0 && (
         <>
@@ -150,12 +199,22 @@ export function PeopleHelping({ view, status, message, onInvite, onRevoke }: Pro
 
       {owner && owner.invites.length > 0 && (
         <>
-          <h3 className="text-[14px] m-0">Invited</h3>
+          <h3
+            ref={invitedRef}
+            tabIndex={-1}
+            className="text-[14px] m-0"
+            style={{ outline: 'none' }}
+          >
+            Invited
+          </h3>
           <ul className="flex flex-col gap-3 m-0 p-0 list-none">
             {owner.invites.map((invite) => (
               <li key={invite.id} className="flex flex-col gap-1">
                 <span className="text-[14px]">{invite.email}</span>
-                <span className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                <span
+                  className="text-[13px]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   Invited · link works until {formatDate(invite.expiresAt)}
                 </span>
                 <button
