@@ -4,17 +4,18 @@ import { render, screen } from '@testing-library/react-native';
 import { App } from './App';
 
 describe('App with the account feature off', () => {
-  it('opens on the template picker with no account entry', async () => {
+  it('opens on Home with no account entry', async () => {
     render(<App />);
-    expect(await screen.findByText('Grievers Guidance')).toBeTruthy();
-    expect(screen.getByText('Choose the type of message you would like to send.')).toBeTruthy();
+    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(screen.getByText("Start with someone I've lost")).toBeTruthy();
+    expect(screen.getByText("What you'll need")).toBeTruthy();
     expect(screen.queryByText('Your account')).toBeNull();
   });
 
   it('removes the stale single service date key left by older versions', async () => {
     await AsyncStorage.setItem('gg.serviceDate.v1', 'May 29, 2020');
     render(<App />);
-    await screen.findByText('Grievers Guidance');
+    await screen.findByText("The people you're writing about");
     expect(await AsyncStorage.getItem('gg.serviceDate.v1')).toBeNull();
   });
 });
