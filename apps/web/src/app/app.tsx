@@ -269,6 +269,9 @@ const CHECKLIST_RETURNS: AppView[] = [
   'whoHearsFirst',
 ];
 
+/** Views that need a person to be open; with nobody open Home is shown instead. */
+const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary'];
+
 function isAccountView(view: AppView): boolean {
   return view === 'signup' || view === 'createAccount' || view === 'forgotPassword';
 }
@@ -304,6 +307,9 @@ function AppBody({
     return 'home';
   });
   const firstView = useRef(view);
+  // A save can finish after the person has moved on; it reads the screen from here and never navigates.
+  const viewRef = useRef(view);
+  viewRef.current = view;
   // Shown once, on the first screen after a removal; leaving it ends it for good.
   const [showRemoved, setShowRemoved] = useState(removed);
   useEffect(() => {
@@ -334,6 +340,10 @@ function AppBody({
   const [firstProfile, setFirstProfile] = useState(false);
   // The name typed at sign-up, shown on that first Profile even before the saved one is known.
   const [signUpName, setSignUpName] = useState('');
+  // The background save of that name failed while Profile was still open: say so there, calmly.
+  const [nameSaveFailed, setNameSaveFailed] = useState(false);
+  // The name a save is in flight for, so Continue does not send the same one twice.
+  const savingName = useRef<string | null>(null);
   const [askingName, setAskingName] = useState(false);
   // Bumped on every sign-in attempt and every sign-out. A name check started under an earlier
   // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
@@ -361,6 +371,8 @@ function AppBody({
       // A stale error from another screen would otherwise show here without being announced.
       clearError?.();
       setAskingName(asksName);
+      setFirstProfile(false);
+      setNameSaveFailed(false);
       setReturnTo(from);
       setNeedsName(false);
       setView('profile');
@@ -375,23 +387,47 @@ function AppBody({
     if (!signedIn || !isAccountView(view)) return;
     if (pendingName !== null && updateSenderName) {
       const generation = accountGeneration.current;
-      void updateSenderName(pendingName).then((saved) => {
+      const name = pendingName;
+      savingName.current = name;
+      void updateSenderName(name).then((saved) => {
+        savingName.current = null;
         if (saved || generation !== accountGeneration.current) return;
-        // The prompt below asks again, so the failure message need not linger. If the save failed
-        // because the session ended, the effect further down drops the request instead.
+        // Only the first Profile is told: the person has moved on otherwise, and a late answer
+        // must not pull them back. The sign-in check asks for the name next time. If the save
+        // failed because the session ended, the effect further down drops the request instead.
+        if (viewRef.current !== 'profile') return;
         clearError?.();
+        setNameSaveFailed(true);
         setNeedsName(true);
       });
       setPendingName(null);
-      setSignUpName(pendingName);
+      setSignUpName(name);
       setAskingName(false);
+      setNameSaveFailed(false);
       setFirstProfile(true);
       setView('profile');
     } else {
+      setFirstProfile(false);
+      setNameSaveFailed(false);
       setFlowCategory(undefined);
       setView('home');
+      // Boot-time session or form sign-in: ask in the background whether the account has a name.
+      // It never holds anyone back, and it clears a prompt left over from an earlier session.
+      if (client) {
+        const generation = accountGeneration.current;
+        void accountLacksName(client).then((lacks) => {
+          if (generation === accountGeneration.current) setNeedsName(lacks);
+        });
+      }
     }
-  }, [signedIn, view, pendingName, updateSenderName, clearError]);
+  }, [signedIn, view, pendingName, updateSenderName, clearError, client]);
+
+  // Orphan unnamed people from the old flow would otherwise sit on the device; tidy them once.
+  const pruneEmpty = sessions.pruneEmpty;
+  useEffect(() => {
+    pruneEmpty();
+  }, [pruneEmpty]);
+
 
   // An account with no name (a failed save at sign-up, or a sign-in to one): ask for it, then
   // return to wherever this interrupted.
@@ -477,6 +513,11 @@ function AppBody({
     [sessions.sessions, activeId],
   );
 
+  // With no one open these views have nothing to show, and Home stands in; keep the state honest.
+  useEffect(() => {
+    if (!active && NEEDS_PERSON.includes(view)) setView('home');
+  }, [active, view]);
+
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
     (d: SendFlowDraft) => {
@@ -543,11 +584,21 @@ function AppBody({
     setView('home');
   }
 
-  /** Continue (or Save) on the first Profile: on to Home. A name still missing is asked for at the next sign-in. */
+  /** Leaves the first Profile for Home. A name still missing is asked for at the next sign-in. */
   function leaveFirstProfile() {
     setFirstProfile(false);
+    setNameSaveFailed(false);
     setNeedsName(false);
     setView('home');
+  }
+
+  /** Continue on the first Profile: a changed or unsaved name is saved in the background, never awaited (C5). */
+  function continueFromFirstProfile(name: string) {
+    const known = auth?.profile?.senderName ?? '';
+    if (name && updateSenderName && savingName.current !== name && (nameSaveFailed || name !== known)) {
+      void updateSenderName(name);
+    }
+    leaveFirstProfile();
   }
 
   /** Makes this person the active one. A message left half-written reopens where it was (#25). */
@@ -738,17 +789,8 @@ function AppBody({
             // must not overwrite the name on an existing account.
             setPendingName(null);
             accountGeneration.current += 1;
-            const generation = accountGeneration.current;
-            const ok = await auth.signIn(email, password);
-            // Signing in never waits on a second request: the name check runs in the background
-            // and, if the account has no name, opens the prompt afterwards. It also clears a
-            // prompt left over from an earlier session.
-            if (ok && client) {
-              void accountLacksName(client).then((lacks) => {
-                if (generation === accountGeneration.current) setNeedsName(lacks);
-              });
-            }
-            return ok;
+            // The name check runs once signed in (the effect above), never holding sign-in back.
+            return auth.signIn(email, password);
           }}
         />
       </Shell>
@@ -796,9 +838,10 @@ function AppBody({
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Profile
-          asksName={askingName || (firstProfile && needsName)}
+          asksName={askingName}
           firstTime={firstProfile}
-          onContinue={leaveFirstProfile}
+          saveFailed={firstProfile && nameSaveFailed}
+          onContinue={continueFromFirstProfile}
           senderName={auth.profile?.senderName ?? (firstProfile ? signUpName : null)}
           error={auth.error}
           onBack={() => {
@@ -812,8 +855,7 @@ function AppBody({
           }}
           onSave={async (name) => {
             const saved = await auth.updateSenderName(name);
-            if (saved && firstProfile) leaveFirstProfile();
-            else if (saved && askingName) {
+            if (saved && askingName) {
               setAskingName(false);
               setView(returnTo);
             }

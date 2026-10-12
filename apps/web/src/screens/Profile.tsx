@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { TopBar } from '../lib/ui';
 
+const SAVE_FAILED = "We couldn't save your name. You can try again.";
 const NAME_REQUIRED = 'Please enter your name.';
 
 interface Props {
@@ -13,14 +14,16 @@ interface Props {
   /** Resolves true when saved. A false result keeps what was typed. */
   onSave: (name: string) => Promise<boolean>;
   onSignOut: () => void;
-  /** Straight after sign-up: a primary Continue goes on to Home, and a name is optional to confirm. */
+  /** Straight after sign-up: one primary Continue, which hands over the name and goes on to Home. */
   firstTime?: boolean;
-  onContinue?: () => void;
+  onContinue?: (name: string) => void;
+  /** The background save of the sign-up name failed; Continue tries again. */
+  saveFailed?: boolean;
   /** The identity hook's own calm copy, shown as-is. */
   error: string | null;
 }
 
-export function Profile({ asksName, firstTime, onContinue, senderName, onBack, onSave, onSignOut, error }: Props) {
+export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error }: Props) {
   const id = useId();
   // Until the person types, show whatever name is known, including one that loads late.
   const [typed, setTyped] = useState<string | null>(null);
@@ -32,6 +35,10 @@ export function Profile({ asksName, firstTime, onContinue, senderName, onBack, o
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (pending) return;
+    if (firstTime) {
+      onContinue?.(value.trim());
+      return;
+    }
     if (!value.trim()) {
       setNameError(NAME_REQUIRED);
       return;
@@ -54,15 +61,9 @@ export function Profile({ asksName, firstTime, onContinue, senderName, onBack, o
     <form className="flex flex-col gap-4" onSubmit={submit}>
       <TopBar onBack={onBack} />
       <h1 className="text-[22px]">{asksName ? 'What should we call you?' : 'Your account'}</h1>
-      {asksName && (
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          This is the name on your account.
-        </p>
-      )}
-
-      {firstTime && !asksName && (
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          This is the name on your account. You can change it later.
+      {(asksName || firstTime) && (
+        <p id={`${id}-intro`} className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
+          {asksName ? 'This is the name on your account.' : 'This is the name on your account. You can change it later.'}
         </p>
       )}
 
@@ -74,7 +75,8 @@ export function Profile({ asksName, firstTime, onContinue, senderName, onBack, o
           type="text"
           autoComplete="name"
           autoCapitalize="words"
-          required
+          required={!firstTime}
+          aria-describedby={asksName || firstTime ? `${id}-intro` : undefined}
           value={value}
           onChange={(e) => {
             setTyped(e.target.value);
@@ -87,30 +89,25 @@ export function Profile({ asksName, firstTime, onContinue, senderName, onBack, o
       <div
         aria-live="polite"
         className="text-[13px]"
-        style={nameError || error ? { color: 'var(--color-danger, #b91c1c)' } : undefined}
+        style={nameError || error || saveFailed ? { color: 'var(--color-danger, #b91c1c)' } : undefined}
       >
-        {nameError ?? error ?? (saved ? 'Your name is saved.' : '')}
+        {nameError ?? (saveFailed ? SAVE_FAILED : (error ?? (saved ? 'Your name is saved.' : '')))}
       </div>
 
-      {firstTime && (
-        <button type="button" onClick={onContinue} className="gg-btn gg-btn-primary gg-btn-block">
+      {firstTime ? (
+        <button type="submit" className="gg-btn gg-btn-primary gg-btn-block">
           Continue
         </button>
+      ) : (
+        <>
+          <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
+            {pending ? 'Saving…' : 'Save'}
+          </button>
+          <button type="button" onClick={onSignOut} className="gg-btn gg-btn-ghost gg-btn-block">
+            Sign out
+          </button>
+        </>
       )}
-      <button
-        type="submit"
-        aria-disabled={pending}
-        className={`gg-btn gg-btn-block ${firstTime ? 'gg-btn-secondary' : 'gg-btn-primary'}`}
-      >
-        {pending ? 'Saving…' : 'Save'}
-      </button>
-      <button
-        type="button"
-        onClick={onSignOut}
-        className="gg-btn gg-btn-ghost gg-btn-block"
-      >
-        Sign out
-      </button>
     </form>
   );
 }

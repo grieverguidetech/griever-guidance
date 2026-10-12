@@ -63,9 +63,23 @@ describe('Profile', () => {
       <Profile firstTime onContinue={onContinue} senderName="Anna" onBack={vi.fn()} onSave={onSave} onSignOut={vi.fn()} error={null} />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Your name'), ' Reyes');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(onContinue).toHaveBeenCalledWith('Anna Reyes');
     expect(onSave).not.toHaveBeenCalled();
+    // One primary action: no Save and no Sign out here.
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+  });
+
+  it('first-time mode describes the field and keeps a failed-save note in the live region', () => {
+    render(
+      <Profile firstTime saveFailed onContinue={vi.fn()} senderName="Anna" onBack={vi.fn()} onSave={vi.fn()} onSignOut={vi.fn()} error={null} />,
+    );
+    const field = screen.getByLabelText('Your name');
+    expect(field).toHaveAccessibleDescription(/name on your account/);
+    const note = screen.getByText("We couldn't save your name. You can try again.");
+    expect(note).toHaveAttribute('aria-live', 'polite');
   });
 
   it('the existing mode has no Continue', () => {

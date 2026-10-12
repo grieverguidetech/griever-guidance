@@ -68,7 +68,18 @@ describe('remove everything from this device, auth on (#51)', () => {
           : { status: 'signed_out' as const },
       ),
       refreshSession: vi.fn(async () => ({ status: 'signed_out' as const })),
-      getProfile: vi.fn(async () => ({ ok: false as const, reason: 'no_profile' as const })),
+      // The seeded device is Anna's account, which has a name: the boot-time name check (#114) must not interrupt Settings.
+      getProfile: vi.fn(async () => ({
+        ok: true as const,
+        profile: {
+          id: 'u1',
+          senderName: 'Anna',
+          contactSource: null,
+          accountType: 'owner' as const,
+          createdAt: '2026-10-11T00:00:00.000Z',
+          updatedAt: '2026-10-11T00:00:00.000Z',
+        },
+      })),
     } as unknown as AuthClient;
     mocks.load.mockResolvedValue({ available: true, client });
     seedDevice();
