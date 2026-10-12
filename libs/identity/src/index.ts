@@ -5,7 +5,7 @@ export type { ProfileRouterConfig } from './profileRouter.js';
 export { supabaseAuth, clearJwksCache } from './supabaseJwt.js';
 export type { SupabaseConfig, SupabaseAuthVariables } from './supabaseJwt.js';
 export { createProfilesClient } from './supabaseClient.js';
-export type { ProfileDto, ProfileFields, ProfilesClient } from './supabaseClient.js';
+export type { ProfileFields, ProfilesClient } from './supabaseClient.js';
 
 /**
  * GET/PUT /me/profile against Supabase, as the signed-in caller (anon key plus

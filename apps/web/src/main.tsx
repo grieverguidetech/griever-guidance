@@ -16,3 +16,11 @@ root.render(
 );
 
 void registerSync();
+
+// Drop the token key left by the old identity system. Runs after sync starts
+// so cleanup can never stop it.
+try {
+  localStorage.removeItem('gg.identity.token.v1');
+} catch {
+  /* storage blocked; nothing to clean */
+}

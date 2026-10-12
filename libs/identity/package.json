@@ -15,7 +15,7 @@
     "name": "identity"
   },
   "dependencies": {
-    "convex": "^1.45.0",
+    "@griever/shared": "workspace:*",
     "hono": "^4.13.7"
   }
 }

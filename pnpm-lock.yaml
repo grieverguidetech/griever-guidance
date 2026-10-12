@@ -425,9 +425,9 @@ importers:
 
   libs/identity:
     dependencies:
-      convex:
-        specifier: ^1.45.0
-        version: 1.45.0(react@19.1.0)
+      '@griever/shared':
+        specifier: workspace:*
+        version: link:../shared
       hono:
         specifier: ^4.13.7
         version: 4.13.7

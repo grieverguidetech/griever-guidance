@@ -16,5 +16,10 @@
     "src/**/*.test.ts",
     "src/testSupabase.ts"
   ],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../shared/tsconfig.lib.json"
+    }
+  ]
 }
