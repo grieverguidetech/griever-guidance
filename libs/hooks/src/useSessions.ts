@@ -99,9 +99,12 @@ export interface UseSessionsResult {
    * a 'member' session. A 'member' session whose flow is no longer returned is removed (access was
    * lost). 'owner' sessions are never removed. Drafts, contacts, who was notified, reminders and
    * edited wording are never touched. With no signed-in user (`myUserId` empty) nothing changes.
+   * When `dropped > 0` some records could not be read, so nothing is removed (they may be among
+   * the missing). A role comes from ownership: `record.ownerId === myUserId`. A session with
+   * `ownerId === null` is never turned into a member.
    */
   applyRemoteFlows: (
-    records: readonly FlowRecord[],
+    result: { flows: readonly FlowRecord[]; dropped?: number },
     myUserId: string,
     pendingByFlow?: Readonly<Record<string, Iterable<FlowFactKey>>>,
   ) => void;
@@ -236,6 +239,7 @@ function mergeRecordIntoSession(
   session: Session,
   record: FlowRecord,
   pending: Iterable<FlowFactKey>,
+  myUserId: string,
 ): Session {
   const pendingKeys = new Set(pending);
   const local = toFlowFacts(session);
@@ -246,16 +250,18 @@ function mergeRecordIntoSession(
   for (const key of FLOW_FACT_KEYS) {
     if (!pendingKeys.has(key) && merged[key] !== local[key]) changed[key] = mapped[key];
   }
-  return {
-    ...session,
-    ...(changed as Partial<ReturnType<typeof flowFactsToSessionFields>>),
-    ownerId: record.ownerId,
-    role: record.role,
-  };
+  const facts = { ...session, ...(changed as Partial<ReturnType<typeof flowFactsToSessionFields>>) };
+  const mine = record.ownerId === myUserId;
+  // Made on this device and not tied to an account: only the account's own record may claim it.
+  if (session.ownerId === null && !mine) return facts;
+  return { ...facts, ownerId: record.ownerId, role: mine ? 'owner' : 'member' };
 }
 
 function sessionFromRecord(record: FlowRecord): Session {
   const now = new Date().toISOString();
+  // A person that arrives from the server must not jump ahead of the one being worked on.
+  const updated = Date.parse(record.updatedAt);
+  const lastOpenedAt = new Date(Number.isNaN(updated) ? 0 : updated).toISOString();
   return {
     ...flowFactsToSessionFields(record.facts),
     id: newId(),
@@ -264,7 +270,7 @@ function sessionFromRecord(record: FlowRecord): Session {
     role: 'member',
     senderName: '',
     createdAt: now,
-    lastOpenedAt: now,
+    lastOpenedAt,
     drafts: {},
     draftsUpdatedAt: {},
     recipientsNotified: {},
@@ -418,20 +424,20 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   );
 
   const applyRemoteFlows = useCallback<UseSessionsResult['applyRemoteFlows']>(
-    (records, myUserId, pendingByFlow = {}) => {
+    ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}) => {
       if (!myUserId) return;
-      const returned = new Map(records.map((r) => [r.id, r]));
+      const returned = new Map(flows.map((r) => [r.id, r]));
       setSessions((list) => {
         const known = new Set(list.map((s) => s.flowId));
         const updated = list
           // Losing access removes a shared person; a person this user owns is never removed here.
-          .filter((s) => s.role !== 'member' || returned.has(s.flowId))
+          .filter((s) => dropped > 0 || s.role !== 'member' || returned.has(s.flowId))
           .map((s) => {
             const record = returned.get(s.flowId);
-            return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? []) : s;
+            return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? [], myUserId) : s;
           });
-        const added = records.filter((r) => !known.has(r.id)).map(sessionFromRecord);
-        return [...added, ...updated];
+        const added = [...returned.values()].filter((r) => !known.has(r.id)).map(sessionFromRecord);
+        return [...updated, ...added];
       });
     },
     [],

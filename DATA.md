@@ -171,8 +171,18 @@ additive: an older list loads, and the file keeps its key and shape.
   (`personName`, `dateOfPassing`, `serviceDate`, `obituaryUrl`, `obituaryPublisher`, `serviceReady`)
   plus `ownerId` and `role`. A field with an unsent local edit keeps the local value. A flow not on
   the device becomes a `role: 'member'` session. A `member` session whose flow is no longer
-  returned is removed (access was lost); an `owner` session is never removed. Drafts, contacts,
-  `recipientsNotified`, reminders and `messageOverride` are never read from or written by it.
+  returned is removed (access was lost); an `owner` session is never removed. Drafts,
+  `draftsUpdatedAt`, contacts, `recipientsNotified`, `momentCompletedAt`, reminders, `senderName`
+  and `messageOverride` are never read from or written by it.
+- The role comes from ownership: `record.ownerId` equal to the signed-in user is `owner`, anything
+  else is `member`. A session with `ownerId: null` is never turned into a member.
+- When the list reply had records that failed validation (`dropped > 0`), valid records are still
+  merged and added, but nothing is removed, because a dropped record may be the one that is missing.
+- A person added from the server sorts after the ones already on the device, and its
+  `lastOpenedAt` is the record's `updatedAt` (the epoch if that will not parse), so it does not
+  take over as the person the app reopens.
+- The `flowId` given to an old session is stable only once the save succeeds. If storage is full
+  or unavailable, the next load makes a new one.
 
 ### 2.1 The C3 checklist lives on the account
 

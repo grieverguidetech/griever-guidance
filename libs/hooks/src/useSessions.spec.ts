@@ -6,6 +6,7 @@ import type { Session } from './useSessions.js';
 import {
   CONTACT_RETENTION_DAYS,
   generateFlowId,
+  namedSessionsByRecent,
   getContactsRetentionExpiry,
   latestInProgressDraft,
   stripSentWording,
@@ -302,7 +303,7 @@ describe('flow ids, owner and role (#133)', () => {
       vi.stubGlobal('crypto', {
         getRandomValues: (a: Uint8Array) => a.fill(255),
       });
-      expect(generateFlowId()).toMatch(V4);
+      expect(generateFlowId()).toBe('ffffffff-ffff-4fff-bfff-ffffffffffff');
     });
 
     it('builds a valid v4 from Math.random when crypto is missing entirely', () => {
@@ -346,7 +347,8 @@ describe('flow ids, owner and role (#133)', () => {
 
     it('creates a member session for a flow not on the device', () => {
       const { result } = renderHook(() => useSessions(mem().storage));
-      act(() => result.current.applyRemoteFlows([record(A, { personName: 'Joan', serviceDate: 'May 29, 2026' })], 'me'));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, { personName: 'Joan', serviceDate: 'May 29, 2026' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
       const [s] = result.current.sessions;
       expect(s).toMatchObject({
         flowId: A,
@@ -362,7 +364,7 @@ describe('flow ids, owner and role (#133)', () => {
 
     it('does nothing when nobody is signed in', () => {
       const { result } = renderHook(() => useSessions(mem([owned(A)]).storage));
-      act(() => result.current.applyRemoteFlows([record(B)], ''));
+      act(() => result.current.applyRemoteFlows({ flows: [record(B)] }, ''));
       expect(result.current.sessions.map((s) => s.flowId)).toEqual([A]);
     });
 
@@ -371,11 +373,12 @@ describe('flow ids, owner and role (#133)', () => {
       const { result } = renderHook(() => useSessions(mem([local]).storage));
       act(() =>
         result.current.applyRemoteFlows(
-          [record(A, { personName: 'Remote name', serviceDate: 'June 1, 2026', serviceReady: true }, 'owner')],
+          { flows: [record(A, { personName: 'Remote name', serviceDate: 'June 1, 2026', serviceReady: true }, 'owner')] },
           'owner-1',
           { [A]: ['personName'] },
         ),
       );
+      expect(result.current.sessions).toHaveLength(1);
       const [s] = result.current.sessions;
       expect(s.personName).toBe('Typed locally');
       expect(s.serviceDate).toBe('June 1, 2026');
@@ -385,7 +388,7 @@ describe('flow ids, owner and role (#133)', () => {
     it('removes a member session whose flow is gone, but never an owner session', () => {
       const m = mem([owned(A, { role: 'member' }), owned(B, { role: 'owner' })]);
       const { result } = renderHook(() => useSessions(m.storage));
-      act(() => result.current.applyRemoteFlows([], 'me'));
+      act(() => result.current.applyRemoteFlows({ flows: [], dropped: 0 }, 'me'));
       expect(result.current.sessions.map((s) => s.flowId)).toEqual([B]);
     });
 
@@ -404,7 +407,8 @@ describe('flow ids, owner and role (#133)', () => {
       });
       const { result } = renderHook(() => useSessions(mem([local]).storage));
       const before = result.current.sessions[0];
-      act(() => result.current.applyRemoteFlows([record(A, { personName: 'Changed' })], 'me'));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, { personName: 'Changed' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
       const after = result.current.sessions[0];
       expect(after.personName).toBe('Changed');
       expect(after.drafts).toEqual(before.drafts);
@@ -412,6 +416,57 @@ describe('flow ids, owner and role (#133)', () => {
       expect(after.remindersScheduled).toEqual(before.remindersScheduled);
       expect(after.senderName).toBe('Anna');
       expect(JSON.stringify(after)).toContain('My own words.');
+    });
+
+    it('keeps a member session and its drafts when some records could not be read', () => {
+      const draft = freshDraft({ step: 'review', templateCategory: 'announcement', selectedContactIds: ['c1'] });
+      const m = owned(A, { role: 'member', drafts: { announcement: draft } });
+      const { result } = renderHook(() => useSessions(mem([m]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [], dropped: 1 }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
+      expect(result.current.sessions[0].drafts.announcement).toEqual(draft);
+    });
+
+    it('still adds the valid records when some could not be read', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A)], dropped: 2 }, 'me'));
+      expect(result.current.sessions.map((s) => s.flowId)).toEqual([A]);
+    });
+
+    it('does not let a newly shared person take focus from the local one', () => {
+      const local = owned(B, { personName: 'Local Person', lastOpenedAt: '2026-10-01T00:00:00.000Z' });
+      const { result } = renderHook(() => useSessions(mem([local]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, { personName: 'Shared Person' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(2);
+      expect(result.current.sessions[0].flowId).toBe(B);
+      expect(namedSessionsByRecent(result.current.sessions)[0].flowId).toBe(B);
+      expect(result.current.sessions[1].lastOpenedAt).toBe('2026-10-01T00:00:00.000Z');
+    });
+
+    it('uses the epoch when the record time will not parse', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [{ ...record(A), updatedAt: 'nonsense' }] }, 'me'));
+      expect(result.current.sessions[0].lastOpenedAt).toBe('1970-01-01T00:00:00.000Z');
+    });
+
+    it('never turns a session made on this device into a member', () => {
+      const { result } = renderHook(() => useSessions(mem([owned(A)]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A)] }, 'me'));
+      expect(result.current.sessions[0]).toMatchObject({ role: 'owner', ownerId: null });
+      act(() => result.current.applyRemoteFlows({ flows: [], dropped: 0 }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
+    });
+
+    it('takes the role from ownership: my own record makes me the owner', () => {
+      const { result } = renderHook(() => useSessions(mem([owned(A)]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, {}, 'member')] }, 'owner-1'));
+      expect(result.current.sessions[0]).toMatchObject({ role: 'owner', ownerId: 'owner-1' });
+    });
+
+    it('makes one session when the same record is returned twice', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A), record(A, { personName: 'Later' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
     });
   });
 });
