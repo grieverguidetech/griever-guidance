@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProfilesClient } from './supabaseClient.js';
-import { SUPABASE_URL, USER_ID, jsonResponse } from './testSupabase.js';
+import { SUPABASE_URL, USER_ID, jsonResponse } from '@griever/gateway-auth/testing';
 
 const ROW = {
   id: USER_ID,

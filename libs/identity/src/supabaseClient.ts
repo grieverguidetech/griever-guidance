@@ -1,5 +1,5 @@
 import type { Profile } from '@griever/shared';
-import type { SupabaseConfig } from './supabaseJwt.js';
+import { postgrestHeaders, type SupabaseConfig } from '@griever/gateway-auth';
 
 export interface ProfileFields {
   senderName?: string | null;
@@ -36,11 +36,7 @@ function toDto(row: ProfileRow): Profile {
  */
 export function createProfilesClient(config: SupabaseConfig, accessToken: string): ProfilesClient {
   const endpoint = `${config.url}/rest/v1/profiles`;
-  const headers = {
-    apikey: config.anonKey,
-    Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-  };
+  const headers = postgrestHeaders(config, accessToken);
 
   async function readRows(res: Response): Promise<ProfileRow[]> {
     if (!res.ok) throw new Error(`profiles request failed (${res.status})`);
