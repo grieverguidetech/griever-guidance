@@ -5,3 +5,5 @@ export { buildInviteLink, cleanOwnerName, inviteEmailContent, sendInviteEmail } 
 export type { InviteEmailInput, SendInviteResult } from './mailer.js';
 export { createInvite, acceptInvite, listMembers, revokeInvite, removeMember, getOwnName } from './membersClient.js';
 export type { MembersFailure, MembersResult } from './membersClient.js';
+export { createMembersRouter, membersRouter } from './membersRouter.js';
+export type { MembersRouterConfig } from './membersRouter.js';
