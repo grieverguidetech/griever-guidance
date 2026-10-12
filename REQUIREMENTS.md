@@ -37,7 +37,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | C7 | All user-facing copy is calm and plain. No exclamation points, no celebratory microcopy. | §6 "Tone and copy" |
 | C8 | Every gateway route validates its request body/query. | §6 "What not to do" |
 | C9 | Deletion is never offered inside a flow or as a swipe action — only in settings. | DATA.md §7 |
-| C10 | The product never implies an order to funeral planning other than the real one: pronouncement → custody → burial/cremation → service → obituary → public announcement. Never ask for an obituary link during setup. | design_specs README |
+| C10 | The product never implies an order to funeral planning other than the real one: pronouncement → custody → burial/cremation → service → obituary → broader public announcement. Telling close family and friends first, one at a time from the user's own phone (the app's "Announce the passing" step), is not that public announcement and can happen at any point. Never ask for an obituary link during setup. | design_specs README |
 
 ---
 
