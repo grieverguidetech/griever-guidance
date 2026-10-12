@@ -23,6 +23,9 @@ import type { AuthClientResult } from '../lib/authClient';
 import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
+import { ForgotPassword } from '../screens/ForgotPassword';
+import { ChooseNewPassword } from '../screens/ChooseNewPassword';
+import { captureRecoveryLink, takeRecoveryLink } from '../lib/recoveryLink';
 import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { removeEverythingFromDevice } from '../lib/removeFromDevice';
@@ -40,6 +43,8 @@ import { Flow } from './Flow';
 type AppView =
   | 'signup'
   | 'createAccount'
+  | 'forgotPassword'
+  | 'chooseNewPassword'
   | 'profile'
   | 'settings'
   | 'addContactsManual'
@@ -195,6 +200,8 @@ export function App() {
     return () => clearTimeout(timer);
   }, [removals]);
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
+  // Before anything can load or fail: take a reset token out of the address bar.
+  if (AUTH_ENABLED) captureRecoveryLink();
   const body = !AUTH_ENABLED ? (
     <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />
   ) : (
@@ -247,7 +254,7 @@ function viewForReturning(sessionList: Session[]): AppView {
 }
 
 function isAccountView(view: AppView): boolean {
-  return view === 'signup' || view === 'createAccount';
+  return view === 'signup' || view === 'createAccount' || view === 'forgotPassword';
 }
 
 function AppBody({
@@ -274,6 +281,8 @@ function AppBody({
 
   const [view, setView] = useState<AppView>(() => {
     if (offline) return viewForReturning(sessions.sessions);
+    // Opened from a reset email: the new-password screen, not sign-up.
+    if (AUTH_ENABLED && captureRecoveryLink()) return 'chooseNewPassword';
     if (AUTH_ENABLED) return 'signup';
     // useSessions reads storage synchronously, so a returning visitor goes
     // straight to their session; a first visit starts at adding contacts.
@@ -367,7 +376,7 @@ function AppBody({
       setView('signup');
     }
   }, [signedOut, leftOnPurpose, view]);
-  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
+  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view) && view !== 'chooseNewPassword';
   // One polite region that is always there, so the note is announced when its text appears.
   const signedOutNote = auth ? (
     <div role="status" aria-live="polite" className="text-[13px]">
@@ -599,6 +608,10 @@ function AppBody({
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <CreateAccount
           error={auth.error}
+          onForgotPassword={() => {
+            auth.clearError();
+            setView('forgotPassword');
+          }}
           onBack={() => {
             auth.clearError();
             setView('signup');
@@ -619,6 +632,43 @@ function AppBody({
               });
             }
             return ok;
+          }}
+        />
+      </Shell>
+    );
+  }
+
+  if (auth && view === 'forgotPassword') {
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+        <ForgotPassword
+          onBack={() => setView('createAccount')}
+          onSubmit={(email) => auth.requestReset(email, window.location.origin)}
+        />
+      </Shell>
+    );
+  }
+
+  if (auth && view === 'chooseNewPassword') {
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+        <ChooseNewPassword
+          openLink={() => auth.openRecoveryLink(takeRecoveryLink())}
+          onSubmit={auth.completeReset}
+          onAskForNewLink={() => setView('forgotPassword')}
+          onBackToSignIn={() => setView('createAccount')}
+          onContinue={() => {
+            // Same as a sign-in: ask for a name if the account has none.
+            setPendingName(null);
+            accountGeneration.current += 1;
+            const generation = accountGeneration.current;
+            if (client) {
+              void accountLacksName(client).then((lacks) => {
+                if (generation === accountGeneration.current) setNeedsName(lacks);
+              });
+            }
+            setFlowCategory(undefined);
+            setView(viewForReturning(sessionList));
           }}
         />
       </Shell>

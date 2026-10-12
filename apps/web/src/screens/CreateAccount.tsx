@@ -13,10 +13,12 @@ interface Props {
   onSubmit: (input: SignInInput) => Promise<boolean>;
   /** The identity hook's own calm copy, shown as-is. */
   error: string | null;
+  /** Opens the reset screen. */
+  onForgotPassword?: () => void;
 }
 
 /** The sign-in screen. The file keeps its old name; sign-up lives in SignUp. */
-export function CreateAccount({ onBack, onSubmit, error }: Props) {
+export function CreateAccount({ onBack, onSubmit, error, onForgotPassword }: Props) {
   const ids = useId();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,6 +81,11 @@ export function CreateAccount({ onBack, onSubmit, error }: Props) {
       <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
         {pending ? 'Signing you in…' : 'Sign in'}
       </button>
+      {onForgotPassword && (
+        <button type="button" onClick={onForgotPassword} className="gg-btn gg-btn-ghost gg-btn-block">
+          Forgot your password?
+        </button>
+      )}
     </form>
   );
 }

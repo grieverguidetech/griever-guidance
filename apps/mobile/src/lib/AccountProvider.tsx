@@ -26,6 +26,10 @@ const LOADING: UseSupabaseIdentityResult = {
   signIn: async () => false,
   signOut: async () => undefined,
   updateSenderName: async () => false,
+  // Password reset has no mobile screen yet; these are never reached.
+  requestReset: async () => ({ ok: false, message: '' }),
+  openRecoveryLink: async () => ({ ok: false, message: '' }),
+  completeReset: async () => ({ ok: false, message: '' }),
 };
 
 /** Calls the hook and hands the result up. Renders nothing. */
