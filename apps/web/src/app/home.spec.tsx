@@ -170,3 +170,221 @@ describe('Home as the landing (#112)', () => {
     await expectHome();
   });
 });
+
+describe('Create a new one walks setup, contacts, then who hears first (#113)', () => {
+  const FIRST = "Start with someone I've lost";
+  const sessionsInStorage = () => JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]') as { personName: string }[];
+
+  async function heading(name: string) {
+    return screen.findByRole('heading', { level: 1, name });
+  }
+
+  async function fillSetup(user: User, name: string) {
+    await user.type(await screen.findByLabelText('Their name'), name);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+  }
+
+  async function addOneContact(user: User) {
+    await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
+    await user.type(screen.getByLabelText('Mobile number'), '6175550148');
+    await user.click(screen.getByRole('button', { name: 'Add and start another' }));
+    await screen.findByText('Added so far — 1');
+  }
+
+  it('first visit: setup, then adding contacts, then who hears first, then the new path', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await expectHome();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: FIRST }));
+    expect(await heading('Who are we writing about?')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/obituary/i)).not.toBeInTheDocument(); // C10
+    await fillSetup(user, 'Margaret Hayes');
+    expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    expect(await heading('Who should hear first?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+    expect(await heading('One thing at a time.')).toBeInTheDocument();
+    expect(screen.getByText('For Margaret Hayes')).toBeInTheDocument();
+    // Back from the path lists the person just created.
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await expectHome();
+    expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
+  });
+
+  it('a second create skips adding contacts: setup, who hears first, path', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await heading('Who should we be able to reach?');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: "Someone else I've lost" }));
+    await fillSetup(user, 'Harold Price');
+    expect(await heading('Who should hear first?')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Who should we be able to reach?' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+    expect(await heading('One thing at a time.')).toBeInTheDocument();
+    expect(screen.getByText('For Harold Price')).toBeInTheDocument();
+  });
+
+  it('Back goes one step at a time: path-bound steps return to contacts, then setup, then Home', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await heading('Who should hear first?');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await heading('Who are we writing about?')).toBeInTheDocument();
+    expect(screen.getByLabelText('Their name')).toHaveValue('Margaret Hayes');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await expectHome();
+    expect(sessionsInStorage()).toHaveLength(1); // a named person is kept
+  });
+
+  it('Back from who hears first goes to setup when contacts were skipped', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: "Someone else I've lost" }));
+    await fillSetup(user, 'Harold Price');
+    await heading('Who should hear first?');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await heading('Who are we writing about?')).toBeInTheDocument();
+  });
+
+  it('Back from an untouched setup on a first visit returns to Home and lists nobody', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await heading('Who are we writing about?');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await expectHome();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(sessionsInStorage()).toHaveLength(0);
+  });
+
+  it('saves who hears first on this device and does not make a second person', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Aunt Carol' }));
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await heading('One thing at a time.');
+    expect(sessionsInStorage()).toHaveLength(1);
+    const { contactStore } = await import('@griever/data-local');
+    expect((await contactStore.list()).map((c) => c.tier)).toEqual(['first']);
+  });
+
+  it('makes no network call while walking the whole order (C5)', async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: FIRST }));
+      await fillSetup(user, 'Margaret Hayes');
+      await addOneContact(user);
+      await user.click(screen.getByRole('button', { name: 'Done for now' }));
+      await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
+      await heading('One thing at a time.');
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps the checklist inside the walk: Back from it returns to the step it was opened from', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await heading('Who should we be able to reach?');
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
+  });
+
+  it('keeps typed contact input and unsaved ticks across the checklist', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await heading('Who should we be able to reach?');
+    await user.type(screen.getByLabelText('Name'), 'Uncle Joe');
+    await user.type(screen.getByLabelText('Mobile number'), '617555');
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await heading('Who should we be able to reach?');
+    expect(screen.getByLabelText('Name')).toHaveValue('Uncle Joe');
+    expect(screen.getByLabelText('Mobile number')).toHaveValue('617555');
+
+    await user.clear(screen.getByLabelText('Name'));
+    await user.clear(screen.getByLabelText('Mobile number'));
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Aunt Carol' }));
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await heading('Who should hear first?');
+    expect(screen.getByRole('checkbox', { name: 'Aunt Carol' })).toBeChecked();
+  });
+
+  it('still reaches a step when the local contacts read never answers', async () => {
+    const { contactStore } = await import('@griever/data-local');
+    const spy = vi.spyOn(contactStore, 'list').mockImplementation(() => new Promise(() => undefined));
+    const user = userEvent.setup();
+    try {
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: FIRST }));
+      await fillSetup(user, 'Margaret Hayes');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' }, { timeout: 4000 })).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
+  }, 10_000);
+
+  it('Edit details from the path and Continue returns to the path, not the contacts walk', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
+    await heading('One thing at a time.');
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await heading('Edit their details');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await heading('One thing at a time.')).toBeInTheDocument();
+  });
+
+  it('Back from who hears first returns to the contacts view that was used', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await heading('Who should hear first?');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
+  });
+});

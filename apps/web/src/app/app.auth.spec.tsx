@@ -129,9 +129,9 @@ beforeEach(() => {
 });
 
 describe('flag off', () => {
-  it('shows the contacts screen and never loads the auth client', async () => {
+  it('shows Home and never loads the auth client', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
     await Promise.resolve();
     expect(mocks.load).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();

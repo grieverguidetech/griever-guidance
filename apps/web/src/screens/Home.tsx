@@ -65,6 +65,12 @@ export function Home({ sessions, onOpen, onCreate, canCreate }: Props) {
         </p>
       )}
 
+      {people.length === 0 && canCreate && (
+        <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)' }}>
+          No one here yet.
+        </p>
+      )}
+
       {canCreate && (
         <button
           type="button"

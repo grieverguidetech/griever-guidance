@@ -1,15 +1,18 @@
 import { expect, test } from '@playwright/test';
-import { addContacts, BOB, CAROL, onboard } from './support';
+import { addContacts, BOB, CAROL, HOME_HEADING, onboard, startFirstPerson } from './support';
 
 test.describe('first visit', () => {
-  test('starts at adding contacts, with no sign-up wall', async ({ page }) => {
+  test('starts at Home, with no sign-up wall and nobody listed', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
+    await expect(page.getByRole('button', { name: "Start with someone I've lost" })).toBeVisible();
+    await expect(page.getByRole('button', { name: "What you'll need" })).toBeVisible();
+    await expect(page.getByRole('list')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
   });
 
   test('explains a number that does not look right', async ({ page }) => {
-    await page.goto('/');
+    await startFirstPerson(page);
     await page.getByLabel('Name').fill('Aunt Carol');
     await page.getByLabel('Mobile number').fill('123');
     await page.getByRole('button', { name: 'Add and start another' }).click();
@@ -18,7 +21,7 @@ test.describe('first visit', () => {
   });
 
   test('marks who hears first and files everyone else as friends & family', async ({ page }) => {
-    await page.goto('/');
+    await startFirstPerson(page);
     await addContacts(page, [CAROL, BOB]);
     await expect(page.getByText('Hears first')).toHaveCount(1);
     await expect(page.getByText('Friends & family')).toHaveCount(1);
@@ -51,10 +54,16 @@ test.describe('coming back', () => {
 
   test('keeps working with the network cut off after load (C5)', async ({ page, context }) => {
     await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
     await context.setOffline(true);
+    await page.getByRole('button', { name: "Start with someone I've lost" }).click();
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await page.getByRole('button', { name: 'Continue' }).click();
     await addContacts(page, [CAROL]);
     await page.getByRole('button', { name: 'Done for now' }).click();
     await expect(page.getByRole('heading', { name: 'Who should hear first?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Save and continue' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await context.setOffline(false);
   });
 });

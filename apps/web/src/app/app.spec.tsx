@@ -13,17 +13,28 @@ async function addContact(user: ReturnType<typeof userEvent.setup>, name: string
   await user.click(screen.getByRole('button', { name: 'Add and start another' }));
 }
 
+/** A first visit: Home, then "Start with someone I've lost", then their name, which opens the contacts step. */
+async function reachContacts(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+}
+
 describe('App onboarding', () => {
-  it('starts a first visit at adding contacts, with no account step', () => {
+  it('starts a first visit at Home with nobody listed and no account step', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
   it('only enables adding once both name and number are filled', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await reachContacts(user);
     const add = screen.getByRole('button', { name: 'Add and start another' });
     expect(add).toBeDisabled();
     await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
@@ -35,25 +46,18 @@ describe('App onboarding', () => {
   it('explains a bad number calmly and keeps what was typed', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await reachContacts(user);
     await addContact(user, 'Aunt Carol', '123');
     expect(screen.getByText("That number doesn't look right — check the area code and digits.")).toBeInTheDocument();
     expect(screen.getByLabelText('Name')).toHaveValue('Aunt Carol');
     expect(screen.queryByText(/Added so far/)).not.toBeInTheDocument();
   });
 
-  it('walks contacts → who hears first → their details → one next thing', async () => {
+  it('walks their details → contacts → who hears first → one next thing', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await addContact(user, 'Aunt Carol', '(617) 555-0148');
-    expect(await screen.findByText('Added so far — 1')).toBeInTheDocument();
-    expect(screen.getByText('(617) 555-0148')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toHaveValue('');
-
-    await user.click(screen.getByRole('button', { name: 'Done for now' }));
-    expect(screen.getByRole('heading', { name: 'Who should hear first?' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     expect(screen.getByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
     const cont = screen.getByRole('button', { name: 'Continue' });
     expect(cont).toBeDisabled();
@@ -63,6 +67,16 @@ describe('App onboarding', () => {
     await user.type(screen.getByLabelText('Date they passed (optional)'), 'May 29, 2026');
     await user.click(cont);
 
+    expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
+    await addContact(user, 'Aunt Carol', '(617) 555-0148');
+    expect(await screen.findByText('Added so far — 1')).toBeInTheDocument();
+    expect(screen.getByText('(617) 555-0148')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('');
+
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    expect(screen.getByRole('heading', { name: 'Who should hear first?' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
     expect(screen.getByText('For Margaret Hayes')).toBeInTheDocument();
     expect(screen.getByText('Announce the passing')).toBeInTheDocument();
@@ -71,11 +85,11 @@ describe('App onboarding', () => {
   it('sends a returning visitor to Home, then into their session when they pick it', async () => {
     const user = userEvent.setup();
     const first = render(<App />);
+    await reachContacts(user);
     await addContact(user, 'Aunt Carol', '6175550148');
     await screen.findByText('Added so far — 1');
     await user.click(screen.getByRole('button', { name: 'Done for now' }));
     await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-    await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
     first.unmount();
 
     render(<App />);
@@ -90,6 +104,7 @@ describe('App onboarding', () => {
   it('keeps contact names and numbers out of localStorage (they stay in IndexedDB)', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await reachContacts(user);
     await addContact(user, 'Aunt Carol', '6175550148');
     await screen.findByText('Added so far — 1');
     const stored = JSON.stringify({ ...window.localStorage });

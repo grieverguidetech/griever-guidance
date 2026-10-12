@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Contact } from '@griever/shared';
 import { detectDeviceRegion, toE164 } from '@griever/contacts';
 import { CheckCircle, Circle, Plus } from '@phosphor-icons/react';
@@ -11,12 +11,26 @@ interface Props {
   onBack?: () => void;
   onAdd: (input: { name: string; phone: string; hearsFirst: boolean }) => void;
   onDone: () => void;
+  /** What was typed and not yet added; kept by the parent so it survives a trip to the checklist. */
+  draft?: ContactDraft;
+  onDraftChange?: (draft: ContactDraft) => void;
 }
 
-export function AddContactsManual({ contacts, onBack, onAdd, onDone }: Props) {
-  const [name, setName] = useState('');
-  const [phoneInput, setPhoneInput] = useState('');
-  const [hearsFirst, setHearsFirst] = useState(false);
+export interface ContactDraft {
+  name: string;
+  phone: string;
+  hearsFirst: boolean;
+}
+
+export function AddContactsManual({ contacts, onBack, onAdd, onDone, draft, onDraftChange }: Props) {
+  const [name, setName] = useState(draft?.name ?? '');
+  const [phoneInput, setPhoneInput] = useState(draft?.phone ?? '');
+  const [hearsFirst, setHearsFirst] = useState(draft?.hearsFirst ?? false);
+
+  useEffect(() => {
+    onDraftChange?.({ name, phone: phoneInput, hearsFirst });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, phoneInput, hearsFirst]);
   const [error, setError] = useState<string | null>(null);
 
   const canAdd = name.trim() !== '' && phoneInput.trim() !== '';

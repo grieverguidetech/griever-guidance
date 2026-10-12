@@ -59,12 +59,18 @@ export function useContacts(store?: ContactStore): UseContactsResult {
       setLoading(false);
       return;
     }
-    store.list().then((loaded) => {
-      if (!cancelled) {
-        setContacts(loaded);
-        setLoading(false);
-      }
-    });
+    store
+      .list()
+      .then((loaded) => {
+        if (!cancelled) {
+          setContacts(loaded);
+          setLoading(false);
+        }
+      })
+      // A failed local read must not leave anything waiting on "loading" forever.
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };

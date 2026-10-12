@@ -21,14 +21,15 @@ async function openFromHome(user: User, name = 'Margaret Hayes') {
 
 async function onboardToLanding(user: User) {
   const view = render(<App />);
+  await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
   await user.type(screen.getByLabelText('Mobile number'), '6175550148');
   await user.click(screen.getByRole('button', { name: 'Add and start another' }));
   await screen.findByText('Added so far — 1');
   await user.click(screen.getByRole('button', { name: 'Done for now' }));
   await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
   return view;
 }
 
@@ -53,12 +54,7 @@ describe('saved as you go', () => {
   it('keeps the person and sender typed on the setup step', async () => {
     const user = userEvent.setup();
     const view = render(<App />);
-    await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
-    await user.type(screen.getByLabelText('Mobile number'), '6175550148');
-    await user.click(screen.getByRole('button', { name: 'Add and start another' }));
-    await screen.findByText('Added so far — 1');
-    await user.click(screen.getByRole('button', { name: 'Done for now' }));
-    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
     await user.type(screen.getByLabelText(/Your name/), 'Peter');
 
