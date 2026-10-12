@@ -375,20 +375,63 @@ A failed background flush retries with backoff (1s → 2s → 4s → … capped 
 
 ## 5. What is *not* synced
 
+This section covers the original Convex session sync, which is dev-only and being retired (#140).
+The family-sharing design below ("Shared people (Supabase)") overrides it where they differ:
+shared person sync never carries contact ids or edited wording (C2, C3).
+
 - **Contacts. Settled: they never leave the device.** Names and mobile numbers of a grieving
   family's circle are the most sensitive data in the app, and they are already on the phone
-  (imported or typed). They stay in IndexedDB. The server sees contact *ids* inside
-  `screens.*.values.selectedContactIds` and nothing more — never a name, never a number.
-  The cost is accepted, not worked around: a new device starts fresh (§2). Do not add a
-  "just this once" path that ships a name to the server for a preview or a receipt.
-- **Message bodies.** Derived, not stored (§2 rule 2). `messageOverride` is the one exception and it
-  does sync — it's the user's own words and losing it is worse than storing it.
+  (imported or typed). They stay in IndexedDB. In the dev-only Convex sync the server sees contact
+  *ids* inside `screens.*.values.selectedContactIds` and nothing more — never a name, never a
+  number. In shared person sync it sees not even the ids (C3). The cost is accepted, not worked
+  around: a new device starts fresh (§2). Do not add a "just this once" path that ships a name to
+  the server for a preview or a receipt.
+- **Message bodies.** Derived, not stored (§2 rule 2). `messageOverride` (edited wording) is not
+  message content in the old sense but it is the user's own words; it stays on the device in shared
+  sync (C2). The dev-only Convex sync carried it; that goes away with #140.
 - **Send jobs / delivery receipts.** Server-owned already (README B5); they are read down by their
   own query, not through the session cursor.
 - *(The C3 checklist ticks **are** synced, on the `users` row — see §2.1. They are the one thing
   that outlives a session.)*
 
----
+### Shared people (Supabase)
+
+**Decided design (family-sharing G1, 2026-10-11). Not built yet.** Built by #116, #117 (tables,
+memberships, invites), #130 (the `flows` table), #131 (gateway routes), #132, #133, #134 (client
+sync), #135, #136 (turning it on). Supersedes the read-only snapshot idea in #39.
+
+An owner can invite family members by email. Members work on the owner's people. The shared
+record is a `flows` row in Supabase Postgres, one per person, with `flows.owner_id` =
+`auth.users.id`. Row-level security lets the owner and the owner's members read and write it;
+only an owner can create one (C11).
+
+**What syncs** (exactly six person fields):
+
+- person name
+- date of passing
+- service date
+- obituary URL
+- obituary publisher
+- service ready
+
+**What never syncs:**
+
+- drafts
+- edited wording (`messageOverride`)
+- recipients, and who was told (who was messaged)
+- contact ids (and contact data)
+- sender name (it stays on the sender's own profile)
+
+Rules:
+
+- **Membership is per owner.** A member belongs to one owner's circle, added only by that owner
+  typing an email (C6). Removing a member or revoking an invite happens in profile or settings only
+  (C9).
+- **Merge: last write per field wins**, but a field with a pending local edit on this device is
+  kept until it has been pushed, so a pull never overwrites typing that has not left the phone.
+- **Removing a member:** that member's copy of the owner's people disappears on their next sync.
+- Account actions (invite, join, remove) need a connection; the sync itself stays invisible and
+  never blocks a flow (C5, §4.6).
 
 ## 6. Local Convex with Docker
 
