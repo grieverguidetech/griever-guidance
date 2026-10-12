@@ -47,7 +47,7 @@ export function normalizeInviteEmail(raw: string): string {
 
 /** Expects an already-normalised address. Deliberately loose: the mail provider is the real check. */
 export function isValidInviteEmail(email: string): boolean {
-  if (email.length === 0 || email.length > MAX_EMAIL_LENGTH) return false;
+  if (email.length > MAX_EMAIL_LENGTH) return false;
   if (/\s/.test(email)) return false;
   const parts = email.split('@');
   if (parts.length !== 2) return false;

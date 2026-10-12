@@ -18,7 +18,7 @@ describe('isValidInviteEmail', () => {
     expect(isValidInviteEmail('anna@example.com')).toBe(true);
   });
 
-  it.each(['', 'anna', 'anna@', '@example.com', 'a b@example.com', 'a@b@c.com', 'anna@example', 'anna@.com', 'anna@example.'])(
+  it.each(['', 'anna', 'anna@', '@example.com', 'a b@example.com', 'a@b@c.com', 'a@b.com@c.com', 'a@@example.com', 'a@com.', 'a@.com', 'anna@example', 'anna@.com', 'anna@example.'])(
     'rejects %j',
     (value) => {
       expect(isValidInviteEmail(value)).toBe(false);
