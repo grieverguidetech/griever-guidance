@@ -149,6 +149,28 @@ describe('resuming', () => {
     expect(resumeDraft({ ...draft, templateCategory: 'service' }).step).toBe('details');
   });
 
+  it('resumes an obituary on its recipients, since it has no details form', () => {
+    expect(resumeDraft(freshDraft({ templateCategory: 'obituary', step: 'template' })).step).toBe('contacts');
+  });
+
+  it("brings a moment's own saved draft back when the picker chooses it (#83)", () => {
+    const saved = freshDraft({ templateCategory: 'announcement', step: 'review', fields: { personalNote: 'hi' }, selectedContactIds: ['c1'] });
+    const { result } = renderHook(() =>
+      useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', step: 'template' }), drafts: { announcement: saved } }),
+    );
+    act(() => result.current.setTemplateCategory('announcement'));
+    expect(result.current).toMatchObject({ step: 'template', fields: { personalNote: 'hi' }, selectedContactIds: ['c1'] });
+    act(() => result.current.nextStep());
+    expect(result.current.step).toBe('announce');
+  });
+
+  it('starts blank when the chosen moment has no draft in progress', () => {
+    const sent = freshDraft({ templateCategory: 'announcement', step: 'sent', selectedContactIds: ['c1'] });
+    const { result } = renderHook(() => useSendFlow({ session, drafts: { announcement: sent } }));
+    act(() => result.current.setTemplateCategory('announcement'));
+    expect(result.current.selectedContactIds).toEqual([]);
+  });
+
   it('leaves a draft that is past the picker alone', () => {
     const draft = freshDraft({ templateCategory: 'announcement', step: 'contacts' });
     expect(resumeDraft(draft)).toBe(draft);

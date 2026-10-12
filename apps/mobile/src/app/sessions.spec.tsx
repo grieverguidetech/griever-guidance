@@ -75,13 +75,35 @@ describe('people kept on the phone', () => {
     const first = render(<App />);
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
-      expect(saved.draft.step).toBe('template');
-      expect(saved.draft.fields).toEqual({});
+      expect(saved.drafts.aftercare.step).toBe('sent');
+      expect(saved.drafts.aftercare.fields).toEqual({});
+      expect(saved.draft).toBeUndefined();
       expect(saved.personName).toBe('Anna');
     });
     first.unmount();
     render(<App />);
     expect(await screen.findByText('Writing about Anna')).toBeTruthy();
+  });
+
+  it("opens the person's latest moment and leaves their other moment's draft alone (#83)", async () => {
+    const moment = (templateCategory: 'announcement' | 'aftercare', step: 'review' | 'details', fields: Record<string, string>) =>
+      ({ ...freshDraft({}), templateCategory, step, fields });
+    const announcement = moment('announcement', 'review', { personalNote: 'Kept as it was' });
+    const person = {
+      id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x',
+      drafts: { announcement, aftercare: moment('aftercare', 'details', { deceasedName: 'Anna Lee' }) },
+      draftsUpdatedAt: { announcement: '2026-10-01T00:00:00.000Z', aftercare: '2026-10-02T00:00:00.000Z' },
+      serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+    };
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
+    render(<App />);
+    fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Marie');
+    await waitFor(async () => {
+      const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
+      expect(saved.drafts.aftercare.fields.deceasedName).toBe('Anna Marie');
+      expect(saved.drafts.announcement).toEqual(announcement);
+    });
   });
 
   it('reuses a blank person instead of adding another', async () => {

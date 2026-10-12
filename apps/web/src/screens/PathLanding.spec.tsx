@@ -11,7 +11,7 @@ const session: Session = {
   dateOfPassing: '2026-05-29',
   senderName: 'Anna',
   obituaryUrl: '',
-  draft: null,
+  drafts: {},
   serviceReady: false,
   recipientsNotified: { announcement: ['contact-id-1'] },
   momentCompletedAt: { announce: '2026-05-30T00:00:00.000Z' },

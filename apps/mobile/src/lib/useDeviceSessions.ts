@@ -14,9 +14,7 @@ export const createSessionCache = () =>
   ]);
 
 // Nothing typed, nothing chosen: a person who has not been filled in yet.
-const isBlank = (s: Session) =>
-  !s.personName.trim() &&
-  (!s.draft || (s.draft.step === 'template' && !s.draft.templateCategory && Object.keys(s.draft.fields).length === 0));
+const isBlank = (s: Session) => !s.personName.trim() && Object.keys(s.drafts).length === 0;
 
 /**
  * The same `useSessions` the web uses, over the device cache, plus which person is open.

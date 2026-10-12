@@ -9,6 +9,7 @@ import {
   hasDraftInProgress,
   resumeDraft,
   namedSessionsByRecent,
+  latestInProgressDraft,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever/hooks';
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
@@ -197,7 +198,7 @@ async function accountLacksName(client: AuthClient): Promise<boolean> {
 /** A message left half-written reopens where it was (#25); otherwise the path. */
 function viewForReturning(sessionList: Session[]): AppView {
   const latest = namedSessionsByRecent(sessionList)[0];
-  return latest && hasDraftInProgress(latest.draft) ? 'flow' : 'pathLanding';
+  return latest && latestInProgressDraft(latest) ? 'flow' : 'pathLanding';
 }
 
 function isAccountView(view: AppView): boolean {
@@ -231,6 +232,9 @@ function AppBody({
       : viewForReturning(sessions.sessions);
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
+  // changed most recently; null means a moment not chosen yet, so the picker.
+  const [flowCategory, setFlowCategory] = useState<TemplateCategory | null | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
   // The name typed at sign-up, saved once the new account has a session.
   const [pendingName, setPendingName] = useState<string | null>(null);
@@ -363,6 +367,7 @@ function AppBody({
   const onDraftChange = useCallback(
     (d: SendFlowDraft) => {
       if (!activeId) return;
+      setFlowCategory(d.templateCategory);
       updateDraft(activeId, d);
       // The service date lives in the flow draft's free-text fields (whatever
       // form asked for it — the "service" template or the announcement's
@@ -390,11 +395,12 @@ function AppBody({
   }, [contacts.loading, sessions.sessions]);
 
   // Once a send job finishes, record who was told for dedup + the path view.
-  const activeStep = active?.draft?.step;
-  const activeCategory = active?.draft?.templateCategory;
+  const flowDraft = flowCategory ? active?.drafts[flowCategory] : undefined;
+  const activeStep = flowDraft?.step;
+  const activeCategory = flowDraft?.templateCategory;
   useEffect(() => {
-    if (activeId && activeStep === 'sent' && activeCategory && active) {
-      recordMomentComplete(activeId, activeCategory, active.draft?.selectedContactIds ?? []);
+    if (activeId && activeStep === 'sent' && activeCategory && flowDraft) {
+      recordMomentComplete(activeId, activeCategory, flowDraft.selectedContactIds);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, activeStep, activeCategory]);
@@ -438,23 +444,28 @@ function AppBody({
     goToPathLanding();
   }
 
+  /**
+   * Opens a moment's flow. Its own draft resumes if it is in progress; otherwise it starts fresh.
+   * Only this moment's draft is touched, so another moment half done is never overwritten.
+   */
+  function openMoment(category: TemplateCategory, fresh: SendFlowDraft) {
+    if (!active) return;
+    const saved = active.drafts[category];
+    const draft = hasDraftInProgress(saved) ? resumeDraft(saved) : fresh;
+    if (draft !== saved) sessions.updateDraft(active.id, draft);
+    setFlowCategory(category);
+    setView('flow');
+  }
+
   function startMoment(key: MomentKey) {
     if (!active) return;
-    // Starting a moment that is already under way resumes it; a fresh draft would wipe what was typed.
-    if (hasDraftInProgress(active.draft) && active.draft.templateCategory === CATEGORY_BY_MOMENT[key]) {
-      if (active.draft.step === 'template') sessions.updateDraft(active.id, resumeDraft(active.draft));
-      setView('flow');
-      return;
-    }
     if (key === 'announce') {
-      sessions.updateDraft(active.id, freshDraft({ templateCategory: 'announcement', step: 'announce' }));
-      setView('flow');
+      openMoment('announcement', freshDraft({ templateCategory: 'announcement', step: 'announce' }));
       return;
     }
     if (key === 'service') {
-      if (active.serviceReady) {
-        sessions.updateDraft(active.id, freshDraft({ templateCategory: 'service', step: 'details' }));
-        setView('flow');
+      if (active.serviceReady || hasDraftInProgress(active.drafts.service)) {
+        openMoment('service', freshDraft({ templateCategory: 'service', step: 'details' }));
       } else {
         setView('gate');
       }
@@ -465,7 +476,12 @@ function AppBody({
       return;
     }
     // thanks — no dedicated entry screen yet; let the picker handle it.
-    sessions.updateDraft(active.id, freshDraft({ templateCategory: null, step: 'template' }));
+    const category = CATEGORY_BY_MOMENT[key];
+    if (category && hasDraftInProgress(active.drafts[category])) {
+      openMoment(category, freshDraft({ templateCategory: category, step: 'template' }));
+      return;
+    }
+    setFlowCategory(null);
     setView('flow');
   }
 
@@ -649,8 +665,7 @@ function AppBody({
           onChoose={(ready) => {
             if (ready) {
               sessions.setServiceReady(active.id, true);
-              sessions.updateDraft(active.id, freshDraft({ templateCategory: 'service', step: 'details' }));
-              setView('flow');
+              openMoment('service', freshDraft({ templateCategory: 'service', step: 'details' }));
             } else {
               const dueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
               sessions.scheduleReminder(active.id, 'service', dueAt);
@@ -670,11 +685,10 @@ function AppBody({
           onBack={() => goToPathLanding()}
           onChange={(patch) => sessions.updateSession(active.id, patch)}
           onContinue={() => {
-            sessions.updateDraft(
-              active.id,
+            openMoment(
+              'obituary',
               freshDraft({ templateCategory: 'obituary', templateOverrideId: 'obituary-link', step: 'contacts' }),
             );
-            setView('flow');
           }}
           onDraft={() => setView('obituary')}
         />
@@ -697,12 +711,15 @@ function AppBody({
   }
 
   if (view === 'flow' && active && activeDetails) {
+    const flowStart =
+      flowCategory === undefined ? latestInProgressDraft(active) : flowCategory ? (active.drafts[flowCategory] ?? null) : null;
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Flow
           key={active.id}
           session={activeDetails}
-          draft={active.draft}
+          draft={flowStart}
+          drafts={active.drafts}
           contacts={contacts.contacts}
           notifiedContactIds={active.recipientsNotified.announcement ?? []}
           onDraftChange={onDraftChange}
