@@ -19,6 +19,9 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../gateway-auth/tsconfig.lib.json"
+    },
+    {
       "path": "../shared/tsconfig.lib.json"
     }
   ]

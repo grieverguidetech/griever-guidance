@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@griever/shared": "workspace:*",
-    "hono": "^4.13.7"
+    "hono": "^4.13.7",
+    "@griever/gateway-auth": "workspace:*"
   }
 }

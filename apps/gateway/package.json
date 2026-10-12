@@ -103,7 +103,8 @@
     "@griever/gateway-messages": "workspace:*",
     "@griever/gateway-sync": "workspace:*",
     "@hono/node-server": "^2.1.1",
-    "hono": "^4.13.7"
+    "hono": "^4.13.7",
+    "@griever/gateway-flows": "workspace:*"
   },
   "devDependencies": {
     "convex": "^1.45.0"

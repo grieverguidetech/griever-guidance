@@ -41,6 +41,12 @@
     },
     {
       "path": "./libs/gateway-sync"
+    },
+    {
+      "path": "./libs/gateway-auth"
+    },
+    {
+      "path": "./libs/gateway-flows"
     }
   ]
 }
