@@ -49,8 +49,8 @@ describe('after a send (C2)', () => {
     expect(stored).not.toContain('private words');
     // What the app still needs afterwards: the step, the moment and who was told.
     const [saved] = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
-    expect(saved.draft).toMatchObject({ step: 'sent', templateCategory: 'announcement', fields: {}, messageOverride: null });
-    expect(saved.draft.selectedContactIds).toHaveLength(1);
+    expect(saved.drafts.announcement).toMatchObject({ step: 'sent', templateCategory: 'announcement', fields: {}, messageOverride: null });
+    expect(saved.drafts.announcement.selectedContactIds).toHaveLength(1);
     expect(saved.recipientsNotified.announcement).toHaveLength(1);
   }, 30_000); // a whole journey under load
 });

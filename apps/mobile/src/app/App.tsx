@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSendFlow, useContacts, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
+import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import { TemplatePickerScreen } from '../screens/TemplatePickerScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
@@ -51,13 +51,14 @@ type SessionProps = {
 // from that person's own saved draft and nothing carries over from the previous person.
 const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onOpenSwitcher }: SessionProps) => {
   const { id } = session;
-  // A finished send is not kept as a draft: the person's name and dates live on the session, and
-  // the next launch opens on a fresh start rather than on the "sent" screen (C2).
-  const saveDraft = useCallback(
-    (draft: SendFlowDraft) => onDraftChange(id, draft.step === 'sent' ? freshDraft({}) : draft),
-    [id, onDraftChange],
-  );
-  const flow = useSendFlow({ session, draft: session.draft, onDraftChange: saveDraft });
+  // The flow opens on the moment changed most recently that is still under way. A finished send
+  // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent".
+  const flow = useSendFlow({
+    session,
+    draft: latestInProgressDraft(session),
+    drafts: session.drafts,
+    onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
+  });
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 

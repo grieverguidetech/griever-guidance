@@ -38,6 +38,7 @@ vi.mock('../lib/authClient', async (importOriginal) => {
   return { ...actual, loadAuthClient: mocks.load };
 });
 
+import { freshDraft } from '@griever/hooks';
 import { App } from './app';
 
 const PROFILE = {
@@ -97,6 +98,13 @@ async function nameSomeoneAndSignOut(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
 }
 
+async function signIn(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'I already have an account' }));
+  await user.type(screen.getByLabelText('Email'), 'anna@example.com');
+  await user.type(screen.getByLabelText('Password'), 'a-long-password');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+}
+
 async function signInAgainAs(user: ReturnType<typeof userEvent.setup>, email: string) {
   await user.click(await screen.findByRole('button', { name: 'I already have an account' }));
   await user.type(screen.getByLabelText('Email'), email);
@@ -104,6 +112,10 @@ async function signInAgainAs(user: ReturnType<typeof userEvent.setup>, email: st
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
   await screen.findByRole('button', { name: 'Your account' });
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   mocks.authEnabled = false;
@@ -300,6 +312,58 @@ describe('flag on', () => {
     expect(client.updateProfile).toHaveBeenLastCalledWith({ senderName: 'Anna Reyes' });
     expect(await screen.findByText('Your name is saved.')).toBeInTheDocument();
   });
+  it('opens the latest in-progress draft after signing out and back in, not the last moment visited', async () => {
+    const draft = (templateCategory: 'announcement' | 'service', step: 'announce' | 'details', fields: Record<string, string>) =>
+      freshDraft({ templateCategory, step, fields });
+    window.localStorage.setItem(
+      'gg.sessions.v1',
+      JSON.stringify([
+        {
+          id: 's1',
+          personName: 'Margaret Hayes',
+          dateOfPassing: '',
+          senderName: 'Anna',
+          obituaryUrl: '',
+          createdAt: '2026-10-10T00:00:00.000Z',
+          lastOpenedAt: '2026-10-10T00:00:00.000Z',
+          recipientsNotified: {},
+          momentCompletedAt: {},
+          remindersScheduled: [],
+          serviceReady: true,
+          drafts: {
+            announcement: draft('announcement', 'announce', { personalNote: 'the announcement note' }),
+            service: draft('service', 'details', { serviceLocation: 'St Mary Church' }),
+          },
+          draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-01T00:00:00.000Z' },
+        },
+      ]),
+    );
+    useClient(
+      stubClient({ getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })) }),
+    );
+    // Only Date is faked, so the order the drafts were touched in can be set: the announcement last.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-12T00:00:00Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await signIn(user);
+    expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('the announcement note');
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    vi.setSystemTime(new Date('2026-10-05T00:00:00Z'));
+    await user.click(screen.getByRole('button', { name: /Share the service/ }));
+    expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    await signIn(user);
+
+    // The service was visited last, but the announcement changed most recently, so it reopens.
+    expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('the announcement note');
+  });
+
   it('goes back to sign-up only after an explicit sign out', async () => {
     useClient(stubClient());
     const user = userEvent.setup();

@@ -127,6 +127,30 @@ lives under that key.
 6. **Contacts are not in the session.** They are account-level and shared across sessions (see
    README's State Management); the session stores only contact *ids*.
 
+### 2.0 In-progress message drafts: one per moment
+
+The flow's working state is kept per moment, so starting one moment never overwrites another that
+is half done ("Everything is saved on this phone as you go"):
+
+```js
+drafts: {                       // keyed by template category: announcement | service | obituary | aftercare
+  announcement: { step, templateCategory, fields, selectedContactIds, messageOverride, … },
+  service:      { … }
+},
+draftsUpdatedAt: { announcement: "2026-10-11T10:00:00.000Z", … }   // which one reopens
+```
+
+- Starting a moment resumes its own draft if it is in progress (never `sending` or `sent`; a draft
+  on the picker resumes at the moment's first form), otherwise starts that moment fresh. Writing a
+  draft touches only its own key.
+- The app reopens the in-progress draft with the latest `draftsUpdatedAt`.
+- C2: a draft at `sent` keeps only its moment and who was messaged; the typed fields, the edited
+  wording and the place are dropped, per moment.
+- A draft with no moment chosen yet is not kept (there is nothing in it to lose).
+- Migration at load: the older single `draft` moves to `drafts[draft.templateCategory]` (dropped
+  when no moment was chosen) and the `draft` key is removed. If an old `draft` sits next to
+  existing `drafts` (a rollback, then an upgrade), `drafts` wins and the old `draft` is ignored.
+
 ### 2.1 The C3 checklist lives on the account
 
 The ticks persist — silently, as decided — but they belong to the **account**, not the session:

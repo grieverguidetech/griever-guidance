@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { addDays, parseCompleteDate } from '@griever/shared';
-import { freshDraft } from './useSendFlow.js';
+import { freshDraft, hasDraftInProgress } from './useSendFlow.js';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
 
 /** How long a saved contact list outlives the last known service date. */
@@ -38,8 +38,13 @@ export interface Session extends SessionDetails {
   id: string;
   createdAt: string;
   lastOpenedAt: string;
-  /** Persisted wizard state; `null` once nothing is in progress. */
-  draft: SendFlowDraft | null;
+  /**
+   * Persisted wizard state, one draft per moment, so starting one moment never overwrites
+   * another that is half done. Only drafts with a chosen moment are kept.
+   */
+  drafts: Partial<Record<TemplateCategory, SendFlowDraft>>;
+  /** When each draft last changed, so the most recent one reopens. */
+  draftsUpdatedAt?: Partial<Record<TemplateCategory, string>>;
   /** Set by the C2 gate's "Yes, we've set a date" choice. */
   serviceReady: boolean;
   /**
@@ -74,7 +79,25 @@ export function namedSessionsByRecent(sessions: Session[]): Session[] {
     .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
 }
 
+/** The saved shape before drafts were kept per moment: one `draft` slot. */
+type StoredSession = Omit<Session, 'drafts'> & {
+  draft?: SendFlowDraft | null;
+  drafts?: Session['drafts'];
+};
+
 const STORAGE_KEY = 'gg.sessions.v1';
+
+/**
+ * The draft that reopens: the in-progress one (never 'sending' or 'sent') that changed most
+ * recently, or null when nothing is under way.
+ */
+export function latestInProgressDraft(session: Pick<Session, 'drafts' | 'draftsUpdatedAt'>): SendFlowDraft | null {
+  const stamp = (category: string) => session.draftsUpdatedAt?.[category as TemplateCategory] ?? '';
+  const [latest] = (Object.keys(session.drafts) as TemplateCategory[])
+    .filter((category) => hasDraftInProgress(session.drafts[category]))
+    .sort((a, b) => stamp(b).localeCompare(stamp(a)));
+  return latest ? (session.drafts[latest] ?? null) : null;
+}
 
 /**
  * C2: message content is not kept after a send. A draft at 'sent' keeps only the moment
@@ -93,6 +116,25 @@ export function stripSentWording(draft: SendFlowDraft | null): SendFlowDraft | n
   });
 }
 
+/**
+ * Loads a saved session. An old single `draft` moves into `drafts` under its moment (one with no
+ * moment chosen holds nothing worth keeping and is dropped), and C2 is applied to every draft.
+ */
+function migrateSession(stored: StoredSession): Session {
+  const { draft, drafts: savedDrafts, ...rest } = stored;
+  const drafts: Session['drafts'] = {};
+  const draftsUpdatedAt: NonNullable<Session['draftsUpdatedAt']> = { ...stored.draftsUpdatedAt };
+  for (const [category, saved] of Object.entries(savedDrafts ?? {})) {
+    if (saved) drafts[category as TemplateCategory] = stripSentWording(saved);
+  }
+  const old = draft?.templateCategory;
+  if (draft && old && !drafts[old]) {
+    drafts[old] = stripSentWording(draft);
+    draftsUpdatedAt[old] ??= stored.lastOpenedAt;
+  }
+  return { ...rest, drafts, draftsUpdatedAt };
+}
+
 function load(storage: SendFlowStorage | undefined): Session[] {
   if (!storage) return [];
   try {
@@ -100,8 +142,7 @@ function load(storage: SendFlowStorage | undefined): Session[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    // Migration: drafts saved at 'sent' before this rule existed still hold the wording.
-    return (parsed as Session[]).map((s) => ({ ...s, draft: stripSentWording(s.draft ?? null) }));
+    return (parsed as StoredSession[]).map(migrateSession);
   } catch {
     return [];
   }
@@ -145,7 +186,8 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
       ...details,
       createdAt: now,
       lastOpenedAt: now,
-      draft: null,
+      drafts: {},
+      draftsUpdatedAt: {},
       serviceReady: false,
       recipientsNotified: {},
       momentCompletedAt: {},
@@ -163,11 +205,21 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
 
   const updateDraft = useCallback((id: string, incoming: SendFlowDraft) => {
     const draft = stripSentWording(incoming);
+    const category = draft.templateCategory;
+    // Before a moment is chosen there is nothing to keep, and no slot to keep it in.
+    if (!category) return;
+    const now = new Date().toISOString();
     setSessions((list) =>
       list.map((s) => {
         if (s.id !== id) return s;
-        if (s.draft && JSON.stringify(s.draft) === JSON.stringify(draft)) return s;
-        return { ...s, draft };
+        const existing = s.drafts[category];
+        if (existing && JSON.stringify(existing) === JSON.stringify(draft)) return s;
+        // Only this moment's slot changes; the other moments' drafts stay as they are.
+        return {
+          ...s,
+          drafts: { ...s.drafts, [category]: draft },
+          draftsUpdatedAt: { ...s.draftsUpdatedAt, [category]: now },
+        };
       }),
     );
   }, []);
@@ -186,7 +238,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
 
   const pruneEmpty = useCallback(() => {
     setSessions((list) =>
-      list.filter((s) => s.personName.trim() !== '' || s.draft !== null),
+      list.filter((s) => s.personName.trim() !== '' || Object.keys(s.drafts).length > 0),
     );
   }, []);
 
@@ -241,11 +293,12 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const inProgressSessions = useMemo(
     () =>
       sessions
-        .filter(
-          (s) =>
-            (s.personName.trim() !== '' || s.draft !== null) &&
-            !(s.draft !== null && s.draft.step === 'sent'),
-        )
+        .filter((s) => {
+          const kept = Object.values(s.drafts);
+          // A session whose every draft is a finished send has nothing left in progress.
+          const allSent = kept.length > 0 && kept.every((d) => d.step === 'sent');
+          return (s.personName.trim() !== '' || kept.length > 0) && !allSent;
+        })
         .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt)),
     [sessions],
   );

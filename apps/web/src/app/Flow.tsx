@@ -1,6 +1,6 @@
 import { useSendFlow } from '@griever/hooks';
 import type { SendFlowDraft } from '@griever/hooks';
-import type { Contact, SessionDetails } from '@griever/shared';
+import type { Contact, SessionDetails, TemplateCategory } from '@griever/shared';
 import { TemplatePicker } from '../screens/TemplatePicker';
 import { AnnounceForm } from '../screens/AnnounceForm';
 import { ServiceKnownScreen } from '../screens/ServiceKnownScreen';
@@ -14,6 +14,8 @@ import { SentScreen } from '../screens/SentScreen';
 interface Props {
   session: SessionDetails;
   draft: SendFlowDraft | null;
+  /** Every moment's saved draft, so picking a moment on the picker brings its own back. */
+  drafts: Partial<Record<TemplateCategory, SendFlowDraft>>;
   contacts: Contact[];
   notifiedContactIds: string[];
   onDraftChange: (draft: SendFlowDraft) => void;
@@ -25,6 +27,7 @@ interface Props {
 export function Flow({
   session,
   draft,
+  drafts,
   contacts,
   notifiedContactIds,
   onDraftChange,
@@ -32,7 +35,7 @@ export function Flow({
   onEditSession,
   onAddContact,
 }: Props) {
-  const flow = useSendFlow({ session, draft, onDraftChange });
+  const flow = useSendFlow({ session, draft, drafts, onDraftChange });
   const grouped = flow.templateCategory === 'announcement';
 
   switch (flow.step) {

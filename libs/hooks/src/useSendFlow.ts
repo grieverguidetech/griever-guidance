@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { templates, composeMessage } from '@griever/shared';
 import type {
   Template,
@@ -135,13 +135,20 @@ export function hasDraftInProgress(draft: SendFlowDraft | null | undefined): dra
   return !!draft && draft.templateCategory !== null && draft.step !== 'sending' && draft.step !== 'sent';
 }
 
+/** The first step after the picker, for moments that do not start on the details form. */
+const FIRST_STEP: Partial<Record<TemplateCategory, SendFlowStep>> = {
+  announcement: 'announce',
+  obituary: 'contacts',
+};
+
 /**
  * The draft to resume with. A draft sitting on the template picker moves on to the moment's first
  * form, so the picker can't be reached and overwrite what was typed. Fields are left untouched.
  */
 export function resumeDraft(draft: SendFlowDraft): SendFlowDraft {
   if (draft.step !== 'template') return draft;
-  return { ...draft, step: draft.templateCategory === 'announcement' ? 'announce' : 'details' };
+  const first = draft.templateCategory ? FIRST_STEP[draft.templateCategory] : undefined;
+  return { ...draft, step: first ?? 'details' };
 }
 
 function fromDraft(draft: SendFlowDraft): SendFlowState {
@@ -258,6 +265,11 @@ export interface UseSendFlowOptions {
   session?: SessionDetails | null;
   /** Draft to restore (from the session). Overrides `storage` when present. */
   draft?: SendFlowDraft | null;
+  /**
+   * The session's saved drafts. Choosing a moment on the picker restores that moment's own draft
+   * when it is in progress, instead of starting it over.
+   */
+  drafts?: Partial<Record<TemplateCategory, SendFlowDraft>>;
   /** Called on every state change so the caller can persist the draft. */
   onDraftChange?: (draft: SendFlowDraft) => void;
   /** Fallback persistence when there is no session (standalone / mobile). */
@@ -267,7 +279,9 @@ export interface UseSendFlowOptions {
 export function useSendFlow(
   options: UseSendFlowOptions = {},
 ): SendFlowState & SendFlowActions & SendFlowDerived {
-  const { session = null, draft = null, onDraftChange, storage } = options;
+  const { session = null, draft = null, drafts, onDraftChange, storage } = options;
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
 
   const [state, setState] = useState<SendFlowState>(() =>
     draft ? fromDraft(draft) : loadState(storage),
@@ -296,23 +310,27 @@ export function useSendFlow(
     ? state.messageOverride
     : composeMessage(selectedTemplate, composedFields);
 
-  const setTemplateCategory = useCallback((category: TemplateCategory) => {
-    setState((s) =>
-      // Choosing what is already chosen keeps what was typed.
-      s.templateCategory === category && s.templateOverrideId === null
-        ? s
-        : { ...initialState, step: 'template', templateCategory: category, templateOverrideId: null },
-    );
+  // A moment already under way comes back as it was, not blank. It stays on the picker step, so
+  // the picker's own nextStep lands on the moment's first form with everything typed still there.
+  const startedState = useCallback((category: TemplateCategory, templateOverrideId: string | null): SendFlowState => {
+    const saved = draftsRef.current?.[category];
+    if (hasDraftInProgress(saved) && saved.templateOverrideId === templateOverrideId) {
+      return { ...fromDraft(saved), step: 'template' };
+    }
+    return { ...initialState, step: 'template', templateCategory: category, templateOverrideId };
   }, []);
 
+  const setTemplateCategory = useCallback((category: TemplateCategory) => {
+    setState((s) => {
+      // Choosing what is already chosen keeps what was typed.
+      if (s.templateCategory === category && s.templateOverrideId === null) return s;
+      return startedState(category, null);
+    });
+  }, [startedState]);
+
   const setTemplate = useCallback((template: Template) => {
-    setState(() => ({
-      ...initialState,
-      step: 'template',
-      templateCategory: template.category,
-      templateOverrideId: template.id,
-    }));
-  }, []);
+    setState(() => startedState(template.category, template.id));
+  }, [startedState]);
 
   const setField = useCallback((key: string, value: string) => {
     setState((s) => ({ ...s, fields: { ...s.fields, [key]: value }, messageOverride: null }));
@@ -439,13 +457,22 @@ export function useSendFlow(
   }, [storage]);
 
   const restartForServiceDetails = useCallback(() => {
-    setState((s) => ({
-      ...initialState,
-      step: 'details',
-      templateCategory: 'service',
-      templateOverrideId: null,
-      selectedContactIds: s.selectedContactIds,
-    }));
+    setState((s) => {
+      const saved = draftsRef.current?.service;
+      // A service message already under way keeps what was typed; the people just told join its list.
+      if (hasDraftInProgress(saved)) {
+        const resumed = resumeDraft(saved);
+        const selectedContactIds = Array.from(new Set([...resumed.selectedContactIds, ...s.selectedContactIds]));
+        return fromDraft({ ...resumed, selectedContactIds });
+      }
+      return {
+        ...initialState,
+        step: 'details',
+        templateCategory: 'service',
+        templateOverrideId: null,
+        selectedContactIds: s.selectedContactIds,
+      };
+    });
   }, []);
 
   const startAnotherMessage = useCallback(() => {
