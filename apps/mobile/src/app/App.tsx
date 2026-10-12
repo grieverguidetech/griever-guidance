@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts, freshDraft, getContactsRetentionExpiry } from '@griever/hooks';
@@ -208,6 +209,8 @@ const SendAppWhenReady = () => {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     void cache.hydrate().then(() => setReady(true));
+    // One-time cleanup of the old single service date, replaced by per-person sessions (#20).
+    void AsyncStorage.removeItem('gg.serviceDate.v1').catch(() => undefined);
   }, [cache]);
   return ready ? (
     <SendApp cache={cache} />
