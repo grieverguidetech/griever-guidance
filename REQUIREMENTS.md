@@ -172,7 +172,7 @@ Grievers Guidance helps people who have just lost a loved one send funeral and s
 ```
 apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
-              Composes libs/identity, libs/gateway-messages, libs/gateway-sync into one HTTP
+              Composes libs/identity, libs/gateway-messages, libs/gateway-sync, libs/gateway-flows into one HTTP
               surface (CORS + routing) — this app owns no domain logic itself. Also holds the
               Convex functions (apps/gateway/convex/).
   web/        React + Vite + Tailwind. Browser send flow and account management.
@@ -199,9 +199,11 @@ libs/
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
                     sending happens entirely on-device (see "The send flow").
   gateway-sync/     The gateway's Convex client and the /sync/pull, /sync/push routes.
-  gateway-auth/     Planned (#118, #119). The one shared helper for the gateway's domain libs:
+  gateway-auth/     The one shared helper for the gateway's domain libs:
                     Supabase JWT verification and a PostgREST client that acts as the caller.
-  gateway-flows/    Planned (#118, #121, #122, #131). Invite and member routes, the invite mailer, and /flows.
+  gateway-flows/    Invite and member routes (GET /members, POST /invites, POST /invites/accept,
+                    DELETE /invites/:id, DELETE /members/:memberId) and the invite mailer; mounted
+                    by apps/gateway. The /flows routes are planned (#131).
 
   identity, gateway-messages, gateway-sync, and gateway-flows each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
@@ -358,6 +360,9 @@ Facebook's or Instagram's OAuth endpoints today.
 - `profileRouter` serves `GET/PUT /me/profile` (the sender name) against Supabase PostgREST as the
   signed-in caller (anon key plus their JWT, so row-level security applies). There is no
   service-role key (see the family-sharing rule below). With `SUPABASE_URL` or `SUPABASE_ANON_KEY` unset the routes answer 503.
+- Invitations: `POST /invites` creates the invite and emails the link (via Resend, from
+  `INVITE_FROM_EMAIL`, pointing at `WEB_URL`); if the email cannot be sent the invite is revoked and
+  the caller gets a calm 503. The routes live in `libs/gateway-flows`.
 - Sign-in errors use one generic message whether the email exists or not, so a failed attempt never
   confirms which one (the copy lives in `useSupabaseIdentity`).
 - **The Convex `/sync/pull`/`/sync/push` routes do not work in production, and are not the plan.**
@@ -420,14 +425,18 @@ tables are removed (#37).
 apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
               CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL,
               SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
+              INVITE_FROM_EMAIL, WEB_URL (wrangler [vars]), RESEND_API_KEY (Worker secret, set by
+              deploy.yml from the GitHub secret; unset means POST /invites answers 503)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (read only when the flag is on)
+              VITE_FEATURE_SHARING ("true" enables sharing; default off)
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
 apps/mobile   EXPO_PUBLIC_API_URL
 ```
 
-Production repo variables (public, not secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEATURE_AUTH`.
+Production repo variables (public, not secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
+(off until the PO sets it to `true`). The one repo secret the gateway needs is `RESEND_API_KEY`.
 Web production has `FEATURE_AUTH=true` (since 2026-10-11). To turn accounts off or on again, change it
 and re-run the deploy. Mobile (`EXPO_PUBLIC_*`, EAS) is a follow-up.
 

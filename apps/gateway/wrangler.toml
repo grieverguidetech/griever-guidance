@@ -27,3 +27,11 @@ CORS_ORIGINS = "https://web.grieversguidance.com"
 # and SUPABASE_ANON_KEY (when set), so these stay empty here.
 SUPABASE_URL = ""
 SUPABASE_ANON_KEY = ""
+
+# Invite emails (POST /invites). The sender address must be on a domain verified
+# in Resend. RESEND_API_KEY is a Worker secret, set by deploy.yml from the
+# GitHub secret of the same name; it never goes in this file. Without it,
+# POST /invites answers 503 and nothing else is affected.
+INVITE_FROM_EMAIL = "Grievers Guidance <invites@grieversguidance.com>"
+# The web app origin (REQUIREMENTS.md section 6 domain table); invite links point here.
+WEB_URL = "https://web.grieversguidance.com"

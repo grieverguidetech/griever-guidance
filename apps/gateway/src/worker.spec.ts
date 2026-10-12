@@ -86,14 +86,28 @@ describe('gateway: health and CORS', () => {
     expect(res.headers.get('access-control-allow-origin')).toBeNull();
   });
 
-  it('answers preflight for allowed origins with GET, POST and PUT only', async () => {
+  it('answers preflight for allowed origins with GET, POST, PUT and DELETE only', async () => {
     const app = await loadApp();
     const res = await app.request('/sync/push', {
       method: 'OPTIONS',
       headers: { Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'POST' },
     });
     expect(res.status).toBe(204);
-    expect(res.headers.get('access-control-allow-methods')).toBe('GET,POST,PUT');
+    expect(res.headers.get('access-control-allow-methods')).toBe('GET,POST,PUT,DELETE');
+  });
+
+  it('allows a DELETE preflight from the web origin and not from another origin', async () => {
+    const app = await loadApp();
+    const preflight = (origin: string) =>
+      app.request('/invites/00000000-0000-4000-8000-000000000000', {
+        method: 'OPTIONS',
+        headers: { Origin: origin, 'Access-Control-Request-Method': 'DELETE' },
+      });
+    const allowed = await preflight(WEB_ORIGIN);
+    expect(allowed.headers.get('access-control-allow-origin')).toBe(WEB_ORIGIN);
+    expect(allowed.headers.get('access-control-allow-methods')).toContain('DELETE');
+    const other = await preflight('https://evil.example');
+    expect(other.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
 
