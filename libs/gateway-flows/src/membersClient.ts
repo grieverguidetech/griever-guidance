@@ -1,6 +1,6 @@
 // Thin wrappers over #117's SQL functions, called as the signed-in user (their JWT, never a
 // service-role key). Known PostgREST failures become typed results; anything else throws.
-import { PostgrestError, rpc, type SupabaseConfig } from '@griever/gateway-auth';
+import { PostgrestError, postgrestRequest, rpc, type SupabaseConfig } from '@griever/gateway-auth';
 import type { MembersView } from '@griever/shared';
 
 export type MembersFailure = 'invalid' | 'forbidden' | 'not_found' | 'conflict' | 'rate_limited';
@@ -40,8 +40,16 @@ export const acceptInvite = (config: SupabaseConfig, jwt: string, tokenHash: str
 export const listMembers = (config: SupabaseConfig, jwt: string) =>
   call<MembersView>(config, jwt, 'list_members', {});
 
-export const revokeInvite = async (config: SupabaseConfig, jwt: string, inviteId: string) =>
+export const revokeInvite = (config: SupabaseConfig, jwt: string, inviteId: string) =>
   call<null>(config, jwt, 'revoke_invite', { p_invite_id: inviteId });
 
-export const removeMember = async (config: SupabaseConfig, jwt: string, memberId: string) =>
+export const removeMember = (config: SupabaseConfig, jwt: string, memberId: string) =>
   call<null>(config, jwt, 'remove_member', { p_member_id: memberId });
+
+/** The caller's own `profiles.sender_name` (row-level security limits the select to their row). */
+export async function getOwnName(config: SupabaseConfig, jwt: string): Promise<string | null> {
+  const res = await postgrestRequest(config, jwt, 'profiles?select=sender_name&limit=1');
+  const rows = (await res.json()) as { sender_name?: unknown }[];
+  const name = rows[0]?.sender_name;
+  return typeof name === 'string' && name.trim() ? name : null;
+}

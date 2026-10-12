@@ -18,43 +18,61 @@ describe('buildInviteLink', () => {
   it('does not double the slash', () => {
     expect(buildInviteLink('https://web.test/', 'T')).toBe('https://web.test/join#t=T');
   });
+
+  it.each(['http://web.test', 'https://web.test/?a=1', 'https://web.test/#x', 'not a url'])(
+    'throws for %s',
+    (webUrl) => {
+      expect(() => buildInviteLink(webUrl, 'T')).toThrow();
+    },
+  );
 });
 
 describe('cleanOwnerName', () => {
-  it('removes URL-shaped text', () => {
-    expect(cleanOwnerName('Anna https://evil.test/x www.evil.test')).toBe('Anna');
+  it.each([
+    ['Anna https://evil.test/x www.evil.test', 'Anna'],
+    ['anna.com', ''],
+    ['Anna visit evil.com/login', 'Anna visit'],
+    ['Anna Lee', 'Anna Lee'],
+    ['\u202eevil', 'evil'],
+    ['An\u200bna', 'Anna'],
+    ['Anna\u2028Lee\u0085', 'AnnaLee'],
+    ['Anna\nLee', 'Anna Lee'],
+  ])('cleans %j', (raw, expected) => {
+    expect(cleanOwnerName(raw)).toBe(expected);
   });
+
   it('limits to 100 characters', () => {
     expect(cleanOwnerName('a'.repeat(300))).toHaveLength(100);
   });
-  it('falls back to Someone', () => {
-    expect(cleanOwnerName('')).toBe('Someone');
-    expect(cleanOwnerName(null)).toBe('Someone');
-    expect(cleanOwnerName('   https://evil.test  ')).toBe('Someone');
+
+  it('is empty for nothing usable', () => {
+    expect(cleanOwnerName('')).toBe('');
+    expect(cleanOwnerName(null)).toBe('');
   });
 });
 
 describe('inviteEmailContent', () => {
-  it('uses the calm wording and the link', () => {
-    const c = inviteEmailContent('Anna', 'https://web.test/join#t=abc');
-    expect(c.subject).toBe('Anna asked for your help');
-    expect(c.text).toBe(
-      'Anna asked you to help let people know. This link works for 7 days.\n\nhttps://web.test/join#t=abc\n',
-    );
-    expect(`${c.subject}${c.text}${c.html}`).not.toContain('!');
+  const link = 'https://web.test/join#t=abc';
+
+  it('with a name', () => {
+    expect(inviteEmailContent('Anna', link)).toEqual({
+      subject: 'Anna asked for your help',
+      text: `Anna asked you to help let people know. This link works for 7 days.\n\n${link}\n`,
+    });
   });
 
-  it('escapes the name in the HTML', () => {
-    const c = inviteEmailContent('<script>alert(1)</script> & "Co"', 'https://web.test/join#t=abc');
-    expect(c.html).not.toContain('<script>');
-    expect(c.html).toContain('&lt;script&gt;');
-    expect(c.html).toContain('&amp;');
-    expect(c.html).toContain('&quot;Co&quot;');
+  it.each([null, '', 'https://evil.test'])('without a usable name (%j)', (name) => {
+    const c = inviteEmailContent(name, link);
+    expect(c).toEqual({
+      subject: "You've been asked to help",
+      text: `You've been asked to help let people know. This link works for 7 days.\n\n${link}\n`,
+    });
+    expect(`${c.subject}${c.text}`).not.toContain('!');
   });
 });
 
 describe('sendInviteEmail', () => {
-  it('sends one request to Resend with the key, from, one recipient and only the email fields', async () => {
+  it('sends one request to Resend with the key and exactly from/to/subject/text', async () => {
     const fetchImpl = okFetch();
     const result = await sendInviteEmail({ ...base, ownerName: 'Anna' }, fetchImpl as unknown as typeof fetch);
     expect(result).toEqual({ ok: true });
@@ -63,18 +81,32 @@ describe('sendInviteEmail', () => {
     expect(url).toBe('https://api.resend.com/emails');
     expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${KEY}`);
     const body = JSON.parse(init.body as string);
-    expect(Object.keys(body).sort()).toEqual(['from', 'html', 'subject', 'text', 'to']);
+    expect(Object.keys(body).sort()).toEqual(['from', 'subject', 'text', 'to']);
     expect(body.from).toBe(base.from);
     expect(body.to).toEqual([base.to]);
     expect(body.text).toContain('Anna asked you to help let people know.');
     expect(init.body).not.toContain(KEY);
   });
 
+  it('rejects a bad recipient without calling fetch', async () => {
+    const fetchImpl = okFetch();
+    const result = await sendInviteEmail(
+      { ...base, to: 'a@b.co, evil@x.test', ownerName: 'Anna' },
+      fetchImpl as unknown as typeof fetch,
+    );
+    expect(result).toEqual({ ok: false, reason: 'rejected' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it.each([
     [429, 'rate_limited'],
-    [500, 'unavailable'],
+    [400, 'rejected'],
     [422, 'rejected'],
-    [401, 'rejected'],
+    [401, 'unavailable'],
+    [403, 'unavailable'],
+    [404, 'unavailable'],
+    [500, 'unavailable'],
+    [503, 'unavailable'],
   ])('maps status %i to %s without leaking the key', async (status, reason) => {
     const logs = [vi.spyOn(console, 'log'), vi.spyOn(console, 'error'), vi.spyOn(console, 'warn')];
     const fetchImpl = vi.fn(async () => new Response(`bad key ${KEY}`, { status }));

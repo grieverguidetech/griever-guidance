@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PostgrestError } from '@griever/gateway-auth';
-import { acceptInvite, createInvite, listMembers, removeMember, revokeInvite } from './membersClient.js';
+import { acceptInvite, createInvite, getOwnName, listMembers, removeMember, revokeInvite } from './membersClient.js';
 
 const config = { url: 'https://proj.supabase.test', anonKey: 'anon' };
 const json = (body: unknown, status = 200) =>
@@ -50,5 +50,20 @@ describe('membersClient error mapping', () => {
     await expect(listMembers(config, 'jwt')).rejects.toBeInstanceOf(PostgrestError);
     stub(new Response('oops', { status: 502 }));
     await expect(listMembers(config, 'jwt')).rejects.toBeInstanceOf(PostgrestError);
+  });
+});
+
+describe('getOwnName', () => {
+  it('selects the caller own sender_name with their JWT', async () => {
+    const f = stub(json([{ sender_name: 'Anna' }]));
+    expect(await getOwnName(config, 'jwt')).toBe('Anna');
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`${config.url}/rest/v1/profiles?select=sender_name&limit=1`);
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt');
+  });
+
+  it.each([[[]], [[{ sender_name: null }]], [[{ sender_name: '  ' }]]])('is null for %j', async (rows) => {
+    stub(json(rows));
+    expect(await getOwnName(config, 'jwt')).toBeNull();
   });
 });
