@@ -22,15 +22,15 @@ export interface MembersRouterConfig {
   getMail: () => { apiKey?: string; from?: string; webUrl?: string };
 }
 
-const UNAVAILABLE = 'Invitations are not available right now. Please try again in a moment.';
-const SEND_FAILED = "The invitation couldn't be sent right now. Please try again in a moment.";
-const UNUSABLE = "This invitation can't be used. Ask the person who sent it for a new one.";
-const BAD_EMAIL = 'Enter a valid email address.';
-const BAD_BODY = 'Send the invitation as a JSON object with an email address.';
-const BAD_ID = 'That request could not be understood.';
+export const UNAVAILABLE = 'Invitations are not available right now. Please try again in a moment.';
+export const SEND_FAILED = "The invitation couldn't be sent right now. Please try again in a moment.";
+export const UNUSABLE = "This invitation can't be used. Ask the person who sent it for a new one.";
+export const BAD_EMAIL = 'Enter a valid email address.';
+export const BAD_BODY = 'Send the invitation as a JSON object with an email address.';
+export const BAD_ID = 'That request could not be understood.';
 
 // What each PostgREST answer (PTnnn becomes HTTP nnn) says to the caller, outside accept.
-const FAILURES: Record<MembersFailure, { status: 400 | 403 | 404 | 409 | 429; error: string }> = {
+export const FAILURES: Record<MembersFailure, { status: 400 | 403 | 404 | 409 | 429; error: string }> = {
   invalid: { status: 400, error: BAD_EMAIL },
   forbidden: { status: 403, error: 'Only the person who owns this account can do that.' },
   not_found: { status: 404, error: 'That could not be found.' },
@@ -108,10 +108,13 @@ export function createMembersRouter(config: MembersRouterConfig) {
 
     // From here on an open invite exists: any failure revokes it so none is left unsendable.
     const undo = async () => {
-      try {
-        await revokeInvite(supabase, jwt, id);
-      } catch {
-        // Nothing more can be done; the invite expires on its own.
+      // One retry; if both fail the invite expires on its own.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          if ((await revokeInvite(supabase, jwt, id)).ok) break;
+        } catch {
+          // Try once more.
+        }
       }
       return c.json({ error: SEND_FAILED }, 503);
     };
@@ -133,7 +136,6 @@ export function createMembersRouter(config: MembersRouterConfig) {
     return c.json(invite, 201);
   });
 
-  // Registered before /invites/:id so "accept" is never read as an id.
   router.post('/invites/accept', async (c) => {
     const supabase = config.getConfig();
     if (!supabase) return c.json({ error: UNAVAILABLE }, 503);

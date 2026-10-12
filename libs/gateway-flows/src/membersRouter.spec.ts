@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearJwksCache } from '@griever/gateway-auth';
 import { SUPABASE_URL, jsonResponse, makeKeys, signJwt } from '@griever/gateway-auth/testing';
 import { hashInviteToken } from './inviteToken.js';
-import { createMembersRouter } from './membersRouter.js';
+import {
+  BAD_BODY,
+  BAD_EMAIL,
+  BAD_ID,
+  FAILURES,
+  SEND_FAILED,
+  UNAVAILABLE,
+  UNUSABLE as UNUSABLE_COPY,
+  createMembersRouter,
+} from './membersRouter.js';
 
 const config = { url: SUPABASE_URL, anonKey: 'anon' };
 const MAIL = { apiKey: 're_test_key', from: 'hello@example.test', webUrl: 'https://app.example.test' };
@@ -121,6 +130,10 @@ describe('members router', () => {
       const raw = /#t=([A-Za-z0-9_-]{43})/.exec(mailBody.text)![1]!;
       expect(mailBody.text).toContain(`https://app.example.test/join#t=${raw}`);
       expect(mailBody.text.replaceAll(`#t=${raw}`, '')).not.toContain(raw);
+      // The whole Resend request body, subject included: one occurrence, inside #t=.
+      const whole = sentTo('emails')[0]!.body;
+      expect(whole.split(raw)).toHaveLength(2);
+      expect(whole.replace(`#t=${raw}`, '')).not.toContain(raw);
       for (const c of calls.filter((x) => x.url.startsWith(SUPABASE_URL))) {
         expect(c.url + c.body).not.toContain(raw);
       }
@@ -169,6 +182,23 @@ describe('members router', () => {
         error: "The invitation couldn't be sent right now. Please try again in a moment.",
       });
       expect(JSON.parse(sentTo('rpc/revoke_invite')[0]!.body)).toEqual({ p_invite_id: INVITE_ID });
+    });
+
+    it('retries a failed revoke once and still answers 503', async () => {
+      answers['emails'] = () => jsonResponse({}, 500);
+      let n = 0;
+      answers['rpc/revoke_invite'] = () => (n++ === 0 ? jsonResponse({ message: 'x' }, 500) : new Response(null, { status: 204 }));
+      const res = await send('POST', '/invites', { email: 'sam@example.test' });
+      expect(res.status).toBe(503);
+      expect(sentTo('rpc/revoke_invite')).toHaveLength(2);
+    });
+
+    it('answers 503 when both revoke attempts fail', async () => {
+      answers['emails'] = () => jsonResponse({}, 500);
+      answers['rpc/revoke_invite'] = () => jsonResponse({ message: 'x' }, 500);
+      const res = await send('POST', '/invites', { email: 'sam@example.test' });
+      expect(res.status).toBe(503);
+      expect(sentTo('rpc/revoke_invite')).toHaveLength(2);
     });
 
     it('answers 503 and creates nothing when RESEND_API_KEY is unset', async () => {
@@ -283,7 +313,14 @@ describe('members router', () => {
       await grab(await send('DELETE', `/invites/${INVITE_ID}`));
     }
     await grab(await send('POST', '/invites', {}));
+    await grab(await send('DELETE', '/invites/not-a-uuid'));
+    answers['rpc/list_members'] = () => jsonResponse({ message: 'x' }, 500);
+    await grab(await send('GET', '/members'));
     expect(texts.length).toBeGreaterThan(10);
     for (const t of texts) expect(t).not.toContain('!');
+    // Every copy constant, including ones the loop above may not reach.
+    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, SEND_FAILED, UNAVAILABLE, UNUSABLE_COPY];
+    for (const f of Object.values(FAILURES)) copy.push(f.error);
+    for (const t of copy) expect(t).not.toContain('!');
   });
 });
