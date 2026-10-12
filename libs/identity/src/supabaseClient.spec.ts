@@ -38,7 +38,7 @@ describe('profiles client', () => {
     [undefined, 'owner'],
     [null, 'owner'],
     ['admin', 'owner'],
-  ])('maps account_type %s to accountType %s', async (stored, expected) => {
+  ])('maps account_type %s to accountType %s (unknown values fail open to owner, display only)', async (stored, expected) => {
     const row = { ...ROW, account_type: stored };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([row])));
     expect((await client().get(USER_ID))?.accountType).toBe(expected);

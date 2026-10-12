@@ -20,7 +20,10 @@ interface ProfileRow {
   updated_at: string;
 }
 
-/** Anything but 'member' reads as 'owner': the database enforces the real value. */
+/**
+ * Anything but 'member' reads as 'owner': the column is NOT NULL with a check, so this fails
+ * open on purpose. It is for display only and never decides what a caller may do.
+ */
 function toAccountType(value: string | null | undefined): AccountType {
   return value === 'member' ? 'member' : 'owner';
 }

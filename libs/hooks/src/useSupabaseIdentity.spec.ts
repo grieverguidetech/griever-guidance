@@ -45,7 +45,7 @@ function stubClient(over: Partial<AuthClient> = {}): AuthClient {
   };
 }
 
-const cached = JSON.stringify({ senderName: 'Peter', contactSource: null, accountType: 'owner' });
+const cached = JSON.stringify({ id: 'u1', senderName: 'Peter', contactSource: null, accountType: 'owner' });
 
 describe('useSupabaseIdentity boot', () => {
   it('is loading only until the first check resolves, then signed in with the profile', async () => {
@@ -57,6 +57,7 @@ describe('useSupabaseIdentity boot', () => {
     await waitFor(() => expect(result.current.profile?.senderName).toBe('Peter'));
     expect(result.current.offline).toBe(false);
     expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY])).toEqual({
+      id: 'u1',
       senderName: 'Peter',
       contactSource: null,
       accountType: 'owner',
@@ -77,7 +78,7 @@ describe('useSupabaseIdentity boot', () => {
   });
 
   it('exposes accountType, and a cached member stays a member through an offline boot (C5)', async () => {
-    const memberCache = JSON.stringify({ senderName: 'Sam', contactSource: null, accountType: 'member' });
+    const memberCache = JSON.stringify({ id: 'u1', senderName: 'Sam', contactSource: null, accountType: 'member' });
     const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: memberCache });
     const client = stubClient({ getSession: async () => ({ status: 'offline' }), getProfile: vi.fn() });
     const { result } = renderHook(() => useSupabaseIdentity({ client, storage }));
@@ -97,8 +98,29 @@ describe('useSupabaseIdentity boot', () => {
     expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY]).accountType).toBe('member');
   });
 
+  it('normalises a profile from an older gateway (no accountType) to owner', async () => {
+    const storage = memoryStorage();
+    const getProfile = async (): Promise<ProfileResult> => {
+      const { accountType: _omit, ...older } = profile('Sam');
+      return { ok: true, profile: older as Profile };
+    };
+    const { result } = renderHook(() => useSupabaseIdentity({ client: stubClient({ getProfile }), storage }));
+    await waitFor(() => expect(result.current.profile?.accountType).toBe('owner'));
+    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY]).accountType).toBe('owner');
+  });
+
+  it('ignores and clears a cache written for a different user', async () => {
+    const other = JSON.stringify({ id: 'someone-else', senderName: 'Ann', contactSource: null, accountType: 'member' });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: other });
+    const getProfile = async (): Promise<ProfileResult> => ({ ok: false, reason: 'unavailable' });
+    const { result } = renderHook(() => useSupabaseIdentity({ client: stubClient({ getProfile }), storage }));
+    await waitFor(() => expect(result.current.isSignedIn).toBe(true));
+    expect(result.current.profile).toBeNull();
+    expect(storage.data[PROFILE_STORAGE_KEY]).toBeUndefined();
+  });
+
   it('reads a cache written before accountType existed as an owner', async () => {
-    const old = JSON.stringify({ senderName: 'Peter', contactSource: null });
+    const old = JSON.stringify({ id: 'u1', senderName: 'Peter', contactSource: null });
     const client = stubClient({ getSession: async () => ({ status: 'offline' }) });
     const { result } = renderHook(() =>
       useSupabaseIdentity({ client, storage: memoryStorage({ [PROFILE_STORAGE_KEY]: old }) }),
@@ -526,9 +548,9 @@ describe('useSupabaseIdentity lifecycle and storage', () => {
     ['an array', '[]'],
     ['a string', '"Peter"'],
     ['null', 'null'],
-    ['wrong field types', JSON.stringify({ senderName: 5, contactSource: null })],
-    ['unknown accountType', JSON.stringify({ senderName: 'P', contactSource: null, accountType: 'admin' })],
-    ['unknown contactSource', JSON.stringify({ senderName: 'P', contactSource: 'x' })],
+    ['wrong field types', JSON.stringify({ id: 'u1', senderName: 5, contactSource: null })],
+    ['unknown accountType', JSON.stringify({ id: 'u1', senderName: 'P', contactSource: null, accountType: 'admin' })],
+    ['unknown contactSource', JSON.stringify({ id: 'u1', senderName: 'P', contactSource: 'x' })],
   ])('ignores a corrupt cache (%s)', async (_label, raw) => {
     const client = stubClient({ getSession: async () => ({ status: 'offline' }) });
     const { result } = renderHook(() =>

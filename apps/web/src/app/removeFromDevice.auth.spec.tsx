@@ -38,7 +38,7 @@ const REMOVED = 'Everything has been removed from this device.';
 function seedDevice() {
   window.localStorage.setItem('sb-abcdef-auth-token', SESSION_JSON);
   window.localStorage.setItem('gg.sessions.v1', JSON.stringify([LOCAL_SESSION]));
-  window.localStorage.setItem('gg.profile.v1', JSON.stringify({ senderName: 'Anna', contactSource: null }));
+  window.localStorage.setItem('gg.profile.v1', JSON.stringify({ id: 'u1', senderName: 'Anna', contactSource: null }));
 }
 
 async function removeFromSettings(user: ReturnType<typeof userEvent.setup>) {
