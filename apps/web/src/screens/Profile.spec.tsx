@@ -86,4 +86,13 @@ describe('Profile', () => {
     render(<Profile senderName="Anna" onBack={vi.fn()} onSave={vi.fn()} onSignOut={vi.fn()} error={null} />);
     expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
   });
+
+  it('renders the optional slot only when one is passed', () => {
+    const props = { senderName: 'Anna', onBack: vi.fn(), onSave: vi.fn(), onSignOut: vi.fn(), error: null };
+    const { rerender } = render(<Profile {...props} />);
+    expect(screen.queryByText('slot content')).not.toBeInTheDocument();
+    rerender(<Profile {...props} peopleHelping={<p>slot content</p>} />);
+    expect(screen.getByText('slot content')).toBeInTheDocument();
+    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+  });
 });
