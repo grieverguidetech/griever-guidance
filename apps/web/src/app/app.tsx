@@ -283,6 +283,7 @@ function AppBody({
       setPendingName(null);
       setView('addContactsManual');
     } else {
+      setFlowCategory(undefined);
       setView(viewForReturning(sessionList));
     }
   }, [signedIn, view, pendingName, updateSenderName, clearError, sessionList]);
@@ -305,6 +306,7 @@ function AppBody({
   useEffect(() => {
     if (signedOut && leftOnPurpose && !isAccountView(view)) {
       setLeftOnPurpose(false);
+      setFlowCategory(undefined);
       setView('signup');
     }
   }, [signedOut, leftOnPurpose, view]);
@@ -711,8 +713,11 @@ function AppBody({
   }
 
   if (view === 'flow' && active && activeDetails) {
+    // A finished send is never reopened; with no moment chosen the picker shows.
+    const chosen = flowCategory ? active.drafts[flowCategory] : null;
+    const latest = latestInProgressDraft(active);
     const flowStart =
-      flowCategory === undefined ? latestInProgressDraft(active) : flowCategory ? (active.drafts[flowCategory] ?? null) : null;
+      flowCategory === undefined ? (latest && resumeDraft(latest)) : hasDraftInProgress(chosen) ? chosen : null;
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Flow

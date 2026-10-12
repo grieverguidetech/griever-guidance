@@ -135,14 +135,20 @@ export function hasDraftInProgress(draft: SendFlowDraft | null | undefined): dra
   return !!draft && draft.templateCategory !== null && draft.step !== 'sending' && draft.step !== 'sent';
 }
 
+/** The first step after the picker, for moments that do not start on the details form. */
+const FIRST_STEP: Partial<Record<TemplateCategory, SendFlowStep>> = {
+  announcement: 'announce',
+  obituary: 'contacts',
+};
+
 /**
  * The draft to resume with. A draft sitting on the template picker moves on to the moment's first
  * form, so the picker can't be reached and overwrite what was typed. Fields are left untouched.
  */
 export function resumeDraft(draft: SendFlowDraft): SendFlowDraft {
   if (draft.step !== 'template') return draft;
-  const first = { announcement: 'announce', obituary: 'contacts' } as const;
-  return { ...draft, step: first[draft.templateCategory as 'announcement' | 'obituary'] ?? 'details' };
+  const first = draft.templateCategory ? FIRST_STEP[draft.templateCategory] : undefined;
+  return { ...draft, step: first ?? 'details' };
 }
 
 function fromDraft(draft: SendFlowDraft): SendFlowState {
@@ -451,13 +457,22 @@ export function useSendFlow(
   }, [storage]);
 
   const restartForServiceDetails = useCallback(() => {
-    setState((s) => ({
-      ...initialState,
-      step: 'details',
-      templateCategory: 'service',
-      templateOverrideId: null,
-      selectedContactIds: s.selectedContactIds,
-    }));
+    setState((s) => {
+      const saved = draftsRef.current?.service;
+      // A service message already under way keeps what was typed; the people just told join its list.
+      if (hasDraftInProgress(saved)) {
+        const resumed = resumeDraft(saved);
+        const selectedContactIds = Array.from(new Set([...resumed.selectedContactIds, ...s.selectedContactIds]));
+        return fromDraft({ ...resumed, selectedContactIds });
+      }
+      return {
+        ...initialState,
+        step: 'details',
+        templateCategory: 'service',
+        templateOverrideId: null,
+        selectedContactIds: s.selectedContactIds,
+      };
+    });
   }, []);
 
   const startAnotherMessage = useCallback(() => {

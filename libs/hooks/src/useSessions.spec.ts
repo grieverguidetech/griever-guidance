@@ -204,6 +204,17 @@ describe('one draft per moment (#83)', () => {
       expect(storage.dump()[0]).not.toHaveProperty('draft');
     });
 
+    it('is idempotent: loading what a load saved gives the same sessions', () => {
+      const draft = freshDraft({ templateCategory: 'announcement', step: 'announce', fields: { personalNote: 'Kind' } });
+      const first = memory([old(draft)]);
+      const one = renderHook(() => useSessions(first)).result.current.sessions;
+      const second = memory(first.dump());
+      const two = renderHook(() => useSessions(second)).result.current.sessions;
+      expect(two).toEqual(one);
+      expect(two[0].drafts).toEqual(one[0].drafts);
+      expect(two[0].draftsUpdatedAt).toEqual(one[0].draftsUpdatedAt);
+    });
+
     it('drops an empty draft with no moment, and a null draft', () => {
       for (const draft of [freshDraft({}), null]) {
         const { result } = renderHook(() => useSessions(memory([old(draft)])));

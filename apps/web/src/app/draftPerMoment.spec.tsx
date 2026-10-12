@@ -4,6 +4,7 @@
  */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { contactStore } from '@griever/data-local';
 import { freshDraft } from '@griever/hooks';
 import type { SendFlowDraft } from '@griever/hooks';
 import { App } from './app';
@@ -123,4 +124,28 @@ describe('one draft per moment (#83)', () => {
     expect(savedDrafts()['obituary']).toMatchObject({ step: 'review', selectedContactIds: ['c-9'] });
     expect(await screen.findByRole('button', { name: 'Text these people' })).toBeInTheDocument();
   });
+
+  it('keeps the service draft when "Add service details" follows a sent announcement', async () => {
+    await contactStore.put({
+      contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
+    });
+    const service = freshDraft({
+      templateCategory: 'service',
+      step: 'details',
+      fields: { serviceLocation: 'St Mary Church' },
+      selectedContactIds: ['c-5'],
+    });
+    const review = freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c-1'], serviceDetailsKnown: 'no' });
+    seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
+    await user.click(screen.getByRole('button', { name: 'Open Messages' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(await screen.findByRole('button', { name: 'Add service details' }));
+
+    expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
+    expect(savedDrafts()['service']?.fields).toEqual({ serviceLocation: 'St Mary Church' });
+    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5', 'c-1']);
+  }, 30_000);
 });

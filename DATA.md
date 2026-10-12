@@ -148,7 +148,8 @@ draftsUpdatedAt: { announcement: "2026-10-11T10:00:00.000Z", … }   // which on
   wording and the place are dropped, per moment.
 - A draft with no moment chosen yet is not kept (there is nothing in it to lose).
 - Migration at load: the older single `draft` moves to `drafts[draft.templateCategory]` (dropped
-  when no moment was chosen) and the `draft` key is removed.
+  when no moment was chosen) and the `draft` key is removed. If an old `draft` sits next to
+  existing `drafts` (a rollback, then an upgrade), `drafts` wins and the old `draft` is ignored.
 
 ### 2.1 The C3 checklist lives on the account
 
