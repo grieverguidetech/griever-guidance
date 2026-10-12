@@ -1,5 +1,5 @@
 begin;
-select plan(51);
+select plan(64);
 
 -- O owner, M O's member, S stranger, F owner of a flow who is invited by O, N plain owner (no profile row).
 insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at) values
@@ -50,8 +50,7 @@ select is((select count(*)::int from information_schema.columns
   where table_schema = 'public' and table_name = 'flows'
     and column_name ~* 'contact|recipient|draft|message|wording|body'), 0,
   'flows has no contact, recipient, draft or message column');
-select is((select array_agg(column_name::text order by column_name) from information_schema.columns
-  where table_schema = 'public' and table_name = 'flows'),
+select columns_are('public', 'flows',
   array['created_at','date_of_passing','deleted_at','id','obituary_publisher','obituary_url','owner_id','person_name','service_date','service_ready','updated_at','updated_by'],
   'flows has exactly the agreed columns');
 select ok((select relrowsecurity from pg_class where oid = 'public.flows'::regclass), 'row level security is on');
@@ -72,12 +71,17 @@ select ok(not has_column_privilege('authenticated', 'public.flows', 'owner_id', 
   and not has_column_privilege('authenticated', 'public.flows', 'updated_by', 'INSERT')
   and has_column_privilege('authenticated', 'public.flows', 'id', 'INSERT'),
   'insert grant leaves out owner_id and updated_by but includes id');
-select ok(not has_function_privilege('anon', 'public.can_access_owner(uuid)', 'execute')
-  and not has_function_privilege('service_role', 'public.can_access_owner(uuid)', 'execute')
-  and has_function_privilege('authenticated', 'public.can_access_owner(uuid)', 'execute'),
-  'only authenticated can execute can_access_owner');
-select ok(exists (select 1 from pg_proc where proname = 'can_access_owner' and prosecdef and proconfig @> array['search_path=""']),
-  'can_access_owner is security definer with an empty search_path');
+select ok(not has_function_privilege('anon', 'public.my_owner_ids()', 'execute')
+  and not has_function_privilege('service_role', 'public.my_owner_ids()', 'execute')
+  and has_function_privilege('authenticated', 'public.my_owner_ids()', 'execute'),
+  'only authenticated can execute my_owner_ids');
+select ok(not has_function_privilege('anon', 'public.flows_refuse_members()', 'execute')
+  and not has_function_privilege('authenticated', 'public.flows_refuse_members()', 'execute')
+  and not has_function_privilege('service_role', 'public.flows_refuse_members()', 'execute'),
+  'nobody can execute the insert trigger function directly');
+select ok((select count(*) = 2 from pg_proc where proname in ('my_owner_ids','flows_refuse_members') and prosecdef and proconfig @> array['search_path=""']),
+  'my_owner_ids and flows_refuse_members are security definer with an empty search_path');
+select is(public.my_owner_ids(), '{}'::uuid[], 'with no caller my_owner_ids is empty');
 select ok(not has_function_privilege('anon', 'public.accept_invite(text)', 'execute')
   and not has_function_privilege('service_role', 'public.accept_invite(text)', 'execute')
   and has_function_privilege('authenticated', 'public.accept_invite(text)', 'execute'),
@@ -103,8 +107,16 @@ select throws_ok($$insert into public.flows (id, owner_id) values (gen_random_uu
   '42501', null, 'owner cannot insert a flow for someone else (owner_id is not grantable)');
 select throws_ok($$insert into public.flows (id, person_name) values (gen_random_uuid(), repeat('x', 201))$$,
   '23514', null, 'person_name length is checked');
-select throws_ok($$insert into public.flows (id, obituary_url) values (gen_random_uuid(), repeat('x', 2049))$$,
+select throws_ok($$insert into public.flows (id, obituary_url) values (gen_random_uuid(), 'https://' || repeat('x', 2050))$$,
   '23514', null, 'obituary_url length is checked');
+select throws_ok($$insert into public.flows (id, obituary_url) values (gen_random_uuid(), 'javascript:alert(1)')$$,
+  '23514', null, 'obituary_url must be http or https');
+select throws_ok($$insert into public.flows (id, date_of_passing) values (gen_random_uuid(), repeat('x', 101))$$,
+  '23514', null, 'date_of_passing length is checked');
+select throws_ok($$insert into public.flows (id, service_date) values (gen_random_uuid(), repeat('x', 101))$$,
+  '23514', null, 'service_date length is checked');
+select throws_ok($$insert into public.flows (id, obituary_publisher) values (gen_random_uuid(), repeat('x', 201))$$,
+  '23514', null, 'obituary_publisher length is checked');
 select throws_ok($$update public.flows set owner_id = '00000000-0000-0000-0000-0000000000c3' where id = '11111111-1111-1111-1111-111111111111'$$,
   '42501', null, 'owner_id cannot be updated');
 select throws_ok($$update public.flows set id = gen_random_uuid() where id = '11111111-1111-1111-1111-111111111111'$$,
@@ -114,6 +126,20 @@ select throws_ok($$update public.flows set created_at = now() where id = '111111
 select throws_ok($$update public.flows set updated_by = null where id = '11111111-1111-1111-1111-111111111111'$$,
   '42501', null, 'updated_by cannot be written by a client');
 select throws_ok($$delete from public.flows$$, '42501', null, 'owner cannot delete');
+reset role;
+alter table public.flows disable trigger flows_set_audit;
+update public.flows set updated_at = '2020-01-01' where id = '33333333-3333-3333-3333-333333333333';
+alter table public.flows enable trigger flows_set_audit;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated","email":"o@example.test"}', true);
+update public.flows set person_name = 'Aunt May R' where id = '33333333-3333-3333-3333-333333333333';
+select ok((select updated_at > '2020-01-01' from public.flows where id = '33333333-3333-3333-3333-333333333333'), 'updated_at moves on update');
+reset role;
+update public.flows set deleted_at = now() where id = '33333333-3333-3333-3333-333333333333';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated","email":"o@example.test"}', true);
+update public.flows set person_name = 'Revived' where id = '33333333-3333-3333-3333-333333333333';
+select is((select person_name from public.flows where id = '33333333-3333-3333-3333-333333333333'), 'Aunt May R', 'a soft-deleted flow can no longer be updated');
 select throws_ok($$update public.flows set deleted_at = now() where id = '11111111-1111-1111-1111-111111111111'$$,
   '42501', null, 'owner cannot set deleted_at directly either');
 
@@ -145,8 +171,14 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select throws_ok($$insert into public.flows (id) values (gen_random_uuid())$$, '42501', null,
   'account_type member alone blocks insert when there is no membership row');
 
--- ===== a removed member loses access at once =====
+-- the insert trigger refuses a member even with RLS bypassed (superuser, caller set by claims)
 reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c2","role":"authenticated","email":"m@example.test"}', true);
+select throws_ok($$insert into public.flows (id, owner_id) values (gen_random_uuid(), '00000000-0000-0000-0000-0000000000c2')$$,
+  '42501', 'not_allowed', 'the insert trigger refuses a member even without RLS');
+select set_config('request.jwt.claims', '', true);
+
+-- ===== a removed member loses access at once =====
 delete from public.memberships where member_id = '00000000-0000-0000-0000-0000000000c2';
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c2","role":"authenticated","email":"m@example.test"}', true);
@@ -169,6 +201,7 @@ select is((select person_name from public.flows where id = '11111111-1111-1111-1
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c5","role":"authenticated","email":"n@example.test"}', true);
 select lives_ok($$insert into public.flows (id, person_name) values (gen_random_uuid(), 'Fresh')$$, 'an owner with no profile row can insert');
+select is((select count(*)::int from public.profiles where id = '00000000-0000-0000-0000-0000000000c5'), 1, 'the insert trigger made their profile row');
 
 -- ===== accept_invite refuses a joiner who owns flows =====
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c4","role":"authenticated","email":"f@example.test"}', true);
@@ -190,6 +223,18 @@ select is(public.accept_invite(repeat('b',64)), '00000000-0000-0000-0000-0000000
 -- once joined, that member can see O's flows and cannot insert
 select is((select count(*)::int from public.flows), 2, 'the new member sees the owner''s flows');
 select throws_ok($$insert into public.flows (id) values (gen_random_uuid())$$, '42501', null, 'the new member cannot insert');
+
+-- ===== deleting a user does not rewrite updated_at (the audit trigger stands aside) =====
+reset role;
+select is((select updated_by from public.flows where id = '11111111-1111-1111-1111-111111111111'),
+  '00000000-0000-0000-0000-0000000000c2'::uuid, 'the member was the last editor');
+alter table public.flows disable trigger flows_set_audit;
+update public.flows set updated_at = '2021-01-01' where id = '11111111-1111-1111-1111-111111111111';
+alter table public.flows enable trigger flows_set_audit;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c2","role":"authenticated"}', true);
+delete from auth.users where id = '00000000-0000-0000-0000-0000000000c2';
+select is((select updated_by from public.flows where id = '11111111-1111-1111-1111-111111111111'), null, 'deleting the last editor sets updated_by to null');
+select is((select updated_at from public.flows where id = '11111111-1111-1111-1111-111111111111'), '2021-01-01'::timestamptz, 'and leaves updated_at alone');
 
 select * from finish();
 rollback;

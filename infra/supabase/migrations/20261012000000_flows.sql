@@ -12,7 +12,7 @@ create table public.flows (
   person_name text not null default '' check (char_length(person_name) <= 200),
   date_of_passing text check (char_length(date_of_passing) <= 100),
   service_date text check (char_length(service_date) <= 100),
-  obituary_url text check (char_length(obituary_url) <= 2048),
+  obituary_url text check (char_length(obituary_url) <= 2048 and obituary_url ~* '^https?://'),
   obituary_publisher text check (char_length(obituary_publisher) <= 200),
   service_ready boolean not null default false,
   created_at timestamptz not null default now(),
@@ -34,6 +34,11 @@ language plpgsql
 set search_path = ''
 as $$
 begin
+  -- The ON DELETE SET NULL cascade from auth.users updates updated_by itself; do not
+  -- overwrite it (clients cannot write updated_by, so this is safe).
+  if tg_op = 'UPDATE' and new.updated_by is distinct from old.updated_by then
+    return new;
+  end if;
   new.updated_at = now();
   new.updated_by = auth.uid();
   return new;
@@ -44,24 +49,56 @@ create trigger flows_set_audit
   before insert or update on public.flows
   for each row execute function public.flows_set_audit();
 
--- Is the caller this owner, or one of this owner's members? Definer so it reads
--- memberships the same way for every caller. The RLS policies call it as the caller,
--- so authenticated must be able to execute it; anon must not.
-create function public.can_access_owner(p_owner uuid) returns boolean
+-- The owner ids the caller may work under: their own id, plus their owner's id if they are
+-- a member. Definer so it reads memberships the same way for every caller. The policies
+-- call it as the caller inside (select ...), so Postgres evaluates it once per query (an
+-- InitPlan) and then uses the owner_id index. authenticated must be able to execute it.
+create function public.my_owner_ids() returns uuid[]
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select p_owner is not null and auth.uid() is not null and (
-    p_owner = auth.uid()
-    or exists (select 1 from public.memberships
-               where owner_id = p_owner and member_id = auth.uid())
-  );
+  select array_remove(array[
+    auth.uid(),
+    (select m.owner_id from public.memberships m where m.member_id = auth.uid())
+  ], null);
 $$;
 
-revoke execute on function public.can_access_owner(uuid) from public, anon, authenticated, service_role;
-grant execute on function public.can_access_owner(uuid) to authenticated;
+revoke execute on function public.my_owner_ids() from public, anon, authenticated, service_role;
+grant execute on function public.my_owner_ids() to authenticated;
+
+-- C11 race guard. The insert policy below reads memberships without a lock, so a person
+-- accepting an invite at the same moment could slip a flow in. This definer trigger takes
+-- a share lock on the caller's profile row (accept_invite takes it for update first), so
+-- the two serialise, then re-checks. It does not replace the policy; both stay.
+create function public.flows_refuse_members() returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  -- No caller (a migration or the superuser): RLS and grants already cover every client.
+  if v_uid is null then
+    return new;
+  end if;
+  insert into public.profiles (id) values (v_uid) on conflict (id) do nothing;
+  perform 1 from public.profiles where id = v_uid for share;
+  if exists (select 1 from public.memberships where member_id = v_uid)
+     or exists (select 1 from public.profiles where id = v_uid and account_type = 'member') then
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.flows_refuse_members() from public, anon, authenticated, service_role;
+
+create trigger flows_refuse_members
+  before insert on public.flows
+  for each row execute function public.flows_refuse_members();
 
 -- Column-level grants. Insert omits owner_id (it defaults to the caller), created_at,
 -- updated_at and updated_by. Update omits id, owner_id, created_at and deleted_at (C9: members must not soft-delete). No delete (C9).
@@ -76,12 +113,12 @@ grant update (person_name, date_of_passing, service_date, obituary_url,
 
 create policy "flows_select_owner_or_member" on public.flows
   for select to authenticated
-  using (public.can_access_owner(owner_id));
+  using (owner_id = any ((select public.my_owner_ids())::uuid[]));
 
 create policy "flows_update_owner_or_member" on public.flows
   for update to authenticated
-  using (public.can_access_owner(owner_id))
-  with check (public.can_access_owner(owner_id));
+  using (owner_id = any ((select public.my_owner_ids())::uuid[]) and deleted_at is null)
+  with check (owner_id = any ((select public.my_owner_ids())::uuid[]));
 
 -- C11 in the database: members cannot create people. A caller counts as a member if
 -- they have a membership row OR their profile says account_type 'member'; either is
