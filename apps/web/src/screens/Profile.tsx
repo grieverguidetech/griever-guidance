@@ -90,7 +90,6 @@ export function Profile({ asksName, senderName, onBack, onSave, onSignOut, error
         type="button"
         onClick={onSignOut}
         className="gg-btn gg-btn-ghost gg-btn-block"
-        style={{ color: 'var(--color-accent-700)' }}
       >
         Sign out
       </button>

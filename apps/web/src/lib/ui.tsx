@@ -44,8 +44,6 @@ export function TopBar({ onBack }: { onBack?: () => void }) {
         type="button"
         onClick={onWhatYoullNeed}
         className="gg-btn gg-btn-ghost !px-0"
-        // The darker accent keeps this AA (5.7:1); the base accent is 3.65:1.
-        style={{ color: 'var(--color-accent-700)' }}
       >
         <ListChecks size={16} weight="duotone" />
         What you'll need

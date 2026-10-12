@@ -300,7 +300,6 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
             type="button"
             onClick={() => setView('createAccount')}
             className="gg-btn gg-btn-ghost self-start !px-0"
-            style={{ color: 'var(--color-accent-700)' }}
           >
             Sign in
           </button>
@@ -714,7 +713,6 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
             type="button"
             onClick={() => openProfile(false)}
             className="gg-btn gg-btn-ghost gg-btn-block mt-4"
-            style={{ color: 'var(--color-accent-700)' }}
           >
             Your account
           </button>
