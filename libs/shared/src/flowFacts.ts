@@ -2,6 +2,7 @@
 // gateway is built here from the whitelist, never by spreading a session. Drafts, edited wording
 // (`messageOverride`), recipients, contact ids and `senderName` are deliberately not facts.
 import { isUuid } from './members.js';
+import { normalizeUrl } from './templates.js';
 
 export interface FlowFacts {
   personName: string;
@@ -60,16 +61,83 @@ export function pickFlowFacts(source: FlowFactsSource): Partial<FlowFacts> {
   return out as Partial<FlowFacts>;
 }
 
-/** The full set of facts for a session, with missing optional values as null. */
+// Postgres text can't hold NUL, so it is removed before anything is sent.
+const stripNul = (value: string): string => value.replaceAll('\u0000', '');
+
+/** Trims and cuts to the database limit, never splitting a surrogate pair. */
+function clampText(value: string, max: number): string {
+  const trimmed = stripNul(value).trim();
+  if (trimmed.length <= max) return trimmed;
+  const cut = trimmed.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return (last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut).trimEnd();
+}
+
+/** Blank or whitespace-only becomes null, so "not set" has one spelling on the wire. */
+function optionalText(
+  value: string | null | undefined,
+  max: number,
+): string | null {
+  return clampText(value ?? '', max) || null;
+}
+
+/**
+ * Typed text becomes a link the database accepts: a bare "legacy.com/x" gets https://. Anything
+ * that still isn't an http(s) link, or is too long to cut safely, becomes null instead of failing
+ * the whole write.
+ */
+function optionalUrl(value: string | null | undefined): string | null {
+  const url = normalizeUrl(stripNul(value ?? ''));
+  if (url.length > FLOW_FACT_MAX_LENGTH.obituaryUrl) return null;
+  return isHttpUrl(url) ? url : null;
+}
+
+/**
+ * The full, valid set of facts for a session (always passes `parseFlowFacts`). Text is trimmed and
+ * cut to the database limits; blank optional values and unusable links become null.
+ */
 export function toFlowFacts(source: FlowFactsSource): FlowFacts {
   return {
-    personName: source.personName ?? '',
-    dateOfPassing: source.dateOfPassing ?? null,
-    serviceDate: source.serviceDate ?? null,
-    // An empty field is "no link": the database only accepts http(s) URLs or null.
-    obituaryUrl: source.obituaryUrl || null,
-    obituaryPublisher: source.obituaryPublisher ?? null,
+    personName: clampText(
+      source.personName ?? '',
+      FLOW_FACT_MAX_LENGTH.personName,
+    ),
+    dateOfPassing: optionalText(
+      source.dateOfPassing,
+      FLOW_FACT_MAX_LENGTH.dateOfPassing,
+    ),
+    serviceDate: optionalText(
+      source.serviceDate,
+      FLOW_FACT_MAX_LENGTH.serviceDate,
+    ),
+    obituaryUrl: optionalUrl(source.obituaryUrl),
+    obituaryPublisher: optionalText(
+      source.obituaryPublisher,
+      FLOW_FACT_MAX_LENGTH.obituaryPublisher,
+    ),
     serviceReady: source.serviceReady ?? false,
+  };
+}
+
+/**
+ * The reverse for Session fields, which are strings that screens call `.trim()` on: null becomes ''.
+ * `obituaryPublisher` and `serviceDate` are optional on a Session, so '' is fine there too.
+ */
+export function flowFactsToSessionFields(facts: FlowFacts): {
+  personName: string;
+  dateOfPassing: string;
+  serviceDate: string;
+  obituaryUrl: string;
+  obituaryPublisher: string;
+  serviceReady: boolean;
+} {
+  return {
+    personName: facts.personName,
+    dateOfPassing: facts.dateOfPassing ?? '',
+    serviceDate: facts.serviceDate ?? '',
+    obituaryUrl: facts.obituaryUrl ?? '',
+    obituaryPublisher: facts.obituaryPublisher ?? '',
+    serviceReady: facts.serviceReady,
   };
 }
 
@@ -107,7 +175,11 @@ export function mergeFlowFacts(
   return merged as unknown as FlowFacts;
 }
 
-/** Several queued edits become one patch holding the latest value per field (later wins). */
+/**
+ * Several queued edits become one patch holding the latest value per field (later wins). An edit
+ * that goes A to B and back to A still sends A: the server may have changed meanwhile, so the
+ * device's value is sent on purpose.
+ */
 export function coalesceFlowPatches(
   patches: readonly FlowFactsSource[],
 ): Partial<FlowFacts> {
@@ -116,26 +188,28 @@ export function coalesceFlowPatches(
   return out as Partial<FlowFacts>;
 }
 
-const isNullableText = (value: unknown, max: number): boolean =>
-  value === null || (typeof value === 'string' && value.length <= max);
+// NUL is refused by Postgres text columns, so it is refused here first.
+const isText = (value: unknown, max: number): value is string =>
+  typeof value === 'string' && value.length <= max && !value.includes('\u0000');
 
-// Matches the database check: http or https only (no javascript: or data: links).
+const isNullableText = (value: unknown, max: number): boolean =>
+  value === null || isText(value, max);
+
+// Stricter than the database check: http or https only, no whitespace (so no javascript: or data:).
 const HTTP_URL = /^https?:\/\/\S+$/i;
+const isHttpUrl = (value: string): boolean => HTTP_URL.test(value);
 
 function validField(key: FlowFactKey, value: unknown): boolean {
   switch (key) {
     case 'personName':
-      return (
-        typeof value === 'string' &&
-        value.length <= FLOW_FACT_MAX_LENGTH.personName
-      );
+      return isText(value, FLOW_FACT_MAX_LENGTH.personName);
     case 'serviceReady':
       return typeof value === 'boolean';
     case 'obituaryUrl':
       return (
         value === null ||
         (isNullableText(value, FLOW_FACT_MAX_LENGTH.obituaryUrl) &&
-          HTTP_URL.test(value as string))
+          isHttpUrl(value as string))
       );
     default:
       return isNullableText(value, FLOW_FACT_MAX_LENGTH[key]);
@@ -171,7 +245,7 @@ export function parseFlowFacts(input: unknown): FlowFacts | null {
     : null;
 }
 
-/** Validates a record from the server: uuid ids, a known role, valid facts. Null when invalid. */
+/** Validates a record from the server: uuid ids, a known role, valid facts (extra keys dropped). Null when invalid. */
 export function parseFlowRecord(input: unknown): FlowRecord | null {
   if (!isPlainObject(input)) return null;
   const { id, ownerId, role, facts, updatedAt, updatedBy } = input;
@@ -185,7 +259,10 @@ export function parseFlowRecord(input: unknown): FlowRecord | null {
     (typeof updatedBy !== 'string' || !isUuid(updatedBy))
   )
     return null;
-  const parsed = parseFlowFacts(facts);
+  // Keys the client doesn't know are ignored (a newer server may add some); known ones are checked.
+  const parsed = parseFlowFacts(
+    isPlainObject(facts) ? pickFlowFacts(facts as FlowFactsSource) : null,
+  );
   if (!parsed) return null;
   return { id, ownerId, role, facts: parsed, updatedAt, updatedBy };
 }

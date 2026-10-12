@@ -3,6 +3,7 @@ import {
   FLOW_FACT_MAX_LENGTH,
   coalesceFlowPatches,
   diffFlowFacts,
+  flowFactsToSessionFields,
   mergeFlowFacts,
   parseFlowFacts,
   parseFlowPatch,
@@ -36,7 +37,9 @@ const sessionLike = {
   obituaryPublisher: 'The Register',
   serviceReady: true,
   senderName: 'Anna',
-  drafts: { announce: { messageOverride: 'my own words', selectedContactIds: ['c1'] } },
+  drafts: {
+    announce: { messageOverride: 'my own words', selectedContactIds: ['c1'] },
+  },
   messageOverride: 'my own words',
   selectedContactIds: ['c1', 'c2'],
   contactIds: ['c1'],
@@ -118,7 +121,11 @@ it('maps an empty obituary link to null', () => {
 describe('diffFlowFacts', () => {
   it('returns only changed keys', () => {
     expect(
-      diffFlowFacts(facts, { ...facts, serviceDate: 'June 3', serviceReady: true }),
+      diffFlowFacts(facts, {
+        ...facts,
+        serviceDate: 'June 3',
+        serviceReady: true,
+      }),
     ).toEqual({ serviceDate: 'June 3', serviceReady: true });
   });
   it('returns nothing when nothing changed', () => {
@@ -130,7 +137,9 @@ describe('diffFlowFacts', () => {
     });
   });
   it('ignores changes to non-fact keys', () => {
-    expect(diffFlowFacts(facts, { ...facts, ...{ senderName: 'Z', drafts: {} } })).toEqual({});
+    expect(
+      diffFlowFacts(facts, { ...facts, ...{ senderName: 'Z', drafts: {} } }),
+    ).toEqual({});
   });
 });
 
@@ -158,16 +167,23 @@ describe('mergeFlowFacts', () => {
   });
 
   it('keeps all local values when every field is pending', () => {
-    expect(mergeFlowFacts(facts, remote, new Set(FLOW_FACT_KEYS))).toEqual(facts);
+    expect(mergeFlowFacts(facts, remote, new Set(FLOW_FACT_KEYS))).toEqual(
+      facts,
+    );
   });
 
   it('keeps local for a field the remote does not have', () => {
     const partial: Partial<FlowFacts> = { serviceDate: 'June 3' };
-    expect(mergeFlowFacts(facts, partial, [])).toEqual({ ...facts, serviceDate: 'June 3' });
+    expect(mergeFlowFacts(facts, partial, [])).toEqual({
+      ...facts,
+      serviceDate: 'June 3',
+    });
   });
 
   it('takes a remote null (a cleared value) when not pending', () => {
-    expect(mergeFlowFacts(facts, { dateOfPassing: null }, []).dateOfPassing).toBeNull();
+    expect(
+      mergeFlowFacts(facts, { dateOfPassing: null }, []).dateOfPassing,
+    ).toBeNull();
   });
 
   it('does not mutate its inputs', () => {
@@ -226,16 +242,21 @@ describe('validation (C8)', () => {
       personName: 'a'.repeat(FLOW_FACT_MAX_LENGTH.personName),
       dateOfPassing: 'a'.repeat(FLOW_FACT_MAX_LENGTH.dateOfPassing),
       serviceDate: 'a'.repeat(FLOW_FACT_MAX_LENGTH.serviceDate),
-      obituaryUrl: 'https://' + 'a'.repeat(FLOW_FACT_MAX_LENGTH.obituaryUrl - 8),
+      obituaryUrl:
+        'https://' + 'a'.repeat(FLOW_FACT_MAX_LENGTH.obituaryUrl - 8),
       obituaryPublisher: 'a'.repeat(FLOW_FACT_MAX_LENGTH.obituaryPublisher),
     };
     expect(parseFlowFacts(atLimit)).toEqual(atLimit);
   });
 
   it('accepts a partial patch but not one with an unknown key', () => {
-    expect(parseFlowPatch({ serviceReady: true })).toEqual({ serviceReady: true });
+    expect(parseFlowPatch({ serviceReady: true })).toEqual({
+      serviceReady: true,
+    });
     expect(parseFlowPatch({})).toEqual({});
-    expect(parseFlowPatch({ serviceReady: true, contactIds: ['c1'] })).toBeNull();
+    expect(
+      parseFlowPatch({ serviceReady: true, contactIds: ['c1'] }),
+    ).toBeNull();
     expect(parseFlowPatch({ personName: 3 })).toBeNull();
   });
 
@@ -262,5 +283,139 @@ describe('validation (C8)', () => {
     ['not an object', 'x'],
   ])('rejects a record with %s', (_label, input) => {
     expect(parseFlowRecord(input)).toBeNull();
+  });
+});
+
+describe('toFlowFacts always produces what the database accepts', () => {
+  it('turns a typed link into https, and an unusable one into null', () => {
+    expect(toFlowFacts({ obituaryUrl: 'legacy.com/x' }).obituaryUrl).toBe(
+      'https://legacy.com/x',
+    );
+    expect(toFlowFacts({ obituaryUrl: ' https://x.com/a ' }).obituaryUrl).toBe(
+      'https://x.com/a',
+    );
+    expect(
+      toFlowFacts({ obituaryUrl: 'two words.com' }).obituaryUrl,
+    ).toBeNull();
+    expect(
+      toFlowFacts({ obituaryUrl: 'javascript:alert(1)' }).obituaryUrl,
+    ).toBe('https://javascript:alert(1)');
+    expect(toFlowFacts({ obituaryUrl: '   ' }).obituaryUrl).toBeNull();
+    expect(
+      toFlowFacts({ obituaryUrl: 'https://' + 'a'.repeat(2050) }).obituaryUrl,
+    ).toBeNull();
+  });
+
+  it('passes parseFlowFacts for messy sessions', () => {
+    const messy = [
+      { obituaryUrl: 'legacy.com/x' },
+      { obituaryUrl: ' https://x' },
+      { obituaryUrl: 'ht' },
+      { obituaryUrl: 'a b c' },
+      { obituaryUrl: '\u0000' },
+      { personName: '  \u0000Ann  ' },
+      { personName: 'a'.repeat(500), dateOfPassing: 'b'.repeat(500) },
+      { obituaryPublisher: '   ', serviceDate: '\n' },
+      { personName: '\u{1F600}'.repeat(150) },
+      {},
+    ];
+    for (const s of messy)
+      expect(parseFlowFacts(toFlowFacts(s))).not.toBeNull();
+  });
+
+  it('trims and cuts every text fact to its limit', () => {
+    const f = toFlowFacts({
+      personName: '  ' + 'a'.repeat(250),
+      dateOfPassing: 'b'.repeat(150),
+      serviceDate: 'c'.repeat(150),
+      obituaryPublisher: 'd'.repeat(250),
+    });
+    expect(f.personName).toBe('a'.repeat(200));
+    expect(f.dateOfPassing).toBe('b'.repeat(100));
+    expect(f.serviceDate).toBe('c'.repeat(100));
+    expect(f.obituaryPublisher).toBe('d'.repeat(200));
+  });
+
+  it('does not split an emoji when cutting', () => {
+    const f = toFlowFacts({ personName: 'a'.repeat(199) + '\u{1F600}' });
+    expect(f.personName).toBe('a'.repeat(199));
+  });
+
+  it('maps blank optional fields to null, as a new Session has them', () => {
+    const fresh = {
+      personName: 'Ann',
+      dateOfPassing: '',
+      senderName: '',
+      obituaryUrl: '',
+      serviceReady: false,
+      drafts: {},
+      recipientsNotified: {},
+    };
+    expect(toFlowFacts(fresh)).toEqual({
+      personName: 'Ann',
+      dateOfPassing: null,
+      serviceDate: null,
+      obituaryUrl: null,
+      obituaryPublisher: null,
+      serviceReady: false,
+    });
+    expect(
+      toFlowFacts({
+        dateOfPassing: '  ',
+        serviceDate: ' ',
+        obituaryPublisher: '\t',
+      }),
+    ).toMatchObject({
+      dateOfPassing: null,
+      serviceDate: null,
+      obituaryPublisher: null,
+    });
+  });
+
+  it('flowFactsToSessionFields maps null back to empty strings', () => {
+    const back = flowFactsToSessionFields(toFlowFacts({ personName: 'Ann' }));
+    expect(back).toEqual({
+      personName: 'Ann',
+      dateOfPassing: '',
+      serviceDate: '',
+      obituaryUrl: '',
+      obituaryPublisher: '',
+      serviceReady: false,
+    });
+    expect(Object.keys(back).sort()).toEqual([...FLOW_FACT_KEYS].sort());
+  });
+});
+
+describe('response and text edge cases', () => {
+  it('rejects a NUL character in any text fact', () => {
+    expect(parseFlowFacts({ ...facts, personName: 'A\u0000B' })).toBeNull();
+    expect(parseFlowFacts({ ...facts, serviceDate: 'x\u0000' })).toBeNull();
+    expect(parseFlowPatch({ obituaryPublisher: '\u0000' })).toBeNull();
+  });
+
+  it('parseFlowRecord keeps only whitelisted facts and drops extras', () => {
+    const rec = {
+      id: ID,
+      ownerId: OTHER,
+      role: 'owner',
+      facts: { ...facts, serviceTime: '10am', drafts: {} },
+      updatedAt: '2026-10-12T10:00:00Z',
+      updatedBy: null,
+    };
+    const out = parseFlowRecord(rec);
+    expect(out?.facts).toEqual(facts);
+    expect(Object.keys(out?.facts ?? {}).sort()).toEqual(
+      [...FLOW_FACT_KEYS].sort(),
+    );
+  });
+
+  it('coalescing A to B to A still sends A', () => {
+    expect(
+      coalesceFlowPatches([
+        { personName: 'A' },
+        { personName: 'B' },
+        { personName: 'A' },
+      ]),
+    ).toEqual({ personName: 'A' });
   });
 });

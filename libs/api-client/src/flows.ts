@@ -1,5 +1,7 @@
 import {
   isUuid,
+  parseFlowFacts,
+  parseFlowPatch,
   parseFlowRecord,
   pickFlowFacts,
   type FlowFacts,
@@ -10,6 +12,7 @@ import { ApiError, apiFetch } from './client.js';
 /**
  * Expected failures are values, never exceptions.
  * - `offline`: the request never reached a server. Sync retries later (C5).
+ * - `conflict` 409: on create, the id already exists, so switch to `patchFlow`.
  * - `signed_out` 401, `forbidden` 403, `not_found` 404, `invalid` 400/422 (or a bad id, never sent).
  * - `unavailable`: a 5xx. `failed`: anything else, including a reply that is not a valid record.
  */
@@ -18,18 +21,26 @@ export type FlowsFailureReason =
   | 'signed_out'
   | 'forbidden'
   | 'not_found'
+  | 'conflict'
   | 'invalid'
   | 'unavailable'
   | 'failed';
 
 export type FlowsFailure = { ok: false; reason: FlowsFailureReason };
-export type ListFlowsResult = { ok: true; flows: FlowRecord[] } | FlowsFailure;
+export type ListFlowsResult =
+  | { ok: true; flows: FlowRecord[]; dropped: number }
+  | FlowsFailure;
 export type WriteFlowResult = { ok: true; flow: FlowRecord } | FlowsFailure;
+/** `flow: null` means there was nothing to send. */
+export type PatchFlowResult =
+  | { ok: true; flow: FlowRecord | null }
+  | FlowsFailure;
 
 function reasonForStatus(status: number): FlowsFailureReason {
   if (status === 401) return 'signed_out';
   if (status === 403) return 'forbidden';
   if (status === 404) return 'not_found';
+  if (status === 409) return 'conflict';
   if (status === 400 || status === 422) return 'invalid';
   if (status >= 500) return 'unavailable';
   return 'failed';
@@ -69,7 +80,8 @@ export async function listFlows(accessToken: string): Promise<ListFlowsResult> {
   const flows = result.body
     .map(parseFlowRecord)
     .filter((flow): flow is FlowRecord => flow !== null);
-  return { ok: true, flows };
+  // `dropped` lets sync tell "the server stopped listing it" from "we couldn't read it".
+  return { ok: true, flows, dropped: result.body.length - flows.length };
 }
 
 async function send(
@@ -89,29 +101,30 @@ async function send(
 
 /**
  * Creates a person (owners only; a member gets `forbidden`). The id is made on the device. This is
- * a plain POST, never an upsert: a repeat for an existing id is a conflict, reported as `failed`.
- * The body is rebuilt from the whitelist even if the caller passed a whole session (C2/C3).
+ * a plain POST, never an upsert: a repeat for an existing id is a `conflict`. The body is rebuilt
+ * from the whitelist and validated before sending (C2/C3, C8).
  */
 export function createFlow(
   accessToken: string,
   id: string,
   facts: FlowFacts,
 ): Promise<WriteFlowResult> {
-  if (!isUuid(id)) return Promise.resolve({ ok: false, reason: 'invalid' });
-  return send(accessToken, '/flows', 'POST', { id, ...pickFlowFacts(facts) });
+  const body = parseFlowFacts(pickFlowFacts(facts));
+  if (!isUuid(id) || !body)
+    return Promise.resolve({ ok: false, reason: 'invalid' });
+  return send(accessToken, '/flows', 'POST', { id, ...body });
 }
 
-/** Edits a person. Sends only the changed whitelisted fields. */
+/** Edits a person. Sends only the changed whitelisted fields; an empty patch sends nothing. */
 export function patchFlow(
   accessToken: string,
   id: string,
   partial: Partial<FlowFacts>,
-): Promise<WriteFlowResult> {
-  if (!isUuid(id)) return Promise.resolve({ ok: false, reason: 'invalid' });
-  return send(
-    accessToken,
-    `/flows/${encodeURIComponent(id)}`,
-    'PATCH',
-    pickFlowFacts(partial),
-  );
+): Promise<PatchFlowResult> {
+  const body = parseFlowPatch(pickFlowFacts(partial));
+  if (!isUuid(id) || !body)
+    return Promise.resolve({ ok: false, reason: 'invalid' });
+  if (Object.keys(body).length === 0)
+    return Promise.resolve({ ok: true, flow: null });
+  return send(accessToken, `/flows/${encodeURIComponent(id)}`, 'PATCH', body);
 }

@@ -45,11 +45,24 @@ const firstCall = () => {
   return { url, init, headers: init.headers as Record<string, string> };
 };
 
-const calls: Array<[string, () => Promise<unknown>, string, string, unknown]> = [
-  ['listFlows', () => listFlows(ACCESS), 'GET', '/flows', [record]],
-  ['createFlow', () => createFlow(ACCESS, ID, facts), 'POST', '/flows', record],
-  ['patchFlow', () => patchFlow(ACCESS, ID, { serviceReady: true }), 'PATCH', `/flows/${ID}`, record],
-];
+const calls: Array<[string, () => Promise<unknown>, string, string, unknown]> =
+  [
+    ['listFlows', () => listFlows(ACCESS), 'GET', '/flows', [record]],
+    [
+      'createFlow',
+      () => createFlow(ACCESS, ID, facts),
+      'POST',
+      '/flows',
+      record,
+    ],
+    [
+      'patchFlow',
+      () => patchFlow(ACCESS, ID, { serviceReady: true }),
+      'PATCH',
+      `/flows/${ID}`,
+      record,
+    ],
+  ];
 
 describe.each(calls)('%s', (_name, run, method, path, okBody) => {
   it('sends the method, path and bearer header, with no token in the URL', async () => {
@@ -66,6 +79,7 @@ describe.each(calls)('%s', (_name, run, method, path, okBody) => {
     [401, 'signed_out'],
     [403, 'forbidden'],
     [404, 'not_found'],
+    [409, 'conflict'],
     [400, 'invalid'],
     [422, 'invalid'],
     [500, 'unavailable'],
@@ -95,7 +109,11 @@ describe.each(calls)('%s', (_name, run, method, path, okBody) => {
 describe('listFlows', () => {
   it('returns validated records and drops invalid ones', async () => {
     fetchMock.mockResolvedValue(json(200, [record, { ...record, id: 'bad' }]));
-    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [record] });
+    expect(await listFlows(ACCESS)).toEqual({
+      ok: true,
+      flows: [record],
+      dropped: 1,
+    });
   });
   it('fails when the reply is not a list', async () => {
     fetchMock.mockResolvedValue(json(200, { flows: [] }));
@@ -106,15 +124,23 @@ describe('listFlows', () => {
 describe('createFlow and patchFlow', () => {
   it('create sends the id and facts as the body and returns the record', async () => {
     fetchMock.mockResolvedValue(json(200, record));
-    expect(await createFlow(ACCESS, ID, facts)).toEqual({ ok: true, flow: record });
-    expect(JSON.parse(firstCall().init.body as string)).toEqual({ id: ID, ...facts });
+    expect(await createFlow(ACCESS, ID, facts)).toEqual({
+      ok: true,
+      flow: record,
+    });
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({
+      id: ID,
+      ...facts,
+    });
     expect(firstCall().headers['Prefer']).toBeUndefined();
   });
 
   it('patch sends only the given fields', async () => {
     fetchMock.mockResolvedValue(json(200, record));
     await patchFlow(ACCESS, ID, { serviceDate: 'June 4' });
-    expect(JSON.parse(firstCall().init.body as string)).toEqual({ serviceDate: 'June 4' });
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({
+      serviceDate: 'June 4',
+    });
   });
 
   it('never sends a non-fact key even if the caller passes a whole session (C2/C3)', async () => {
@@ -129,13 +155,98 @@ describe('createFlow and patchFlow', () => {
     };
     await createFlow(ACCESS, ID, session);
     const body = firstCall().init.body as string;
-    expect(Object.keys(JSON.parse(body)).sort()).toEqual(['id', ...Object.keys(facts)].sort());
+    expect(Object.keys(JSON.parse(body)).sort()).toEqual(
+      ['id', ...Object.keys(facts)].sort(),
+    );
     for (const s of ['Anna', 'c1', 'my words']) expect(body).not.toContain(s);
   });
 
   it('rejects a non-uuid id without making a request', async () => {
-    expect(await createFlow(ACCESS, '../members', facts)).toEqual({ ok: false, reason: 'invalid' });
-    expect(await patchFlow(ACCESS, 'x', {})).toEqual({ ok: false, reason: 'invalid' });
+    expect(await createFlow(ACCESS, '../members', facts)).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(await patchFlow(ACCESS, 'x', {})).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('round 2 behaviour', () => {
+  it('create reports a 409 as conflict', async () => {
+    fetchMock.mockResolvedValue(json(409, { error: 'exists' }));
+    expect(await createFlow(ACCESS, ID, facts)).toEqual({
+      ok: false,
+      reason: 'conflict',
+    });
+  });
+
+  it('listFlows counts dropped records so sync never treats them as removed', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, [record, { ...record, id: 'bad' }, 5]),
+    );
+    expect(await listFlows(ACCESS)).toEqual({
+      ok: true,
+      flows: [record],
+      dropped: 2,
+    });
+    fetchMock.mockResolvedValue(json(200, [record]));
+    expect(await listFlows(ACCESS)).toMatchObject({ dropped: 0 });
+  });
+
+  it('listFlows ignores unknown fact keys in a record (forward compatibility)', async () => {
+    const newer = { ...record, facts: { ...facts, serviceTime: '10am' } };
+    fetchMock.mockResolvedValue(json(200, [newer]));
+    expect(await listFlows(ACCESS)).toEqual({
+      ok: true,
+      flows: [record],
+      dropped: 0,
+    });
+  });
+
+  it('create refuses invalid facts without a request', async () => {
+    const bad = { ...facts, obituaryUrl: 'javascript:alert(1)' };
+    expect(await createFlow(ACCESS, ID, bad)).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(
+      await createFlow(ACCESS, ID, { ...facts, personName: 'a'.repeat(201) }),
+    ).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('patch refuses an invalid patch without a request', async () => {
+    expect(
+      await patchFlow(ACCESS, ID, { serviceDate: 'a'.repeat(101) }),
+    ).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('an empty patch is ok and sends nothing', async () => {
+    expect(await patchFlow(ACCESS, ID, {})).toEqual({ ok: true, flow: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps Content-Type alongside Authorization', async () => {
+    fetchMock.mockResolvedValue(json(200, record));
+    await patchFlow(ACCESS, ID, { serviceReady: false });
+    expect(firstCall().headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${ACCESS}`,
+    });
+  });
+
+  it('maps an AbortError to failed, not offline', async () => {
+    fetchMock.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    expect(await listFlows(ACCESS)).toEqual({ ok: false, reason: 'failed' });
   });
 });
