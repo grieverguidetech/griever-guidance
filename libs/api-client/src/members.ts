@@ -5,14 +5,15 @@ import type {
   MembersView,
   PendingInvite,
 } from '@griever/shared';
-import { ApiError, apiFetch } from './client.js';
+import { ApiError, apiFetch, apiFetchNoContent } from './client.js';
 
 /**
  * Expected failures are values, never exceptions.
  * - `offline`: the request never reached a server (C5: account actions need a connection).
  * - `signed_out` 401, `invalid` 400, `forbidden` 403, `rate_limited` 429.
- * - `unusable`: the invite link is wrong, expired, used or revoked. The gateway gives one answer
- *   (404 or 410) for all of these, so nothing is revealed.
+ * - `conflict` 409: creating, already invited or already a member; accepting, the joiner owns people.
+ * - `unusable`: accepting only. The invite link is wrong, expired, used or revoked. The gateway gives
+ *   one answer (404 or 410) for all of these, so nothing is revealed. Elsewhere a 404 is `failed`.
  * - `unavailable`: a 5xx.
  */
 export type MembersFailureReason =
@@ -20,6 +21,7 @@ export type MembersFailureReason =
   | 'signed_out'
   | 'invalid'
   | 'forbidden'
+  | 'conflict'
   | 'rate_limited'
   | 'unusable'
   | 'unavailable'
@@ -37,21 +39,26 @@ export type AcceptInviteResult =
   | { ok: true; ownerId: string }
   | MembersFailure;
 
-function reasonForStatus(status: number): MembersFailureReason {
+function reasonForStatus(
+  status: number,
+  isAccept = false,
+): MembersFailureReason {
   if (status === 401) return 'signed_out';
   if (status === 400) return 'invalid';
   if (status === 403) return 'forbidden';
   if (status === 429) return 'rate_limited';
-  if (status === 404 || status === 410) return 'unusable';
+  if (status === 409) return 'conflict';
+  if (isAccept && (status === 404 || status === 410)) return 'unusable';
   if (status >= 500) return 'unavailable';
   return 'failed';
 }
 
-function failure(error: unknown): MembersFailure {
+function failure(error: unknown, isAccept = false): MembersFailure {
   // Only the status is kept. The message could echo request text, and a token must not travel on.
   if (error instanceof ApiError)
-    return { ok: false, reason: reasonForStatus(error.status) };
-  // Only a fetch TypeError is a network failure; a malformed body (SyntaxError) is `failed`.
+    return { ok: false, reason: reasonForStatus(error.status, isAccept) };
+  // A fetch TypeError is a network failure (a malformed header value also throws one and reads as
+  // offline). A malformed body (SyntaxError) is `failed`.
   return { ok: false, reason: error instanceof TypeError ? 'offline' : 'failed' };
 }
 
@@ -59,6 +66,7 @@ async function call<T>(
   accessToken: string,
   path: string,
   init: RequestInit,
+  isAccept = false,
 ): Promise<{ ok: true; body: T } | MembersFailure> {
   try {
     const body = await apiFetch<T>(path, {
@@ -67,28 +75,25 @@ async function call<T>(
     });
     return { ok: true, body };
   } catch (error) {
-    return failure(error);
+    return failure(error, isAccept);
   }
 }
 
 /** Ids go in the path, so each is encoded; the gateway validates them as uuids (C8). */
 const segment = (id: string) => encodeURIComponent(id);
 
-/** For routes that may answer 2xx with no body: apiFetch then fails to parse JSON. Not an error. */
 async function callNoBody(
   accessToken: string,
   path: string,
   init: RequestInit,
 ): Promise<{ ok: true } | MembersFailure> {
   try {
-    await apiFetch<unknown>(path, {
+    await apiFetchNoContent(path, {
       ...init,
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return { ok: true };
   } catch (error) {
-    // A non-2xx throws ApiError first, so a SyntaxError here means success with an empty body.
-    if (error instanceof SyntaxError) return { ok: true };
     return failure(error);
   }
 }
@@ -140,6 +145,7 @@ export async function acceptInvite(
     accessToken,
     '/invites/accept',
     { method: 'POST', body: JSON.stringify(payload) },
+    true,
   );
   return result.ok ? { ok: true, ownerId: result.body.ownerId } : result;
 }

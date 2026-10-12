@@ -28,7 +28,8 @@ afterEach(() => {
   configureApiClient({ baseUrl: undefined });
 });
 
-const lastCall = () => {
+// Each test makes one request, so the first call is the only call.
+const firstCall = () => {
   const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
   return { url, init, headers: init.headers as Record<string, string> };
 };
@@ -41,11 +42,11 @@ const calls: Array<[string, () => Promise<unknown>, string, string]> = [
   ['acceptInvite', () => acceptInvite(ACCESS, INVITE), 'POST', '/invites/accept'],
 ];
 
-describe.each(calls)('%s', (_name, run, method, path) => {
+describe.each(calls)('%s', (name, run, method, path) => {
   it('sends the method, path and bearer header', async () => {
     fetchMock.mockResolvedValue(json(200, { ownerId: ID }));
     await run();
-    const { url, init, headers } = lastCall();
+    const { url, init, headers } = firstCall();
     expect(init.method).toBe(method);
     expect(url).toBe(`http://gw${path}`);
     expect(headers['Authorization']).toBe(`Bearer ${ACCESS}`);
@@ -54,7 +55,7 @@ describe.each(calls)('%s', (_name, run, method, path) => {
   it('puts no token in the URL', async () => {
     fetchMock.mockResolvedValue(json(200, { ownerId: ID }));
     await run();
-    const { url } = lastCall();
+    const { url } = firstCall();
     expect(url).not.toContain(ACCESS);
     expect(url).not.toContain(INVITE);
     expect(url).not.toContain('?');
@@ -64,12 +65,13 @@ describe.each(calls)('%s', (_name, run, method, path) => {
     [401, 'signed_out'],
     [400, 'invalid'],
     [403, 'forbidden'],
+    [409, 'conflict'],
     [429, 'rate_limited'],
-    [404, 'unusable'],
-    [410, 'unusable'],
     [500, 'unavailable'],
     [503, 'unavailable'],
     [418, 'failed'],
+    [404, name === 'acceptInvite' ? 'unusable' : 'failed'],
+    [410, name === 'acceptInvite' ? 'unusable' : 'failed'],
   ])('maps status %i to %s', async (status, reason) => {
     fetchMock.mockResolvedValue(json(status, { error: 'x' }));
     expect(await run()).toEqual({ ok: false, reason });
@@ -89,16 +91,18 @@ describe('results', () => {
   });
 
   it('createInvite sends the email in the body and returns the invite', async () => {
-    const invite = { id: ID, email: 'a@b.co', expiresAt: '2026-10-18T00:00:00Z' };
+    const invite = { id: ID, email: 'a@b.co', expiresAt: '2026-10-18T00:00:00Z',
+      createdAt: '2026-10-11T00:00:00Z',
+    };
     fetchMock.mockResolvedValue(json(201, invite));
     expect(await createInvite(ACCESS, 'a@b.co')).toEqual({ ok: true, invite });
-    expect(JSON.parse(lastCall().init.body as string)).toEqual({ email: 'a@b.co' });
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({ email: 'a@b.co' });
   });
 
   it('acceptInvite sends the token in the body and returns the owner id', async () => {
     fetchMock.mockResolvedValue(json(200, { ownerId: ID }));
     expect(await acceptInvite(ACCESS, INVITE)).toEqual({ ok: true, ownerId: ID });
-    expect(JSON.parse(lastCall().init.body as string)).toEqual({ token: INVITE });
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({ token: INVITE });
   });
 
   it('a failed result never carries the invite token', async () => {
@@ -112,6 +116,18 @@ describe('results', () => {
     expect(await revokeInvite(ACCESS, ID)).toEqual({ ok: true });
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
     expect(await removeMember(ACCESS, ID)).toEqual({ ok: true });
+  });
+
+  it('revoke and remove succeed on a 200 with an empty body', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+    expect(await revokeInvite(ACCESS, ID)).toEqual({ ok: true });
+  });
+
+  it('revoke and remove fail on a 200 with any other body', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>', { status: 200 }));
+    expect(await revokeInvite(ACCESS, ID)).toEqual({ ok: false, reason: 'failed' });
+    fetchMock.mockResolvedValue(json(200, { ok: true }));
+    expect(await removeMember(ACCESS, ID)).toEqual({ ok: false, reason: 'failed' });
   });
 
   it('a malformed 200 body from getMembers is failed, not offline', async () => {

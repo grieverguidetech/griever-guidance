@@ -1,4 +1,5 @@
 import {
+  parseInviteEmail,
   INVITE_TOKEN_PATTERN,
   isUuid,
   isValidInviteEmail,
@@ -25,15 +26,43 @@ describe('isValidInviteEmail', () => {
     },
   );
 
+  it.each([
+    ['display name form', '"anna"<x@evil.com>'],
+    ['trailing dot', 'anna@example.com.'],
+    ['empty label', 'a@b..com'],
+    ['leading hyphen label', 'a@-.com'],
+    ['trailing hyphen label', 'a@b-.com'],
+    ['semicolon', 'a@b.com;c'],
+    ['comma in local part', 'a,b@example.com'],
+    ['zero-width space', 'an\u200bna@example.com'],
+    ['trailing NUL', 'anna@example.com\u0000'],
+    ['non-ASCII domain', 'anna@exämple.com'],
+    ['65-character local part', 'a'.repeat(65) + '@example.com'],
+    ['64-character label', 'a@' + 'b'.repeat(64) + '.com'],
+  ])('rejects %s', (_label, value) => {
+    expect(isValidInviteEmail(value)).toBe(false);
+  });
+
+  it('accepts a 64-character local part and a hyphen inside a label', () => {
+    expect(isValidInviteEmail('a'.repeat(64) + '@example.com')).toBe(true);
+    expect(isValidInviteEmail('anna+tag@my-site.example.co.uk')).toBe(true);
+  });
+
   it('rejects a tab or newline', () => {
     expect(isValidInviteEmail('anna\t@example.com')).toBe(false);
     expect(isValidInviteEmail('anna@example.com\n')).toBe(false);
   });
 
   it('allows 254 characters and rejects 255', () => {
-    const at = (n: number) => 'a'.repeat(n - '@example.com'.length) + '@example.com';
-    expect(isValidInviteEmail(at(254))).toBe(true);
-    expect(isValidInviteEmail(at(255))).toBe(false);
+    // 64-character local part, then labels of at most 63 characters.
+    const withLength = (total: number) => {
+      const domainLength = total - 65;
+      const filler = domainLength - '.com'.length - 128;
+      return `${'a'.repeat(64)}@${'b'.repeat(63)}.${'b'.repeat(63)}.${'b'.repeat(filler)}.com`;
+    };
+    expect(withLength(254)).toHaveLength(254);
+    expect(isValidInviteEmail(withLength(254))).toBe(true);
+    expect(isValidInviteEmail(withLength(255))).toBe(false);
   });
 });
 
@@ -60,5 +89,16 @@ describe('isUuid', () => {
     expect(isUuid('123e4567-e89b-12d3-a456-426614174000')).toBe(true);
     expect(isUuid('not-a-uuid')).toBe(false);
     expect(isUuid('123e4567-e89b-12d3-a456-426614174000/..')).toBe(false);
+  });
+});
+
+describe('parseInviteEmail', () => {
+  it('normalises and returns a valid address', () => {
+    expect(parseInviteEmail('  Anna@Example.COM ')).toBe('anna@example.com');
+  });
+
+  it('returns null for an unusable address', () => {
+    expect(parseInviteEmail('anna')).toBeNull();
+    expect(parseInviteEmail(' a@b..com ')).toBeNull();
   });
 });

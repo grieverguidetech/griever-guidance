@@ -1,4 +1,4 @@
-import { apiFetch, configureApiClient, generateObituary } from './client.js';
+import { ApiError, apiFetch, apiFetchNoContent, configureApiClient, generateObituary } from './client.js';
 
 const fetchMock = vi.fn();
 
@@ -88,5 +88,27 @@ describe('configureApiClient', () => {
     configureApiClient({ baseUrl: '  ' });
     await generateObituary(body);
     expect(urlCalled()).toBe('http://localhost:3001/obituary');
+  });
+});
+
+describe('apiFetchNoContent', () => {
+  it('resolves on 204', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(apiFetchNoContent('/x', { method: 'DELETE' })).resolves.toBeUndefined();
+  });
+
+  it('resolves on a 2xx with an empty body', async () => {
+    respond(200, '');
+    await expect(apiFetchNoContent('/x')).resolves.toBeUndefined();
+  });
+
+  it('throws on a 2xx with any other body', async () => {
+    respond(200, '<html>');
+    await expect(apiFetchNoContent('/x')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('throws ApiError with the status on non-2xx', async () => {
+    respond(403, { error: 'no' });
+    await expect(apiFetchNoContent('/x')).rejects.toMatchObject({ status: 403 });
   });
 });

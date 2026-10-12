@@ -14,6 +14,8 @@ export interface PendingInvite {
   email: string;
   /** ISO 8601 timestamp. */
   expiresAt: string;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
 }
 
 export type MembersView =
@@ -45,17 +47,33 @@ export function normalizeInviteEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
-/** Expects an already-normalised address. Deliberately loose: the mail provider is the real check. */
+const MAX_DOMAIN_LENGTH = 253;
+const MAX_LOCAL_LENGTH = 64;
+// Whitespace, specials that change how an address parses, control and zero-width characters.
+const FORBIDDEN_LOCAL_CHARS = /[\s@<>()[\]\\,;:"\u0000-\u001f\u007f\u200b-\u200d\ufeff]/;
+// One LDH label: letters, digits and inner hyphens, 1-63 characters.
+const DOMAIN_LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+/**
+ * Strict on purpose (C8): the address goes into an email and a database. ASCII only for now, so an
+ * internationalised address is rejected. Expects an already-normalised address.
+ */
 export function isValidInviteEmail(email: string): boolean {
   if (email.length > MAX_EMAIL_LENGTH) return false;
-  if (/\s/.test(email)) return false;
   const parts = email.split('@');
   if (parts.length !== 2) return false;
   const [local, domain] = parts as [string, string];
-  if (local.length === 0) return false;
-  // A dot inside the domain, with something on both sides.
-  const dot = domain.indexOf('.');
-  return dot > 0 && dot < domain.length - 1;
+  if (local.length < 1 || local.length > MAX_LOCAL_LENGTH) return false;
+  if (FORBIDDEN_LOCAL_CHARS.test(local)) return false;
+  if (domain.length > MAX_DOMAIN_LENGTH) return false;
+  const labels = domain.split('.');
+  return labels.length >= 2 && labels.every((l) => DOMAIN_LABEL.test(l));
+}
+
+/** Normalises and validates in one step. Null when the address is not usable. */
+export function parseInviteEmail(raw: string): string | null {
+  const email = normalizeInviteEmail(raw);
+  return isValidInviteEmail(email) ? email : null;
 }
 
 const UUID_PATTERN =
