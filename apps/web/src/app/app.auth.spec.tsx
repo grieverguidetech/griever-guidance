@@ -90,16 +90,21 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Password'), 'a-long-password');
 }
 
-// From the screen right after signing in or up to the signed-out sign-up screen, via a saved
-// session (the only way to reach "Your account").
-async function nameSomeoneAndSignOut(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
-  await screen.findByRole('heading', { name: 'One thing at a time.' });
-  expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument(); // not under the path
-  await user.click(await screen.findByRole('button', { name: 'Back' })); // path to Home, where "Your account" sits (#112)
+const HOME = "The people you're writing about";
+
+// From Home (where "Your account" sits) to the signed-out sign-up screen.
+async function signOutFromHome(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Your account' }));
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
+}
+
+// Sign-up lands on Profile first; Continue goes on to Home (#114).
+async function signUpToHome(user: ReturnType<typeof userEvent.setup>) {
+  await fillSignUp(user);
+  await user.click(screen.getByRole('button', { name: 'Create account' }));
+  await screen.findByRole('heading', { level: 1, name: 'Your account' });
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await screen.findByRole('heading', { level: 1, name: HOME });
 }
 
 async function signIn(user: ReturnType<typeof userEvent.setup>) {
@@ -205,7 +210,7 @@ describe('flag on', () => {
       render(<App />);
 
       expect(await screen.findByText("Your account can't be reached right now. Your work on this device is here.")).toBeInTheDocument();
-      expect(await screen.findByRole('heading', { name: "The people you're writing about" })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
       await userEvent.setup().click(screen.getByRole('button', { name: 'Margaret Hayes' }));
       expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note kept on this device');
@@ -229,6 +234,18 @@ describe('flag on', () => {
       expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
     });
 
+    it('lands on Home, not a new person or contacts, when nobody is named yet', async () => {
+      window.localStorage.setItem('sb-abcdef-auth-token', SESSION);
+      mocks.load.mockResolvedValue({ available: false });
+      render(<App />);
+
+      expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
+      expect(screen.getByText('No one here yet.')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Their name')).not.toBeInTheDocument();
+      await act(async () => {});
+      expect(JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')).toEqual([]);
+    });
+
     it('ignores a stored value that is not a session', async () => {
       window.localStorage.setItem('sb-abcdef-auth-token', 'not json');
       mocks.load.mockResolvedValue({ available: false });
@@ -237,7 +254,7 @@ describe('flag on', () => {
     });
   });
 
-  it('creates the account, saves the name, and moves on to adding contacts', async () => {
+  it('creates the account, saves the name, shows Profile, and Continue goes to an empty Home', async () => {
     const client = stubClient();
     useClient(client);
     const user = userEvent.setup();
@@ -246,10 +263,41 @@ describe('flag on', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(client.signUp).toHaveBeenCalledWith('anna@example.com', 'a-long-password');
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
     await waitFor(() => expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Anna' }));
+    // No path from sign-up leads to adding contacts.
+    expect(screen.queryByRole('heading', { name: 'Who should we be able to reach?' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+    expect(screen.getByText('No one here yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
+  });
+
+  it('never holds Continue back on a slow profile request (C5)', async () => {
+    const client = stubClient({ updateProfile: vi.fn(() => new Promise<never>(() => undefined)) });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+  });
+
+  it('after sign-up, Home leads to setup, then contacts, and Back from contacts returns to setup', async () => {
+    useClient(stubClient());
+    const user = userEvent.setup();
+    render(<App />);
+    await signUpToHome(user);
+    await user.click(screen.getByRole('button', { name: "Start with someone I've lost" }));
+    await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByLabelText('Their name')).toHaveValue('Margaret Hayes');
   });
 
   it('says so when the email already has an account, and keeps what was typed', async () => {
@@ -281,7 +329,7 @@ describe('flag on', () => {
     expect(screen.getByLabelText('Password')).toHaveValue('a-long-password');
   });
 
-  it('signs in and lands on the existing path', async () => {
+  it('signs in and lands on Home', async () => {
     const client = stubClient({
       getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })),
     });
@@ -294,7 +342,7 @@ describe('flag on', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(client.signIn).toHaveBeenCalledWith('anna@example.com', 'a-long-password');
-    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
     expect(client.updateProfile).not.toHaveBeenCalled();
   });
 
@@ -317,17 +365,7 @@ describe('flag on', () => {
     useClient(client);
     const user = userEvent.setup();
     render(<App />);
-    await fillSignUp(user);
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
-    await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
-    await user.type(screen.getByLabelText('Mobile number'), '6175550148');
-    await user.click(screen.getByRole('button', { name: 'Add and start another' }));
-    await user.click(await screen.findByRole('button', { name: 'Done for now' }));
-    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-    await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(screen.getByRole('button', { name: 'Back' })); // path to Home (#112)
+    await signUpToHome(user);
     await user.click(await screen.findByRole('button', { name: 'Your account' }));
 
     const field = await screen.findByLabelText('Your name');
@@ -398,15 +436,8 @@ describe('flag on', () => {
     useClient(stubClient());
     const user = userEvent.setup();
     render(<App />);
-    await fillSignUp(user);
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(screen.getByRole('button', { name: 'Back' })); // path to Home (#112)
-    await user.click(await screen.findByRole('button', { name: 'Your account' }));
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    await signUpToHome(user);
+    await signOutFromHome(user);
     expect(await screen.findByRole('button', { name: 'Create account' })).toBeInTheDocument();
   });
 
@@ -419,12 +450,12 @@ describe('flag on', () => {
     render(<App />);
     await fillSignUp(user);
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
     // The background name save above already hit the ended session; the person is still here.
     expect(
       await screen.findByText("You've been signed out. Your work on this device is safe. Sign in again when you're ready."),
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
   });
@@ -451,19 +482,7 @@ describe('flag on', () => {
     expect(client.updateProfile).not.toHaveBeenCalled();
   });
 
-  it('asks for a name when the background save after sign-up fails', async () => {
-    const client = stubClient({
-      updateProfile: vi.fn(async () => ({ ok: false as const, reason: 'offline' as const })),
-    });
-    useClient(client);
-    const user = userEvent.setup();
-    render(<App />);
-    await fillSignUp(user);
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument();
-  });
-
-  it('returns to adding contacts after the name prompt, so onboarding is not skipped', async () => {
+  it('keeps a calm message on Profile when the background save after sign-up fails, and Continue still reaches Home', async () => {
     const updateProfile = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, reason: 'offline' })
@@ -476,12 +495,157 @@ describe('flag on', () => {
     render(<App />);
     await fillSignUp(user);
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { name: 'What should we call you?' });
-    await user.type(screen.getByLabelText('Your name'), 'Anna');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' }),
-    ).toBeInTheDocument();
+    // One h1, and it does not change in place.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+    const note = await screen.findByText("We couldn't save your name. You can try again.");
+    expect(note.closest('[aria-live="polite"]')).not.toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+
+    // Continue retries the save in the background and goes straight on.
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+    await waitFor(() => expect(updateProfile).toHaveBeenCalledTimes(2));
+    expect(updateProfile).toHaveBeenLastCalledWith({ senderName: 'Anna' });
+  });
+
+  it('saves a name changed on the first Profile when Continue is pressed', async () => {
+    const client = stubClient();
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await waitFor(() => expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Anna' }));
+    await user.clear(screen.getByLabelText('Your name'));
+    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { level: 1, name: HOME });
+    await waitFor(() => expect(client.updateProfile).toHaveBeenLastCalledWith({ senderName: 'Anna Reyes' }));
+  });
+
+  it('Back on the first Profile goes to Home', async () => {
+    useClient(stubClient());
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+  });
+
+  it('a late failed save never pulls the person back from what they moved on to', async () => {
+    let fail: (value: { ok: false; reason: 'offline' }) => void = () => undefined;
+    const updateProfile = vi.fn(() => new Promise<{ ok: false; reason: 'offline' }>((resolve) => (fail = resolve)));
+    useClient(stubClient({ updateProfile }));
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await waitFor(() => expect(updateProfile).toHaveBeenCalled());
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+    expect(await screen.findByLabelText('Their name')).toBeInTheDocument();
+
+    await act(async () => {
+      fail({ ok: false, reason: 'offline' });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.getByLabelText('Their name')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
+  });
+
+  it('shows no first-time Continue on "Your account" after the session ended and the person signed in again', async () => {
+    const client = stubClient({
+      updateProfile: vi.fn(async () => ({ ok: false as const, reason: 'signed_out' as const })),
+      getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })),
+    });
+    useClient(client);
+    const user = userEvent.setup();
+    render(<App />);
+    await fillSignUp(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await user.click(await screen.findByRole('button', { name: 'Sign in' })); // the signed-out note
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await user.click(await screen.findByRole('button', { name: 'Your account' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+  });
+
+  it('does not offer "Your account" under the path', async () => {
+    window.localStorage.setItem(
+      'gg.sessions.v1',
+      JSON.stringify([
+        {
+          id: 's1',
+          personName: 'Margaret Hayes',
+          dateOfPassing: '',
+          senderName: 'Anna',
+          obituaryUrl: '',
+          createdAt: '2026-10-10T00:00:00.000Z',
+          lastOpenedAt: '2026-10-10T00:00:00.000Z',
+          recipientsNotified: {},
+          momentCompletedAt: {},
+          remindersScheduled: [],
+          serviceReady: false,
+          drafts: {},
+          draftsUpdatedAt: {},
+        },
+      ]),
+    );
+    useClient(stubClient({ getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })) }));
+    const user = userEvent.setup();
+    render(<App />);
+    await signIn(user);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+    await screen.findByRole('heading', { name: 'One thing at a time.' });
+    expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
+  });
+
+  it('asks for a name at boot when the stored session belongs to an account without one', async () => {
+    useClient(
+      stubClient({
+        getSession: vi.fn(async () => ({
+          status: 'signed_in' as const,
+          session: { userId: 'u1', email: 'a@b.co', accessToken: 't' },
+        })),
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeInTheDocument();
+  });
+
+  it('tidies an unnamed person left by the old flow', async () => {
+    window.localStorage.setItem(
+      'gg.sessions.v1',
+      JSON.stringify([
+        {
+          id: 'orphan',
+          personName: '',
+          dateOfPassing: '',
+          senderName: '',
+          obituaryUrl: '',
+          createdAt: '2026-10-10T00:00:00.000Z',
+          lastOpenedAt: '2026-10-10T00:00:00.000Z',
+          recipientsNotified: {},
+          momentCompletedAt: {},
+          remindersScheduled: [],
+          serviceReady: false,
+          drafts: {},
+          draftsUpdatedAt: {},
+        },
+      ]),
+    );
+    useClient(stubClient());
+    render(<App />);
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')).toEqual([]));
   });
 
   it('drops the name prompt when the save failed because the session ended', async () => {
@@ -501,7 +665,7 @@ describe('flag on', () => {
     await user.type(screen.getByLabelText('Password'), 'a-long-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
     await waitFor(() => expect(client.getProfile).toHaveBeenCalled());
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -518,7 +682,7 @@ describe('flag on', () => {
     await user.type(screen.getByLabelText('Email'), 'anna@example.com');
     await user.type(screen.getByLabelText('Password'), 'a-long-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
   });
 
   it('ignores a slow "no name" answer for the first account after a second one signs in', async () => {
@@ -546,7 +710,8 @@ describe('flag on', () => {
     await user.type(screen.getByLabelText('Email'), 'a@example.com');
     await user.type(screen.getByLabelText('Password'), 'a-long-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    await nameSomeoneAndSignOut(user);
+    await screen.findByRole('heading', { name: HOME });
+    await signOutFromHome(user);
     await signInAgainAs(user, 'b@example.com');
     await waitFor(() => expect(waiting.length).toBeGreaterThan(0));
 
@@ -568,11 +733,11 @@ describe('flag on', () => {
     render(<App />);
     await fillSignUp(user);
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
     await waitFor(() => expect(updateProfile).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await nameSomeoneAndSignOut(user);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await signOutFromHome(user);
     await signInAgainAs(user, 'b@example.com');
 
     await act(async () => {
@@ -582,21 +747,21 @@ describe('flag on', () => {
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
   });
 
-  it('goes straight to the path from adding contacts, without showing sign-up again', async () => {
+  it('goes straight to Home from Profile, without showing sign-up again', async () => {
     useClient(stubClient());
     const user = userEvent.setup();
     render(<App />);
     await fillSignUp(user);
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
 
     let signUpShown = false;
     const watcher = new MutationObserver(() => {
       if (screen.queryByRole('button', { name: 'Create account' })) signUpShown = true;
     });
     watcher.observe(document.body, { childList: true, subtree: true });
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await screen.findByRole('heading', { name: 'Who are we writing about?' });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { name: HOME });
     watcher.disconnect();
     expect(signUpShown).toBe(false);
   });
@@ -605,13 +770,7 @@ describe('flag on', () => {
     useClient(stubClient());
     const user = userEvent.setup();
     render(<App />);
-    await fillSignUp(user);
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(await screen.findByRole('button', { name: 'Back' })); // path to Home (#112)
+    await signUpToHome(user);
     const open = await screen.findByRole('button', { name: 'Your account' });
     mocks.clearError.mockClear();
     await user.click(open);
@@ -630,10 +789,19 @@ describe('flag on', () => {
   });
 
   it('reaches the app offline with a stored session (C5)', async () => {
-    useClient(stubClient({ getSession: vi.fn(async () => ({ status: 'offline' as const })) }));
+    // Offline, the profile request fails like the session check does; that never reads as "no name".
+    useClient(
+      stubClient({
+        getSession: vi.fn(async () => ({ status: 'offline' as const })),
+        getProfile: vi.fn(async () => ({ ok: false as const, reason: 'offline' as const })),
+      }),
+    );
     render(<App />);
-    expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
+    expect(screen.getByText('No one here yet.')).toBeInTheDocument();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    // Nothing is created on the way in: only Home's button starts a person.
+    expect(JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')).toEqual([]);
   });
 
   it('retries the load from the unavailable state', async () => {

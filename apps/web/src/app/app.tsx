@@ -252,14 +252,6 @@ async function accountLacksName(client: AuthClient): Promise<boolean> {
   }
 }
 
-/**
- * A returning visit lands on Home, where the person picks who to open. With nobody named yet
- * there is nothing to list, so the path (which starts a person) is kept as before.
- */
-function viewForReturning(sessionList: Session[]): AppView {
-  return namedSessionsByRecent(sessionList).length > 0 ? 'home' : 'pathLanding';
-}
-
 /** Screens the checklist returns to; from anywhere else (the flow, a gate) it returns to the path. */
 const CHECKLIST_RETURNS: AppView[] = [
   'home',
@@ -276,6 +268,9 @@ const CHECKLIST_RETURNS: AppView[] = [
   'importContacts',
   'whoHearsFirst',
 ];
+
+/** Views that need a person to be open; with nobody open Home is shown instead. */
+const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary'];
 
 function isAccountView(view: AppView): boolean {
   return view === 'signup' || view === 'createAccount' || view === 'forgotPassword';
@@ -304,7 +299,7 @@ function AppBody({
   const isSignedIn = auth ? auth.isSignedIn : true;
 
   const [view, setView] = useState<AppView>(() => {
-    if (offline) return viewForReturning(sessions.sessions);
+    if (offline) return 'home';
     // Opened from a reset email: the new-password screen, not sign-up.
     if (AUTH_ENABLED && captureRecoveryLink()) return 'chooseNewPassword';
     if (AUTH_ENABLED) return 'signup';
@@ -312,6 +307,9 @@ function AppBody({
     return 'home';
   });
   const firstView = useRef(view);
+  // A save can finish after the person has moved on; it reads the screen from here and never navigates.
+  const viewRef = useRef(view);
+  viewRef.current = view;
   // Shown once, on the first screen after a removal; leaving it ends it for good.
   const [showRemoved, setShowRemoved] = useState(removed);
   useEffect(() => {
@@ -323,7 +321,7 @@ function AppBody({
   const [flowCategory, setFlowCategory] = useState<TemplateCategory | null | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
   // True from "Create a new one" until who-hears-first is saved: setup, then contacts (only when
-  // this device has none), then who hears first. Not set by the account sign-up path (#114).
+  // this device has none), then who hears first. This is the only way a person is created.
   const [creating, setCreating] = useState(false);
   // The contacts step was skipped because contacts were already saved, so Back from who hears
   // first goes to setup instead.
@@ -338,6 +336,14 @@ function AppBody({
   const [pendingName, setPendingName] = useState<string | null>(null);
   // The account has no name: Profile opens with a "What should we call you?" prompt.
   const [needsName, setNeedsName] = useState(false);
+  // Profile is open straight after sign-up: Continue (or Save) goes on to Home.
+  const [firstProfile, setFirstProfile] = useState(false);
+  // The name typed at sign-up, shown on that first Profile even before the saved one is known.
+  const [signUpName, setSignUpName] = useState('');
+  // The background save of that name failed while Profile was still open: say so there, calmly.
+  const [nameSaveFailed, setNameSaveFailed] = useState(false);
+  // The name a save is in flight for, so Continue does not send the same one twice.
+  const savingName = useRef<string | null>(null);
   const [askingName, setAskingName] = useState(false);
   // Bumped on every sign-in attempt and every sign-out. A name check started under an earlier
   // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
@@ -365,6 +371,8 @@ function AppBody({
       // A stale error from another screen would otherwise show here without being announced.
       clearError?.();
       setAskingName(asksName);
+      setFirstProfile(false);
+      setNameSaveFailed(false);
       setReturnTo(from);
       setNeedsName(false);
       setView('profile');
@@ -373,25 +381,53 @@ function AppBody({
   );
 
   // Sign-in resolves asynchronously (the boot-time session check, or a form), so the next view
-  // can't be decided in useState's initializer. A new account goes on to add contacts.
+  // can't be decided in useState's initializer. A new account sees Profile first; everyone else
+  // lands on Home.
   useEffect(() => {
     if (!signedIn || !isAccountView(view)) return;
     if (pendingName !== null && updateSenderName) {
       const generation = accountGeneration.current;
-      void updateSenderName(pendingName).then((saved) => {
+      const name = pendingName;
+      savingName.current = name;
+      void updateSenderName(name).then((saved) => {
+        savingName.current = null;
         if (saved || generation !== accountGeneration.current) return;
-        // The prompt below asks again, so the failure message need not linger. If the save failed
-        // because the session ended, the effect further down drops the request instead.
+        // Only the first Profile is told: the person has moved on otherwise, and a late answer
+        // must not pull them back. The sign-in check asks for the name next time. If the save
+        // failed because the session ended, the effect further down drops the request instead.
+        if (viewRef.current !== 'profile') return;
         clearError?.();
+        setNameSaveFailed(true);
         setNeedsName(true);
       });
       setPendingName(null);
-      setView('addContactsManual');
+      setSignUpName(name);
+      setAskingName(false);
+      setNameSaveFailed(false);
+      setFirstProfile(true);
+      setView('profile');
     } else {
+      setFirstProfile(false);
+      setNameSaveFailed(false);
       setFlowCategory(undefined);
-      setView(viewForReturning(sessionList));
+      setView('home');
+      // Boot-time session or form sign-in: ask in the background whether the account has a name.
+      // It never holds anyone back, and it clears a prompt left over from an earlier session.
+      if (client) {
+        const generation = accountGeneration.current;
+        void accountLacksName(client).then((lacks) => {
+          if (generation === accountGeneration.current) setNeedsName(lacks);
+        });
+      }
     }
-  }, [signedIn, view, pendingName, updateSenderName, clearError, sessionList]);
+  }, [signedIn, view, pendingName, updateSenderName, clearError, client]);
+
+  // Orphan unnamed people from the old flow would otherwise sit on the device; tidy them once.
+  const pruneEmpty = sessions.pruneEmpty;
+  useEffect(() => {
+    pruneEmpty();
+  }, [pruneEmpty]);
+
 
   // An account with no name (a failed save at sign-up, or a sign-in to one): ask for it, then
   // return to wherever this interrupted.
@@ -465,28 +501,22 @@ function AppBody({
 
   const sortedSessions = useMemo(() => namedSessionsByRecent([...sessions.sessions]), [sessions.sessions]);
 
+  // Picks the most recent person when none is open. It never creates one: Home's "Create a new
+  // one" is the only way to start a person.
   useEffect(() => {
-    // While the name prompt is about to open, don't also start a session (the two would race).
-    if (!isSignedIn || activeId || needsName) return;
-    if (sortedSessions.length > 0) {
-      setActiveId(sortedSessions[0].id);
-      return;
-    }
-    // No sessions at all: only the accounts-on paths reach here (signed in, or the offline
-    // AuthGate path, with no people yet). Flag off, Home's create button starts the person. #114 removes this with the account order.
-    if (view === 'pathLanding' || view === 'flow' || view === 'setup') {
-      const created = sessions.createSession();
-      setActiveId(created.id);
-      setSetupEditing(false);
-      setView('setup');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, activeId, sortedSessions, view, needsName]);
+    if (!isSignedIn || activeId || sortedSessions.length === 0) return;
+    setActiveId(sortedSessions[0].id);
+  }, [isSignedIn, activeId, sortedSessions]);
 
   const active = useMemo<Session | null>(
     () => sessions.sessions.find((s) => s.id === activeId) ?? null,
     [sessions.sessions, activeId],
   );
+
+  // With no one open these views have nothing to show, and Home stands in; keep the state honest.
+  useEffect(() => {
+    if (!active && NEEDS_PERSON.includes(view)) setView('home');
+  }, [active, view]);
 
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
@@ -545,13 +575,30 @@ function AppBody({
     [active],
   );
 
-  // With people on the device but none open, the path has nobody to show: go to Home instead.
+  // With no one open, the path has nobody to show: go to Home instead.
   function goToPathLanding() {
-    setView(active || sortedSessions.length === 0 ? 'pathLanding' : 'home');
+    setView(active ? 'pathLanding' : 'home');
   }
 
   function goHome() {
     setView('home');
+  }
+
+  /** Leaves the first Profile for Home. A name still missing is asked for at the next sign-in. */
+  function leaveFirstProfile() {
+    setFirstProfile(false);
+    setNameSaveFailed(false);
+    setNeedsName(false);
+    setView('home');
+  }
+
+  /** Continue on the first Profile: a changed or unsaved name is saved in the background, never awaited (C5). */
+  function continueFromFirstProfile(name: string) {
+    const known = auth?.profile?.senderName ?? '';
+    if (name && updateSenderName && savingName.current !== name && (nameSaveFailed || name !== known)) {
+      void updateSenderName(name);
+    }
+    leaveFirstProfile();
   }
 
   /** Makes this person the active one. A message left half-written reopens where it was (#25). */
@@ -567,7 +614,7 @@ function AppBody({
 
   function backFromChecklist() {
     const target = checklistBack.current;
-    setView(target === 'pathLanding' && !active && sortedSessions.length > 0 ? 'home' : target);
+    setView(target === 'pathLanding' && !active ? 'home' : target);
   }
 
   function startSetup() {
@@ -625,12 +672,8 @@ function AppBody({
   }
 
   function backFromWhoHearsFirst() {
-    if (creating) {
-      if (contactsSkipped) backToSetup();
-      else setView(contactsView);
-      return;
-    }
-    setView(!auth || auth.profile?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts');
+    if (contactsSkipped) backToSetup();
+    else setView(contactsView);
   }
 
   function saveWhoHearsFirst(firstIds: string[]) {
@@ -638,14 +681,10 @@ function AppBody({
     for (const c of contacts.contacts) {
       contacts.setTier(c.contactId, firstSet.has(c.contactId) ? 'first' : 'family');
     }
-    if (creating) {
-      // The person was made at "Create a new one"; carry on to their path.
-      setCreating(false);
-      setFirstTicks(null);
-      setView('pathLanding');
-    } else {
-      startSetup(); // accounts-on sign-up still ends contacts here until #114 reorders it
-    }
+    // The person was made at "Create a new one"; carry on to their path.
+    setCreating(false);
+    setFirstTicks(null);
+    setView('pathLanding');
   }
 
   function backFromSetup() {
@@ -750,17 +789,8 @@ function AppBody({
             // must not overwrite the name on an existing account.
             setPendingName(null);
             accountGeneration.current += 1;
-            const generation = accountGeneration.current;
-            const ok = await auth.signIn(email, password);
-            // Signing in never waits on a second request: the name check runs in the background
-            // and, if the account has no name, opens the prompt afterwards. It also clears a
-            // prompt left over from an earlier session.
-            if (ok && client) {
-              void accountLacksName(client).then((lacks) => {
-                if (generation === accountGeneration.current) setNeedsName(lacks);
-              });
-            }
-            return ok;
+            // The name check runs once signed in (the effect above), never holding sign-in back.
+            return auth.signIn(email, password);
           }}
         />
       </Shell>
@@ -797,7 +827,7 @@ function AppBody({
               });
             }
             setFlowCategory(undefined);
-            setView(viewForReturning(sessionList));
+            setView('home');
           }}
         />
       </Shell>
@@ -809,10 +839,17 @@ function AppBody({
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Profile
           asksName={askingName}
-          senderName={auth.profile?.senderName ?? null}
+          firstTime={firstProfile}
+          saveFailed={firstProfile && nameSaveFailed}
+          onContinue={continueFromFirstProfile}
+          senderName={auth.profile?.senderName ?? (firstProfile ? signUpName : null)}
           error={auth.error}
           onBack={() => {
             auth.clearError();
+            if (firstProfile) {
+              leaveFirstProfile();
+              return;
+            }
             setAskingName(false);
             setView(askingName ? returnTo : 'home');
           }}
@@ -825,6 +862,7 @@ function AppBody({
             return saved;
           }}
           onSignOut={() => {
+            setFirstProfile(false);
             accountGeneration.current += 1;
             setLeftOnPurpose(true);
             setCreating(false);
@@ -852,7 +890,7 @@ function AppBody({
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <AddContactsManual
           contacts={contacts.contacts}
-          onBack={creating ? backToSetup : auth || offline ? goToPathLanding : undefined}
+          onBack={backToSetup}
           onAdd={({ name, phone, hearsFirst }) =>
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
@@ -872,7 +910,7 @@ function AppBody({
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <ImportContacts
           storedPhones={storedPhones}
-          onBack={() => (creating || !(auth || offline) ? setView('addContactsManual') : goToPathLanding())}
+          onBack={() => setView('addContactsManual')}
           onSwitchToManual={() => setView('addContactsManual')}
           onContinue={(picked, source) => {
             contacts.importContacts(picked, source);
@@ -1016,24 +1054,6 @@ function AppBody({
     );
   }
 
-  if (view === 'home') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <Home sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate />
-        <div className="flex flex-col items-start gap-2 mt-4">
-          {auth && !sessionEnded && (
-            <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-ghost !px-0">
-              Your account
-            </button>
-          )}
-          <button type="button" onClick={() => setView('settings')} className="gg-btn gg-btn-ghost !px-0">
-            Settings
-          </button>
-        </div>
-      </Shell>
-    );
-  }
-
   if (view === 'pathLanding' && active) {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
@@ -1047,9 +1067,22 @@ function AppBody({
     );
   }
 
-  // No active session yet (fresh account, or the active one was pruned) —
-  // the effect above creates one and moves to 'setup'.
-  return <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>{null}</Shell>;
+  // Home is also the fallback: a view with nobody open (the path, a flow) never shows a blank screen.
+  return (
+    <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Home sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate />
+      <div className="flex flex-col items-start gap-2 mt-4">
+        {auth && !sessionEnded && (
+          <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-ghost !px-0">
+            Your account
+          </button>
+        )}
+        <button type="button" onClick={() => setView('settings')} className="gg-btn gg-btn-ghost !px-0">
+          Settings
+        </button>
+      </div>
+    </Shell>
+  );
 }
 
 export default App;

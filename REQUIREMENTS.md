@@ -84,6 +84,7 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | SE-3 | Multiple sessions ("Someone else I've lost") | Done | Done | Mobile: on-device only (#20); no delete (C9); no server sync yet |
 | SE-4 | Guided path landing (C1) ordered around the real planning sequence | Done | Not started | |
 | SE-5 | Checklist ticks persist silently per *account* | Partial | Not started | `profiles.checklistTicks` |
+| SE-6 | Home lists the people you're writing about, newest first, with 'What you'll need' at the top. 'Create a new one' leads to setup → contacts (only when the device has none) → who hears first → the path; the path returns to Home. | Done | Done | Web with accounts on: sign-up → Profile (Continue) → Home (#114). Mobile: #108; mobile accounts stay suspended while its flag is off |
 
 ### 3.4 Send flow (Flows A & B)
 
