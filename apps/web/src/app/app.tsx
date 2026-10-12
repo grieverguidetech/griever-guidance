@@ -24,6 +24,8 @@ import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { Profile } from '../screens/Profile';
+import { Settings } from '../screens/Settings';
+import { removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
@@ -39,6 +41,7 @@ type AppView =
   | 'signup'
   | 'createAccount'
   | 'profile'
+  | 'settings'
   | 'addContactsManual'
   | 'importContacts'
   | 'whoHearsFirst'
@@ -108,7 +111,15 @@ function Loading() {
  * Loads the Supabase client (its own chunk) and only then mounts the identity hook, which needs
  * a client at render time. Rendered only when AUTH_ENABLED is on.
  */
-function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode }) {
+function AuthGate({
+  children,
+  removed,
+  onRemoved,
+}: {
+  children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode;
+  removed: boolean;
+  onRemoved: () => void;
+}) {
   const [loaded, setLoaded] = useState<AuthClientResult | null>(null);
   // Bumped by "Try again"; loadAuthClient forgets a failed load, so this runs it afresh.
   const [attempt, setAttempt] = useState(0);
@@ -133,7 +144,7 @@ function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult, cl
   if (!loaded.available && hasStoredSession()) {
     // Accounts can't be reached, but this device holds a signed-in session: the work on it is
     // theirs and stays reachable (C5). No account actions, and nothing here touches the network.
-    return <AppBody auth={null} offline />;
+    return <AppBody auth={null} offline removed={removed} onRemoved={onRemoved} />;
   }
   if (!loaded.available) {
     return (
@@ -164,10 +175,43 @@ function noop() {
   // The checklist is not reachable before the app has loaded.
 }
 
+const REMOVED_MESSAGE = 'Everything has been removed from this device.';
+
 export function App() {
+  // Bumped after "Remove everything from this device": the key remounts every hook, so each
+  // reads the now-empty storage and starts from the first screen.
+  const [removals, setRemovals] = useState(0);
+  const removed = removals > 0;
+  // The announcement lives outside the keyed subtree so it is already in the page when its text
+  // arrives. It is emptied on removal and filled a moment after the remount, so it is read out.
+  const [announcement, setAnnouncement] = useState('');
+  const onRemoved = useCallback(() => {
+    setAnnouncement('');
+    setRemovals((n) => n + 1);
+  }, []);
+  useEffect(() => {
+    if (removals === 0) return;
+    const timer = setTimeout(() => setAnnouncement(REMOVED_MESSAGE), 50);
+    return () => clearTimeout(timer);
+  }, [removals]);
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
-  if (!AUTH_ENABLED) return <AppBody auth={null} />;
-  return <AuthGate>{(auth, client) => <AppBody auth={auth} client={client} />}</AuthGate>;
+  const body = !AUTH_ENABLED ? (
+    <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />
+  ) : (
+    <AuthGate key={removals} removed={removed} onRemoved={onRemoved}>
+      {(auth, client) => <AppBody auth={auth} client={client} removed={removed} onRemoved={onRemoved} />}
+    </AuthGate>
+  );
+  return (
+    <>
+      {removed && (
+        <div role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </div>
+      )}
+      {body}
+    </>
+  );
 }
 
 /** True when the signed-in account has no name yet (or the name is blank). */
@@ -210,8 +254,13 @@ function AppBody({
   auth,
   client,
   offline = false,
+  removed = false,
+  onRemoved,
 }: {
   auth: UseSupabaseIdentityResult | null;
+  /** Everything was just removed from this device: say so on the first screen. */
+  removed?: boolean;
+  onRemoved: () => void;
   client?: AuthClient;
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
@@ -232,6 +281,12 @@ function AppBody({
       ? 'addContactsManual'
       : viewForReturning(sessions.sessions);
   });
+  const firstView = useRef(view);
+  // Shown once, on the first screen after a removal; leaving it ends it for good.
+  const [showRemoved, setShowRemoved] = useState(removed);
+  useEffect(() => {
+    if (view !== firstView.current) setShowRemoved(false);
+  }, [view]);
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
   // changed most recently; null means a moment not chosen yet, so the picker.
@@ -314,7 +369,7 @@ function AppBody({
   }, [signedOut, leftOnPurpose, view]);
   const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
   // One polite region that is always there, so the note is announced when its text appears.
-  const endedNote = auth ? (
+  const signedOutNote = auth ? (
     <div role="status" aria-live="polite" className="text-[13px]">
       {sessionEnded && (
         <div className="flex flex-col gap-1 mb-4">
@@ -334,6 +389,25 @@ function AppBody({
       <p className="m-0">Your account can't be reached right now. Your work on this device is here.</p>
     </div>
   ) : null;
+
+  const removedNote = (
+    // Announced by the region in App, so it is hidden from readers here to avoid saying it twice.
+    <div className="text-[13px]" aria-hidden="true">
+      {showRemoved && <p className="m-0 mb-4">{REMOVED_MESSAGE}</p>}
+    </div>
+  );
+  const endedNote = (
+    <>
+      {removedNote}
+      {signedOutNote}
+    </>
+  );
+
+  async function removeEverything() {
+    // Local only: signOut here is supabase-js's local scope. It deletes nothing on a server.
+    await removeEverythingFromDevice(window.localStorage, client ? () => client.signOut() : undefined);
+    onRemoved();
+  }
 
   // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
   // (#39), so the Supabase user id is deliberately not passed in.
@@ -581,6 +655,18 @@ function AppBody({
     );
   }
 
+  if (view === 'settings') {
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+        <Settings
+          onBack={goToPathLanding}
+          onRemoveEverything={removeEverything}
+          signsOut={offline || (auth?.isSignedIn ?? false)}
+        />
+      </Shell>
+    );
+  }
+
   if (view === 'addContactsManual') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
@@ -760,6 +846,13 @@ function AppBody({
             Your account
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setView('settings')}
+          className="gg-btn gg-btn-ghost !px-0 self-start mt-2"
+        >
+          Settings
+        </button>
       </Shell>
     );
   }

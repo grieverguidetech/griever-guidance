@@ -11,3 +11,4 @@ export { accountStore } from "./accountStore.js";
 export { outboxStore } from "./outboxStore.js";
 export { contactStore } from "./contactStore.js";
 export { sendJobStore } from "./sendJobStore.js";
+export { clearAllLocalData } from "./clearAll.js";
