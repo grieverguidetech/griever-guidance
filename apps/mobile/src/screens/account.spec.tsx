@@ -29,6 +29,8 @@ function stubClient(overrides: Partial<Record<keyof AuthClient, unknown>> = {}) 
     signOut: jest.fn(async () => ({ ok: true as const, serverRevoked: true })),
     getSession: jest.fn(async (): Promise<SessionState> => ({ status: 'signed_out' })),
     refreshSession: jest.fn(async (): Promise<SessionState> => ({ status: 'signed_out' })),
+    startAutoRefresh: jest.fn(async () => undefined),
+    stopAutoRefresh: jest.fn(async () => undefined),
     getProfile: jest.fn(async (): Promise<ProfileResult> => noProfile),
     updateProfile: jest.fn(async (u: { senderName?: string | null }): Promise<ProfileResult> => profileWith(u.senderName ?? '')),
   };
