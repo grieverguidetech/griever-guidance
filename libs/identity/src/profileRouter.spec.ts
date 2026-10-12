@@ -9,6 +9,7 @@ const PROFILE: Profile = {
   id: USER_ID,
   senderName: 'Ada',
   contactSource: 'manual',
+  accountType: 'owner',
   createdAt: '2026-10-11T10:00:00.000Z',
   updatedAt: '2026-10-11T10:00:00.000Z',
 };
@@ -81,6 +82,11 @@ describe('profile router', () => {
     expect(client.get).toHaveBeenCalledWith(USER_ID);
   });
 
+  it('GET passes accountType through for a member', async () => {
+    vi.mocked(client.get).mockResolvedValue({ ...PROFILE, accountType: 'member' });
+    expect((await (await call('GET')).json()).accountType).toBe('member');
+  });
+
   it('GET is 404 when there is no row yet', async () => {
     vi.mocked(client.get).mockResolvedValue(null);
     expect((await call('GET')).status).toBe(404);
@@ -108,6 +114,8 @@ describe('profile router', () => {
     ['unknown key', { nope: 1 }],
     ['too-long name', { senderName: 'x'.repeat(101) }],
     ['bad contactSource', { contactSource: 'sms' }],
+    ['accountType (read-only)', { senderName: 'Ada', accountType: 'member' }],
+    ['account_type (read-only)', { account_type: 'member' }],
   ])('PUT 400 for %s and writes nothing', async (_l, body) => {
     const res = await call('PUT', body);
     expect(res.status).toBe(400);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AccountContactSource } from '@griever/shared';
+import type { AccountContactSource, AccountType } from '@griever/shared';
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { SendFlowStorage } from './useSendFlow.js';
 
@@ -9,6 +9,8 @@ export const PROFILE_STORAGE_KEY = 'gg.profile.v1';
 export interface CachedProfile {
   senderName: string | null;
   contactSource: AccountContactSource | null;
+  /** Cached so an offline boot still hides "create" for members (C5). */
+  accountType: AccountType;
 }
 
 /** What a reset step tells the person. `ok` says whether the step worked; `message` is always calm copy. */
@@ -82,10 +84,11 @@ export function identityErrorMessage(reason: string): string {
 
 function isCachedProfile(value: unknown): value is CachedProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const { senderName, contactSource } = value as Record<string, unknown>;
+  const { senderName, contactSource, accountType } = value as Record<string, unknown>;
   return (
     (senderName === null || typeof senderName === 'string') &&
-    (contactSource === null || contactSource === 'import' || contactSource === 'manual')
+    (contactSource === null || contactSource === 'import' || contactSource === 'manual') &&
+    (accountType === undefined || accountType === 'owner' || accountType === 'member')
   );
 }
 
@@ -95,8 +98,9 @@ function readCache(storage: SendFlowStorage | undefined): CachedProfile | null {
     const raw = storage.getItem(PROFILE_STORAGE_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
+    // A cache written before accountType existed reads as an owner.
     return isCachedProfile(parsed)
-      ? { senderName: parsed.senderName, contactSource: parsed.contactSource }
+      ? { senderName: parsed.senderName, contactSource: parsed.contactSource, accountType: parsed.accountType ?? 'owner' }
       : null;
   } catch {
     return null;
@@ -113,8 +117,8 @@ function writeCache(storage: SendFlowStorage | undefined, profile: CachedProfile
   }
 }
 
-function toCached(profile: { senderName: string | null; contactSource: CachedProfile['contactSource'] }): CachedProfile {
-  return { senderName: profile.senderName, contactSource: profile.contactSource };
+function toCached(profile: CachedProfile): CachedProfile {
+  return { senderName: profile.senderName, contactSource: profile.contactSource, accountType: profile.accountType };
 }
 
 export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOptions): UseSupabaseIdentityResult {

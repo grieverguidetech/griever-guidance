@@ -10,7 +10,7 @@ const signedIn: SessionState = {
 };
 
 function profile(senderName: string | null): Profile {
-  return { id: 'u1', senderName, contactSource: null, createdAt: 'x', updatedAt: 'x' };
+  return { id: 'u1', senderName, contactSource: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' };
 }
 
 function memoryStorage(seed: Record<string, string> = {}): SendFlowStorage & { data: Record<string, string> } {
@@ -45,7 +45,7 @@ function stubClient(over: Partial<AuthClient> = {}): AuthClient {
   };
 }
 
-const cached = JSON.stringify({ senderName: 'Peter', contactSource: null });
+const cached = JSON.stringify({ senderName: 'Peter', contactSource: null, accountType: 'owner' });
 
 describe('useSupabaseIdentity boot', () => {
   it('is loading only until the first check resolves, then signed in with the profile', async () => {
@@ -56,7 +56,11 @@ describe('useSupabaseIdentity boot', () => {
     expect(result.current.isSignedIn).toBe(true);
     await waitFor(() => expect(result.current.profile?.senderName).toBe('Peter'));
     expect(result.current.offline).toBe(false);
-    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY])).toEqual({ senderName: 'Peter', contactSource: null });
+    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY])).toEqual({
+      senderName: 'Peter',
+      contactSource: null,
+      accountType: 'owner',
+    });
   });
 
   it('keeps the user signed in and shows the cached name when offline', async () => {
@@ -70,6 +74,36 @@ describe('useSupabaseIdentity boot', () => {
     expect(result.current.profile?.senderName).toBe('Peter');
     expect(storage.data[PROFILE_STORAGE_KEY]).toBe(cached);
     expect(getProfile).not.toHaveBeenCalled();
+  });
+
+  it('exposes accountType, and a cached member stays a member through an offline boot (C5)', async () => {
+    const memberCache = JSON.stringify({ senderName: 'Sam', contactSource: null, accountType: 'member' });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: memberCache });
+    const client = stubClient({ getSession: async () => ({ status: 'offline' }), getProfile: vi.fn() });
+    const { result } = renderHook(() => useSupabaseIdentity({ client, storage }));
+    expect(result.current.profile?.accountType).toBe('member');
+    await waitFor(() => expect(result.current.offline).toBe(true));
+    expect(result.current.profile?.accountType).toBe('member');
+  });
+
+  it('caches the accountType the server returns', async () => {
+    const storage = memoryStorage();
+    const getProfile = async (): Promise<ProfileResult> => ({
+      ok: true,
+      profile: { ...profile('Sam'), accountType: 'member' },
+    });
+    const { result } = renderHook(() => useSupabaseIdentity({ client: stubClient({ getProfile }), storage }));
+    await waitFor(() => expect(result.current.profile?.accountType).toBe('member'));
+    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY]).accountType).toBe('member');
+  });
+
+  it('reads a cache written before accountType existed as an owner', async () => {
+    const old = JSON.stringify({ senderName: 'Peter', contactSource: null });
+    const client = stubClient({ getSession: async () => ({ status: 'offline' }) });
+    const { result } = renderHook(() =>
+      useSupabaseIdentity({ client, storage: memoryStorage({ [PROFILE_STORAGE_KEY]: old }) }),
+    );
+    expect(result.current.profile?.accountType).toBe('owner');
   });
 
   it('is signed out when there is no session, and clears any stale cache', async () => {
@@ -493,6 +527,7 @@ describe('useSupabaseIdentity lifecycle and storage', () => {
     ['a string', '"Peter"'],
     ['null', 'null'],
     ['wrong field types', JSON.stringify({ senderName: 5, contactSource: null })],
+    ['unknown accountType', JSON.stringify({ senderName: 'P', contactSource: null, accountType: 'admin' })],
     ['unknown contactSource', JSON.stringify({ senderName: 'P', contactSource: 'x' })],
   ])('ignores a corrupt cache (%s)', async (_label, raw) => {
     const client = stubClient({ getSession: async () => ({ status: 'offline' }) });

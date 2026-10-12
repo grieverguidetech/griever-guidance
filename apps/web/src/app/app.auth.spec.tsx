@@ -45,6 +45,7 @@ const PROFILE = {
   id: 'u1',
   senderName: 'Anna',
   contactSource: null,
+  accountType: 'owner' as const,
   createdAt: '2026-10-11T00:00:00.000Z',
   updatedAt: '2026-10-11T00:00:00.000Z',
 };
