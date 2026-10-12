@@ -11,6 +11,7 @@ import {
   diffFlowFacts,
   FLOW_FACT_KEYS,
   isUuid,
+  parseFlowFacts,
   parseFlowPatch,
   toFlowFacts,
 } from '@griever/shared';
@@ -47,6 +48,8 @@ export interface UseFlowSyncResult {
 }
 
 export const FLOW_QUEUE_STORAGE_KEY = 'gg.flowQueue.v1';
+/** One record per account, so signing in as someone else and back keeps the first queue. */
+export const flowQueueKey = (userId: string): string => `${FLOW_QUEUE_STORAGE_KEY}:${userId}`;
 export const BACKOFF_START_MS = 5_000;
 export const BACKOFF_MAX_MS = 300_000;
 export const PULL_INTERVAL_MS = 600_000;
@@ -56,17 +59,18 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 type Pending = Partial<FlowFacts>;
 
 interface Stored {
-  userId: string;
   queue: Record<string, Pending>;
   /** Flows the server is known to have, so the next write is a PATCH. */
   known: string[];
+  /** The facts last seen per person (facts only), so edits made while sync was off are still found. */
+  baselines: Record<string, FlowFacts>;
 }
 
 interface SyncState {
   userId: string;
   queue: Map<string, Pending>;
   known: Set<string>;
-  /** The facts last seen per flow, to tell what the user changed. Memory only. */
+  /** The facts last seen per flow, to tell what the user changed. Saved in storage. */
   baselines: Map<string, FlowFacts>;
   /** True once a pull has worked this run: only then do we know which people the server lacks. */
   pulled: boolean;
@@ -78,13 +82,17 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
   const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), pulled: false, refused: new Set() };
   if (!storage) return state;
   try {
-    const raw = storage.getItem(FLOW_QUEUE_STORAGE_KEY);
+    const raw = storage.getItem(flowQueueKey(userId));
     if (!raw) return state;
     const parsed = JSON.parse(raw) as Partial<Stored> | null;
-    if (!parsed || parsed.userId !== userId) return state;
+    if (!parsed) return state;
     for (const [id, pending] of Object.entries(parsed.queue ?? {})) {
       const clean = isUuid(id) ? parseFlowPatch(pending) : null;
       if (clean && Object.keys(clean).length > 0) state.queue.set(id, clean);
+    }
+    for (const [id, facts] of Object.entries(parsed.baselines ?? {})) {
+      const clean = isUuid(id) ? parseFlowFacts(facts) : null;
+      if (clean) state.baselines.set(id, clean);
     }
     for (const id of parsed.known ?? []) if (typeof id === 'string' && isUuid(id)) state.known.add(id);
   } catch {
@@ -97,11 +105,11 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
   if (!storage) return;
   try {
     const stored: Stored = {
-      userId: state.userId,
       queue: Object.fromEntries(state.queue),
       known: [...state.known],
+      baselines: Object.fromEntries(state.baselines),
     };
-    storage.setItem(FLOW_QUEUE_STORAGE_KEY, JSON.stringify(stored));
+    storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
     // storage unavailable: the queue still works for this run
   }
@@ -116,28 +124,31 @@ const isMine = (s: Session, userId: string): boolean =>
   s.role === 'member' || s.ownerId === null || s.ownerId === userId;
 
 /** The request can hang forever in some runtimes, so the queue stops waiting after a while. */
-function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, fallback: T, timers: Set<ReturnType<typeof setTimeout>>): Promise<T> {
   return new Promise<T>((resolve) => {
-    const timer = setTimeout(() => resolve(fallback), REQUEST_TIMEOUT_MS);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      () => {
-        clearTimeout(timer);
-        resolve(fallback);
-      },
-    );
+    const done = (value: T) => {
+      clearTimeout(timer);
+      timers.delete(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => done(fallback), REQUEST_TIMEOUT_MS);
+    timers.add(timer);
+    promise.then(done, () => done(fallback));
   });
 }
 
 /**
  * Notices what changed since the last look and queues it. A person the server may not have is
- * queued whole, but only after a pull has shown what the server has. Returns true if the queue changed.
+ * queued whole, but only after a pull has shown what the server has. `queue` is true if the
+ * queue changed; `dirty` if anything saved did.
  */
-function scanSessions(state: SyncState, sessions: readonly Session[], userId: string): boolean {
+function scanSessions(
+  state: SyncState,
+  sessions: readonly Session[],
+  userId: string,
+): { queue: boolean; dirty: boolean } {
   let changed = false;
+  let dirty = false;
   const seen = new Set<string>();
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
@@ -146,6 +157,7 @@ function scanSessions(state: SyncState, sessions: readonly Session[], userId: st
     const before = state.baselines.get(s.flowId);
     state.baselines.set(s.flowId, facts);
     const diff = before ? diffFlowFacts(before, facts) : {};
+    if (!before || Object.keys(diff).length > 0) dirty = true;
     const unsent =
       state.pulled &&
       mayCreate(s, userId) &&
@@ -161,8 +173,12 @@ function scanSessions(state: SyncState, sessions: readonly Session[], userId: st
       changed = true;
     }
   }
-  for (const id of [...state.baselines.keys()]) if (!seen.has(id)) state.baselines.delete(id);
-  return changed;
+  for (const id of [...state.baselines.keys()]) {
+    if (seen.has(id)) continue;
+    state.baselines.delete(id);
+    dirty = true;
+  }
+  return { queue: changed, dirty: dirty || changed };
 }
 
 const offline = { ok: false, reason: 'offline' } as const;
@@ -190,10 +206,12 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     const { storage } = latest.current;
     if (stateRef.current?.userId !== userId) stateRef.current = readStored(storage, userId);
     const state = stateRef.current;
-    const changed = scanSessions(state, sessions, userId);
-    if (changed) {
-      writeStored(storage, state);
-      kickRef.current(EDIT_DEBOUNCE_MS);
+    try {
+      const { queue, dirty } = scanSessions(state, sessions, userId);
+      if (dirty) writeStored(storage, state);
+      if (queue) kickRef.current(EDIT_DEBOUNCE_MS);
+    } catch {
+      // Never thrown to the app (C5). The next change scans again.
     }
   }, [active, userId, sessions]);
 
@@ -206,6 +224,8 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     let needPull = true;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const requestTimers = new Set<ReturnType<typeof setTimeout>>();
+    let softFailure = false;
     const fail = (reason: FlowsFailureReason | null) => {
       setLastError((prev) => (prev === reason ? prev : reason));
     };
@@ -223,7 +243,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     const client = () => latest.current.client ?? defaultClient;
 
     const pull = async (accessToken: string): Promise<boolean> => {
-      const result = await withTimeout(client().listFlows(accessToken), offline);
+      const result = await withTimeout(client().listFlows(accessToken), offline, requestTimers);
       if (!alive) return false;
       if (!result.ok) {
         fail(result.reason);
@@ -232,7 +252,11 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       const state = getState();
       markKnown(state, result.flows, userId);
       state.pulled = true;
-      scanSessions(state, latest.current.sessions, userId);
+      try {
+        scanSessions(state, latest.current.sessions, userId);
+      } catch {
+        // keep pulling; the next change scans again
+      }
       const pendingByFlow: Record<string, FlowFactKey[]> = {};
       for (const [id, pending] of state.queue) {
         pendingByFlow[id] = FLOW_FACT_KEYS.filter((key) => key in pending);
@@ -254,6 +278,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     /** Sends every queued flow. Returns false when a retryable failure means "stop and back off". */
     const flush = async (accessToken: string): Promise<boolean> => {
       const state = getState();
+      softFailure = false;
       for (const id of [...state.queue.keys()]) {
         for (;;) {
           if (!alive) return true;
@@ -270,6 +295,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
               ? client().createFlow(accessToken, id, sent as FlowFacts)
               : client().patchFlow(accessToken, id, sent),
             offline,
+            requestTimers,
           );
           if (!alive) return true;
           if (result.ok) {
@@ -283,7 +309,6 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             if (Object.keys(left).length > 0) state.queue.set(id, left as Pending);
             else state.queue.delete(id);
             writeStored(latest.current.storage, state);
-            fail(null);
             break;
           }
           if (result.reason === 'conflict' && create) {
@@ -297,10 +322,15 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             writeStored(latest.current.storage, state);
             if (result.reason !== 'invalid') needPull = true;
             fail(result.reason);
+            softFailure = true;
             break;
           }
           fail(result.reason);
-          return false;
+          // Only a network or server outage stops the queue. Anything else is about this person
+          // alone: keep their edits, note the error and carry on with the next one.
+          if (result.reason === 'offline' || result.reason === 'unavailable') return false;
+          softFailure = true;
+          break;
         }
       }
       return true;
@@ -316,22 +346,25 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         do {
           again = false;
           const accessToken = await token();
-          if (!alive || !accessToken) break;
-          let ok = true;
-          if (needPull) {
+          if (!alive) break;
+          let ok = accessToken !== null;
+          if (!ok) fail('signed_out'); // no token yet: back off and ask again
+          softFailure = false;
+          if (accessToken && needPull) {
             const pulled = await pull(accessToken);
             if (pulled) needPull = false;
             else ok = false;
           }
-          if (alive && ok) ok = await flush(accessToken);
+          if (alive && ok && accessToken) ok = await flush(accessToken);
           // A 403/404 asks for a pull straight away.
-          if (alive && ok && needPull) {
+          if (alive && ok && needPull && accessToken) {
             if (await pull(accessToken)) needPull = false;
             else ok = false;
           }
           if (!alive) break;
           if (ok) {
             failures = 0;
+            if (!softFailure) fail(null);
           } else {
             failures += 1;
             const delay = Math.min(BACKOFF_START_MS * 2 ** (failures - 1), BACKOFF_MAX_MS);
@@ -346,6 +379,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       }
     };
 
+    // (Re)starts the one timer that runs the next cycle, so a later edit or wake replaces a backoff wait.
     function arm(delayMs: number): void {
       if (timer !== undefined) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -355,11 +389,16 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     }
 
     kickRef.current = arm;
-    const unsubscribe = latest.current.subscribe(() => {
-      failures = 0;
-      needPull = true;
-      arm(0);
-    });
+    let unsubscribe: () => void = () => undefined;
+    try {
+      unsubscribe = latest.current.subscribe(() => {
+        failures = 0;
+        needPull = true;
+        arm(0);
+      });
+    } catch {
+      // No wake source: the timers still run.
+    }
     const interval = setInterval(() => {
       needPull = true;
       void cycle();
@@ -373,6 +412,8 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       kickRef.current = () => undefined;
       if (timer !== undefined) clearTimeout(timer);
       clearInterval(interval);
+      for (const t of requestTimers) clearTimeout(t);
+      requestTimers.clear();
       try {
         unsubscribe();
       } catch {

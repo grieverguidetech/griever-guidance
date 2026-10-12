@@ -3,12 +3,13 @@ import { FLOW_FACT_KEYS } from '@griever/shared';
 import type { FlowFacts } from '@griever/shared';
 import { freshDraft } from './useSendFlow.js';
 import type { SendFlowStorage } from './useSendFlow.js';
+import { useSessions } from './useSessions.js';
 import type { Session } from './useSessions.js';
 import {
   BACKOFF_MAX_MS,
   BACKOFF_START_MS,
   EDIT_DEBOUNCE_MS,
-  FLOW_QUEUE_STORAGE_KEY,
+  flowQueueKey,
   PULL_INTERVAL_MS,
   REQUEST_TIMEOUT_MS,
   useFlowSync,
@@ -79,7 +80,7 @@ function memoryStorage(initial: Record<string, string> = {}): SendFlowStorage & 
 }
 
 /** Stubs fetch; `route` decides each reply. Requests are recorded. */
-function mockFetch(route: (req: Req) => Reply) {
+function mockFetch(route: (req: Req) => Reply | Promise<Reply>) {
   const requests: Req[] = [];
   const fn = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
@@ -89,7 +90,7 @@ function mockFetch(route: (req: Req) => Reply) {
       body: typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null,
     };
     requests.push(req);
-    const reply = route(req);
+    const reply = await route(req);
     if (reply === 'offline') throw new TypeError('Failed to fetch');
     if (reply === 'hang') return new Promise<Response>(() => undefined);
     return new Response(JSON.stringify(reply.body ?? null), {
@@ -357,7 +358,7 @@ describe('useFlowSync failures (C5)', () => {
     await advance(10);
     rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
     await advance(EDIT_DEBOUNCE_MS + 10);
-    expect(JSON.parse(storage.data.get(FLOW_QUEUE_STORAGE_KEY) ?? '{}').queue).toEqual({});
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').queue).toEqual({});
     await advance(BACKOFF_MAX_MS);
     expect(writes(requests).length).toBe(1);
   });
@@ -431,18 +432,15 @@ describe('useFlowSync pulling', () => {
   });
 
   it('does not let an older remote value overwrite a pending local edit', async () => {
-    let online = true;
-    mockFetch((req) => {
-      if (!online) return req.method === 'GET' ? { status: 200, body: [record({ personName: 'Old Name' })] } : 'offline';
-      return req.method === 'GET' ? { status: 200, body: [record({ personName: 'Old Name' })] } : 'offline';
-    });
+    mockFetch((req) =>
+      req.method === 'GET' ? { status: 200, body: [record({ personName: 'Old Name' })] } : 'offline',
+    );
     const base = session();
     const { rerender, wake, applyRemoteFlows } = setup([base]);
     await advance(10);
     // The edit cannot be sent (writes fail), so it stays pending across the next pull.
     rerender({ sessions: [{ ...base, personName: 'Margaret Ann Hayes' }] });
     await advance(EDIT_DEBOUNCE_MS + 10);
-    online = false;
     applyRemoteFlows.mockClear();
     await wake();
     await advance(10);
@@ -468,7 +466,7 @@ describe('useFlowSync persistence', () => {
     first.rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
     await advance(EDIT_DEBOUNCE_MS + 10);
     first.unmount();
-    expect(JSON.parse(storage.data.get(FLOW_QUEUE_STORAGE_KEY) ?? '{}').queue[FLOW]).toEqual({ serviceDate: 'June 3' });
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').queue[FLOW]).toEqual({ serviceDate: 'June 3' });
 
     const requests = mockFetch(serverWithFlow);
     setup([{ ...base, serviceDate: 'June 3' }], { storage });
@@ -480,12 +478,196 @@ describe('useFlowSync persistence', () => {
     const requests = mockFetch(serverWithFlow);
     const stored = (userId: string, pending: object) =>
       JSON.stringify({ userId, queue: { [FLOW]: pending }, known: [FLOW] });
-    setup([session()], { storage: memoryStorage({ [FLOW_QUEUE_STORAGE_KEY]: stored(OTHER, { serviceDate: 'x' }) }) });
+    setup([session()], { storage: memoryStorage({ [flowQueueKey(OTHER)]: stored(OTHER, { serviceDate: 'x' }) }) });
     await advance(EDIT_DEBOUNCE_MS + 10);
     setup([session()], {
-      storage: memoryStorage({ [FLOW_QUEUE_STORAGE_KEY]: stored(USER, { recipientsNotified: ['c-secret'] }) }),
+      storage: memoryStorage({ [flowQueueKey(USER)]: stored(USER, { recipientsNotified: ['c-secret'] }) }),
     });
     await advance(EDIT_DEBOUNCE_MS + 10);
     expect(writes(requests)).toEqual([]);
+  });
+});
+
+describe('useFlowSync edits made while sync is off (B1)', () => {
+  it('sends an edit made while disabled once enabled, and protects it from the pull', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const base = session();
+    const { rerender, applyRemoteFlows } = setup([base], { storage });
+    await advance(10);
+    rerender({ sessions: [base], enabled: false });
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }], enabled: false });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([]);
+    applyRemoteFlows.mockClear();
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }], enabled: true });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([{ method: 'PATCH', path: `/flows/${FLOW}`, body: { serviceDate: 'June 3' } }]);
+    expect(applyRemoteFlows.mock.calls[0][2]).toEqual({ [FLOW]: ['serviceDate'] });
+  });
+
+  it('finds an edit made while the app was closed (saved baseline)', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const base = session();
+    const first = setup([base], { storage });
+    await advance(10);
+    first.unmount();
+    setup([{ ...base, personName: 'Margaret Ann Hayes' }], { storage });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([
+      { method: 'PATCH', path: `/flows/${FLOW}`, body: { personName: 'Margaret Ann Hayes' } },
+    ]);
+  });
+
+  it('keeps each account\'s queue when signing in as someone else and back (A, B, A)', async () => {
+    let online = true;
+    const requests = mockFetch((req) => (online ? serverWithFlow(req) : 'offline'));
+    const storage = memoryStorage();
+    const base = session();
+    const { rerender } = setup([base], { storage });
+    await advance(10);
+    online = false;
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').queue[FLOW]).toEqual({ serviceDate: 'June 3' });
+
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }], userId: OTHER });
+    await advance(10);
+    expect(storage.data.get(flowQueueKey(OTHER))).toBeUndefined();
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').queue[FLOW]).toEqual({ serviceDate: 'June 3' });
+
+    online = true;
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }], userId: USER });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).at(-1)).toEqual({
+      method: 'PATCH',
+      path: `/flows/${FLOW}`,
+      body: { serviceDate: 'June 3' },
+    });
+  });
+
+  it('keeps a local edit through a pull with an older server value (real useSessions)', async () => {
+    let flowId = '';
+    let serverName = 'Margaret';
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [record({ personName: serverName }, USER, flowId)] };
+      return 'offline';
+    });
+    const wakes = new Set<() => void>();
+    const view = renderHook(
+      (props: { enabled: boolean }) => {
+        const s = useSessions();
+        useFlowSync({
+          sessions: s.sessions,
+          userId: USER,
+          getAccessToken: async () => 'tok',
+          enabled: props.enabled,
+          subscribe: (fn) => {
+            wakes.add(fn);
+            return () => void wakes.delete(fn);
+          },
+          applyRemoteFlows: s.applyRemoteFlows,
+        });
+        return s;
+      },
+      { initialProps: { enabled: false } },
+    );
+    act(() => {
+      view.result.current.createSession({ personName: 'Margaret' });
+    });
+    flowId = view.result.current.sessions[0].flowId;
+    view.rerender({ enabled: true });
+    await advance(10);
+    act(() => view.result.current.updateSession(view.result.current.sessions[0].id, { personName: 'Margaret Ann' }));
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).length).toBeGreaterThan(0); // the send failed, so the edit is pending
+    serverName = 'Old Name';
+    await act(async () => wakes.forEach((fn) => fn()));
+    await advance(10);
+    expect(view.result.current.sessions[0].personName).toBe('Margaret Ann');
+  });
+});
+
+describe('useFlowSync queue behaviour', () => {
+  it('goes on to the next person after a failure that is not an outage (413)', async () => {
+    const OTHER_FLOW = '44444444-4444-4444-8444-444444444444';
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [record(), record({}, USER, OTHER_FLOW)] };
+      return req.path.endsWith(FLOW) ? { status: 413 } : { status: 200, body: record({}, USER, OTHER_FLOW) };
+    });
+    const a = session();
+    const b = session({ id: 's2', flowId: OTHER_FLOW });
+    const { rerender, result } = setup([a, b]);
+    await advance(10);
+    rerender({ sessions: [{ ...a, serviceDate: 'x' }, { ...b, serviceDate: 'y' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).map((r) => r.path)).toEqual([`/flows/${FLOW}`, `/flows/${OTHER_FLOW}`]);
+    expect(result.current.lastError).toBe('failed');
+  });
+
+  it('backs off and retries when there is no token yet, with no edit or wake', async () => {
+    const requests = mockFetch(serverWithFlow);
+    let token: string | null = null;
+    renderHook(() =>
+      useFlowSync({
+        sessions: [session()],
+        userId: USER,
+        getAccessToken: async () => token,
+        enabled: true,
+        subscribe: () => () => undefined,
+        applyRemoteFlows: vi.fn(),
+      }),
+    );
+    await advance(10);
+    expect(requests).toEqual([]);
+    token = 'tok';
+    await advance(BACKOFF_START_MS + 10);
+    expect(gets(requests).length).toBe(1);
+  });
+
+  it('sends an edit made during an in-flight request next, and does not clear it', async () => {
+    let release: (reply: Reply) => void = () => undefined;
+    let first = true;
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [record()] };
+      if (first) {
+        first = false;
+        return new Promise<Reply>((resolve) => (release = resolve));
+      }
+      return { status: 200, body: record() };
+    });
+    const base = session();
+    const { rerender } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'A' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).map((r) => r.body)).toEqual([{ serviceDate: 'A' }]);
+    rerender({ sessions: [{ ...base, serviceDate: 'B' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    release({ status: 200, body: record() });
+    await advance(10);
+    expect(writes(requests).map((r) => r.body)).toEqual([{ serviceDate: 'A' }, { serviceDate: 'B' }]);
+  });
+
+  it('makes no requests with an empty userId', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const base = session();
+    const { rerender, wake } = setup([base], { userId: '' });
+    rerender({ sessions: [{ ...base, serviceDate: 'x' }], userId: '' });
+    wake();
+    await advance(EDIT_DEBOUNCE_MS + PULL);
+    expect(requests).toEqual([]);
+  });
+
+  it('makes no requests after unmount', async () => {
+    const requests = mockFetch((req) => (req.method === 'GET' ? 'hang' : { status: 200 }));
+    const { unmount, wake } = setup([session()]);
+    await advance(10);
+    unmount();
+    const count = requests.length;
+    wake();
+    await advance(PULL + BACKOFF_MAX_MS);
+    expect(requests.length).toBe(count);
   });
 });
