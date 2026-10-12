@@ -45,18 +45,30 @@ export async function addContacts(page: Page, contacts: TestContact[]) {
   await expect(page.getByText(`Added so far — ${contacts.length}`)).toBeVisible();
 }
 
-/** First visit through to the path landing, via the UI only. */
-export async function onboard(
+export const HOME_HEADING = "The people you're writing about";
+
+/** Home, then "Start with someone I've lost", then their name and date, up to the contacts step. */
+export async function startFirstPerson(
   page: Page,
-  { contacts = [CAROL, BOB], personName = 'Margaret Hayes', senderName = 'Peter' } = {},
+  { personName = 'Margaret Hayes', senderName = 'Peter' } = {},
 ) {
   await page.goto('/');
-  await addContacts(page, contacts);
-  await page.getByRole('button', { name: 'Done for now' }).click();
-  await page.getByRole('button', { name: 'Save and continue' }).click();
+  await page.getByRole('button', { name: "Start with someone I've lost" }).click();
   await page.getByLabel('Their name').fill(personName);
   await page.getByLabel('Date they passed').fill('May 29, 2026');
   if (senderName) await page.getByLabel('Your name (optional)').fill(senderName);
   await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeVisible();
+}
+
+/** First visit through to the path landing, via the UI only: person, contacts, who hears first. */
+export async function onboard(
+  page: Page,
+  { contacts = [CAROL, BOB], personName = 'Margaret Hayes', senderName = 'Peter' } = {},
+) {
+  await startFirstPerson(page, { personName, senderName });
+  await addContacts(page, contacts);
+  await page.getByRole('button', { name: 'Done for now' }).click();
+  await page.getByRole('button', { name: 'Save and continue' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
 }

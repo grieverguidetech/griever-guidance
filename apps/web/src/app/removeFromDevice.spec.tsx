@@ -13,14 +13,15 @@ const OTHER_KEYS = ['gg.profile.v1', 'gg.activeSessionId', 'gg.userId', 'gg.send
 const REMOVE = 'Remove everything from this device';
 
 async function reachPathLanding(user: User) {
+  await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
   await user.type(screen.getByLabelText('Mobile number'), '6175550148');
   await user.click(screen.getByRole('button', { name: 'Add and start another' }));
   await screen.findByText('Added so far — 1');
   await user.click(screen.getByRole('button', { name: 'Done for now' }));
   await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await screen.findByRole('heading', { name: 'One thing at a time.' });
 }
 
@@ -89,7 +90,7 @@ describe('remove everything from this device (#51)', () => {
       ).toBe(true),
     );
     expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(2);
-    expect(screen.getByLabelText('Name')).toBeInTheDocument(); // the first screen: adding contacts
+    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument(); // the first screen: Home
     expect(await snapshot()).toEqual({ contacts: 0, sessions: 0, outbox: 0, sendJobs: 0, account: 0, deviceId: null });
     // The fresh start may write an empty list back, but nothing of ours is left in it.
     expect(JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')).toEqual([]);
@@ -133,7 +134,7 @@ describe('remove everything from this device (#51)', () => {
 
     failOnce.mockRestore();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
-    await waitFor(() => expect(screen.getByLabelText('Name')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument());
     expect((await snapshot()).contacts).toBe(0);
   });
 
@@ -153,13 +154,12 @@ describe('remove everything from this device (#51)', () => {
     await reachPathLanding(user);
     await openRemoveConfirm(user);
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
-    await screen.findByLabelText('Name');
+    await screen.findByRole('button', { name: "Start with someone I've lost" });
     await waitFor(() => expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(2));
-    await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
-    await user.type(screen.getByLabelText('Mobile number'), '6175550148');
-    await user.click(screen.getByRole('button', { name: 'Add and start another' }));
-    await screen.findByText('Added so far — 1');
-    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(screen.getByRole('button', { name: "Start with someone I've lost" }));
+    await user.type(screen.getByLabelText('Their name'), 'Harold Price');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' });
     // Only the live region still holds the words; the visible note is gone.
     expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(1);
   });

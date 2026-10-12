@@ -37,6 +37,9 @@ describe('focus follows the screen heading (#50)', () => {
   it('moves focus to the new h1 on Continue and back to the previous h1 on Back', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+    await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
     await user.type(screen.getByLabelText('Mobile number'), '6175550148');
     await user.click(screen.getByRole('button', { name: 'Add and start another' }));

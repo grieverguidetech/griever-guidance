@@ -18,14 +18,15 @@ async function addContact(user: User, name: string, phone: string) {
 }
 
 async function reachServiceDateField(user: User) {
+  await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await addContact(user, 'Aunt Carol', '6175550148');
   await screen.findByText('Added so far — 1');
   await addContact(user, 'Uncle Joe', '6175550199');
   await screen.findByText('Added so far — 2');
   await user.click(screen.getByRole('button', { name: 'Done for now' }));
   await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await screen.findByRole('heading', { name: 'One thing at a time.' });
   await user.click(screen.getByRole('button', { name: 'Start' }));
   await user.click(await screen.findByRole('button', { name: 'Continue' }));

@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { addContacts, BOB, CAROL, onboard } from './support';
+import { addContacts, BOB, CAROL, HOME_HEADING, onboard, startFirstPerson } from './support';
 
 /**
  * Automated WCAG 2.2 A/AA checks with axe on each main screen. Axe finds only
@@ -20,11 +20,15 @@ async function violations(page: Page, { contrastOnly = false } = {}) {
 }
 
 const screens: Record<string, (page: Page) => Promise<void>> = {
-  'add contacts': async (page) => {
+  'first-visit home': async (page) => {
     await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
+  },
+  'add contacts': async (page) => {
+    await startFirstPerson(page);
   },
   'who hears first': async (page) => {
-    await page.goto('/');
+    await startFirstPerson(page);
     await addContacts(page, [CAROL, BOB]);
     await page.getByRole('button', { name: 'Done for now' }).click();
   },
@@ -34,7 +38,7 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
   home: async (page) => {
     await onboard(page);
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
   },
   'announce form': async (page) => {
     await onboard(page);

@@ -11,14 +11,15 @@ const edited = 'My own private words for the family.';
 
 async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
   render(<App />);
+  await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
   await user.type(screen.getByLabelText('Mobile number'), '6175550148');
   await user.click(screen.getByRole('button', { name: 'Add and start another' }));
   await screen.findByText('Added so far — 1');
   await user.click(screen.getByRole('button', { name: 'Done for now' }));
   await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(screen.getByRole('button', { name: 'Start' }));
   await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
   await user.click(screen.getByRole('button', { name: 'Continue' }));
