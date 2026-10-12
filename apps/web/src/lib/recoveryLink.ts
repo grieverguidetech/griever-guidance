@@ -18,3 +18,33 @@ export function isRecoveryUrl(url: string): boolean {
 export function clearRecoveryFromAddressBar(): void {
   window.history.replaceState(null, '', window.location.pathname);
 }
+
+// Held in memory from app start, so the token is out of the address bar before anything can fail
+// (offline, a slow chunk, an error screen) and is still available to read once the client loads.
+let captured: string | null = null;
+
+/**
+ * Call as early as possible. If the page was opened from a reset email, remembers the full link
+ * and clears the address bar at once. Safe to call repeatedly (React may render twice).
+ */
+export function captureRecoveryLink(): string | null {
+  if (captured === null && isRecoveryUrl(window.location.href)) {
+    captured = window.location.href;
+    clearRecoveryFromAddressBar();
+  }
+  return captured;
+}
+
+/** Hands over the remembered link once; the link is single-use. */
+export function takeRecoveryLink(): string {
+  const href = captured ?? '';
+  captured = null;
+  return href;
+}
+
+/** `anna@example.com` becomes `a•••@example.com`. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at < 1) return email;
+  return `${email[0]}•••${email.slice(at)}`;
+}

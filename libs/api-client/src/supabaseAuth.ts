@@ -87,12 +87,18 @@ export type ResetCompleteResult =
  * `completePasswordReset` can set the new password.
  */
 export type RecoveryLinkResult =
-  | { ok: true }
+  | {
+      ok: true;
+      /** From the link's own token, so the app can show whose password this is. Null if absent. */
+      email: string | null;
+    }
   | {
       ok: false;
       reason:
         | 'no_recovery'
         | 'expired_link'
+        /** This device is signed in as someone else; their session is left alone. */
+        | 'different_account'
         | 'offline'
         | 'unavailable'
         | 'failed';
@@ -228,8 +234,7 @@ function resetRequestFailure(
 ): Extract<ResetRequestResult, { ok: false }> {
   const unreachable = reachability(error);
   if (unreachable) return { ok: false, reason: unreachable };
-  if (isRateLimited(error) || error?.code === 'over_email_send_rate_limit')
-    return { ok: false, reason: 'rate_limited' };
+  if (isRateLimited(error)) return { ok: false, reason: 'rate_limited' };
   if (
     error?.code === 'validation_failed' ||
     error?.code === 'email_address_invalid'
@@ -274,6 +279,23 @@ function urlParams(url: string): { hash: URLSearchParams; query: URLSearchParams
     };
   } catch {
     return { hash: new URLSearchParams(), query: new URLSearchParams() };
+  }
+}
+
+/** Reads `sub` and `email` from a JWT payload without any network call. Null if it isn't a JWT. */
+function tokenClaims(token: string): { sub: string; email: string | null } | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(json) as { sub?: unknown; email?: unknown };
+    if (typeof claims.sub !== 'string') return null;
+    return {
+      sub: claims.sub,
+      email: typeof claims.email === 'string' ? claims.email : null,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -411,8 +433,15 @@ export function createAuthClient(
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${redirectOrigin}/?reset=1`,
         });
-        // Non-enumerating: "no such user" is the same answer as success.
-        if (error && error.code !== 'user_not_found')
+        // Non-enumerating: "no such user" is the same answer as success. So is the per-email wait
+        // window (`over_email_send_rate_limit`): Supabase answers it only for an email that has an
+        // account (checked on a local project), and a link was already sent. The IP-level limit
+        // (`over_request_rate_limit`, bare 429) says nothing about the email and stays rate_limited.
+        if (
+          error &&
+          error.code !== 'user_not_found' &&
+          error.code !== 'over_email_send_rate_limit'
+        )
           return resetRequestFailure(error);
         return { ok: true };
       } catch (error) {
@@ -425,17 +454,20 @@ export function createAuthClient(
       const accessToken = hash.get('access_token');
       const refreshToken = hash.get('refresh_token');
       if (accessToken && refreshToken && hash.get('type') === 'recovery') {
+        const claims = tokenClaims(accessToken);
+        if (!claims) return { ok: false, reason: 'expired_link' };
         try {
+          // Someone else's recovery link must not replace the session already on this device.
+          const current = await supabase.auth.getSession();
+          if (current.data.session && current.data.session.user.id !== claims.sub)
+            return { ok: false, reason: 'different_account' };
           const { error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-          if (!error) return { ok: true };
-          const unreachable = reachability(error);
-          return {
-            ok: false,
-            reason: unreachable ?? 'expired_link',
-          };
+          if (!error) return { ok: true, email: claims.email };
+          // reachability() already maps no network to offline and 5xx to unavailable.
+          return { ok: false, reason: reachability(error) ?? 'expired_link' };
         } catch (error) {
           return { ok: false, reason: reachability(error) ?? 'failed' };
         }

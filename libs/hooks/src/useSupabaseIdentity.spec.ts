@@ -39,7 +39,7 @@ function stubClient(over: Partial<AuthClient> = {}): AuthClient {
     getProfile: async () => ({ ok: true, profile: profile('Peter') }),
     updateProfile: async () => ({ ok: true, profile: profile('Pete') }),
     requestPasswordReset: async () => ({ ok: true }),
-    consumeRecoveryFromUrl: async () => ({ ok: true }),
+    consumeRecoveryFromUrl: async () => ({ ok: true, email: 'a@b.c' }),
     completePasswordReset: async () => ({ ok: true }),
     ...over,
   };
@@ -600,7 +600,20 @@ describe('password reset', () => {
     await act(async () => {
       outcome = await good.result.current.openRecoveryLink('http://x/?reset=1');
     });
-    expect(outcome).toMatchObject({ ok: true });
+    expect(outcome).toMatchObject({ ok: true, email: 'a@b.c' });
+  });
+
+  it('reports a different signed-in account without calling it expired', async () => {
+    const { result } = renderHook(() =>
+      useSupabaseIdentity({
+        client: stubClient({ consumeRecoveryFromUrl: async () => ({ ok: false, reason: 'different_account' }) }),
+      }),
+    );
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.openRecoveryLink('http://x/?reset=1');
+    });
+    expect(outcome).toEqual({ ok: false, message: 'This link is for a different account.', differentAccount: true });
   });
 
   it('signs in after a successful reset', async () => {

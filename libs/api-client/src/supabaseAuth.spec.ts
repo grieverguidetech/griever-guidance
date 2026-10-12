@@ -425,7 +425,6 @@ describe('requestPasswordReset', () => {
   });
 
   it.each([
-    [apiError(429, 'over_email_send_rate_limit'), 'rate_limited'],
     [apiError(429, 'over_request_rate_limit'), 'rate_limited'],
     [apiError(400, 'validation_failed'), 'invalid_email'],
     [apiError(422, 'email_address_invalid'), 'invalid_email'],
@@ -441,6 +440,16 @@ describe('requestPasswordReset', () => {
     });
   });
 
+  it('answers ok when the per-email wait window applies (it only does for real accounts)', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({
+      data: null,
+      error: apiError(429, 'over_email_send_rate_limit'),
+    });
+    expect(await make().requestPasswordReset('a@b.c', 'http://o')).toEqual({
+      ok: true,
+    });
+  });
+
   it('turns a thrown fetch failure into offline', async () => {
     auth.resetPasswordForEmail.mockRejectedValue(new TypeError('fetch'));
     expect(await make().requestPasswordReset('a@b.c', 'http://o')).toEqual({
@@ -450,15 +459,24 @@ describe('requestPasswordReset', () => {
   });
 });
 
+const jwt = (claims: object) =>
+  `h.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.s`;
+
 describe('consumeRecoveryFromUrl', () => {
-  const link =
-    'https://app.example.com/?reset=1#access_token=at&refresh_token=rt&expires_in=3600&type=recovery';
+  const token = jwt({ sub: 'u1', email: 'anna@example.com' });
+  const link = `https://app.example.com/?reset=1#access_token=${token}&refresh_token=rt&expires_in=3600&type=recovery`;
+  beforeEach(() => {
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+  });
 
   it('stores the session from an implicit-flow recovery link', async () => {
     auth.setSession.mockResolvedValue({ data: {}, error: null });
-    expect(await make().consumeRecoveryFromUrl(link)).toEqual({ ok: true });
+    expect(await make().consumeRecoveryFromUrl(link)).toEqual({
+      ok: true,
+      email: 'anna@example.com',
+    });
     expect(auth.setSession).toHaveBeenCalledWith({
-      access_token: 'at',
+      access_token: token,
       refresh_token: 'rt',
     });
   });
@@ -476,6 +494,49 @@ describe('consumeRecoveryFromUrl', () => {
     expect(
       await make().consumeRecoveryFromUrl('https://app.example.com/?reset=1'),
     ).toEqual({ ok: false, reason: 'expired_link' });
+  });
+
+  it('leaves a different signed-in account alone', async () => {
+    auth.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'someone-else' } } },
+      error: null,
+    });
+    expect(await make().consumeRecoveryFromUrl(link)).toEqual({
+      ok: false,
+      reason: 'different_account',
+    });
+    expect(auth.setSession).not.toHaveBeenCalled();
+  });
+
+  it('accepts the link when this device is already signed in as the same account', async () => {
+    auth.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'u1' } } },
+      error: null,
+    });
+    auth.setSession.mockResolvedValue({ data: {}, error: null });
+    expect(await make().consumeRecoveryFromUrl(link)).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('treats a token that is not a readable JWT as an expired link', async () => {
+    expect(
+      await make().consumeRecoveryFromUrl(
+        'https://app.example.com/#access_token=at&refresh_token=rt&type=recovery',
+      ),
+    ).toEqual({ ok: false, reason: 'expired_link' });
+    expect(auth.setSession).not.toHaveBeenCalled();
+  });
+
+  it('reports a server error while storing the session as unavailable, not expired', async () => {
+    auth.setSession.mockResolvedValue({
+      data: {},
+      error: apiError(500, 'unexpected_failure'),
+    });
+    expect(await make().consumeRecoveryFromUrl(link)).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
   });
 
   it('ignores a token that is not a recovery token', async () => {

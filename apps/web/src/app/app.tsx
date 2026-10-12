@@ -25,7 +25,7 @@ import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { ForgotPassword } from '../screens/ForgotPassword';
 import { ChooseNewPassword } from '../screens/ChooseNewPassword';
-import { clearRecoveryFromAddressBar, isRecoveryUrl } from '../lib/recoveryLink';
+import { captureRecoveryLink, takeRecoveryLink } from '../lib/recoveryLink';
 import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { removeEverythingFromDevice } from '../lib/removeFromDevice';
@@ -200,6 +200,8 @@ export function App() {
     return () => clearTimeout(timer);
   }, [removals]);
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
+  // Before anything can load or fail: take a reset token out of the address bar.
+  if (AUTH_ENABLED) captureRecoveryLink();
   const body = !AUTH_ENABLED ? (
     <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />
   ) : (
@@ -280,7 +282,7 @@ function AppBody({
   const [view, setView] = useState<AppView>(() => {
     if (offline) return viewForReturning(sessions.sessions);
     // Opened from a reset email: the new-password screen, not sign-up.
-    if (AUTH_ENABLED && isRecoveryUrl(window.location.href)) return 'chooseNewPassword';
+    if (AUTH_ENABLED && captureRecoveryLink()) return 'chooseNewPassword';
     if (AUTH_ENABLED) return 'signup';
     // useSessions reads storage synchronously, so a returning visitor goes
     // straight to their session; a first visit starts at adding contacts.
@@ -651,13 +653,10 @@ function AppBody({
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed}>
         <ChooseNewPassword
-          openLink={() => {
-            const href = window.location.href;
-            clearRecoveryFromAddressBar();
-            return auth.openRecoveryLink(href);
-          }}
+          openLink={() => auth.openRecoveryLink(takeRecoveryLink())}
           onSubmit={auth.completeReset}
           onAskForNewLink={() => setView('forgotPassword')}
+          onBackToSignIn={() => setView('createAccount')}
           onContinue={() => {
             // Same as a sign-in: ask for a name if the account has none.
             setPendingName(null);

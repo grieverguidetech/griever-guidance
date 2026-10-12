@@ -17,6 +17,10 @@ export interface ResetOutcome {
   message: string;
   /** True when the link is no good and only a new one will help. */
   expired?: boolean;
+  /** True when this device is signed in as someone else and the link was not used. */
+  differentAccount?: boolean;
+  /** The account a good recovery link is for (from the link itself), when known. */
+  email?: string | null;
 }
 
 export const RESET_REQUESTED_MESSAGE =
@@ -67,6 +71,7 @@ const MESSAGES = {
   unavailable: "We can't reach your account right now. Please try again in a little while.",
   weak_password: 'Please choose a stronger password.',
   invalid_email: "That doesn't look like an email address. Please check it and try again.",
+  different_account: 'This link is for a different account.',
   expired_link: 'That link has expired. You can ask for a new one.',
 } as const;
 
@@ -268,7 +273,10 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
 
   const openRecoveryLink = useCallback(async (url: string): Promise<ResetOutcome> => {
     const result = await clientRef.current.consumeRecoveryFromUrl(url);
-    if (result.ok) return { ok: true, message: '' };
+    if (result.ok) return { ok: true, message: '', email: result.email };
+    if (result.reason === 'different_account') {
+      return { ok: false, message: identityErrorMessage(result.reason), differentAccount: true };
+    }
     // No link at all reads the same as a dead one: either way, ask for a new one.
     const expired = result.reason === 'no_recovery' || result.reason === 'expired_link';
     return { ok: false, message: identityErrorMessage(expired ? 'expired_link' : result.reason), expired };

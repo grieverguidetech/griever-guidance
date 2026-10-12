@@ -1,6 +1,7 @@
 /**
  * Forgotten-password flow on the real App with a stub auth client (no network, no supabase-js).
  */
+import { StrictMode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AuthClient } from '@griever/api-client/auth';
@@ -20,6 +21,7 @@ vi.mock('../lib/authClient', async (importOriginal) => {
 });
 
 import { App } from './app';
+import { maskEmail } from '../lib/recoveryLink';
 
 function stubClient(overrides: Partial<AuthClient> = {}): AuthClient {
   let signedIn = false;
@@ -38,7 +40,7 @@ function stubClient(overrides: Partial<AuthClient> = {}): AuthClient {
     getProfile: vi.fn(async () => ({ ok: false as const, reason: 'no_profile' as const })),
     updateProfile: vi.fn(),
     requestPasswordReset: vi.fn(async () => ({ ok: true as const })),
-    consumeRecoveryFromUrl: vi.fn(async () => ({ ok: true as const })),
+    consumeRecoveryFromUrl: vi.fn(async () => ({ ok: true as const, email: 'anna@example.com' })),
     completePasswordReset: vi.fn(async () => {
       signedIn = true;
       return { ok: true as const };
@@ -72,6 +74,7 @@ describe('asking for a reset link', () => {
       "If that email has an account, we've sent a link to reset your password. It may take a few minutes.",
     );
     expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('role', 'status');
     expect(client.requestPasswordReset).toHaveBeenCalledWith('anna@example.com', window.location.origin);
     expect(document.body.textContent).not.toContain('!');
   });
@@ -111,11 +114,14 @@ describe('opening a recovery link', () => {
     expect(client.consumeRecoveryFromUrl).toHaveBeenCalledWith(expect.stringContaining('access_token=at'));
     expect(window.location.hash).toBe('');
     expect(window.location.search).toBe('');
+    // Whose password this is, masked, from the link itself.
+    expect(screen.getByText(/For a•••@example\.com\./)).toBeInTheDocument();
 
     await user.type(field, 'a-new-long-password');
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
 
     expect(await screen.findByText("Your password is changed. You're signed in.")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
     expect(client.completePasswordReset).toHaveBeenCalledWith('a-new-long-password');
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -167,5 +173,93 @@ describe('opening a recovery link', () => {
 
     expect(await screen.findByText('That link has expired. You can ask for a new one.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send me a new link' })).toBeInTheDocument();
+  });
+
+  it('has already cleaned the address bar when the link is read', async () => {
+    window.history.replaceState(null, '', RECOVERY);
+    let hashAtCall: string | null = null;
+    let hrefArg = '';
+    const client = stubClient({
+      consumeRecoveryFromUrl: vi.fn(async (url: string) => {
+        hashAtCall = window.location.hash;
+        hrefArg = url;
+        return { ok: true as const, email: null };
+      }),
+    });
+    mocks.load.mockResolvedValue({ available: true, client });
+    render(<App />);
+    await screen.findByLabelText('New password');
+    expect(hashAtCall).toBe('');
+    expect(hrefArg).toContain('access_token=at');
+  });
+
+  it('clears the token even when accounts cannot be loaded', async () => {
+    window.history.replaceState(null, '', RECOVERY);
+    mocks.load.mockResolvedValue({ available: false });
+    render(<App />);
+    await screen.findByRole('heading', { name: "Accounts aren't available right now" });
+    expect(window.location.hash).toBe('');
+  });
+
+  it('reads the link once under StrictMode', async () => {
+    window.history.replaceState(null, '', RECOVERY);
+    const client = stubClient();
+    mocks.load.mockResolvedValue({ available: true, client });
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+    await screen.findByLabelText('New password');
+    expect(client.consumeRecoveryFromUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces that it is checking, with no Save button yet', async () => {
+    window.history.replaceState(null, '', RECOVERY);
+    let release: (v: { ok: true; email: string | null }) => void = () => undefined;
+    const client = stubClient({
+      consumeRecoveryFromUrl: vi.fn(() => new Promise((resolve) => (release = resolve))) as AuthClient['consumeRecoveryFromUrl'],
+    });
+    mocks.load.mockResolvedValue({ available: true, client });
+    render(<App />);
+    const status = await screen.findByText('Checking your link…');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('button', { name: 'Save new password' })).not.toBeInTheDocument();
+    release({ ok: true, email: null });
+    expect(await screen.findByRole('button', { name: 'Save new password' })).toBeInTheDocument();
+  });
+
+  it('keeps one status region, moves focus to the heading, and offers Back to sign in when expired', async () => {
+    window.history.replaceState(null, '', '/?reset=1#error=access_denied&error_code=otp_expired');
+    const client = stubClient({
+      consumeRecoveryFromUrl: vi.fn(async () => ({ ok: false as const, reason: 'expired_link' as const })),
+    });
+    mocks.load.mockResolvedValue({ available: true, client });
+    const user = userEvent.setup();
+    render(<App />);
+    const status = await screen.findByText('That link has expired. You can ask for a new one.');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('heading', { name: 'Choose a new password' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Back to sign in' }));
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('leaves another signed-in account alone', async () => {
+    window.history.replaceState(null, '', RECOVERY);
+    const client = stubClient({
+      consumeRecoveryFromUrl: vi.fn(async () => ({ ok: false as const, reason: 'different_account' as const })),
+    });
+    mocks.load.mockResolvedValue({ available: true, client });
+    render(<App />);
+    expect(await screen.findByText('This link is for a different account.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();
+    expect(client.completePasswordReset).not.toHaveBeenCalled();
+  });
+});
+
+describe('maskEmail', () => {
+  it('keeps the first letter and the domain', () => {
+    expect(maskEmail('anna@example.com')).toBe('a•••@example.com');
+    expect(maskEmail('nonsense')).toBe('nonsense');
   });
 });

@@ -53,6 +53,7 @@ export function ForgotPassword({ onBack, onSubmit }: Props) {
       </div>
 
       <div
+        role="status"
         aria-live="polite"
         className="text-[13px]"
         style={outcome && !outcome.ok ? { color: 'var(--color-danger, #b91c1c)' } : undefined}
