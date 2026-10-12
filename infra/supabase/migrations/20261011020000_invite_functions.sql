@@ -10,7 +10,7 @@
 -- It answers PT409 only after the token checked out, and only about the caller's own state.
 -- No error ever carries a constraint or key detail.
 --
--- TODO(C1 of the flows work): once people sync to Supabase, accept_invite must also
+-- TODO(#130): once people sync to Supabase, accept_invite must also
 -- refuse a joiner who owns people. No people table exists yet, so it cannot today.
 
 create function public.create_invite(p_email text, p_token_hash text) returns uuid
@@ -26,11 +26,14 @@ begin
   if v_uid is null then
     raise exception 'not_allowed' using errcode = 'PT403';
   end if;
-  if char_length(v_email) > 254 or position('@' in v_email) <= 1
+  if char_length(v_email) > 254
+     or v_email !~ '^[^@[:space:][:cntrl:]]+@[^@[:space:][:cntrl:]]+\.[^@[:space:][:cntrl:]]+$'
      or p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
     raise exception 'invalid_invite' using errcode = 'PT400';
   end if;
 
+  -- A confirmed owner may not have a profile row yet; make one so the lock below works.
+  insert into public.profiles (id) values (v_uid) on conflict (id) do nothing;
   -- Serialise this owner's invites so the rate limits cannot be raced.
   perform 1 from public.profiles where id = v_uid for update;
 
@@ -39,7 +42,8 @@ begin
      or not exists (select 1 from auth.users where id = v_uid and email_confirmed_at is not null) then
     raise exception 'not_allowed' using errcode = 'PT403';
   end if;
-  if v_email = lower(coalesce(auth.jwt() ->> 'email', '')) then
+  if v_email = lower(coalesce(auth.jwt() ->> 'email', ''))
+     or exists (select 1 from auth.users where id = v_uid and lower(email) = v_email) then
     raise exception 'invalid_invite' using errcode = 'PT400';
   end if;
   if exists (
@@ -100,38 +104,48 @@ begin
     raise exception 'invite_unusable' using errcode = 'PT404';
   end if;
 
-  insert into public.profiles (id) values (v_uid) on conflict (id) do nothing;
-
-  -- Lock both profiles in id order (no deadlock), then the invite, before any check, so
-  -- "joiner has no members" and "owner is not a member" cannot race another accept.
-  perform 1 from public.profiles where id in (v_owner, v_uid) order by id for update;
-  select * into v_invite from public.invites where token_hash = p_token_hash for update;
-
-  if v_invite.id is null
-     or v_invite.email <> v_email
-     or v_invite.accepted_at is not null
-     or v_invite.revoked_at is not null
-     or v_invite.expires_at <= now()
-     or v_invite.owner_id = v_uid
-     or not exists (select 1 from auth.users
-                    where id = v_uid and email_confirmed_at is not null and lower(email) = v_email)
-     or not exists (select 1 from public.profiles where id = v_owner and account_type = 'owner')
-     or exists (select 1 from public.memberships where member_id = v_owner) then
-    raise exception 'invite_unusable' using errcode = 'PT404';
-  end if;
-
-  if exists (select 1 from public.memberships where member_id = v_uid or owner_id = v_uid)
-     or exists (select 1 from public.profiles where id = v_uid and account_type <> 'owner') then
-    raise exception 'invite_conflict' using errcode = 'PT409';
-  end if;
-
   begin
-    insert into public.memberships (owner_id, member_id) values (v_owner, v_uid);
-  exception when unique_violation then
-    raise exception 'invite_unusable' using errcode = 'PT404';
+    insert into public.profiles (id) values (v_uid) on conflict (id) do nothing;
+    -- Lock both profiles in id order (no deadlock), then the invite, before any check, so
+    -- "joiner has no members" and "owner is not a member" cannot race another accept.
+    perform 1 from public.profiles where id in (v_owner, v_uid) order by id for update;
+    select * into v_invite from public.invites where token_hash = p_token_hash for update;
+
+    if v_invite.id is null
+       or v_invite.email <> v_email
+       or v_invite.accepted_at is not null
+       or v_invite.revoked_at is not null
+       or v_invite.expires_at <= now()
+       or v_invite.owner_id = v_uid
+       or not exists (select 1 from auth.users
+                      where id = v_uid and email_confirmed_at is not null and lower(email) = v_email)
+       or not exists (select 1 from public.profiles where id = v_owner and account_type = 'owner')
+       or exists (select 1 from public.memberships where member_id = v_owner) then
+      raise exception 'invite_unusable' using errcode = 'PT404';
+    end if;
+
+    if exists (select 1 from public.memberships where member_id = v_uid or owner_id = v_uid)
+       or exists (select 1 from public.profiles where id = v_uid and account_type <> 'owner') then
+      raise exception 'invite_conflict' using errcode = 'PT409';
+    end if;
+
+    begin
+      insert into public.memberships (owner_id, member_id) values (v_owner, v_uid);
+    exception when unique_violation then
+      raise exception 'invite_unusable' using errcode = 'PT404';
+    end;
+    update public.invites set accepted_at = now(), accepted_by = v_uid where id = v_invite.id;
+    update public.profiles set account_type = 'member' where id = v_uid;
+    -- A member cannot invite, so their own open invites are dead; retire them.
+    update public.invites set revoked_at = now()
+    where owner_id = v_uid and accepted_at is null and revoked_at is null;
+  exception
+    when sqlstate 'PT409' then
+      raise;
+    when others then
+      -- Deadlocks, FK errors and the like must look like every other accept failure.
+      raise exception 'invite_unusable' using errcode = 'PT404';
   end;
-  update public.invites set accepted_at = now(), accepted_by = v_uid where id = v_invite.id;
-  update public.profiles set account_type = 'member' where id = v_uid;
   return v_owner;
 end;
 $$;
@@ -161,7 +175,13 @@ begin
   return jsonb_build_object(
     'role', 'owner',
     'members', coalesce((
-      select jsonb_agg(jsonb_build_object('id', m.member_id, 'name', p.sender_name, 'email', u.email)
+      -- the email the member accepted with, not whatever their account email is now
+      select jsonb_agg(jsonb_build_object('id', m.member_id, 'name', p.sender_name,
+                                          'email', coalesce(
+                                            (select i.email from public.invites i
+                                             where i.accepted_by = m.member_id and i.owner_id = v_uid
+                                             order by i.accepted_at desc limit 1),
+                                            u.email))
                        order by m.created_at)
       from public.memberships m
       join auth.users u on u.id = m.member_id
@@ -207,11 +227,11 @@ begin
 end;
 $$;
 
-revoke execute on function public.create_invite(text, text) from public, anon, authenticated;
-revoke execute on function public.accept_invite(text) from public, anon, authenticated;
-revoke execute on function public.list_members() from public, anon, authenticated;
-revoke execute on function public.revoke_invite(uuid) from public, anon, authenticated;
-revoke execute on function public.remove_member(uuid) from public, anon, authenticated;
+revoke execute on function public.create_invite(text, text) from public, anon, authenticated, service_role;
+revoke execute on function public.accept_invite(text) from public, anon, authenticated, service_role;
+revoke execute on function public.list_members() from public, anon, authenticated, service_role;
+revoke execute on function public.revoke_invite(uuid) from public, anon, authenticated, service_role;
+revoke execute on function public.remove_member(uuid) from public, anon, authenticated, service_role;
 
 grant execute on function public.create_invite(text, text) to authenticated;
 grant execute on function public.accept_invite(text) to authenticated;
