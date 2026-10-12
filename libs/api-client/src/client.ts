@@ -34,7 +34,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function request(path: string, init?: RequestInit): Promise<Response> {
   // `...init` goes first so a caller's `headers` can't replace the merged set.
   const res = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
@@ -51,7 +51,26 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     }
     throw new ApiError(message, res.status);
   }
+  return res;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await request(path, init);
   return res.json() as Promise<T>;
+}
+
+/**
+ * For routes that answer "done" with no body. Resolves on 204 or a 2xx with an empty body; any other
+ * 2xx body throws, because it is not the answer we expected.
+ */
+export async function apiFetchNoContent(
+  path: string,
+  init?: RequestInit,
+): Promise<void> {
+  const res = await request(path, init);
+  if (res.status === 204) return;
+  const text = await res.text().catch(() => 'unreadable');
+  if (text !== '') throw new ApiError('Unexpected response body', res.status);
 }
 
 export function generateObituary(payload: ObituaryRequest): Promise<ObituaryResponse> {
