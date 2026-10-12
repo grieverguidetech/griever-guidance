@@ -38,6 +38,9 @@ function stubClient(over: Partial<AuthClient> = {}): AuthClient {
     stopAutoRefresh: async () => undefined,
     getProfile: async () => ({ ok: true, profile: profile('Peter') }),
     updateProfile: async () => ({ ok: true, profile: profile('Pete') }),
+    requestPasswordReset: async () => ({ ok: true }),
+    consumeRecoveryFromUrl: async () => ({ ok: true }),
+    completePasswordReset: async () => ({ ok: true }),
     ...over,
   };
 }
@@ -550,5 +553,101 @@ describe('useSupabaseIdentity lifecycle and storage', () => {
     });
     expect(storage.data[PROFILE_STORAGE_KEY]).toBe(before);
     expect(result.current.error).toBe("We can't reach your account right now. Please try again in a little while.");
+  });
+});
+
+describe('password reset', () => {
+  it('gives the same calm words for a request, and passes the origin through', async () => {
+    const requestPasswordReset = vi.fn(async () => ({ ok: true as const }));
+    const { result } = renderHook(() => useSupabaseIdentity({ client: stubClient({ requestPasswordReset }) }));
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.requestReset('a@b.c', 'https://x.test');
+    });
+    expect(requestPasswordReset).toHaveBeenCalledWith('a@b.c', 'https://x.test');
+    expect(outcome).toEqual({
+      ok: true,
+      message: "If that email has an account, we've sent a link to reset your password. It may take a few minutes.",
+    });
+  });
+
+  it('turns request failures into calm copy', async () => {
+    const { result } = renderHook(() =>
+      useSupabaseIdentity({
+        client: stubClient({ requestPasswordReset: async () => ({ ok: false, reason: 'rate_limited' }) }),
+      }),
+    );
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.requestReset('a@b.c', 'https://x.test');
+    });
+    expect(outcome).toEqual({ ok: false, message: identityErrorMessage('rate_limited') });
+  });
+
+  it('says an unusable link has expired, and reads a good one as ok', async () => {
+    const missing = renderHook(() =>
+      useSupabaseIdentity({
+        client: stubClient({ consumeRecoveryFromUrl: async () => ({ ok: false, reason: 'no_recovery' }) }),
+      }),
+    );
+    let outcome;
+    await act(async () => {
+      outcome = await missing.result.current.openRecoveryLink('http://x/');
+    });
+    expect(outcome).toEqual({ ok: false, message: 'That link has expired. You can ask for a new one.', expired: true });
+
+    const good = renderHook(() => useSupabaseIdentity({ client: stubClient() }));
+    await act(async () => {
+      outcome = await good.result.current.openRecoveryLink('http://x/?reset=1');
+    });
+    expect(outcome).toMatchObject({ ok: true });
+  });
+
+  it('signs in after a successful reset', async () => {
+    let signed = false;
+    const client = stubClient({
+      getSession: async () => (signed ? signedIn : { status: 'signed_out' }),
+      completePasswordReset: async () => {
+        signed = true;
+        return { ok: true };
+      },
+    });
+    const { result } = renderHook(() => useSupabaseIdentity({ client }));
+    await waitFor(() => expect(result.current.status).toBe('signed_out'));
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.completeReset('new-password-1');
+    });
+    expect(outcome).toEqual({ ok: true, message: "Your password is changed. You're signed in." });
+    expect(result.current.isSignedIn).toBe(true);
+  });
+
+  it('maps weak and expired results and does not change status on failure', async () => {
+    const weak = renderHook(() =>
+      useSupabaseIdentity({
+        client: stubClient({ completePasswordReset: async () => ({ ok: false, reason: 'weak_password' }) }),
+      }),
+    );
+    let outcome;
+    await act(async () => {
+      outcome = await weak.result.current.completeReset('x');
+    });
+    expect(outcome).toEqual({ ok: false, message: 'Please choose a stronger password.', expired: false });
+
+    const expired = renderHook(() =>
+      useSupabaseIdentity({
+        client: stubClient({ completePasswordReset: async () => ({ ok: false, reason: 'expired_link' }) }),
+      }),
+    );
+    await act(async () => {
+      outcome = await expired.result.current.completeReset('x');
+    });
+    expect(outcome).toMatchObject({ ok: false, expired: true, message: 'That link has expired. You can ask for a new one.' });
+  });
+
+  it('uses no exclamation marks in any reset copy', () => {
+    for (const reason of ['invalid_email', 'expired_link', 'weak_password', 'rate_limited', 'offline', 'unavailable']) {
+      expect(identityErrorMessage(reason)).not.toContain('!');
+    }
   });
 });

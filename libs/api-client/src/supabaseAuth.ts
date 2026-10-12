@@ -2,6 +2,7 @@ import {
   createClient,
   isAuthRefreshDiscardedError,
   isAuthRetryableFetchError,
+  isAuthSessionMissingError,
 } from '@supabase/supabase-js';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import type { Profile, ProfileUpdate } from '@griever/shared';
@@ -46,6 +47,52 @@ export type SignInResult =
         | 'invalid_credentials'
         | 'email_not_confirmed'
         | 'rate_limited'
+        | 'offline'
+        | 'unavailable'
+        | 'failed';
+    };
+
+/**
+ * Asking for a reset link says nothing about whether the email has an account (C7): an unknown
+ * email is `ok`, exactly like a known one.
+ */
+export type ResetRequestResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | 'invalid_email'
+        | 'rate_limited'
+        | 'offline'
+        | 'unavailable'
+        | 'failed';
+    };
+
+export type ResetCompleteResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | 'weak_password'
+        | 'expired_link'
+        | 'rate_limited'
+        | 'offline'
+        | 'unavailable'
+        | 'failed';
+    };
+
+/**
+ * `no_recovery`: the URL carries no recovery link (nothing to do). `expired_link`: it had one, but
+ * the link was used, expired, or is damaged. On `ok` the recovery session is stored, so
+ * `completePasswordReset` can set the new password.
+ */
+export type RecoveryLinkResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | 'no_recovery'
+        | 'expired_link'
         | 'offline'
         | 'unavailable'
         | 'failed';
@@ -96,6 +143,19 @@ export interface AuthClient {
   startAutoRefresh(): Promise<void>;
   /** Pauses background token refresh (the app is in the background). */
   stopAutoRefresh(): Promise<void>;
+  /** Emails a reset link that returns to `<redirectOrigin>/?reset=1`. The app passes its own origin. */
+  requestPasswordReset(
+    email: string,
+    redirectOrigin: string,
+  ): Promise<ResetRequestResult>;
+  /**
+   * Reads a recovery link from the URL the app opened with and stores its session. Needed because
+   * `detectSessionInUrl` is off. The client uses supabase-js's implicit flow, so the link carries
+   * `#access_token=…&refresh_token=…&type=recovery` (or `#error_code=otp_expired…`), not a `?code=`.
+   */
+  consumeRecoveryFromUrl(url: string): Promise<RecoveryLinkResult>;
+  /** Sets the new password for the recovery session. The account stays signed in. */
+  completePasswordReset(newPassword: string): Promise<ResetCompleteResult>;
   getProfile(): Promise<ProfileResult>;
   updateProfile(update: ProfileUpdate): Promise<ProfileResult>;
 }
@@ -161,6 +221,60 @@ function signInFailure(
   if (error?.code === 'email_not_confirmed')
     return { ok: false, reason: 'email_not_confirmed' };
   return { ok: false, reason: 'failed' };
+}
+
+function resetRequestFailure(
+  error: AuthFailure,
+): Extract<ResetRequestResult, { ok: false }> {
+  const unreachable = reachability(error);
+  if (unreachable) return { ok: false, reason: unreachable };
+  if (isRateLimited(error) || error?.code === 'over_email_send_rate_limit')
+    return { ok: false, reason: 'rate_limited' };
+  if (
+    error?.code === 'validation_failed' ||
+    error?.code === 'email_address_invalid'
+  )
+    return { ok: false, reason: 'invalid_email' };
+  return { ok: false, reason: 'failed' };
+}
+
+const EXPIRED_SESSION_CODES = [
+  'bad_jwt',
+  'session_expired',
+  'session_not_found',
+  'refresh_token_not_found',
+  'otp_expired',
+];
+
+function resetCompleteFailure(
+  error: AuthFailure,
+): Extract<ResetCompleteResult, { ok: false }> {
+  const unreachable = reachability(error);
+  if (unreachable) return { ok: false, reason: unreachable };
+  // The same password as before is not a stronger one, but "choose another" is the right nudge.
+  if (error?.code === 'weak_password' || error?.code === 'same_password')
+    return { ok: false, reason: 'weak_password' };
+  if (isRateLimited(error)) return { ok: false, reason: 'rate_limited' };
+  if (
+    isAuthSessionMissingError(error) ||
+    error?.status === 401 ||
+    (error?.code && EXPIRED_SESSION_CODES.includes(error.code))
+  )
+    return { ok: false, reason: 'expired_link' };
+  return { ok: false, reason: 'failed' };
+}
+
+/** Reads the `#…` fragment (or `?…` query) of a URL as parameters. Never throws. */
+function urlParams(url: string): { hash: URLSearchParams; query: URLSearchParams } {
+  try {
+    const parsed = new URL(url);
+    return {
+      hash: new URLSearchParams(parsed.hash.replace(/^#/, '')),
+      query: parsed.searchParams,
+    };
+  } catch {
+    return { hash: new URLSearchParams(), query: new URLSearchParams() };
+  }
 }
 
 /**
@@ -291,6 +405,61 @@ export function createAuthClient(
 
     startAutoRefresh: () => supabase.auth.startAutoRefresh(),
     stopAutoRefresh: () => supabase.auth.stopAutoRefresh(),
+
+    async requestPasswordReset(email, redirectOrigin) {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${redirectOrigin}/?reset=1`,
+        });
+        // Non-enumerating: "no such user" is the same answer as success.
+        if (error && error.code !== 'user_not_found')
+          return resetRequestFailure(error);
+        return { ok: true };
+      } catch (error) {
+        return resetRequestFailure(error as AuthFailure);
+      }
+    },
+
+    async consumeRecoveryFromUrl(url) {
+      const { hash, query } = urlParams(url);
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
+      if (accessToken && refreshToken && hash.get('type') === 'recovery') {
+        try {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (!error) return { ok: true };
+          const unreachable = reachability(error);
+          return {
+            ok: false,
+            reason: unreachable ?? 'expired_link',
+          };
+        } catch (error) {
+          return { ok: false, reason: reachability(error) ?? 'failed' };
+        }
+      }
+      // Supabase sends an expired or already-used link back with the error in the fragment.
+      if (hash.get('error') || hash.get('error_code'))
+        return { ok: false, reason: 'expired_link' };
+      // Our own marker with nothing usable behind it: the link was cut short or reused.
+      if (query.get('reset') === '1')
+        return { ok: false, reason: 'expired_link' };
+      return { ok: false, reason: 'no_recovery' };
+    },
+
+    async completePasswordReset(newPassword) {
+      try {
+        const { error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+        if (error) return resetCompleteFailure(error);
+        return { ok: true };
+      } catch (error) {
+        return resetCompleteFailure(error as AuthFailure);
+      }
+    },
 
     getProfile: () => profileCall(),
 

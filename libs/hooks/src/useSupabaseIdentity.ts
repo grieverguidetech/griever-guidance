@@ -11,6 +11,18 @@ export interface CachedProfile {
   contactSource: AccountContactSource | null;
 }
 
+/** What a reset step tells the person. `ok` says whether the step worked; `message` is always calm copy. */
+export interface ResetOutcome {
+  ok: boolean;
+  message: string;
+  /** True when the link is no good and only a new one will help. */
+  expired?: boolean;
+}
+
+export const RESET_REQUESTED_MESSAGE =
+  "If that email has an account, we've sent a link to reset your password. It may take a few minutes.";
+export const RESET_DONE_MESSAGE = "Your password is changed. You're signed in.";
+
 export type IdentityStatus = 'loading' | 'signed_in' | 'signed_out';
 
 export interface UseSupabaseIdentityOptions {
@@ -38,6 +50,12 @@ export interface UseSupabaseIdentityResult {
   signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   updateSenderName: (name: string) => Promise<boolean>;
+  /** Asks for a reset link. The same words whether or not the email has an account. */
+  requestReset: (email: string, redirectOrigin: string) => Promise<ResetOutcome>;
+  /** Reads the recovery link in `url`. `ok: false` carries the reason in `message`. */
+  openRecoveryLink: (url: string) => Promise<ResetOutcome>;
+  /** Sets the new password; on success the account is signed in. */
+  completeReset: (newPassword: string) => Promise<ResetOutcome>;
 }
 
 const MESSAGES = {
@@ -48,6 +66,8 @@ const MESSAGES = {
   offline: "You need a connection to do this. Nothing you've typed is lost.",
   unavailable: "We can't reach your account right now. Please try again in a little while.",
   weak_password: 'Please choose a stronger password.',
+  invalid_email: "That doesn't look like an email address. Please check it and try again.",
+  expired_link: 'That link has expired. You can ask for a new one.',
 } as const;
 
 /** Maps any failure reason from the auth client to calm copy (C7). */
@@ -239,6 +259,34 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
     [callWithRefresh, keepProfile, endSession, fail],
   );
 
+  const requestReset = useCallback(async (email: string, redirectOrigin: string): Promise<ResetOutcome> => {
+    const result = await clientRef.current.requestPasswordReset(email, redirectOrigin);
+    return result.ok
+      ? { ok: true, message: RESET_REQUESTED_MESSAGE }
+      : { ok: false, message: identityErrorMessage(result.reason) };
+  }, []);
+
+  const openRecoveryLink = useCallback(async (url: string): Promise<ResetOutcome> => {
+    const result = await clientRef.current.consumeRecoveryFromUrl(url);
+    if (result.ok) return { ok: true, message: '' };
+    // No link at all reads the same as a dead one: either way, ask for a new one.
+    const expired = result.reason === 'no_recovery' || result.reason === 'expired_link';
+    return { ok: false, message: identityErrorMessage(expired ? 'expired_link' : result.reason), expired };
+  }, []);
+
+  const completeReset = useCallback(
+    async (newPassword: string): Promise<ResetOutcome> => {
+      const result = await clientRef.current.completePasswordReset(newPassword);
+      if (!result.ok) {
+        return { ok: false, message: identityErrorMessage(result.reason), expired: result.reason === 'expired_link' };
+      }
+      // The recovery session is now a normal one: pick it up so the app sees a signed-in account.
+      await checkSession();
+      return { ok: true, message: RESET_DONE_MESSAGE };
+    },
+    [checkSession],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -253,5 +301,8 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
     signIn,
     signOut,
     updateSenderName,
+    requestReset,
+    openRecoveryLink,
+    completeReset,
   };
 }

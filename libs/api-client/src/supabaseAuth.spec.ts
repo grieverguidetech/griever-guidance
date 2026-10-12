@@ -1,5 +1,6 @@
 import {
   AuthApiError,
+  AuthSessionMissingError,
   AuthRefreshDiscardedError,
   AuthRetryableFetchError,
 } from '@supabase/supabase-js';
@@ -17,6 +18,9 @@ const auth = {
   refreshSession: vi.fn(),
   startAutoRefresh: vi.fn(),
   stopAutoRefresh: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
+  setSession: vi.fn(),
+  updateUser: vi.fn(),
 };
 const stub = { auth } as unknown as SupabaseClient;
 const make = () =>
@@ -396,5 +400,145 @@ describe('profile', () => {
     expect(await make().getProfile()).toEqual({ ok: false, reason: 'offline' });
     fetchMock.mockResolvedValueOnce(new Response('not json', { status: 200 }));
     expect(await make().getProfile()).toEqual({ ok: false, reason: 'failed' });
+  });
+});
+
+describe('requestPasswordReset', () => {
+  it('asks Supabase to redirect back to the origin it was given', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    expect(
+      await make().requestPasswordReset('a@b.c', 'https://web.example.com'),
+    ).toEqual({ ok: true });
+    expect(auth.resetPasswordForEmail).toHaveBeenCalledWith('a@b.c', {
+      redirectTo: 'https://web.example.com/?reset=1',
+    });
+  });
+
+  it('answers ok for an email with no account (non-enumerating)', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({
+      data: null,
+      error: apiError(400, 'user_not_found'),
+    });
+    expect(await make().requestPasswordReset('no@one.c', 'http://o')).toEqual({
+      ok: true,
+    });
+  });
+
+  it.each([
+    [apiError(429, 'over_email_send_rate_limit'), 'rate_limited'],
+    [apiError(429, 'over_request_rate_limit'), 'rate_limited'],
+    [apiError(400, 'validation_failed'), 'invalid_email'],
+    [apiError(422, 'email_address_invalid'), 'invalid_email'],
+    [offlineError(), 'offline'],
+    [new AuthRetryableFetchError('down', 503), 'unavailable'],
+    [apiError(500, 'unexpected_failure'), 'unavailable'],
+    [apiError(400, 'something_else'), 'failed'],
+  ])('maps %# to %s', async (error, reason) => {
+    auth.resetPasswordForEmail.mockResolvedValue({ data: null, error });
+    expect(await make().requestPasswordReset('a@b.c', 'http://o')).toEqual({
+      ok: false,
+      reason,
+    });
+  });
+
+  it('turns a thrown fetch failure into offline', async () => {
+    auth.resetPasswordForEmail.mockRejectedValue(new TypeError('fetch'));
+    expect(await make().requestPasswordReset('a@b.c', 'http://o')).toEqual({
+      ok: false,
+      reason: 'offline',
+    });
+  });
+});
+
+describe('consumeRecoveryFromUrl', () => {
+  const link =
+    'https://app.example.com/?reset=1#access_token=at&refresh_token=rt&expires_in=3600&type=recovery';
+
+  it('stores the session from an implicit-flow recovery link', async () => {
+    auth.setSession.mockResolvedValue({ data: {}, error: null });
+    expect(await make().consumeRecoveryFromUrl(link)).toEqual({ ok: true });
+    expect(auth.setSession).toHaveBeenCalledWith({
+      access_token: 'at',
+      refresh_token: 'rt',
+    });
+  });
+
+  it('reports an expired link when Supabase put an error in the fragment', async () => {
+    expect(
+      await make().consumeRecoveryFromUrl(
+        'https://app.example.com/?reset=1#error=access_denied&error_code=otp_expired&error_description=x',
+      ),
+    ).toEqual({ ok: false, reason: 'expired_link' });
+    expect(auth.setSession).not.toHaveBeenCalled();
+  });
+
+  it('reports an expired link when the marker has no token behind it', async () => {
+    expect(
+      await make().consumeRecoveryFromUrl('https://app.example.com/?reset=1'),
+    ).toEqual({ ok: false, reason: 'expired_link' });
+  });
+
+  it('ignores a token that is not a recovery token', async () => {
+    expect(
+      await make().consumeRecoveryFromUrl(
+        'https://app.example.com/#access_token=at&refresh_token=rt&type=signup',
+      ),
+    ).toEqual({ ok: false, reason: 'no_recovery' });
+    expect(auth.setSession).not.toHaveBeenCalled();
+  });
+
+  it('says there is no recovery link in an ordinary URL', async () => {
+    expect(await make().consumeRecoveryFromUrl('https://app.example.com/')).toEqual({
+      ok: false,
+      reason: 'no_recovery',
+    });
+    expect(await make().consumeRecoveryFromUrl('not a url')).toEqual({
+      ok: false,
+      reason: 'no_recovery',
+    });
+  });
+
+  it('treats a rejected token as expired and a dead network as offline', async () => {
+    auth.setSession.mockResolvedValueOnce({
+      data: {},
+      error: apiError(401, 'bad_jwt'),
+    });
+    expect(await make().consumeRecoveryFromUrl(link)).toEqual({
+      ok: false,
+      reason: 'expired_link',
+    });
+    auth.setSession.mockResolvedValueOnce({ data: {}, error: offlineError() });
+    expect(await make().consumeRecoveryFromUrl(link)).toEqual({
+      ok: false,
+      reason: 'offline',
+    });
+  });
+});
+
+describe('completePasswordReset', () => {
+  it('sets the new password', async () => {
+    auth.updateUser.mockResolvedValue({ data: {}, error: null });
+    expect(await make().completePasswordReset('new-password-1')).toEqual({
+      ok: true,
+    });
+    expect(auth.updateUser).toHaveBeenCalledWith({ password: 'new-password-1' });
+  });
+
+  it.each([
+    [apiError(422, 'weak_password'), 'weak_password'],
+    [apiError(422, 'same_password'), 'weak_password'],
+    [new AuthSessionMissingError(), 'expired_link'],
+    [apiError(401, 'bad_jwt'), 'expired_link'],
+    [apiError(403, 'session_not_found'), 'expired_link'],
+    [apiError(429, 'over_request_rate_limit'), 'rate_limited'],
+    [offlineError(), 'offline'],
+    [apiError(500, 'unexpected_failure'), 'unavailable'],
+    [apiError(400, 'something_else'), 'failed'],
+  ])('maps %# to %s', async (error, reason) => {
+    auth.updateUser.mockResolvedValue({ data: {}, error });
+    expect(await make().completePasswordReset('pw')).toEqual({
+      ok: false,
+      reason,
+    });
   });
 });
