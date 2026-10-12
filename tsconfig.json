@@ -13,9 +13,6 @@
       "path": "./libs/hooks"
     },
     {
-      "path": "./libs/ui-web"
-    },
-    {
       "path": "./apps/gateway"
     },
     {

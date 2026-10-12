@@ -133,7 +133,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm nx run-many -t build -p shared hooks api-client ui-web data-local data-sync --parallel=3
+      - run: pnpm nx run-many -t build -p shared hooks api-client data-local data-sync --parallel=3
 
       - run: pnpm nx build web
         env:

@@ -42,7 +42,6 @@ is a defect. The ones you will meet first:
 | `shared` | Types, interfaces and message templates used by more than one project. |
 | `api-client` | Gateway HTTP calls for the app, and the Supabase auth calls. Sync traffic goes through `data-sync` (and the web service worker). |
 | `hooks` | Shared React hooks, such as `useSendFlow` and `useSupabaseIdentity`. Also the `sms:` link builder, `buildSmsLink`. No platform-specific code. |
-| `ui-web` | Unused generator placeholder; being removed in #71. |
 | `data-local` | IndexedDB storage in the browser: the session document, the outbox, and contacts. |
 | `data-sync` | The offline sync engine. It flushes the outbox and pulls and pushes changes through the gateway. |
 | `contacts` | Contact import logic shared by web and mobile: the source interface, normalizing, de-duplicating, and the review-and-commit steps. |
