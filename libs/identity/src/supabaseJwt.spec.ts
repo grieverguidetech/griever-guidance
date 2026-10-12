@@ -94,6 +94,28 @@ describe('supabaseAuth', () => {
     expect(res.status).toBe(401);
   });
 
+  it('401 for the wrong issuer', async () => {
+    const token = await signJwt(keys.privateKey, keys.kid, { iss: 'https://evil.example/auth/v1' });
+    expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
+  });
+
+  it('401 for an issuer that is the bare project URL without /auth/v1', async () => {
+    const token = await signJwt(keys.privateKey, keys.kid, { iss: SUPABASE_URL });
+    expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
+  });
+
+  it('401 for a validly signed token with no iss', async () => {
+    const token = await signJwt(keys.privateKey, keys.kid, { iss: undefined });
+    expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
+  });
+
+  it('accepts the right issuer when SUPABASE_URL has a trailing slash', async () => {
+    const token = await signJwt(keys.privateKey, keys.kid);
+    const res = await buildApp({ url: `${SUPABASE_URL}/`, anonKey: 'anon' }).request('/who', bearer(token));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`);
+  });
+
   it('401 for a validly signed token with no sub', async () => {
     const token = await signJwt(keys.privateKey, keys.kid, { sub: undefined });
     expect((await buildApp().request('/who', bearer(token))).status).toBe(401);
