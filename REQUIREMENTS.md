@@ -224,8 +224,9 @@ URLs to hand users or hardcode.
 | `web.grieversguidance.com` | web app (Pages project `griever-guidance-web`) | Pages → Custom domains |
 | `api.grieversguidance.com` | gateway (Worker `griever-guidance-gateway`) | `apps/gateway/wrangler.toml` `routes` |
 
-`VITE_API_URL` and `PUBLIC_WEB_URL` are set in `.github/workflows/deploy.yml`; `CORS_ORIGINS` and
-`SUPABASE_URL` / `SUPABASE_ANON_KEY` in `apps/gateway/wrangler.toml`.
+`VITE_API_URL` and `PUBLIC_WEB_URL` are set in `.github/workflows/deploy.yml`; `CORS_ORIGINS` in
+`apps/gateway/wrangler.toml`. `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `FEATURE_AUTH` are GitHub repo
+variables that the deploy workflow passes to the gateway and the web build.
 
 ---
 
@@ -396,9 +397,14 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
               SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
+              VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (read only when the flag is on)
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
 apps/mobile   EXPO_PUBLIC_API_URL
 ```
+
+Production repo variables (public, not secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEATURE_AUTH`.
+To turn accounts on: set `FEATURE_AUTH=true` and re-run the deploy. Mobile (`EXPO_PUBLIC_*`, EAS) is
+a follow-up.
 
 `CORS_ORIGINS` is comma-separated allowed origins — there is no "allow all" mode; an empty value
 blocks every cross-origin request (see `apps/gateway/src/worker.ts`).
