@@ -1,3 +1,4 @@
+import { useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -252,6 +253,7 @@ function AppBody({
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
+  useFocusHeadingOnChange(view);
   const updateSenderName = auth?.updateSenderName;
   const clearError = auth?.clearError;
 

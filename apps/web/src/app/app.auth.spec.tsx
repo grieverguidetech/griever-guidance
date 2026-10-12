@@ -139,6 +139,24 @@ describe('flag on', () => {
     mocks.authEnabled = true;
   });
 
+  it('does not move focus when a signed-in person cold-loads straight past sign-up (#50)', async () => {
+    useClient(
+      stubClient({
+        getSession: vi.fn(async () => ({
+          status: 'signed_in' as const,
+          session: { userId: 'u1', email: 'a@b.co', accessToken: 't' },
+        })),
+        getProfile: vi.fn(async () => ({ ok: true as const, profile: PROFILE })),
+      }),
+    );
+    render(<App />);
+    await screen.findByRole('button', { name: "What you'll need" });
+    await act(async () => {});
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('shows a calm message, not a crash, when the client cannot be made', async () => {
     mocks.load.mockResolvedValue({ available: false });
     render(<App />);
