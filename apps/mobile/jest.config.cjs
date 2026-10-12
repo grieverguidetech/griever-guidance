@@ -24,4 +24,7 @@ module.exports = {
   // Workspace libs are TypeScript sources that import siblings as './x.js' (NodeNext style).
   moduleNameMapper: { ...preset.moduleNameMapper, '^(\\.{1,2}/.*)\\.js$': '$1' },
   testEnvironmentOptions: { customExportConditions: ['@org/source', 'react-native', 'require', 'default'] },
+  // Several specs render the whole app and walk a journey (e.g. sessions.spec). On a shared CI
+  // runner one of them passed 5s (the default) and turned main red; 20s is still a clear hang signal.
+  testTimeout: 20_000,
 };
