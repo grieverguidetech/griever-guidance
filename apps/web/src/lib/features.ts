@@ -16,3 +16,9 @@ export const AUTH_ENABLED = import.meta.env['VITE_FEATURE_AUTH'] === 'true';
  * "in beta" tooltip, and nothing calls the gateway.
  */
 export const OBITUARY_DRAFTING_ENABLED = import.meta.env['VITE_FEATURE_OBITUARY_DRAFTING'] === 'true';
+
+/**
+ * Family sharing (inviting people to help, joining, removing). Off until people's
+ * data actually syncs between phones, so a member who joins never sees an empty Home.
+ */
+export const SHARING_ENABLED = import.meta.env['VITE_FEATURE_SHARING'] === 'true';

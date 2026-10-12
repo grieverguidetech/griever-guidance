@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { TopBar } from '../lib/ui';
 
 const SAVE_FAILED = "We couldn't save your name. You can try again.";
@@ -21,9 +21,11 @@ interface Props {
   saveFailed?: boolean;
   /** The identity hook's own calm copy, shown as-is. */
   error: string | null;
+  /** Optional extra section under the form ("People helping you"). Nothing renders when absent. */
+  peopleHelping?: ReactNode;
 }
 
-export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error }: Props) {
+export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping }: Props) {
   const id = useId();
   // Until the person types, show whatever name is known, including one that loads late.
   const [typed, setTyped] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
     }
   }
 
-  return (
+  const form = (
     <form className="flex flex-col gap-4" onSubmit={submit}>
       <TopBar onBack={onBack} />
       <h1 className="text-[22px]">{asksName ? 'What should we call you?' : 'Your account'}</h1>
@@ -109,5 +111,13 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
         </>
       )}
     </form>
+  );
+  if (!peopleHelping) return form;
+  // The invite form is its own form, so it sits beside this one, never inside it.
+  return (
+    <div className="flex flex-col gap-6">
+      {form}
+      {peopleHelping}
+    </div>
   );
 }

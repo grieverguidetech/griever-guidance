@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { TopBar } from '../lib/ui';
 
 interface Props {
@@ -7,10 +8,12 @@ interface Props {
   onRemoveEverything: () => Promise<void>;
   /** True when this also ends a sign-in on this device. */
   signsOut?: boolean;
+  /** Optional "remove a member" section, shown above the device removal; it brings its own heading. Nothing renders when absent. */
+  removeMember?: ReactNode;
 }
 
 /** Settings is the only place deletion is offered (C9): never inside a flow, never a swipe. */
-export function Settings({ onBack, onRemoveEverything, signsOut = false }: Props) {
+export function Settings({ onBack, onRemoveEverything, signsOut = false, removeMember }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
@@ -47,6 +50,8 @@ export function Settings({ onBack, onRemoveEverything, signsOut = false }: Props
     <div className="flex flex-col gap-4">
       <TopBar onBack={pending ? undefined : onBack} />
       <h1 className="text-[22px]">Settings</h1>
+
+      {removeMember}
 
       <section
         aria-labelledby="remove-heading"
