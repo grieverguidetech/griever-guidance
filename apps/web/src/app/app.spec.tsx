@@ -68,7 +68,7 @@ describe('App onboarding', () => {
     expect(screen.getByText('Announce the passing')).toBeInTheDocument();
   });
 
-  it('sends a returning visitor straight back to their session', async () => {
+  it('sends a returning visitor to Home, then into their session when they pick it', async () => {
     const user = userEvent.setup();
     const first = render(<App />);
     await addContact(user, 'Aunt Carol', '6175550148');
@@ -79,7 +79,11 @@ describe('App onboarding', () => {
     first.unmount();
 
     render(<App />);
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: "The people you're writing about" })).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
+    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
     expect(screen.getByText('For Margaret Hayes')).toBeInTheDocument();
   });
 

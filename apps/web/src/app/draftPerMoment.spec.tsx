@@ -48,6 +48,11 @@ function savedDrafts() {
   return saved.drafts as Record<string, SendFlowDraft>;
 }
 
+/** A reopened app lands on Home (#112); the person is opened from there. */
+async function openFromHome(user: User) {
+  await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+}
+
 async function backToLanding(user: User) {
   await user.click(screen.getByRole('button', { name: 'Back' }));
   if (!screen.queryByRole('heading', { name: 'One thing at a time.' })) {
@@ -61,6 +66,7 @@ describe('one draft per moment (#83)', () => {
     seed({ announcement });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue(note);
     await backToLanding(user);
 
@@ -82,6 +88,7 @@ describe('one draft per moment (#83)', () => {
     seed({ announcement, service }, { serviceReady: true });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/Anything you'd like to add/); // the announcement is the older one
     await backToLanding(user);
     await user.click(screen.getByRole('button', { name: /Share the service/ }));
@@ -92,6 +99,7 @@ describe('one draft per moment (#83)', () => {
     seed({ announcement }, { obituaryUrl: 'https://example.com/margaret' });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/Anything you'd like to add/);
     await backToLanding(user);
 
@@ -117,6 +125,7 @@ describe('one draft per moment (#83)', () => {
     );
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/Anything you'd like to add/); // the newer draft reopens
     await backToLanding(user);
     await user.click(screen.getByRole('button', { name: /Share the obituary/ }));
@@ -139,6 +148,7 @@ describe('one draft per moment (#83)', () => {
     seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Open Messages' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
@@ -165,6 +175,7 @@ describe('start this message again (#98)', () => {
     seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Open Messages' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
@@ -186,7 +197,9 @@ describe('start this message again (#98)', () => {
 
   it('is hidden while the draft is empty', async () => {
     seed({ announcement: freshDraft({ templateCategory: 'announcement', step: 'announce' }) });
+    const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/Anything you'd like to add/);
     expect(link()).not.toBeInTheDocument();
   });
@@ -196,6 +209,7 @@ describe('start this message again (#98)', () => {
     seed({ announcement, service }, { serviceReady: true, recipientsNotified: { announcement: ['c-1'] } });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/Anything you'd like to add/);
     await user.click(link() as HTMLElement);
     const confirm = screen.getByText(/Clear what you've written for this message\? People and contacts stay as they are\./);
@@ -216,6 +230,7 @@ describe('start this message again (#98)', () => {
     seed({ announcement });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/Anything you'd like to add/);
     await user.click(link() as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'Keep it' }));
@@ -228,6 +243,7 @@ describe('start this message again (#98)', () => {
     seed({ service }, { serviceReady: true });
     const user = userEvent.setup();
     render(<App />);
+    await openFromHome(user);
     await screen.findByLabelText(/^Location/);
     await user.click(link() as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'Clear it' }));

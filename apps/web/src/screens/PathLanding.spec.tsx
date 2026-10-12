@@ -30,10 +30,9 @@ describe('PathLanding share', () => {
     render(
       <PathLanding
         session={session}
-        otherSessions={[]}
+        onBack={vi.fn()}
         onStartMoment={vi.fn()}
         onWhatYoullNeed={vi.fn()}
-        onNewSession={vi.fn()}
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Share these details' }));
@@ -45,5 +44,17 @@ describe('PathLanding share', () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(text).toContain('- Done: Announce the passing');
     expect(text).not.toContain('contact-id-1');
+  });
+});
+
+describe('PathLanding Home link (#112)', () => {
+  it('has a Back control, and no other-people list or "Someone else I\'ve lost"', async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    render(<PathLanding session={session} onBack={onBack} onStartMoment={vi.fn()} onWhatYoullNeed={vi.fn()} />);
+    expect(screen.queryByText("Other people you're writing about")).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "Someone else I've lost" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledOnce();
   });
 });

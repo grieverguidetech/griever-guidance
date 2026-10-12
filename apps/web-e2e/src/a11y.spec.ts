@@ -31,6 +31,11 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
   'path landing': async (page) => {
     await onboard(page);
   },
+  home: async (page) => {
+    await onboard(page);
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeVisible();
+  },
   'announce form': async (page) => {
     await onboard(page);
     await page.getByRole('button', { name: 'Start' }).click();

@@ -38,11 +38,15 @@ test.describe('first visit', () => {
 });
 
 test.describe('coming back', () => {
-  test('a reload lands back on the session with nothing lost', async ({ page }) => {
+  test('a reload lands on Home listing the person, and opening her shows her path', async ({ page }) => {
     await onboard(page);
     await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeVisible();
+    await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeFocused();
   });
 
   test('keeps working with the network cut off after load (C5)', async ({ page, context }) => {
