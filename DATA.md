@@ -430,7 +430,8 @@ shared person sync never carries contact ids or edited wording (C2, C3).
 
 ### Shared people (Supabase)
 
-**Decided design (family-sharing G1, 2026-10-11). Not built yet.** Built by #116 (memberships and
+**Decided design (family-sharing G1, 2026-10-11). The client sync queue (`useFlowSync`, #134) is
+built; it is not turned on in either app yet (#135, #136).** Built by #116 (memberships and
 invites tables), #117 (invite functions), #130 (the `flows` table), #131 (gateway routes), #132, #133, #134 (client
 sync), #135, #136 (turning it on). Supersedes the read-only snapshot idea in #39.
 
@@ -465,6 +466,18 @@ Rules:
   kept until it has been pushed, so a pull never overwrites typing that has not left the phone.
 - **Removing a member:** that member's copy of the owner's people disappears on their next sync. Once they belong to no circle, their account becomes an owner again,
   so they can start their own person (#117).
+- **Sync queue (`useFlowSync`).** Edits are noticed by diffing each session's six facts and kept
+  per person in `storage` under `gg.flowQueue.v1` (pending keys and values only, plus the ids the
+  server is known to have). They are coalesced and sent after a short pause: a person this account
+  owns and the server hasn't seen is created with `POST /flows`; anything else is edited with
+  `PATCH /flows/:id` carrying only the pending keys. No upserts. A `409` on create switches to
+  `PATCH`; `400/422`, `403` and `404` drop that person's pending edits (`403/404` also pull);
+  offline, `5xx` and timeouts keep the queue and retry after 5 s doubling to 5 min, or on wake.
+  After a send, only keys unchanged since sending are cleared. `GET /flows` runs on start, on
+  wake and every 10 minutes, one request at a time with sends, and goes to `applyRemoteFlows` with
+  the pending keys so a pull never overwrites an unsent edit. A pull with unreadable records
+  (`dropped > 0`) removes nothing. Nothing is shown to the user (C5). Creating waits for the first
+  successful pull, so a person the server already has is not created again.
 - Account actions (invite, join, remove) need a connection; the sync itself stays invisible and
   never blocks the app or a flow (C5, §4.6).
 
