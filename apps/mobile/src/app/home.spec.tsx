@@ -116,7 +116,9 @@ const draftOf = (fields: Record<string, string>, step = 'details') => ({
 });
 
 describe('Home from every step', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('goes Home from a resumed details step', async () => {
     const anna = { ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({ deceasedName: 'Anna' }) } };
