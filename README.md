@@ -16,7 +16,7 @@ is a defect. The ones you will meet first:
 - **Offline-first (C5).** Nothing after sign-up may wait on the network. The device is the source
   of truth.
 - **Contacts stay on the device (C3, C4).** They never reach the gateway or Convex. Only contact
-  ids appear in synced data, and only six fields are kept.
+  ids appear in synced data, and only seven fields are kept.
 - **Messages go out through `sms:` deep links (C1).** One contact at a time, from the user's own
   phone. There is no backend SMS path.
 - **Message content is never stored (C2).**

@@ -31,7 +31,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | C1 | Messages are sent from the user's own phone via an `sms:` deep link, one contact at a time. No backend SMS path, no bulk send, no business number. | §6 rule 3 |
 | C2 | Message content is never stored — not Convex, not local state after send, not logs, not a history. | §6 "What not to do" |
 | C3 | Contact data never reaches the gateway or Convex. Only contact *ids* appear in synced session data. | §6 "Contacts" |
-| C4 | Only the 6 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`) survive past the import screen. | §6 "Contacts" |
+| C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
 | C5 | Offline-first: nothing after sign-up may block on a network round-trip. The device is authoritative. | DATA.md posture |
 | C6 | Sign-in (email today, Facebook later) is identity only — never a friends list, never a DM path. | §6 "Identity" |
 | C7 | All user-facing copy is calm and plain. No exclamation points, no celebratory microcopy. | §6 "Tone and copy" |
@@ -300,8 +300,8 @@ Read from the device on demand — `expo-contacts` on mobile (`apps/mobile/src/l
 `.web.ts` is a no-op stub, since expo-contacts has no web implementation and importing it there
 crashes on load), the Contact Picker API on Android Chrome web, manual entry everywhere else
 (`libs/contacts`, shared adapter logic behind the `ContactSource` interface). Never *raw* provider
-data — only 6 fields survive past the picker/import screen: `contactId`, `name`, `phone`, `email`,
-`tier`, `source` (see `Contact` in `libs/shared`).
+data — only 7 fields survive past the picker/import screen: `contactId`, `name`, `phone`, `email`,
+`tier`, `source`, `createdAt` (a timestamp, not personal data) (see `Contact` in `libs/shared`).
 
 Contacts are persisted on-device only (IndexedDB on web via `libs/data-local`, AsyncStorage on
 mobile via `apps/mobile/src/lib/contactStore.ts` — same `ContactStore` interface, so `useContacts`
@@ -420,7 +420,7 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No backend SMS-sending path (no Twilio, no `libs/sms`, no server-side send route) — see rule 3
 - No shared types defined in apps
 - No contact data reaches the gateway or Convex — on-device storage only (see "Contacts"), and never more than the 6 named `Contact` fields
-- No raw provider payload (photo, provider ID, labels, etc.) kept past the picker/import screen — normalize down to the 6 `Contact` fields immediately
+- No raw provider payload (photo, provider ID, labels, etc.) kept past the picker/import screen — normalize down to the 7 `Contact` fields immediately
 - No message content stored anywhere — not the DB, not state, not logs, not a send history; nothing to view or restore once sent (the user's own Messages app is the only record)
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
