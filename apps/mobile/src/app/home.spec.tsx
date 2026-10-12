@@ -9,7 +9,7 @@ import { SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
 
 const person = (id: string, personName: string, lastOpenedAt: string, dateOfPassing = ''): Session =>
   ({
-    id, personName, dateOfPassing, senderName: '', obituaryUrl: '', createdAt: lastOpenedAt, lastOpenedAt,
+    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing, senderName: '', obituaryUrl: '', createdAt: lastOpenedAt, lastOpenedAt,
     drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
   }) as Session;
 

@@ -151,6 +151,39 @@ draftsUpdatedAt: { announcement: "2026-10-11T10:00:00.000Z", … }   // which on
   when no moment was chosen) and the `draft` key is removed. If an old `draft` sits next to
   existing `drafts` (a rollback, then an upgrade), `drafts` wins and the old `draft` is ignored.
 
+### 2.0a Shared-person fields on the local session (`gg.sessions.v1`)
+
+The local session list (`gg.sessions.v1`, written by `useSessions`) gains three fields. They are
+additive: an older list loads, and the file keeps its key and shape.
+
+```js
+{ id: "s-…",                  // local key; never changes, never sent
+  flowId: "3f2b…-4…",         // UUID v4 made on the device; the person's id on the server
+  ownerId: null,              // account that owns the person; null = made here, not tied to an account
+  role: "owner",              // 'owner' | 'member' (default 'owner')
+  … }                         // everything else as before
+```
+
+- `flowId` comes from `crypto.randomUUID`, else a v4 built from `crypto.getRandomValues`, else from
+  `Math.random` (Hermes may lack both). A session saved before this change gets one at load; it is
+  saved straight away and is the same on every later load.
+- Applying what the server returns (`applyRemoteFlows`) can change only the whitelisted fact fields
+  (`personName`, `dateOfPassing`, `serviceDate`, `obituaryUrl`, `obituaryPublisher`, `serviceReady`)
+  plus `ownerId` and `role`. A field with an unsent local edit keeps the local value. A flow not on
+  the device becomes a `role: 'member'` session. A `member` session whose flow is no longer
+  returned is removed (access was lost); an `owner` session is never removed. Drafts,
+  `draftsUpdatedAt`, contacts, `recipientsNotified`, `momentCompletedAt`, reminders, `senderName`
+  and `messageOverride` are never read from or written by it.
+- The role comes from ownership: `record.ownerId` equal to the signed-in user is `owner`, anything
+  else is `member`. A session with `ownerId: null` is never turned into a member.
+- When the list reply had records that failed validation (`dropped > 0`), valid records are still
+  merged and added, but nothing is removed, because a dropped record may be the one that is missing.
+- A person added from the server sorts after the ones already on the device, and its
+  `lastOpenedAt` is the record's `updatedAt` (the epoch if that will not parse), so it does not
+  take over as the person the app reopens.
+- The `flowId` given to an old session is stable only once the save succeeds. If storage is full
+  or unavailable, the next load makes a new one.
+
 ### 2.1 The C3 checklist lives on the account
 
 The ticks persist — silently, as decided — but they belong to the **account**, not the session:

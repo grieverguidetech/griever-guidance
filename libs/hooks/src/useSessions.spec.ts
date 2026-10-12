@@ -1,9 +1,12 @@
 import { renderHook, act } from '@testing-library/react';
+import type { FlowFacts, FlowRecord } from '@griever/shared';
 import { freshDraft } from './useSendFlow.js';
 import type { SendFlowStorage } from './useSendFlow.js';
 import type { Session } from './useSessions.js';
 import {
   CONTACT_RETENTION_DAYS,
+  generateFlowId,
+  namedSessionsByRecent,
   getContactsRetentionExpiry,
   latestInProgressDraft,
   stripSentWording,
@@ -243,6 +246,227 @@ describe('one draft per moment (#83)', () => {
       renderHook(() => useSessions(storage));
       expect(storage.dump()[0].drafts.service?.fields).toEqual({});
       expect(JSON.stringify(storage.dump())).not.toContain('private');
+    });
+  });
+});
+
+describe('flow ids, owner and role (#133)', () => {
+  const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const KEY = 'gg.sessions.v1';
+
+  function mem(initial?: unknown) {
+    const map = new Map<string, string>();
+    if (initial) map.set(KEY, JSON.stringify(initial));
+    const storage: SendFlowStorage = {
+      getItem: (k) => map.get(k) ?? null,
+      setItem: (k, v) => void map.set(k, v),
+      removeItem: (k) => void map.delete(k),
+    };
+    return { storage, saved: () => JSON.parse(map.get(KEY) ?? '[]') as Session[] };
+  }
+
+  const facts = (over: Partial<FlowFacts> = {}): FlowFacts => ({
+    personName: 'Margaret Hayes',
+    dateOfPassing: null,
+    serviceDate: null,
+    obituaryUrl: null,
+    obituaryPublisher: null,
+    serviceReady: false,
+    ...over,
+  });
+  const record = (id: string, over: Partial<FlowFacts> = {}, role: FlowRecord['role'] = 'member'): FlowRecord => ({
+    id,
+    ownerId: 'owner-1',
+    role,
+    facts: facts(over),
+    updatedAt: '2026-10-01T00:00:00.000Z',
+    updatedBy: null,
+  });
+  const A = '11111111-1111-4111-8111-111111111111';
+  const B = '22222222-2222-4222-8222-222222222222';
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  describe('new sessions', () => {
+    it('get a v4 flowId, no owner, and the owner role', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      let created!: Session;
+      act(() => {
+        created = result.current.createSession({ personName: 'Ann' });
+      });
+      expect(created.flowId).toMatch(V4);
+      expect(created.ownerId).toBeNull();
+      expect(created.role).toBe('owner');
+    });
+
+    it('builds a valid v4 from getRandomValues when randomUUID is missing', () => {
+      vi.stubGlobal('crypto', {
+        getRandomValues: (a: Uint8Array) => a.fill(255),
+      });
+      expect(generateFlowId()).toBe('ffffffff-ffff-4fff-bfff-ffffffffffff');
+    });
+
+    it('builds a valid v4 from Math.random when crypto is missing entirely', () => {
+      vi.stubGlobal('crypto', undefined);
+      const a = generateFlowId();
+      expect(a).toMatch(V4);
+      expect(generateFlowId()).not.toBe(a);
+    });
+  });
+
+  describe('old sessions', () => {
+    const old = { ...session(), id: 'old', lastOpenedAt: '2026-01-01T00:00:00.000Z' };
+
+    it('gain a flowId once; it is saved and the same after a reload', () => {
+      const m = mem([old]);
+      const first = renderHook(() => useSessions(m.storage)).result.current.sessions[0];
+      expect(first.flowId).toMatch(V4);
+      expect(first.ownerId).toBeNull();
+      expect(first.role).toBe('owner');
+      expect(m.saved()[0].flowId).toBe(first.flowId);
+      const second = renderHook(() => useSessions(m.storage)).result.current.sessions[0];
+      expect(second.flowId).toBe(first.flowId);
+    });
+
+    it('keep a flowId, owner and role that are already stored', () => {
+      const stored = { ...old, flowId: A, ownerId: 'u1', role: 'member' };
+      const [s] = renderHook(() => useSessions(mem([stored]).storage)).result.current.sessions;
+      expect([s.flowId, s.ownerId, s.role]).toEqual([A, 'u1', 'member']);
+    });
+  });
+
+  describe('applyRemoteFlows', () => {
+    const owned = (flowId: string, over: Partial<Session> = {}) => ({
+      ...session(),
+      id: `local-${flowId.slice(0, 2)}`,
+      flowId,
+      ownerId: null,
+      role: 'owner',
+      ...over,
+    });
+
+    it('creates a member session for a flow not on the device', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, { personName: 'Joan', serviceDate: 'May 29, 2026' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
+      const [s] = result.current.sessions;
+      expect(s).toMatchObject({
+        flowId: A,
+        role: 'member',
+        ownerId: 'owner-1',
+        personName: 'Joan',
+        serviceDate: 'May 29, 2026',
+        drafts: {},
+        recipientsNotified: {},
+        remindersScheduled: [],
+      });
+    });
+
+    it('does nothing when nobody is signed in', () => {
+      const { result } = renderHook(() => useSessions(mem([owned(A)]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(B)] }, ''));
+      expect(result.current.sessions.map((s) => s.flowId)).toEqual([A]);
+    });
+
+    it('merges remote facts but keeps a field with a pending local edit', () => {
+      const local = owned(A, { personName: 'Typed locally', serviceDate: 'old date' });
+      const { result } = renderHook(() => useSessions(mem([local]).storage));
+      act(() =>
+        result.current.applyRemoteFlows(
+          { flows: [record(A, { personName: 'Remote name', serviceDate: 'June 1, 2026', serviceReady: true }, 'owner')] },
+          'owner-1',
+          { [A]: ['personName'] },
+        ),
+      );
+      expect(result.current.sessions).toHaveLength(1);
+      const [s] = result.current.sessions;
+      expect(s.personName).toBe('Typed locally');
+      expect(s.serviceDate).toBe('June 1, 2026');
+      expect(s.serviceReady).toBe(true);
+    });
+
+    it('removes a member session whose flow is gone, but never an owner session', () => {
+      const m = mem([owned(A, { role: 'member' }), owned(B, { role: 'owner' })]);
+      const { result } = renderHook(() => useSessions(m.storage));
+      act(() => result.current.applyRemoteFlows({ flows: [], dropped: 0 }, 'me'));
+      expect(result.current.sessions.map((s) => s.flowId)).toEqual([B]);
+    });
+
+    it('never touches drafts, contacts, who was notified, reminders or edited wording', () => {
+      const draft = freshDraft({
+        step: 'review',
+        templateCategory: 'announcement',
+        selectedContactIds: ['c1'],
+        messageOverride: 'My own words.',
+      });
+      const local = owned(A, {
+        drafts: { announcement: draft },
+        recipientsNotified: { announcement: ['c1'] },
+        remindersScheduled: [{ momentKey: 'service', dueAt: '2026-11-01', dismissed: false }],
+        senderName: 'Anna',
+      });
+      const { result } = renderHook(() => useSessions(mem([local]).storage));
+      const before = result.current.sessions[0];
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, { personName: 'Changed' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
+      const after = result.current.sessions[0];
+      expect(after.personName).toBe('Changed');
+      expect(after.drafts).toEqual(before.drafts);
+      expect(after.recipientsNotified).toEqual(before.recipientsNotified);
+      expect(after.remindersScheduled).toEqual(before.remindersScheduled);
+      expect(after.senderName).toBe('Anna');
+      expect(JSON.stringify(after)).toContain('My own words.');
+    });
+
+    it('keeps a member session and its drafts when some records could not be read', () => {
+      const draft = freshDraft({ step: 'review', templateCategory: 'announcement', selectedContactIds: ['c1'] });
+      const m = owned(A, { role: 'member', drafts: { announcement: draft } });
+      const { result } = renderHook(() => useSessions(mem([m]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [], dropped: 1 }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
+      expect(result.current.sessions[0].drafts.announcement).toEqual(draft);
+    });
+
+    it('still adds the valid records when some could not be read', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A)], dropped: 2 }, 'me'));
+      expect(result.current.sessions.map((s) => s.flowId)).toEqual([A]);
+    });
+
+    it('does not let a newly shared person take focus from the local one', () => {
+      const local = owned(B, { personName: 'Local Person', lastOpenedAt: '2026-10-01T00:00:00.000Z' });
+      const { result } = renderHook(() => useSessions(mem([local]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, { personName: 'Shared Person' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(2);
+      expect(result.current.sessions[0].flowId).toBe(B);
+      expect(namedSessionsByRecent(result.current.sessions)[0].flowId).toBe(B);
+      expect(result.current.sessions[1].lastOpenedAt).toBe('2026-10-01T00:00:00.000Z');
+    });
+
+    it('uses the epoch when the record time will not parse', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [{ ...record(A), updatedAt: 'nonsense' }] }, 'me'));
+      expect(result.current.sessions[0].lastOpenedAt).toBe('1970-01-01T00:00:00.000Z');
+    });
+
+    it('never turns a session made on this device into a member', () => {
+      const { result } = renderHook(() => useSessions(mem([owned(A)]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A)] }, 'me'));
+      expect(result.current.sessions[0]).toMatchObject({ role: 'owner', ownerId: null });
+      act(() => result.current.applyRemoteFlows({ flows: [], dropped: 0 }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
+    });
+
+    it('takes the role from ownership: my own record makes me the owner', () => {
+      const { result } = renderHook(() => useSessions(mem([owned(A)]).storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A, {}, 'member')] }, 'owner-1'));
+      expect(result.current.sessions[0]).toMatchObject({ role: 'owner', ownerId: 'owner-1' });
+    });
+
+    it('makes one session when the same record is returned twice', () => {
+      const { result } = renderHook(() => useSessions(mem().storage));
+      act(() => result.current.applyRemoteFlows({ flows: [record(A), record(A, { personName: 'Later' })] }, 'me'));
+      expect(result.current.sessions).toHaveLength(1);
     });
   });
 });
