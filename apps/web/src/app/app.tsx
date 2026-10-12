@@ -16,7 +16,7 @@ import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/share
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED } from '../lib/features';
-import { loadAuthClient } from '../lib/authClient';
+import { hasStoredSession, loadAuthClient } from '../lib/authClient';
 import type { AuthClientResult } from '../lib/authClient';
 import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
@@ -128,6 +128,11 @@ function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult, cl
       </Shell>
     );
   }
+  if (!loaded.available && hasStoredSession()) {
+    // Accounts can't be reached, but this device holds a signed-in session: the work on it is
+    // theirs and stays reachable (C5). No account actions, and nothing here touches the network.
+    return <AppBody auth={null} offline />;
+  }
   if (!loaded.available) {
     return (
       <Shell onWhatYoullNeed={noop}>
@@ -199,7 +204,16 @@ function isAccountView(view: AppView): boolean {
   return view === 'signup' || view === 'createAccount';
 }
 
-function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; client?: AuthClient }) {
+function AppBody({
+  auth,
+  client,
+  offline = false,
+}: {
+  auth: UseSupabaseIdentityResult | null;
+  client?: AuthClient;
+  /** Signed in on this device, but accounts can't be reached: local work only. */
+  offline?: boolean;
+}) {
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const sessionList = sessions.sessions;
@@ -208,6 +222,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
   const isSignedIn = auth ? auth.isSignedIn : true;
 
   const [view, setView] = useState<AppView>(() => {
+    if (offline) return viewForReturning(sessions.sessions);
     if (AUTH_ENABLED) return 'signup';
     // useSessions reads storage synchronously, so a returning visitor goes
     // straight to their session; a first visit starts at adding contacts.
@@ -305,6 +320,10 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
           </button>
         </div>
       )}
+    </div>
+  ) : offline ? (
+    <div role="status" aria-live="polite" className="text-[13px] mb-4">
+      <p className="m-0">Your account can't be reached right now. Your work on this device is here.</p>
     </div>
   ) : null;
 
@@ -547,7 +566,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <AddContactsManual
           contacts={contacts.contacts}
-          onBack={auth ? goToPathLanding : undefined}
+          onBack={auth || offline ? goToPathLanding : undefined}
           onAdd={({ name, phone, hearsFirst }) =>
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
@@ -562,7 +581,7 @@ function AppBody({ auth, client }: { auth: UseSupabaseIdentityResult | null; cli
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <ImportContacts
           storedPhones={storedPhones}
-          onBack={() => (auth ? goToPathLanding() : setView('addContactsManual'))}
+          onBack={() => (auth || offline ? goToPathLanding() : setView('addContactsManual'))}
           onSwitchToManual={() => setView('addContactsManual')}
           onContinue={(picked, source) => {
             contacts.importContacts(picked, source);

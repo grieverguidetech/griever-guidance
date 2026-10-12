@@ -33,7 +33,10 @@ vi.mock('../lib/features', () => ({
   },
   OBITUARY_DRAFTING_ENABLED: false,
 }));
-vi.mock('../lib/authClient', () => ({ loadAuthClient: mocks.load }));
+vi.mock('../lib/authClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/authClient')>();
+  return { ...actual, loadAuthClient: mocks.load };
+});
 
 import { App } from './app';
 
@@ -106,6 +109,7 @@ beforeEach(() => {
   mocks.authEnabled = false;
   mocks.load.mockReset();
   mocks.clearError.mockClear();
+  window.localStorage.clear();
 });
 
 describe('flag off', () => {
@@ -128,6 +132,64 @@ describe('flag on', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: "Accounts aren't available right now" })).toBeInTheDocument();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  });
+
+  describe('accounts unavailable with a session stored on this device', () => {
+    const SESSION = JSON.stringify({ access_token: 'a', refresh_token: 'r', user: { id: 'u1' } });
+    const LOCAL_SESSION = {
+      id: 's1',
+      personName: 'Margaret Hayes',
+      dateOfPassing: '',
+      senderName: 'Anna',
+      createdAt: '2026-10-10T00:00:00.000Z',
+      lastOpenedAt: '2026-10-10T00:00:00.000Z',
+      draft: {
+        step: 'announce',
+        templateCategory: 'announcement',
+        templateOverrideId: null,
+        fields: { personalNote: 'note kept on this device' },
+        serviceDetailsKnown: null,
+        selectedContactIds: [],
+        place: null,
+        includeFlowers: false,
+        floristId: null,
+        customFlorist: '',
+        flowerDeliveryTarget: 'service',
+        tone: 'plain',
+        messageOverride: null,
+      },
+      serviceReady: false,
+      recipientsNotified: {},
+      momentCompletedAt: {},
+      remindersScheduled: [],
+    };
+
+    it('opens the local work with a calm note and no account actions', async () => {
+      window.localStorage.setItem('sb-abcdef-auth-token', SESSION);
+      window.localStorage.setItem('gg.sessions.v1', JSON.stringify([LOCAL_SESSION]));
+      const client = stubClient();
+      mocks.load.mockResolvedValue({ available: false });
+      render(<App />);
+
+      expect(await screen.findByText("Your account can't be reached right now. Your work on this device is here.")).toBeInTheDocument();
+      expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note kept on this device');
+      expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: "Accounts aren't available right now" })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+      expect(window.localStorage.getItem('sb-abcdef-auth-token')).toBe(SESSION);
+      expect(window.localStorage.getItem('gg.sessions.v1')).not.toBeNull();
+      // No auth call of any kind: the client was never even built.
+      expect(client.getSession).not.toHaveBeenCalled();
+      expect(client.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('ignores a stored value that is not a session', async () => {
+      window.localStorage.setItem('sb-abcdef-auth-token', 'not json');
+      mocks.load.mockResolvedValue({ available: false });
+      render(<App />);
+      expect(await screen.findByRole('heading', { name: "Accounts aren't available right now" })).toBeInTheDocument();
+    });
   });
 
   it('creates the account, saves the name, and moves on to adding contacts', async () => {
