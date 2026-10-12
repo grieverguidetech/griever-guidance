@@ -309,8 +309,8 @@ is shared) — never sent to Convex, never to the gateway. They are **not** kept
 list is cleared 30 days after the latest known service date (`CONTACT_RETENTION_DAYS` in
 `libs/hooks/src/useSessions.ts`), on the theory the family may want to reuse it right up until the
 service is behind them, but has no reason to once it is. No service date yet set → no expiry
-computed → contacts are kept. Mobile now keeps sessions too (#20), but still anchors this to a single
-stored date rather than a list of sessions (see `apps/mobile/src/lib/contactRetention.ts`).
+computed → contacts are kept. Mobile keeps sessions too and uses the same expiry (#20); its old
+single stored service date was removed (#85).
 
 ---
 
