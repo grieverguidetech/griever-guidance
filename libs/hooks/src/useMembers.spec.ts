@@ -149,17 +149,25 @@ describe('useMembers actions', () => {
   });
 
   it('offline: says so, never retries or queues', async () => {
-    const client = stub({ createInvite: vi.fn(fail('offline')) as never });
-    const { result } = setup(client);
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    await act(async () => {
-      expect(await result.current.invite('a@b.co')).toBe(false);
-    });
-    expect(result.current.message).toBe('We need a moment of signal to do this.');
-    expect(client.createInvite).toHaveBeenCalledTimes(1);
-    expect(client.getMembers).toHaveBeenCalledTimes(1);
-    await new Promise((r) => setTimeout(r, 20));
-    expect(client.createInvite).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const client = stub({ createInvite: vi.fn(fail('offline')) as never });
+      const { result } = setup(client);
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+      await act(async () => {
+        expect(await result.current.invite('a@b.co')).toBe(false);
+      });
+      expect(result.current.message).toBe('You need a connection to do this. Nothing else is affected.');
+      expect(client.createInvite).toHaveBeenCalledTimes(1);
+      expect(client.getMembers).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      });
+      expect(client.createInvite).toHaveBeenCalledTimes(1);
+      expect(client.getMembers).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a missing token on an action is signed_out and calls nothing', async () => {
@@ -176,13 +184,122 @@ describe('useMembers actions', () => {
   });
 });
 
+describe('useMembers lifecycle', () => {
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => (resolve = r));
+    return { promise, resolve };
+  }
+  const viewOf = (id: string): MembersView => ({
+    role: 'owner',
+    members: [{ id, name: id, email: `${id}@example.com` }],
+    invites: [],
+  });
+
+  it('clears the list and message when switched off', async () => {
+    const client = stub({ getMembers: vi.fn(async () => ({ ok: true as const, view: viewOf('A') })) });
+    const { result, rerender } = renderHook(({ enabled }) => useMembers({ getAccessToken, enabled, client }), {
+      initialProps: { enabled: true },
+    });
+    await waitFor(() => expect(result.current.view).toEqual(viewOf('A')));
+    rerender({ enabled: false });
+    await waitFor(() => expect(result.current.view).toBeNull());
+    expect(result.current.status).toBe('idle');
+    expect(result.current.message).toBeNull();
+  });
+
+  it('a load still in flight when switched off does not bring the list back', async () => {
+    const d = deferred<{ ok: true; view: MembersView }>();
+    const client = stub({ getMembers: vi.fn(() => d.promise) });
+    const { result, rerender } = renderHook(({ enabled }) => useMembers({ getAccessToken, enabled, client }), {
+      initialProps: { enabled: true },
+    });
+    await waitFor(() => expect(client.getMembers).toHaveBeenCalledTimes(1));
+    rerender({ enabled: false });
+    await act(async () => {
+      d.resolve({ ok: true, view: viewOf('A') });
+    });
+    expect(result.current.view).toBeNull();
+    expect(result.current.status).toBe('idle');
+  });
+
+  it('the newest load wins when an older one finishes last', async () => {
+    const first = deferred<{ ok: true; view: MembersView }>();
+    const second = deferred<{ ok: true; view: MembersView }>();
+    const getMembersStub = vi
+      .fn<MembersClient['getMembers']>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const client = stub({ getMembers: getMembersStub });
+    const { result } = setup(client);
+    // The mount load used `first`; this refresh uses `second`.
+    await waitFor(() => expect(getMembersStub).toHaveBeenCalledTimes(1));
+    act(() => {
+      void result.current.refresh();
+    });
+    await waitFor(() => expect(getMembersStub).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      second.resolve({ ok: true, view: viewOf('B') });
+    });
+    await act(async () => {
+      first.resolve({ ok: true, view: viewOf('A') });
+    });
+    expect(result.current.view).toEqual(viewOf('B'));
+  });
+
+  it('an unmount during a pending load updates nothing and warns about nothing', async () => {
+    const d = deferred<{ ok: true; view: MembersView }>();
+    const client = stub({ getMembers: vi.fn(() => d.promise) });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const { unmount } = setup(client);
+      await waitFor(() => expect(client.getMembers).toHaveBeenCalledTimes(1));
+      unmount();
+      await act(async () => {
+        d.resolve({ ok: true, view: viewOf('A') });
+      });
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('a true result stays true when the reload after it fails, and status says so', async () => {
+    const client = stub();
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    vi.mocked(client.getMembers).mockImplementationOnce(fail('offline') as never);
+    await act(async () => {
+      expect(await result.current.revoke('i1')).toBe(true);
+    });
+    expect(result.current.status).toBe('offline');
+    expect(result.current.view).toEqual(ownerView);
+  });
+
+  it('invite when disabled returns false with no message and no call', async () => {
+    const client = stub();
+    const { result } = setup(client, false);
+    await act(async () => {
+      expect(await result.current.invite('not an email')).toBe(false);
+    });
+    expect(result.current.message).toBeNull();
+    expect(client.createInvite).not.toHaveBeenCalled();
+  });
+
+  it('a missing token on load sets the signed-out message', async () => {
+    const { result } = setup(stub(), true, async () => null);
+    await waitFor(() => expect(result.current.status).toBe('signed_out'));
+    expect(result.current.message).toBe(MEMBERS_MESSAGES.signed_out);
+  });
+});
+
 describe('useMembers copy per reason', () => {
   const cases: [string, MembersFailureReason, 'invite' | 'accept' | 'revoke', string][] = [
-    ['offline', 'offline', 'invite', 'We need a moment of signal to do this.'],
+    ['offline', 'offline', 'invite', 'You need a connection to do this. Nothing else is affected.'],
     ['signed_out', 'signed_out', 'invite', 'Please sign in again to do this.'],
     ['invalid', 'invalid', 'invite', "That doesn't look right. Please check it and try again."],
     ['forbidden', 'forbidden', 'invite', "This isn't available for your account."],
-    ['rate_limited', 'rate_limited', 'invite', "You've sent a lot of invitations today. You can try again tomorrow."],
+    ['rate_limited', 'rate_limited', 'invite', "You've sent a lot of invitations today. You can send more tomorrow."],
     ['conflict on create', 'conflict', 'invite', 'That person is already invited or already helping.'],
     ['conflict on accept', 'conflict', 'accept', MEMBERS_MESSAGES.conflict_accept],
     ['unusable on accept', 'unusable', 'accept', "This invitation can't be used. Ask the person who sent it for a new one."],

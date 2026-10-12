@@ -10,6 +10,7 @@ import type {
   AcceptInviteResult,
   CreateInviteResult,
   GetMembersResult,
+  MembersFailure,
   MembersFailureReason,
   RemoveMemberResult,
   RevokeInviteResult,
@@ -43,7 +44,11 @@ export interface UseMembersResult {
   status: MembersStatus;
   /** Calm copy for the last failure, or null. */
   message: string | null;
-  /** Each action resolves true when it worked. A failure sets `message`. Nothing is queued. */
+  /**
+   * Each action resolves true when the server accepted it, false otherwise (a failure sets `message`).
+   * Nothing is queued. If the follow-up reload then fails, it still resolves true; `status` and
+   * `message` report the reload, and `view` keeps the older list.
+   */
   invite: (email: string) => Promise<boolean>;
   revoke: (inviteId: string) => Promise<boolean>;
   remove: (memberId: string) => Promise<boolean>;
@@ -55,12 +60,12 @@ export interface UseMembersResult {
 export type MembersAction = 'load' | 'create' | 'revoke' | 'remove' | 'accept';
 
 export const MEMBERS_MESSAGES = {
-  offline: 'We need a moment of signal to do this.',
+  offline: 'You need a connection to do this. Nothing else is affected.',
   signed_out: 'Please sign in again to do this.',
   invalid_email: "That email doesn't look right.",
   invalid: "That doesn't look right. Please check it and try again.",
   forbidden: "This isn't available for your account.",
-  rate_limited: "You've sent a lot of invitations today. You can try again tomorrow.",
+  rate_limited: "You've sent a lot of invitations today. You can send more tomorrow.",
   conflict_create: 'That person is already invited or already helping.',
   conflict_accept: "You already have people you're helping, so this invitation can't be joined from this account.",
   unusable: "This invitation can't be used. Ask the person who sent it for a new one.",
@@ -103,6 +108,9 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
   clientRef.current = client ?? defaultClient;
   enabledRef.current = enabled;
 
+  /** True while this hook is still mounted and switched on. Late results are dropped otherwise. */
+  const isLive = () => mounted.current && enabledRef.current;
+
   const load = useCallback(async () => {
     if (!enabledRef.current) return;
     const g = ++loadGen.current;
@@ -110,6 +118,7 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     const token = await tokenRef.current();
     if (!mounted.current || g !== loadGen.current) return;
     if (!token) {
+      setMessage(MEMBERS_MESSAGES.signed_out);
       setStatus('signed_out');
       return;
     }
@@ -128,25 +137,37 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     );
   }, []);
 
+  // Tracks real unmount only, not `enabled` toggles.
   useEffect(() => {
     mounted.current = true;
-    if (enabled) void load();
     return () => {
       mounted.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (enabled) {
+      void load();
+      return;
+    }
+    // Switched off (for example on sign-out): drop the last account's list and any load in flight.
+    loadGen.current++;
+    setView(null);
+    setStatus('idle');
+    setMessage(null);
   }, [enabled, load]);
 
   /** Runs one account action. The access token is read for the call and goes nowhere else. */
   const act = useCallback(
-    async <R extends { ok: boolean }>(
+    async (
       action: MembersAction,
-      run: (c: MembersClient, token: string) => Promise<R & ({ ok: true } | { ok: false; reason: MembersFailureReason })>,
+      run: (c: MembersClient, token: string) => Promise<{ ok: true } | MembersFailure>,
     ): Promise<boolean> => {
       if (!enabledRef.current) return false;
       setMessage(null);
       const token = await tokenRef.current();
       if (!token) {
-        if (mounted.current) {
+        if (isLive()) {
           setMessage(MEMBERS_MESSAGES.signed_out);
           setStatus('signed_out');
         }
@@ -154,14 +175,13 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
       }
       const result = await run(clientRef.current, token);
       if (!result.ok) {
-        if (mounted.current) {
-          const reason = (result as { reason: MembersFailureReason }).reason;
-          setMessage(membersErrorMessage(reason, action));
-          if (reason === 'signed_out') setStatus('signed_out');
+        if (isLive()) {
+          setMessage(membersErrorMessage(result.reason, action));
+          if (result.reason === 'signed_out') setStatus('signed_out');
         }
         return false;
       }
-      await load();
+      if (isLive()) await load();
       return true;
     },
     [load],
@@ -169,6 +189,7 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
 
   const invite = useCallback(
     async (rawEmail: string) => {
+      if (!enabledRef.current) return false;
       const email = parseInviteEmail(rawEmail);
       if (email === null) {
         setMessage(MEMBERS_MESSAGES.invalid_email);
