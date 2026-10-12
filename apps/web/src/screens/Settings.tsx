@@ -1,33 +1,51 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TopBar } from '../lib/ui';
 
 interface Props {
   onBack: () => void;
   /** Resolves once everything is gone. The app then returns to its first screen. */
   onRemoveEverything: () => Promise<void>;
+  /** True when this also ends a sign-in on this device. */
+  signsOut?: boolean;
 }
 
 /** Settings is the only place deletion is offered (C9): never inside a flow, never a swipe. */
-export function Settings({ onBack, onRemoveEverything }: Props) {
+export function Settings({ onBack, onRemoveEverything, signsOut = false }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [status, setStatus] = useState('');
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const cameFromConfirm = useRef(false);
+
+  // Focus follows the swap: to the warning when it opens, back to the button when it closes.
+  useEffect(() => {
+    if (confirming) {
+      cameFromConfirm.current = true;
+      confirmRef.current?.focus();
+    } else if (cameFromConfirm.current) {
+      cameFromConfirm.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [confirming]);
 
   async function remove() {
     if (pending) return;
     setPending(true);
-    setFailed(false);
+    setStatus('Removing…');
     try {
       await onRemoveEverything();
     } catch {
-      setFailed(true);
       setPending(false);
+      // Emptied first, then set after a tick, so a repeat of the same message is read out again.
+      setStatus('');
+      setTimeout(() => setStatus("That didn't finish. You can try again."), 50);
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <TopBar onBack={onBack} />
+      <TopBar onBack={pending ? undefined : onBack} />
       <h1 className="text-[22px]">Settings</h1>
 
       <section
@@ -45,6 +63,7 @@ export function Settings({ onBack, onRemoveEverything }: Props) {
             </p>
             <button
               type="button"
+              ref={triggerRef}
               className="gg-btn gg-btn-secondary gg-btn-block"
               onClick={() => setConfirming(true)}
             >
@@ -52,10 +71,18 @@ export function Settings({ onBack, onRemoveEverything }: Props) {
             </button>
           </>
         ) : (
-          <div role="group" aria-labelledby="remove-confirm" className="flex flex-col gap-3">
+          <div
+            ref={confirmRef}
+            tabIndex={-1}
+            role="group"
+            aria-labelledby="remove-confirm"
+            className="flex flex-col gap-3"
+            style={{ outline: 'none' }}
+          >
             <p id="remove-confirm" className="text-[14px] leading-[1.6] m-0">
               This removes the people you're writing about, your contacts, and your drafts from this
               device. It can't be undone. Nothing is removed from anyone else's phone.
+              {signsOut && " You'll be signed out on this device."}
             </p>
             <button
               type="button"
@@ -70,7 +97,7 @@ export function Settings({ onBack, onRemoveEverything }: Props) {
               className="gg-btn gg-btn-secondary gg-btn-block"
               onClick={() => {
                 setConfirming(false);
-                setFailed(false);
+                setStatus('');
               }}
               disabled={pending}
             >
@@ -79,7 +106,7 @@ export function Settings({ onBack, onRemoveEverything }: Props) {
           </div>
         )}
         <div role="status" aria-live="polite" className="text-[13px]">
-          {failed && "That didn't finish. You can try again."}
+          {status}
         </div>
       </section>
     </div>

@@ -110,7 +110,15 @@ function Loading() {
  * Loads the Supabase client (its own chunk) and only then mounts the identity hook, which needs
  * a client at render time. Rendered only when AUTH_ENABLED is on.
  */
-function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode }) {
+function AuthGate({
+  children,
+  removed,
+  onRemoved,
+}: {
+  children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode;
+  removed: boolean;
+  onRemoved: () => void;
+}) {
   const [loaded, setLoaded] = useState<AuthClientResult | null>(null);
   // Bumped by "Try again"; loadAuthClient forgets a failed load, so this runs it afresh.
   const [attempt, setAttempt] = useState(0);
@@ -135,7 +143,7 @@ function AuthGate({ children }: { children: (auth: UseSupabaseIdentityResult, cl
   if (!loaded.available && hasStoredSession()) {
     // Accounts can't be reached, but this device holds a signed-in session: the work on it is
     // theirs and stays reachable (C5). No account actions, and nothing here touches the network.
-    return <AppBody auth={null} offline />;
+    return <AppBody auth={null} offline removed={removed} onRemoved={onRemoved} />;
   }
   if (!loaded.available) {
     return (
@@ -166,18 +174,42 @@ function noop() {
   // The checklist is not reachable before the app has loaded.
 }
 
+const REMOVED_MESSAGE = 'Everything has been removed from this device.';
+
 export function App() {
   // Bumped after "Remove everything from this device": the key remounts every hook, so each
   // reads the now-empty storage and starts from the first screen.
   const [removals, setRemovals] = useState(0);
   const removed = removals > 0;
-  const onRemoved = useCallback(() => setRemovals((n) => n + 1), []);
+  // The announcement lives outside the keyed subtree so it is already in the page when its text
+  // arrives. It is emptied on removal and filled a moment after the remount, so it is read out.
+  const [announcement, setAnnouncement] = useState('');
+  const onRemoved = useCallback(() => {
+    setAnnouncement('');
+    setRemovals((n) => n + 1);
+  }, []);
+  useEffect(() => {
+    if (removals === 0) return;
+    const timer = setTimeout(() => setAnnouncement(REMOVED_MESSAGE), 50);
+    return () => clearTimeout(timer);
+  }, [removals]);
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
-  if (!AUTH_ENABLED) return <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />;
-  return (
-    <AuthGate key={removals}>
+  const body = !AUTH_ENABLED ? (
+    <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />
+  ) : (
+    <AuthGate key={removals} removed={removed} onRemoved={onRemoved}>
       {(auth, client) => <AppBody auth={auth} client={client} removed={removed} onRemoved={onRemoved} />}
     </AuthGate>
+  );
+  return (
+    <>
+      {removed && (
+        <div role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </div>
+      )}
+      {body}
+    </>
   );
 }
 
@@ -227,7 +259,7 @@ function AppBody({
   auth: UseSupabaseIdentityResult | null;
   /** Everything was just removed from this device: say so on the first screen. */
   removed?: boolean;
-  onRemoved?: () => void;
+  onRemoved: () => void;
   client?: AuthClient;
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
@@ -249,7 +281,11 @@ function AppBody({
       : viewForReturning(sessions.sessions);
   });
   const firstView = useRef(view);
-  const showRemoved = removed && view === firstView.current;
+  // Shown once, on the first screen after a removal; leaving it ends it for good.
+  const [showRemoved, setShowRemoved] = useState(removed);
+  useEffect(() => {
+    if (view !== firstView.current) setShowRemoved(false);
+  }, [view]);
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
   // changed most recently; null means a moment not chosen yet, so the picker.
@@ -353,8 +389,9 @@ function AppBody({
   ) : null;
 
   const removedNote = (
-    <div role="status" aria-live="polite" className="text-[13px]">
-      {showRemoved && <p className="m-0 mb-4">Everything has been removed from this device.</p>}
+    // Announced by the region in App, so it is hidden from readers here to avoid saying it twice.
+    <div className="text-[13px]" aria-hidden="true">
+      {showRemoved && <p className="m-0 mb-4">{REMOVED_MESSAGE}</p>}
     </div>
   );
   const endedNote = (
@@ -367,7 +404,7 @@ function AppBody({
   async function removeEverything() {
     // Local only: signOut here is supabase-js's local scope. It deletes nothing on a server.
     await removeEverythingFromDevice(window.localStorage, client ? () => client.signOut() : undefined);
-    onRemoved?.();
+    onRemoved();
   }
 
   // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
@@ -619,7 +656,11 @@ function AppBody({
   if (view === 'settings') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <Settings onBack={goToPathLanding} onRemoveEverything={removeEverything} />
+        <Settings
+          onBack={goToPathLanding}
+          onRemoveEverything={removeEverything}
+          signsOut={offline || (auth?.isSignedIn ?? false)}
+        />
       </Shell>
     );
   }
@@ -807,7 +848,6 @@ function AppBody({
           type="button"
           onClick={() => setView('settings')}
           className="gg-btn gg-btn-ghost !px-0 self-start mt-2"
-          style={{ color: 'var(--color-neutral-700)' }}
         >
           Settings
         </button>

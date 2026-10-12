@@ -80,7 +80,13 @@ describe('remove everything from this device (#51)', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
 
-    expect(await screen.findByText('Everything has been removed from this device.')).toBeInTheDocument();
+    // Said once, in a live region that sits outside the part of the page that restarts.
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('status').some((r) => r.textContent === 'Everything has been removed from this device.'),
+      ).toBe(true),
+    );
+    expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(2);
     expect(screen.getByLabelText('Name')).toBeInTheDocument(); // the first screen: adding contacts
     expect(await snapshot()).toEqual({ contacts: 0, sessions: 0, outbox: 0, sendJobs: 0, account: 0, deviceId: null });
     // The fresh start may write an empty list back, but nothing of ours is left in it.
@@ -110,6 +116,58 @@ describe('remove everything from this device (#51)', () => {
     for (const key of OTHER_KEYS) expect(window.localStorage.getItem(key), key).not.toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('says so, and lets Remove be tried again, when removing fails', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await reachPathLanding(user);
+    await openRemoveConfirm(user);
+    const failOnce = vi.spyOn(Storage.prototype, 'removeItem').mockImplementationOnce(() => {
+      throw new Error('blocked');
+    });
+    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
+    expect(await screen.findByText("That didn't finish. You can try again.")).toBeInTheDocument();
+
+    failOnce.mockRestore();
+    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
+    await waitFor(() => expect(screen.getByLabelText('Name')).toBeInTheDocument());
+    expect((await snapshot()).contacts).toBe(0);
+  });
+
+  it('moves focus to the warning, and back to the button on Keep', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await reachPathLanding(user);
+    await openRemoveConfirm(user);
+    expect(screen.getByRole('group')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Keep everything' }));
+    expect(screen.getByRole('button', { name: REMOVE })).toHaveFocus();
+  });
+
+  it('shows the note on the first screen only, not on a later return to it', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await reachPathLanding(user);
+    await openRemoveConfirm(user);
+    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
+    await screen.findByLabelText('Name');
+    await waitFor(() => expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(2));
+    await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
+    await user.type(screen.getByLabelText('Mobile number'), '6175550148');
+    await user.click(screen.getByRole('button', { name: 'Add and start another' }));
+    await screen.findByText('Added so far — 1');
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    // Only the live region still holds the words; the visible note is gone.
+    expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(1);
+  });
+
+  it('does not mention an account when auth is off', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await reachPathLanding(user);
+    await openRemoveConfirm(user);
+    expect(screen.queryByText(/signed out/i)).not.toBeInTheDocument();
   });
 
   it('is not offered inside the flow screens', async () => {
