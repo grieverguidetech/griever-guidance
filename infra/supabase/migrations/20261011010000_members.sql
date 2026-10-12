@@ -30,17 +30,47 @@ create policy "memberships_select_party" on public.memberships
 
 -- No insert, update or delete grant or policy (C6, C9): functions only.
 
+-- When a membership goes (remove_member in #117, or the owner's account being deleted
+-- by cascade), a person with no membership left becomes an owner again (PO decision on
+-- #117), so account_type cannot drift. Definer because clients cannot write account_type.
+create function public.reset_account_type_after_membership_delete() returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from public.memberships where member_id = old.member_id) then
+    update public.profiles set account_type = 'owner' where id = old.member_id;
+  end if;
+  return null;
+end;
+$$;
+
+revoke execute on function public.reset_account_type_after_membership_delete()
+  from public, anon, authenticated;
+
+create trigger memberships_reset_account_type
+  after delete on public.memberships
+  for each row execute function public.reset_account_type_after_membership_delete();
+
 create table public.invites (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users (id) on delete cascade,
-  email text not null check (char_length(email) <= 254 and email = lower(email)),
-  token_hash text not null unique,
+  email text not null check (
+    char_length(email) <= 254 and email = lower(email)
+    and email = btrim(email) and position('@' in email) > 1
+  ),
+  -- sha256 as lowercase hex; the raw token is never stored
+  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default now() + interval '7 days',
   accepted_at timestamptz,
-  accepted_by uuid references auth.users (id),
-  revoked_at timestamptz
+  accepted_by uuid references auth.users (id) on delete set null,
+  revoked_at timestamptz,
+  check (expires_at > created_at)
 );
+
+create index invites_accepted_by_idx on public.invites (accepted_by);
 
 -- At most one open (not accepted, not revoked) invite per owner and email.
 -- Expiry cannot be in an index predicate, so #117 must revoke expired rows when re-inviting.
