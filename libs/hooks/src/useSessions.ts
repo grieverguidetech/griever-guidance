@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { addDays, parseCompleteDate } from '@griever/shared';
+import { freshDraft } from './useSendFlow.js';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
 
 /** How long a saved contact list outlives the last known service date. */
@@ -75,13 +76,32 @@ export function namedSessionsByRecent(sessions: Session[]): Session[] {
 
 const STORAGE_KEY = 'gg.sessions.v1';
 
+/**
+ * C2: message content is not kept after a send. A draft at 'sent' keeps only the moment
+ * (category) and who was messaged; the typed fields, the hand-edited wording, the place and
+ * everything else that composes the text are dropped. Other drafts are returned unchanged.
+ * The live flow keeps its full state in memory, so the Sent screen is unaffected.
+ */
+export function stripSentWording(draft: SendFlowDraft): SendFlowDraft;
+export function stripSentWording(draft: SendFlowDraft | null): SendFlowDraft | null;
+export function stripSentWording(draft: SendFlowDraft | null): SendFlowDraft | null {
+  if (!draft || draft.step !== 'sent') return draft;
+  return freshDraft({
+    step: 'sent',
+    templateCategory: draft.templateCategory,
+    selectedContactIds: draft.selectedContactIds,
+  });
+}
+
 function load(storage: SendFlowStorage | undefined): Session[] {
   if (!storage) return [];
   try {
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Session[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Migration: drafts saved at 'sent' before this rule existed still hold the wording.
+    return (parsed as Session[]).map((s) => ({ ...s, draft: stripSentWording(s.draft ?? null) }));
   } catch {
     return [];
   }
@@ -141,7 +161,8 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     );
   }, []);
 
-  const updateDraft = useCallback((id: string, draft: SendFlowDraft) => {
+  const updateDraft = useCallback((id: string, incoming: SendFlowDraft) => {
+    const draft = stripSentWording(incoming);
     setSessions((list) =>
       list.map((s) => {
         if (s.id !== id) return s;

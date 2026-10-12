@@ -1,0 +1,56 @@
+/**
+ * C2 (#82): once a message has been sent, its wording is not kept. The real App over real
+ * localStorage: type a note, edit the wording, send, and look at everything the app saved.
+ */
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { App } from './app';
+
+const note = 'She was peaceful and we were with her at the end.';
+const edited = 'My own private words for the family.';
+
+async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
+  render(<App />);
+  await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
+  await user.type(screen.getByLabelText('Mobile number'), '6175550148');
+  await user.click(screen.getByRole('button', { name: 'Add and start another' }));
+  await screen.findByText('Added so far — 1');
+  await user.click(screen.getByRole('button', { name: 'Done for now' }));
+  await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+  await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(screen.getByRole('button', { name: 'Start' }));
+  await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(screen.getByRole('button', { name: /Not yet/ }));
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(screen.getByRole('button', { name: 'Edit wording' }));
+  const box = screen.getByRole('textbox');
+  await user.clear(box);
+  await user.type(box, edited);
+  await user.click(screen.getByRole('button', { name: 'Done editing' }));
+  await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
+  await user.click(screen.getByRole('button', { name: 'Open Messages' }));
+  await user.click(screen.getByRole('button', { name: 'Done' }));
+}
+
+describe('after a send (C2)', () => {
+  it('keeps none of the wording in localStorage, and still shows the Sent screen', async () => {
+    const user = userEvent.setup();
+    await sendAnAnnouncement(user);
+
+    expect(await screen.findByRole('heading', { name: 'Everyone has been told.' })).toBeInTheDocument();
+    expect(screen.getByText(/1 person now knows about Margaret Hayes/)).toBeInTheDocument();
+
+    const stored = JSON.stringify({ ...window.localStorage });
+    expect(stored).not.toContain('peaceful');
+    expect(stored).not.toContain('private words');
+    // What the app still needs afterwards: the step, the moment and who was told.
+    const [saved] = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
+    expect(saved.draft).toMatchObject({ step: 'sent', templateCategory: 'announcement', fields: {}, messageOverride: null });
+    expect(saved.draft.selectedContactIds).toHaveLength(1);
+    expect(saved.recipientsNotified.announcement).toHaveLength(1);
+  }, 30_000); // a whole journey under load
+});
