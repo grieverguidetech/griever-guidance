@@ -137,6 +137,29 @@ describe('Home as the landing (#112)', () => {
     }
   });
 
+  it('never leaves a blank screen after a pruned setup: Settings, the checklist and Back', async () => {
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await createFromHome(user);
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await expectHome();
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    await user.click(await screen.findByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+  });
+
+  it('returns the checklist to Settings when it was opened from Settings', async () => {
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Settings' }));
+    await user.click(await screen.findByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+  });
+
   it('returns the checklist to Home when it was opened from Home', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));

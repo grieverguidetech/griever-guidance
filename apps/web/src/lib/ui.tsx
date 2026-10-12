@@ -24,7 +24,7 @@ export function Tooltip({ text, children }: { text: string; children: (id: strin
 export function BackButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="gg-btn gg-btn-ghost self-start !px-0">
-      <ArrowLeft size={16} weight="regular" />
+      <ArrowLeft size={16} weight="regular" aria-hidden="true" />
       Back
     </button>
   );

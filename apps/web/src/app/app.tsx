@@ -257,6 +257,17 @@ function viewForReturning(sessionList: Session[]): AppView {
   return namedSessionsByRecent(sessionList).length > 0 ? 'home' : 'pathLanding';
 }
 
+/** Screens the checklist returns to; from anywhere else (the flow, a gate) it returns to the path. */
+const CHECKLIST_RETURNS: AppView[] = [
+  'home',
+  'settings',
+  'profile',
+  'signup',
+  'createAccount',
+  'forgotPassword',
+  'pathLanding',
+];
+
 function isAccountView(view: AppView): boolean {
   return view === 'signup' || view === 'createAccount' || view === 'forgotPassword';
 }
@@ -318,13 +329,12 @@ function AppBody({
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
   // The checklist goes back to where it was opened from: Home, or otherwise the path as before.
-  const currentView = useRef(view);
-  currentView.current = view;
   const checklistBack = useRef<AppView>('pathLanding');
   const openWhatYoullNeed = useCallback(() => {
-    checklistBack.current = currentView.current === 'home' ? 'home' : 'pathLanding';
+    if (view === 'whatYoullNeed') return;
+    checklistBack.current = CHECKLIST_RETURNS.includes(view) ? view : 'pathLanding';
     setView('whatYoullNeed');
-  }, []);
+  }, [view]);
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
@@ -518,8 +528,9 @@ function AppBody({
     [active],
   );
 
+  // With people on the device but none open, the path has nobody to show: go to Home instead.
   function goToPathLanding() {
-    setView('pathLanding');
+    setView(active || sortedSessions.length === 0 ? 'pathLanding' : 'home');
   }
 
   function goHome() {
@@ -534,6 +545,11 @@ function AppBody({
     setActiveId(id);
     setFlowCategory(undefined);
     setView(latestInProgressDraft(person) ? 'flow' : 'pathLanding');
+  }
+
+  function backFromChecklist() {
+    const target = checklistBack.current;
+    setView(target === 'pathLanding' && !active && sortedSessions.length > 0 ? 'home' : target);
   }
 
   function startNewSession() {
@@ -553,6 +569,8 @@ function AppBody({
       return;
     }
     sessions.pruneEmpty();
+    // The pruned person was the active one; clear it so a remaining person can be picked.
+    setActiveId(null);
     goHome();
   }
 
@@ -813,8 +831,8 @@ function AppBody({
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <WhatYoullNeed
-          onBack={() => setView(checklistBack.current)}
-          onEmailList={() => setView(checklistBack.current)}
+          onBack={backFromChecklist}
+          onEmailList={backFromChecklist}
         />
       </Shell>
     );
@@ -909,22 +927,16 @@ function AppBody({
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Home sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate />
-        {auth && !sessionEnded && (
-          <button
-            type="button"
-            onClick={() => openProfile(false)}
-            className="gg-btn gg-btn-ghost gg-btn-block mt-4"
-          >
-            Your account
+        <div className="flex flex-col items-start gap-2 mt-4">
+          {auth && !sessionEnded && (
+            <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-ghost !px-0">
+              Your account
+            </button>
+          )}
+          <button type="button" onClick={() => setView('settings')} className="gg-btn gg-btn-ghost !px-0">
+            Settings
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setView('settings')}
-          className="gg-btn gg-btn-ghost !px-0 self-start mt-2"
-        >
-          Settings
-        </button>
+        </div>
       </Shell>
     );
   }

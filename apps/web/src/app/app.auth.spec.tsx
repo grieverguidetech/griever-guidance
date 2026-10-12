@@ -94,6 +94,8 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
 async function nameSomeoneAndSignOut(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
   await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await screen.findByRole('heading', { name: 'One thing at a time.' });
+  expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument(); // not under the path
   await user.click(await screen.findByRole('button', { name: 'Back' })); // path to Home, where "Your account" sits (#112)
   await user.click(await screen.findByRole('button', { name: 'Your account' }));
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
