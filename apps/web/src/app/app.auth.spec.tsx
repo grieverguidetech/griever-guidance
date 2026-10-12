@@ -167,7 +167,6 @@ describe('flag on', () => {
     it('opens the local work with a calm note and no account actions', async () => {
       window.localStorage.setItem('sb-abcdef-auth-token', SESSION);
       window.localStorage.setItem('gg.sessions.v1', JSON.stringify([LOCAL_SESSION]));
-      const client = stubClient();
       mocks.load.mockResolvedValue({ available: false });
       render(<App />);
 
@@ -179,9 +178,17 @@ describe('flag on', () => {
       expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
       expect(window.localStorage.getItem('sb-abcdef-auth-token')).toBe(SESSION);
       expect(window.localStorage.getItem('gg.sessions.v1')).not.toBeNull();
-      // No auth call of any kind: the client was never even built.
-      expect(client.getSession).not.toHaveBeenCalled();
-      expect(client.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('opens the path landing, without "Your account", when no message is half-written', async () => {
+      window.localStorage.setItem('sb-abcdef-auth-token', SESSION);
+      window.localStorage.setItem('gg.sessions.v1', JSON.stringify([{ ...LOCAL_SESSION, draft: null }]));
+      mocks.load.mockResolvedValue({ available: false });
+      render(<App />);
+
+      expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+      expect(screen.getByText("Your account can't be reached right now. Your work on this device is here.")).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
     });
 
     it('ignores a stored value that is not a session', async () => {

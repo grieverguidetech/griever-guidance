@@ -52,7 +52,9 @@ function looksLikeSession(raw: string | null): boolean {
   if (!raw) return false;
   try {
     const value: unknown = JSON.parse(raw);
-    return typeof value === 'object' && value !== null && 'refresh_token' in value;
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+    const token = (value as { refresh_token?: unknown }).refresh_token;
+    return typeof token === 'string' && token !== '';
   } catch {
     return false;
   }
@@ -63,8 +65,9 @@ function looksLikeSession(raw: string | null): boolean {
  * network, so it works when the auth chunk or the env is unavailable. With no project URL (the
  * env is missing) the exact key is unknown, so any `sb-*-auth-token` entry counts.
  */
-export function hasStoredSession(storage: Storage | undefined = globalThis.localStorage): boolean {
+export function hasStoredSession(storageOverride?: Storage): boolean {
   try {
+    const storage = storageOverride ?? globalThis.localStorage;
     if (!storage) return false;
     const key = sessionKeyFor(readEnv('VITE_SUPABASE_URL'));
     if (key) return looksLikeSession(storage.getItem(key));
