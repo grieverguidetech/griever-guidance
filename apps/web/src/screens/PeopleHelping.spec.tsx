@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { MembersView } from '@griever/shared';
+import { formatDate } from '../lib/format';
 import { PeopleHelping } from './PeopleHelping';
 
 const owner: MembersView = {
@@ -43,7 +44,9 @@ describe('PeopleHelping as an owner', () => {
     expect(screen.getByText('Sam Lee')).toBeInTheDocument();
     expect(screen.getByText('noname@example.com')).toBeInTheDocument();
     expect(screen.getByText('pending@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Invited · link works until October 20, 2026')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Helping you' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Invited' })).toBeInTheDocument();
+    expect(screen.getByText(`Invited · link works until ${formatDate('2026-10-20T12:00:00Z')}`)).toBeInTheDocument();
   });
 
   it('sends a trimmed, lower-cased email and announces the result politely', async () => {
@@ -54,8 +57,7 @@ describe('PeopleHelping as an owner', () => {
     expect(onInvite).toHaveBeenCalledWith('new@example.com');
     const live = screen.getByRole('status');
     expect(live).toHaveAttribute('aria-live', 'polite');
-    expect(await screen.findByText('Invitation sent.')).toBeInTheDocument();
-    expect(live).toHaveTextContent('Invitation sent.');
+    await waitFor(() => expect(live).toHaveTextContent('Invitation sent.'));
     expect(screen.getByLabelText('Their email')).toHaveValue('');
   });
 
@@ -67,6 +69,7 @@ describe('PeopleHelping as an owner', () => {
     await user.click(screen.getByRole('button', { name: 'Send an invitation' }));
     expect(onInvite).not.toHaveBeenCalled();
     const error = screen.getByText("That email doesn't look right.");
+    expect(error).toHaveAttribute('role', 'status');
     expect(field).toHaveAttribute('aria-describedby', error.id);
     expect(field).toHaveFocus();
     expect(field).toHaveValue('not-an-email');
@@ -77,18 +80,51 @@ describe('PeopleHelping as an owner', () => {
     setup({ message: 'You need a connection to do this.', onInvite: vi.fn(async () => false) });
     await user.type(screen.getByLabelText('Their email'), 'a@b.co');
     await user.click(screen.getByRole('button', { name: 'Send an invitation' }));
-    expect(screen.getByRole('status')).toHaveTextContent('You need a connection to do this.');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('You need a connection to do this.'));
     expect(screen.getByLabelText('Their email')).toHaveValue('a@b.co');
   });
 
-  it('cancels an invitation with a 44px button', async () => {
+  it('cancels an invitation, announces it and moves focus to the email field', async () => {
     const user = userEvent.setup();
     const { onRevoke } = setup();
-    const button = screen.getByRole('button', { name: /Cancel this invitation/ });
-    expect(button.className).toContain('min-h-[44px]');
-    await user.click(button);
+    await user.click(screen.getByRole('button', { name: /Cancel this invitation/ }));
     expect(onRevoke).toHaveBeenCalledWith('i1');
     expect(await screen.findByText('Invitation cancelled.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Their email')).toHaveFocus();
+  });
+
+  it('sends one revoke for a double tap', async () => {
+    const user = userEvent.setup();
+    let finish: (ok: boolean) => void = () => undefined;
+    const onRevoke = vi.fn(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    setup({ onRevoke });
+    const button = screen.getByRole('button', { name: /Cancel this invitation/ });
+    await user.click(button);
+    await user.click(button);
+    expect(onRevoke).toHaveBeenCalledTimes(1);
+    finish(true);
+    await screen.findByText('Invitation cancelled.');
+  });
+
+  it('keeps the live region mounted and re-announces a repeated failure', async () => {
+    const user = userEvent.setup();
+    setup({ message: 'You need a connection to do this.', onRevoke: vi.fn(async () => false) });
+    const live = screen.getByRole('status');
+    await waitFor(() => expect(live).toHaveTextContent('You need a connection'));
+    await user.click(screen.getByRole('button', { name: /Cancel this invitation/ }));
+    expect(live).toBeEmptyDOMElement();
+    await waitFor(() => expect(live).toHaveTextContent('You need a connection'));
+    expect(screen.getByRole('status')).toBe(live);
+  });
+});
+
+describe('PeopleHelping without a view', () => {
+  it('shows only the message: no field, no button, no heading', async () => {
+    setup({ view: null, status: 'offline', message: 'You need a connection to do this.' });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('You need a connection to do this.'));
   });
 });
 
@@ -98,14 +134,19 @@ describe('PeopleHelping as a member', () => {
     expect(screen.getByText("You're helping Anna.")).toBeInTheDocument();
     expect(screen.queryByLabelText('Their email')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('falls back to "someone" without an owner name', () => {
+    setup({ view: { role: 'member', owner: { id: 'o1', name: null } } });
+    expect(screen.getByText("You're helping someone.")).toBeInTheDocument();
   });
 });
 
 describe('SHARING_ENABLED', () => {
   async function flag(value: string | undefined) {
     vi.resetModules();
-    if (value === undefined) vi.stubEnv('VITE_FEATURE_SHARING', '');
-    else vi.stubEnv('VITE_FEATURE_SHARING', value);
+    vi.stubEnv('VITE_FEATURE_SHARING', value);
     return (await import('../lib/features')).SHARING_ENABLED;
   }
   afterEach(() => vi.unstubAllEnvs());
