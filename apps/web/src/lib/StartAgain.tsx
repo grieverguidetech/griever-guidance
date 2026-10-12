@@ -6,7 +6,7 @@ type Phase = 'idle' | 'confirm' | 'cleared';
 
 /**
  * A quiet way to empty one moment's draft from its first form. Shown only when the draft holds
- * something. The confirm is announced politely; focus moves to it, then back to the link on
+ * something. Focus moves to the confirm group, which announces its question; then back to the link on
  * Keep, or to the calm note on Clear (the link is gone by then because the draft is empty).
  */
 export function StartAgain({ flow }: { flow: Flow }) {
@@ -36,7 +36,7 @@ export function StartAgain({ flow }: { flow: Flow }) {
 
   if (shown === 'note') {
     return (
-      <p ref={noteRef} tabIndex={-1} role="status" className="m-0 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+      <p ref={noteRef} tabIndex={-1} className="m-0 text-[13px]" style={{ color: 'var(--text-muted)' }}>
         This message is empty again.
       </p>
     );
@@ -44,8 +44,8 @@ export function StartAgain({ flow }: { flow: Flow }) {
 
   if (shown === 'confirm') {
     return (
-      <div ref={confirmRef} tabIndex={-1} role="status" aria-live="polite" className="gg-card">
-        <p className="gg-card-body m-0" style={{ opacity: 1, fontSize: 14 }}>
+      <div ref={confirmRef} tabIndex={-1} role="group" aria-labelledby="start-again-question" className="gg-card">
+        <p id="start-again-question" className="gg-card-body m-0" style={{ opacity: 1, fontSize: 14 }}>
           Clear what you've written for this message? People and contacts stay as they are.
         </p>
         <div className="flex gap-2">

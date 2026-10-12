@@ -89,7 +89,7 @@ export interface SendFlowDerived {
   session: SessionDetails | null;
   composedFields: Record<string, string>;
   composedMessage: string;
-  /** True when the draft holds something typed, a hand-edited message or chosen contacts. */
+  /** True when the first form shows something typed, a hand-edited message or (obituary) chosen contacts. */
   hasDraftContent: boolean;
 }
 
@@ -155,12 +155,18 @@ export function resumeDraft(draft: SendFlowDraft): SendFlowDraft {
   return { ...draft, step: first ?? 'details' };
 }
 
-/** True when a draft holds something worth asking about before clearing it. */
-export function draftHasContent(draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds'>): boolean {
+/**
+ * True when the moment's first form shows something to clear. Typed fields and a hand-edited
+ * message count everywhere; chosen contacts count only where the first form is the contacts step
+ * (the obituary), so people carried in from elsewhere never make an empty form look written.
+ */
+export function draftHasContent(
+  draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds' | 'templateCategory'>,
+): boolean {
   return (
     Object.values(draft.fields).some((value) => value.trim() !== '') ||
     !!draft.messageOverride ||
-    draft.selectedContactIds.length > 0
+    (draft.templateCategory === 'obituary' && draft.selectedContactIds.length > 0)
   );
 }
 
@@ -501,6 +507,9 @@ export function useSendFlow(
         step: FIRST_STEP[category] ?? 'details',
         templateCategory: category,
         templateOverrideId: s.templateOverrideId,
+        // People chosen elsewhere (e.g. carried in by "Add service details") are not on this form,
+        // so they are not ours to drop. The obituary's first form is the contacts list itself.
+        selectedContactIds: category === 'obituary' ? [] : s.selectedContactIds,
       };
     });
   }, []);

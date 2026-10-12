@@ -151,6 +151,30 @@ describe('one draft per moment (#83)', () => {
 });
 
 describe('start this message again (#98)', () => {
+  it('shows no start-again link on an empty service form after "Add service details"', async () => {
+    await contactStore.put({
+      contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
+    });
+    const service = freshDraft({
+      templateCategory: 'service',
+      step: 'details',
+      fields: {},
+      selectedContactIds: ['c-5'],
+    });
+    const review = freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c-1'], serviceDetailsKnown: 'no' });
+    seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
+    await user.click(screen.getByRole('button', { name: 'Open Messages' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(await screen.findByRole('button', { name: 'Add service details' }));
+
+    expect(await screen.findByLabelText(/^Location/)).toHaveValue('');
+    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5', 'c-1']);
+    expect(screen.queryByRole('button', { name: 'Start this message again' })).not.toBeInTheDocument();
+  }, 30_000);
+
   const link = () => screen.queryByRole('button', { name: 'Start this message again' });
   const service = freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary Church' } });
 
@@ -175,12 +199,12 @@ describe('start this message again (#98)', () => {
     await screen.findByLabelText(/Anything you'd like to add/);
     await user.click(link() as HTMLElement);
     const confirm = screen.getByText(/Clear what you've written for this message\? People and contacts stay as they are\./);
-    expect(confirm.closest('[role="status"]')).toHaveFocus();
+    expect(confirm.closest('[role="group"]')).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Clear it' }));
 
     expect(screen.getByLabelText(/Anything you'd like to add/)).toHaveValue('');
     expect(link()).not.toBeInTheDocument();
-    expect(savedDrafts()['announcement']).toMatchObject({ templateCategory: 'announcement', fields: {}, selectedContactIds: [] });
+    expect(savedDrafts()['announcement']).toMatchObject({ templateCategory: 'announcement', fields: {} });
     expect(savedDrafts()['service']).toMatchObject({ fields: { serviceLocation: 'St Mary Church' } });
     const [saved] = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
     expect(saved.recipientsNotified).toEqual({ announcement: ['c-1'] });
