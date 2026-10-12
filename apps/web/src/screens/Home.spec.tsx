@@ -6,6 +6,9 @@ import { Home } from './Home';
 function make(id: string, personName: string, lastOpenedAt: string, dateOfPassing = ''): Session {
   return {
     id,
+    flowId: `flow-${id}`,
+    ownerId: null,
+    role: 'owner',
     createdAt: lastOpenedAt,
     lastOpenedAt,
     personName,

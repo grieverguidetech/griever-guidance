@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
-import { addDays, parseCompleteDate } from '@griever/shared';
+import type {
+  FlowFactKey,
+  FlowRecord,
+  FlowRole,
+  MomentKey,
+  SessionDetails,
+  TemplateCategory,
+} from '@griever/shared';
+import {
+  addDays,
+  flowFactsToSessionFields,
+  FLOW_FACT_KEYS,
+  mergeFlowFacts,
+  parseCompleteDate,
+  toFlowFacts,
+} from '@griever/shared';
 import { freshDraft, hasDraftInProgress } from './useSendFlow.js';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
 
@@ -35,7 +49,14 @@ export interface ReminderEntry {
  * (restored on reload) and there can be more than one.
  */
 export interface Session extends SessionDetails {
+  /** The local key. It never changes and is not what the server knows the person by. */
   id: string;
+  /** UUID v4 made on this device; the person's id on the server. Stable once set. */
+  flowId: string;
+  /** The account that owns this person. null = made on this device, not yet tied to an account. */
+  ownerId: string | null;
+  /** 'member' = someone shared this person with me. Only ever changed by `applyRemoteFlows`. */
+  role: FlowRole;
   createdAt: string;
   lastOpenedAt: string;
   /**
@@ -72,6 +93,18 @@ export interface UseSessionsResult {
   scheduleReminder: (id: string, momentKey: MomentKey, dueAt: string) => void;
   /** Marks a moment done and records who was notified, for dedup. */
   recordMomentComplete: (id: string, category: TemplateCategory, contactIds: string[]) => void;
+  /**
+   * Applies what the server returned for this account. `pendingByFlow` maps a flowId to the fact
+   * fields with an unsent local edit; those keep the local value. A flow not on the device becomes
+   * a 'member' session. A 'member' session whose flow is no longer returned is removed (access was
+   * lost). 'owner' sessions are never removed. Drafts, contacts, who was notified, reminders and
+   * edited wording are never touched. With no signed-in user (`myUserId` empty) nothing changes.
+   */
+  applyRemoteFlows: (
+    records: readonly FlowRecord[],
+    myUserId: string,
+    pendingByFlow?: Readonly<Record<string, Iterable<FlowFactKey>>>,
+  ) => void;
 }
 
 /** Sessions with a person's name, most recently opened first. The first is the one that reopens. */
@@ -82,7 +115,10 @@ export function namedSessionsByRecent(sessions: Session[]): Session[] {
 }
 
 /** The saved shape before drafts were kept per moment: one `draft` slot. */
-type StoredSession = Omit<Session, 'drafts'> & {
+type StoredSession = Omit<Session, 'drafts' | 'flowId' | 'ownerId' | 'role'> & {
+  flowId?: string;
+  ownerId?: string | null;
+  role?: FlowRole;
   draft?: SendFlowDraft | null;
   drafts?: Session['drafts'];
 };
@@ -134,7 +170,16 @@ function migrateSession(stored: StoredSession): Session {
     drafts[old] = stripSentWording(draft);
     draftsUpdatedAt[old] ??= stored.lastOpenedAt;
   }
-  return { ...rest, drafts, draftsUpdatedAt };
+  // Sessions saved before sharing have no flowId: give one now. It is saved straight after load,
+  // so it is the same on every later load.
+  return {
+    ...rest,
+    flowId: stored.flowId ?? generateFlowId(),
+    ownerId: stored.ownerId ?? null,
+    role: stored.role ?? 'owner',
+    drafts,
+    draftsUpdatedAt,
+  };
 }
 
 function load(storage: SendFlowStorage | undefined): Session[] {
@@ -163,6 +208,71 @@ function newId(): string {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * A UUID v4. Uses `crypto.randomUUID`, else `crypto.getRandomValues`, else `Math.random` (Hermes
+ * may have neither). The id only has to be unique, not secret, so the last resort is acceptable.
+ */
+export function generateFlowId(): string {
+  const c = (
+    globalThis as {
+      crypto?: { randomUUID?: () => string; getRandomValues?: (a: Uint8Array) => unknown };
+    }
+  ).crypto;
+  if (typeof c?.randomUUID === 'function') return c.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (typeof c?.getRandomValues === 'function') {
+    c.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Updates one session from a server record. Only fact fields without a pending edit can change. */
+function mergeRecordIntoSession(
+  session: Session,
+  record: FlowRecord,
+  pending: Iterable<FlowFactKey>,
+): Session {
+  const pendingKeys = new Set(pending);
+  const local = toFlowFacts(session);
+  const merged = mergeFlowFacts(local, record.facts, pendingKeys);
+  const mapped = flowFactsToSessionFields(merged);
+  // Only write fields that really changed, so text being typed is not rewritten (trimmed etc.).
+  const changed: Record<string, unknown> = {};
+  for (const key of FLOW_FACT_KEYS) {
+    if (!pendingKeys.has(key) && merged[key] !== local[key]) changed[key] = mapped[key];
+  }
+  return {
+    ...session,
+    ...(changed as Partial<ReturnType<typeof flowFactsToSessionFields>>),
+    ownerId: record.ownerId,
+    role: record.role,
+  };
+}
+
+function sessionFromRecord(record: FlowRecord): Session {
+  const now = new Date().toISOString();
+  return {
+    ...flowFactsToSessionFields(record.facts),
+    id: newId(),
+    flowId: record.id,
+    ownerId: record.ownerId,
+    role: 'member',
+    senderName: '',
+    createdAt: now,
+    lastOpenedAt: now,
+    drafts: {},
+    draftsUpdatedAt: {},
+    recipientsNotified: {},
+    momentCompletedAt: {},
+    remindersScheduled: [],
+  };
+}
+
 const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
   announcement: 'announce',
   service: 'service',
@@ -181,6 +291,9 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     const now = new Date().toISOString();
     const session: Session = {
       id: newId(),
+      flowId: generateFlowId(),
+      ownerId: null,
+      role: 'owner',
       personName: '',
       dateOfPassing: '',
       senderName: '',
@@ -304,6 +417,26 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     [],
   );
 
+  const applyRemoteFlows = useCallback<UseSessionsResult['applyRemoteFlows']>(
+    (records, myUserId, pendingByFlow = {}) => {
+      if (!myUserId) return;
+      const returned = new Map(records.map((r) => [r.id, r]));
+      setSessions((list) => {
+        const known = new Set(list.map((s) => s.flowId));
+        const updated = list
+          // Losing access removes a shared person; a person this user owns is never removed here.
+          .filter((s) => s.role !== 'member' || returned.has(s.flowId))
+          .map((s) => {
+            const record = returned.get(s.flowId);
+            return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? []) : s;
+          });
+        const added = records.filter((r) => !known.has(r.id)).map(sessionFromRecord);
+        return [...added, ...updated];
+      });
+    },
+    [],
+  );
+
   const inProgressSessions = useMemo(
     () =>
       sessions
@@ -330,5 +463,6 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     setServiceReady,
     scheduleReminder,
     recordMomentComplete,
+    applyRemoteFlows,
   };
 }

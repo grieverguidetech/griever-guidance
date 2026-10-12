@@ -5,6 +5,9 @@ import { PathLanding } from './PathLanding';
 
 const session: Session = {
   id: 's1',
+  flowId: '11111111-1111-4111-8111-111111111111',
+  ownerId: null,
+  role: 'owner',
   createdAt: '2026-05-30T00:00:00.000Z',
   lastOpenedAt: '2026-05-30T00:00:00.000Z',
   personName: 'Margaret Hale',
