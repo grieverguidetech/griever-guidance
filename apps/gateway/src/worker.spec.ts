@@ -229,6 +229,7 @@ describe('gateway: /me/profile (Supabase accounts)', () => {
       id: USER_ID,
       senderName: 'Ada',
       contactSource: null,
+      accountType: 'owner',
       createdAt: '2026-10-11T10:00:00.000Z',
       updatedAt: '2026-10-11T10:00:00.000Z',
     });

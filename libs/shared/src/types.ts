@@ -1,3 +1,5 @@
+import type { AccountType } from './members.js';
+
 export type SendStatus = 'pending' | 'sent' | 'failed';
 
 export type TemplateCategory = 'announcement' | 'service' | 'aftercare' | 'obituary';
@@ -157,6 +159,8 @@ export interface Profile {
   id: string;
   senderName: string | null;
   contactSource: AccountContactSource | null;
+  /** Read-only to clients: set by the server when an invite is accepted. */
+  accountType: AccountType;
   createdAt: string;
   updatedAt: string;
 }

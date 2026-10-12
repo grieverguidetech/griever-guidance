@@ -1,4 +1,4 @@
-import type { Profile } from '@griever/shared';
+import type { AccountType, Profile } from '@griever/shared';
 import { postgrestHeaders, type SupabaseConfig } from '@griever/gateway-auth';
 
 export interface ProfileFields {
@@ -15,8 +15,17 @@ interface ProfileRow {
   id: string;
   sender_name: string | null;
   contact_source: 'import' | 'manual' | null;
+  account_type?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Anything but 'member' reads as 'owner': the column is NOT NULL with a check, so this fails
+ * open on purpose. It is for display only and never decides what a caller may do.
+ */
+function toAccountType(value: string | null | undefined): AccountType {
+  return value === 'member' ? 'member' : 'owner';
 }
 
 function toDto(row: ProfileRow): Profile {
@@ -24,6 +33,7 @@ function toDto(row: ProfileRow): Profile {
     id: row.id,
     senderName: row.sender_name,
     contactSource: row.contact_source,
+    accountType: toAccountType(row.account_type),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };

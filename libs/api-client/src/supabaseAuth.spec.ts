@@ -329,6 +329,7 @@ describe('profile', () => {
     id: 'u1',
     senderName: 'Sam',
     contactSource: null,
+    accountType: 'owner' as const,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };

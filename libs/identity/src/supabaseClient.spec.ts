@@ -6,6 +6,7 @@ const ROW = {
   id: USER_ID,
   sender_name: 'Ada',
   contact_source: 'import',
+  account_type: 'owner',
   created_at: '2026-10-11T10:00:00.123456+00:00',
   updated_at: '2026-10-11T10:00:00.123456+00:00',
 };
@@ -22,12 +23,36 @@ describe('profiles client', () => {
       id: USER_ID,
       senderName: 'Ada',
       contactSource: 'import',
+      accountType: 'owner',
       createdAt: '2026-10-11T10:00:00.123Z',
       updatedAt: '2026-10-11T10:00:00.123Z',
     });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${USER_ID}&select=*`);
     expect(init.headers).toMatchObject({ apikey: 'anon-key', Authorization: 'Bearer caller-jwt' });
+  });
+
+  it.each([
+    ['owner', 'owner'],
+    ['member', 'member'],
+    [undefined, 'owner'],
+    [null, 'owner'],
+    ['admin', 'owner'],
+  ])('maps account_type %s to accountType %s (unknown values fail open to owner, display only)', async (stored, expected) => {
+    const row = { ...ROW, account_type: stored };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([row])));
+    expect((await client().get(USER_ID))?.accountType).toBe(expected);
+  });
+
+  it('never sends account_type, even if a caller smuggles accountType in', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse([])).mockResolvedValueOnce(jsonResponse([ROW], 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const fields = { senderName: 'Ada', accountType: 'member', account_type: 'member' };
+    await client().upsert(USER_ID, fields);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(JSON.parse(init.body)).not.toHaveProperty('account_type');
+      expect(init.body).not.toMatch(/account/i);
+    }
   });
 
   it('returns null when no row exists', async () => {

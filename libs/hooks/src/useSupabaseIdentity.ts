@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AccountContactSource } from '@griever/shared';
+import type { AccountContactSource, AccountType } from '@griever/shared';
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { SendFlowStorage } from './useSendFlow.js';
 
@@ -7,8 +7,12 @@ export const PROFILE_STORAGE_KEY = 'gg.profile.v1';
 
 /** The only profile fields kept on the device. No contact or message data. */
 export interface CachedProfile {
+  /** The user this cache belongs to; a cache for anyone else is discarded at boot. */
+  id: string;
   senderName: string | null;
   contactSource: AccountContactSource | null;
+  /** Cached so an offline boot still hides "create" for members (C5). */
+  accountType: AccountType;
 }
 
 /** What a reset step tells the person. `ok` says whether the step worked; `message` is always calm copy. */
@@ -82,10 +86,12 @@ export function identityErrorMessage(reason: string): string {
 
 function isCachedProfile(value: unknown): value is CachedProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const { senderName, contactSource } = value as Record<string, unknown>;
+  const { id, senderName, contactSource, accountType } = value as Record<string, unknown>;
   return (
+    typeof id === 'string' &&
     (senderName === null || typeof senderName === 'string') &&
-    (contactSource === null || contactSource === 'import' || contactSource === 'manual')
+    (contactSource === null || contactSource === 'import' || contactSource === 'manual') &&
+    (accountType === undefined || accountType === 'owner' || accountType === 'member')
   );
 }
 
@@ -95,8 +101,9 @@ function readCache(storage: SendFlowStorage | undefined): CachedProfile | null {
     const raw = storage.getItem(PROFILE_STORAGE_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
+    // A cache written before accountType existed reads as an owner.
     return isCachedProfile(parsed)
-      ? { senderName: parsed.senderName, contactSource: parsed.contactSource }
+      ? { id: parsed.id, senderName: parsed.senderName, contactSource: parsed.contactSource, accountType: parsed.accountType ?? 'owner' }
       : null;
   } catch {
     return null;
@@ -113,8 +120,14 @@ function writeCache(storage: SendFlowStorage | undefined, profile: CachedProfile
   }
 }
 
-function toCached(profile: { senderName: string | null; contactSource: CachedProfile['contactSource'] }): CachedProfile {
-  return { senderName: profile.senderName, contactSource: profile.contactSource };
+function toCached(profile: CachedProfile): CachedProfile {
+  return {
+    id: profile.id,
+    senderName: profile.senderName,
+    contactSource: profile.contactSource,
+    // An older gateway may not send accountType yet; never keep undefined.
+    accountType: profile.accountType === 'member' ? 'member' : 'owner',
+  };
 }
 
 export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOptions): UseSupabaseIdentityResult {
@@ -196,8 +209,15 @@ export function useSupabaseIdentity({ client, storage }: UseSupabaseIdentityOpti
     }
     setStatus('signed_in');
     if (state.status === 'offline') {
+      // Offline gives no user id to compare, so the cache stands (sign-out clears it).
       setOffline(true);
       return;
+    }
+    // A cache written for another account must not show here.
+    const stored = readCache(storageRef.current);
+    if (stored && stored.id !== state.session.userId) {
+      writeCache(storageRef.current, null);
+      setProfile(null);
     }
     setOffline(false);
     void refreshProfile();
