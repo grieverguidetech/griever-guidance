@@ -34,21 +34,11 @@ Then deploy the functions in `apps/gateway/convex/` against those env vars:
 pnpm convex:dev
 ```
 
-This also writes `CONVEX_URL` (and `CONVEX_SITE_URL`) to `apps/gateway/.env.local` automatically —
-that's what the gateway's own runtime (`apps/gateway/src/app/convexClient.ts`) reads to reach
-Convex. `apps/web` never sees any of this; it only ever calls the gateway (CLAUDE.md rule 2a).
+This also writes `CONVEX_URL` (and `CONVEX_SITE_URL`) to `apps/gateway/.env.local` automatically.
+The gateway's sync client (`libs/gateway-sync`) reads it to reach Convex. `apps/web` never sees any
+of this; it only ever calls the gateway (CLAUDE.md rule 2a).
 
-One more variable this deployment needs, set directly on Convex rather than in a `.env` file —
-`convex/identity.ts`'s functions read it from `process.env`, not from an argument, so it never
-travels over the wire:
-
-```bash
-npx convex env set IDENTITY_SERVICE_SECRET <same value as apps/gateway's IDENTITY_SERVICE_SECRET>
-```
-
-This must be the exact same string as `apps/gateway/.env`'s `IDENTITY_SERVICE_SECRET` — it's how
-`identity.ts` tells a call from the gateway (which has already verified a Facebook/Instagram sign-in)
-apart from an arbitrary call from a browser (see `libs/identity`'s CLAUDE.md section).
+Convex holds only `sessions` and `counters`, for dev-only session sync. Accounts live in Supabase.
 
 ## Production (Convex Cloud)
 

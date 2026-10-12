@@ -347,8 +347,8 @@ Facebook's or Instagram's OAuth endpoints today.
   store yet, so the outbox sync would flush is currently empty; see DATA.md.
 
 **Accounts live in Supabase `profiles`** (see "Supabase boundary" under Database). The Convex
-`identities` and `profiles` tables, and their functions in `apps/gateway/convex/identity.ts`,
-have no caller and are removed in #37. Everything else in
+`identities` and `profiles` tables and their functions (`convex/identity.ts`) are removed (#37).
+Convex holds only `sessions` and `counters`, for dev-only sync. Everything else in
 this repo reaches a user only by their opaque `userId`.
 
 **What sign-in is not, and cannot become:** it does not, and cannot, give this app a friends list
@@ -378,7 +378,7 @@ security so a user reaches only their own row and no delete policy (C9). Convex'
 unchanged; session sync (still dev-only) stays there. Contacts and message content stay on the device and reach no
 server (C2, C3, C4). Migrations and pgTAP tests live in `infra/supabase/`; migrations must stay backward-compatible
 with the live gateway. Supabase is the only account path: the Convex `identities`/`profiles`
-tables have no caller and are removed in #37.
+tables are removed (#37).
 `checklistTicks` is not carried over yet, and how `auth.users.id` maps to Convex `sessions.userId`
 is open (owned by #20/#39).
 
@@ -394,9 +394,6 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
 apps/mobile   EXPO_PUBLIC_API_URL
-
-Convex (set via `npx convex env set`, never a `.env` file — see infra/convex/README.md)
-              IDENTITY_SERVICE_SECRET  (read only by convex/identity.ts; goes with #37)
 ```
 
 `CORS_ORIGINS` is comma-separated allowed origins — there is no "allow all" mode; an empty value
