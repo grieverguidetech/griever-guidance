@@ -172,9 +172,9 @@ Grievers Guidance helps people who have just lost a loved one send funeral and s
 ```
 apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
-              Composes libs/identity, libs/gateway-messages, libs/gateway-sync, libs/gateway-flows into one HTTP
-              surface (CORS + routing) — this app owns no domain logic itself. Also holds the
-              Convex functions (apps/gateway/convex/).
+              Composes libs/identity, libs/gateway-messages, libs/gateway-sync and
+              libs/gateway-flows into one HTTP surface (CORS + routing) — this app owns no
+              domain logic itself. Also holds the Convex functions (apps/gateway/convex/).
   web/        React + Vite + Tailwind. Browser send flow and account management.
   mobile/     Expo + React Native. The primary user surface — mobile-first, core RN only.
   marketing/  Astro. Public-facing site. No shared business logic.
@@ -426,7 +426,9 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
               CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL,
               SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
               INVITE_FROM_EMAIL, WEB_URL (wrangler [vars]), RESEND_API_KEY (Worker secret, set by
-              deploy.yml from the GitHub secret; unset means POST /invites answers 503)
+              deploy.yml from the GitHub secret; skipped when empty, and a key already on the
+              Worker stays; to remove it: `wrangler secret delete RESEND_API_KEY --config
+              apps/gateway/wrangler.toml`; with no key, POST /invites answers 503)
               CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (read only when the flag is on)
@@ -436,7 +438,8 @@ apps/mobile   EXPO_PUBLIC_API_URL
 ```
 
 Production repo variables (public, not secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
-(off until the PO sets it to `true`). The one repo secret the gateway needs is `RESEND_API_KEY`.
+(off until the PO sets it to `true`). The gateway's only Worker secret is `RESEND_API_KEY` (from the
+repo secret of the same name).
 Web production has `FEATURE_AUTH=true` (since 2026-10-11). To turn accounts off or on again, change it
 and re-run the deploy. Mobile (`EXPO_PUBLIC_*`, EAS) is a follow-up.
 

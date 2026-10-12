@@ -45,6 +45,10 @@ jobs:
     steps:
       - name: Check FEATURE_AUTH, SUPABASE_URL and SUPABASE_ANON_KEY
         run: |
+          if [ "$FEATURE_SHARING" = "true" ] && [ "$FEATURE_AUTH" != "true" ]; then
+            echo "::error::FEATURE_SHARING is true but FEATURE_AUTH is not. Sharing needs accounts, so turn FEATURE_AUTH on first or set FEATURE_SHARING back."
+            exit 1
+          fi
           if [ "$FEATURE_AUTH" = "true" ]; then
             missing=""
             [ -n "$SUPABASE_URL" ] || missing="$missing SUPABASE_URL"
@@ -71,6 +75,7 @@ jobs:
           echo "Accounts config ok (FEATURE_AUTH=${FEATURE_AUTH:-unset})"
         env:
           FEATURE_AUTH: ${{ vars.FEATURE_AUTH }}
+          FEATURE_SHARING: ${{ vars.FEATURE_SHARING }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
 
@@ -166,15 +171,22 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # RESEND_API_KEY is a Worker secret, not a var. Skipped when the GitHub
-      # secret is empty (POST /invites then answers 503). The value goes in
-      # through env and stdin only; never echoed, never on a command line.
+      # secret is empty; a key already on the Worker stays. To remove it:
+      # wrangler secret delete RESEND_API_KEY --config apps/gateway/wrangler.toml
+      # The value goes in through env and stdin only; never echoed, never on a
+      # command line. `secret list` prints names only.
       - name: Set the Worker secret RESEND_API_KEY
         run: |
           if [ -z "$RESEND_API_KEY" ]; then
-            echo "::notice::RESEND_API_KEY is not set; skipping the Worker secret"
+            echo "::notice::RESEND_API_KEY is empty; skipped. A key already on the Worker stays. To remove it: wrangler secret delete RESEND_API_KEY --config apps/gateway/wrangler.toml"
             exit 0
           fi
           printf '%s' "$RESEND_API_KEY" | pnpm exec wrangler secret put RESEND_API_KEY --config apps/gateway/wrangler.toml
+          names=$(pnpm exec wrangler secret list --config apps/gateway/wrangler.toml)
+          if ! printf '%s' "$names" | grep -q '"RESEND_API_KEY"'; then
+            echo "::error::RESEND_API_KEY is not listed on the Worker after the put"
+            exit 1
+          fi
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
