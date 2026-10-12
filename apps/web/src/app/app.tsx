@@ -23,6 +23,8 @@ import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { SignUp } from '../screens/SignUp';
 import { CreateAccount } from '../screens/CreateAccount';
 import { Profile } from '../screens/Profile';
+import { Settings } from '../screens/Settings';
+import { removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
@@ -38,6 +40,7 @@ type AppView =
   | 'signup'
   | 'createAccount'
   | 'profile'
+  | 'settings'
   | 'addContactsManual'
   | 'importContacts'
   | 'whoHearsFirst'
@@ -164,9 +167,18 @@ function noop() {
 }
 
 export function App() {
+  // Bumped after "Remove everything from this device": the key remounts every hook, so each
+  // reads the now-empty storage and starts from the first screen.
+  const [removals, setRemovals] = useState(0);
+  const removed = removals > 0;
+  const onRemoved = useCallback(() => setRemovals((n) => n + 1), []);
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
-  if (!AUTH_ENABLED) return <AppBody auth={null} />;
-  return <AuthGate>{(auth, client) => <AppBody auth={auth} client={client} />}</AuthGate>;
+  if (!AUTH_ENABLED) return <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />;
+  return (
+    <AuthGate key={removals}>
+      {(auth, client) => <AppBody auth={auth} client={client} removed={removed} onRemoved={onRemoved} />}
+    </AuthGate>
+  );
 }
 
 /** True when the signed-in account has no name yet (or the name is blank). */
@@ -209,8 +221,13 @@ function AppBody({
   auth,
   client,
   offline = false,
+  removed = false,
+  onRemoved,
 }: {
   auth: UseSupabaseIdentityResult | null;
+  /** Everything was just removed from this device: say so on the first screen. */
+  removed?: boolean;
+  onRemoved?: () => void;
   client?: AuthClient;
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
@@ -231,6 +248,8 @@ function AppBody({
       ? 'addContactsManual'
       : viewForReturning(sessions.sessions);
   });
+  const firstView = useRef(view);
+  const showRemoved = removed && view === firstView.current;
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
   // changed most recently; null means a moment not chosen yet, so the picker.
@@ -312,7 +331,7 @@ function AppBody({
   }, [signedOut, leftOnPurpose, view]);
   const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
   // One polite region that is always there, so the note is announced when its text appears.
-  const endedNote = auth ? (
+  const signedOutNote = auth ? (
     <div role="status" aria-live="polite" className="text-[13px]">
       {sessionEnded && (
         <div className="flex flex-col gap-1 mb-4">
@@ -332,6 +351,24 @@ function AppBody({
       <p className="m-0">Your account can't be reached right now. Your work on this device is here.</p>
     </div>
   ) : null;
+
+  const removedNote = (
+    <div role="status" aria-live="polite" className="text-[13px]">
+      {showRemoved && <p className="m-0 mb-4">Everything has been removed from this device.</p>}
+    </div>
+  );
+  const endedNote = (
+    <>
+      {removedNote}
+      {signedOutNote}
+    </>
+  );
+
+  async function removeEverything() {
+    // Local only: signOut here is supabase-js's local scope. It deletes nothing on a server.
+    await removeEverythingFromDevice(window.localStorage, client ? () => client.signOut() : undefined);
+    onRemoved?.();
+  }
 
   // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
   // (#39), so the Supabase user id is deliberately not passed in.
@@ -579,6 +616,14 @@ function AppBody({
     );
   }
 
+  if (view === 'settings') {
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+        <Settings onBack={goToPathLanding} onRemoveEverything={removeEverything} />
+      </Shell>
+    );
+  }
+
   if (view === 'addContactsManual') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
@@ -758,6 +803,14 @@ function AppBody({
             Your account
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setView('settings')}
+          className="gg-btn gg-btn-ghost !px-0 self-start mt-2"
+          style={{ color: 'var(--color-neutral-700)' }}
+        >
+          Settings
+        </button>
       </Shell>
     );
   }
