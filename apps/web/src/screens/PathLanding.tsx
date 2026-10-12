@@ -4,6 +4,7 @@ import type { Moment, MomentKey } from '@griever/shared';
 import { CheckCircle, CircleDashed, ListChecks } from '@phosphor-icons/react';
 import { Eyebrow } from '../lib/ui';
 import { formatDate } from '../lib/format';
+import { ShareDetailsButton } from './ShareDetailsButton';
 
 const MOMENT_COPY: Record<MomentKey, { title: string; body: string; doneLabel: string }> = {
   announce: {
@@ -60,7 +61,7 @@ export function PathLanding({
         onClick={onWhatYoullNeed}
         className="gg-btn gg-btn-secondary gg-btn-block"
       >
-        <ListChecks size={18} weight="duotone" />
+        <ListChecks size={18} weight="duotone" aria-hidden="true" />
         What you'll need
       </button>
 
@@ -69,6 +70,14 @@ export function PathLanding({
           <MomentRow key={moment.key} moment={moment} onStart={() => onStartMoment(moment.key)} />
         ))}
       </div>
+
+      <ShareDetailsButton
+        session={session}
+        checklist={moments.map((m) => ({
+          label: MOMENT_COPY[m.key].title,
+          done: m.status === 'done',
+        }))}
+      />
 
       {otherSessions.length > 0 && (
         <div className="flex flex-col gap-2">
