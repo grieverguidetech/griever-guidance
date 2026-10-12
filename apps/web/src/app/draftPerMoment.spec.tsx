@@ -149,3 +149,88 @@ describe('one draft per moment (#83)', () => {
     expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5', 'c-1']);
   }, 30_000);
 });
+
+describe('start this message again (#98)', () => {
+  it('shows no start-again link on an empty service form after "Add service details"', async () => {
+    await contactStore.put({
+      contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
+    });
+    const service = freshDraft({
+      templateCategory: 'service',
+      step: 'details',
+      fields: {},
+      selectedContactIds: ['c-5'],
+    });
+    const review = freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c-1'], serviceDetailsKnown: 'no' });
+    seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
+    await user.click(screen.getByRole('button', { name: 'Open Messages' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await user.click(await screen.findByRole('button', { name: 'Add service details' }));
+
+    expect(await screen.findByLabelText(/^Location/)).toHaveValue('');
+    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5', 'c-1']);
+    expect(screen.queryByRole('button', { name: 'Start this message again' })).not.toBeInTheDocument();
+  }, 30_000);
+
+  const link = () => screen.queryByRole('button', { name: 'Start this message again' });
+  const service = freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary Church' } });
+
+  async function putContact() {
+    await contactStore.put({
+      contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
+    });
+  }
+
+  it('is hidden while the draft is empty', async () => {
+    seed({ announcement: freshDraft({ templateCategory: 'announcement', step: 'announce' }) });
+    render(<App />);
+    await screen.findByLabelText(/Anything you'd like to add/);
+    expect(link()).not.toBeInTheDocument();
+  });
+
+  it('clears only this moment after a confirm, and leaves the other moment and the contacts alone', async () => {
+    await putContact();
+    seed({ announcement, service }, { serviceReady: true, recipientsNotified: { announcement: ['c-1'] } });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByLabelText(/Anything you'd like to add/);
+    await user.click(link() as HTMLElement);
+    const confirm = screen.getByText(/Clear what you've written for this message\? People and contacts stay as they are\./);
+    expect(confirm.closest('[role="group"]')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Clear it' }));
+
+    expect(screen.getByLabelText(/Anything you'd like to add/)).toHaveValue('');
+    expect(link()).not.toBeInTheDocument();
+    expect(savedDrafts()['announcement']).toMatchObject({ templateCategory: 'announcement', fields: {} });
+    expect(savedDrafts()['service']).toMatchObject({ fields: { serviceLocation: 'St Mary Church' } });
+    const [saved] = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
+    expect(saved.recipientsNotified).toEqual({ announcement: ['c-1'] });
+    expect(saved.personName).toBe('Margaret Hayes');
+    expect((await contactStore.list()).map((c) => c.contactId)).toEqual(['c-1']);
+  });
+
+  it('changes nothing on Keep and puts focus back on the link', async () => {
+    seed({ announcement });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByLabelText(/Anything you'd like to add/);
+    await user.click(link() as HTMLElement);
+    await user.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(screen.getByLabelText(/Anything you'd like to add/)).toHaveValue(note);
+    expect(link()).toHaveFocus();
+    expect(savedDrafts()['announcement']).toMatchObject(kept);
+  });
+
+  it('is offered on the service form too', async () => {
+    seed({ service }, { serviceReady: true });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByLabelText(/^Location/);
+    await user.click(link() as HTMLElement);
+    await user.click(screen.getByRole('button', { name: 'Clear it' }));
+    expect(screen.getByLabelText(/^Location/)).toHaveValue('');
+  });
+});

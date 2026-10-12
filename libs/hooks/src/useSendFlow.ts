@@ -77,6 +77,8 @@ export interface SendFlowActions {
   reset: () => void;
   /** B6 → Flow A for the same session, keeping the recipient list. */
   restartForServiceDetails: () => void;
+  /** Empties this moment's draft and returns to its first form. The person, contacts and sent record are not touched. */
+  startAgain: () => void;
   /** A5 "Send another message" → back to the picker for the same session. */
   startAnotherMessage: () => void;
 }
@@ -87,6 +89,8 @@ export interface SendFlowDerived {
   session: SessionDetails | null;
   composedFields: Record<string, string>;
   composedMessage: string;
+  /** True when the first form shows something typed, a hand-edited message or (obituary) chosen contacts. */
+  hasDraftContent: boolean;
 }
 
 const STORAGE_KEY = 'gg.sendflow.v1';
@@ -149,6 +153,21 @@ export function resumeDraft(draft: SendFlowDraft): SendFlowDraft {
   if (draft.step !== 'template') return draft;
   const first = draft.templateCategory ? FIRST_STEP[draft.templateCategory] : undefined;
   return { ...draft, step: first ?? 'details' };
+}
+
+/**
+ * True when the moment's first form shows something to clear. Typed fields and a hand-edited
+ * message count everywhere; chosen contacts count only where the first form is the contacts step
+ * (the obituary), so people carried in from elsewhere never make an empty form look written.
+ */
+export function draftHasContent(
+  draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds' | 'templateCategory'>,
+): boolean {
+  return (
+    Object.values(draft.fields).some((value) => value.trim() !== '') ||
+    !!draft.messageOverride ||
+    (draft.templateCategory === 'obituary' && draft.selectedContactIds.length > 0)
+  );
 }
 
 function fromDraft(draft: SendFlowDraft): SendFlowState {
@@ -479,8 +498,26 @@ export function useSendFlow(
     setState(() => ({ ...initialState, step: 'template' }));
   }, []);
 
+  const startAgain = useCallback(() => {
+    setState((s) => {
+      const category = s.templateCategory;
+      if (!category) return s;
+      return {
+        ...initialState,
+        step: FIRST_STEP[category] ?? 'details',
+        templateCategory: category,
+        templateOverrideId: s.templateOverrideId,
+        // People chosen elsewhere (e.g. carried in by "Add service details") are not on this form,
+        // so they are not ours to drop. The obituary's first form is the contacts list itself.
+        selectedContactIds: category === 'obituary' ? [] : s.selectedContactIds,
+      };
+    });
+  }, []);
+
   return {
     ...state,
+    hasDraftContent: draftHasContent(state),
+    startAgain,
     selectedTemplate,
     steps,
     session,
