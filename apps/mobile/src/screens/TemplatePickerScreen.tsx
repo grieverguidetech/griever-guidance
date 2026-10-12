@@ -7,7 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../app/App';
 import { AUTH_ENABLED } from '../lib/features';
-import { ACCENT } from '../components/colors';
+import { ACCENT, MUTED } from '../components/colors';
 
 const CATEGORY_ORDER: TemplateCategory[] = ['announcement', 'service', 'aftercare'];
 
@@ -73,12 +73,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60 },
   title: { fontSize: 24, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#9ca3af', marginBottom: 32 },
+  subtitle: { fontSize: 14, color: MUTED, marginBottom: 32 },
   group: { marginBottom: 24 },
   categoryHeading: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#9ca3af',
+    color: MUTED,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 8,
@@ -91,9 +91,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardTitle: { fontSize: 16, fontWeight: '500', color: '#111827', marginBottom: 4 },
-  cardDescription: { fontSize: 14, color: '#6b7280' },
-  whatYoullNeedLink: { alignSelf: 'flex-start', paddingVertical: 8, marginBottom: 24 },
+  cardDescription: { fontSize: 14, color: MUTED },
+  whatYoullNeedLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginBottom: 24 },
   accountLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginBottom: 16 },
   accountLinkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
-  whatYoullNeedText: { fontSize: 14, color: '#6B7FD4', fontWeight: '500' },
+  whatYoullNeedText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
 });

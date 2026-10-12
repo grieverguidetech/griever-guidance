@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { FlowProps } from '../app/App';
+import { ACCENT, ACCENT_TINT, MUTED } from '../components/colors';
 
 export function SentScreen({ flow }: FlowProps) {
   const { fields, reset, sendJob } = flow;
@@ -42,12 +43,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#eef0fb',
+    backgroundColor: ACCENT_TINT,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
-  icon: { fontSize: 24, color: '#6B7FD4', fontWeight: '700' },
+  icon: { fontSize: 24, color: ACCENT, fontWeight: '700' },
   heading: {
     fontSize: 20,
     fontWeight: '600',
@@ -57,23 +58,23 @@ const styles = StyleSheet.create({
   },
   body: {
     fontSize: 14,
-    color: '#6b7280',
+    color: MUTED,
     textAlign: 'center',
     marginBottom: 4,
   },
   condolence: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: MUTED,
     textAlign: 'center',
     marginBottom: 16,
   },
   noSave: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: MUTED,
     textAlign: 'center',
     marginBottom: 24,
     paddingHorizontal: 16,
   },
   link: {},
-  linkText: { fontSize: 14, color: '#6B7FD4' },
+  linkText: { fontSize: 14, color: ACCENT },
 });
