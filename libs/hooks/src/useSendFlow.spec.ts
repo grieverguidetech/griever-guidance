@@ -184,3 +184,30 @@ describe('resuming', () => {
     expect(result.current.fields).toEqual({});
   });
 });
+
+describe('useSendFlow — start again (#98)', () => {
+  it('reports content only when something is typed, edited or chosen', () => {
+    const { result } = announcement();
+    expect(result.current.hasDraftContent).toBe(false);
+    act(() => result.current.setField('personalNote', '  '));
+    expect(result.current.hasDraftContent).toBe(false);
+    act(() => result.current.setField('personalNote', 'hi'));
+    expect(result.current.hasDraftContent).toBe(true);
+  });
+
+  it('empties the moment and returns to its first form, keeping the moment', () => {
+    const { result } = announcement({ step: 'review', fields: { personalNote: 'hi' }, selectedContactIds: ['c-1'], messageOverride: 'mine' });
+    act(() => result.current.startAgain());
+    expect(result.current).toMatchObject({ step: 'announce', templateCategory: 'announcement', fields: {}, selectedContactIds: [], messageOverride: null });
+    expect(result.current.hasDraftContent).toBe(false);
+  });
+
+  it('goes to the details form for a service and the contacts step for the obituary', () => {
+    const service = renderHook(() => useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', step: 'review', fields: { serviceLocation: 'x' } }) }));
+    act(() => service.result.current.startAgain());
+    expect(service.result.current.step).toBe('details');
+    const obit = renderHook(() => useSendFlow({ session, draft: freshDraft({ templateCategory: 'obituary', templateOverrideId: 'obituary-link', step: 'contacts', selectedContactIds: ['c-1'] }) }));
+    act(() => obit.result.current.startAgain());
+    expect(obit.result.current).toMatchObject({ step: 'contacts', selectedContactIds: [], templateOverrideId: 'obituary-link' });
+  });
+});

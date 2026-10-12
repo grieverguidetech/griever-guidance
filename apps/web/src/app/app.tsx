@@ -734,6 +734,7 @@ function AppBody({
             setView('setup');
           }}
           onAddContact={({ name, phone }) => contacts.addContact({ name, phone, tier: 'family' })}
+          onClearDraft={(category) => sessions.clearDraft(active.id, category)}
         />
       </Shell>
     );

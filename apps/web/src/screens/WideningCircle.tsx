@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
 import { TopBar } from '../lib/ui';
+import { StartAgain } from '../lib/StartAgain';
 import { ContactRow } from './ContactSelector';
 
 type Flow = ReturnType<typeof useSendFlow>;
@@ -96,6 +97,7 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
           Continue
         </button>
       </div>
+      <StartAgain flow={flow} />
     </div>
   );
 }

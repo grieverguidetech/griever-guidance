@@ -169,6 +169,21 @@ describe('one draft per moment (#83)', () => {
     expect(saved.drafts.service?.step).toBe('details');
   });
 
+  it('clearDraft removes only that moment, and leaves the others, who was notified and the person', () => {
+    const { result, id, storage } = start();
+    const announcement = freshDraft({ templateCategory: 'announcement', step: 'announce', fields: { personalNote: 'Kind' } });
+    act(() => result.current.updateDraft(id, announcement));
+    act(() => result.current.updateDraft(id, freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } })));
+    act(() => result.current.recordMomentComplete(id, 'service', ['c-1']));
+    act(() => result.current.clearDraft(id, 'service'));
+    const [saved] = storage.dump();
+    expect(Object.keys(saved.drafts)).toEqual(['announcement']);
+    expect(saved.drafts.announcement).toEqual(announcement);
+    expect(Object.keys(saved.draftsUpdatedAt ?? {})).toEqual(['announcement']);
+    expect(saved.recipientsNotified.service).toEqual(['c-1']);
+    expect(saved.personName).toBe('Margaret Hayes');
+  });
+
   it('does not keep a draft with no moment chosen yet', () => {
     const { result, id } = start();
     act(() => result.current.updateDraft(id, freshDraft({})));

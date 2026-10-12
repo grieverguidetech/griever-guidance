@@ -63,6 +63,8 @@ export interface UseSessionsResult {
   createSession: (details?: Partial<SessionDetails>) => Session;
   updateSession: (id: string, patch: Partial<SessionDetails>) => void;
   updateDraft: (id: string, draft: SendFlowDraft) => void;
+  /** Empties one moment's draft. Other moments, people, contacts and who was notified stay as they are. */
+  clearDraft: (id: string, category: TemplateCategory) => void;
   touchSession: (id: string) => void;
   deleteSession: (id: string) => void;
   pruneEmpty: () => void;
@@ -224,6 +226,18 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     );
   }, []);
 
+  const clearDraft = useCallback((id: string, category: TemplateCategory) => {
+    setSessions((list) =>
+      list.map((s) => {
+        if (s.id !== id || !s.drafts[category]) return s;
+        // Only this moment's slot goes; recipientsNotified and the person's details are not drafts.
+        const { [category]: _removed, ...drafts } = s.drafts;
+        const { [category]: _removedAt, ...draftsUpdatedAt } = s.draftsUpdatedAt ?? {};
+        return { ...s, drafts, draftsUpdatedAt };
+      }),
+    );
+  }, []);
+
   const touchSession = useCallback((id: string) => {
     setSessions((list) =>
       list.map((s) =>
@@ -309,6 +323,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     createSession,
     updateSession,
     updateDraft,
+    clearDraft,
     touchSession,
     deleteSession,
     pruneEmpty,

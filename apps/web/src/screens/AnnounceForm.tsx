@@ -1,6 +1,7 @@
 import type { useSendFlow } from '@griever/hooks';
 import { PencilSimple } from '@phosphor-icons/react';
 import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
+import { StartAgain } from '../lib/StartAgain';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -73,6 +74,7 @@ export function AnnounceForm({ flow, onEditSession }: Props) {
         Continue
       </button>
       <SavedNote />
+      <StartAgain flow={flow} />
     </div>
   );
 }

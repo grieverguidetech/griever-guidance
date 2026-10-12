@@ -22,6 +22,8 @@ interface Props {
   onExitToLanding: () => void;
   onEditSession: () => void;
   onAddContact: (input: { name: string; phone: string }) => Promise<Contact>;
+  /** Removes one moment's saved draft from the session. */
+  onClearDraft: (category: TemplateCategory) => void;
 }
 
 export function Flow({
@@ -34,8 +36,17 @@ export function Flow({
   onExitToLanding,
   onEditSession,
   onAddContact,
+  onClearDraft,
 }: Props) {
-  const flow = useSendFlow({ session, draft, drafts, onDraftChange });
+  const base = useSendFlow({ session, draft, drafts, onDraftChange });
+  // Starting again also clears the saved draft for this moment, not just the live form.
+  const flow = {
+    ...base,
+    startAgain: () => {
+      if (base.templateCategory) onClearDraft(base.templateCategory);
+      base.startAgain();
+    },
+  };
   const grouped = flow.templateCategory === 'announcement';
 
   switch (flow.step) {
