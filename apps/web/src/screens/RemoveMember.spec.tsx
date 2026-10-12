@@ -63,4 +63,18 @@ describe('RemoveMember', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(FAILED));
     expect(screen.getByRole('button', { name: 'Remove Sam Lee' })).toHaveFocus();
   });
+
+  it('stays mounted after the last member is removed, announces it and keeps focus on the heading', async () => {
+    const user = userEvent.setup();
+    const one = [members[0]!];
+    const onRemove = vi.fn(async () => true);
+    const { rerender } = render(<RemoveMember members={one} message={null} onRemove={onRemove} />);
+    await user.click(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    rerender(<RemoveMember members={[]} message={null} onRemove={onRemove} />);
+    const heading = screen.getByRole('heading', { name: 'People helping you' });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Sam Lee has been removed.'));
+    expect(heading).toHaveFocus();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

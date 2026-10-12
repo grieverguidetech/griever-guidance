@@ -26,6 +26,9 @@ export function RemoveMember({ members, message, onRemove }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
   const focusAfterClose = useRef<FocusTarget>(null);
+  // Once shown, the section stays so the last removal can still be announced and hold focus.
+  const hadMembers = useRef(false);
+  if (members.length > 0) hadMembers.current = true;
 
   // Focus follows the swap: into the confirm step when it opens, back out when it closes.
   useEffect(() => {
@@ -39,7 +42,7 @@ export function RemoveMember({ members, message, onRemove }: Props) {
     else if (target) rowButtons.current.get(target.row)?.focus();
   }, [confirmingId]);
 
-  if (members.length === 0) return null;
+  if (members.length === 0 && !hadMembers.current) return null;
 
   function close(target: FocusTarget) {
     focusAfterClose.current = target;
