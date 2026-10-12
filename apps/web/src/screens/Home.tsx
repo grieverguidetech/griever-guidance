@@ -30,7 +30,7 @@ export function Home({ sessions, onOpen, onCreate, canCreate }: Props) {
       <h1 className="text-[22px]">The people you're writing about</h1>
 
       {people.length > 0 && (
-        <ul className="flex flex-col gap-2 list-none m-0 p-0">
+        <ul role="list" className="flex flex-col gap-2 list-none m-0 p-0">
           {people.map((s) => {
             const passed = passingLabel(s.dateOfPassing);
             return (
@@ -38,10 +38,16 @@ export function Home({ sessions, onOpen, onCreate, canCreate }: Props) {
                 <button
                   type="button"
                   onClick={() => onOpen(s.id)}
+                  // Read as "Margaret Hale, passed May 29, 2026". A hidden-text span got a stray space before the comma.
+                  aria-label={passed ? `${s.personName}, passed ${passed}` : s.personName}
                   className="gg-card flex-row items-center justify-between gap-3 w-full text-left"
-                  style={{ minHeight: 44 }}
+                  style={{
+                    minHeight: 44,
+                    // Opaque ink/bg mix: 3.16:1 against the page background.
+                    border: '1px solid color-mix(in srgb, var(--color-ink) 50%, var(--color-bg))',
+                  }}
                 >
-                  <span className="flex flex-col">
+                  <span className="flex flex-col min-w-0 break-words">
                     <span className="gg-card-title">{s.personName}</span>
                     {passed && <span className="gg-card-meta">{passed}</span>}
                   </span>
@@ -51,6 +57,12 @@ export function Home({ sessions, onOpen, onCreate, canCreate }: Props) {
             );
           })}
         </ul>
+      )}
+
+      {people.length === 0 && !canCreate && (
+        <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)' }}>
+          When someone adds you to help, the people you're helping will show here.
+        </p>
       )}
 
       {canCreate && (

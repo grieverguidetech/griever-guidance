@@ -33,6 +33,16 @@ function setup(props: Partial<Parameters<typeof Home>[0]> = {}) {
   return { onOpen, onCreate };
 }
 
+const originalTZ = process.env.TZ;
+beforeAll(() => {
+  // West of UTC, so a date parsed as UTC midnight would show the day before.
+  process.env.TZ = 'America/Los_Angeles';
+});
+afterAll(() => {
+  if (originalTZ === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTZ;
+});
+
 describe('Home', () => {
   it('has exactly one h1', () => {
     setup();
@@ -52,6 +62,43 @@ describe('Home', () => {
     setup();
     expect(screen.getByRole('button', { name: /Margaret Hale/ }).textContent).toContain('May 29, 2026');
     expect(screen.getByRole('button', { name: /Walter Hale/ }).textContent).toContain('April 20, 2026');
+  });
+
+  it('names each row with the person and when they passed', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'Margaret Hale, passed May 29, 2026' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Walter Hale, passed April 20, 2026' })).toBeTruthy();
+  });
+
+  it('shows a date that is not complete exactly as typed', () => {
+    setup({ sessions: [make('a', 'Ruth Hale', '2026-06-01T00:00:00.000Z', 'late May')] });
+    expect(screen.getByRole('button', { name: 'Ruth Hale, passed late May' }).textContent).toContain('late May');
+  });
+
+  it('renders no date line when the date is empty', () => {
+    setup({ sessions: [make('a', 'Ruth Hale', '2026-06-01T00:00:00.000Z', '')] });
+    const row = screen.getByRole('button', { name: 'Ruth Hale' });
+    expect(row.textContent).toBe('Ruth Hale');
+  });
+
+  it('keeps every row at least 44px tall and the list announced as a list', () => {
+    setup();
+    for (const row of within(screen.getByRole('list')).getAllByRole('button')) {
+      expect(row.style.minHeight).toBe('44px');
+    }
+    expect(screen.getByRole('list').getAttribute('role')).toBe('list');
+  });
+
+  it('explains the empty state to someone who cannot create', () => {
+    setup({ sessions: [], canCreate: false });
+    expect(
+      screen.getByText("When someone adds you to help, the people you're helping will show here."),
+    ).toBeTruthy();
+  });
+
+  it('does not show the member line when people exist or create is allowed', () => {
+    setup({ canCreate: false });
+    expect(screen.queryByText(/When someone adds you/)).toBeNull();
   });
 
   it('opens the person that was pressed', async () => {
