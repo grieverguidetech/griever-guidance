@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
@@ -19,9 +20,11 @@ import { authClient } from '../lib/authClient';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
-import { PersonBar, PersonSwitcher } from '../components/PersonSwitcher';
+import { PersonBar } from '../components/PersonSwitcher';
+import { HomeScreen } from '../screens/HomeScreen';
 
 export type RootStackParamList = {
+  Home: undefined;
   TemplatePicker: undefined;
   DetailsForm: undefined;
   ContactSelector: undefined;
@@ -44,12 +47,12 @@ type SessionProps = {
   arrived: boolean;
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
   onDetails: (id: string, details: Details) => void;
-  onOpenSwitcher: () => void;
+  onHome: () => void;
 };
 
-// One person's send flow. Keyed by session id in SendApp, so switching people starts the flow
+// One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onOpenSwitcher }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onHome }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent".
@@ -62,7 +65,7 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onO
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
-  // What is typed on the details form becomes this person's details, so the switcher can list
+  // What is typed on the details form becomes this person's details, so Home can list
   // them and retention can use the service date. Compared with what was there when the form
   // opened, so opening it (its fields start empty) never wipes the saved name.
   const name = flow.fields['deceasedName'] ?? '';
@@ -86,14 +89,14 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onO
   }, [flow.step, id, name, passed, service, onDetails]);
 
   const bar = (
-    <PersonBar active={session} onOpen={onOpenSwitcher} arrived={pendingArrival} onArrived={clearArrival} />
+    <PersonBar active={session} onOpen={onHome} arrived={pendingArrival} onArrived={clearArrival} />
   );
   return <Navigation flow={flow} contacts={contacts} bar={bar} />;
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
   const { sessions, active, switchTo, addPerson, updateDraft, updateSession } = useDeviceSessions(cache);
-  const [switching, setSwitching] = useState(false);
+  const [atHome, setAtHome] = useState(true);
   const [arrived, setArrived] = useState(false);
   const contacts = useContacts(mobileContactStore);
   const purgedOnBoot = useRef(false);
@@ -110,25 +113,30 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   }, [contacts.loading, clearAll, sessions]);
 
   if (!active) return null;
-  const close = () => {
+  const open = () => {
     setArrived(true);
-    setSwitching(false);
+    setAtHome(false);
   };
-  if (switching) {
+  if (atHome) {
     return (
-      <PersonSwitcher
-        sessions={sessions}
-        activeId={active.id}
-        onPick={(id) => {
-          switchTo(id);
-          close();
-        }}
-        onAdd={() => {
-          addPerson();
-          close();
-        }}
-        onClose={close}
-      />
+      <HomeNavigation>
+        {(navigation) => (
+          <HomeScreen
+            sessions={sessions}
+            canCreate
+            onOpen={(id) => {
+              switchTo(id);
+              open();
+            }}
+            onCreate={() => {
+              addPerson();
+              open();
+            }}
+            onWhatYoullNeed={() => navigation.navigate('WhatYoullNeed')}
+            onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
+          />
+        )}
+      </HomeNavigation>
     );
   }
   return (
@@ -139,13 +147,38 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       arrived={arrived}
       onDraftChange={updateDraft}
       onDetails={updateSession}
-      onOpenSwitcher={() => {
+      onHome={() => {
         setArrived(false);
-        setSwitching(true);
+        setAtHome(true);
       }}
     />
   );
 };
+
+type StackNavigation = NativeStackNavigationProp<RootStackParamList>;
+
+// The screens every stack shares: the checklist and, with accounts on, the account.
+const sharedScreens = () => (
+  <>
+    <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
+      {() => <WhatYoullNeedScreen />}
+    </Stack.Screen>
+    {AUTH_ENABLED && (
+      <Stack.Screen name="Account">{({ navigation }) => <AccountScreen onBack={navigation.goBack} />}</Stack.Screen>
+    )}
+  </>
+);
+
+const screenOptions = { headerShown: false, contentStyle: { backgroundColor: '#ffffff' } } as const;
+
+const HomeNavigation = ({ children }: { children: (navigation: StackNavigation) => ReactNode }) => (
+  <NavigationContainer>
+    <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Screen name="Home">{({ navigation }) => children(navigation)}</Stack.Screen>
+      {sharedScreens()}
+    </Stack.Navigator>
+  </NavigationContainer>
+);
 
 const Navigation = ({
   flow,
@@ -158,12 +191,7 @@ const Navigation = ({
 }) => {
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#ffffff' },
-        }}
-      >
+      <Stack.Navigator screenOptions={screenOptions}>
         {flow.step === 'template' && (
           <Stack.Screen name="TemplatePicker">
             {() => (
@@ -191,14 +219,7 @@ const Navigation = ({
         {flow.step === 'sent' && (
           <Stack.Screen name="Sent">{() => <SentScreen flow={flow} />}</Stack.Screen>
         )}
-        <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
-          {() => <WhatYoullNeedScreen />}
-        </Stack.Screen>
-        {AUTH_ENABLED && (
-          <Stack.Screen name="Account">
-            {({ navigation }) => <AccountScreen onBack={navigation.goBack} />}
-          </Stack.Screen>
-        )}
+        {sharedScreens()}
       </Stack.Navigator>
     </NavigationContainer>
   );

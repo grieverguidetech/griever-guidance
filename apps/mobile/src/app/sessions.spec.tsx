@@ -16,9 +16,18 @@ async function startWith(name: string) {
   await screen.findByText(`Writing about ${name}`);
 }
 
+const START = "Start with someone I've lost";
+const ANOTHER = "Someone else I've lost";
+
+// Home is where every launch lands; the first person is begun from there.
+async function begin() {
+  fireEvent.press(await screen.findByText(START));
+  await screen.findByText('Writing about Someone new');
+}
+
 async function addPerson() {
-  fireEvent.press(await screen.findByLabelText(/^Change who you are writing about/));
-  fireEvent.press(await screen.findByText("Someone else I've lost"));
+  fireEvent.press(await screen.findByLabelText('Back to home'));
+  fireEvent.press(await screen.findByText(ANOTHER));
 }
 
 afterEach(() => {
@@ -28,15 +37,15 @@ afterEach(() => {
 describe('people kept on the phone', () => {
   it('keeps two people separate and switches between them', async () => {
     render(<App />);
+    await begin();
     await startWith('Anna');
     await addPerson();
     expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
     await startWith('Ben');
 
-    fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
+    fireEvent.press(screen.getByLabelText('Back to home'));
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
     expect(screen.getByLabelText('Ben')).toBeTruthy();
-    expect(screen.getByText('Current')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Anna'));
     expect(await screen.findByText('Writing about Anna')).toBeTruthy();
 
@@ -49,6 +58,7 @@ describe('people kept on the phone', () => {
 
   it("starts the next person's form empty, even after the first was filled in", async () => {
     render(<App />);
+    await begin();
     await startWith('Anna');
     await addPerson();
     fireEvent.press(await screen.findByText('Thank-you note'));
@@ -57,6 +67,7 @@ describe('people kept on the phone', () => {
 
   it('restores a half-finished draft, not just the names', async () => {
     const first = render(<App />);
+    await begin();
     await startWith('Anna');
     fireEvent.press(screen.getByText('Thank-you note'));
     fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Lee');
@@ -64,6 +75,7 @@ describe('people kept on the phone', () => {
     first.unmount();
 
     render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna Lee')); // typing the name renamed the person
     expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
   });
 
@@ -82,6 +94,7 @@ describe('people kept on the phone', () => {
     });
     first.unmount();
     render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
     expect(await screen.findByText('Writing about Anna')).toBeTruthy();
   });
 
@@ -98,6 +111,7 @@ describe('people kept on the phone', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
     await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Marie');
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
@@ -108,16 +122,16 @@ describe('people kept on the phone', () => {
 
   it('reuses a blank person instead of adding another', async () => {
     render(<App />);
+    await begin();
+    fireEvent.press(await screen.findByLabelText('Back to home'));
+    fireEvent.press(await screen.findByText(START)); // still nobody named, so still the first start
     expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
-    await addPerson();
-    expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
-    await screen.findByText('Who are you writing about?');
-    expect(screen.getAllByLabelText('Someone new')).toHaveLength(1);
+    await waitFor(async () => expect(JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]')).toHaveLength(1));
   });
 
   it('restores both people and the open one after a relaunch', async () => {
     const first = render(<App />);
+    await begin();
     await startWith('Anna');
     await addPerson();
     await startWith('Ben');
@@ -125,16 +139,14 @@ describe('people kept on the phone', () => {
     first.unmount();
 
     render(<App />); // a new App, a new in-memory cache, the same AsyncStorage
-    expect(await screen.findByText('Writing about Ben')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
     expect(screen.getByLabelText('Ben')).toBeTruthy();
-    expect(screen.getByText('Current')).toBeTruthy();
   });
 
   it('makes no network calls', async () => {
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
     render(<App />);
+    await begin();
     await startWith('Anna');
     await addPerson();
     await startWith('Ben');
@@ -143,9 +155,10 @@ describe('people kept on the phone', () => {
 
   it('offers no way to delete a person', async () => {
     render(<App />);
+    await begin();
     await startWith('Anna');
-    fireEvent.press(screen.getByLabelText(/^Change who you are writing about/));
-    await screen.findByText('Who are you writing about?');
+    fireEvent.press(screen.getByLabelText('Back to home'));
+    await screen.findByLabelText('Anna');
     expect(screen.queryByText(/delete|remove/i)).toBeNull();
     expect(screen.queryByLabelText(/delete|remove/i)).toBeNull();
   });
@@ -165,7 +178,7 @@ describe('when saved people cannot be read', () => {
       throw new Error('read failed');
     });
     render(<App />);
-    await screen.findByText('Writing about Someone new'); // works in memory for this run
+    await begin(); // works in memory for this run
     await startWith('Cara');
     jest.restoreAllMocks();
     expect(await real(SESSIONS_KEY)).toBe(saved);
@@ -175,7 +188,7 @@ describe('when saved people cannot be read', () => {
   it('never overwrites corrupt data', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, '{not json');
     render(<App />);
-    await screen.findByText('Writing about Someone new');
+    await begin();
     await startWith('Cara');
     expect(await AsyncStorage.getItem(SESSIONS_KEY)).toBe('{not json');
   });
