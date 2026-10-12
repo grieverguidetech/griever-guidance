@@ -58,4 +58,28 @@ describe('postgrest helper', () => {
     const err = await rpc(config, 'jwt', 'x').catch((e: unknown) => e);
     expect(err).toMatchObject({ status: 502, code: null });
   });
+
+  it('never lets caller headers replace the auth headers', async () => {
+    const fetchMock = stubFetch(jsonResponse([]));
+    await postgrestRequest(config, 'caller-jwt', 'members', {
+      headers: { Authorization: 'Bearer other', apikey: 'x', Prefer: 'return=minimal' },
+    });
+    const headers = fetchMock.mock.calls[0][1].headers;
+    expect(headers.Authorization).toBe('Bearer caller-jwt');
+    expect(headers.apikey).toBe('anon-key');
+    expect(headers.Prefer).toBe('return=minimal');
+  });
+
+  it.each(['../profiles', 'x?select=*', 'Upper', '', 'a/b'])('rpc rejects the name %j without calling fetch', async (name) => {
+    const fetchMock = stubFetch(jsonResponse({}));
+    await expect(rpc(config, 'jwt', name)).rejects.toThrow('invalid rpc name');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rpc wraps a non-JSON 2xx body as a PostgrestError', async () => {
+    stubFetch(new Response('<html>', { status: 200 }));
+    const err = await rpc(config, 'jwt', 'x').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PostgrestError);
+    expect(err).toMatchObject({ status: 200, code: null });
+  });
 });

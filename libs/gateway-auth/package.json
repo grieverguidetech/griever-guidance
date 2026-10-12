@@ -9,7 +9,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./testing": {
+      "types": "./src/testSupabase.ts",
+      "import": "./src/testSupabase.ts",
+      "default": "./src/testSupabase.ts"
+    }
   },
   "nx": {
     "name": "gateway-auth"

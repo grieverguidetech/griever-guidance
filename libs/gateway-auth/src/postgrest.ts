@@ -45,7 +45,8 @@ export async function postgrestRequest(
 ): Promise<Response> {
   const res = await fetch(`${config.url}/rest/v1/${path}`, {
     method: init.method ?? 'GET',
-    headers: { ...postgrestHeaders(config, accessToken), ...init.headers },
+    // Caller headers first: the auth headers must always win.
+    headers: { ...init.headers, ...postgrestHeaders(config, accessToken) },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
   if (!res.ok) throw await errorFrom(res);
@@ -59,7 +60,14 @@ export async function rpc<T = unknown>(
   name: string,
   args: Record<string, unknown> = {},
 ): Promise<T> {
+  // The name goes into the URL path, so only plain function names are allowed.
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`invalid rpc name: ${name}`);
   const res = await postgrestRequest(config, accessToken, `rpc/${name}`, { method: 'POST', body: args });
   const text = await res.text();
-  return (text ? JSON.parse(text) : null) as T;
+  if (!text) return null as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new PostgrestError(res.status, null, `postgrest returned a non-JSON body (${res.status})`);
+  }
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearJwksCache, SUPABASE_URL, USER_ID, jsonResponse, makeKeys, signJwt } from '@griever/gateway-auth';
+import { clearJwksCache } from '@griever/gateway-auth';
+import { SUPABASE_URL, USER_ID, jsonResponse, makeKeys, signJwt } from '@griever/gateway-auth/testing';
 import { createProfileRouter, parseProfileBody } from './profileRouter.js';
 import type { Profile } from '@griever/shared';
 import type { ProfilesClient } from './supabaseClient.js';
