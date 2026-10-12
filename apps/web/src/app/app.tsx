@@ -232,7 +232,6 @@ function AppBody({
       ? 'addContactsManual'
       : viewForReturning(sessions.sessions);
   });
-  useFocusHeadingOnChange(view);
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
   // changed most recently; null means a moment not chosen yet, so the picker.
@@ -254,6 +253,7 @@ function AppBody({
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
+  useFocusHeadingOnChange(view);
   const updateSenderName = auth?.updateSenderName;
   const clearError = auth?.clearError;
 

@@ -78,18 +78,36 @@ export function SavedNote() {
 
 /**
  * When `key` changes (a new view or flow step), moves focus to the new screen's
- * `<h1>` so a screen reader announces it. The first render and re-renders that
- * keep the same key never move focus. The heading is made focusable with
- * tabindex="-1" (not a tab stop); styles.css hides the ring on it.
+ * `<h1>` so a screen reader announces it. Until the person first presses, taps or
+ * types, changes only update the recorded key: the app's own start-up redirects
+ * (loading, then sign-in, then the right screen) are the initial screen, not
+ * navigation. If the new screen has no h1 yet, the move waits and happens on the
+ * first later render that has one. The heading is made focusable with
+ * tabindex="-1" (not a tab stop); styles.css marks it differently from the ring.
  */
 export function useFocusHeadingOnChange(key: string | undefined) {
+  const interacted = useRef(false);
   const previous = useRef(key);
+  const pending = useRef(false);
   useEffect(() => {
-    if (previous.current === key) return;
-    previous.current = key;
+    const events = ['pointerdown', 'keydown', 'click'] as const;
+    const mark = () => {
+      interacted.current = true;
+      events.forEach((e) => document.removeEventListener(e, mark, true));
+    };
+    events.forEach((e) => document.addEventListener(e, mark, true));
+    return () => events.forEach((e) => document.removeEventListener(e, mark, true));
+  }, []);
+  useEffect(() => {
+    if (previous.current !== key) {
+      previous.current = key;
+      pending.current = interacted.current;
+    }
+    if (!pending.current) return;
     const heading = document.querySelector('h1');
     if (!heading) return;
+    pending.current = false;
     heading.setAttribute('tabindex', '-1');
     heading.focus();
-  }, [key]);
+  });
 }
