@@ -131,4 +131,14 @@ describe('Home', () => {
     setup();
     expect(screen.getByRole('button', { name: "What you'll need" })).toBeTruthy();
   });
+
+  it('says so calmly when nobody is listed yet and the person can create', () => {
+    setup({ sessions: [] });
+    expect(screen.getByText('No one here yet.')).toBeInTheDocument();
+  });
+
+  it('does not say it once someone is listed', () => {
+    setup();
+    expect(screen.queryByText('No one here yet.')).not.toBeInTheDocument();
+  });
 });

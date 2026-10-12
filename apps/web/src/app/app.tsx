@@ -30,6 +30,7 @@ import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
+import type { ContactDraft } from '../screens/AddContactsManual';
 import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
 import { SessionSetup } from '../screens/SessionSetup';
@@ -231,6 +232,7 @@ function lacksName(result: ProfileResult): boolean {
 }
 
 const NAME_CHECK_TIMEOUT_MS = 5000;
+const CONTACTS_CHECK_FALLBACK_MS = 1500;
 
 /**
  * Asks the server whether the account has a name, in the background. A slow or failed answer
@@ -267,6 +269,7 @@ const CHECKLIST_RETURNS: AppView[] = [
   'createAccount',
   'forgotPassword',
   'pathLanding',
+  'checkContacts',
   // The walk after "Create a new one": the checklist returns to the step it was opened from.
   'setup',
   'addContactsManual',
@@ -325,6 +328,12 @@ function AppBody({
   // The contacts step was skipped because contacts were already saved, so Back from who hears
   // first goes to setup instead.
   const [contactsSkipped, setContactsSkipped] = useState(false);
+  // Typed or ticked but not yet saved on the contacts steps; kept here so opening the checklist
+  // from a step does not lose it. Cleared when the walk starts and ends.
+  const [contactDraft, setContactDraft] = useState<ContactDraft>({ name: '', phone: '', hearsFirst: false });
+  const [firstTicks, setFirstTicks] = useState<string[] | null>(null);
+  // Which contacts view the walk used, so Back from who hears first returns to it.
+  const [contactsView, setContactsView] = useState<'addContactsManual' | 'importContacts'>('addContactsManual');
   // The name typed at sign-up, saved once the new account has a session.
   const [pendingName, setPendingName] = useState<string | null>(null);
   // The account has no name: Profile opens with a "What should we call you?" prompt.
@@ -463,8 +472,8 @@ function AppBody({
       setActiveId(sortedSessions[0].id);
       return;
     }
-    // No sessions at all: only the accounts-on path reaches here (an account with no people
-    // yet). Flag off, Home's create button starts the person. #114 removes this with the account order.
+    // No sessions at all: only the accounts-on paths reach here (signed in, or the offline
+    // AuthGate path, with no people yet). Flag off, Home's create button starts the person. #114 removes this with the account order.
     if (view === 'pathLanding' || view === 'flow' || view === 'setup') {
       const created = sessions.createSession();
       setActiveId(created.id);
@@ -571,6 +580,9 @@ function AppBody({
   /** "Create a new one" on Home: setup first, then the rest of the walk. */
   function startNewSession() {
     setCreating(true);
+    setContactDraft({ name: '', phone: '', hearsFirst: false });
+    setFirstTicks(null);
+    setContactsView('addContactsManual');
     startSetup();
   }
 
@@ -582,9 +594,11 @@ function AppBody({
   }
 
   function finishSetup() {
-    if (!creating) {
+    if (!creating || setupEditing) {
       goToPathLanding();
-    } else if (contacts.loading) {
+      return;
+    }
+    if (contacts.loading) {
       setView('checkContacts'); // waits for the local load, then continues below
     } else {
       continueAfterSetup();
@@ -596,6 +610,15 @@ function AppBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, contacts.loading]);
 
+  // If the local read never answers, carry on as if there are no contacts rather than hold
+  // anyone on a loading screen (C5 spirit: nothing in the flow waits on something slow).
+  useEffect(() => {
+    if (view !== 'checkContacts') return;
+    const timer = setTimeout(continueAfterSetup, CONTACTS_CHECK_FALLBACK_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
   function backToSetup() {
     setSetupEditing(false);
     setView('setup');
@@ -604,7 +627,7 @@ function AppBody({
   function backFromWhoHearsFirst() {
     if (creating) {
       if (contactsSkipped) backToSetup();
-      else setView('addContactsManual');
+      else setView(contactsView);
       return;
     }
     setView(!auth || auth.profile?.contactSource === 'manual' ? 'addContactsManual' : 'importContacts');
@@ -618,6 +641,7 @@ function AppBody({
     if (creating) {
       // The person was made at "Create a new one"; carry on to their path.
       setCreating(false);
+      setFirstTicks(null);
       setView('pathLanding');
     } else {
       startSetup(); // accounts-on sign-up still ends contacts here until #114 reorders it
@@ -803,6 +827,7 @@ function AppBody({
           onSignOut={() => {
             accountGeneration.current += 1;
             setLeftOnPurpose(true);
+            setCreating(false);
             void auth.signOut();
           }}
         />
@@ -831,7 +856,12 @@ function AppBody({
           onAdd={({ name, phone, hearsFirst }) =>
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
-          onDone={() => setView('whoHearsFirst')}
+          onDone={() => {
+            setContactsView('addContactsManual');
+            setView('whoHearsFirst');
+          }}
+          draft={contactDraft}
+          onDraftChange={setContactDraft}
         />
       </Shell>
     );
@@ -846,6 +876,7 @@ function AppBody({
           onSwitchToManual={() => setView('addContactsManual')}
           onContinue={(picked, source) => {
             contacts.importContacts(picked, source);
+            setContactsView('importContacts');
             setView('whoHearsFirst');
           }}
         />
@@ -868,6 +899,8 @@ function AppBody({
           contacts={contacts.contacts}
           onBack={backFromWhoHearsFirst}
           onSave={saveWhoHearsFirst}
+          initialFirstIds={firstTicks}
+          onTicksChange={setFirstTicks}
         />
       </Shell>
     );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Contact } from '@griever/shared';
 import { CheckCircle, Circle } from '@phosphor-icons/react';
 import { TopBar } from '../lib/ui';
@@ -8,12 +8,20 @@ interface Props {
   contacts: Contact[];
   onBack: () => void;
   onSave: (firstIds: string[]) => void;
+  /** Unsaved ticks kept by the parent, so they survive a trip to the checklist. */
+  initialFirstIds?: string[] | null;
+  onTicksChange?: (firstIds: string[]) => void;
 }
 
-export function WhoHearsFirst({ contacts, onBack, onSave }: Props) {
+export function WhoHearsFirst({ contacts, onBack, onSave, initialFirstIds, onTicksChange }: Props) {
   const [firstIds, setFirstIds] = useState<Set<string>>(
-    () => new Set(contacts.filter((c) => c.tier === 'first').map((c) => c.contactId)),
+    () => new Set(initialFirstIds ?? contacts.filter((c) => c.tier === 'first').map((c) => c.contactId)),
   );
+
+  useEffect(() => {
+    onTicksChange?.([...firstIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstIds]);
 
   function toggle(id: string) {
     setFirstIds((current) => {

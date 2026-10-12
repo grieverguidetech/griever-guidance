@@ -320,5 +320,71 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     await user.click(await screen.findByRole('button', { name: 'Back' }));
     expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
   });
-});
 
+  it('keeps typed contact input and unsaved ticks across the checklist', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await heading('Who should we be able to reach?');
+    await user.type(screen.getByLabelText('Name'), 'Uncle Joe');
+    await user.type(screen.getByLabelText('Mobile number'), '617555');
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await heading('Who should we be able to reach?');
+    expect(screen.getByLabelText('Name')).toHaveValue('Uncle Joe');
+    expect(screen.getByLabelText('Mobile number')).toHaveValue('617555');
+
+    await user.clear(screen.getByLabelText('Name'));
+    await user.clear(screen.getByLabelText('Mobile number'));
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Aunt Carol' }));
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await heading('Who should hear first?');
+    expect(screen.getByRole('checkbox', { name: 'Aunt Carol' })).toBeChecked();
+  });
+
+  it('still reaches a step when the local contacts read never answers', async () => {
+    const { contactStore } = await import('@griever/data-local');
+    const spy = vi.spyOn(contactStore, 'list').mockImplementation(() => new Promise(() => undefined));
+    const user = userEvent.setup();
+    try {
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: FIRST }));
+      await fillSetup(user, 'Margaret Hayes');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' }, { timeout: 4000 })).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
+  }, 10_000);
+
+  it('Edit details from the path and Continue returns to the path, not the contacts walk', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
+    await heading('One thing at a time.');
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await heading('Edit their details');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await heading('One thing at a time.')).toBeInTheDocument();
+  });
+
+  it('Back from who hears first returns to the contacts view that was used', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: FIRST }));
+    await fillSetup(user, 'Margaret Hayes');
+    await addOneContact(user);
+    await user.click(screen.getByRole('button', { name: 'Done for now' }));
+    await heading('Who should hear first?');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
+  });
+});
