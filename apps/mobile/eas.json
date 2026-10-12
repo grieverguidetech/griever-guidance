@@ -3,6 +3,9 @@
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com"
       }
     },
     "development": {
@@ -16,6 +19,9 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com"
       }
     }
   },
