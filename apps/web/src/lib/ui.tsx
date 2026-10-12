@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { ArrowLeft, ListChecks } from '@phosphor-icons/react';
 import { useWhatYoullNeed } from './whatYoullNeedContext';
@@ -74,4 +74,22 @@ export function SavedNote() {
       Everything is saved on this phone as you go. You can stop and come back.
     </p>
   );
+}
+
+/**
+ * When `key` changes (a new view or flow step), moves focus to the new screen's
+ * `<h1>` so a screen reader announces it. The first render and re-renders that
+ * keep the same key never move focus. The heading is made focusable with
+ * tabindex="-1" (not a tab stop); styles.css hides the ring on it.
+ */
+export function useFocusHeadingOnChange(key: string | undefined) {
+  const previous = useRef(key);
+  useEffect(() => {
+    if (previous.current === key) return;
+    previous.current = key;
+    const heading = document.querySelector('h1');
+    if (!heading) return;
+    heading.setAttribute('tabindex', '-1');
+    heading.focus();
+  }, [key]);
 }

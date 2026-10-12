@@ -1,3 +1,4 @@
+import { useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -231,6 +232,7 @@ function AppBody({
       ? 'addContactsManual'
       : viewForReturning(sessions.sessions);
   });
+  useFocusHeadingOnChange(view);
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
   // changed most recently; null means a moment not chosen yet, so the picker.

@@ -1,6 +1,7 @@
 import { useSendFlow } from '@griever/hooks';
 import type { SendFlowDraft } from '@griever/hooks';
 import type { Contact, SessionDetails, TemplateCategory } from '@griever/shared';
+import { useFocusHeadingOnChange } from '../lib/ui';
 import { TemplatePicker } from '../screens/TemplatePicker';
 import { AnnounceForm } from '../screens/AnnounceForm';
 import { ServiceKnownScreen } from '../screens/ServiceKnownScreen';
@@ -36,6 +37,7 @@ export function Flow({
   onAddContact,
 }: Props) {
   const flow = useSendFlow({ session, draft, drafts, onDraftChange });
+  useFocusHeadingOnChange(flow.step);
   const grouped = flow.templateCategory === 'announcement';
 
   switch (flow.step) {
