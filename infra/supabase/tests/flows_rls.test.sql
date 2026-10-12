@@ -1,5 +1,5 @@
 begin;
-select plan(44);
+select plan(51);
 
 -- O owner, M O's member, S stranger, F owner of a flow who is invited by O, N plain owner (no profile row).
 insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at) values
@@ -65,6 +65,9 @@ select ok(not has_column_privilege('authenticated', 'public.flows', 'owner_id', 
   and not has_column_privilege('authenticated', 'public.flows', 'updated_by', 'UPDATE')
   and not has_column_privilege('authenticated', 'public.flows', 'updated_at', 'UPDATE'),
   'owner_id, id, created_at, updated_at and updated_by are not updatable');
+select ok(not has_column_privilege('authenticated', 'public.flows', 'deleted_at', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.flows', 'deleted_at', 'INSERT'),
+  'no client can write deleted_at');
 select ok(not has_column_privilege('authenticated', 'public.flows', 'owner_id', 'INSERT')
   and not has_column_privilege('authenticated', 'public.flows', 'updated_by', 'INSERT')
   and has_column_privilege('authenticated', 'public.flows', 'id', 'INSERT'),
@@ -111,6 +114,8 @@ select throws_ok($$update public.flows set created_at = now() where id = '111111
 select throws_ok($$update public.flows set updated_by = null where id = '11111111-1111-1111-1111-111111111111'$$,
   '42501', null, 'updated_by cannot be written by a client');
 select throws_ok($$delete from public.flows$$, '42501', null, 'owner cannot delete');
+select throws_ok($$update public.flows set deleted_at = now() where id = '11111111-1111-1111-1111-111111111111'$$,
+  '42501', null, 'owner cannot set deleted_at directly either');
 
 -- ===== member =====
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c2","role":"authenticated","email":"m@example.test"}', true);
@@ -123,6 +128,8 @@ select is((select updated_by from public.flows where id = '11111111-1111-1111-11
 select throws_ok($$insert into public.flows (id, person_name) values (gen_random_uuid(), 'Mine')$$,
   '42501', null, 'a member cannot insert a flow (C11)');
 select throws_ok($$delete from public.flows$$, '42501', null, 'member cannot delete');
+select throws_ok($$update public.flows set deleted_at = now() where id = '11111111-1111-1111-1111-111111111111'$$,
+  '42501', null, 'a member cannot set deleted_at (C9)');
 select is((select count(*)::int from public.flows where owner_id = '00000000-0000-0000-0000-0000000000c2'), 0, 'member owns nothing');
 
 -- membership row alone (account_type still owner) is enough to refuse an insert
@@ -138,7 +145,19 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select throws_ok($$insert into public.flows (id) values (gen_random_uuid())$$, '42501', null,
   'account_type member alone blocks insert when there is no membership row');
 
+-- ===== a removed member loses access at once =====
+reset role;
+delete from public.memberships where member_id = '00000000-0000-0000-0000-0000000000c2';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c2","role":"authenticated","email":"m@example.test"}', true);
+select is((select count(*)::int from public.flows), 0, 'a just-removed member sees 0 flows');
+select is(pg_temp.err($$update public.flows set person_name = 'x' where id = '11111111-1111-1111-1111-111111111111'$$), 'no error', 'a just-removed member update is not an error');
+reset role;
+select is((select person_name from public.flows where id = '11111111-1111-1111-1111-111111111111'), 'Gran', 'and it changed nothing');
+select is((select account_type from public.profiles where id = '00000000-0000-0000-0000-0000000000c2'), 'owner', 'the removed member is an owner again');
+
 -- ===== stranger =====
+set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c3","role":"authenticated","email":"s@example.test"}', true);
 select is((select count(*)::int from public.flows), 0, 'a stranger sees no flows');
 select is(pg_temp.err($$update public.flows set person_name = 'x' where id = '11111111-1111-1111-1111-111111111111'$$), 'no error', 'a stranger update is not an error');
@@ -157,9 +176,9 @@ select is(pg_temp.err($$select public.accept_invite(repeat('a',64))$$), 'PT409|i
 reset role;
 select is((select count(*)::int from public.memberships where member_id = '00000000-0000-0000-0000-0000000000c4'), 0, 'and no membership was made');
 -- a soft-deleted flow still counts as owned
+update public.flows set deleted_at = now() where id = '22222222-2222-2222-2222-222222222222';
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c4","role":"authenticated","email":"f@example.test"}', true);
-update public.flows set deleted_at = now() where id = '22222222-2222-2222-2222-222222222222';
 select is(pg_temp.err($$select public.accept_invite(repeat('a',64))$$), 'PT409|invite_conflict', 'a soft-deleted flow still blocks joining');
 -- an owner with no flows can still join
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c5","role":"authenticated","email":"n@example.test"}', true);

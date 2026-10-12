@@ -1,6 +1,9 @@
 -- Shared people (G1, ticket #130): one flows row per person, shared by an owner and
 -- that owner's members. Holds exactly six person fields (C2). No draft, contact,
 -- recipient, message or wording column, now or later (C2, C3).
+-- This migration also resolves TODO(#130) in 20261011020000_invite_functions.sql (already
+-- applied, so that file is untouched): accept_invite is replaced below to refuse a joiner
+-- who owns flows.
 -- The id is made on the device (a uuid), so a flow exists offline before it syncs (C5).
 
 create table public.flows (
@@ -15,7 +18,8 @@ create table public.flows (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   updated_by uuid references auth.users (id) on delete set null,
-  -- Soft delete only; nobody can delete rows (C9).
+  -- Soft delete only; nobody can delete rows (C9). No client can write this column:
+  -- only the owner may delete a person, through a definer function in a later ticket.
   deleted_at timestamptz
 );
 
@@ -60,14 +64,14 @@ revoke execute on function public.can_access_owner(uuid) from public, anon, auth
 grant execute on function public.can_access_owner(uuid) to authenticated;
 
 -- Column-level grants. Insert omits owner_id (it defaults to the caller), created_at,
--- updated_at and updated_by. Update omits id, owner_id and created_at. No delete (C9).
+-- updated_at and updated_by. Update omits id, owner_id, created_at and deleted_at (C9: members must not soft-delete). No delete (C9).
 revoke all on table public.flows from anon, authenticated;
 grant select on table public.flows to authenticated;
 grant insert (id, person_name, date_of_passing, service_date, obituary_url,
-              obituary_publisher, service_ready, deleted_at)
+              obituary_publisher, service_ready)
   on table public.flows to authenticated;
 grant update (person_name, date_of_passing, service_date, obituary_url,
-              obituary_publisher, service_ready, deleted_at)
+              obituary_publisher, service_ready)
   on table public.flows to authenticated;
 
 create policy "flows_select_owner_or_member" on public.flows
