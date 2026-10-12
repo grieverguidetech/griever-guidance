@@ -2,8 +2,6 @@ import { createProfileRouter } from './profileRouter.js';
 
 export { createProfileRouter, parseProfileBody } from './profileRouter.js';
 export type { ProfileRouterConfig } from './profileRouter.js';
-export { supabaseAuth, clearJwksCache } from './supabaseJwt.js';
-export type { SupabaseConfig, SupabaseAuthVariables } from './supabaseJwt.js';
 export { createProfilesClient } from './supabaseClient.js';
 export type { ProfileFields, ProfilesClient } from './supabaseClient.js';
 

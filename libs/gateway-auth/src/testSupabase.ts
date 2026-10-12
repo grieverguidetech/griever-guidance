@@ -16,7 +16,7 @@ export async function makeKeys(kid = 'key-1') {
 }
 
 export async function signJwt(
-  privateKey: CryptoKey,
+  privateKey: Awaited<ReturnType<typeof makeKeys>>['privateKey'],
   kid: string,
   claims: Record<string, unknown> = {},
 ): Promise<string> {

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { supabaseAuth, type SupabaseAuthVariables, type SupabaseConfig } from './supabaseJwt.js';
+import { supabaseAuth, type SupabaseAuthVariables, type SupabaseConfig } from '@griever/gateway-auth';
 import { createProfilesClient, type ProfileFields, type ProfilesClient } from './supabaseClient.js';
 
 const MAX_SENDER_NAME_LENGTH = 100;

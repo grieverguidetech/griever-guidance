@@ -13,5 +13,8 @@
   },
   "nx": {
     "name": "gateway-auth"
+  },
+  "dependencies": {
+    "hono": "^4.13.7"
   }
 }

@@ -399,7 +399,11 @@ importers:
         specifier: ^6.2.5
         version: 6.2.5
 
-  libs/gateway-auth: {}
+  libs/gateway-auth:
+    dependencies:
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
 
   libs/gateway-flows:
     dependencies:
