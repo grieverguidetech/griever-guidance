@@ -10,8 +10,8 @@
 -- It answers PT409 only after the token checked out, and only about the caller's own state.
 -- No error ever carries a constraint or key detail.
 --
--- TODO(#130): once people sync to Supabase, accept_invite must also
--- refuse a joiner who owns people. No people table exists yet, so it cannot today.
+-- accept_invite also refuses a joiner who owns flows; that rule was added with the
+-- flows table in 20261012000000_flows.sql (#130), which replaces the function.
 
 create function public.create_invite(p_email text, p_token_hash text) returns uuid
 language plpgsql
