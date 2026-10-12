@@ -54,4 +54,22 @@ describe('Profile', () => {
     expect(screen.getByLabelText('Your name')).toHaveValue('Anna Reyes');
     expect(screen.queryByText('Your name is saved.')).not.toBeInTheDocument();
   });
+
+  it('first-time mode shows a primary Continue that calls onContinue without saving', async () => {
+    const onContinue = vi.fn();
+    const onSave = vi.fn(async () => true);
+    const user = userEvent.setup();
+    render(
+      <Profile firstTime onContinue={onContinue} senderName="Anna" onBack={vi.fn()} onSave={onSave} onSignOut={vi.fn()} error={null} />,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('the existing mode has no Continue', () => {
+    render(<Profile senderName="Anna" onBack={vi.fn()} onSave={vi.fn()} onSignOut={vi.fn()} error={null} />);
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+  });
 });

@@ -13,11 +13,14 @@ interface Props {
   /** Resolves true when saved. A false result keeps what was typed. */
   onSave: (name: string) => Promise<boolean>;
   onSignOut: () => void;
+  /** Straight after sign-up: a primary Continue goes on to Home, and a name is optional to confirm. */
+  firstTime?: boolean;
+  onContinue?: () => void;
   /** The identity hook's own calm copy, shown as-is. */
   error: string | null;
 }
 
-export function Profile({ asksName, senderName, onBack, onSave, onSignOut, error }: Props) {
+export function Profile({ asksName, firstTime, onContinue, senderName, onBack, onSave, onSignOut, error }: Props) {
   const id = useId();
   // Until the person types, show whatever name is known, including one that loads late.
   const [typed, setTyped] = useState<string | null>(null);
@@ -57,6 +60,12 @@ export function Profile({ asksName, senderName, onBack, onSave, onSignOut, error
         </p>
       )}
 
+      {firstTime && !asksName && (
+        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
+          This is the name on your account. You can change it later.
+        </p>
+      )}
+
       <div className="gg-field">
         <label htmlFor={`${id}-name`}>Your name</label>
         <input
@@ -83,7 +92,16 @@ export function Profile({ asksName, senderName, onBack, onSave, onSignOut, error
         {nameError ?? error ?? (saved ? 'Your name is saved.' : '')}
       </div>
 
-      <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
+      {firstTime && (
+        <button type="button" onClick={onContinue} className="gg-btn gg-btn-primary gg-btn-block">
+          Continue
+        </button>
+      )}
+      <button
+        type="submit"
+        aria-disabled={pending}
+        className={`gg-btn gg-btn-block ${firstTime ? 'gg-btn-secondary' : 'gg-btn-primary'}`}
+      >
         {pending ? 'Saving…' : 'Save'}
       </button>
       <button

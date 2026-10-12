@@ -130,6 +130,29 @@ describe('opening a recovery link', () => {
     expect(screen.queryByRole('button', { name: 'Create account' })).not.toBeInTheDocument();
   });
 
+  it('lands on Home after Continue when the account has a name (#114)', async () => {
+    window.history.replaceState(null, '', RECOVERY);
+    const profile = {
+      id: 'u1',
+      senderName: 'Anna',
+      contactSource: null,
+      accountType: 'owner' as const,
+      createdAt: '2026-10-11T00:00:00.000Z',
+      updatedAt: '2026-10-11T00:00:00.000Z',
+    };
+    const client = stubClient({ getProfile: vi.fn(async () => ({ ok: true as const, profile })) });
+    mocks.load.mockResolvedValue({ available: true, client });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByLabelText('New password'), 'a-new-long-password');
+    await user.click(screen.getByRole('button', { name: 'Save new password' }));
+    await user.click(await screen.findByRole('button', { name: 'Continue' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
+  });
+
   it('says the link has expired and offers a new one', async () => {
     window.history.replaceState(null, '', '/?reset=1#error=access_denied&error_code=otp_expired');
     const client = stubClient({
