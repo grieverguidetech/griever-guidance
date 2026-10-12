@@ -10,6 +10,11 @@ const EXPECTED_ROUTES = [
   'POST /obituary',
   'GET /sync/pull',
   'POST /sync/push',
+  'GET /members',
+  'DELETE /members/:memberId',
+  'POST /invites',
+  'POST /invites/accept',
+  'DELETE /invites/:id',
 ];
 
 async function loadApp() {
@@ -50,9 +55,14 @@ describe('gateway route inventory (C8)', () => {
   it.each([
     ['GET', '/me/profile'],
     ['PUT', '/me/profile'],
+    ['GET', '/members'],
+    ['POST', '/invites'],
+    ['POST', '/invites/accept'],
+    ['DELETE', '/invites/00000000-0000-4000-8000-000000000000'],
+    ['DELETE', '/members/00000000-0000-4000-8000-000000000000'],
   ])('%s %s refuses a request with no token', async (method, path) => {
     const app = await loadApp();
-    const res = await app.request(path, { method, body: method === 'PUT' ? '{}' : undefined });
+    const res = await app.request(path, { method, body: method === 'PUT' || method === 'POST' ? '{}' : undefined });
     expect(res.status).toBe(401);
   });
 });

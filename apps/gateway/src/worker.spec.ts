@@ -86,14 +86,28 @@ describe('gateway: health and CORS', () => {
     expect(res.headers.get('access-control-allow-origin')).toBeNull();
   });
 
-  it('answers preflight for allowed origins with GET, POST and PUT only', async () => {
+  it('answers preflight for allowed origins with GET, POST, PUT and DELETE only', async () => {
     const app = await loadApp();
     const res = await app.request('/sync/push', {
       method: 'OPTIONS',
       headers: { Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'POST' },
     });
     expect(res.status).toBe(204);
-    expect(res.headers.get('access-control-allow-methods')).toBe('GET,POST,PUT');
+    expect(res.headers.get('access-control-allow-methods')).toBe('GET,POST,PUT,DELETE');
+  });
+
+  it('allows a DELETE preflight from the web origin and not from another origin', async () => {
+    const app = await loadApp();
+    const preflight = (origin: string) =>
+      app.request('/invites/00000000-0000-4000-8000-000000000000', {
+        method: 'OPTIONS',
+        headers: { Origin: origin, 'Access-Control-Request-Method': 'DELETE' },
+      });
+    const allowed = await preflight(WEB_ORIGIN);
+    expect(allowed.headers.get('access-control-allow-origin')).toBe(WEB_ORIGIN);
+    expect(allowed.headers.get('access-control-allow-methods')).toContain('DELETE');
+    const other = await preflight('https://evil.example');
+    expect(other.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
 
@@ -270,5 +284,65 @@ describe('gateway: /me/profile (Supabase accounts)', () => {
     const app = await loadApp({ SUPABASE_URL: '', SUPABASE_ANON_KEY: '' });
     const res = await app.request('/me/profile', { headers: auth });
     expect(res.status).toBe(503);
+  });
+});
+
+describe('gateway: POST /invites reads the mail settings by their env names', () => {
+  const INVITE_ID = '22222222-2222-4222-8222-222222222222';
+  const MAIL_ENV = {
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY: 'anon-key',
+    INVITE_FROM_EMAIL: 'X <x@example.test>',
+    WEB_URL: 'https://web.example.test',
+  };
+  const invite = {
+    id: INVITE_ID,
+    email: 'friend@example.test',
+    expiresAt: '2026-10-19T10:00:00+00:00',
+    createdAt: '2026-10-12T10:00:00+00:00',
+  };
+
+  async function setup(env: Record<string, string | undefined>) {
+    const keys = await makeKeys();
+    const token = await signJwt(keys.privateKey, keys.kid);
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
+      if (url.endsWith('/auth/v1/.well-known/jwks.json')) return jsonResponse(keys.jwks);
+      if (url.endsWith('/rpc/create_invite')) return jsonResponse(INVITE_ID);
+      if (url.endsWith('/rpc/list_members')) return jsonResponse({ role: 'owner', members: [], invites: [invite] });
+      if (url.includes('/rest/v1/profiles')) return jsonResponse([{ sender_name: 'Ada' }]);
+      if (url === 'https://api.resend.com/emails') return jsonResponse({ id: 'email-1' });
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const app = await loadApp(env);
+    const req = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ email: 'friend@example.test' }),
+    };
+    return { app, req, fetchMock };
+  }
+
+  it('sends the email with the configured key, sender and web origin', async () => {
+    const { app, req, fetchMock } = await setup({ ...MAIL_ENV, RESEND_API_KEY: 're_test' });
+    const res = await app.request('/invites', req);
+    expect(res.status).toBe(201);
+
+    const call = fetchMock.mock.calls.find(([url]) => url === 'https://api.resend.com/emails');
+    expect(call).toBeDefined();
+    const init = call![1] as RequestInit;
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer re_test');
+    const sent = JSON.parse(init.body as string);
+    expect(sent.from).toBe('X <x@example.test>');
+    expect(sent.text).toContain('https://web.example.test/join#t=');
+  });
+
+  it('answers 503 and creates no invite when RESEND_API_KEY is unset', async () => {
+    const { app, req, fetchMock } = await setup(MAIL_ENV);
+    const res = await app.request('/invites', req);
+    expect(res.status).toBe(503);
+    const urls = fetchMock.mock.calls.map(([url]) => url);
+    expect(urls.some((url) => url.endsWith('/rpc/create_invite'))).toBe(false);
+    expect(urls).not.toContain('https://api.resend.com/emails');
   });
 });
