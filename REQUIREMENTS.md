@@ -172,7 +172,6 @@ libs/
   api-client/       All HTTP calls to apps/gateway. Apps never call fetch directly.
   hooks/            Shared React hooks. Zero platform-specific dependencies allowed here.
                     Also owns the sms: deep-link builder (buildSmsLink) — see "The send flow".
-  ui-web/           Shared React + Tailwind components for web.
   data-local/       IndexedDB-backed local storage (the screen-keyed session document, outbox,
                     contacts). Browser-only — see DATA.md.
   data-sync/        The offline sync engine (outbox flush, cursor-based pull/push, merge) that
