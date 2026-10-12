@@ -1,5 +1,6 @@
-import { describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { BackHandler } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
@@ -24,7 +25,7 @@ describe('HomeScreen', () => {
     ];
     render(<HomeScreen {...props} sessions={sessions} />);
     const rows = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel ?? '');
-    expect(rows.filter((l) => l === 'Ben' || l.startsWith('Anna'))).toEqual(['Ben', 'Anna, May 2, 2026']);
+    expect(rows.filter((l) => l === 'Ben' || l.startsWith('Anna'))).toEqual(['Ben', 'Anna, passed May 2, 2026']);
     expect(screen.getByText('May 2, 2026')).toBeTruthy();
     expect(screen.queryByText('Someone new')).toBeNull();
   });
@@ -105,5 +106,65 @@ describe('the order in the app', () => {
     await waitFor(async () =>
       expect((await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes')).props.value).toBe('Anna Lee'),
     );
+  });
+});
+
+const draftOf = (fields: Record<string, string>, step = 'details') => ({
+  step, templateCategory: 'aftercare', templateOverrideId: null, fields,
+  serviceDetailsKnown: null, selectedContactIds: [], place: null, includeFlowers: false, floristId: null,
+  customFlorist: '', flowerDeliveryTarget: 'service', tone: 'warm', messageOverride: null,
+});
+
+describe('Home from every step', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('goes Home from a resumed details step', async () => {
+    const anna = { ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({ deceasedName: 'Anna' }) } };
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
+    fireEvent.press(screen.getByLabelText('Back to home'));
+    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+  });
+
+  it('Android back: a step goes Home; the checklist pops to the path first', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    // Like React Native: newest handler first, stop at the first that handles it.
+    const pressBack = () => [...handlers].reverse().some((h) => h());
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByText('Choose the type of message you would like to send.');
+    fireEvent.press(screen.getByText("What you'll need"));
+    await screen.findByText('Gather when you can');
+    act(() => void pressBack());
+    expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
+    act(() => void pressBack());
+    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+  });
+});
+
+describe('people who would otherwise be hidden', () => {
+  it('lists an unnamed person with a draft as "Someone new"', () => {
+    const unnamed = { ...person('u', '', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({}) } };
+    render(<HomeScreen {...props} sessions={[unnamed as unknown as Session]} />);
+    expect(screen.getByLabelText('Someone new')).toBeTruthy();
+  });
+
+  it('"Someone else" reuses a blank person even when another person is open', async () => {
+    const anna = person('a', 'Anna', '2026-10-02T00:00:00.000Z');
+    const blank = person('b', '', '2026-10-01T00:00:00.000Z');
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna, blank]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
+    render(<App />);
+    fireEvent.press(await screen.findByText("Someone else I've lost"));
+    await screen.findByText('Writing about Someone new');
+    const stored = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { id: string }[];
+    expect(stored.map((p) => p.id).sort()).toEqual(['a', 'b']);
   });
 });

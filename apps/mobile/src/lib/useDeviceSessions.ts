@@ -14,7 +14,7 @@ export const createSessionCache = () =>
   ]);
 
 // Nothing typed, nothing chosen: a person who has not been filled in yet.
-const isBlank = (s: Session) => !s.personName.trim() && Object.keys(s.drafts).length === 0;
+export const isBlank = (s: Session) => !s.personName.trim() && Object.keys(s.drafts).length === 0;
 
 /**
  * The same `useSessions` the web uses, over the device cache, plus which person is open.
@@ -50,11 +50,11 @@ export function useDeviceSessions(cache: ReturnType<typeof createSessionCache>) 
     [select, touchSession],
   );
 
-  // If the open person is still blank, "Someone else" keeps them rather than adding another blank one.
+  // If anyone here is still blank, "Someone else" opens them rather than adding another blank one.
   const addPerson = useCallback(() => {
-    if (active && isBlank(active)) return;
-    select(createSession().id);
-  }, [active, createSession, select]);
+    const blank = sessions.find(isBlank);
+    select(blank ? blank.id : createSession().id);
+  }, [sessions, createSession, select]);
 
   return { ...store, active, switchTo, addPerson };
 }

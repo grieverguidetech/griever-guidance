@@ -1,11 +1,16 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { namedSessionsByRecent } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import { PrimaryButton, ScreenHeader, authStyles } from '../components/authForm';
+import { personLabel } from '../components/PersonSwitcher';
 import { ACCENT, MUTED } from '../components/colors';
+import { isBlank } from '../lib/useDeviceSessions';
 
 export const START_FIRST = "Start with someone I've lost";
 export const ADD_PERSON = "Someone else I've lost";
+
+// Someone with a draft but no name yet still shows (as "Someone new"), so their draft is reachable.
+const listed = (sessions: Session[]) =>
+  sessions.filter((s) => !isBlank(s)).sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
 
 export type HomeScreenProps = {
   sessions: Session[];
@@ -23,10 +28,10 @@ export type HomeScreenProps = {
  * another. Nothing here removes anyone (C9).
  */
 export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount }: HomeScreenProps) {
-  const people = namedSessionsByRecent([...sessions]);
+  const people = listed(sessions);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ScreenHeader>Grievers Guidance</ScreenHeader>
+      <ScreenHeader>The people you're writing about</ScreenHeader>
       <Pressable style={styles.link} onPress={onWhatYoullNeed} accessibilityRole="button">
         <Text style={styles.linkText}>What you'll need</Text>
       </Pressable>
@@ -42,9 +47,9 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
           style={styles.row}
           onPress={() => onOpen(s.id)}
           accessibilityRole="button"
-          accessibilityLabel={`${s.personName}${s.dateOfPassing ? `, ${s.dateOfPassing}` : ''}`}
+          accessibilityLabel={`${personLabel(s)}${s.dateOfPassing ? `, passed ${s.dateOfPassing}` : ''}`}
         >
-          <Text style={styles.rowName}>{s.personName}</Text>
+          <Text style={styles.rowName}>{personLabel(s)}</Text>
           {s.dateOfPassing ? <Text style={styles.rowMeta}>{s.dateOfPassing}</Text> : null}
         </Pressable>
       ))}

@@ -100,6 +100,10 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [arrived, setArrived] = useState(false);
   const contacts = useContacts(mobileContactStore);
   const purgedOnBoot = useRef(false);
+  const goHome = useCallback(() => {
+    setArrived(false);
+    setAtHome(true);
+  }, []);
 
   // Retention: the saved contact list is cleared 30 days past the latest service date across
   // everyone kept here (the family may still want it right up until the services are behind them).
@@ -147,10 +151,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       arrived={arrived}
       onDraftChange={updateDraft}
       onDetails={updateSession}
-      onHome={() => {
-        setArrived(false);
-        setAtHome(true);
-      }}
+      onHome={goHome}
     />
   );
 };
@@ -180,6 +181,14 @@ const HomeNavigation = ({ children }: { children: (navigation: StackNavigation) 
   </NavigationContainer>
 );
 
+// The Home link, the arrival announcement and Android back live on every step, not just the picker.
+const withBar = (bar: ReactNode, screen: ReactNode) => (
+  <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+    {bar}
+    {screen}
+  </View>
+);
+
 const Navigation = ({
   flow,
   contacts,
@@ -203,21 +212,21 @@ const Navigation = ({
           </Stack.Screen>
         )}
         {flow.step === 'details' && (
-          <Stack.Screen name="DetailsForm">{() => <DetailsFormScreen flow={flow} />}</Stack.Screen>
+          <Stack.Screen name="DetailsForm">{() => withBar(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
-            {() => <ContactSelectorScreen flow={flow} contacts={contacts} />}
+            {() => withBar(bar, <ContactSelectorScreen flow={flow} contacts={contacts} />)}
           </Stack.Screen>
         )}
         {flow.step === 'review' && (
-          <Stack.Screen name="Confirm">{() => <ConfirmScreen flow={flow} />}</Stack.Screen>
+          <Stack.Screen name="Confirm">{() => withBar(bar, <ConfirmScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'sending' && (
           <Stack.Screen name="Sending">{() => <SendingScreen flow={flow} contacts={contacts} />}</Stack.Screen>
         )}
         {flow.step === 'sent' && (
-          <Stack.Screen name="Sent">{() => <SentScreen flow={flow} />}</Stack.Screen>
+          <Stack.Screen name="Sent">{() => withBar(bar, <SentScreen flow={flow} />)}</Stack.Screen>
         )}
         {sharedScreens()}
       </Stack.Navigator>

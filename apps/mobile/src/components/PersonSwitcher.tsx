@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Session } from '@griever/hooks';
@@ -10,7 +11,7 @@ const UNNAMED = 'Someone new';
 export const personLabel = (s: Session) => s.personName.trim() || UNNAMED;
 
 /**
- * Sits at the top of the path: who is open and one quiet link back to Home. When the person has
+ * Sits at the top of every step: who is open and one quiet link back to Home. When the person has
  * just come from Home, it moves screen-reader focus to the link and says who is now open.
  */
 export function PersonBar({
@@ -27,13 +28,19 @@ export function PersonBar({
   const insets = useSafeAreaInsets();
   const ref = useRef<View>(null);
   // Android's back button means Home here, not leaving the app.
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onOpen();
-      return true;
-    });
-    return () => sub.remove();
-  }, [onOpen]);
+  // Only while this screen is showing, and only when there is nothing to pop (e.g. the checklist
+  // opened from here goes back to here first).
+  const navigation = useNavigation();
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (navigation.canGoBack()) return false;
+        onOpen();
+        return true;
+      });
+      return () => sub.remove();
+    }, [navigation, onOpen]),
+  );
   useEffect(() => {
     if (!arrived) return;
     const handle = ref.current ? findNodeHandle(ref.current) : null;
