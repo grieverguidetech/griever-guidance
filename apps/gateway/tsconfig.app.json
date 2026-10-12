@@ -9,6 +9,9 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../libs/gateway-flows/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/gateway-sync/tsconfig.lib.json"
     },
     {

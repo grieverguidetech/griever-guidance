@@ -199,6 +199,9 @@ importers:
 
   apps/gateway:
     dependencies:
+      '@griever/gateway-flows':
+        specifier: workspace:*
+        version: link:../../libs/gateway-flows
       '@griever/gateway-messages':
         specifier: workspace:*
         version: link:../../libs/gateway-messages
@@ -396,6 +399,20 @@ importers:
         specifier: ^6.2.5
         version: 6.2.5
 
+  libs/gateway-auth: {}
+
+  libs/gateway-flows:
+    dependencies:
+      '@griever/gateway-auth':
+        specifier: workspace:*
+        version: link:../gateway-auth
+      '@griever/shared':
+        specifier: workspace:*
+        version: link:../shared
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
+
   libs/gateway-messages:
     dependencies:
       '@griever/shared':
@@ -425,6 +442,9 @@ importers:
 
   libs/identity:
     dependencies:
+      '@griever/gateway-auth':
+        specifier: workspace:*
+        version: link:../gateway-auth
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared
