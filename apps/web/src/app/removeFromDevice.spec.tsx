@@ -56,7 +56,9 @@ async function snapshot() {
   };
 }
 
+/** Settings sits under Home now (#112), so go back from the path first. */
 async function openRemoveConfirm(user: User) {
+  await user.click(screen.getByRole('button', { name: 'Back' }));
   await user.click(screen.getByRole('button', { name: 'Settings' }));
   await user.click(screen.getByRole('button', { name: REMOVE }));
 }
@@ -174,7 +176,10 @@ describe('remove everything from this device (#51)', () => {
     const user = userEvent.setup();
     render(<App />);
     await reachPathLanding(user);
-    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument(); // the path is not a flow
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument(); // moved under Home (#112)
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument(); // Home is not a flow
+    await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
 
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await screen.findByRole('button', { name: 'Continue' });

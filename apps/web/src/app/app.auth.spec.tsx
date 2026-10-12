@@ -94,6 +94,7 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
 async function nameSomeoneAndSignOut(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
   await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(await screen.findByRole('button', { name: 'Back' })); // path to Home, where "Your account" sits (#112)
   await user.click(await screen.findByRole('button', { name: 'Your account' }));
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
 }
@@ -201,6 +202,9 @@ describe('flag on', () => {
       render(<App />);
 
       expect(await screen.findByText("Your account can't be reached right now. Your work on this device is here.")).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: "The people you're writing about" })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Margaret Hayes' }));
       expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note kept on this device');
       expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
@@ -210,12 +214,13 @@ describe('flag on', () => {
       expect(window.localStorage.getItem('gg.sessions.v1')).not.toBeNull();
     });
 
-    it('opens the path landing, without "Your account", when no message is half-written', async () => {
+    it('lands on Home, then the path, without "Your account", when no message is half-written', async () => {
       window.localStorage.setItem('sb-abcdef-auth-token', SESSION);
       window.localStorage.setItem('gg.sessions.v1', JSON.stringify([{ ...LOCAL_SESSION, draft: null }]));
       mocks.load.mockResolvedValue({ available: false });
       render(<App />);
 
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
       expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
       expect(screen.getByText("Your account can't be reached right now. Your work on this device is here.")).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
@@ -319,6 +324,7 @@ describe('flag on', () => {
     await user.click(screen.getByRole('button', { name: 'Save and continue' }));
     await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Back' })); // path to Home (#112)
     await user.click(await screen.findByRole('button', { name: 'Your account' }));
 
     const field = await screen.findByLabelText('Your name');
@@ -365,6 +371,7 @@ describe('flag on', () => {
     const user = userEvent.setup();
     render(<App />);
     await signIn(user);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' })); // Home, then open (#112)
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('the announcement note');
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -374,9 +381,11 @@ describe('flag on', () => {
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Back' })); // path to Home (#112)
     await user.click(await screen.findByRole('button', { name: 'Your account' }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await signIn(user);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
 
     // The service was visited last, but the announcement changed most recently, so it reopens.
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('the announcement note');
@@ -392,6 +401,7 @@ describe('flag on', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Back' })); // path to Home (#112)
     await user.click(await screen.findByRole('button', { name: 'Your account' }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(await screen.findByRole('button', { name: 'Create account' })).toBeInTheDocument();
@@ -598,6 +608,7 @@ describe('flag on', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.type(await screen.findByLabelText('Their name'), 'Margaret Hayes');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Back' })); // path to Home (#112)
     const open = await screen.findByRole('button', { name: 'Your account' });
     mocks.clearError.mockClear();
     await user.click(open);

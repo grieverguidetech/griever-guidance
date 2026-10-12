@@ -2,7 +2,7 @@ import type { Session } from '@griever/hooks';
 import { usePathMoments } from '@griever/hooks';
 import type { Moment, MomentKey } from '@griever/shared';
 import { CheckCircle, CircleDashed, ListChecks } from '@phosphor-icons/react';
-import { Eyebrow } from '../lib/ui';
+import { BackButton, Eyebrow } from '../lib/ui';
 import { formatDate } from '../lib/format';
 import { ShareDetailsButton } from './ShareDetailsButton';
 
@@ -31,23 +31,17 @@ const MOMENT_COPY: Record<MomentKey, { title: string; body: string; doneLabel: s
 
 interface Props {
   session: Session;
-  otherSessions: Session[];
+  onBack: () => void;
   onStartMoment: (key: MomentKey) => void;
   onWhatYoullNeed: () => void;
-  onNewSession: () => void;
 }
 
-export function PathLanding({
-  session,
-  otherSessions,
-  onStartMoment,
-  onWhatYoullNeed,
-  onNewSession,
-}: Props) {
+export function PathLanding({ session, onBack, onStartMoment, onWhatYoullNeed }: Props) {
   const moments = usePathMoments(session);
 
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
+      <BackButton onClick={onBack} />
       <div className="flex flex-col gap-1">
         <Eyebrow name={session.personName} />
         <h1 className="text-[22px]">One thing at a time.</h1>
@@ -78,28 +72,6 @@ export function PathLanding({
           done: m.status === 'done',
         }))}
       />
-
-      {otherSessions.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="gg-eyebrow m-0">Other people you're writing about</p>
-          {otherSessions.map((s) => (
-            <div key={s.id} className="text-[14px]" style={{ color: 'var(--text-muted)' }}>
-              {s.personName || "Someone I've lost"}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-col" style={{ gap: '2px', marginTop: 'auto', paddingTop: 'var(--space-4)' }}>
-        <button
-          type="button"
-          onClick={onNewSession}
-          className="gg-btn gg-btn-ghost !px-0 self-start"
-          style={{ color: 'var(--color-neutral-700)' }}
-        >
-          Someone else I've lost
-        </button>
-      </div>
     </div>
   );
 }

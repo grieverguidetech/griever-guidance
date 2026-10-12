@@ -33,6 +33,7 @@ import { AddContactsManual } from '../screens/AddContactsManual';
 import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
 import { SessionSetup } from '../screens/SessionSetup';
+import { Home } from '../screens/Home';
 import { PathLanding } from '../screens/PathLanding';
 import { Gate } from '../screens/Gate';
 import { WhatYoullNeed } from '../screens/WhatYoullNeed';
@@ -51,6 +52,7 @@ type AppView =
   | 'importContacts'
   | 'whoHearsFirst'
   | 'setup'
+  | 'home'
   | 'pathLanding'
   | 'gate'
   | 'whatYoullNeed'
@@ -247,10 +249,12 @@ async function accountLacksName(client: AuthClient): Promise<boolean> {
   }
 }
 
-/** A message left half-written reopens where it was (#25); otherwise the path. */
+/**
+ * A returning visit lands on Home, where the person picks who to open. With nobody named yet
+ * there is nothing to list, so the path (which starts a person) is kept as before.
+ */
 function viewForReturning(sessionList: Session[]): AppView {
-  const latest = namedSessionsByRecent(sessionList)[0];
-  return latest && latestInProgressDraft(latest) ? 'flow' : 'pathLanding';
+  return namedSessionsByRecent(sessionList).length > 0 ? 'home' : 'pathLanding';
 }
 
 function isAccountView(view: AppView): boolean {
@@ -284,8 +288,8 @@ function AppBody({
     // Opened from a reset email: the new-password screen, not sign-up.
     if (AUTH_ENABLED && captureRecoveryLink()) return 'chooseNewPassword';
     if (AUTH_ENABLED) return 'signup';
-    // useSessions reads storage synchronously, so a returning visitor goes
-    // straight to their session; a first visit starts at adding contacts.
+    // useSessions reads storage synchronously, so a returning visitor lands on Home;
+    // a first visit starts at adding contacts.
     return namedSessionsByRecent(sessions.sessions).length === 0
       ? 'addContactsManual'
       : viewForReturning(sessions.sessions);
@@ -310,10 +314,17 @@ function AppBody({
   // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
   const accountGeneration = useRef(0);
   // Where the prompt interrupted, so Save or Back returns there and onboarding carries on.
-  const [returnTo, setReturnTo] = useState<AppView>('pathLanding');
+  const [returnTo, setReturnTo] = useState<AppView>('home');
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
-  const openWhatYoullNeed = useCallback(() => setView('whatYoullNeed'), []);
+  // The checklist goes back to where it was opened from: Home, or otherwise the path as before.
+  const currentView = useRef(view);
+  currentView.current = view;
+  const checklistBack = useRef<AppView>('pathLanding');
+  const openWhatYoullNeed = useCallback(() => {
+    checklistBack.current = currentView.current === 'home' ? 'home' : 'pathLanding';
+    setView('whatYoullNeed');
+  }, []);
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
@@ -322,7 +333,7 @@ function AppBody({
   const clearError = auth?.clearError;
 
   const openProfile = useCallback(
-    (asksName: boolean, from: AppView = 'pathLanding') => {
+    (asksName: boolean, from: AppView = 'home') => {
       // A stale error from another screen would otherwise show here without being announced.
       clearError?.();
       setAskingName(asksName);
@@ -511,6 +522,20 @@ function AppBody({
     setView('pathLanding');
   }
 
+  function goHome() {
+    setView('home');
+  }
+
+  /** Makes this person the active one. A message left half-written reopens where it was (#25). */
+  function openPerson(id: string) {
+    const person = sessions.sessions.find((s) => s.id === id);
+    if (!person) return;
+    sessions.touchSession(id);
+    setActiveId(id);
+    setFlowCategory(undefined);
+    setView(latestInProgressDraft(person) ? 'flow' : 'pathLanding');
+  }
+
   function startNewSession() {
     const created = sessions.createSession();
     setActiveId(created.id);
@@ -528,7 +553,7 @@ function AppBody({
       return;
     }
     sessions.pruneEmpty();
-    goToPathLanding();
+    goHome();
   }
 
   /**
@@ -685,7 +710,7 @@ function AppBody({
           onBack={() => {
             auth.clearError();
             setAskingName(false);
-            setView(askingName ? returnTo : 'pathLanding');
+            setView(askingName ? returnTo : 'home');
           }}
           onSave={async (name) => {
             const saved = await auth.updateSenderName(name);
@@ -709,7 +734,7 @@ function AppBody({
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Settings
-          onBack={goToPathLanding}
+          onBack={goHome}
           onRemoveEverything={removeEverything}
           signsOut={offline || (auth?.isSignedIn ?? false)}
         />
@@ -787,7 +812,10 @@ function AppBody({
   if (view === 'whatYoullNeed') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <WhatYoullNeed onBack={() => goToPathLanding()} onEmailList={() => goToPathLanding()} />
+        <WhatYoullNeed
+          onBack={() => setView(checklistBack.current)}
+          onEmailList={() => setView(checklistBack.current)}
+        />
       </Shell>
     );
   }
@@ -877,16 +905,10 @@ function AppBody({
     );
   }
 
-  if (view === 'pathLanding' && active) {
+  if (view === 'home') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <PathLanding
-          session={active}
-          otherSessions={sortedSessions.filter((s) => s.id !== active.id)}
-          onStartMoment={startMoment}
-          onWhatYoullNeed={() => setView('whatYoullNeed')}
-          onNewSession={startNewSession}
-        />
+        <Home sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate />
         {auth && !sessionEnded && (
           <button
             type="button"
@@ -903,6 +925,19 @@ function AppBody({
         >
           Settings
         </button>
+      </Shell>
+    );
+  }
+
+  if (view === 'pathLanding' && active) {
+    return (
+      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+        <PathLanding
+          session={active}
+          onBack={goHome}
+          onStartMoment={startMoment}
+          onWhatYoullNeed={openWhatYoullNeed}
+        />
       </Shell>
     );
   }

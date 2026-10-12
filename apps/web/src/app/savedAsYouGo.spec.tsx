@@ -14,6 +14,11 @@ function reload(view: { unmount: () => void }) {
   return render(<App />);
 }
 
+/** A reload now lands on Home (#112); the person is opened from there. */
+async function openFromHome(user: User, name = 'Margaret Hayes') {
+  await user.click(await screen.findByRole('button', { name }));
+}
+
 async function onboardToLanding(user: User) {
   const view = render(<App />);
   await user.type(screen.getByLabelText('Name'), 'Aunt Carol');
@@ -58,6 +63,7 @@ describe('saved as you go', () => {
     await user.type(screen.getByLabelText(/Your name/), 'Peter');
 
     reload(view);
+    await openFromHome(user);
     await screen.findByRole('heading', { name: 'One thing at a time.' });
     expect(screen.getByText('For Margaret Hayes')).toBeInTheDocument();
   });
@@ -68,6 +74,7 @@ describe('saved as you go', () => {
     await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
 
     reload(view);
+    await openFromHome(user);
     expect(await screen.findByRole('heading', { name: 'Announce the passing' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Anything you'd like to add/)).toHaveValue(note);
   });
@@ -79,6 +86,7 @@ describe('saved as you go', () => {
     await user.click(screen.getByRole('button', { name: /Yes, I have them/ }));
 
     reload(view);
+    await openFromHome(user);
     const yes = await screen.findByRole('button', { name: /Yes, I have them/ });
     expect(yes).toHaveAttribute('aria-pressed', 'true');
   });
@@ -92,6 +100,7 @@ describe('saved as you go', () => {
 
     await user.type(screen.getByLabelText(/^Location/), 'St Mary Church');
     view = reload(view);
+    await openFromHome(user);
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
 
     // Pasted, not typed: a half-typed date such as "May 2" already parses as a past date, and the
@@ -104,6 +113,7 @@ describe('saved as you go', () => {
 
     await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
     view = reload(view);
+    await openFromHome(user);
     expect(await screen.findByRole('button', { name: /Aunt Carol/ })).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -113,6 +123,7 @@ describe('saved as you go', () => {
     await user.type(box, 'My own words');
 
     reload(view);
+    await openFromHome(user);
     expect(await screen.findByText('My own words')).toBeInTheDocument();
   });
 
@@ -153,6 +164,7 @@ describe('saved as you go', () => {
     await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
 
     reload(view);
+    await openFromHome(user);
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start' }));
     expect(await screen.findByRole('heading', { name: 'Announce the passing' })).toBeInTheDocument();
@@ -192,18 +204,24 @@ describe('saved as you go', () => {
       window.localStorage.setItem('gg.sessions.v1', JSON.stringify(list));
     }
 
-    it('reopens the most recently opened of two named sessions', async () => {
+    it('lists both people on Home, newest first, and reopens whichever is picked at its draft', async () => {
+      const user = userEvent.setup();
       seed([
         { name: 'Older Person', openedAt: '2026-01-01T00:00:00.000Z', step: 'announce' },
         { name: 'Newer Person', openedAt: '2026-02-01T00:00:00.000Z', step: 'announce' },
       ]);
       render(<App />);
-      expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note for Newer Person');
+      const names = (await screen.findAllByRole('listitem')).map((li) => li.textContent);
+      expect(names).toEqual(['Newer Person', 'Older Person']);
+      await user.click(screen.getByRole('button', { name: 'Older Person' }));
+      expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note for Older Person');
     });
 
     it('opens the landing when the last message was already sent', async () => {
+      const user = userEvent.setup();
       seed([{ name: 'Margaret Hayes', openedAt: '2026-02-01T00:00:00.000Z', step: 'sent' }]);
       render(<App />);
+      await openFromHome(user);
       expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
     });
   });
