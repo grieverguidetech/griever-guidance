@@ -35,3 +35,48 @@ export function loadAuthClient(): Promise<AuthClientResult> {
   });
   return loading;
 }
+
+/**
+ * The key supabase-js stores a session under: `sb-<first label of the project host>-auth-token`
+ * (SupabaseClient.ts, `defaultStorageKey`). Our client does not override it.
+ */
+function sessionKeyFor(url: string): string | null {
+  try {
+    return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeSession(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+    const token = (value as { refresh_token?: unknown }).refresh_token;
+    return typeof token === 'string' && token !== '';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True when a Supabase session is already saved on this device. Reads storage only, never the
+ * network, so it works when the auth chunk or the env is unavailable. With no project URL (the
+ * env is missing) the exact key is unknown, so any `sb-*-auth-token` entry counts.
+ */
+export function hasStoredSession(storageOverride?: Storage): boolean {
+  try {
+    const storage = storageOverride ?? globalThis.localStorage;
+    if (!storage) return false;
+    const key = sessionKeyFor(readEnv('VITE_SUPABASE_URL'));
+    if (key) return looksLikeSession(storage.getItem(key));
+    for (let i = 0; i < storage.length; i++) {
+      const name = storage.key(i);
+      if (name && /^sb-.+-auth-token$/.test(name) && looksLikeSession(storage.getItem(name))) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
