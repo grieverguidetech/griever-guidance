@@ -150,8 +150,8 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 - `CORS_ORIGINS` (comma-separated allowed origins; empty blocks every cross-origin request)
 - `ANTHROPIC_API_KEY`
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public; there is no service-role key. The production slots are in
-  `wrangler.toml` `[vars]` and are empty today, so `/me/*` answers 503 in production until they
-  are set, see #45. Locally, unset also means 503.)
+  `wrangler.toml` `[vars]` and stay empty there; the deploy workflow passes them from the repo
+  variables of the same name. Unset means `/me/*` answers 503, in production and locally.)
 - `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_SITE_URL` (local Convex only)
 - `CONVEX_DEPLOY_KEY`, `CONVEX_URL` (GitHub secrets; CI and production only)
 
@@ -159,6 +159,14 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 - `VITE_API_URL`
 - `VITE_FEATURE_AUTH`, `VITE_FEATURE_OBITUARY_DRAFTING`
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (read only when `VITE_FEATURE_AUTH` is `true`)
+
+**Production (GitHub repo variables, not secrets)**
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public values). The deploy workflow passes them to the
+  gateway and, as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, to the web build.
+- `FEATURE_AUTH` becomes `VITE_FEATURE_AUTH` in the web build. To turn accounts on: set
+  `FEATURE_AUTH=true` and re-run the deploy. With it `true`, the deploy stops if either Supabase
+  variable is empty or the key looks like a secret key.
+- Mobile (`EXPO_PUBLIC_*`, EAS) is not wired yet.
 
 **`apps/mobile`**
 - `EXPO_PUBLIC_API_URL`
