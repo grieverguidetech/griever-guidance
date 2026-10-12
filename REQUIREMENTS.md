@@ -32,7 +32,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | C2 | Message content is never stored — not Convex, not local state after send, not logs, not a history. Person details are not message content, and they sync to Supabase. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
 | C3 | Contact data never reaches the gateway or Convex. Contact data **and contact ids** never reach the gateway, Supabase or Convex in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
 | C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
-| C5 | Offline-first: nothing inside a flow may wait on the network. Account actions (sign-up, sign-in, reset, invite, join, remove a member) need a connection and say so calmly. The device is authoritative. | DATA.md posture |
+| C5 | Offline-first: nothing after sign-up may wait on the network, and nothing inside a flow ever does. Only account actions (sign-up, sign-in, reset, invite, revoke an invite, join, remove a member) need a connection, and they say so calmly. The device is authoritative. | DATA.md posture |
 | C6 | Sign-in (email today, Facebook later) is identity only — never a friends list, never a DM path. Members are added only by an owner typing an email. They are never suggested. | §6 "Identity" |
 | C7 | All user-facing copy is calm and plain. No exclamation points, no celebratory microcopy. | §6 "Tone and copy" |
 | C8 | Every gateway route validates its request body/query. | §6 "What not to do" |
@@ -60,9 +60,9 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | ID-5 | X sign-in | Not started | Not started | Shown disabled, "coming soon" |
 | ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); shared people sync reads it through Supabase instead (`flows.owner_id`, #130); the Convex `/sync/*` stub is being retired (#140) |
 | ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done (live in production) | Partial | DATA.md "Settled"; mobile is suspended while its flag is off |
-| ID-8 | An owner invites a member by typing their email (in profile) | Not started | Not started | Planned: #116, #117 (database), #121, #122, #124 (gateway), #125, #126 (web), #129 (mobile). Email is typed, never picked from contacts (C3, C6) |
+| ID-8 | An owner invites a member by typing their email (in profile) | Not started | Not started | Planned: #116, #117 (database), #120 (shared types), #121, #122, #124 (gateway), #125 (hooks), #126 (web), #129 (mobile). Email is typed, never picked from contacts (C3, C6) |
 | ID-9 | A member joins from the emailed link (web in v1) | Not started | Not started | Planned: #117, #128 (web); mobile join is a follow-up (#139) |
-| ID-10 | Members can't create a person (RLS) | Not started | Not started | Planned: #116, #130 (database rules), #127, #129 (UI). C11 |
+| ID-10 | Members can't create a person (RLS) | Not started | Not started | Planned: #116, #130 (database rules), #123, #127, #129 (UI). C11 |
 
 ### 3.2 Contacts (Flow D)
 
@@ -106,7 +106,7 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | DS-3 | Sync is invisible — no spinners or "saving…" states | Partial | DATA.md §4.6 |
 | DS-4 | Deleted sessions soft-delete, hard-purge at 90 days | Done (server) | `convex/crons.ts` |
 | DS-5 | "Delete everything" in settings purges immediately, clears every local store | Partial | Server mutation exists; no settings UI yet |
-| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through Supabase; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Service time and place are a follow-up (#138). DATA.md "Shared people (Supabase)" |
+| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through Supabase; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138). DATA.md "Shared people (Supabase)" |
 
 ### 3.6 Marketing
 
@@ -200,7 +200,7 @@ libs/
   gateway-sync/     The gateway's Convex client and the /sync/pull, /sync/push routes.
   gateway-auth/     Planned (#118, #119). The one shared helper for the gateway's domain libs:
                     Supabase JWT verification and a PostgREST client that acts as the caller.
-  gateway-flows/    Planned (#118, #131). The /flows routes for shared people details.
+  gateway-flows/    Planned (#118, #121, #122, #131). Invite and member routes, the invite mailer, and /flows.
 
   identity, gateway-messages, gateway-sync, and gateway-flows each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
