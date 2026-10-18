@@ -5,15 +5,24 @@ type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
+  /** Opens Home, the people list. */
+  onHome: () => void;
 }
 
-export function SentScreen({ flow }: Props) {
+export function SentScreen({ flow, onHome }: Props) {
   const isAnnouncement = flow.templateCategory === 'announcement';
   const name = flow.session?.personName?.trim() || flow.fields['deceasedName']?.trim();
-  const recipients = flow.sendJob?.recipients ?? [];
-  const count = recipients.filter((r) => r.status === 'delivered').length;
-  const skipped = recipients.filter((r) => r.status === 'skipped').length;
+  // The send job lives only in memory. Opened again after a send (#167) there is none, and who was
+  // skipped is not known, so no number is given.
+  const recipients = flow.sendJob?.recipients ?? null;
+  const count = recipients?.filter((r) => r.status === 'delivered').length ?? 0;
+  const skipped = recipients?.filter((r) => r.status === 'skipped').length ?? 0;
   const people = `${count} ${count === 1 ? 'person' : 'people'}`;
+  const who = recipients ? people : 'The people you chose';
+  const plural = !recipients || count !== 1;
+  const summary = isAnnouncement
+    ? `${who} now ${plural ? 'know' : 'knows'} about ${name || 'your loved one'}. Nothing else needs doing today.`
+    : `${who} ${plural ? 'have' : 'has'} service details${name ? ` for ${name}` : ''}.`;
 
   return (
     <div className="flex flex-col items-center text-center gap-3 pt-16">
@@ -34,9 +43,7 @@ export function SentScreen({ flow }: Props) {
       </h1>
 
       <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)', maxWidth: '28ch' }}>
-        {isAnnouncement
-          ? `${people} now ${count === 1 ? 'knows' : 'know'} about ${name || 'your loved one'}. Nothing else needs doing today.`
-          : `${people} ${count === 1 ? 'has' : 'have'} service details${name ? ` for ${name}` : ''}.`}
+        {summary}
       </p>
 
       {skipped > 0 && (
@@ -74,6 +81,10 @@ export function SentScreen({ flow }: Props) {
           Send another message
         </button>
       )}
+
+      <button type="button" onClick={onHome} className="gg-btn gg-btn-ghost">
+        Back to home
+      </button>
 
       <p className="text-[12px] m-0" style={{ color: 'var(--text-hint)' }}>
         We don't keep a copy of what was sent — it's already where it belongs, in your own

@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { SessionDetails } from '@griever/shared';
 import { freshDraft, hasDraftInProgress, resumeDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
+import { stripSentWording } from './useSessions.js';
 
 const session: SessionDetails = {
   personName: 'Margaret Hayes',
@@ -216,5 +217,35 @@ describe('useSendFlow — start again (#98)', () => {
     const obit = renderHook(() => useSendFlow({ session, draft: freshDraft({ templateCategory: 'obituary', templateOverrideId: 'obituary-link', step: 'contacts', selectedContactIds: ['c-1'] }) }));
     act(() => obit.result.current.startAgain());
     expect(obit.result.current).toMatchObject({ step: 'contacts', selectedContactIds: [], templateOverrideId: 'obituary-link' });
+  });
+});
+
+// Characterization (#167): passes before and after the fix. It pins the contract the web app relies
+// on when the flow is mounted again at Sent: a saved sent draft mounts at 'sent', not the picker.
+describe('useSendFlow — mounted again with the saved sent draft (#167)', () => {
+  it('keeps step "sent" and has no send job or wording', () => {
+    // The draft as the app stores it after a send (useSessions.updateDraft strips it, C2).
+    const draft = stripSentWording(
+      freshDraft({
+        templateCategory: 'announcement',
+        step: 'sent',
+        serviceDetailsKnown: 'no',
+        selectedContactIds: ['c-1'],
+        fields: { personalNote: 'private words' },
+        messageOverride: 'private words',
+      }),
+    );
+    const { result } = renderHook(() => useSendFlow({ session, draft }));
+    expect(result.current).toMatchObject({
+      step: 'sent',
+      templateCategory: 'announcement',
+      selectedContactIds: ['c-1'],
+      sendJob: null,
+      fields: {},
+      messageOverride: null,
+    });
+    expect(result.current.composedMessage).not.toContain('private words');
+    // Still not something Home reopens.
+    expect(hasDraftInProgress(draft)).toBe(false);
   });
 });
