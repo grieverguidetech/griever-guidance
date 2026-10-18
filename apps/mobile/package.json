@@ -8,6 +8,18 @@
   "nx": {
     "name": "mobile",
     "targets": {
+      "start": {
+        "dependsOn": [
+          "build-deps",
+          "watch-deps"
+        ]
+      },
+      "export": {
+        "dependsOn": [
+          "^export",
+          "build-deps"
+        ]
+      },
       "test": {
         "executor": "nx:run-commands",
         "cache": true,
