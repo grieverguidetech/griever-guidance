@@ -88,7 +88,6 @@ export function RemoveMember({ members, message, onRemove }: Props) {
         ref={headingRef}
         tabIndex={-1}
         className="text-[16px] m-0"
-        style={{ outline: 'none' }}
       >
         People helping you
       </h2>
@@ -108,7 +107,6 @@ export function RemoveMember({ members, message, onRemove }: Props) {
                     role="group"
                     aria-labelledby={`remove-member-${m.id}`}
                     className="flex flex-col gap-3"
-                    style={{ outline: 'none' }}
                   >
                     <p
                       id={`remove-member-${m.id}`}
