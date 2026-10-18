@@ -45,19 +45,21 @@ const firstCall = () => {
   return { url, init, headers: init.headers as Record<string, string> };
 };
 
-const calls: Array<[string, () => Promise<unknown>, string, string, unknown]> =
+const calls: Array<
+  [string, (signal?: AbortSignal) => Promise<unknown>, string, string, unknown]
+> =
   [
-    ['listFlows', () => listFlows(ACCESS), 'GET', '/flows', [record]],
+    ['listFlows', (signal) => listFlows(ACCESS, signal), 'GET', '/flows', [record]],
     [
       'createFlow',
-      () => createFlow(ACCESS, ID, facts),
+      (signal) => createFlow(ACCESS, ID, facts, signal),
       'POST',
       '/flows',
       record,
     ],
     [
       'patchFlow',
-      () => patchFlow(ACCESS, ID, { serviceReady: true }),
+      (signal) => patchFlow(ACCESS, ID, { serviceReady: true }, signal),
       'PATCH',
       `/flows/${ID}`,
       record,
@@ -93,6 +95,13 @@ describe.each(calls)('%s', (_name, run, method, path, okBody) => {
   it('maps a network failure to offline', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     expect(await run()).toEqual({ ok: false, reason: 'offline' });
+  });
+
+  it('passes the signal to fetch (#164)', async () => {
+    fetchMock.mockResolvedValue(json(200, okBody));
+    const controller = new AbortController();
+    await run(controller.signal);
+    expect(firstCall().init.signal).toBe(controller.signal);
   });
 
   it('maps an unreadable reply to failed', async () => {

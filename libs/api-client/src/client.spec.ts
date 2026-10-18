@@ -112,3 +112,28 @@ describe('apiFetchNoContent', () => {
     await expect(apiFetchNoContent('/x')).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe('abort signal (#164)', () => {
+  it('apiFetch passes the signal to fetch', async () => {
+    respond(200, {});
+    const controller = new AbortController();
+    await apiFetch('/x', { method: 'GET' }, controller.signal);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('apiFetchNoContent passes the signal to fetch', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const controller = new AbortController();
+    await apiFetchNoContent('/x', { method: 'DELETE' }, controller.signal);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('sends no signal when the caller gives none', async () => {
+    respond(200, {});
+    await apiFetch('/x');
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBeUndefined();
+  });
+});

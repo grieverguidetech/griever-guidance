@@ -60,12 +60,14 @@ async function call(
   accessToken: string,
   path: string,
   init: RequestInit,
+  signal?: AbortSignal,
 ): Promise<{ ok: true; body: unknown } | FlowsFailure> {
   try {
-    const body = await apiFetch<unknown>(path, {
-      ...init,
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const body = await apiFetch<unknown>(
+      path,
+      { ...init, headers: { Authorization: `Bearer ${accessToken}` } },
+      signal,
+    );
     return { ok: true, body };
   } catch (error) {
     return failure(error);
@@ -73,8 +75,11 @@ async function call(
 }
 
 /** Every person the signed-in user owns or helps with. Records that fail validation are dropped. */
-export async function listFlows(accessToken: string): Promise<ListFlowsResult> {
-  const result = await call(accessToken, '/flows', { method: 'GET' });
+export async function listFlows(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<ListFlowsResult> {
+  const result = await call(accessToken, '/flows', { method: 'GET' }, signal);
   if (!result.ok) return result;
   if (!Array.isArray(result.body)) return { ok: false, reason: 'failed' };
   const flows = result.body
@@ -89,11 +94,14 @@ async function send(
   path: string,
   method: 'POST' | 'PATCH',
   body: unknown,
+  signal?: AbortSignal,
 ): Promise<WriteFlowResult> {
-  const result = await call(accessToken, path, {
-    method,
-    body: JSON.stringify(body),
-  });
+  const result = await call(
+    accessToken,
+    path,
+    { method, body: JSON.stringify(body) },
+    signal,
+  );
   if (!result.ok) return result;
   const flow = parseFlowRecord(result.body);
   return flow ? { ok: true, flow } : { ok: false, reason: 'failed' };
@@ -108,11 +116,12 @@ export function createFlow(
   accessToken: string,
   id: string,
   facts: FlowFacts,
+  signal?: AbortSignal,
 ): Promise<WriteFlowResult> {
   const body = parseFlowFacts(pickFlowFacts(facts));
   if (!isUuid(id) || !body)
     return Promise.resolve({ ok: false, reason: 'invalid' });
-  return send(accessToken, '/flows', 'POST', { id, ...body });
+  return send(accessToken, '/flows', 'POST', { id, ...body }, signal);
 }
 
 /** Edits a person. Sends only the changed whitelisted fields; an empty patch sends nothing. */
@@ -120,11 +129,18 @@ export function patchFlow(
   accessToken: string,
   id: string,
   partial: Partial<FlowFacts>,
+  signal?: AbortSignal,
 ): Promise<PatchFlowResult> {
   const body = parseFlowPatch(pickFlowFacts(partial));
   if (!isUuid(id) || !body)
     return Promise.resolve({ ok: false, reason: 'invalid' });
   if (Object.keys(body).length === 0)
     return Promise.resolve({ ok: true, flow: null });
-  return send(accessToken, `/flows/${encodeURIComponent(id)}`, 'PATCH', body);
+  return send(
+    accessToken,
+    `/flows/${encodeURIComponent(id)}`,
+    'PATCH',
+    body,
+    signal,
+  );
 }
