@@ -79,10 +79,22 @@ function memoryStorage(initial: Record<string, string> = {}): SendFlowStorage & 
   };
 }
 
+/** The signal each request was sent with, in request order. Reset by `mockFetch`. */
+let signals: Array<AbortSignal | undefined> = [];
+
+/** Rejects like a real fetch does when its signal aborts. */
+function hang(signal: AbortSignal | undefined): Promise<Response> {
+  return new Promise<Response>((_resolve, reject) => {
+    signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
+  });
+}
+
 /** Stubs fetch; `route` decides each reply. Requests are recorded. */
 function mockFetch(route: (req: Req) => Reply | Promise<Reply>) {
   const requests: Req[] = [];
+  signals = [];
   const fn = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    signals.push(init?.signal ?? undefined);
     const path = new URL(String(input)).pathname;
     const req: Req = {
       method: init?.method ?? 'GET',
@@ -92,7 +104,7 @@ function mockFetch(route: (req: Req) => Reply | Promise<Reply>) {
     requests.push(req);
     const reply = await route(req);
     if (reply === 'offline') throw new TypeError('Failed to fetch');
-    if (reply === 'hang') return new Promise<Response>(() => undefined);
+    if (reply === 'hang') return hang(init?.signal ?? undefined);
     return new Response(JSON.stringify(reply.body ?? null), {
       status: reply.status,
       headers: { 'Content-Type': 'application/json' },
@@ -312,6 +324,35 @@ describe('useFlowSync failures (C5)', () => {
     expect(result.current.lastError).toBe('offline');
     await advance(BACKOFF_START_MS + 10);
     expect(gets(requests).length).toBe(2);
+  });
+
+  it('aborts a request that times out (#164)', async () => {
+    mockFetch((req) => (req.method === 'GET' ? 'hang' : { status: 200, body: record() }));
+    setup([session()]);
+    await advance(REQUEST_TIMEOUT_MS - 10);
+    expect(signals[0]?.aborted).toBe(false);
+    await advance(20);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it('keeps and resends an edit whose PATCH timed out and was aborted (#164)', async () => {
+    let hangPatch = true;
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [record()] };
+      return hangPatch ? 'hang' : { status: 200, body: record() };
+    });
+    const base = session();
+    const { rerender, result } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + REQUEST_TIMEOUT_MS + 10);
+    const patchSignal = signals[requests.findIndex((r) => r.method === 'PATCH')];
+    expect(patchSignal?.aborted).toBe(true);
+    expect(result.current.lastError).toBe('offline');
+    hangPatch = false;
+    await advance(BACKOFF_START_MS + 10);
+    expect(writes(requests).map((r) => r.body)).toEqual([{ serviceDate: 'June 3' }, { serviceDate: 'June 3' }]);
+    expect(result.current.lastError).toBe(null);
   });
 
   it('drops that person\'s patch on a 403 and pulls', async () => {
@@ -658,6 +699,16 @@ describe('useFlowSync queue behaviour', () => {
     wake();
     await advance(EDIT_DEBOUNCE_MS + PULL);
     expect(requests).toEqual([]);
+  });
+
+  it('aborts a request in flight on unmount (#164)', async () => {
+    mockFetch((req) => (req.method === 'GET' ? 'hang' : { status: 200 }));
+    const { unmount } = setup([session()]);
+    await advance(10);
+    expect(signals[0]?.aborted).toBe(false);
+    unmount();
+    expect(signals[0]?.aborted).toBe(true);
+    await advance(REQUEST_TIMEOUT_MS + BACKOFF_MAX_MS);
   });
 
   it('makes no requests after unmount', async () => {

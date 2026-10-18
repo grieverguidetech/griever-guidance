@@ -21,9 +21,14 @@ import type { Session, UseSessionsResult } from './useSessions.js';
 
 /** The api-client functions the hook uses. Tests pass a stub; the default is the real module. */
 export interface FlowSyncClient {
-  listFlows: (accessToken: string) => Promise<ListFlowsResult>;
-  createFlow: (accessToken: string, id: string, facts: FlowFacts) => Promise<WriteFlowResult>;
-  patchFlow: (accessToken: string, id: string, partial: Partial<FlowFacts>) => Promise<PatchFlowResult>;
+  listFlows: (accessToken: string, signal?: AbortSignal) => Promise<ListFlowsResult>;
+  createFlow: (accessToken: string, id: string, facts: FlowFacts, signal?: AbortSignal) => Promise<WriteFlowResult>;
+  patchFlow: (
+    accessToken: string,
+    id: string,
+    partial: Partial<FlowFacts>,
+    signal?: AbortSignal,
+  ) => Promise<PatchFlowResult>;
 }
 
 const defaultClient: FlowSyncClient = { listFlows, createFlow, patchFlow };
@@ -123,16 +128,38 @@ const mayCreate = (s: Session, userId: string): boolean =>
 const isMine = (s: Session, userId: string): boolean =>
   s.role === 'member' || s.ownerId === null || s.ownerId === userId;
 
-/** The request can hang forever in some runtimes, so the queue stops waiting after a while. */
-function withTimeout<T>(promise: Promise<T>, fallback: T, timers: Set<ReturnType<typeof setTimeout>>): Promise<T> {
+/** Stops one request: clears its timer and aborts it. Called on unmount. */
+type Cancel = () => void;
+
+/**
+ * The request can hang forever in some runtimes, so the queue stops waiting after a while. On
+ * timeout the request is also aborted, so a stale PATCH can't land after a newer one (#164).
+ * Whatever the aborted request later returns is ignored: this has already resolved with `fallback`.
+ */
+function withTimeout<T>(start: (signal: AbortSignal) => Promise<T>, fallback: T, inFlight: Set<Cancel>): Promise<T> {
+  const controller = new AbortController();
   return new Promise<T>((resolve) => {
+    const cancel: Cancel = () => {
+      clearTimeout(timer);
+      inFlight.delete(cancel);
+      controller.abort();
+    };
     const done = (value: T) => {
       clearTimeout(timer);
-      timers.delete(timer);
+      inFlight.delete(cancel);
       resolve(value);
     };
-    const timer = setTimeout(() => done(fallback), REQUEST_TIMEOUT_MS);
-    timers.add(timer);
+    const timer = setTimeout(() => {
+      cancel();
+      done(fallback);
+    }, REQUEST_TIMEOUT_MS);
+    inFlight.add(cancel);
+    let promise: Promise<T>;
+    try {
+      promise = start(controller.signal);
+    } catch {
+      promise = Promise.resolve(fallback);
+    }
     promise.then(done, () => done(fallback));
   });
 }
@@ -224,7 +251,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     let needPull = true;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const requestTimers = new Set<ReturnType<typeof setTimeout>>();
+    const inFlight = new Set<Cancel>();
     let softFailure = false;
     const fail = (reason: FlowsFailureReason | null) => {
       setLastError((prev) => (prev === reason ? prev : reason));
@@ -243,7 +270,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     const client = () => latest.current.client ?? defaultClient;
 
     const pull = async (accessToken: string): Promise<boolean> => {
-      const result = await withTimeout(client().listFlows(accessToken), offline, requestTimers);
+      const result = await withTimeout((signal) => client().listFlows(accessToken, signal), offline, inFlight);
       if (!alive) return false;
       if (!result.ok) {
         fail(result.reason);
@@ -291,11 +318,12 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
           const create = mayCreate(session, userId) && !state.known.has(id);
           const sent: Pending = create ? toFlowFacts(session) : { ...pending };
           const result = await withTimeout<WriteFlowResult | PatchFlowResult>(
-            create
-              ? client().createFlow(accessToken, id, sent as FlowFacts)
-              : client().patchFlow(accessToken, id, sent),
+            (signal) =>
+              create
+                ? client().createFlow(accessToken, id, sent as FlowFacts, signal)
+                : client().patchFlow(accessToken, id, sent, signal),
             offline,
-            requestTimers,
+            inFlight,
           );
           if (!alive) return true;
           if (result.ok) {
@@ -412,8 +440,8 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       kickRef.current = () => undefined;
       if (timer !== undefined) clearTimeout(timer);
       clearInterval(interval);
-      for (const t of requestTimers) clearTimeout(t);
-      requestTimers.clear();
+      // Abort every request still in flight; `alive` is false, so their results are ignored.
+      for (const cancel of [...inFlight]) cancel();
       try {
         unsubscribe();
       } catch {

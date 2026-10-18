@@ -34,11 +34,12 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path: string, init?: RequestInit): Promise<Response> {
+async function request(path: string, init?: RequestInit, signal?: AbortSignal): Promise<Response> {
   // `...init` goes first so a caller's `headers` can't replace the merged set.
   const res = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
+    ...(signal ? { signal } : {}),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -54,8 +55,9 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
   return res;
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await request(path, init);
+/** `signal` cancels the request; fetch then rejects with an `AbortError`. */
+export async function apiFetch<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
+  const res = await request(path, init, signal);
   return res.json() as Promise<T>;
 }
 
@@ -66,8 +68,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 export async function apiFetchNoContent(
   path: string,
   init?: RequestInit,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const res = await request(path, init);
+  const res = await request(path, init, signal);
   if (res.status === 204) return;
   const text = await res.text().catch(() => 'unreadable');
   if (text !== '') throw new ApiError('Unexpected response body', res.status);
