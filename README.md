@@ -96,6 +96,8 @@ pnpm dev:mobile     # Expo
 pnpm dev:marketing  # Astro
 ```
 
+`pnpm dev:mobile` builds the workspace libs mobile imports first and rebuilds them on change (`mobile:watch-deps`); `pnpm nx run mobile:export` builds them first too.
+
 Env files, with your own values (never commit them):
 
 - Web and mobile: copy `apps/<app>/.env.example` to `apps/<app>/.env.local`.
