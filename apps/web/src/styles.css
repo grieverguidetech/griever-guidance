@@ -103,8 +103,9 @@ h1, h2, h3, h4, h5, h6 {
    where focus went (WCAG 2.4.7). The bar is accent-700, which is 5.72:1 on --color-bg,
    5.28:1 on --color-surface and 5.89:1 on --color-accent-100 (non-text 3:1, WCAG 1.4.11).
    Unlayered on purpose, like the reset above, so no component class can hide it.
+   The transparent outline shows in forced-colors mode, which drops box-shadow.
    Guarded by focusStyles.spec.ts. Never add an inline `outline: 'none'` to these targets. */
-[tabindex='-1']:focus-visible { outline: none; box-shadow: -4px 0 0 0 var(--color-accent-700); }
+[tabindex='-1']:focus-visible { outline: 2px solid transparent; box-shadow: -4px 0 0 0 var(--color-accent-700); }
 /* Fields: a 2px accent-700 ring (the 1px border plus a 1px outline right outside it).
    accent-700 is 5.28:1 on the field (--color-surface), 5.72:1 on the page and 3.87:1 against
    the unfocused border, so the change of state clears 3:1 too. The base accent (#0088b0) was
