@@ -121,7 +121,6 @@ export function PeopleHelping({
             ref={headingRef}
             tabIndex={-1}
             className="text-[16px] m-0"
-            style={{ outline: 'none' }}
           >
             People helping you
           </h2>
@@ -203,7 +202,6 @@ export function PeopleHelping({
             ref={invitedRef}
             tabIndex={-1}
             className="text-[14px] m-0"
-            style={{ outline: 'none' }}
           >
             Invited
           </h3>

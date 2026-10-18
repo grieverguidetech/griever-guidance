@@ -82,7 +82,6 @@ export function Settings({ onBack, onRemoveEverything, signsOut = false, removeM
             role="group"
             aria-labelledby="remove-confirm"
             className="flex flex-col gap-3"
-            style={{ outline: 'none' }}
           >
             <p id="remove-confirm" className="text-[14px] leading-[1.6] m-0">
               This removes the people you're writing about, your contacts, and your drafts from this
