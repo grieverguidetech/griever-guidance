@@ -218,3 +218,19 @@ describe('useSendFlow — start again (#98)', () => {
     expect(obit.result.current).toMatchObject({ step: 'contacts', selectedContactIds: [], templateOverrideId: 'obituary-link' });
   });
 });
+
+describe('useSendFlow — opened again at Sent (#167)', () => {
+  it('keeps step "sent" when the saved draft from after the send is applied again', () => {
+    const first = announcement({ step: 'review', serviceDetailsKnown: 'no', selectedContactIds: ['c-1'] });
+    act(() => first.result.current.startSendJob());
+    act(() => first.result.current.markActiveSent());
+    expect(first.result.current.step).toBe('sent');
+
+    // What the app saves at Sent (no wording, C2), handed to a new mount of the flow.
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sent', serviceDetailsKnown: 'no', selectedContactIds: ['c-1'] });
+    const again = renderHook(() => useSendFlow({ session, draft }));
+    expect(again.result.current).toMatchObject({ step: 'sent', templateCategory: 'announcement', selectedContactIds: ['c-1'], sendJob: null });
+    // Still not something Home reopens (C2: nothing to resume once sent).
+    expect(hasDraftInProgress(draft)).toBe(false);
+  });
+});

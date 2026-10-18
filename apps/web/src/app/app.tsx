@@ -1028,11 +1028,17 @@ function AppBody({
   }
 
   if (view === 'flow' && active && activeDetails) {
-    // A finished send is never reopened; with no moment chosen the picker shows.
+    // A finished send is never reopened from Home; with no moment chosen the picker shows. The
+    // moment just sent keeps its Sent screen if the flow is opened again (a prompt came between),
+    // instead of starting over on the picker (#167). Its saved draft holds no wording (C2).
     const chosen = flowCategory ? active.drafts[flowCategory] : null;
     const latest = latestInProgressDraft(active);
     const flowStart =
-      flowCategory === undefined ? (latest && resumeDraft(latest)) : hasDraftInProgress(chosen) ? chosen : null;
+      flowCategory === undefined
+        ? latest && resumeDraft(latest)
+        : chosen?.step === 'sent' || hasDraftInProgress(chosen)
+          ? chosen
+          : null;
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Flow
@@ -1044,6 +1050,7 @@ function AppBody({
           notifiedContactIds={active.recipientsNotified.announcement ?? []}
           onDraftChange={onDraftChange}
           onExitToLanding={goToPathLanding}
+          onHome={goHome}
           onEditSession={() => {
             setSetupEditing(true);
             setView('setup');

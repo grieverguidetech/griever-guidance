@@ -5,12 +5,18 @@ type Flow = ReturnType<typeof useSendFlow>;
 
 interface Props {
   flow: Flow;
+  /** Opens Home, the people list. */
+  onHome: () => void;
 }
 
-export function SentScreen({ flow }: Props) {
+export function SentScreen({ flow, onHome }: Props) {
   const isAnnouncement = flow.templateCategory === 'announcement';
   const name = flow.session?.personName?.trim() || flow.fields['deceasedName']?.trim();
-  const recipients = flow.sendJob?.recipients ?? [];
+  // The send job lives only in memory. Opened again after a send (#167), the saved draft still
+  // knows who was messaged, though not who was skipped.
+  const recipients =
+    flow.sendJob?.recipients ??
+    flow.selectedContactIds.map((contactId) => ({ contactId, status: 'delivered' as const }));
   const count = recipients.filter((r) => r.status === 'delivered').length;
   const skipped = recipients.filter((r) => r.status === 'skipped').length;
   const people = `${count} ${count === 1 ? 'person' : 'people'}`;
@@ -74,6 +80,10 @@ export function SentScreen({ flow }: Props) {
           Send another message
         </button>
       )}
+
+      <button type="button" onClick={onHome} className="gg-btn gg-btn-ghost">
+        Back to home
+      </button>
 
       <p className="text-[12px] m-0" style={{ color: 'var(--text-hint)' }}>
         We don't keep a copy of what was sent — it's already where it belongs, in your own

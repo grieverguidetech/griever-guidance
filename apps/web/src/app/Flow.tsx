@@ -21,6 +21,8 @@ interface Props {
   notifiedContactIds: string[];
   onDraftChange: (draft: SendFlowDraft) => void;
   onExitToLanding: () => void;
+  /** Opens Home, the people list. Leaving unmounts the flow, so nothing composed is kept (C2). */
+  onHome: () => void;
   onEditSession: () => void;
   onAddContact: (input: { name: string; phone: string }) => Promise<Contact>;
 }
@@ -33,6 +35,7 @@ export function Flow({
   notifiedContactIds,
   onDraftChange,
   onExitToLanding,
+  onHome,
   onEditSession,
   onAddContact,
 }: Props) {
@@ -66,7 +69,7 @@ export function Flow({
     case 'sending':
       return <SendingScreen flow={flow} contacts={contacts} />;
     case 'sent':
-      return <SentScreen flow={flow} />;
+      return <SentScreen flow={flow} onHome={onHome} />;
     default:
       return null;
   }
