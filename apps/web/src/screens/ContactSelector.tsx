@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import type { Contact, ContactTier } from '@griever/shared';
 import { detectDeviceRegion, toE164 } from '@griever/contacts';
-import { CheckCircle, Circle, Plus } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
+import { Circle } from '@phosphor-icons/react/Circle';
+import { Plus } from '@phosphor-icons/react/Plus';
 import { TopBar, SavedNote } from '../lib/ui';
 import { formatPhone } from '../lib/format';
 

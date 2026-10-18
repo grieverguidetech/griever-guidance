@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ShareNetwork } from '@phosphor-icons/react';
+import { ShareNetwork } from '@phosphor-icons/react/ShareNetwork';
 import { buildShareSnapshot } from '@griever/shared';
 import type { ShareChecklistItem, ShareSessionDetails } from '@griever/shared';
 

@@ -11,7 +11,8 @@ import {
 } from '@griever/contacts';
 import { TopBar } from '../lib/ui';
 import { formatPhone } from '../lib/format';
-import { CheckCircle, Circle } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
+import { Circle } from '@phosphor-icons/react/Circle';
 
 export interface PickedForImport {
   name: string;

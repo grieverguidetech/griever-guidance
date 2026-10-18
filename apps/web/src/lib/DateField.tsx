@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from 'react';
-import { CalendarBlank } from '@phosphor-icons/react';
+import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
 
 /**
  * An accessible, low-effort date field. The user can **type** a date freely

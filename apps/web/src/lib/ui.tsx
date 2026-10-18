@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactElement } from 'react';
-import { ArrowLeft, ListChecks } from '@phosphor-icons/react';
+import { ArrowLeft } from '@phosphor-icons/react/ArrowLeft';
+import { ListChecks } from '@phosphor-icons/react/ListChecks';
 import { useWhatYoullNeed } from './whatYoullNeedContext';
 
 /**

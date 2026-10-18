@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
 import { composeMessage } from '@griever/shared';
-import { PencilSimple, CheckCircle, Circle } from '@phosphor-icons/react';
+import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
+import { Circle } from '@phosphor-icons/react/Circle';
 import { TopBar } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;

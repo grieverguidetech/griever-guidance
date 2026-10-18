@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { buildSmsLink, isIOSUserAgent } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
-import { CheckCircle, CircleDashed, MinusCircle, ShareNetwork } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
+import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
+import { MinusCircle } from '@phosphor-icons/react/MinusCircle';
+import { ShareNetwork } from '@phosphor-icons/react/ShareNetwork';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
