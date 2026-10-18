@@ -120,6 +120,20 @@ describe('people kept on the phone', () => {
     });
   });
 
+  it("reopens a moment left on the picker at that moment's first form (#99)", async () => {
+    const onPicker = { ...freshDraft({}), templateCategory: 'aftercare' as const, step: 'template' as const, fields: { deceasedName: 'Anna Lee' } };
+    const person = {
+      id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x',
+      drafts: { aftercare: onPicker }, draftsUpdatedAt: { aftercare: '2026-10-02T00:00:00.000Z' },
+      serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+    };
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
+  });
+
   it('reuses a blank person instead of adding another', async () => {
     render(<App />);
     await begin();
