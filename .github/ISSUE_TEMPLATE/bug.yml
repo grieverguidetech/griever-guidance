@@ -25,5 +25,5 @@ body:
   - type: input
     id: constraints
     attributes:
-      label: Does it break a constraint (C1–C10)?
+      label: Does it break a constraint (C1–C11)?
       placeholder: e.g. C2 — message text found in localStorage

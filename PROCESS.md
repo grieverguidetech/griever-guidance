@@ -66,7 +66,7 @@ so in one line and goes straight to a ticket.
    it brushes against) and, if the shape of the code changes, **architect** (where it goes per
    §6, what it does *not* do). Their output goes in the issue body, not new docs.
 6. Spawn **ticketer** to split the work (§4 below). Present the tickets at **G1**: a table of
-   title, size, labels, depends-on, files touched, plus which constraints (C1–C10) each one touches.
+   title, size, labels, depends-on, files touched, plus which constraints (C1–C11) each one touches.
 
 ### Ticket
 
@@ -197,7 +197,7 @@ send-flow change in history (25 files) was reverted whole.
 
 Every ticket (the **Ticket** issue template enforces this) has: context; acceptance criteria someone
 who didn't see your reasoning can check; the `REQUIREMENTS.md` row(s) it moves; the constraints
-(C1–C10) it touches; `files_touched`; depends-on; size; and the tests it will add.
+(C1–C11) it touches; `files_touched`; depends-on; size; and the tests it will add.
 
 Dependencies (`package.json`, `pnpm-lock.yaml`) change only in a ticket that says so. If a
 developer needs one mid-ticket, it comments on the issue, labels `blocked`, and stops.
@@ -244,7 +244,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
   **never reuses** a running server, so a `pnpm dev` or another worktree's run can't be tested by
   mistake. It runs on desktop Chrome, Pixel 7, and iPhone 15 (WebKit). The person this is for is
   on a phone. `BASE_URL=<url>` runs it against a deployed site.
-- Test what the user experiences: role- and label-based locators, real copy. Constraints C1–C10
+- Test what the user experiences: role- and label-based locators, real copy. Constraints C1–C11
   get tests where they can be checked by code (e.g. no `!` in any template, one recipient per
   `sms:` link, every gateway route rejects bad input).
 - **Stress and repeat runs happen in CI**, via the manual `E2E stress` workflow

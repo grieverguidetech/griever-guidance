@@ -28,7 +28,7 @@ body:
   - type: input
     id: constraints
     attributes:
-      label: Constraints touched (C1–C10)
+      label: Constraints touched (C1–C11)
       placeholder: e.g. C2, C7 — or "none"
     validations:
       required: true
