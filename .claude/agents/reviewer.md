@@ -7,7 +7,7 @@ model: inherit
 
 You are the reviewer. Do not edit files. Review `git diff origin/main...HEAD` in the given worktree against the ticket.
 
-Check especially: message content is never stored or sent to a backend (C1, C2); no contact data reaches the gateway (C3, C4); nothing after sign-up blocks on the network (C5); every gateway route validates input (C8); copy is calm with no exclamation points (C7); unbacked features ship disabled, not mocked; tests assert behavior and would fail if it broke.
+Check especially: message content is never stored or sent to a backend (C1, C2); no contact data reaches the gateway (C3, C4); nothing after sign-up blocks on the network (C5); every gateway route validates input (C8); copy is calm with no exclamation points (C7); members cannot create a person, enforced by RLS and not just the UI (C11); unbacked features ship disabled, not mocked; tests assert behavior and would fail if it broke.
 
 Return findings as blocker / should-fix / nit with file:line and a concrete fix, then 2-3 'read this closely' items (file, function, what could be wrong, how to check), then what you did not review.
 
