@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { SessionDetails } from '@griever/shared';
 import { freshDraft, hasDraftInProgress, resumeDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
+import { stripSentWording } from './useSessions.js';
 
 const session: SessionDetails = {
   personName: 'Margaret Hayes',
@@ -219,18 +220,32 @@ describe('useSendFlow — start again (#98)', () => {
   });
 });
 
-describe('useSendFlow — opened again at Sent (#167)', () => {
-  it('keeps step "sent" when the saved draft from after the send is applied again', () => {
-    const first = announcement({ step: 'review', serviceDetailsKnown: 'no', selectedContactIds: ['c-1'] });
-    act(() => first.result.current.startSendJob());
-    act(() => first.result.current.markActiveSent());
-    expect(first.result.current.step).toBe('sent');
-
-    // What the app saves at Sent (no wording, C2), handed to a new mount of the flow.
-    const draft = freshDraft({ templateCategory: 'announcement', step: 'sent', serviceDetailsKnown: 'no', selectedContactIds: ['c-1'] });
-    const again = renderHook(() => useSendFlow({ session, draft }));
-    expect(again.result.current).toMatchObject({ step: 'sent', templateCategory: 'announcement', selectedContactIds: ['c-1'], sendJob: null });
-    // Still not something Home reopens (C2: nothing to resume once sent).
+// Characterization (#167): passes before and after the fix. It pins the contract the web app relies
+// on when the flow is mounted again at Sent: a saved sent draft mounts at 'sent', not the picker.
+describe('useSendFlow — mounted again with the saved sent draft (#167)', () => {
+  it('keeps step "sent" and has no send job or wording', () => {
+    // The draft as the app stores it after a send (useSessions.updateDraft strips it, C2).
+    const draft = stripSentWording(
+      freshDraft({
+        templateCategory: 'announcement',
+        step: 'sent',
+        serviceDetailsKnown: 'no',
+        selectedContactIds: ['c-1'],
+        fields: { personalNote: 'private words' },
+        messageOverride: 'private words',
+      }),
+    );
+    const { result } = renderHook(() => useSendFlow({ session, draft }));
+    expect(result.current).toMatchObject({
+      step: 'sent',
+      templateCategory: 'announcement',
+      selectedContactIds: ['c-1'],
+      sendJob: null,
+      fields: {},
+      messageOverride: null,
+    });
+    expect(result.current.composedMessage).not.toContain('private words');
+    // Still not something Home reopens.
     expect(hasDraftInProgress(draft)).toBe(false);
   });
 });

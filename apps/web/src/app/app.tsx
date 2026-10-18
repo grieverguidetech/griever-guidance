@@ -1028,15 +1028,17 @@ function AppBody({
   }
 
   if (view === 'flow' && active && activeDetails) {
-    // A finished send is never reopened from Home; with no moment chosen the picker shows. The
-    // moment just sent keeps its Sent screen if the flow is opened again (a prompt came between),
-    // instead of starting over on the picker (#167). Its saved draft holds no wording (C2).
+    // A send under way or finished is never reopened from Home; with no moment chosen the picker
+    // shows. If the flow is mounted again mid-send or at Sent (a prompt came between), the moment
+    // keeps its place instead of starting over on the picker (#167): mid-send comes back on Review
+    // (the send job is not saved), Sent stays Sent. A sent draft holds no wording (C2).
     const chosen = flowCategory ? active.drafts[flowCategory] : null;
     const latest = latestInProgressDraft(active);
+    const sendingOrSent = chosen?.step === 'sending' || chosen?.step === 'sent';
     const flowStart =
       flowCategory === undefined
         ? latest && resumeDraft(latest)
-        : chosen?.step === 'sent' || hasDraftInProgress(chosen)
+        : sendingOrSent || hasDraftInProgress(chosen)
           ? chosen
           : null;
     return (

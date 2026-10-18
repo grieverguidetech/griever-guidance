@@ -104,11 +104,20 @@ describe('Sent screen (#167)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'What would you like to send?' })).toBeInTheDocument();
   });
 
-  it('opened again at Sent (no send job in memory), still counts who was messaged', () => {
+  it('opened again at Sent (no send job in memory), gives no number, since skips are not known', () => {
     renderFlow(freshDraft({ templateCategory: 'announcement', step: 'sent', selectedContactIds: ['c1'] }));
 
     expect(screen.getByRole('heading', { level: 1, name: 'Everyone has been told.' })).toBeInTheDocument();
-    expect(screen.getByText(/1 person now knows about Margaret Hayes/)).toBeInTheDocument();
+    expect(screen.getByText('The people you chose now know about Margaret Hayes. Nothing else needs doing today.')).toBeInTheDocument();
+    expect(screen.queryByText(/\d (person|people)/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('!'); // C7
     expect(screen.getByRole('button', { name: 'Back to home' })).toBeInTheDocument();
+  });
+
+  it('service details opened again at Sent gives no number either', () => {
+    renderFlow(freshDraft({ templateCategory: 'service', step: 'sent', selectedContactIds: ['c1'] }));
+
+    expect(screen.getByText('The people you chose have service details for Margaret Hayes.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send another message' })).toBeInTheDocument();
   });
 });
