@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft } from '@griever/hooks';
+import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import { TemplatePickerScreen } from '../screens/TemplatePickerScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
@@ -55,10 +55,12 @@ type SessionProps = {
 const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onHome }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
-  // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent".
+  // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
+  // left on the picker reopens at its first form, so the picker can't overwrite it (#99, as web).
+  const latest = latestInProgressDraft(session);
   const flow = useSendFlow({
     session,
-    draft: latestInProgressDraft(session),
+    draft: latest && resumeDraft(latest),
     drafts: session.drafts,
     onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
   });
