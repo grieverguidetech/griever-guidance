@@ -9,7 +9,7 @@ human playing a role). **`PROCESS.md` says *when*; this file says *who* and *how
 1. **The user comes first.** Someone who has just lost a loved one, on a phone, exhausted
    (`REQUIREMENTS.md` §1). If a change makes the app slower or more confusing for that person,
    the change is wrong, whatever it enables.
-2. **`REQUIREMENTS.md` §2 (C1–C10) and §6 are binding.** Breaking one is a defect. Flag conflicts;
+2. **`REQUIREMENTS.md` §2 (C1–C11) and §6 are binding.** Breaking one is a defect. Flag conflicts;
    don't resolve them silently.
 3. **All work is tracked on the board** (GitHub Project #4, see `PROCESS.md` §0). No ticket, no
    branch. The issue is where scope, decisions, and blockers are written down.
@@ -49,7 +49,7 @@ the role's brief.
 | **ticketer** | No | Splits approved work into small tickets with disjoint `files_touched`, checkable acceptance criteria, and planned tests. Creates nothing until G1. |
 | **developer** | Yes | Implements exactly one ticket in its worktree, with tests. Runs the checks and reports the output. Commits; doesn't push or open the PR. |
 | **tester** | Tests only | Finds untested requirements and constraints; writes tests-only PRs; maintains the e2e suite; reads the CI/server e2e results against production after deploys; lists `HUMAN TODO` checks. |
-| **reviewer** | No (read-only) | Diff review: acceptance criteria, correctness, constraints C1–C10, copy tone, tests that would fail if the code broke, security/privacy, scope creep. Ranks blocker / should-fix / nit. Gives 2–3 "read this closely" items. |
+| **reviewer** | No (read-only) | Diff review: acceptance criteria, correctness, constraints C1–C11, copy tone, tests that would fail if the code broke, security/privacy, scope creep. Ranks blocker / should-fix / nit. Gives 2–3 "read this closely" items. |
 | **a11y-auditor** | No (read-only) | Any UI change: keyboard flow, focus, labels, roles/states, contrast (computed, not guessed), touch targets, reduced motion, screen-reader announcements. Reads the CI Playwright + axe results (never runs e2e locally). |
 
 ### Models

@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: "Read-only review of a ticket's diff: acceptance criteria, correctness, edge cases, REQUIREMENTS constraints C1-C10, copy tone, whether the tests would fail if the code broke, security and privacy, and scope creep. Ranks findings blocker / should-fix / nit and names 2-3 read-this-closely items for the human."
+description: "Read-only review of a ticket's diff: acceptance criteria, correctness, edge cases, REQUIREMENTS constraints C1-C11, copy tone, whether the tests would fail if the code broke, security and privacy, and scope creep. Ranks findings blocker / should-fix / nit and names 2-3 read-this-closely items for the human."
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---
