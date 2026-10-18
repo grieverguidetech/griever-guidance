@@ -1,7 +1,9 @@
 import type { Session } from '@griever/hooks';
 import { usePathMoments } from '@griever/hooks';
 import type { Moment, MomentKey } from '@griever/shared';
-import { CheckCircle, CircleDashed, ListChecks } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
+import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
+import { ListChecks } from '@phosphor-icons/react/ListChecks';
 import { BackButton, Eyebrow } from '../lib/ui';
 import { formatDate } from '../lib/format';
 import { ShareDetailsButton } from './ShareDetailsButton';

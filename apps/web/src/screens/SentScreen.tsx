@@ -1,5 +1,5 @@
 import type { useSendFlow } from '@griever/hooks';
-import { CheckCircle } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 
 type Flow = ReturnType<typeof useSendFlow>;
 

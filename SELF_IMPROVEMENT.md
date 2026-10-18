@@ -173,3 +173,14 @@ to read in a minute; it is a staging area, not an archive.
   EAS build target, which `check:affected` deliberately excludes.
 - **Rule:** use the repo's `pnpm check:affected`, not hand-rolled nx commands, for the independent
   check. **Promoted → PROCESS.md "Independent check".**
+
+### 2026-10-18 — An icon barrel import made web:test flaky under load (#152)
+- **What happened:** Nx flagged `web:test` as flaky twice. Whole-App specs hit Vitest's 5 s
+  timeout when other work was running. With three suites running at once, 2–4 tests failed per
+  run; the suite spent about 270 s importing modules.
+- **Why:** screens imported icons from `@phosphor-icons/react`, whose root loads about 3,000
+  modules. Every spec file that renders a screen paid about 2 s of CPU for that, so the specs
+  fought each other for the CPU and the journeys ran slow.
+- **Rule:** import Phosphor icons by path (`@phosphor-icons/react/CheckCircle`), never from the
+  package root. `apps/web/src/iconImports.spec.ts` fails if a root import comes back. When a spec
+  is slow, look at the import time in Vitest's summary before touching timeouts.

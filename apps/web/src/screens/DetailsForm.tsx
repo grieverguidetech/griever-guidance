@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { useMockPlaces } from '@griever/hooks';
 import { shareService } from '@griever/shared';
-import { MapPin } from '@phosphor-icons/react';
+import { MapPin } from '@phosphor-icons/react/MapPin';
 import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 import { StartAgain } from '../lib/StartAgain';
 import { DateInput } from '../lib/DateField';

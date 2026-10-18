@@ -1,5 +1,5 @@
 import type { useSendFlow } from '@griever/hooks';
-import { PencilSimple } from '@phosphor-icons/react';
+import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 import { StartAgain } from '../lib/StartAgain';
 

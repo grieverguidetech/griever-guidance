@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Contact } from '@griever/shared';
-import { CheckCircle, Circle } from '@phosphor-icons/react';
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
+import { Circle } from '@phosphor-icons/react/Circle';
 import { TopBar } from '../lib/ui';
 import { formatPhone } from '../lib/format';
 

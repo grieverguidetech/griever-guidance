@@ -1,6 +1,6 @@
 import type { useSendFlow } from '@griever/hooks';
 import type { TemplateCategory } from '@griever/shared';
-import { PencilSimple } from '@phosphor-icons/react';
+import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { TopBar, Eyebrow } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;

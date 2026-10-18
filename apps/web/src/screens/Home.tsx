@@ -1,7 +1,7 @@
 import type { Session } from '@griever/hooks';
 import { namedSessionsByRecent } from '@griever/hooks';
 import { parseCompleteDate } from '@griever/shared';
-import { CaretRight } from '@phosphor-icons/react';
+import { CaretRight } from '@phosphor-icons/react/CaretRight';
 import { TopBar } from '../lib/ui';
 
 interface Props {

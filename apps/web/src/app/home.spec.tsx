@@ -2,7 +2,7 @@
  * #112: Home is where the app lands and where the path returns. The real App over real
  * localStorage; a "reload" is an unmount and a fresh <App /> over the same storage.
  */
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { freshDraft } from '@griever/hooks';
 import { App } from './app';
@@ -31,6 +31,8 @@ function seed(...people: ReturnType<typeof person>[]) {
   window.localStorage.setItem('gg.sessions.v1', JSON.stringify(people));
 }
 
+// Matches CONTACTS_CHECK_FALLBACK_MS in app.tsx: how long setup waits on the local contacts read.
+const CONTACTS_CHECK_FALLBACK_MS = 1500;
 const HOME = "The people you're writing about";
 
 async function expectHome() {
@@ -349,16 +351,30 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
   it('still reaches a step when the local contacts read never answers', async () => {
     const { contactStore } = await import('@griever/data-local');
     const spy = vi.spyOn(contactStore, 'list').mockImplementation(() => new Promise(() => undefined));
+    // The app gives up on the read after 1.5 s. Hold back only that timer and fire it here, so
+    // the test doesn't sleep through the wait (a real sleep stretches under load). Every other
+    // timer runs as normal.
+    let giveUp: (() => void) | undefined;
+    const realSetTimeout = globalThis.setTimeout;
+    const timers = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number, ...args: unknown[]) => {
+      if (ms !== CONTACTS_CHECK_FALLBACK_MS) return realSetTimeout(fn, ms, ...args);
+      giveUp = fn;
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout);
     const user = userEvent.setup();
     try {
       render(<App />);
       await user.click(await screen.findByRole('button', { name: FIRST }));
       await fillSetup(user, 'Margaret Hayes');
-      expect(await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' }, { timeout: 4000 })).toBeInTheDocument();
+      await waitFor(() => expect(giveUp).toBeDefined());
+      expect(screen.queryByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).not.toBeInTheDocument();
+      act(() => giveUp?.());
+      expect(await screen.findByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();
     } finally {
+      timers.mockRestore();
       spy.mockRestore();
     }
-  }, 10_000);
+  });
 
   it('Edit details from the path and Continue returns to the path, not the contacts walk', async () => {
     const user = userEvent.setup();
