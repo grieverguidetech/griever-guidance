@@ -19,11 +19,15 @@ function renderList() {
   return render(<WhatYoullNeed onBack={vi.fn()} onEmailList={vi.fn()} />);
 }
 
+/** Rows are off until the saved ticks are read. */
+const loaded = () => waitFor(() => expect(row('Life insurance policies')).toBeEnabled());
+
 const row = (label: string) => screen.getByRole('button', { name: new RegExp(label) });
 
 describe('What you will need (#176)', () => {
   it('starts with every item unticked, including will and funeral plans', async () => {
     renderList();
+    await loaded();
     for (const label of ROWS) expect(row(label)).toHaveAttribute('aria-pressed', 'false');
     expect(await accountStore.getChecklistTicks()).toEqual([]);
   });
@@ -31,6 +35,7 @@ describe('What you will need (#176)', () => {
   it('ticks a row on tap, strikes the text through, and unticks on a second tap', async () => {
     const user = userEvent.setup();
     renderList();
+    await loaded();
     await user.click(row('Life insurance policies'));
     expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
     // Strikethrough is not the only cue: the pressed state and the filled icon change too.
@@ -45,18 +50,22 @@ describe('What you will need (#176)', () => {
 
   it('saves ticks on this device and shows them again after a reload', async () => {
     const user = userEvent.setup();
+    await accountStore.setChecklistTicks(['life-insurance']);
     const first = renderList();
+    await loaded();
     await user.click(row('Social Security number and ID'));
     await user.click(row('Any will or written wishes'));
     await waitFor(async () =>
-      expect((await accountStore.getChecklistTicks()).sort()).toEqual(['ssn-and-id', 'will-or-wishes']),
+      expect((await accountStore.getChecklistTicks()).sort()).toEqual(['life-insurance', 'ssn-and-id', 'will-or-wishes']),
     );
 
     first.unmount();
     renderList();
     await waitFor(() => expect(row('Social Security number and ID')).toHaveAttribute('aria-pressed', 'true'));
     expect(row('Any will or written wishes')).toHaveAttribute('aria-pressed', 'true');
-    expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'false');
+    // A tick saved before this visit is kept, not overwritten by the new ones.
+    expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
+    expect(row('Military discharge papers')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('never goes to the network, and never reminds, notifies or counts', async () => {
@@ -65,6 +74,7 @@ describe('What you will need (#176)', () => {
     try {
       const user = userEvent.setup();
       renderList();
+      await loaded();
       await user.click(row('Pre-arranged funeral plans'));
       await waitFor(async () => expect(await accountStore.getChecklistTicks()).toEqual(['pre-arranged-plans']));
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -80,6 +90,7 @@ describe('What you will need (#176)', () => {
     vi.spyOn(accountStore, 'setChecklistTicks').mockRejectedValue(new Error('no storage'));
     const user = userEvent.setup();
     renderList();
+    await loaded();
     await user.click(row('Life insurance policies'));
     expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
     vi.restoreAllMocks();

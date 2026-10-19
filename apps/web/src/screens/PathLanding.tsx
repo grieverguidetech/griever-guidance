@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useRef } from 'react';
 import type { Session } from '@griever/hooks';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Moment, MomentKey, TemplateCategory } from '@griever/shared';
@@ -56,11 +56,25 @@ const ALL_TOLD: Record<MomentKey, string> = {
   thanks: 'Your thank-yous have been sent.',
 };
 
+const NO_COPY_LINE =
+  "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.";
+
 export function finishNoteText({ moment, told, total }: FinishNote): string {
+  if (told === 0) return 'No one was texted this time. You can come back to this any time.';
   if (told < total) {
     return `You told ${told} of ${total}. You can text the others from your own Messages app any time.`;
   }
   return ALL_TOLD[moment];
+}
+
+/** The C2 line applies only when something was sent. */
+function showsNoCopyLine(note: FinishNote): boolean {
+  return note.told > 0;
+}
+
+/** What the screen-reader region says: the same words as the visible note. */
+export function finishNoteSpoken(note: FinishNote): string {
+  return showsNoCopyLine(note) ? `${finishNoteText(note)} ${NO_COPY_LINE}` : finishNoteText(note);
 }
 
 interface Props {
@@ -83,6 +97,13 @@ export function PathLanding({
   onCloseNote,
 }: Props) {
   const moments = usePathMoments(session);
+  const heading = useRef<HTMLHeadingElement>(null);
+  // The Close button leaves the page, so focus goes to the heading rather than being lost.
+  function closeNote() {
+    onCloseNote?.();
+    heading.current?.setAttribute('tabindex', '-1');
+    heading.current?.focus();
+  }
 
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
@@ -95,13 +116,15 @@ export function PathLanding({
             Edit person
           </button>
         </div>
-        <h1 className="text-[22px]">One thing at a time.</h1>
+        <h1 ref={heading} className="text-[22px]">
+          One thing at a time.
+        </h1>
         <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
           Here's what usually comes next.
         </p>
       </div>
 
-      <FinishNoteRegion note={note} onClose={onCloseNote} />
+      <FinishNoteCard note={note} onClose={closeNote} />
 
       <button
         type="button"
@@ -135,27 +158,23 @@ export function PathLanding({
 }
 
 /**
- * The region is always in the page and its words arrive a render later, so a screen reader
- * announces them. The note stays until the person moves on or closes it. It has no motion.
+ * The visible note. It is spoken by the status region in App, which stays mounted across screens
+ * and is filled after the heading takes focus, so this card is plain content. No motion.
  */
-function FinishNoteRegion({ note, onClose }: { note: FinishNote | null; onClose?: () => void }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    setReady(note !== null);
-  }, [note]);
+function FinishNoteCard({ note, onClose }: { note: FinishNote | null; onClose: () => void }) {
+  if (!note) return null;
   return (
-    <div role="status">
-      {note && ready && (
-        <div className="gg-card">
-          <p className="m-0 text-[14px]">{finishNoteText(note)}</p>
-          <p className="gg-reassure m-0 text-[12px]">
-            We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.
-          </p>
-          <button type="button" onClick={onClose} className="gg-btn gg-btn-ghost self-start">
-            Close
-          </button>
-        </div>
-      )}
+    <div className="gg-card">
+      <p className="m-0 text-[14px]">{finishNoteText(note)}</p>
+      {showsNoCopyLine(note) && <p className="gg-reassure m-0 text-[12px]">{NO_COPY_LINE}</p>}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close note"
+        className="gg-btn gg-btn-secondary gg-btn-bar self-start"
+      >
+        Close
+      </button>
     </div>
   );
 }
@@ -183,6 +202,7 @@ function MomentRow({
         <CheckCircle
           size={22}
           weight="duotone"
+          aria-hidden="true"
           style={{ color: 'var(--color-accent-700)', marginTop: 1 }}
         />
         <div>

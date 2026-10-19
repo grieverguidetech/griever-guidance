@@ -122,12 +122,12 @@ describe('Done on the last person', () => {
     expect(onFinished).toHaveBeenCalledWith({ category: 'announcement', deliveredIds: [], total: 1 });
   });
 
-  it('opened again already at sent (no send job), reports the saved list once', () => {
-    const { onFinished } = renderFlow(
+  it('opened again already at sent (no send job), goes to the path and records nothing', () => {
+    const { onFinished, onExitToLanding } = renderFlow(
       freshDraft({ templateCategory: 'announcement', step: 'sent', selectedContactIds: ['c1'] }),
     );
-    expect(onFinished).toHaveBeenCalledTimes(1);
-    expect(onFinished).toHaveBeenCalledWith({ category: 'announcement', deliveredIds: ['c1'], total: 1 });
+    expect(onFinished).not.toHaveBeenCalled();
+    expect(onExitToLanding).toHaveBeenCalled();
   });
 });
 

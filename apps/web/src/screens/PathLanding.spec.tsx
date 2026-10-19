@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { freshDraft } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import type { MomentKey } from '@griever/shared';
-import { PathLanding, finishNoteText } from './PathLanding';
+import { PathLanding, finishNoteSpoken, finishNoteText } from './PathLanding';
 import type { FinishNote } from './PathLanding';
 
 const session: Session = {
@@ -75,8 +75,6 @@ function renderPath(
   return handlers;
 }
 
-/** The finish note's live region (the share button has its own status region too). */
-const inStatus = (words: string) => screen.getByText(words).closest('[role="status"]');
 
 describe('PathLanding finish note (#176)', () => {
   it.each<[MomentKey, string]>([
@@ -87,38 +85,41 @@ describe('PathLanding finish note (#176)', () => {
   ])('says the agreed words for %s when everyone was told', (moment, words) => {
     expect(finishNoteText({ moment, told: 3, total: 3 })).toBe(words);
     renderPath({}, { note: { moment, told: 3, total: 3 } });
-    expect(inStatus(words)).toBeInTheDocument();
+    expect(screen.getByText(words)).toBeInTheDocument();
+    expect(finishNoteSpoken({ moment, told: 3, total: 3 })).toContain(words);
   });
 
   it('counts, and says how to reach the others, when anyone was skipped', () => {
     renderPath({}, { note: { moment: 'announce', told: 2, total: 5 } });
-    expect(inStatus('You told 2 of 5. You can text the others from your own Messages app any time.')).toBeInTheDocument();
+    expect(screen.getByText('You told 2 of 5. You can text the others from your own Messages app any time.')).toBeInTheDocument();
     expect(screen.queryByText('Everyone has been told.')).not.toBeInTheDocument();
   });
 
   it('keeps the C2 line in the note, and calm copy (C7)', () => {
     renderPath({}, { note: { moment: 'announce', told: 1, total: 1 } });
-    const region = inStatus('Everyone has been told.') as HTMLElement;
-    expect(region).toHaveTextContent("We don't keep a copy of what was sent");
-    expect(region.textContent).not.toContain('!');
+    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('!');
   });
 
-  it('is a live status region that is in the page with or without a note, and has no timer', () => {
-    vi.useFakeTimers();
-    try {
-      renderPath();
-      expect(screen.getAllByRole('status')[0]).toBeEmptyDOMElement();
-    } finally {
-      vi.useRealTimers();
-    }
+  it('when no one was texted, says so and leaves out the no-copy line', () => {
+    const note: FinishNote = { moment: 'announce', told: 0, total: 2 };
+    renderPath({}, { note });
+    expect(screen.getByText('No one was texted this time. You can come back to this any time.')).toBeInTheDocument();
+    expect(screen.queryByText(/We don't keep a copy/)).not.toBeInTheDocument();
+    expect(finishNoteSpoken(note)).not.toContain("We don't keep a copy");
+    expect(finishNoteText(note)).not.toMatch(/You told 0/);
   });
 
   it('stays until it is closed', async () => {
     const user = userEvent.setup();
     const onCloseNote = vi.fn();
     renderPath({}, { note: { moment: 'service', told: 1, total: 1 }, onCloseNote });
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    const close = screen.getByRole('button', { name: 'Close note' });
+    expect(close).toHaveClass('gg-btn-bar'); // 44px minimum width
+    await user.click(close);
     expect(onCloseNote).toHaveBeenCalledOnce();
+    // The button leaves the page, so focus goes to the heading.
+    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toHaveFocus();
   });
 });
 

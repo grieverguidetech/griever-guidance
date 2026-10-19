@@ -66,10 +66,13 @@ export function Flow({
       onExitToLanding();
       return;
     }
-    // A flow opened again already at 'sent' has no send job; its saved list stands in for it.
-    const recipients =
-      flow.sendJob?.recipients ??
-      flow.selectedContactIds.map((contactId) => ({ contactId, status: 'delivered' as const }));
+    // Opened again already at 'sent' there is no send job and nothing to report: the moment was
+    // recorded when it finished. Go to the path without a note.
+    const recipients = flow.sendJob?.recipients;
+    if (!recipients) {
+      onExitToLanding();
+      return;
+    }
     onFinished({
       category,
       deliveredIds: recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId),

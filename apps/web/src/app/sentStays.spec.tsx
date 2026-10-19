@@ -126,7 +126,7 @@ describe('after Done on the last person (#167)', () => {
 
     await sendAnAnnouncement(user);
     expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();
-    expect(screen.getByText('Everyone has been told.').closest('[role="status"]')).toBeInTheDocument();
+    expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
     await nameCheckInterrupts(user, answer);
 
     // Back on the path: the announcement stays done, and the flow is not reopened.

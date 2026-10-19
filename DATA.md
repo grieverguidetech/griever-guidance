@@ -191,7 +191,7 @@ The ticks persist — silently, as decided — but they belong to the **account*
 **Settled Oct 2026 (#176, product owner): ticks are kept on this device only.** They live in the
 local `account` store as `checklistTicks: string[]` (keys: `will-or-wishes`, `pre-arranged-plans`,
 `ssn-and-id`, `life-insurance`, `military-papers`; never rename one). All items start unticked.
-They are read and written only by the "What you'll need" screen, are never sent to the network, and
+Ticks are per device, not per account: a second phone starts unticked. They are read and written only by the "What you'll need" screen, are never sent to the network, and
 are emptied with everything else by "Remove everything from this device". This resolves the design
 handoff's C3 open question as "persist". The server copy below (`users.checklistTicks`) is **not
 built and not planned**; if it is ever wanted it needs a fresh decision, because syncing would

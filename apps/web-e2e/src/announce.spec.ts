@@ -69,7 +69,7 @@ test('sends one person at a time, then opens the path with a quiet note (C1)', a
     page.getByText('You told 1 of 2. You can text the others from your own Messages app any time.'),
   ).toBeVisible();
   await expect(page.getByText(/We don't keep a copy of what was sent/)).toBeVisible();
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByText(/You told 1 of 2/)).toHaveCount(0);
 });
 

@@ -3,7 +3,7 @@
  * Covers the note after the last person, reopening a done moment, thanks without a picker,
  * and "Edit person" on the path.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { contactStore } from '@griever/data-local';
 import { freshDraft } from '@griever/hooks';
@@ -56,7 +56,12 @@ beforeEach(() => {
   });
 });
 
-const noteRegion = (words: string) => screen.getByText(words).closest('[role="status"]') as HTMLElement;
+/** The spoken copy: a status region that stays mounted and is filled a moment after the heading. */
+async function spokenNote(words: string) {
+  await waitFor(() =>
+    expect(screen.getAllByRole('status').some((el) => el.textContent?.startsWith(words))).toBe(true),
+  );
+}
 
 describe('the note after the last person', () => {
   it('opens the path at once with the words for the moment, the C2 line, and a Close button', async () => {
@@ -74,13 +79,20 @@ describe('the note after the last person', () => {
     await user.click(await screen.findByRole('button', { name: 'Done' }));
 
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
-    const region = noteRegion('Everyone has been told.');
-    expect(region).toHaveTextContent("We don't keep a copy of what was sent");
+    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeInTheDocument();
+    await spokenNote('Everyone has been told.');
+    // The region is in the page before the words arrive, and holds only text (no button).
+    const spoken = screen.getAllByRole('status').find((el) => el.textContent?.startsWith('Everyone has been told.'));
+    expect(spoken?.querySelector('button')).toBeNull();
     // The announcement now reads as done on the path, with the count.
     expect(screen.getByRole('button', { name: /Told close family/ })).toHaveTextContent('1 person');
 
-    await user.click(within(region).getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close note' }));
     expect(screen.queryByText('Everyone has been told.')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.getAllByRole('status').some((el) => el.textContent?.includes('Everyone has been told.'))).toBe(false),
+    );
   });
 
   it('says how many were told when someone was skipped, and does not mark the moment done', async () => {
@@ -97,8 +109,9 @@ describe('the note after the last person', () => {
     await user.click(screen.getByRole('button', { name: 'Skip' }));
 
     expect(
-      await screen.findByText('You told 0 of 1. You can text the others from your own Messages app any time.'),
+      await screen.findByText('No one was texted this time. You can come back to this any time.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/We don't keep a copy/)).not.toBeInTheDocument(); // nothing was sent
     expect(screen.queryByRole('button', { name: /Told close family/ })).not.toBeInTheDocument();
   });
 
@@ -170,11 +183,11 @@ describe('reopening a done moment', () => {
     await user.click(screen.getByRole('button', { name: /Told close family/ }));
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    // Already-told people may show; pick both.
-    await user.click(await screen.findByRole('button', { name: /Uncle Joe/ }));
-    if (screen.getByRole('button', { name: /Aunt Carol/ }).getAttribute('aria-pressed') !== 'true') {
-      await user.click(screen.getByRole('button', { name: /Aunt Carol/ }));
-    }
+    // A fresh draft: nobody is pre-selected, not even the person already told.
+    const carol = await screen.findByRole('button', { name: /Aunt Carol/ });
+    expect(carol).toHaveAttribute('aria-pressed', 'false');
+    await user.click(carol);
+    await user.click(screen.getByRole('button', { name: /Uncle Joe/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: /^Text 2 people|^Text these people/ }));
     await user.click(screen.getByRole('button', { name: 'Copy message' }));
@@ -230,5 +243,34 @@ describe('thanks and Edit person', () => {
     await screen.findByLabelText('Their name');
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { name: 'Announce the passing' })).toBeInTheDocument();
+  });
+});
+
+describe('the service line in an announcement', () => {
+  async function reviewAnnouncement(extra: Record<string, unknown>) {
+    await putContacts();
+    seed(
+      { serviceDate: 'June 5, 2099', ...extra },
+      { announcement: freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c1'] }) },
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await openPerson(user);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { name: 'Read it once before it goes' });
+  }
+
+  it('says details will follow when the date came from a service draft that was never sent', async () => {
+    await reviewAnnouncement({});
+    expect(screen.getByText(/Details of the service will follow/)).toBeInTheDocument();
+    expect(screen.queryByText(/June 5, 2099/)).not.toBeInTheDocument();
+  });
+
+  it('carries the service date once the service moment has been shared', async () => {
+    await reviewAnnouncement({
+      recipientsNotified: { service: ['c1'] },
+      momentCompletedAt: { service: DONE_AT },
+    });
+    expect(screen.getByText(/The service will be held June 5, 2099/)).toBeInTheDocument();
   });
 });

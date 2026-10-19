@@ -137,13 +137,6 @@ describe('useSendFlow — contacts', () => {
     expect(result.current.selectedContactIds).toEqual(['b']);
   });
 
-  it('keeps the same people when moving on to the service details', () => {
-    const { result } = announcement({ step: 'sent', selectedContactIds: ['a', 'b'] });
-    act(() => result.current.restartForServiceDetails());
-    expect(result.current.step).toBe('details');
-    expect(result.current.templateCategory).toBe('service');
-    expect(result.current.selectedContactIds).toEqual(['a', 'b']);
-  });
 });
 
 describe('useSendFlow — storage fallback', () => {

@@ -25,16 +25,21 @@ const CHECKLIST: ChecklistItem[] = [
  */
 function useChecklistTicks() {
   const [ticks, setTicks] = useState<string[]>([]);
+  // Rows stay off until the saved ticks are read, so an early tap cannot overwrite them.
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     let live = true;
     accountStore
       .getChecklistTicks()
       .then((saved) => {
-        // A tap made before the read finished is kept.
-        if (live) setTicks((now) => Array.from(new Set([...saved, ...now])));
+        if (live) {
+          setTicks(saved);
+          setLoaded(true);
+        }
       })
       .catch(() => {
         // Storage unavailable: the list still works for this visit.
+        if (live) setLoaded(true);
       });
     return () => {
       live = false;
@@ -47,7 +52,7 @@ function useChecklistTicks() {
       // Not saved; the tick still shows until the screen closes.
     });
   }
-  return { ticks, toggle };
+  return { ticks, toggle, loaded };
 }
 
 interface Props {
@@ -56,7 +61,7 @@ interface Props {
 }
 
 export function WhatYoullNeed({ onBack, onEmailList }: Props) {
-  const { ticks, toggle } = useChecklistTicks();
+  const { ticks, toggle, loaded } = useChecklistTicks();
   return (
     <div className="flex flex-col gap-4">
       <TopBar onBack={onBack} />
@@ -85,13 +90,14 @@ export function WhatYoullNeed({ onBack, onEmailList }: Props) {
               key={item.id}
               type="button"
               aria-pressed={checked}
+              disabled={!loaded}
               onClick={() => toggle(item.id)}
               className="flex items-start gap-3 text-left min-h-[44px] w-full"
             >
               {checked ? (
                 <CheckCircle size={22} weight="fill" aria-hidden="true" style={{ color: 'var(--color-accent-700)' }} />
               ) : (
-                <Circle size={22} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-500)' }} />
+                <Circle size={22} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-600)' }} />
               )}
               <div>
                 <div className={`text-[14px]${checked ? ' line-through' : ''}`}>{item.label}</div>

@@ -41,8 +41,8 @@ describe('after a send (C2)', () => {
     await sendAnAnnouncement(user);
 
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
-    expect(screen.getByText('Everyone has been told.').closest('[role="status"]')).toBeInTheDocument();
-    expect(screen.getByText(/We don't keep a copy of what was sent/).closest('[role="status"]')).toBeInTheDocument();
+    expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
+    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Everyone has been told.' })).not.toBeInTheDocument();
 
     const stored = JSON.stringify({ ...window.localStorage });

@@ -75,12 +75,8 @@ export interface SendFlowActions {
   nextStep: () => void;
   prevStep: () => void;
   reset: () => void;
-  /** B6 → Flow A for the same session, keeping the recipient list. */
-  restartForServiceDetails: () => void;
   /** Empties this moment's draft and returns to its first form. The person, contacts and sent record are not touched. */
   startAgain: () => void;
-  /** A5 "Send another message" → back to the picker for the same session. */
-  startAnotherMessage: () => void;
 }
 
 export interface SendFlowDerived {
@@ -486,29 +482,6 @@ export function useSendFlow(
     setState(initialState);
   }, [storage]);
 
-  const restartForServiceDetails = useCallback(() => {
-    setState((s) => {
-      const saved = draftsRef.current?.service;
-      // A service message already under way keeps what was typed; the people just told join its list.
-      if (hasDraftInProgress(saved)) {
-        const resumed = resumeDraft(saved);
-        const selectedContactIds = Array.from(new Set([...resumed.selectedContactIds, ...s.selectedContactIds]));
-        return fromDraft({ ...resumed, selectedContactIds });
-      }
-      return {
-        ...initialState,
-        step: 'details',
-        templateCategory: 'service',
-        templateOverrideId: null,
-        selectedContactIds: s.selectedContactIds,
-      };
-    });
-  }, []);
-
-  const startAnotherMessage = useCallback(() => {
-    setState(() => ({ ...initialState, step: 'template' }));
-  }, []);
-
   const startAgain = useCallback(() => {
     setState((s) => {
       const category = s.templateCategory;
@@ -552,7 +525,5 @@ export function useSendFlow(
     nextStep,
     prevStep,
     reset,
-    restartForServiceDetails,
-    startAnotherMessage,
   };
 }

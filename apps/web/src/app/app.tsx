@@ -36,6 +36,7 @@ import { WhoHearsFirst } from '../screens/WhoHearsFirst';
 import { SessionSetup } from '../screens/SessionSetup';
 import { Home } from '../screens/Home';
 import { PathLanding } from '../screens/PathLanding';
+import { finishNoteSpoken } from '../screens/PathLanding';
 import type { FinishNote } from '../screens/PathLanding';
 import { Gate } from '../screens/Gate';
 import { WhatYoullNeed } from '../screens/WhatYoullNeed';
@@ -331,6 +332,17 @@ function AppBody({
   useEffect(() => {
     if (view !== 'pathLanding') setFinishNote(null);
   }, [view]);
+  // The spoken copy of the note lives in a region that stays mounted across views (like
+  // signedOutNote) and is filled a moment after the path's heading takes focus.
+  const [finishAnnouncement, setFinishAnnouncement] = useState('');
+  useEffect(() => {
+    if (!finishNote) {
+      setFinishAnnouncement('');
+      return;
+    }
+    const timer = setTimeout(() => setFinishAnnouncement(finishNoteSpoken(finishNote)), 100);
+    return () => clearTimeout(timer);
+  }, [finishNote]);
   // True from "Create a new one" until who-hears-first is saved: setup, then contacts (only when
   // this device has none), then who hears first. This is the only way a person is created.
   const [creating, setCreating] = useState(false);
@@ -495,6 +507,9 @@ function AppBody({
     <>
       {removedNote}
       {signedOutNote}
+      <div role="status" aria-live="polite" className="sr-only">
+        {finishAnnouncement}
+      </div>
     </>
   );
 
@@ -579,16 +594,18 @@ function AppBody({
             senderName: active.senderName,
             obituaryUrl: active.obituaryUrl,
             obituaryPublisher: active.obituaryPublisher,
-            serviceDate: active.serviceDate,
+            // Only a service date that was actually shared may reach an announcement. A date
+            // typed in a service draft that was never sent is not announced.
+            serviceDate: active.momentCompletedAt?.service ? active.serviceDate : '',
           }
         : null,
     [active],
   );
 
   // With no one open, the path has nobody to show: go to Home instead.
-  function goToPathLanding() {
+  const goToPathLanding = useCallback(() => {
     setView(active ? 'pathLanding' : 'home');
-  }
+  }, [active]);
 
   function goHome() {
     setView('home');
@@ -744,7 +761,7 @@ function AppBody({
     openMoment('aftercare', freshDraft({ templateCategory: 'aftercare', step: 'details' }));
   }
 
-  /** "Edit person" on the path or on a form. Back and Save return to where it was opened. */
+  /** "Edit person" on the path or on a form. Back returns to where it was opened; Continue always goes to the path. */
   function editPerson(from: AppView) {
     setupReturn.current = from;
     setSetupEditing(true);
