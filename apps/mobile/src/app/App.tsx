@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AccessibilityInfo, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,7 +12,6 @@ import { DetailsFormScreen } from '../screens/DetailsFormScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
-import { SentScreen } from '../screens/SentScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider } from '../lib/AccountProvider';
@@ -111,11 +110,11 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
 
 // The announcement path has a "do you know the service details" step that mobile has no screen
 // for. Forward and back step over it, so the flow only ever lands on a screen that exists.
-const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): ReturnType<typeof useSendFlow> => ({
+export const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): ReturnType<typeof useSendFlow> => ({
   ...flow,
   nextStep: () => {
     flow.nextStep();
-    if (flow.step === 'announce') flow.nextStep();
+    if (flow.step === 'announce' && flow.steps.includes('serviceKnown')) flow.nextStep();
   },
   prevStep: () => {
     flow.prevStep();
@@ -139,7 +138,6 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setArrived(false);
     setNote(text);
     setAtHome(true);
-    AccessibilityInfo.announceForAccessibility(text);
   }, []);
 
   // Retention: the saved contact list is cleared 30 days past the latest service date across
@@ -266,7 +264,7 @@ const Navigation = ({
           <Stack.Screen name="Sending">{() => <SendingScreen flow={flow} contacts={contacts} />}</Stack.Screen>
         )}
         {flow.step === 'sent' && (
-          <Stack.Screen name="Sent">{() => withBar(bar, <SentScreen flow={flow} />)}</Stack.Screen>
+          <Stack.Screen name="Sent">{() => <View style={{ flex: 1, backgroundColor: '#ffffff' }} />}</Stack.Screen>
         )}
         {sharedScreens()}
       </Stack.Navigator>

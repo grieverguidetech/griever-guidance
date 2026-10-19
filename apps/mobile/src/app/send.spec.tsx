@@ -3,7 +3,7 @@ import { AccessibilityInfo, Linking } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
-import { App } from './App';
+import { App, withoutServiceKnown } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 const anna = {
@@ -60,7 +60,7 @@ describe('the end of a send', () => {
   };
 
   it('returns Home with a calm note, announced, once the last person is done', async () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Next'));
@@ -69,22 +69,23 @@ describe('the end of a send', () => {
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByText("The people you're writing about")).toBeTruthy();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith('Everyone has been told.');
+    expect(announce).toHaveBeenCalledWith('Everyone has been told.', { queue: true });
+    expect(screen.getByLabelText(/Everyone has been told\. We don't keep a copy/)).toBeTruthy();
   });
 
   it('says how many were told when someone was skipped', async () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
     const line = 'You told 1 of 2. You can text the others from your own Messages app any time.';
     expect(await screen.findByText(line)).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith(line);
+    expect(announce).toHaveBeenCalledWith(line, { queue: true });
   });
 
   it('stays on Home with no timer, and the note goes when a person is opened', async () => {
-    jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Done'));
@@ -93,5 +94,35 @@ describe('the end of a send', () => {
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Anna'));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
+  });
+});
+
+describe('stepping over serviceKnown', () => {
+  const fake = (step: string, steps: string[]) => {
+    const nextStep = jest.fn();
+    const prevStep = jest.fn();
+    const flow = { step, steps, nextStep, prevStep } as unknown as Parameters<typeof withoutServiceKnown>[0];
+    return { wrapped: withoutServiceKnown(flow), nextStep, prevStep };
+  };
+
+  it('steps twice from announce while serviceKnown is in the path', () => {
+    const { wrapped, nextStep } = fake('announce', ['template', 'announce', 'serviceKnown', 'contacts']);
+    wrapped.nextStep();
+    expect(nextStep).toHaveBeenCalledTimes(2);
+  });
+
+  it('steps once from announce when the path has no serviceKnown, so contacts is not skipped', () => {
+    const { wrapped, nextStep } = fake('announce', ['template', 'announce', 'contacts', 'review']);
+    wrapped.nextStep();
+    expect(nextStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('steps back twice from contacts only when serviceKnown is in the path', () => {
+    const withIt = fake('contacts', ['template', 'announce', 'serviceKnown', 'contacts']);
+    withIt.wrapped.prevStep();
+    expect(withIt.prevStep).toHaveBeenCalledTimes(2);
+    const without = fake('contacts', ['template', 'announce', 'contacts']);
+    without.wrapped.prevStep();
+    expect(without.prevStep).toHaveBeenCalledTimes(1);
   });
 });

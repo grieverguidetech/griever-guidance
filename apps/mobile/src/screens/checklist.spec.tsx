@@ -8,7 +8,8 @@ import { CHECKLIST_KEY, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
 const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ goBack: mockGoBack }) }));
 
-const row = (name: string) => screen.getByRole('checkbox', { name });
+// The row's detail line is part of its label, so match on the start of the name.
+const row = (name: string) => screen.getByRole('checkbox', { name: new RegExp(`^${name}`) });
 
 describe('What you\'ll need checklist', () => {
   it('starts with every row unticked', async () => {
@@ -27,6 +28,19 @@ describe('What you\'ll need checklist', () => {
     fireEvent.press(row('Life insurance policies'));
     expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: false });
     await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('[]'));
+  });
+
+  it('reads the detail line as part of the row label', async () => {
+    render(<WhatYoullNeedScreen />);
+    expect(await screen.findByRole('checkbox', { name: 'Any will or written wishes. Burial or cremation, and who they named' })).toBeTruthy();
+  });
+
+  it('counts two quick taps', async () => {
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    fireEvent.press(row('Life insurance policies'));
+    fireEvent.press(row('Social Security number and ID'));
+    await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance","ssn"]'));
   });
 
   it('comes back ticked after a restart', async () => {

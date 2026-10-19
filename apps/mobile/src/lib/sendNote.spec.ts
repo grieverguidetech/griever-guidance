@@ -17,6 +17,10 @@ describe('sendNote', () => {
     );
   });
 
+  it('does not say "0 of 0" when there are no recipients', () => {
+    expect(sendNote('announcement', [])).toBe('Everyone has been told.');
+  });
+
   it('never uses an exclamation point', () => {
     for (const c of ['announcement', 'service', 'obituary', 'aftercare', null] as const) {
       expect(sendNote(c, r('delivered'))).not.toContain('!');

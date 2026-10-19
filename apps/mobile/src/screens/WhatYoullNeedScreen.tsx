@@ -38,16 +38,19 @@ export function WhatYoullNeedScreen() {
   }, []);
 
   const toggle = (id: string) => {
-    const next = ticked.includes(id) ? ticked.filter((t) => t !== id) : [...ticked, id];
-    setTicked(next);
-    void AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).catch(() => undefined);
+    // Computed from the latest ticks, so two quick taps both count.
+    setTicked((prev) => {
+      const next = prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id];
+      void AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).catch(() => undefined);
+      return next;
+    });
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Pressable
         onPress={() => navigation.goBack()}
-        style={styles.backButton}
+        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         accessibilityRole="button"
         accessibilityLabel="Back"
       >
@@ -73,14 +76,13 @@ export function WhatYoullNeedScreen() {
           <Pressable
             key={item.id}
             onPress={() => toggle(item.id)}
-            style={styles.checklistItem}
+            style={({ pressed }) => [styles.checklistItem, pressed && styles.pressed]}
             accessibilityRole="checkbox"
             accessibilityState={{ checked }}
-            accessibilityLabel={item.label}
-            accessibilityHint={item.meta}
+            accessibilityLabel={item.meta ? `${item.label}. ${item.meta}` : item.label}
           >
             <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-              {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+              {checked ? <Text style={styles.checkmark} allowFontScaling={false}>✓</Text> : null}
             </View>
             <View style={styles.checklistText}>
               <Text style={[styles.checklistLabel, checked && styles.struck]}>{item.label}</Text>
@@ -126,6 +128,7 @@ const styles = StyleSheet.create({
   checklistItem: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 44, paddingVertical: 8, marginBottom: 8 },
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: FIELD_BORDER, marginRight: 12, marginTop: 1, alignItems: 'center', justifyContent: 'center' },
   checkmark: { fontSize: 14, color: '#ffffff', fontWeight: '700' },
+  pressed: { opacity: 0.7 },
   struck: { textDecorationLine: 'line-through', color: MUTED },
   checkboxChecked: { borderColor: ACCENT, backgroundColor: ACCENT },
   checklistText: { flex: 1 },
