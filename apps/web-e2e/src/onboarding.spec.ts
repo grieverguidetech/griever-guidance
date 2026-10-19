@@ -40,6 +40,42 @@ test.describe('first visit', () => {
   });
 });
 
+test.describe('What you will need', () => {
+  test('starts unticked, and ticks stay after a reload (#176)', async ({ page }) => {
+    await onboard(page);
+    await page.getByRole('button', { name: "What you'll need" }).first().click();
+    const row = page.getByRole('button', { name: /Life insurance policies/ });
+    await expect(page.getByRole('button', { pressed: true })).toHaveCount(0);
+    await row.click();
+    await expect(row).toHaveAttribute('aria-pressed', 'true');
+    // The tick shows at once; the save to IndexedDB finishes a moment later. Reload only once it
+    // is confirmed in the store, so the test does not cut the write short.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            new Promise<string[]>((resolve, reject) => {
+              const open = indexedDB.open('gg');
+              open.onerror = () => reject(open.error);
+              open.onsuccess = () => {
+                const get = open.result.transaction('account').objectStore('account').get('checklistTicks');
+                get.onerror = () => reject(get.error);
+                get.onsuccess = () => {
+                  open.result.close();
+                  resolve((get.result?.value as string[] | undefined) ?? []);
+                };
+              };
+            }),
+        ),
+      )
+      .toContain('life-insurance');
+    await page.reload();
+    await page.getByRole('button', { name: "What you'll need" }).first().click();
+    await expect(page.getByRole('button', { name: /Life insurance policies/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /Military discharge papers/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
 test.describe('coming back', () => {
   test('a reload lands on Home listing the person, and opening her shows her path', async ({ page }) => {
     await onboard(page);
@@ -50,6 +86,18 @@ test.describe('coming back', () => {
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
     await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeFocused();
+  });
+
+  test('a half-written message shows Started on the path, and one tap resumes it (#176)', async ({ page }) => {
+    await onboard(page);
+    await page.getByRole('button', { name: 'Start' }).click();
+    await page.getByLabel(/Anything you'd like to add/).fill('She was peaceful.');
+    await page.reload();
+    await page.getByRole('button', { name: /Margaret Hayes/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
+    await expect(page.getByText('Started')).toBeVisible();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByLabel(/Anything you'd like to add/)).toHaveValue('She was peaceful.');
   });
 
   test('keeps working with the network cut off after load (C5)', async ({ page, context }) => {

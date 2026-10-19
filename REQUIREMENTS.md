@@ -82,21 +82,21 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | SE-1 | Ask for the deceased person's details once per session; every flow reads from it | Done | Partial | Mobile: each person's name and date are kept as a session; templates still ask for the name on their own form |
 | SE-2 | Sessions survive app close and restore on relaunch; landing offers "continue" first | Done | Partial | Mobile restores people and the open one from AsyncStorage; no "continue" prompt yet |
 | SE-3 | Multiple sessions ("Someone else I've lost") | Done | Done | Mobile: on-device only (#20); no delete (C9); no server sync yet |
-| SE-4 | Guided path landing (C1) ordered around the real planning sequence | Done | Not started | |
-| SE-5 | Checklist ticks persist silently per *account* | Partial | Not started | `profiles.checklistTicks` |
-| SE-6 | Home lists the people you're writing about, newest first, with 'What you'll need' at the top. 'Create a new one' leads to setup → contacts (only when the device has none) → who hears first → the path; the path returns to Home. | Done | Done | Web with accounts on: sign-up → Profile (Continue) → Home (#114). Mobile: #108; mobile accounts stay suspended while its flag is off |
+| SE-4 | Guided path landing (C1) ordered around the real planning sequence. On web the path is the hub: every done row is tappable and opens a fresh, empty draft of that moment (no old wording, C2); the done date stays and the count adds up; a moment with a half-written draft shows "Started" and one tap resumes it. "Edit person" is on the path. | Done | Not started | #176. Mobile still has its picker |
+| SE-5 | Checklist ticks ("What you'll need") are kept silently **on this device only**. All items start unticked; each row is a toggle (`aria-pressed`, strikethrough plus a filled icon). Never notified, nagged, badged or counted; nothing goes to the network. | Done | Not started | #176. Settled by the product owner (Oct 2026): persist, on device, not synced. Local `account.checklistTicks` (DATA.md §2.1). Supersedes the per-account server copy (`profiles.checklistTicks`) |
+| SE-6 | Home lists the people you're writing about, newest first, with 'What you'll need' at the top. 'Create a new one' leads to setup → contacts (only when the device has none) → who hears first → the path; the path returns to Home. On web, tapping a person on Home always opens their path (never a form); a half-written message shows "Started" there and resumes in one tap (keeps #25). | Done | Done | Web with accounts on: sign-up → Profile (Continue) → Home (#114). Mobile: #108; mobile accounts stay suspended while its flag is off. Web path-as-hub: #176; mobile still reopens a person at the picker |
 
 ### 3.4 Send flow (Flows A & B)
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| SF-1 | Template picker → Details → Contacts → Confirm → Sending → Sent, driven by `useSendFlow()` | Done | Done | |
+| SF-1 | Mobile: Template picker → Details → Contacts → Confirm → Sending → Sent. Web: Path → first form → Contacts → Confirm → Sending → Path with a quiet note. Both driven by `useSendFlow()` | Done | Done | #176: web has no picker and no Sent screen. The hook keeps its `template` step; the web flow treats it, and Back on a moment's first form, as "exit to the path" |
 | SF-2 | Close family hears first, from a small hand-picked group; wider circle later | Done | Not started | `WhoHearsFirst`, `WideningCircle` |
 | SF-3 | Sending steps through contacts one at a time with a pre-filled `sms:` link | Done | Done | `buildSmsLink()` |
-| SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact | Done | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop) |
+| SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact. On web, Done on the last person opens the path at once with a `role="status"` note that stays until the next navigation or a Close tap (no timer, no motion): "Everyone has been told." / "The service details have been shared." / "The obituary has been shared." / "Your thank-yous have been sent."; if anyone was skipped, "You told N of M. You can text the others from your own Messages app any time." The note also says "We don't keep a copy of what was sent" (C2). | Done | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop). Web note: #176; mobile still shows its Sent screen |
 | SF-5 | Share button (OS share sheet) with clipboard fallback, same undo toast | Done | Not started | |
 | SF-6 | AI-drafted obituary, reached from "Has the obituary been published?" ("Help me write it"); name and date of passing prefilled from the session; the draft is copied or shared to the funeral home or paper, never published or stored by the app | Partial — UI built; flagged off (`VITE_FEATURE_OBITUARY_DRAFTING`), so "Help me write it" shows disabled with an "in beta" tooltip. Turning it on needs a valid `ANTHROPIC_API_KEY` on the Worker. | Not started | `libs/gateway-messages` |
-| SF-7 | Announcement form has no required fields — read-only session recap + optional note | Done | Not started | |
+| SF-7 | Announcement form has no required fields — read-only session recap + optional note. Continue goes straight to "Who should know?": no service question. The message says "details to follow", or carries the service line if the session has a service date. A saved draft on the retired service step resumes on contacts. | Done | Not started | #176. The separate "Have the arrangements been made?" gate for the service moment stays (C2/C10) |
 
 ### 3.5 Sync & data
 
@@ -291,8 +291,14 @@ No screen-level `useState` duplicating send flow logic. One hook owns it.
 ### The send flow
 
 ```
-Template picker → Details form → Contact selector → Confirm → Sending → Sent
+Mobile: Template picker → Details form → Contact selector → Confirm → Sending → Sent
+Web:    Path → first form → Contact selector → Confirm → Sending → Path (with a quiet note)
 ```
+
+On web the path is the hub (#176): there is no picker and no Sent screen. Back on a moment's first
+form returns to the path; the hook's `template` step is kept for mobile and is treated by the web
+flow as "exit to the path". The announcement has no service-details question: the message says
+"details to follow" or carries the service details the session already has.
 
 This is the core user journey. It is driven by `useSendFlow()` from `libs/hooks`. Any change to this flow touches `libs/hooks`, `apps/web`, and `apps/mobile`.
 

@@ -48,14 +48,20 @@ function savedDrafts() {
   return saved.drafts as Record<string, SendFlowDraft>;
 }
 
-/** A reopened app lands on Home (#112); the person is opened from there. */
+/** A reopened app lands on Home (#112); the person is opened from there, on their path (#176). */
 async function openFromHome(user: User) {
   await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+  await screen.findByRole('heading', { name: 'One thing at a time.' });
 }
 
+/** The half-written announcement shows "Started" on the path; one tap on Continue resumes it. */
+async function resumeAnnouncement(user: User) {
+  await user.click(await screen.findByRole('button', { name: 'Continue' }));
+}
+
+/** Back from a moment's first form returns to the path (#176); from a later step it goes back one. */
 async function backToLanding(user: User) {
-  await user.click(screen.getByRole('button', { name: 'Back' }));
-  if (!screen.queryByRole('heading', { name: 'One thing at a time.' })) {
+  for (let i = 0; i < 3 && !screen.queryByRole('heading', { name: 'One thing at a time.' }); i += 1) {
     await user.click(screen.getByRole('button', { name: 'Back' }));
   }
   await screen.findByRole('heading', { name: 'One thing at a time.' });
@@ -67,6 +73,7 @@ describe('one draft per moment (#83)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    await resumeAnnouncement(user);
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue(note);
     await backToLanding(user);
 
@@ -78,7 +85,7 @@ describe('one draft per moment (#83)', () => {
     expect(savedDrafts()['announcement']).toMatchObject(kept);
 
     await backToLanding(user);
-    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await resumeAnnouncement(user);
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue(note);
     expect(savedDrafts()['announcement']?.selectedContactIds).toEqual(['c-1', 'c-2']);
   });
@@ -89,8 +96,6 @@ describe('one draft per moment (#83)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
-    await screen.findByLabelText(/Anything you'd like to add/); // the announcement is the older one
-    await backToLanding(user);
     await user.click(screen.getByRole('button', { name: /Share the service/ }));
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
   });
@@ -100,9 +105,6 @@ describe('one draft per moment (#83)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
-    await screen.findByLabelText(/Anything you'd like to add/);
-    await backToLanding(user);
-
     await user.click(screen.getByRole('button', { name: /Share the obituary/ }));
     await user.click(screen.getByRole('button', { name: 'Choose who to send it to' }));
     expect(savedDrafts()['obituary']).toMatchObject({ step: 'contacts', templateCategory: 'obituary' });
@@ -126,15 +128,13 @@ describe('one draft per moment (#83)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
-    await screen.findByLabelText(/Anything you'd like to add/); // the newer draft reopens
-    await backToLanding(user);
     await user.click(screen.getByRole('button', { name: /Share the obituary/ }));
     await user.click(screen.getByRole('button', { name: 'Choose who to send it to' }));
     expect(savedDrafts()['obituary']).toMatchObject({ step: 'review', selectedContactIds: ['c-9'] });
     expect(await screen.findByRole('button', { name: 'Text these people' })).toBeInTheDocument();
   });
 
-  it('keeps the service draft when "Add service details" follows a sent announcement', async () => {
+  it('keeps the service draft when the service is started after a sent announcement', async () => {
     await contactStore.put({
       contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
     });
@@ -149,19 +149,22 @@ describe('one draft per moment (#83)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    await resumeAnnouncement(user);
     await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Open Messages' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
-    await user.click(await screen.findByRole('button', { name: 'Add service details' }));
+    // Done opens the path; the service, now next, is resumed from there on its own draft.
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
     expect(savedDrafts()['service']?.fields).toEqual({ serviceLocation: 'St Mary Church' });
-    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5', 'c-1']);
+    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5']);
   }, 30_000);
 });
 
 describe('start this message again (#98)', () => {
-  it('shows no start-again link on an empty service form after "Add service details"', async () => {
+  it('shows no start-again link on an empty service form started after a sent announcement', async () => {
     await contactStore.put({
       contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
     });
@@ -176,13 +179,16 @@ describe('start this message again (#98)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    await resumeAnnouncement(user);
     await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Open Messages' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
-    await user.click(await screen.findByRole('button', { name: 'Add service details' }));
+    // Done opens the path; the service, now next, is started from there.
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Start' })); // empty, so not "Started"
 
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('');
-    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5', 'c-1']);
+    expect(savedDrafts()['service']?.selectedContactIds).toEqual(['c-5']);
     expect(screen.queryByRole('button', { name: 'Start this message again' })).not.toBeInTheDocument();
   }, 30_000);
 
@@ -200,6 +206,7 @@ describe('start this message again (#98)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    await user.click(screen.getByRole('button', { name: 'Start' })); // opened but empty: not "Started"
     await screen.findByLabelText(/Anything you'd like to add/);
     expect(link()).not.toBeInTheDocument();
   });
@@ -210,6 +217,8 @@ describe('start this message again (#98)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    // The announcement is done (c-1 was told); its row reopens the half-written draft.
+    await user.click(screen.getByRole('button', { name: /Told close family/ }));
     await screen.findByLabelText(/Anything you'd like to add/);
     await user.click(link() as HTMLElement);
     const confirm = screen.getByText(/Clear what you've written for this message\? People and contacts stay as they are\./);
@@ -231,6 +240,7 @@ describe('start this message again (#98)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    await resumeAnnouncement(user);
     await screen.findByLabelText(/Anything you'd like to add/);
     await user.click(link() as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'Keep it' }));
@@ -244,6 +254,7 @@ describe('start this message again (#98)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openFromHome(user);
+    await user.click(screen.getByRole('button', { name: /Share the service/ }));
     await screen.findByLabelText(/^Location/);
     await user.click(link() as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'Clear it' }));

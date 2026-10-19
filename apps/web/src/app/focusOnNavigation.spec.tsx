@@ -64,11 +64,15 @@ describe('focus follows the screen heading (#50)', () => {
     expect(document.activeElement).toBe(document.body); // landing on Home never moves focus
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     // Opening the person from Home is itself a navigation, so focus is already on the new h1.
+    const path = await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' });
+    expect(document.activeElement).toBe(path);
+
+    await user.click(screen.getByRole('button', { name: 'Start' }));
     const announce = await screen.findByRole('heading', { level: 1, name: 'Announce the passing' });
     expect(document.activeElement).toBe(announce);
 
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    const picker = await screen.findByRole('heading', { level: 1, name: 'What would you like to send?' });
-    expect(document.activeElement).toBe(picker);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    const people = await screen.findByRole('heading', { level: 1, name: 'Who should know?' });
+    expect(document.activeElement).toBe(people);
   });
 });

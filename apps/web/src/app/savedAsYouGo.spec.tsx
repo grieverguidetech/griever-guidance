@@ -14,9 +14,14 @@ function reload(view: { unmount: () => void }) {
   return render(<App />);
 }
 
-/** A reload now lands on Home (#112); the person is opened from there. */
+/** A reload now lands on Home (#112); the person is opened from there, on their path (#176). */
 async function openFromHome(user: User, name = 'Margaret Hayes') {
   await user.click(await screen.findByRole('button', { name }));
+}
+
+/** A half-written message shows "Started" on the path; one tap on Continue resumes it. */
+async function resume(user: User) {
+  await user.click(await screen.findByRole('button', { name: 'Continue' }));
 }
 
 async function onboardToLanding(user: User) {
@@ -71,45 +76,29 @@ describe('saved as you go', () => {
 
     reload(view);
     await openFromHome(user);
+    expect(screen.getByText('Started')).toBeInTheDocument();
+    await resume(user);
     expect(await screen.findByRole('heading', { name: 'Announce the passing' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Anything you'd like to add/)).toHaveValue(note);
   });
 
-  it('keeps the service-known choice, even before Continue', async () => {
+  it('goes from the announcement straight to the people, with no service question', async () => {
     const user = userEvent.setup();
-    const view = await startAnnouncement(user);
+    await startAnnouncement(user);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(screen.getByRole('button', { name: /Yes, I have them/ }));
-
-    reload(view);
-    await openFromHome(user);
-    const yes = await screen.findByRole('button', { name: /Yes, I have them/ });
-    expect(yes).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('button', { name: /Aunt Carol/ })).toBeInTheDocument();
+    expect(screen.queryByText('Do you know the service details?')).not.toBeInTheDocument();
   });
 
-  it('keeps the service details, the chosen people and an edited message', async () => {
+  it('keeps the chosen people and an edited message', async () => {
     const user = userEvent.setup();
     let view = await startAnnouncement(user);
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(screen.getByRole('button', { name: /Yes, I have them/ }));
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-
-    await user.type(screen.getByLabelText(/^Location/), 'St Mary Church');
-    view = reload(view);
-    await openFromHome(user);
-    expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
-
-    // Pasted, not typed: a half-typed date such as "May 2" already parses as a past date, and the
-    // contact-retention effect would clear the contacts (a separate bug, flagged on #25).
-    await user.click(screen.getByLabelText('Service date'));
-    await user.paste('May 29, 2099');
-    await user.click(screen.getByLabelText(/^Time/));
-    await user.paste('11:00 am');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
     view = reload(view);
     await openFromHome(user);
+    await resume(user);
     expect(await screen.findByRole('button', { name: /Aunt Carol/ })).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -120,6 +109,7 @@ describe('saved as you go', () => {
 
     reload(view);
     await openFromHome(user);
+    await resume(user);
     expect(await screen.findByText('My own words')).toBeInTheDocument();
   });
 
@@ -130,9 +120,7 @@ describe('saved as you go', () => {
     vi.stubGlobal('fetch', fetchSpy);
     try {
       await user.click(screen.getByRole('button', { name: 'Continue' }));
-      await waitFor(() =>
-        expect(screen.getByRole('heading', { name: 'Do you know the service details?' })).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByRole('button', { name: /Aunt Carol/ })).toBeInTheDocument());
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     } finally {
@@ -140,20 +128,18 @@ describe('saved as you go', () => {
     }
   });
 
-  it('keeps the note after Back, Back and Start (resuming never resets the draft)', async () => {
+  it('keeps the note after Back and Continue (resuming never resets the draft)', async () => {
     const user = userEvent.setup();
     await startAnnouncement(user);
     await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
-    await user.click(screen.getByRole('button', { name: 'Back' })); // the template picker
-    await user.click(screen.getByRole('button', { name: 'Back' })); // the path landing
-    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await user.click(screen.getByRole('button', { name: 'Back' })); // the first form goes to the path
+    await user.click(screen.getByRole('button', { name: 'Continue' })); // "Started": one tap resumes
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue(note);
   });
 
   it('opens the landing, not Review, when the last draft was mid-send', async () => {
     const user = userEvent.setup();
     const view = await startAnnouncement(user);
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -210,7 +196,18 @@ describe('saved as you go', () => {
       const names = (await screen.findAllByRole('listitem')).map((li) => li.textContent);
       expect(names).toEqual(['Newer Person', 'Older Person']);
       await user.click(screen.getByRole('button', { name: 'Older Person' }));
+      await resume(user);
       expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note for Older Person');
+    });
+
+    it('resumes a draft saved on the retired service question on the people step', async () => {
+      const user = userEvent.setup();
+      seed([{ name: 'Margaret Hayes', openedAt: '2026-02-01T00:00:00.000Z', step: 'serviceKnown' }]);
+      render(<App />);
+      await openFromHome(user);
+      await resume(user);
+      expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeInTheDocument();
+      expect(screen.queryByText('Do you know the service details?')).not.toBeInTheDocument();
     });
 
     it('opens the landing when the last message was already sent', async () => {

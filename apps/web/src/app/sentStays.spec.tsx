@@ -1,5 +1,6 @@
 /**
- * #167: after Done on the last person, the Sent screen stays, and "Back to home" opens Home.
+ * #167, then #176: Done on the last person opens the path with a quiet note (the Sent screen is
+ * gone), and the path's Back opens Home.
  * The real App, signed in with a stub auth client (no network, no supabase-js).
  *
  * The bounce: when the flow is mounted again while its moment is mid-send or at 'sent', the app
@@ -69,8 +70,6 @@ async function toSending(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Start' }));
   await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
   await user.click(screen.getByRole('button', { name: 'Continue' }));
-  await user.click(screen.getByRole('button', { name: /Not yet/ }));
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
   await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
@@ -119,21 +118,21 @@ afterEach(() => {
 });
 
 describe('after Done on the last person (#167)', () => {
-  it('stays on Sent when the flow is opened again, and keeps no wording', async () => {
+  it('opens the path with the note, stays there after a prompt, and keeps no wording', async () => {
     const { profile, answer } = lateProfile();
     mocks.load.mockResolvedValue({ available: true, client: signedInClient(profile) });
     const user = userEvent.setup();
     render(<App />);
 
     await sendAnAnnouncement(user);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Everyone has been told.' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();
+    expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
     await nameCheckInterrupts(user, answer);
 
-    // Back in the flow: still Sent, never the template picker. Skips aren't known now, so no number.
-    expect(await screen.findByRole('heading', { level: 1, name: 'Everyone has been told.' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Announce the passing/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/The people you chose now know about Margaret Hayes/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add service details' })).toBeInTheDocument();
+    // Back on the path: the announcement stays done, and the flow is not reopened.
+    expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();
+    expect(screen.getByText('Told close family')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Anything you'd like to add/)).not.toBeInTheDocument();
     // C2: what was written is not on screen and not saved.
     expect(screen.queryByText(new RegExp(note))).not.toBeInTheDocument();
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('peaceful');
@@ -154,7 +153,7 @@ describe('after Done on the last person (#167)', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'What would you like to send?' })).not.toBeInTheDocument();
   }, 30_000);
 
-  it('"Back to home" opens Home, the people list', async () => {
+  it('Back on the path opens Home, the people list', async () => {
     mocks.load.mockResolvedValue({
       available: true,
       client: signedInClient(Promise.resolve({ ok: true, profile: { ...PROFILE, senderName: 'Anna' } })),
@@ -163,8 +162,8 @@ describe('after Done on the last person (#167)', () => {
     render(<App />);
 
     await sendAnAnnouncement(user);
-    await screen.findByRole('heading', { level: 1, name: 'Everyone has been told.' });
-    await user.click(screen.getByRole('button', { name: 'Back to home' }));
+    await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Margaret Hayes/ })).toBeInTheDocument();

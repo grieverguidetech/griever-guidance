@@ -54,7 +54,7 @@ describe('Home as the landing (#112)', () => {
     expect(screen.getByText('For Margaret Hayes')).toBeInTheDocument();
   });
 
-  it('opens a person with a half-written message at that message', async () => {
+  it('opens a person with a half-written message on the path, marked Started, and one tap resumes it', async () => {
     const user = userEvent.setup();
     const draft = freshDraft({
       templateCategory: 'announcement',
@@ -68,6 +68,9 @@ describe('Home as the landing (#112)', () => {
     render(<App />);
     await expectHome();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    expect(screen.getByText('Started')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('kept as it was');
   });
 

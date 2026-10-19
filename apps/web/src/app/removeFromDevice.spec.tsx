@@ -39,6 +39,7 @@ async function fillEveryStore() {
   });
   await sendJobStore.put({ jobId: 'j1', sessionId: 's1', recipients: [], createdAt: 1 });
   await accountStore.setSenderName('Sam');
+  await accountStore.setChecklistTicks(['ssn-and-id']);
   await metaStore.setMetaString('deviceId', 'dev-1');
   for (const key of OTHER_KEYS) window.localStorage.setItem(key, '{"refresh_token":"x"}');
   window.localStorage.setItem('unrelated', 'keep');
@@ -72,7 +73,7 @@ describe('remove everything from this device (#51)', () => {
     render(<App />);
     await reachPathLanding(user);
     await fillEveryStore();
-    expect(await snapshot()).toEqual({ contacts: 1, sessions: 1, outbox: 1, sendJobs: 1, account: 1, deviceId: 'dev-1' });
+    expect(await snapshot()).toEqual({ contacts: 1, sessions: 1, outbox: 1, sendJobs: 1, account: 2, deviceId: 'dev-1' });
     expect(window.localStorage.getItem('gg.sessions.v1')).not.toBeNull();
 
     await openRemoveConfirm(user);
@@ -114,7 +115,7 @@ describe('remove everything from this device (#51)', () => {
     await user.click(screen.getByRole('button', { name: 'Keep everything' }));
 
     expect(screen.getByRole('button', { name: REMOVE })).toBeInTheDocument();
-    expect(await snapshot()).toEqual({ contacts: 1, sessions: 1, outbox: 1, sendJobs: 1, account: 1, deviceId: 'dev-1' });
+    expect(await snapshot()).toEqual({ contacts: 1, sessions: 1, outbox: 1, sendJobs: 1, account: 2, deviceId: 'dev-1' });
     expect(window.localStorage.getItem('gg.sessions.v1')).toBe(sessionsJson);
     for (const key of OTHER_KEYS) expect(window.localStorage.getItem(key), key).not.toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();

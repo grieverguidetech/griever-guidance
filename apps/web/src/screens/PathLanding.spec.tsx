@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { freshDraft } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
-import { PathLanding } from './PathLanding';
+import type { MomentKey } from '@griever/shared';
+import { PathLanding, finishNoteSpoken, finishNoteText } from './PathLanding';
+import type { FinishNote } from './PathLanding';
 
 const session: Session = {
   id: 's1',
@@ -36,6 +39,7 @@ describe('PathLanding share', () => {
         onBack={vi.fn()}
         onStartMoment={vi.fn()}
         onWhatYoullNeed={vi.fn()}
+        onEditPerson={vi.fn()}
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Share these details' }));
@@ -54,10 +58,105 @@ describe('PathLanding Home link (#112)', () => {
   it('has a Back control, and no other-people list or "Someone else I\'ve lost"', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
-    render(<PathLanding session={session} onBack={onBack} onStartMoment={vi.fn()} onWhatYoullNeed={vi.fn()} />);
+    render(<PathLanding session={session} onBack={onBack} onStartMoment={vi.fn()} onWhatYoullNeed={vi.fn()} onEditPerson={vi.fn()} />);
     expect(screen.queryByText("Other people you're writing about")).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "Someone else I've lost" })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+function renderPath(
+  over: Partial<Session> = {},
+  props: { note?: FinishNote | null; onCloseNote?: () => void } = {},
+) {
+  const handlers = { onBack: vi.fn(), onStartMoment: vi.fn(), onWhatYoullNeed: vi.fn(), onEditPerson: vi.fn() };
+  render(<PathLanding session={{ ...session, ...over }} {...handlers} {...props} />);
+  return handlers;
+}
+
+
+describe('PathLanding finish note (#176)', () => {
+  it.each<[MomentKey, string]>([
+    ['announce', 'Everyone has been told.'],
+    ['service', 'The service details have been shared.'],
+    ['obituary', 'The obituary has been shared.'],
+    ['thanks', 'Your thank-yous have been sent.'],
+  ])('says the agreed words for %s when everyone was told', (moment, words) => {
+    expect(finishNoteText({ moment, told: 3, total: 3 })).toBe(words);
+    renderPath({}, { note: { moment, told: 3, total: 3 } });
+    expect(screen.getByText(words)).toBeInTheDocument();
+    expect(finishNoteSpoken({ moment, told: 3, total: 3 })).toContain(words);
+  });
+
+  it('counts, and says how to reach the others, when anyone was skipped', () => {
+    renderPath({}, { note: { moment: 'announce', told: 2, total: 5 } });
+    expect(screen.getByText('You told 2 of 5. You can text the others from your own Messages app any time.')).toBeInTheDocument();
+    expect(screen.queryByText('Everyone has been told.')).not.toBeInTheDocument();
+  });
+
+  it('keeps the C2 line in the note, and calm copy (C7)', () => {
+    renderPath({}, { note: { moment: 'announce', told: 1, total: 1 } });
+    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('!');
+  });
+
+  it('when no one was texted, says so and leaves out the no-copy line', () => {
+    const note: FinishNote = { moment: 'announce', told: 0, total: 2 };
+    renderPath({}, { note });
+    expect(screen.getByText('No one was texted this time. You can come back to this any time.')).toBeInTheDocument();
+    expect(screen.queryByText(/We don't keep a copy/)).not.toBeInTheDocument();
+    expect(finishNoteSpoken(note)).not.toContain("We don't keep a copy");
+    expect(finishNoteText(note)).not.toMatch(/You told 0/);
+  });
+
+  it('stays until it is closed', async () => {
+    const user = userEvent.setup();
+    const onCloseNote = vi.fn();
+    renderPath({}, { note: { moment: 'service', told: 1, total: 1 }, onCloseNote });
+    const close = screen.getByRole('button', { name: 'Close note' });
+    expect(close).toHaveClass('gg-btn-bar'); // 44px minimum width
+    await user.click(close);
+    expect(onCloseNote).toHaveBeenCalledOnce();
+    // The button leaves the page, so focus goes to the heading.
+    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toHaveFocus();
+  });
+});
+
+describe('PathLanding hub (#176)', () => {
+  it('has Edit person, which asks to edit', async () => {
+    const user = userEvent.setup();
+    const { onEditPerson } = renderPath();
+    await user.click(screen.getByRole('button', { name: 'Edit person' }));
+    expect(onEditPerson).toHaveBeenCalledOnce();
+  });
+
+  it('makes a done row a button that starts that moment again', async () => {
+    const user = userEvent.setup();
+    const { onStartMoment } = renderPath();
+    await user.click(screen.getByRole('button', { name: /Told close family/ }));
+    expect(onStartMoment).toHaveBeenCalledWith('announce');
+  });
+
+  it('keeps the done date and the count on the reopened row, and one Start card', () => {
+    renderPath();
+    const done = screen.getByRole('button', { name: /Told close family/ });
+    expect(done).toHaveTextContent('1 person');
+    expect(done).toHaveTextContent(/May (29|30), 2026/); // local time zone
+    expect(screen.getAllByRole('button', { name: 'Start' })).toHaveLength(1);
+  });
+
+  it('shows Started and Continue for a half-written moment, and plain Start for an empty one', () => {
+    const half = freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } });
+    renderPath({ drafts: { service: half } });
+    expect(screen.getByText(/Started/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+  });
+
+  it('does not call a draft that was only opened "Started"', () => {
+    const opened = freshDraft({ templateCategory: 'service', step: 'details' });
+    renderPath({ drafts: { service: opened } });
+    expect(screen.queryByText(/Started/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
   });
 });

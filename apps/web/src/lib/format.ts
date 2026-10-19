@@ -41,13 +41,11 @@ export function draftStageLabel(draft: SendFlowDraft): string {
     ? categoryLabels[draft.templateCategory]
     : 'Message';
   const stage =
-    draft.step === 'contacts'
+    draft.step === 'contacts' || draft.step === 'serviceKnown' // the old step resumes on contacts
       ? 'recipients chosen'
       : draft.step === 'review'
         ? 'ready to send'
-        : draft.step === 'details' ||
-            draft.step === 'announce' ||
-            draft.step === 'serviceKnown'
+        : draft.step === 'details' || draft.step === 'announce'
           ? 'filling in details'
           : 'just started';
   return `${kind} — ${stage}, not yet sent.`;

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { useMockPlaces } from '@griever/hooks';
-import { shareService } from '@griever/shared';
 import { MapPin } from '@phosphor-icons/react/MapPin';
 import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 import { StartAgain } from '../lib/StartAgain';
@@ -20,14 +19,9 @@ export function DetailsForm({ flow }: Props) {
 
   if (!selectedTemplate) return null;
 
-  // B2 "Yes, I have them" routes here to collect the service logistics even
-  // though the flow's template is the announcement.
-  const serviceMode =
-    flow.templateCategory === 'announcement' && flow.serviceDetailsKnown === 'yes';
-  const formTemplate = serviceMode ? shareService : selectedTemplate;
-  const showEyebrow = serviceMode || selectedTemplate.category === 'service';
+  const showEyebrow = selectedTemplate.category === 'service';
 
-  const canProceed = formTemplate.fields
+  const canProceed = selectedTemplate.fields
     .filter((f) => f.required)
     .every((f) => fields[f.key]?.trim());
 
@@ -37,18 +31,16 @@ export function DetailsForm({ flow }: Props) {
     <div className="flex flex-col gap-4">
       <TopBar onBack={prevStep} />
       <div className="flex flex-col gap-1">
-        {showEyebrow && <Eyebrow name={name} accent2={serviceMode} />}
-        <h1 className="text-[22px]">
-          {serviceMode ? 'Service details' : selectedTemplate.name}
-        </h1>
-        {(serviceMode || selectedTemplate.category === 'service') && (
+        {showEyebrow && <Eyebrow name={name} accent2 />}
+        <h1 className="text-[22px]">{selectedTemplate.name}</h1>
+        {selectedTemplate.category === 'service' && (
           <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
             Three things and you're done.
           </p>
         )}
       </div>
 
-      {formTemplate.fields.map((field) => {
+      {selectedTemplate.fields.map((field) => {
         const isLocation = field.key === 'serviceLocation';
         const isNotes = field.key === 'serviceNotes';
         const isDate = field.key === 'serviceDate';
@@ -134,8 +126,7 @@ export function DetailsForm({ flow }: Props) {
         Continue
       </button>
       <SavedNote />
-      {/* The announcement's service details are not its first form. */}
-      {!serviceMode && <StartAgain flow={flow} />}
+      <StartAgain flow={flow} />
     </div>
   );
 }

@@ -1,5 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useFocusHeadingOnChange } from './ui';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { useFocusHeadingOnChange, TopBar } from './ui';
+import { WhatYoullNeedProvider } from './whatYoullNeedContext';
 
 function Screen({ view, headingFrom, tick }: { view: string; headingFrom: number; tick: number }) {
   useFocusHeadingOnChange(view);
@@ -34,5 +37,31 @@ describe('useFocusHeadingOnChange', () => {
     const { rerender } = render(<Screen view="a" headingFrom={0} tick={0} />);
     rerender(<Screen view="b" headingFrom={0} tick={1} />);
     expect(document.activeElement).toBe(document.body);
+  });
+});
+
+describe('top buttons (#176)', () => {
+  const css = readFileSync(join(import.meta.dirname, '..', 'styles.css'), 'utf8');
+
+  it('Back and What you will need are bordered buttons, not bare links', () => {
+    render(
+      <WhatYoullNeedProvider onWhatYoullNeed={vi.fn()}>
+        <TopBar onBack={vi.fn()} />
+      </WhatYoullNeedProvider>,
+    );
+    for (const name of ['Back', "What you'll need"]) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveClass('gg-btn-secondary'); // the visible border
+      expect(button).toHaveClass('gg-btn-bar');
+      expect(button).not.toHaveClass('!px-0'); // padding is kept
+      expect(button).not.toHaveClass('gg-btn-ghost');
+    }
+  });
+
+  it('the shared styles keep them at least 44 by 44 with a border', () => {
+    expect(css).toMatch(/\.gg-btn\s*{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*min-width:\s*44px/);
+    expect(css).toMatch(/\.gg-btn-secondary\s*{[^}]*border-color:/);
+    expect(css).toMatch(/\.gg-btn\s*{[^}]*border:\s*1px solid/);
   });
 });

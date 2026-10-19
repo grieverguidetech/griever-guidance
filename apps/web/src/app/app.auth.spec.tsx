@@ -212,7 +212,9 @@ describe('flag on', () => {
       expect(await screen.findByText("Your account can't be reached right now. Your work on this device is here.")).toBeInTheDocument();
       expect(await screen.findByRole('heading', { name: HOME })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
-      await userEvent.setup().click(screen.getByRole('button', { name: 'Margaret Hayes' }));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
+      await user.click(await screen.findByRole('button', { name: 'Continue' })); // "Started" on the path
       expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('note kept on this device');
       expect(screen.queryByRole('button', { name: 'Your account' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
@@ -377,7 +379,7 @@ describe('flag on', () => {
     expect(client.updateProfile).toHaveBeenLastCalledWith({ senderName: 'Anna Reyes' });
     expect(await screen.findByText('Your name is saved.')).toBeInTheDocument();
   });
-  it('opens the latest in-progress draft after signing out and back in, not the last moment visited', async () => {
+  it('opens the path after signing out and back in, with each half-written message kept and resumed in its own place', async () => {
     const draft = (templateCategory: 'announcement' | 'service', step: 'announce' | 'details', fields: Record<string, string>) =>
       freshDraft({ templateCategory, step, fields });
     window.localStorage.setItem(
@@ -412,15 +414,16 @@ describe('flag on', () => {
     const user = userEvent.setup();
     render(<App />);
     await signIn(user);
-    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' })); // Home, then open (#112)
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' })); // Home, then the path (#176)
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    expect(screen.getAllByText(/Started/)).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('the announcement note');
 
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Back' })); // the first form goes to the path
     vi.setSystemTime(new Date('2026-10-05T00:00:00Z'));
     await user.click(screen.getByRole('button', { name: /Share the service/ }));
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
-    await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Back' })); // path to Home (#112)
     await user.click(await screen.findByRole('button', { name: 'Your account' }));
@@ -428,7 +431,9 @@ describe('flag on', () => {
     await signIn(user);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
 
-    // The service was visited last, but the announcement changed most recently, so it reopens.
+    // Both drafts are still there, and the announcement still resumes with its own words.
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('the announcement note');
   });
 

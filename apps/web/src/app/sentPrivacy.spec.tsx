@@ -23,8 +23,6 @@ async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Start' }));
   await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
   await user.click(screen.getByRole('button', { name: 'Continue' }));
-  await user.click(screen.getByRole('button', { name: /Not yet/ }));
-  await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
   await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(screen.getByRole('button', { name: 'Edit wording' }));
@@ -38,12 +36,14 @@ async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('after a send (C2)', () => {
-  it('keeps none of the wording in localStorage, and still shows the Sent screen', async () => {
+  it('keeps none of the wording in localStorage, and opens the path with a note', async () => {
     const user = userEvent.setup();
     await sendAnAnnouncement(user);
 
-    expect(await screen.findByRole('heading', { name: 'Everyone has been told.' })).toBeInTheDocument();
-    expect(screen.getByText(/1 person now knows about Margaret Hayes/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
+    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Everyone has been told.' })).not.toBeInTheDocument();
 
     const stored = JSON.stringify({ ...window.localStorage });
     expect(stored).not.toContain('peaceful');

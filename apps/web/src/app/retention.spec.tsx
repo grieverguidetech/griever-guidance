@@ -28,9 +28,9 @@ async function reachServiceDateField(user: User) {
   await user.click(screen.getByRole('button', { name: 'Done for now' }));
   await user.click(screen.getByRole('button', { name: 'Save and continue' }));
   await screen.findByRole('heading', { name: 'One thing at a time.' });
-  await user.click(screen.getByRole('button', { name: 'Start' }));
-  await user.click(await screen.findByRole('button', { name: 'Continue' }));
-  await user.click(await screen.findByRole('button', { name: /Yes, I have them/ }));
+  // The service moment's date field (the announcement no longer asks about the service, #176).
+  await user.click(screen.getByRole('button', { name: /Share the service/ }));
+  await user.click(await screen.findByRole('button', { name: /Yes, we've set a date/ }));
   await user.click(screen.getByRole('button', { name: 'Continue' }));
   return screen.findByLabelText('Service date');
 }
