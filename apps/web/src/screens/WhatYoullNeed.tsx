@@ -1,20 +1,54 @@
+import { useEffect, useState } from 'react';
+import { accountStore } from '@griever/data-local';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
 import { TopBar } from '../lib/ui';
 
 interface ChecklistItem {
+  /** The key saved on this device when the row is ticked. Never change one. */
+  id: string;
   label: string;
   meta?: string;
-  checked: boolean;
 }
 
 const CHECKLIST: ChecklistItem[] = [
-  { label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named', checked: true },
-  { label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this', checked: true },
-  { label: 'Social Security number and ID', checked: false },
-  { label: 'Life insurance policies', checked: false },
-  { label: 'Military discharge papers', meta: 'If they served — it may cover the burial', checked: false },
+  { id: 'will-or-wishes', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },
+  { id: 'pre-arranged-plans', label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this' },
+  { id: 'ssn-and-id', label: 'Social Security number and ID' },
+  { id: 'life-insurance', label: 'Life insurance policies' },
+  { id: 'military-papers', label: 'Military discharge papers', meta: 'If they served — it may cover the burial' },
 ];
+
+/**
+ * Ticks live on this device only (IndexedDB `account.checklistTicks`) and are read back here and
+ * nowhere else: no network, no reminder, no badge, no count (C3, DATA.md §2.1).
+ */
+function useChecklistTicks() {
+  const [ticks, setTicks] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    accountStore
+      .getChecklistTicks()
+      .then((saved) => {
+        // A tap made before the read finished is kept.
+        if (live) setTicks((now) => Array.from(new Set([...saved, ...now])));
+      })
+      .catch(() => {
+        // Storage unavailable: the list still works for this visit.
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  function toggle(id: string) {
+    const next = ticks.includes(id) ? ticks.filter((t) => t !== id) : [...ticks, id];
+    setTicks(next);
+    accountStore.setChecklistTicks(next).catch(() => {
+      // Not saved; the tick still shows until the screen closes.
+    });
+  }
+  return { ticks, toggle };
+}
 
 interface Props {
   onBack: () => void;
@@ -22,6 +56,7 @@ interface Props {
 }
 
 export function WhatYoullNeed({ onBack, onEmailList }: Props) {
+  const { ticks, toggle } = useChecklistTicks();
   return (
     <div className="flex flex-col gap-4">
       <TopBar onBack={onBack} />
@@ -43,19 +78,28 @@ export function WhatYoullNeed({ onBack, onEmailList }: Props) {
 
       <div className="flex flex-col gap-3">
         <p className="gg-eyebrow m-0">Gather when you can</p>
-        {CHECKLIST.map((item) => (
-          <div key={item.label} className="flex items-start gap-3">
-            {item.checked ? (
-              <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-accent)' }} />
-            ) : (
-              <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-400)' }} />
-            )}
-            <div>
-              <div className="text-[14px]">{item.label}</div>
-              {item.meta && <div className="gg-card-meta">{item.meta}</div>}
-            </div>
-          </div>
-        ))}
+        {CHECKLIST.map((item) => {
+          const checked = ticks.includes(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={checked}
+              onClick={() => toggle(item.id)}
+              className="flex items-start gap-3 text-left min-h-[44px] w-full"
+            >
+              {checked ? (
+                <CheckCircle size={22} weight="fill" aria-hidden="true" style={{ color: 'var(--color-accent-700)' }} />
+              ) : (
+                <Circle size={22} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-500)' }} />
+              )}
+              <div>
+                <div className={`text-[14px]${checked ? ' line-through' : ''}`}>{item.label}</div>
+                {item.meta && <div className="gg-card-meta">{item.meta}</div>}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       <button type="button" onClick={onEmailList} className="gg-btn gg-btn-secondary gg-btn-block">

@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import type { SessionDetails } from '@griever/shared';
-import { freshDraft, hasDraftInProgress, resumeDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
+import { freshDraft, hasDraftInProgress, isDraftStarted, resumeDraft, useSendFlow, type SendFlowDraft } from './useSendFlow.js';
 import { stripSentWording } from './useSessions.js';
 
 const session: SessionDetails = {
@@ -19,16 +19,43 @@ function announcement(patch: Partial<SendFlowDraft> = {}) {
 }
 
 describe('useSendFlow — announcement path', () => {
-  it('skips the details step when the service is not known', () => {
+  it('goes from the announcement straight to the people, with no service question', () => {
     const { result } = announcement();
-    act(() => result.current.setServiceDetailsKnown('no'));
-    expect(result.current.steps).toEqual(['template', 'announce', 'serviceKnown', 'contacts', 'review', 'sending', 'sent']);
+    expect(result.current.steps).toEqual(['template', 'announce', 'contacts', 'review', 'sending', 'sent']);
+    act(() => result.current.nextStep());
+    expect(result.current.step).toBe('contacts');
   });
 
-  it('asks for details when the griever has them', () => {
+  it('says details will follow when the session has no service details', () => {
     const { result } = announcement();
-    act(() => result.current.setServiceDetailsKnown('yes'));
-    expect(result.current.steps).toContain('details');
+    expect(result.current.composedMessage).toContain('Details of the service will follow');
+    expect(result.current.composedFields['serviceDetailsKnown']).toBe('no');
+  });
+
+  it('includes the service line when the session has a service date', () => {
+    const withService = { ...session, serviceDate: 'June 5' } as SessionDetails;
+    const { result } = renderHook(() =>
+      useSendFlow({ session: withService, draft: freshDraft({ templateCategory: 'announcement', step: 'announce' }) }),
+    );
+    expect(result.current.composedFields['serviceDetailsKnown']).toBe('yes');
+    expect(result.current.composedMessage).toContain('The service will be held June 5.');
+    expect(result.current.composedMessage).not.toContain('will follow');
+  });
+
+  it('resumes a draft saved on the retired serviceKnown step on the people step', () => {
+    const { result } = announcement({ step: 'serviceKnown' });
+    expect(result.current.step).toBe('contacts');
+  });
+
+  it('resumes an old announcement draft on the details step on the people step, keeping what was typed', () => {
+    const { result } = announcement({
+      step: 'details',
+      serviceDetailsKnown: 'yes',
+      fields: { serviceDate: 'June 7', serviceLocation: 'Oak Chapel' },
+    });
+    expect(result.current.step).toBe('contacts');
+    expect(result.current.composedMessage).toContain('June 7');
+    expect(result.current.composedMessage).toContain('Oak Chapel');
   });
 
   it('composes the message from the session, so names are typed once', () => {
@@ -40,7 +67,7 @@ describe('useSendFlow — announcement path', () => {
   it('walks forward and back through the step order', () => {
     const { result } = announcement();
     act(() => result.current.nextStep());
-    expect(result.current.step).toBe('serviceKnown');
+    expect(result.current.step).toBe('contacts');
     act(() => result.current.prevStep());
     expect(result.current.step).toBe('announce');
   });
@@ -140,6 +167,21 @@ describe('hasDraftInProgress', () => {
 
   it('is false while sending, because the send job is not saved', () => {
     expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sending' }))).toBe(false);
+  });
+});
+
+describe('isDraftStarted', () => {
+  it('is false for no draft, a draft only opened, and a finished one', () => {
+    expect(isDraftStarted(undefined)).toBe(false);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'announcement', step: 'announce' }))).toBe(false);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'service', step: 'details' }))).toBe(false);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'announcement', step: 'sent' }))).toBe(false);
+  });
+
+  it('is true once words are typed or the draft is past its first form', () => {
+    expect(isDraftStarted(freshDraft({ templateCategory: 'announcement', step: 'announce', fields: { personalNote: 'x' } }))).toBe(true);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'announcement', step: 'contacts' }))).toBe(true);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'aftercare', step: 'review' }))).toBe(true);
   });
 });
 

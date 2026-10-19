@@ -1,28 +1,36 @@
+import { useEffect, useRef } from 'react';
 import { useSendFlow } from '@griever/hooks';
 import type { SendFlowDraft } from '@griever/hooks';
 import type { Contact, SessionDetails, TemplateCategory } from '@griever/shared';
 import { useFocusHeadingOnChange } from '../lib/ui';
-import { TemplatePicker } from '../screens/TemplatePicker';
 import { AnnounceForm } from '../screens/AnnounceForm';
-import { ServiceKnownScreen } from '../screens/ServiceKnownScreen';
 import { DetailsForm } from '../screens/DetailsForm';
 import { ContactSelector } from '../screens/ContactSelector';
 import { WideningCircle } from '../screens/WideningCircle';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
-import { SentScreen } from '../screens/SentScreen';
+
+/** How a finished send went, handed to the app so it can record the moment and open the path. */
+export interface FlowFinish {
+  category: TemplateCategory;
+  /** People who were handed the message (skipped ones are not here). */
+  deliveredIds: string[];
+  /** Everyone on the list, skipped included. */
+  total: number;
+}
 
 interface Props {
   session: SessionDetails;
   draft: SendFlowDraft | null;
-  /** Every moment's saved draft, so picking a moment on the picker brings its own back. */
+  /** Every moment's saved draft, so a moment already under way comes back as it was. */
   drafts: Partial<Record<TemplateCategory, SendFlowDraft>>;
   contacts: Contact[];
   notifiedContactIds: string[];
   onDraftChange: (draft: SendFlowDraft) => void;
+  /** Opens the path. Back from a moment's first form, and the way out of a flow with no moment, come here. */
   onExitToLanding: () => void;
-  /** Opens Home, the people list. Leaving unmounts the flow, so nothing composed is kept (C2). */
-  onHome: () => void;
+  /** The last person was handed the message. The app records it and opens the path with a note. */
+  onFinished: (finish: FlowFinish) => void;
   onEditSession: () => void;
   onAddContact: (input: { name: string; phone: string }) => Promise<Contact>;
 }
@@ -35,7 +43,7 @@ export function Flow({
   notifiedContactIds,
   onDraftChange,
   onExitToLanding,
-  onHome,
+  onFinished,
   onEditSession,
   onAddContact,
 }: Props) {
@@ -43,33 +51,52 @@ export function Flow({
   useFocusHeadingOnChange(flow.step);
   const grouped = flow.templateCategory === 'announcement';
 
+  // The path is the hub, so the hook's 'template' step (kept for mobile's picker) is a way out.
+  useEffect(() => {
+    if (flow.step === 'template') onExitToLanding();
+  }, [flow.step, onExitToLanding]);
+
+  // Fires once, when this mount's own send reaches its end.
+  const finished = useRef(false);
+  useEffect(() => {
+    if (flow.step !== 'sent' || finished.current) return;
+    finished.current = true;
+    const category = flow.templateCategory;
+    if (!category) {
+      onExitToLanding();
+      return;
+    }
+    // A flow opened again already at 'sent' has no send job; its saved list stands in for it.
+    const recipients =
+      flow.sendJob?.recipients ??
+      flow.selectedContactIds.map((contactId) => ({ contactId, status: 'delivered' as const }));
+    onFinished({
+      category,
+      deliveredIds: recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId),
+      total: recipients.length,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.step]);
+
+  // Back on a moment's first form goes to the path, not to a picker.
+  const onFirstForm = flow.steps[1] === flow.step;
+  const forms = { ...flow, prevStep: onFirstForm ? onExitToLanding : flow.prevStep };
+
   switch (flow.step) {
-    case 'template':
-      return (
-        <TemplatePicker
-          flow={flow}
-          onBack={onExitToLanding}
-          onEditPerson={onEditSession}
-        />
-      );
     case 'announce':
-      return <AnnounceForm flow={flow} onEditSession={onEditSession} />;
-    case 'serviceKnown':
-      return <ServiceKnownScreen flow={flow} />;
+      return <AnnounceForm flow={forms} onEditSession={onEditSession} />;
     case 'details':
-      return <DetailsForm flow={flow} />;
+      return <DetailsForm flow={forms} />;
     case 'contacts':
       return flow.templateCategory === 'obituary' ? (
-        <WideningCircle flow={flow} contacts={contacts} notifiedContactIds={notifiedContactIds} />
+        <WideningCircle flow={forms} contacts={contacts} notifiedContactIds={notifiedContactIds} />
       ) : (
-        <ContactSelector flow={flow} contacts={contacts} grouped={grouped} onAddContact={onAddContact} />
+        <ContactSelector flow={forms} contacts={contacts} grouped={grouped} onAddContact={onAddContact} />
       );
     case 'review':
-      return <ConfirmScreen flow={flow} />;
+      return <ConfirmScreen flow={forms} />;
     case 'sending':
-      return <SendingScreen flow={flow} contacts={contacts} />;
-    case 'sent':
-      return <SentScreen flow={flow} onHome={onHome} />;
+      return <SendingScreen flow={forms} contacts={contacts} />;
     default:
       return null;
   }

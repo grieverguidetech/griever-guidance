@@ -36,11 +36,13 @@ import { WhoHearsFirst } from '../screens/WhoHearsFirst';
 import { SessionSetup } from '../screens/SessionSetup';
 import { Home } from '../screens/Home';
 import { PathLanding } from '../screens/PathLanding';
+import type { FinishNote } from '../screens/PathLanding';
 import { Gate } from '../screens/Gate';
 import { WhatYoullNeed } from '../screens/WhatYoullNeed';
 import { ShareObituary } from '../screens/ShareObituary';
 import { ObituaryScreen } from '../screens/ObituaryScreen';
 import { Flow } from './Flow';
+import type { FlowFinish } from './Flow';
 
 type AppView =
   | 'signup'
@@ -62,10 +64,11 @@ type AppView =
   | 'flow'
   | 'obituary';
 
-const CATEGORY_BY_MOMENT: Partial<Record<MomentKey, TemplateCategory>> = {
-  announce: 'announcement',
+const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
+  announcement: 'announce',
   service: 'service',
-  thanks: 'aftercare',
+  obituary: 'obituary',
+  aftercare: 'thanks',
 };
 
 const browserStorage =
@@ -317,9 +320,17 @@ function AppBody({
   }, [view]);
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
-  // changed most recently; null means a moment not chosen yet, so the picker.
-  const [flowCategory, setFlowCategory] = useState<TemplateCategory | null | undefined>(undefined);
+  // changed most recently.
+  const [flowCategory, setFlowCategory] = useState<TemplateCategory | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
+  // Where Back from "Edit person" returns: the form it was opened from, or the path.
+  const setupReturn = useRef<AppView>('flow');
+  // The quiet note on the path after the last person was handed a message. It lasts until the
+  // person goes anywhere else or closes it (#176).
+  const [finishNote, setFinishNote] = useState<FinishNote | null>(null);
+  useEffect(() => {
+    if (view !== 'pathLanding') setFinishNote(null);
+  }, [view]);
   // True from "Create a new one" until who-hears-first is saved: setup, then contacts (only when
   // this device has none), then who hears first. This is the only way a person is created.
   const [creating, setCreating] = useState(false);
@@ -522,7 +533,7 @@ function AppBody({
   const onDraftChange = useCallback(
     (d: SendFlowDraft) => {
       if (!activeId) return;
-      setFlowCategory(d.templateCategory);
+      setFlowCategory(d.templateCategory ?? undefined);
       updateDraft(activeId, d);
       // The service date lives in the flow draft's free-text fields (whatever
       // form asked for it — the "service" template or the announcement's
@@ -549,16 +560,15 @@ function AppBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts.loading, sessions.sessions]);
 
-  // Once a send job finishes, record who was told for dedup + the path view.
-  const flowDraft = flowCategory ? active?.drafts[flowCategory] : undefined;
-  const activeStep = flowDraft?.step;
-  const activeCategory = flowDraft?.templateCategory;
-  useEffect(() => {
-    if (activeId && activeStep === 'sent' && activeCategory && flowDraft) {
-      recordMomentComplete(activeId, activeCategory, flowDraft.selectedContactIds);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, activeStep, activeCategory]);
+  // The last person was handed the message: record who was told (for dedup and the path), then
+  // open the path at once with a note. No timer (#176).
+  function finishFlow({ category, deliveredIds, total }: FlowFinish) {
+    if (!active) return;
+    if (deliveredIds.length > 0) recordMomentComplete(active.id, category, deliveredIds);
+    setFinishNote({ moment: MOMENT_BY_CATEGORY[category], told: deliveredIds.length, total });
+    setFlowCategory(undefined);
+    setView('pathLanding');
+  }
 
   const activeDetails = useMemo<SessionDetails | null>(
     () =>
@@ -601,7 +611,7 @@ function AppBody({
     leaveFirstProfile();
   }
 
-  /** Makes this person the active one. A message left half-written reopens where it was (#25). */
+  /** Makes this person the active one and opens their path. A half-written message shows "Started" there (#25). */
   function openPerson(id: string) {
     const person = sessions.sessions.find((s) => s.id === id);
     if (!person) return;
@@ -609,7 +619,7 @@ function AppBody({
     sessions.touchSession(id);
     setActiveId(id);
     setFlowCategory(undefined);
-    setView(latestInProgressDraft(person) ? 'flow' : 'pathLanding');
+    setView('pathLanding');
   }
 
   function backFromChecklist() {
@@ -689,7 +699,7 @@ function AppBody({
 
   function backFromSetup() {
     if (setupEditing) {
-      setView('flow');
+      setView(setupReturn.current);
       return;
     }
     setCreating(false);
@@ -730,14 +740,15 @@ function AppBody({
       setView('shareObituary');
       return;
     }
-    // thanks — no dedicated entry screen yet; let the picker handle it.
-    const category = CATEGORY_BY_MOMENT[key];
-    if (category && hasDraftInProgress(active.drafts[category])) {
-      openMoment(category, freshDraft({ templateCategory: category, step: 'template' }));
-      return;
-    }
-    setFlowCategory(null);
-    setView('flow');
+    // thanks starts on its details form.
+    openMoment('aftercare', freshDraft({ templateCategory: 'aftercare', step: 'details' }));
+  }
+
+  /** "Edit person" on the path or on a form. Back and Save return to where it was opened. */
+  function editPerson(from: AppView) {
+    setupReturn.current = from;
+    setSetupEditing(true);
+    setView('setup');
   }
 
   // While a stored session is being checked, render nothing rather than flash "signup" first.
@@ -1028,10 +1039,10 @@ function AppBody({
   }
 
   if (view === 'flow' && active && activeDetails) {
-    // A send under way or finished is never reopened from Home; with no moment chosen the picker
-    // shows. If the flow is mounted again mid-send or at Sent (a prompt came between), the moment
-    // keeps its place instead of starting over on the picker (#167): mid-send comes back on Review
-    // (the send job is not saved), Sent stays Sent. A sent draft holds no wording (C2).
+    // A send under way or finished is never reopened from Home. If the flow is mounted again
+    // mid-send or at Sent (a prompt came between), the moment keeps its place (#167): mid-send
+    // comes back on Review (the send job is not saved), Sent stays Sent. A sent draft holds no
+    // wording (C2). With nothing to show, the flow sends the person back to the path.
     const chosen = flowCategory ? active.drafts[flowCategory] : null;
     const latest = latestInProgressDraft(active);
     const sendingOrSent = chosen?.step === 'sending' || chosen?.step === 'sent';
@@ -1052,11 +1063,8 @@ function AppBody({
           notifiedContactIds={active.recipientsNotified.announcement ?? []}
           onDraftChange={onDraftChange}
           onExitToLanding={goToPathLanding}
-          onHome={goHome}
-          onEditSession={() => {
-            setSetupEditing(true);
-            setView('setup');
-          }}
+          onFinished={finishFlow}
+          onEditSession={() => editPerson('flow')}
           onAddContact={({ name, phone }) => contacts.addContact({ name, phone, tier: 'family' })}
         />
       </Shell>
@@ -1071,6 +1079,9 @@ function AppBody({
           onBack={goHome}
           onStartMoment={startMoment}
           onWhatYoullNeed={openWhatYoullNeed}
+          onEditPerson={() => editPerson('pathLanding')}
+          note={finishNote}
+          onCloseNote={() => setFinishNote(null)}
         />
       </Shell>
     );

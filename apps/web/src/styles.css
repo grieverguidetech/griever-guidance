@@ -179,6 +179,8 @@ h1, h2, h3, h4, h5, h6 {
   .gg-btn-ghost:not(:disabled):hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
   .gg-btn-ghost:not(:disabled):active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
   .gg-btn-block { width: 100%; }
+  /* Top-bar buttons (Back, What you'll need): bordered, never smaller than 44 by 44. */
+  .gg-btn-bar { min-width: 44px; color: var(--color-accent-700); }
 
   /* — cards — */
   .gg-card {

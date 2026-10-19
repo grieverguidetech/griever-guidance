@@ -12,6 +12,7 @@ import type {
 export type SendFlowStep =
   | 'template'
   | 'announce'
+  /** Retired: no longer a step. A saved draft on it resumes on 'contacts' (see fromDraft). */
   | 'serviceKnown'
   | 'details'
   | 'contacts'
@@ -58,7 +59,6 @@ export interface SendFlowActions {
   setTemplate: (template: Template) => void;
   setField: (key: string, value: string) => void;
   setPlace: (place: Place | null) => void;
-  setServiceDetailsKnown: (value: 'yes' | 'no') => void;
   toggleContact: (contactId: string) => void;
   selectContacts: (contactIds: string[]) => void;
   setIncludeFlowers: (value: boolean) => void;
@@ -170,9 +170,28 @@ export function draftHasContent(
   );
 }
 
+/**
+ * True when a moment has something to resume: the first form shows typed words or a hand-edited
+ * message, or the draft has moved past that form. A draft only opened (nothing typed) is not started.
+ */
+export function isDraftStarted(draft: SendFlowDraft | null | undefined): boolean {
+  if (!hasDraftInProgress(draft) || !draft.templateCategory) return false;
+  const first = FIRST_STEP[draft.templateCategory] ?? 'details';
+  return draftHasContent(draft) || (draft.step !== 'template' && draft.step !== first);
+}
+
 function fromDraft(draft: SendFlowDraft): SendFlowState {
   const restored: SendFlowState = { ...initialState, ...draft, sendJob: null };
   if (restored.step === 'sending') restored.step = 'review';
+  // The announcement no longer asks whether the service is known (or collects its details on a
+  // step of its own); a draft saved on either of those carries on to the people. What was typed
+  // stays in `fields` and still reaches the message.
+  if (
+    restored.step === 'serviceKnown' ||
+    (restored.step === 'details' && restored.templateCategory === 'announcement')
+  ) {
+    restored.step = 'contacts';
+  }
   return restored;
 }
 
@@ -221,18 +240,7 @@ function resolveTemplate(state: SendFlowState): Template | null {
 function stepsFor(state: SendFlowState, template: Template | null): SendFlowStep[] {
   const category = template?.category ?? state.templateCategory;
   if (category === 'announcement') {
-    const middle: SendFlowStep[] =
-      state.serviceDetailsKnown === 'yes' ? ['details'] : [];
-    return [
-      'template',
-      'announce',
-      'serviceKnown',
-      ...middle,
-      'contacts',
-      'review',
-      'sending',
-      'sent',
-    ];
+    return ['template', 'announce', 'contacts', 'review', 'sending', 'sent'];
   }
   if (category === 'obituary') {
     // The one required field (the link) is gathered on the session in C4,
@@ -263,7 +271,14 @@ function buildComposedFields(
 
   if (state.place) fields['serviceLocation'] = state.place.formattedAddress;
   fields['tone'] = state.tone;
-  if (state.serviceDetailsKnown) fields['serviceDetailsKnown'] = state.serviceDetailsKnown;
+  if (state.templateCategory === 'announcement') {
+    // No question is asked: the message carries the service details if the session has them
+    // (or a saved draft typed them), and says they will follow otherwise.
+    const serviceDate = fields['serviceDate']?.trim() || session?.serviceDate?.trim() || '';
+    if (serviceDate) fields['serviceDate'] = serviceDate;
+    const known = Boolean(serviceDate || fields['serviceLocation']?.trim());
+    fields['serviceDetailsKnown'] = known ? 'yes' : 'no';
+  }
   if (state.includeFlowers && floristName) {
     fields['floristName'] = floristName;
     fields['flowerDeliveryTarget'] = state.flowerDeliveryTarget;
@@ -365,10 +380,6 @@ export function useSendFlow(
       },
       messageOverride: null,
     }));
-  }, []);
-
-  const setServiceDetailsKnown = useCallback((value: 'yes' | 'no') => {
-    setState((s) => ({ ...s, serviceDetailsKnown: value, messageOverride: null }));
   }, []);
 
   const toggleContact = useCallback((contactId: string) => {
@@ -527,7 +538,6 @@ export function useSendFlow(
     setTemplate,
     setField,
     setPlace,
-    setServiceDetailsKnown,
     toggleContact,
     selectContacts,
     setIncludeFlowers,

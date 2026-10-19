@@ -186,10 +186,19 @@ additive: an older list loads, and the file keeps its key and shape.
 
 ### 2.1 The C3 checklist lives on the account
 
-The ticks persist — silently, as decided — but they belong to the **account**, not the session:
-`users.checklistTicks: string[]` server-side, mirrored into the local `account` store. Someone
-returning a year later for a second loss sees the paperwork they already gathered still ticked;
-nobody re-ticks a military discharge record they found in 2026.
+The ticks persist — silently, as decided — but they belong to the **account**, not the session.
+
+**Settled Oct 2026 (#176, product owner): ticks are kept on this device only.** They live in the
+local `account` store as `checklistTicks: string[]` (keys: `will-or-wishes`, `pre-arranged-plans`,
+`ssn-and-id`, `life-insurance`, `military-papers`; never rename one). All items start unticked.
+They are read and written only by the "What you'll need" screen, are never sent to the network, and
+are emptied with everything else by "Remove everything from this device". This resolves the design
+handoff's C3 open question as "persist". The server copy below (`users.checklistTicks`) is **not
+built and not planned**; if it is ever wanted it needs a fresh decision, because syncing would
+make the list something the app holds about a person.
+
+Someone returning a year later for a second loss, on the same device, sees the paperwork they
+already gathered still ticked; nobody re-ticks a military discharge record they found in 2026.
 
 The copy's promise is absolute and is a build requirement, not a preference: **never notify, never
 nag, never badge, never count.** A persisted tick may only ever be read back onto C3 itself. If any
@@ -254,7 +263,7 @@ export default defineSchema({
     emailVerified: v.boolean(),     // recorded, NEVER gates anything (README D2)
     senderName:    v.union(v.string(), v.null()),
     contactSource: v.union(v.literal("imported"), v.literal("manual")),
-    checklistTicks: v.array(v.string()),   // C3 item keys — account-level, carries across sessions (§2.1)
+    checklistTicks: v.array(v.string()),   // NOT BUILT: ticks stay on the device (§2.1, #176)
     createdAt:     v.number(),
     ...syncFields,
   }).index("by_userId", ["userId"])
@@ -425,8 +434,8 @@ shared person sync never carries contact ids or edited wording (C2, C3).
   writes it there today. #140 removes that path.
 - **Send jobs / delivery receipts.** Server-owned already (README B5); they are read down by their
   own query, not through the session cursor.
-- *(The C3 checklist ticks **are** synced, on the `users` row — see §2.1. They are the one thing
-  that outlives a session.)*
+- *(The C3 checklist ticks are **not** synced: they stay in the local `account` store — see §2.1.
+  They are the one thing that outlives a session.)*
 
 ### Shared people (Supabase)
 

@@ -21,10 +21,10 @@ export function Tooltip({ text, children }: { text: string; children: (id: strin
   );
 }
 
-/** Ghost "Back" affordance — flush left, zero left padding, per the handoff. */
+/** "Back" button: a visible border, at least 44 by 44, with the shared focus ring (#176). */
 export function BackButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="gg-btn gg-btn-ghost self-start !px-0">
+    <button type="button" onClick={onClick} className="gg-btn gg-btn-secondary gg-btn-bar self-start">
       <ArrowLeft size={16} weight="regular" aria-hidden="true" />
       Back
     </button>
@@ -44,9 +44,9 @@ export function TopBar({ onBack }: { onBack?: () => void }) {
       <button
         type="button"
         onClick={onWhatYoullNeed}
-        className="gg-btn gg-btn-ghost !px-0"
+        className="gg-btn gg-btn-secondary gg-btn-bar"
       >
-        <ListChecks size={16} weight="duotone" />
+        <ListChecks size={16} weight="duotone" aria-hidden="true" />
         What you'll need
       </button>
     </div>

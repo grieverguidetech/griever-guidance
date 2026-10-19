@@ -13,11 +13,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function toReview(page: Page) {
+  // No service question (#176): Continue goes straight to the people.
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Do you know the service details?' })).toBeVisible();
-  // "Not yet" is the default: most people don't have them.
-  await expect(page.getByRole('button', { name: /^Not yet/ })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Do you know the service details?' })).toHaveCount(0);
 
   await expect(page.getByRole('heading', { name: 'Who should know?' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
@@ -42,7 +40,13 @@ test('the softer tone changes the words, not the facts', async ({ page }) => {
   await expect(message).toContainText('Margaret Hayes passed away on May 29, 2026');
 });
 
-test('sends one person at a time, then finishes (C1)', async ({ page }) => {
+test('Back on the first form returns to the path, with no picker (#176)', async ({ page }) => {
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
+  await expect(page.getByText('What would you like to send?')).toHaveCount(0);
+});
+
+test('sends one person at a time, then opens the path with a quiet note (C1)', async ({ page }) => {
   await toReview(page);
   await page.getByRole('button', { name: 'Text 2 people' }).click();
 
@@ -59,7 +63,14 @@ test('sends one person at a time, then finishes (C1)', async ({ page }) => {
   await expect(page.getByText('2 of 2')).toBeVisible();
   await page.getByRole('button', { name: 'Skip' }).click();
 
-  await expect(page.getByText('Share the service details')).toBeVisible();
+  // Done on the last person opens the path at once; nothing times out (#176).
+  await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
+  await expect(
+    page.getByText('You told 1 of 2. You can text the others from your own Messages app any time.'),
+  ).toBeVisible();
+  await expect(page.getByText(/We don't keep a copy of what was sent/)).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByText(/You told 1 of 2/)).toHaveCount(0);
 });
 
 test('"Open Messages" hands off to the phone and waits for the user', async ({ page }) => {

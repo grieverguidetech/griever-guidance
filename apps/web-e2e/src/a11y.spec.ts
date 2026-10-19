@@ -40,6 +40,11 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await page.reload();
     await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
   },
+  'what you will need': async (page) => {
+    await onboard(page);
+    await page.getByRole('button', { name: "What you'll need" }).first().click();
+    await page.getByRole('button', { name: /Life insurance policies/ }).click();
+  },
   'announce form': async (page) => {
     await onboard(page);
     await page.getByRole('button', { name: 'Start' }).click();
