@@ -184,3 +184,29 @@ to read in a minute; it is a staging area, not an archive.
 - **Rule:** import Phosphor icons by path (`@phosphor-icons/react/CheckCircle`), never from the
   package root. `apps/web/src/iconImports.spec.ts` fails if a root import comes back. When a spec
   is slow, look at the import time in Vitest's summary before touching timeouts.
+
+### 2026-10-19 — A new e2e test reloaded before IndexedDB finished writing (#176)
+- **What happened:** "ticks stay after a reload" was flaky on desktop and phone Chrome in PR #179.
+  The tick was on screen, but the saved value was missing after the reload.
+- **Why:** the test reloaded right after the on-screen check. The IndexedDB write was still in
+  flight, and on a slow runner the reload cut it off.
+- **Rule:** an e2e test that reloads to prove persistence waits on the stored value first
+  (`expect.poll` on IndexedDB/localStorage), never on the UI alone and never on a fixed sleep.
+
+### 2026-10-19 — Two PRs sharing a hook contract merged without the planned rebase (#178, #179)
+- **What happened:** #179 changed `libs/hooks` step order, and #178's mobile wrapper depended on
+  it. Both PR bodies said "whichever merges second must be rebased", but both merged within a
+  minute, so the first CI run on the combined code was `main` (it passed).
+- **Why:** the merge-order note was advice in the PR body, not something the order of events enforced.
+- **Rule:** when two open PRs touch the same contract, keep the second one in draft until the
+  first is merged, then rebase it and mark it ready. Don't hand the human both as mergeable at once.
+
+### 2026-10-19 — `SUPABASE_ACCESS_TOKEN` was rejected again, this time as invalid (#180)
+- **What happened:** the gateway deploy for `515a7ee` failed at `supabase link` with "Invalid
+  access token". The same secret worked for the 2026-10-18 deploy, so it was revoked or expired
+  between deploys. Web and Marketing deployed; the smoke test was skipped.
+- **Why:** nothing checks the token before a deploy needs it, so a dead token surfaces only on a
+  merge to `main`.
+- **Rule:** when a deploy fails at `supabase link`, check the token first (§2 "Asking for a
+  secret"), and quote which jobs did deploy. The live gateway stays on the last good build until
+  the job is re-run.
