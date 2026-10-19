@@ -48,6 +48,27 @@ test.describe('What you will need', () => {
     await expect(page.getByRole('button', { pressed: true })).toHaveCount(0);
     await row.click();
     await expect(row).toHaveAttribute('aria-pressed', 'true');
+    // The tick shows at once; the save to IndexedDB finishes a moment later. Reload only once it
+    // is confirmed in the store, so the test does not cut the write short.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            new Promise<string[]>((resolve, reject) => {
+              const open = indexedDB.open('gg');
+              open.onerror = () => reject(open.error);
+              open.onsuccess = () => {
+                const get = open.result.transaction('account').objectStore('account').get('checklistTicks');
+                get.onerror = () => reject(get.error);
+                get.onsuccess = () => {
+                  open.result.close();
+                  resolve((get.result?.value as string[] | undefined) ?? []);
+                };
+              };
+            }),
+        ),
+      )
+      .toContain('life-insurance');
     await page.reload();
     await page.getByRole('button', { name: "What you'll need" }).first().click();
     await expect(page.getByRole('button', { name: /Life insurance policies/ })).toHaveAttribute('aria-pressed', 'true');
