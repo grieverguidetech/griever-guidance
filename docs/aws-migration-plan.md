@@ -163,6 +163,32 @@ under 100 a month now, under 1,000 at 10×.
 Both totals are far under $10. Supabase Auth stays on its current Supabase plan. That cost is
 outside the AWS budget and does not change.
 
+## How we will build this: hands-on with the AWS CLI
+
+Peter sets up AWS himself with the AWS CLI, one step at a time. Claude teaches. Claude does not do
+the work. **Rule: Peter runs every command. Claude explains each command first, then checks the
+output with Peter.** Real resources go into CloudFormation templates. Direct commands are for
+learning and for checks.
+
+This repo gets its own `LEARNINGS.md`, in the same style as Peter's other projects. Lessons are
+numbered and split into parts ("Lesson 4, part 2"). Each new concept gets one entry with
+**Concept**, **In this project** (numbered steps), **Related concepts**, **Interview answer**, and,
+where it helps, **Simple explanation (high school level)** with an everyday analogy. All of it is
+in ASD-STE100.
+
+The lessons follow the Steps above:
+
+1. Account, MFA and CLI sign-in (step 1): `aws login`, `aws sts get-caller-identity`.
+2. Budgets and the anomaly alert (step 2): `aws budgets create-budget`, `aws ce create-anomaly-monitor`, `aws ce create-anomaly-subscription`.
+3. IAM, the scoped Worker key and GitHub OIDC (step 2): `aws iam create-open-id-connect-provider`, `aws iam create-user`, `aws iam put-user-policy`, `aws iam create-access-key`, `aws iam delete-access-key`.
+4. CloudFormation basics (step 2): `aws cloudformation validate-template`, `aws cloudformation deploy`, `aws cloudformation describe-stack-events`.
+5. DynamoDB table design and transactions (step 4): `aws dynamodb create-table`, `aws dynamodb transact-write-items`, `aws dynamodb update-continuous-backups`.
+6. The data Lambda and its function URL (step 4): `aws lambda create-function-url-config`, `aws lambda add-permission`, `aws logs tail`.
+7. SES domain and sandbox (step 5): `aws sesv2 create-email-identity`, `aws sesv2 get-account`, `aws sesv2 send-email`.
+8. The new-account alert (step 5): `aws lambda invoke --invocation-type Event`.
+9. Site-use counts (step 5): `aws cloudwatch get-metric-data`.
+10. Import and checks (steps 6 to 8): `aws dynamodb batch-write-item`, `aws dynamodb scan --select COUNT`.
+
 ## Outstanding questions
 
 1. **Should the alert include the new user's email address?** C1 to C11 do not cover email to the
