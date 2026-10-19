@@ -6,6 +6,18 @@ that ships a phase updates them.
 
 Written 2026-10-19 by the architect role, from the code on `main` at `515a7ee`.
 
+## Decisions so far (Peter, 2026-10-19)
+
+- **D1: no server copy of session progress.** The plan stops after Phase 1. Phases 2–4 and tickets
+  T4–T11 are not planned. Convex is retired, and AWS holds no app data for now. Progress stays on
+  the device (C2).
+- **D2: a dedicated AWS account on the Paid plan.**
+- **Still open:** D3 (region, only matters once something runs on AWS) and D8 (Supabase plan). To
+  answer D8: Supabase dashboard → the project → Settings → Billing shows "Free" or "Pro".
+- **What this means for AWS now:** only the Phase 0 guardrails (budgets, anomaly monitor, GitHub
+  OIDC role). Expected AWS cost: **$0 a month**. New backend services default to AWS (TypeScript on
+  Lambda) and must fit the same $10 budget; each one gets its own cost row in §6.2 before it ships.
+
 ---
 
 ## 1. Summary and recommendation
@@ -370,6 +382,9 @@ Each phase ships on its own, with a cut-over and a rollback. No phase blocks the
 - Rollback: revert the PR. The Convex Cloud project still exists for 30 days.
 - After 30 quiet days: Peter deletes the Convex Cloud project and the GitHub secrets
   `CONVEX_DEPLOY_KEY` and `CONVEX_URL` (a product-owner action, as #140 asks).
+
+> **Phases 2–4 are not planned (D1 = no, 2026-10-19).** They stay below as the design to reuse if a
+> server copy of progress is ever wanted.
 
 ### Phase 2: build the AWS store dark (only after D1 says yes)
 
