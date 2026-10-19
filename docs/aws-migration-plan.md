@@ -292,8 +292,9 @@ cost, not AWS. See decision D7.
 3. **AWS Budgets**, cost type "unblended", monthly:
    - `gg-monthly-5`: alert at 100% of $5 actual, and at 100% of $5 forecast. Email to Peter.
    - `gg-monthly-10`: alert at 80% and 100% of $10 actual. At 100% actual, a **budget action**
-     attaches a deny-all IAM policy to the sync Lambda's execution role. Sync then fails, the gateway
-     answers 503, and clients back off silently. The app keeps working on the device (C5).
+     sets the Lambda's reserved concurrency to 0, so it is no longer invoked or billed. A deny-all
+     IAM policy alone would not stop paid invocations. Callers get an error and back off silently.
+     With D1 = no there is no Lambda yet, so this applies to the first AWS service that ships.
 4. **Cost Anomaly Detection:** one "AWS services" monitor, individual email alerts, absolute
    threshold $1.
 5. Lambda **reserved concurrency 5** on the sync function, as a hard ceiling on spend from abuse of
