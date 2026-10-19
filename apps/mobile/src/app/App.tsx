@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { AccessibilityInfo, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +19,7 @@ import { AccountProvider } from '../lib/AccountProvider';
 import { authClient } from '../lib/authClient';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
+import { sendNote } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -48,11 +49,13 @@ type SessionProps = {
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
+  /** The last person has been dealt with: go Home and show this calm line. */
+  onFinished: (note: string) => void;
 };
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onHome }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
@@ -93,18 +96,50 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
   const bar = (
     <PersonBar active={session} onOpen={onHome} arrived={pendingArrival} onArrived={clearArrival} />
   );
-  return <Navigation flow={flow} contacts={contacts} bar={bar} />;
+
+  // Done on the last person ends the send. Home keeps no wording of it (C2) and sets no timer.
+  const { step, templateCategory, sendJob } = flow;
+  const finished = useRef(false);
+  useEffect(() => {
+    if (step !== 'sent' || finished.current) return;
+    finished.current = true;
+    onFinished(sendNote(templateCategory, sendJob?.recipients ?? []));
+  }, [step, templateCategory, sendJob, onFinished]);
+
+  return <Navigation flow={withoutServiceKnown(flow)} contacts={contacts} bar={bar} />;
 };
+
+// The announcement path has a "do you know the service details" step that mobile has no screen
+// for. Forward and back step over it, so the flow only ever lands on a screen that exists.
+const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): ReturnType<typeof useSendFlow> => ({
+  ...flow,
+  nextStep: () => {
+    flow.nextStep();
+    if (flow.step === 'announce') flow.nextStep();
+  },
+  prevStep: () => {
+    flow.prevStep();
+    if (flow.step === 'contacts' && flow.steps.includes('serviceKnown')) flow.prevStep();
+  },
+});
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
   const { sessions, active, switchTo, addPerson, updateDraft, updateSession } = useDeviceSessions(cache);
   const [atHome, setAtHome] = useState(true);
   const [arrived, setArrived] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
   const purgedOnBoot = useRef(false);
   const goHome = useCallback(() => {
     setArrived(false);
+    setNote(null);
     setAtHome(true);
+  }, []);
+  const finish = useCallback((text: string) => {
+    setArrived(false);
+    setNote(text);
+    setAtHome(true);
+    AccessibilityInfo.announceForAccessibility(text);
   }, []);
 
   // Retention: the saved contact list is cleared 30 days past the latest service date across
@@ -120,6 +155,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
 
   if (!active) return null;
   const open = () => {
+    setNote(null);
     setArrived(true);
     setAtHome(false);
   };
@@ -130,6 +166,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           <HomeScreen
             sessions={sessions}
             canCreate
+            note={note}
             onOpen={(id) => {
               switchTo(id);
               open();
@@ -154,6 +191,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       onDraftChange={updateDraft}
       onDetails={updateSession}
       onHome={goHome}
+      onFinished={finish}
     />
   );
 };
@@ -213,7 +251,7 @@ const Navigation = ({
             )}
           </Stack.Screen>
         )}
-        {flow.step === 'details' && (
+        {(flow.step === 'details' || flow.step === 'announce' || flow.step === 'serviceKnown') && (
           <Stack.Screen name="DetailsForm">{() => withBar(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'contacts' && (
