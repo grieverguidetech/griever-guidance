@@ -1,9 +1,11 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { Session } from '@griever/hooks';
 import { PrimaryButton, ScreenHeader, authStyles } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';
-import { ACCENT, MUTED } from '../components/colors';
+import { ACCENT, ACCENT_TINT, MUTED } from '../components/colors';
 import { isBlank } from '../lib/useDeviceSessions';
+import { NO_COPY_LINE } from '../lib/sendNote';
 
 export const START_FIRST = "Start with someone I've lost";
 export const ADD_PERSON = "Someone else I've lost";
@@ -19,6 +21,8 @@ export type HomeScreenProps = {
   onOpen: (id: string) => void;
   onCreate: () => void;
   onWhatYoullNeed: () => void;
+  /** A calm line after the last person of a send was dealt with. Stays until the person leaves Home. */
+  note?: string | null;
   /** Only given when accounts are on. */
   onAccount?: () => void;
 };
@@ -27,12 +31,33 @@ export type HomeScreenProps = {
  * Where every launch lands. The people kept on this phone, newest first, and one way to add
  * another. Nothing here removes anyone (C9).
  */
-export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount }: HomeScreenProps) {
+export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount, note }: HomeScreenProps) {
   const people = listed(sessions);
+  // The header takes screen-reader focus as Home opens. On iOS the note is queued behind it, so it
+  // is read rather than dropped. Android reads the live region below.
+  useEffect(() => {
+    if (note && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(note, { queue: true });
+  }, [note]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader>The people you're writing about</ScreenHeader>
-      <Pressable style={styles.link} onPress={onWhatYoullNeed} accessibilityRole="button">
+      {note ? (
+        <View
+          style={styles.note}
+          accessible
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={`${note} ${NO_COPY_LINE}`}
+        >
+          <Text style={styles.noteText}>{note}</Text>
+          <Text style={styles.noteSmall}>{NO_COPY_LINE}</Text>
+        </View>
+      ) : null}
+      <Pressable
+        style={({ pressed }) => [styles.link, pressed && styles.pressed]}
+        onPress={onWhatYoullNeed}
+        accessibilityRole="button"
+        accessibilityLabel="What you'll need"
+      >
         <Text style={styles.linkText}>What you'll need</Text>
       </Pressable>
       {onAccount ? (
@@ -65,7 +90,22 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60 },
-  link: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginBottom: 8 },
+  link: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 10,
+    backgroundColor: ACCENT_TINT,
+    marginBottom: 8,
+  },
+  note: { borderWidth: 1, borderColor: MUTED, borderRadius: 10, padding: 16, marginBottom: 16 },
+  pressed: { opacity: 0.7 },
+  noteText: { fontSize: 16, color: '#111827', marginBottom: 4 },
+  noteSmall: { fontSize: 12, color: MUTED },
   linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
   row: {
     minHeight: 44,
