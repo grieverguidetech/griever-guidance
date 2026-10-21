@@ -15,6 +15,9 @@ import {
  * on a clean CI checkout — the inferred `test` targets don't build deps first.
  * Tests always run against source.
  */
+// Exception: libs/data-aws/vite.config.mts replaces the two `conditions` lists below. The AWS SDK
+// v3 `module` export is ES code without file extensions, which Node cannot load, so that lib drops
+// the `module` condition (resolve and ssr) and lets Node pick the SDK CommonJS build.
 export function vitestConfig(
   environment: 'node' | 'jsdom',
   overrides: UserConfig = {},

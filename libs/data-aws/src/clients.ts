@@ -3,12 +3,17 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
 import type { AwsConfig } from './config.js';
 
-export function createDynamoClient(config: AwsConfig): DynamoDBClient {
-  return new DynamoDBClient({
+// `credentials` is passed only when the config has them. Otherwise the SDK default chain runs.
+function common(config: AwsConfig, endpoint: string | undefined) {
+  return {
     region: config.region,
-    endpoint: config.dynamoEndpoint,
-    credentials: config.credentials,
-  });
+    ...(endpoint ? { endpoint } : {}),
+    ...(config.credentials ? { credentials: config.credentials } : {}),
+  };
+}
+
+export function createDynamoClient(config: AwsConfig): DynamoDBClient {
+  return new DynamoDBClient(common(config, config.dynamoEndpoint));
 }
 
 export function createDocClient(client: DynamoDBClient): DynamoDBDocumentClient {
@@ -18,9 +23,5 @@ export function createDocClient(client: DynamoDBClient): DynamoDBDocumentClient 
 }
 
 export function createSesClient(config: AwsConfig): SESv2Client {
-  return new SESv2Client({
-    region: config.region,
-    endpoint: config.sesEndpoint,
-    credentials: config.credentials,
-  });
+  return new SESv2Client(common(config, config.sesEndpoint));
 }

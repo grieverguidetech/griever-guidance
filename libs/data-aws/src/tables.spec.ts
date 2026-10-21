@@ -1,8 +1,8 @@
-import { loadAwsConfig } from './config.js';
+import { loadLocalConfig } from './config.js';
 import { tableDefinitions } from './tables.js';
 
 describe('tableDefinitions', () => {
-  const [data, content] = tableDefinitions(loadAwsConfig({}));
+  const [data, content] = tableDefinitions(loadLocalConfig({}));
 
   it('keys gg-content by kind and id (plan v4)', () => {
     expect(content?.TableName).toBe('gg-content');

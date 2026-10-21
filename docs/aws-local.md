@@ -22,8 +22,9 @@ pnpm aws:down    # stop both and delete their data
 | Service | Image or package | Port |
 |---|---|---|
 | DynamoDB Local | `amazon/dynamodb-local:3.1.0` | 8100 |
-| SES stand-in | `aws-ses-v2-local@2.10.2` (Node) | 8105 |
+| SES stand-in | `aws-ses-v2-local` 2.10.2 (Node, from the root devDependencies, run in `node:22.22-alpine`) | 8105 |
 
+Run `pnpm install` first. The SES container mounts the repo `node_modules` read-only, so it needs no network at start.
 The SES stand-in keeps sent emails in memory. Read them with `GET http://localhost:8105/store`.
 Clear them with `POST http://localhost:8105/clear-store`. No email leaves your machine.
 
@@ -39,14 +40,21 @@ The code is in `libs/data-aws`. The scripts are in `infra/aws-local`.
 - Plan v4 names `gg-content` and its keys. It does not name the keys of the data table.
   `gg-data` is the simplest choice: generic `pk` and `sk`, and one index for lookups by email.
   A later ticket can change it before any real data exists.
+- `gg-data` has time to live (TTL) on one attribute, named `ttl` (epoch seconds). The table script turns it on, and checks first, so a second run changes nothing.
+- The table script waits until each table is ACTIVE. If a table with the same name has other keys or indexes, it stops with an error. Run `pnpm aws:down` and start again.
 - `seed` loads the "What you'll need" items, three samples and one example into `gg-content`.
-- The checklist is a copy of the list in `WhatYoullNeed.tsx`. A unit test fails if the two differ.
+- The checklist is a copy of the list in the web `WhatYoullNeed.tsx` (id, label, reason, and the SSN tip). A unit test compares them in full. It also compares label, reason and tip with the mobile screen, which has its own ids. `data-aws` depends on both apps in Nx, so `check:affected` runs this test when a screen changes.
 - The sample and example texts come from the templates in `libs/shared`.
 
 ## Configuration
 
 Code reads the endpoints from the environment. The names are in `.env.example`. If you set
-nothing, the code uses the ports above and fake credentials. Never put real keys in the repo.
+nothing, the code uses the ports above. Never put real keys in the repo.
+
+- The local config treats an empty variable as unset.
+- It always uses fake credentials.
+- It throws unless each endpoint host is `localhost`, `127.0.0.1` or `::1`. So a local run cannot reach real AWS.
+- Real AWS needs its own config function, built later. It must leave `credentials` unset, so the SDK default chain applies (including `AWS_SESSION_TOKEN`). Nothing in `libs/data-aws` forces fake credentials onto such a config. A test checks this.
 
 ## Tests
 
@@ -63,7 +71,7 @@ pnpm nx test data-aws
 
 ## CI
 
-The `aws-local` job in `.github/workflows/ci.yml` runs on pull requests into `aws-be` only. It
+The `aws-local` job in `.github/workflows/ci.yml` runs on pull requests into `aws-be` and on the pull request from `aws-be` into `main`. It
 starts DynamoDB Local as a service container. It starts the SES stand-in as a process. It runs
 `pnpm nx test data-aws`.
 

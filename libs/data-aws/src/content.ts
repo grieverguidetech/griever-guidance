@@ -16,19 +16,25 @@ export interface ContentItem {
   label: string;
   /** Checklist only: why the item is needed (GRI-9). */
   reason?: string;
+  /** Checklist only: a short reason shown when the info button is opened (SSN row). */
+  tip?: string;
   /** Sample and example only: the message text. */
   text?: string;
 }
 
 /**
- * Copy of the CHECKLIST in apps/web/src/screens/WhatYoullNeed.tsx. That constant is private to
- * the screen, so a unit test reads the file and fails if the ids or labels drift apart.
+ * Copy of the CHECKLIST in apps/web/src/screens/WhatYoullNeed.tsx (`meta` is `reason` here). That
+ * constant is private to the screen, so a unit test reads the file and fails if id, label, meta or
+ * tip drift apart. The mobile screen has the same label, meta and tip, with its own ids.
  * Never change an id: ticks on devices use it.
  */
-export const CHECKLIST_SEED: ReadonlyArray<{ id: string; label: string; reason?: string }> = [
+const SSN_TIP =
+  "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.";
+
+export const CHECKLIST_SEED: ReadonlyArray<{ id: string; label: string; reason?: string; tip?: string }> = [
   { id: 'will-or-wishes', label: 'Any will or written wishes', reason: 'Burial or cremation, and who they named' },
   { id: 'pre-arranged-plans', label: 'Pre-arranged funeral plans', reason: 'Many people have already paid for this' },
-  { id: 'ssn-and-id', label: 'Social Security number and ID' },
+  { id: 'ssn-and-id', label: 'Social Security number and ID', tip: SSN_TIP },
   { id: 'life-insurance', label: 'Life insurance policies' },
   { id: 'military-papers', label: 'Military discharge papers', reason: 'If they served — it may cover the burial' },
 ];
@@ -58,6 +64,7 @@ export function buildContent(): ContentItem[] {
       order: index + 1,
       label: item.label,
       reason: item.reason,
+      tip: item.tip,
     }),
   );
   const samples: ContentItem[] = [

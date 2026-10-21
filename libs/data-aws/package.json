@@ -14,7 +14,21 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "data-aws"
+    "name": "data-aws",
+    "implicitDependencies": [
+      "web",
+      "mobile"
+    ],
+    "targets": {
+      "test": {
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/apps/web/src/screens/WhatYoullNeed.tsx",
+          "{workspaceRoot}/apps/mobile/src/screens/WhatYoullNeedScreen.tsx"
+        ]
+      }
+    }
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1154.0",

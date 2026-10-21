@@ -1,11 +1,11 @@
-import { DeleteTableCommand } from '@aws-sdk/client-dynamodb';
+import { CreateTableCommand, DeleteTableCommand, DescribeTimeToLiveCommand } from '@aws-sdk/client-dynamodb';
 import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { createDocClient, createDynamoClient, createSesClient } from './clients.js';
 import { loadLocalConfig } from './config.js';
 import { buildContent } from './content.js';
 import { seedContent } from './seed.js';
 import { clearSentEmails, isSesReachable, readSentEmails, sendTextEmail } from './ses.js';
-import { ensureTables } from './tables.js';
+import { ensureTables, TTL_ATTRIBUTE } from './tables.js';
 import { isDynamoReachable } from './wait.js';
 
 /**
@@ -39,6 +39,40 @@ describe.runIf(dynamoUp)('DynamoDB Local', () => {
   it('creates the tables, and a second run creates nothing', async () => {
     expect(await ensureTables(dynamo, config)).toEqual([config.dataTable, config.contentTable]);
     expect(await ensureTables(dynamo, config)).toEqual([]);
+  });
+
+  it('turns on TTL for the data table on the attribute ttl, and a repeat run keeps it', async () => {
+    await ensureTables(dynamo, config);
+    const { TimeToLiveDescription } = await dynamo.send(
+      new DescribeTimeToLiveCommand({ TableName: config.dataTable }),
+    );
+    expect(TTL_ATTRIBUTE).toBe('ttl');
+    expect(TimeToLiveDescription?.AttributeName).toBe('ttl');
+    expect(TimeToLiveDescription?.TimeToLiveStatus).toMatch(/ENABL/);
+  });
+
+  it('throws a clear error when an existing table has other keys', async () => {
+    const odd = { ...config, dataTable: `${config.dataTable}-odd`, contentTable: `${config.contentTable}-odd` };
+    // A content table with the wrong sort key name, and a data table with no index.
+    await dynamo.send(
+      new CreateTableCommand({
+        TableName: odd.dataTable,
+        BillingMode: 'PAY_PER_REQUEST',
+        AttributeDefinitions: [
+          { AttributeName: 'pk', AttributeType: 'S' },
+          { AttributeName: 'sk', AttributeType: 'S' },
+        ],
+        KeySchema: [
+          { AttributeName: 'pk', KeyType: 'HASH' },
+          { AttributeName: 'sk', KeyType: 'RANGE' },
+        ],
+      }),
+    );
+    try {
+      await expect(ensureTables(dynamo, odd)).rejects.toThrow(/index gsi1 is missing/);
+    } finally {
+      await dynamo.send(new DeleteTableCommand({ TableName: odd.dataTable }));
+    }
   });
 
   it('writes and reads one item in the data table', async () => {

@@ -10,8 +10,13 @@ services:
       - "127.0.0.1:8100:8000"
 
   ses:
-    image: node:22-alpine
-    # aws-ses-v2-local keeps sent emails in memory. Read them at GET /store.
-    command: ["npx", "--yes", "aws-ses-v2-local@2.10.2", "--host=0.0.0.0", "--port=8105"]
+    image: node:22.22-alpine
+    # Runs the pinned root devDependency (aws-ses-v2-local 2.10.2) from the repo's node_modules.
+    # No install at start, no network. Run `pnpm install` first. It keeps sent emails in
+    # memory. Read them at GET /store.
+    working_dir: /app
+    volumes:
+      - ./node_modules:/app/node_modules:ro
+    command: ["node", "node_modules/aws-ses-v2-local/dist/cli.js", "--host=0.0.0.0", "--port=8105"]
     ports:
       - "127.0.0.1:8105:8105"

@@ -2,24 +2,74 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { BatchWriteCommand, type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { buildContent, CHECKLIST_SEED } from './content.js';
-import { loadAwsConfig } from './config.js';
+import { loadLocalConfig } from './config.js';
 import { seedContent } from './seed.js';
 
-const screen = readFileSync(
-  fileURLToPath(new URL('../../../apps/web/src/screens/WhatYoullNeed.tsx', import.meta.url)),
-  'utf8',
-);
+const read = (path: string) =>
+  readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
+
+interface ScreenItem {
+  id: string;
+  label: string;
+  meta?: string;
+  tip?: string;
+}
+
+/** Reads the CHECKLIST array of a screen: id, label, meta and tip (a string, or a const name). */
+function parseChecklist(source: string): ScreenItem[] {
+  const start = source.indexOf('const CHECKLIST');
+  const body = source.slice(source.indexOf('= [', start), source.indexOf('\n];', start));
+  const constant = (name: string) =>
+    new RegExp(`const ${name}[^=]*=\\s*(["'])(.*?)\\1;`, 's').exec(source)?.[2];
+  const field = (row: string, key: string) => {
+    const literal = new RegExp(`\\b${key}: (["'])(.*?)\\1`).exec(row);
+    if (literal) return literal[2];
+    const name = new RegExp(`\\b${key}: ([A-Z_]+)`).exec(row)?.[1];
+    return name ? constant(name) : undefined;
+  };
+  return body
+    .split('\n')
+    .filter((row) => row.includes('label:'))
+    .map((row) => ({
+      id: field(row, 'id') as string,
+      label: field(row, 'label') as string,
+      meta: field(row, 'meta'),
+      tip: field(row, 'tip'),
+    }));
+}
+
+const seedAsScreen = (): ScreenItem[] =>
+  CHECKLIST_SEED.map((i) => ({ id: i.id, label: i.label, meta: i.reason, tip: i.tip }));
+
+describe('parseChecklist', () => {
+  it('reads id, label, meta and a tip held in a const', () => {
+    const source = [
+      'export const SSN_TIP =',
+      '  "You\'ll need this number.";',
+      'const CHECKLIST: ChecklistItem[] = [',
+      "  { id: 'a', label: 'One', meta: 'Why' },",
+      "  { id: 'b', label: 'Two', tip: SSN_TIP },",
+      '];',
+    ].join('\n');
+    expect(parseChecklist(source)).toEqual([
+      { id: 'a', label: 'One', meta: 'Why', tip: undefined },
+      { id: 'b', label: 'Two', meta: undefined, tip: "You'll need this number." },
+    ]);
+  });
+});
 
 describe('checklist seed', () => {
-  it('has every id and label of the screen CHECKLIST, and no extra', () => {
-    const block = screen.slice(screen.indexOf('const CHECKLIST'), screen.indexOf('];'));
-    const screenIds = [...block.matchAll(/id: '([^']+)'/g)].map((m) => m[1]);
-    expect(screenIds.length).toBeGreaterThan(0);
-    expect(CHECKLIST_SEED.map((item) => item.id)).toEqual(screenIds);
-    for (const item of CHECKLIST_SEED) {
-      expect(block).toContain(`label: '${item.label}'`);
-      if (item.reason) expect(block).toContain(item.reason);
-    }
+  it('matches the web screen CHECKLIST in full: id, label, meta and tip', () => {
+    const screen = parseChecklist(read('apps/web/src/screens/WhatYoullNeed.tsx'));
+    expect(screen.length).toBeGreaterThan(0);
+    expect(seedAsScreen()).toEqual(screen);
+  });
+
+  it('matches the mobile screen on label, meta and tip (its ids differ)', () => {
+    const mobile = parseChecklist(read('apps/mobile/src/screens/WhatYoullNeedScreen.tsx'));
+    expect(mobile.length).toBeGreaterThan(0);
+    const strip = ({ label, meta, tip }: ScreenItem) => ({ label, meta, tip });
+    expect(seedAsScreen().map(strip)).toEqual(mobile.map(strip));
   });
 
   it('stores one checklist item per entry, in order, with a version', () => {
@@ -77,7 +127,7 @@ describe('seedContent', () => {
       version: 1,
       label: 'x',
     }));
-    const count = await seedContent(doc, loadAwsConfig({}), items);
+    const count = await seedContent(doc, loadLocalConfig({}), items);
     expect(count).toBe(30);
     const sizes = sent.map((c) => c.input.RequestItems?.['gg-content']?.length);
     expect(sizes).toEqual([25, 5]);

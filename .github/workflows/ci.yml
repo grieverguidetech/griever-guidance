@@ -90,11 +90,11 @@ jobs:
         run: supabase test db --workdir infra
 
   # DynamoDB Local + SES stand-in integration tests (#210). Runs only on PRs into the
-  # aws-be integration branch, so main CI is unchanged. Here the tests fail, not skip, if a
+  # aws-be integration branch and on the final aws-be to main PR, so other PRs are unchanged. Here the tests fail, not skip, if a
   # service is unreachable (AWS_LOCAL_REQUIRED).
   aws-local:
     name: AWS local stack (DynamoDB Local, SES stand-in)
-    if: github.event_name == 'pull_request' && github.base_ref == 'aws-be'
+    if: github.event_name == 'pull_request' && (github.base_ref == 'aws-be' || github.head_ref == 'aws-be')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
