@@ -22,3 +22,9 @@ export const OBITUARY_DRAFTING_ENABLED = import.meta.env['VITE_FEATURE_OBITUARY_
  * data actually syncs between phones, so a member who joins never sees an empty Home.
  */
 export const SHARING_ENABLED = import.meta.env['VITE_FEATURE_SHARING'] === 'true';
+
+/**
+ * Paying for tasks after the first announcement. Off until the paywall is built:
+ * with it off, every task stays free and nothing asks for payment.
+ */
+export const PAYMENTS_ENABLED = import.meta.env['VITE_FEATURE_PAYMENTS'] === 'true';
