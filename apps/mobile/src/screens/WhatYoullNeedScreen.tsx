@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { AccessibilityInfo, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,10 +9,14 @@ import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
 // Which rows are ticked stays on this phone only. Nothing is sent anywhere, and nothing nags.
 export const CHECKLIST_KEY = 'gg.checklist.v1';
 
-const CHECKLIST = [
+// Same words as the web list (a unit test compares the two).
+export const SSN_TIP =
+  "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.";
+
+const CHECKLIST: { id: string; label: string; meta?: string; tip?: string }[] = [
   { id: 'will', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },
   { id: 'plans', label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this' },
-  { id: 'ssn', label: 'Social Security number and ID' },
+  { id: 'ssn', label: 'Social Security number and ID', tip: SSN_TIP },
   { id: 'insurance', label: 'Life insurance policies' },
   { id: 'military', label: 'Military discharge papers', meta: 'If they served — it may cover the burial' },
 ];
@@ -22,6 +26,7 @@ export function WhatYoullNeedScreen() {
   const [ticked, setTicked] = useState<string[]>([]);
   // Rows show once the saved ticks are read, so a tap can never overwrite them with a partial list.
   const [loaded, setLoaded] = useState(false);
+  const [tipOpen, setTipOpen] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -39,6 +44,7 @@ export function WhatYoullNeedScreen() {
 
   const toggle = (id: string) => {
     // Computed from the latest ticks, so two quick taps both count.
+    setTipOpen(null);
     setTicked((prev) => {
       const next = prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id];
       void AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).catch(() => undefined);
@@ -47,7 +53,12 @@ export function WhatYoullNeedScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      // A touch anywhere outside the info button closes the tip.
+      onTouchStart={() => setTipOpen(null)}
+    >
       <Pressable
         onPress={() => navigation.goBack()}
         style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
@@ -73,22 +84,46 @@ export function WhatYoullNeedScreen() {
       {loaded && CHECKLIST.map((item) => {
         const checked = ticked.includes(item.id);
         return (
-          <Pressable
-            key={item.id}
-            onPress={() => toggle(item.id)}
-            style={({ pressed }) => [styles.checklistItem, pressed && styles.pressed]}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked }}
-            accessibilityLabel={item.meta ? `${item.label}. ${item.meta}` : item.label}
-          >
-            <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-              {checked ? <Text style={styles.checkmark} allowFontScaling={false}>✓</Text> : null}
+          <View key={item.id}>
+            <View style={styles.checklistRow}>
+              <Pressable
+                onPress={() => toggle(item.id)}
+                style={({ pressed }) => [styles.checklistItem, styles.checklistMain, pressed && styles.pressed]}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                accessibilityLabel={item.meta ? `${item.label}. ${item.meta}` : item.label}
+              >
+                <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                  {checked ? <Text style={styles.checkmark} allowFontScaling={false}>✓</Text> : null}
+                </View>
+                <View style={styles.checklistText}>
+                  <Text style={[styles.checklistLabel, checked && styles.struck]}>{item.label}</Text>
+                  {item.meta && <Text style={styles.checklistMeta}>{item.meta}</Text>}
+                </View>
+              </Pressable>
+              {item.tip && (
+                <View onTouchStart={(e) => e.stopPropagation()}>
+                <Pressable
+                  onPress={() => {
+                    const opening = tipOpen !== item.id;
+                    setTipOpen(opening ? item.id : null);
+                    // Android reads the live region; iOS VoiceOver needs this announcement.
+                    if (opening && item.tip) AccessibilityInfo.announceForAccessibility(item.tip);
+                  }}
+                  style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Why we list this"
+                  accessibilityState={{ expanded: tipOpen === item.id }}
+                >
+                  <Text style={styles.infoGlyph} allowFontScaling={false}>i</Text>
+                </Pressable>
+                </View>
+              )}
             </View>
-            <View style={styles.checklistText}>
-              <Text style={[styles.checklistLabel, checked && styles.struck]}>{item.label}</Text>
-              {item.meta && <Text style={styles.checklistMeta}>{item.meta}</Text>}
-            </View>
-          </Pressable>
+            {item.tip && tipOpen === item.id && (
+              <Text style={styles.tip} accessibilityLiveRegion="polite">{item.tip}</Text>
+            )}
+          </View>
         );
       })}
     </ScrollView>
@@ -126,6 +161,11 @@ const styles = StyleSheet.create({
   cardBody: { fontSize: 14, color: '#374151', lineHeight: 20 },
   gatherHeading: { fontSize: 11, fontWeight: '500', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
   checklistItem: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 44, paddingVertical: 8, marginBottom: 8 },
+  checklistRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  checklistMain: { flex: 1 },
+  infoButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  infoGlyph: { width: 22, height: 22, lineHeight: 20, textAlign: 'center', fontSize: 13, fontWeight: '600', color: MUTED, borderWidth: 1.5, borderColor: MUTED, borderRadius: 11, overflow: 'hidden' },
+  tip: { fontSize: 12, color: MUTED, lineHeight: 18, marginLeft: 36, marginBottom: 8 },
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: FIELD_BORDER, marginRight: 12, marginTop: 1, alignItems: 'center', justifyContent: 'center' },
   checkmark: { fontSize: 14, color: '#ffffff', fontWeight: '700' },
   pressed: { opacity: 0.7 },
