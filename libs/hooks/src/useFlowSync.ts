@@ -17,6 +17,7 @@ import {
 } from '@griever/shared';
 import type { FlowFactKey, FlowFacts, FlowRecord } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
+import { readRemovedFlows, writeRemovedFlows } from './useSessions.js';
 import type { Session, UseSessionsResult } from './useSessions.js';
 
 /** The api-client functions the hook uses. Tests pass a stub; the default is the real module. */
@@ -173,10 +174,12 @@ function scanSessions(
   state: SyncState,
   sessions: readonly Session[],
   userId: string,
+  removed: ReadonlySet<string>,
 ): { queue: boolean; dirty: boolean } {
   let changed = false;
   let dirty = false;
   const seen = new Set<string>();
+  const present = new Set(sessions.map((s) => s.flowId));
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
     seen.add(s.flowId);
@@ -198,6 +201,14 @@ function scanSessions(
     } else if (Object.keys(diff).length > 0) {
       state.queue.set(s.flowId, coalesceFlowPatches([state.queue.get(s.flowId) ?? {}, diff]));
       changed = true;
+    }
+  }
+  // Unsent edits of a person removed on purpose (removeSession) are forgotten. A person who is
+  // merely missing (unreadable storage, access lost) is not treated as removed.
+  for (const id of [...state.queue.keys()]) {
+    if (!present.has(id) && removed.has(id)) {
+      state.queue.delete(id);
+      dirty = true;
     }
   }
   for (const id of [...state.baselines.keys()]) {
@@ -234,7 +245,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     if (stateRef.current?.userId !== userId) stateRef.current = readStored(storage, userId);
     const state = stateRef.current;
     try {
-      const { queue, dirty } = scanSessions(state, sessions, userId);
+      const { queue, dirty } = scanSessions(state, sessions, userId, new Set((readRemovedFlows(storage) ?? []).map((m) => m.id)));
       if (dirty) writeStored(storage, state);
       if (queue) kickRef.current(EDIT_DEBOUNCE_MS);
     } catch {
@@ -277,10 +288,21 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         return false;
       }
       const state = getState();
-      markKnown(state, result.flows, userId);
+      // Sync lag: a person removed here (removeSession) that the server still lists is left out. Once a clean pull no longer
+      // lists the id, it is forgotten. A pull that dropped records may be hiding it, so keep it then.
+      // Marks name the owner, so another account's pull neither hides nor prunes this account's marks.
+      const marks = readRemovedFlows(latest.current.storage);
+      const mine = new Set((marks ?? []).filter((m) => m.ownerId === null || m.ownerId === userId).map((m) => m.id));
+      const flows = result.flows.filter((r) => !(mine.has(r.id) && r.ownerId === userId));
+      if (marks && !result.dropped) {
+        const listed = new Set(result.flows.filter((r) => r.ownerId === userId).map((r) => r.id));
+        const kept = marks.filter((m) => !mine.has(m.id) || listed.has(m.id));
+        if (kept.length !== marks.length) writeRemovedFlows(latest.current.storage, kept);
+      }
+      markKnown(state, flows, userId);
       state.pulled = true;
       try {
-        scanSessions(state, latest.current.sessions, userId);
+        scanSessions(state, latest.current.sessions, userId, new Set((marks ?? []).map((m) => m.id)));
       } catch {
         // keep pulling; the next change scans again
       }
@@ -289,7 +311,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         pendingByFlow[id] = FLOW_FACT_KEYS.filter((key) => key in pending);
       }
       // Records already merged into sessions must not look like local edits afterwards.
-      for (const record of result.flows) {
+      for (const record of flows) {
         const base = state.baselines.get(record.id);
         if (!base) continue;
         const pendingKeys = new Set(pendingByFlow[record.id] ?? []);
@@ -298,7 +320,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         state.baselines.set(record.id, next as unknown as FlowFacts);
       }
       writeStored(latest.current.storage, state);
-      latest.current.applyRemoteFlows({ flows: result.flows, dropped: result.dropped }, userId, pendingByFlow);
+      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
       return true;
     };
 
