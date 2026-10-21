@@ -12,7 +12,7 @@ export const CHECKLIST_KEY = 'gg.checklist.v1';
 const CHECKLIST = [
   { id: 'will', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },
   { id: 'plans', label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this' },
-  { id: 'ssn', label: 'Social Security number and ID', meta: 'The funeral home uses it to report the death. This app never asks for it.' },
+  { id: 'ssn', label: 'Social Security number and ID', meta: 'The funeral home uses the number to report the death. This app never asks for it or keeps it.' },
   { id: 'insurance', label: 'Life insurance policies' },
   { id: 'military', label: 'Military discharge papers', meta: 'If they served — it may cover the burial' },
 ];

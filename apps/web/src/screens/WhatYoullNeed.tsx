@@ -14,7 +14,7 @@ interface ChecklistItem {
 const CHECKLIST: ChecklistItem[] = [
   { id: 'will-or-wishes', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },
   { id: 'pre-arranged-plans', label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this' },
-  { id: 'ssn-and-id', label: 'Social Security number and ID', meta: 'The funeral home uses it to report the death. This app never asks for it.' },
+  { id: 'ssn-and-id', label: 'Social Security number and ID', meta: 'The funeral home uses the number to report the death. This app never asks for it or keeps it.' },
   { id: 'life-insurance', label: 'Life insurance policies' },
   { id: 'military-papers', label: 'Military discharge papers', meta: 'If they served — it may cover the burial' },
 ];

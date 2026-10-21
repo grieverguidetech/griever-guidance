@@ -38,7 +38,7 @@ describe('What you\'ll need checklist', () => {
   it('says why the list asks for the Social Security number, in the same words as web', async () => {
     render(<WhatYoullNeedScreen />);
     // Same literal as the web spec (apps cannot import each other), so the two stay equal.
-    const reason = 'The funeral home uses it to report the death. This app never asks for it.';
+    const reason = 'The funeral home uses the number to report the death. This app never asks for it or keeps it.';
     expect(await screen.findByRole('checkbox', { name: `Social Security number and ID. ${reason}` })).toBeTruthy();
     expect(screen.getByText(reason)).toBeTruthy();
   });

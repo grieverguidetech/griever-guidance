@@ -2,6 +2,8 @@
  * #176: the "What you'll need" list starts unticked, each row toggles, and ticks stay on this
  * device only (IndexedDB), never sent anywhere (C3).
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
@@ -101,8 +103,19 @@ describe('What you will need (#176)', () => {
     await loaded();
     // Same literal as the mobile spec (apps cannot import each other), so the two stay equal.
     expect(row('Social Security number and ID')).toHaveAccessibleName(
-      'Social Security number and ID The funeral home uses it to report the death. This app never asks for it.',
+      'Social Security number and ID The funeral home uses the number to report the death. This app never asks for it or keeps it.',
     );
-    expect(screen.getByText('The funeral home uses it to report the death. This app never asks for it.')).toBeInTheDocument();
+    expect(screen.getByText('The funeral home uses the number to report the death. This app never asks for it or keeps it.')).toBeInTheDocument();
+  });
+
+  // The apps cannot import each other, so read the mobile source to keep the two reasons equal.
+  it('gives the same Social Security reason as the mobile app', () => {
+    const mobile = readFileSync(
+      join(__dirname, '../../../mobile/src/screens/WhatYoullNeedScreen.tsx'),
+      'utf8',
+    );
+    expect(mobile).toContain(
+      "meta: 'The funeral home uses the number to report the death. This app never asks for it or keeps it.'",
+    );
   });
 });
