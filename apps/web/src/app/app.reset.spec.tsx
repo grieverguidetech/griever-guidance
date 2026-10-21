@@ -149,7 +149,7 @@ describe('opening a recovery link', () => {
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
     await user.click(await screen.findByRole('button', { name: 'Continue' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
   });
 

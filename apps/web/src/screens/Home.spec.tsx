@@ -50,7 +50,7 @@ describe('Home', () => {
   it('has exactly one h1', () => {
     setup();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe("The people you're writing about");
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe("Who you're writing about");
   });
 
   it('lists people newest first and leaves out empty names', () => {
@@ -130,9 +130,10 @@ describe('Home', () => {
     expect(screen.getAllByRole('button', { name: /Hale/ })).toHaveLength(2);
   });
 
-  it('keeps What you\'ll need reachable', () => {
+  it('has no "What you\'ll need" link; the list lives on "Your account" (#190)', () => {
     setup();
-    expect(screen.getByRole('button', { name: "What you'll need" })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
+    expect(screen.queryByText('The people you\'re writing about')).toBeNull();
   });
 
   it('says so calmly when nobody is listed yet and the person can create', () => {

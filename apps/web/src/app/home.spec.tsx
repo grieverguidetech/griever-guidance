@@ -33,7 +33,7 @@ function seed(...people: ReturnType<typeof person>[]) {
 
 // Matches CONTACTS_CHECK_FALLBACK_MS in app.tsx: how long setup waits on the local contacts read.
 const CONTACTS_CHECK_FALLBACK_MS = 1500;
-const HOME = "The people you're writing about";
+const HOME = "Who you're writing about";
 
 async function expectHome() {
   expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
@@ -165,14 +165,11 @@ describe('Home as the landing (#112)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
   });
 
-  it('returns the checklist to Home when it was opened from Home', async () => {
-    const user = userEvent.setup();
+  it('has no "What you\'ll need" link on Home (#190)', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await expectHome();
-    await user.click(screen.getByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
-    await expectHome();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
   });
 });
 

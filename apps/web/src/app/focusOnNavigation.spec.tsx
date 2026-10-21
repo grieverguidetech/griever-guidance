@@ -60,7 +60,7 @@ describe('focus follows the screen heading (#50)', () => {
     seedAnnouncementStep();
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: "The people you're writing about" });
+    await screen.findByRole('heading', { level: 1, name: "Who you're writing about" });
     expect(document.activeElement).toBe(document.body); // landing on Home never moves focus
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     // Opening the person from Home is itself a navigation, so focus is already on the new h1.

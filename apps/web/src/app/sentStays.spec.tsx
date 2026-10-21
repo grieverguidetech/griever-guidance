@@ -165,7 +165,7 @@ describe('after Done on the last person (#167)', () => {
     await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' });
     await user.click(screen.getByRole('button', { name: 'Back' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Margaret Hayes/ })).toBeInTheDocument();
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('peaceful');
   }, 30_000);

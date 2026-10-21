@@ -90,7 +90,7 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Password'), 'a-long-password');
 }
 
-const HOME = "The people you're writing about";
+const HOME = "Who you're writing about";
 
 // From Home (where "Your account" sits) to the signed-out sign-up screen.
 async function signOutFromHome(user: ReturnType<typeof userEvent.setup>) {
@@ -136,7 +136,7 @@ beforeEach(() => {
 describe('flag off', () => {
   it('shows Home and never loads the auth client', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     await Promise.resolve();
     expect(mocks.load).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
@@ -159,7 +159,7 @@ describe('flag on', () => {
       }),
     );
     render(<App />);
-    await screen.findByRole('button', { name: "What you'll need" });
+    await screen.findByRole('heading', { level: 1, name: HOME });
     await act(async () => {});
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();

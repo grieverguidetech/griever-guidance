@@ -6,7 +6,7 @@ test.describe('first visit', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
     await expect(page.getByRole('button', { name: "Start with someone I've lost" })).toBeVisible();
-    await expect(page.getByRole('button', { name: "What you'll need" })).toBeVisible();
+    await expect(page.getByRole('button', { name: "What you'll need" })).toHaveCount(0);
     await expect(page.getByRole('list')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
   });
@@ -70,6 +70,7 @@ test.describe('What you will need', () => {
       )
       .toContain('life-insurance');
     await page.reload();
+    await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await page.getByRole('button', { name: "What you'll need" }).first().click();
     await expect(page.getByRole('button', { name: /Life insurance policies/ })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: /Military discharge papers/ })).toHaveAttribute('aria-pressed', 'false');
@@ -80,12 +81,12 @@ test.describe('coming back', () => {
   test('a reload lands on Home listing the person, and opening her shows her path', async ({ page }) => {
     await onboard(page);
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeVisible();
     await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
     await page.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeFocused();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeFocused();
   });
 
   test('a half-written message shows Started on the path, and one tap resumes it (#176)', async ({ page }) => {

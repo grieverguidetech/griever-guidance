@@ -2,7 +2,6 @@ import type { Session } from '@griever/hooks';
 import { namedSessionsByRecent } from '@griever/hooks';
 import { parseCompleteDate } from '@griever/shared';
 import { CaretRight } from '@phosphor-icons/react/CaretRight';
-import { TopBar } from '../lib/ui';
 
 interface Props {
   sessions: Session[];
@@ -26,8 +25,7 @@ export function Home({ sessions, onOpen, onCreate, canCreate }: Props) {
 
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
-      <TopBar />
-      <h1 className="text-[22px]">The people you're writing about</h1>
+      <h1 className="text-[22px]">Who you're writing about</h1>
 
       {people.length > 0 && (
         <ul role="list" className="flex flex-col gap-2 list-none m-0 p-0">

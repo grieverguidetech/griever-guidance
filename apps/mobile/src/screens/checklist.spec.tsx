@@ -2,7 +2,6 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { HomeScreen } from './HomeScreen';
 import { AccountScreen } from './AccountScreen';
 import { AccountProvider } from '../lib/AccountProvider';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
@@ -133,19 +132,6 @@ describe('top buttons', () => {
     expect(style.backgroundColor).toBeTruthy();
     fireEvent.press(back);
     expect(mockGoBack).toHaveBeenCalled();
-  });
-
-  it('the Home link is a labelled button, at least 44x44, with a visible border and fill', () => {
-    const onWhatYoullNeed = jest.fn();
-    render(<HomeScreen sessions={[]} canCreate onOpen={jest.fn()} onCreate={jest.fn()} onWhatYoullNeed={onWhatYoullNeed} />);
-    const link = screen.getByRole('button', { name: "What you'll need" });
-    const style = size(link);
-    expect(style.minHeight).toBeGreaterThanOrEqual(44);
-    expect(style.minWidth).toBeGreaterThanOrEqual(44);
-    expect(style.borderWidth).toBeGreaterThan(0);
-    expect(style.backgroundColor).toBeTruthy();
-    fireEvent.press(link);
-    expect(onWhatYoullNeed).toHaveBeenCalled();
   });
 });
 

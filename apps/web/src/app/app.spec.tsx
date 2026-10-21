@@ -24,8 +24,8 @@ async function reachContacts(user: ReturnType<typeof userEvent.setup>) {
 describe('App onboarding', () => {
   it('starts a first visit at Home with nobody listed and no account step', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('App onboarding', () => {
 
     render(<App />);
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: "The people you're writing about" })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: "Who you're writing about" })).toBeInTheDocument(),
     );
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
