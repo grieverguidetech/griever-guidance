@@ -28,17 +28,17 @@ function renderScreen(contactList: Contact[] = saved) {
 }
 
 describe('ContactSelectorScreen grouping', () => {
-  it('lists Close family before Friends & family, with headings as headers', () => {
+  it('lists Close family before Friends & neighbours, with headings as headers', () => {
     renderScreen();
     const headers = screen.getAllByRole('header').map((h) => h.props.children);
-    expect(headers).toEqual(['Close family', 'Friends & family']);
-    const rendered = screen.getAllByText(/^(Close family|Friends & family|Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
-    expect(rendered).toEqual(['Close family', 'Mum', 'Dad', 'Friends & family', 'Neighbour Ned', 'Cousin Cat']);
+    expect(headers).toEqual(['Close family', 'Friends & neighbours']);
+    const rendered = screen.getAllByText(/^(Close family|Friends & neighbours|Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
+    expect(rendered).toEqual(['Close family', 'Mum', 'Dad', 'Friends & neighbours', 'Neighbour Ned', 'Cousin Cat']);
   });
 
   it('omits a heading with no contacts', () => {
     renderScreen([make('1', 'Neighbour Ned', 'family')]);
-    expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['Friends & family']);
+    expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['Friends & neighbours']);
   });
 
   it('preselects no one and sends nothing until the user picks', () => {

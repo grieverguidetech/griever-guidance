@@ -30,7 +30,7 @@ type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] }
 
 const TIER_LABELS: Record<ContactTier, string> = {
   first: 'Close family',
-  family: 'Friends & family',
+  family: 'Friends & neighbours',
 };
 
 const TIER_ORDER: ContactTier[] = ['first', 'family'];
