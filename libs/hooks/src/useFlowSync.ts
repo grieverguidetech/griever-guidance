@@ -17,7 +17,7 @@ import {
 } from '@griever/shared';
 import type { FlowFactKey, FlowFacts, FlowRecord } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
-import { readRemovedFlowIds, writeRemovedFlowIds } from './useSessions.js';
+import { readRemovedFlows, writeRemovedFlows } from './useSessions.js';
 import type { Session, UseSessionsResult } from './useSessions.js';
 
 /** The api-client functions the hook uses. Tests pass a stub; the default is the real module. */
@@ -245,7 +245,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     if (stateRef.current?.userId !== userId) stateRef.current = readStored(storage, userId);
     const state = stateRef.current;
     try {
-      const { queue, dirty } = scanSessions(state, sessions, userId, readRemovedFlowIds(storage));
+      const { queue, dirty } = scanSessions(state, sessions, userId, new Set((readRemovedFlows(storage) ?? []).map((m) => m.id)));
       if (dirty) writeStored(storage, state);
       if (queue) kickRef.current(EDIT_DEBOUNCE_MS);
     } catch {
@@ -290,17 +290,19 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       const state = getState();
       // Sync lag: a person removed here (removeSession) that the server still lists is left out. Once a clean pull no longer
       // lists the id, it is forgotten. A pull that dropped records may be hiding it, so keep it then.
-      const removedIds = readRemovedFlowIds(latest.current.storage);
-      const flows = result.flows.filter((r) => !removedIds.has(r.id));
-      if (!result.dropped) {
-        const listed = new Set(result.flows.map((r) => r.id));
-        const stillListed = [...removedIds].filter((id) => listed.has(id));
-        if (stillListed.length !== removedIds.size) writeRemovedFlowIds(latest.current.storage, stillListed);
+      // Marks name the owner, so another account's pull neither hides nor prunes this account's marks.
+      const marks = readRemovedFlows(latest.current.storage);
+      const mine = new Set((marks ?? []).filter((m) => m.ownerId === null || m.ownerId === userId).map((m) => m.id));
+      const flows = result.flows.filter((r) => !(mine.has(r.id) && r.ownerId === userId));
+      if (marks && !result.dropped) {
+        const listed = new Set(result.flows.filter((r) => r.ownerId === userId).map((r) => r.id));
+        const kept = marks.filter((m) => !mine.has(m.id) || listed.has(m.id));
+        if (kept.length !== marks.length) writeRemovedFlows(latest.current.storage, kept);
       }
       markKnown(state, flows, userId);
       state.pulled = true;
       try {
-        scanSessions(state, latest.current.sessions, userId, removedIds);
+        scanSessions(state, latest.current.sessions, userId, new Set((marks ?? []).map((m) => m.id)));
       } catch {
         // keep pulling; the next change scans again
       }

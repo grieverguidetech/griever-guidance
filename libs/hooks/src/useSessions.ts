@@ -136,23 +136,46 @@ type StoredSession = Omit<Session, 'drafts' | 'flowId' | 'ownerId' | 'role'> & {
 const STORAGE_KEY = 'gg.sessions.v1';
 
 /**
- * Flow ids of people the owner removed on this device (`removeSession`). Device-local and not
- * per account. `useFlowSync` keeps these out of pulls until the server stops listing them.
+ * People the owner removed on this device (`removeSession`). Device-local and shared by every
+ * account on the device, so each mark names the account that owned the person (`ownerId`, null
+ * when the session was never tied to an account). `useFlowSync` keeps a marked person out of that
+ * owner's pulls until the server stops listing them.
+ *
+ * Storage rules: `useFlowSync`'s `storage` option must be the same object as the one given to
+ * `useSessions`. The mobile session cache must also hydrate this key when sync is wired there.
  */
 export const REMOVED_FLOWS_STORAGE_KEY = 'gg.removedFlows.v1';
 
-export function readRemovedFlowIds(storage: SendFlowStorage | undefined): Set<string> {
+export interface RemovedFlow {
+  id: string;
+  ownerId: string | null;
+}
+
+/** The marks, or null when they could not be read (callers must not overwrite then). */
+export function readRemovedFlows(storage: SendFlowStorage | undefined): RemovedFlow[] | null {
+  if (!storage) return [];
   try {
-    const parsed: unknown = JSON.parse(storage?.getItem(REMOVED_FLOWS_STORAGE_KEY) ?? '[]');
-    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
+    const raw = storage.getItem(REMOVED_FLOWS_STORAGE_KEY);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const marks: RemovedFlow[] = [];
+    for (const item of parsed) {
+      if (typeof item === 'string') marks.push({ id: item, ownerId: null });
+      else if (item && typeof item === 'object' && typeof (item as RemovedFlow).id === 'string') {
+        const owner = (item as RemovedFlow).ownerId;
+        marks.push({ id: (item as RemovedFlow).id, ownerId: typeof owner === 'string' ? owner : null });
+      }
+    }
+    return marks;
   } catch {
-    return new Set();
+    return null;
   }
 }
 
-export function writeRemovedFlowIds(storage: SendFlowStorage | undefined, ids: Iterable<string>): void {
+export function writeRemovedFlows(storage: SendFlowStorage | undefined, marks: readonly RemovedFlow[]): void {
   try {
-    storage?.setItem(REMOVED_FLOWS_STORAGE_KEY, JSON.stringify([...ids]));
+    storage?.setItem(REMOVED_FLOWS_STORAGE_KEY, JSON.stringify(marks));
   } catch {
     // storage unavailable: the person is still removed for this run
   }
@@ -408,7 +431,9 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     if (!target || target.role === 'member') return false;
     sessionsRef.current = sessionsRef.current.filter((s) => s.id !== id);
     // Explicit mark: sync only hides a person from pulls when the owner chose to remove them.
-    writeRemovedFlowIds(storage, [...readRemovedFlowIds(storage), target.flowId]);
+    // An unreadable list is left alone: writing now would drop the earlier marks.
+    const marks = readRemovedFlows(storage);
+    if (marks) writeRemovedFlows(storage, [...marks.filter((m) => m.id !== target.flowId), { id: target.flowId, ownerId: target.ownerId }]);
     setSessions((list) => list.filter((s) => s.id !== id));
     return true;
   }, [storage]);

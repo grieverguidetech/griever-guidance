@@ -538,7 +538,19 @@ describe('removeSession (#215)', () => {
     act(() => void result.current.removeSession('m'));
     expect(storage.getItem('gg.removedFlows.v1')).toBeNull();
     act(() => void result.current.removeSession('a'));
-    expect(JSON.parse(storage.getItem('gg.removedFlows.v1') ?? '[]')).toEqual(['flow-a']);
+    expect(JSON.parse(storage.getItem('gg.removedFlows.v1') ?? '[]')).toEqual([{ id: 'flow-a', ownerId: null }]);
+  });
+
+  it('leaves earlier marks alone when the list cannot be read', () => {
+    const { storage } = store([keep('a', 'owner')]);
+    storage.setItem('gg.removedFlows.v1', 'not json');
+    const { result } = renderHook(() => useSessions(storage));
+    let removed = false;
+    act(() => {
+      removed = result.current.removeSession('a');
+    });
+    expect(removed).toBe(true);
+    expect(storage.getItem('gg.removedFlows.v1')).toBe('not json');
   });
 
   it('returns false for an unknown id', () => {
