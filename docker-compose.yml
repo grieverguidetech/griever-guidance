@@ -1,0 +1,22 @@
+# Local AWS stand-ins for the aws-be branch. No AWS account or real keys.
+# Start: pnpm aws:up   Stop: pnpm aws:down   See docs/aws-local.md.
+# (The Convex stack is separate: infra/convex/docker-compose.yml.)
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:3.1.0
+    # In memory: the data goes away on stop. Run `pnpm aws:seed` after each start.
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "127.0.0.1:8100:8000"
+
+  ses:
+    image: node:22.22-alpine
+    # Runs the pinned root devDependency (aws-ses-v2-local 2.10.2) from the repo's node_modules.
+    # No install at start, no network. Run `pnpm install` first. It keeps sent emails in
+    # memory. Read them at GET /store.
+    working_dir: /app
+    volumes:
+      - ./node_modules:/app/node_modules:ro
+    command: ["node", "node_modules/aws-ses-v2-local/dist/cli.js", "--host=0.0.0.0", "--port=8105"]
+    ports:
+      - "127.0.0.1:8105:8105"

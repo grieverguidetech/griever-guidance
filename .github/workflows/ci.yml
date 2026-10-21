@@ -89,6 +89,45 @@ jobs:
       - if: steps.detect.outputs.present == 'true'
         run: supabase test db --workdir infra
 
+  # DynamoDB Local + SES stand-in integration tests (#210). Runs only on PRs into the
+  # aws-be integration branch and on the final aws-be to main PR, so other PRs are unchanged. Here the tests fail, not skip, if a
+  # service is unreachable (AWS_LOCAL_REQUIRED).
+  aws-local:
+    name: AWS local stack (DynamoDB Local, SES stand-in)
+    if: github.event_name == 'pull_request' && (github.base_ref == 'aws-be' || github.head_ref == 'aws-be')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:3.1.0
+        ports:
+          - 8100:8000
+    env:
+      AWS_LOCAL_REQUIRED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start the SES stand-in
+        run: |
+          nohup pnpm exec aws-ses-v2-local --port 8105 > ses.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8105/health-check && exit 0
+            sleep 1
+          done
+          cat ses.log
+          exit 1
+
+      - run: pnpm nx test data-aws --skip-nx-cache
+
   e2e:
     name: Playwright e2e (desktop, Android, iPhone)
     runs-on: ubuntu-latest
