@@ -41,7 +41,7 @@ describe('ContactSelector', () => {
     expect(screen.queryByText(/neighbours/i)).not.toBeInTheDocument();
   });
 
-  it('exposes each row selected state, and preselects no one', () => {
+  it("exposes each row's selected state, and preselects no one", () => {
     setup();
     expect(screen.getByRole('button', { name: /Aunt Carol/ })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: /Bob Smith/ })).toHaveAttribute('aria-pressed', 'false');

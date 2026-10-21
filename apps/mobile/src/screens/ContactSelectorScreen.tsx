@@ -117,7 +117,15 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           <Text style={styles.phone}>{item.phone}</Text>
         </View>
         <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-          {selected && <Text style={styles.checkmark}>✓</Text>}
+          {selected && (
+            <Text
+              style={styles.checkmark}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              ✓
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -143,6 +151,8 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
             return (
               <TouchableOpacity
                 style={[styles.row, selected && styles.rowSelected]}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
                 onPress={() =>
                   setReviewSelected((current) => {
                     const next = new Set(current);
@@ -158,7 +168,15 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
                   <Text style={styles.phone}>{item.phone}</Text>
                 </View>
                 <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-                  {selected && <Text style={styles.checkmark}>✓</Text>}
+                  {selected && (
+                    <Text
+                      style={styles.checkmark}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
+                    >
+                      ✓
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             );
