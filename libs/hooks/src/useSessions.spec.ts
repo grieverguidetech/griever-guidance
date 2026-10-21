@@ -532,6 +532,15 @@ describe('removeSession (#215)', () => {
     expect(saved().map((s) => s.id)).toEqual(['a', 'm']);
   });
 
+  it('marks the flow id as removed on this device only for a removal that happened', () => {
+    const { storage } = store([keep('a', 'owner'), keep('m', 'member')]);
+    const { result } = renderHook(() => useSessions(storage));
+    act(() => void result.current.removeSession('m'));
+    expect(storage.getItem('gg.removedFlows.v1')).toBeNull();
+    act(() => void result.current.removeSession('a'));
+    expect(JSON.parse(storage.getItem('gg.removedFlows.v1') ?? '[]')).toEqual(['flow-a']);
+  });
+
   it('returns false for an unknown id', () => {
     const { storage } = store([keep('a', 'owner')]);
     const { result } = renderHook(() => useSessions(storage));

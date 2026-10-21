@@ -3,7 +3,7 @@ import { FLOW_FACT_KEYS } from '@griever/shared';
 import type { FlowFacts } from '@griever/shared';
 import { freshDraft } from './useSendFlow.js';
 import type { SendFlowStorage } from './useSendFlow.js';
-import { useSessions } from './useSessions.js';
+import { readRemovedFlowIds, REMOVED_FLOWS_STORAGE_KEY, useSessions, writeRemovedFlowIds } from './useSessions.js';
 import type { Session } from './useSessions.js';
 import {
   BACKOFF_MAX_MS,
@@ -724,63 +724,96 @@ describe('useFlowSync queue behaviour', () => {
 });
 
 describe('useFlowSync removed people (#215)', () => {
-  it('never sends a queued edit for a person who was removed', async () => {
+  const removedIn = (storage: SendFlowStorage) => [...readRemovedFlowIds(storage)];
+
+  it('forgets a queued edit for a person removed on purpose and sends nothing for them', async () => {
     const requests = mockFetch(serverWithFlow);
     const storage = memoryStorage();
     const base = session();
     const { rerender } = setup([base], { storage });
     await advance(10);
-    // The edit is noticed, then the person is removed before the debounce ends.
     rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    writeRemovedFlowIds(storage, [FLOW]); // what removeSession does
     rerender({ sessions: [] });
     await advance(EDIT_DEBOUNCE_MS + 10);
     // writes == [] also holds without the fix (flush skips a flow with no session); the storage
-    // assertions below are the regression guard.
+    // assertions are the regression guard.
     expect(writes(requests)).toEqual([]);
     const saved = JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}');
     expect(saved.queue).toEqual({});
     expect(saved.baselines).toEqual({});
-    expect(saved.removed).toEqual([FLOW]);
   });
 
-  it('does not bring the person back when a pull still returns them, then forgets the id', async () => {
-    const requests = mockFetch(serverWithFlow);
+  it('keeps a removed person out of pulls while listed, then forgets the id after a clean pull', async () => {
+    mockFetch(serverWithFlow);
     const storage = memoryStorage();
     const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
     await advance(10);
+    writeRemovedFlowIds(storage, [FLOW]);
     rerender({ sessions: [] });
     await advance(10);
     await wake();
     await advance(10);
-    const last = applyRemoteFlows.mock.calls.at(-1);
-    expect(last?.[0].flows).toEqual([]);
-    expect(writes(requests)).toEqual([]);
-
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows).toEqual([]);
+    expect(removedIn(storage)).toEqual([FLOW]);
     mockFetch(() => ({ status: 200, body: [] }));
     await wake();
     await advance(10);
-    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').removed).toEqual([]);
+    expect(removedIn(storage)).toEqual([]);
   });
 
-  it('keeps a removed id across a reload', async () => {
+  it('restores owned people from the server when storage loads empty (nothing hidden)', async () => {
     mockFetch(serverWithFlow);
     const storage = memoryStorage();
-    const first = setup([session()], { storage });
+    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
     await advance(10);
-    first.rerender({ sessions: [] });
+    rerender({ sessions: [] }); // unreadable sessions storage, not a removal
     await advance(10);
-    first.unmount();
-    const second = setup([], { storage });
+    await wake();
     await advance(10);
-    expect(second.applyRemoteFlows.mock.calls.at(-1)?.[0].flows).toEqual([]);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows.map((r: { id: string }) => r.id)).toEqual([FLOW]);
+    expect(storage.data.has(REMOVED_FLOWS_STORAGE_KEY)).toBe(false);
+  });
+
+  it('brings a shared person back when access is lost and then regained (C9)', async () => {
+    mockFetch(() => ({ status: 200, body: [] }));
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session({ role: 'member', ownerId: OTHER })], { storage });
+    await advance(10);
+    rerender({ sessions: [] });
+    await advance(10);
+    mockFetch(() => ({ status: 200, body: [record({}, OTHER)] }));
+    await wake();
+    await advance(10);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows.map((r: { id: string }) => r.id)).toEqual([FLOW]);
+  });
+
+  it('never re-adds a removed id on a pull that dropped unreadable records, and keeps the id', async () => {
+    mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
+    await advance(10);
+    writeRemovedFlowIds(storage, [FLOW]);
+    rerender({ sessions: [] });
+    await advance(10);
+    mockFetch(() => ({ status: 200, body: [record(), { junk: true }] }));
+    await wake();
+    await advance(10);
+    const call = applyRemoteFlows.mock.calls.at(-1)?.[0];
+    expect(call.dropped).toBe(1);
+    expect(call.flows).toEqual([]);
+    expect(removedIn(storage)).toEqual([FLOW]);
+    mockFetch(() => ({ status: 200, body: [{ junk: true }] }));
+    await wake();
+    await advance(10);
+    expect(removedIn(storage)).toEqual([FLOW]);
   });
 
   it('works with the real useSessions.removeSession', async () => {
     const requests = mockFetch(serverWithFlow);
-    const storage = memoryStorage();
-    const sessionsStore = memoryStorage({ 'gg.sessions.v1': JSON.stringify([session()]) });
+    const storage = memoryStorage({ 'gg.sessions.v1': JSON.stringify([session()]) });
     const view = renderHook(() => {
-      const s = useSessions(sessionsStore);
+      const s = useSessions(storage);
       useFlowSync({
         sessions: s.sessions,
         userId: USER,
@@ -794,66 +827,9 @@ describe('useFlowSync removed people (#215)', () => {
     });
     await advance(10);
     act(() => void view.result.current.removeSession('s1'));
+    expect(removedIn(storage)).toEqual([FLOW]);
     await advance(PULL + 10);
     expect(view.result.current.sessions).toEqual([]);
     expect(writes(requests)).toEqual([]);
-  });
-});
-
-describe('useFlowSync removed ids and pulls (#215)', () => {
-  const removedOf = (storage: ReturnType<typeof memoryStorage>) =>
-    JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').removed as string[];
-
-  it('does not hide a shared person who dropped out and is listed again (C9)', async () => {
-    mockFetch(() => ({ status: 200, body: [] }));
-    const storage = memoryStorage();
-    const member = session({ role: 'member', ownerId: OTHER });
-    const { rerender, applyRemoteFlows, wake } = setup([member], { storage });
-    await advance(10);
-    rerender({ sessions: [] }); // access lost: applyRemoteFlows removed the member session
-    await advance(10);
-    expect(removedOf(storage)).toEqual([]);
-    mockFetch(() => ({ status: 200, body: [record({}, OTHER)] }));
-    await wake();
-    await advance(10);
-    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows.map((r: { id: string }) => r.id)).toEqual([FLOW]);
-  });
-
-  it('keeps an owner removal filtered while the server lists it, and forgets it after a clean pull', async () => {
-    mockFetch(serverWithFlow);
-    const storage = memoryStorage();
-    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
-    await advance(10);
-    rerender({ sessions: [] });
-    await advance(10);
-    await wake();
-    await advance(10);
-    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows).toEqual([]);
-    expect(removedOf(storage)).toEqual([FLOW]);
-    mockFetch(() => ({ status: 200, body: [] }));
-    await wake();
-    await advance(10);
-    expect(removedOf(storage)).toEqual([]);
-  });
-
-  it('never re-adds a removed id on a pull that dropped unreadable records, and keeps the id', async () => {
-    mockFetch(serverWithFlow);
-    const storage = memoryStorage();
-    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
-    await advance(10);
-    rerender({ sessions: [] });
-    await advance(10);
-    mockFetch(() => ({ status: 200, body: [record(), { junk: true }] }));
-    await wake();
-    await advance(10);
-    const call = applyRemoteFlows.mock.calls.at(-1)?.[0];
-    expect(call.dropped).toBe(1);
-    expect(call.flows).toEqual([]);
-    expect(removedOf(storage)).toEqual([FLOW]);
-    // Even once the server stops listing it, a pull with dropped records keeps the id.
-    mockFetch(() => ({ status: 200, body: [{ junk: true }] }));
-    await wake();
-    await advance(10);
-    expect(removedOf(storage)).toEqual([FLOW]);
   });
 });

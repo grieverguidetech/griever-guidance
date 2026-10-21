@@ -17,6 +17,7 @@ import {
 } from '@griever/shared';
 import type { FlowFactKey, FlowFacts, FlowRecord } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
+import { readRemovedFlowIds, writeRemovedFlowIds } from './useSessions.js';
 import type { Session, UseSessionsResult } from './useSessions.js';
 
 /** The api-client functions the hook uses. Tests pass a stub; the default is the real module. */
@@ -69,10 +70,6 @@ interface Stored {
   known: string[];
   /** The facts last seen per person (facts only), so edits made while sync was off are still found. */
   baselines: Record<string, FlowFacts>;
-  /** People removed on this device, kept until a pull no longer returns them (sync lag). */
-  removed?: string[];
-  /** Flows this account owns here, so a later disappearance is known to be a removal. */
-  owned?: string[];
 }
 
 interface SyncState {
@@ -81,10 +78,6 @@ interface SyncState {
   known: Set<string>;
   /** The facts last seen per flow, to tell what the user changed. Saved in storage. */
   baselines: Map<string, FlowFacts>;
-  /** Flow ids removed on this device. A pull that still returns one must not bring the person back. */
-  removed: Set<string>;
-  /** Flow ids of sessions this account owns (not shared-in). Only these can become `removed`. */
-  owned: Set<string>;
   /** True once a pull has worked this run: only then do we know which people the server lacks. */
   pulled: boolean;
   /** People the server refused to create; not offered again this run. */
@@ -92,7 +85,7 @@ interface SyncState {
 }
 
 function readStored(storage: SendFlowStorage | undefined, userId: string): SyncState {
-  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), removed: new Set(), owned: new Set(), pulled: false, refused: new Set() };
+  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), pulled: false, refused: new Set() };
   if (!storage) return state;
   try {
     const raw = storage.getItem(flowQueueKey(userId));
@@ -107,8 +100,6 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
       const clean = isUuid(id) ? parseFlowFacts(facts) : null;
       if (clean) state.baselines.set(id, clean);
     }
-    for (const id of parsed.removed ?? []) if (typeof id === 'string' && isUuid(id)) state.removed.add(id);
-    for (const id of parsed.owned ?? []) if (typeof id === 'string' && isUuid(id)) state.owned.add(id);
     for (const id of parsed.known ?? []) if (typeof id === 'string' && isUuid(id)) state.known.add(id);
   } catch {
     // unreadable storage: start empty
@@ -123,8 +114,6 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
       queue: Object.fromEntries(state.queue),
       known: [...state.known],
       baselines: Object.fromEntries(state.baselines),
-      removed: [...state.removed],
-      owned: [...state.owned],
     };
     storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
@@ -185,6 +174,7 @@ function scanSessions(
   state: SyncState,
   sessions: readonly Session[],
   userId: string,
+  removed: ReadonlySet<string>,
 ): { queue: boolean; dirty: boolean } {
   let changed = false;
   let dirty = false;
@@ -193,11 +183,6 @@ function scanSessions(
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
     seen.add(s.flowId);
-    if (s.role === 'member') state.owned.delete(s.flowId);
-    else if (!state.owned.has(s.flowId)) {
-      state.owned.add(s.flowId);
-      dirty = true;
-    }
     const facts = toFlowFacts(s);
     const before = state.baselines.get(s.flowId);
     state.baselines.set(s.flowId, facts);
@@ -218,15 +203,13 @@ function scanSessions(
       changed = true;
     }
   }
-  // A person who is gone from the device: forget their facts and unsent edits, and remember the id
-  // so a pull that still lists them does not add them back.
-  for (const id of new Set([...state.baselines.keys(), ...state.queue.keys()])) {
-    if (present.has(id)) continue;
-    state.baselines.delete(id);
-    state.queue.delete(id);
-    // A shared-in person who drops out (access lost) is not a removal: a later pull may list them again.
-    if (state.owned.delete(id)) state.removed.add(id);
-    dirty = true;
+  // Unsent edits of a person removed on purpose (removeSession) are forgotten. A person who is
+  // merely missing (unreadable storage, access lost) is not treated as removed.
+  for (const id of [...state.queue.keys()]) {
+    if (!present.has(id) && removed.has(id)) {
+      state.queue.delete(id);
+      dirty = true;
+    }
   }
   for (const id of [...state.baselines.keys()]) {
     if (seen.has(id)) continue;
@@ -262,7 +245,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     if (stateRef.current?.userId !== userId) stateRef.current = readStored(storage, userId);
     const state = stateRef.current;
     try {
-      const { queue, dirty } = scanSessions(state, sessions, userId);
+      const { queue, dirty } = scanSessions(state, sessions, userId, readRemovedFlowIds(storage));
       if (dirty) writeStored(storage, state);
       if (queue) kickRef.current(EDIT_DEBOUNCE_MS);
     } catch {
@@ -305,17 +288,19 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         return false;
       }
       const state = getState();
-      // Sync lag: a removed person the server still lists is left out. Once a clean pull no longer
+      // Sync lag: a person removed here (removeSession) that the server still lists is left out. Once a clean pull no longer
       // lists the id, it is forgotten. A pull that dropped records may be hiding it, so keep it then.
-      const flows = result.flows.filter((r) => !state.removed.has(r.id));
+      const removedIds = readRemovedFlowIds(latest.current.storage);
+      const flows = result.flows.filter((r) => !removedIds.has(r.id));
       if (!result.dropped) {
         const listed = new Set(result.flows.map((r) => r.id));
-        for (const id of [...state.removed]) if (!listed.has(id)) state.removed.delete(id);
+        const stillListed = [...removedIds].filter((id) => listed.has(id));
+        if (stillListed.length !== removedIds.size) writeRemovedFlowIds(latest.current.storage, stillListed);
       }
       markKnown(state, flows, userId);
       state.pulled = true;
       try {
-        scanSessions(state, latest.current.sessions, userId);
+        scanSessions(state, latest.current.sessions, userId, removedIds);
       } catch {
         // keep pulling; the next change scans again
       }

@@ -136,6 +136,29 @@ type StoredSession = Omit<Session, 'drafts' | 'flowId' | 'ownerId' | 'role'> & {
 const STORAGE_KEY = 'gg.sessions.v1';
 
 /**
+ * Flow ids of people the owner removed on this device (`removeSession`). Device-local and not
+ * per account. `useFlowSync` keeps these out of pulls until the server stops listing them.
+ */
+export const REMOVED_FLOWS_STORAGE_KEY = 'gg.removedFlows.v1';
+
+export function readRemovedFlowIds(storage: SendFlowStorage | undefined): Set<string> {
+  try {
+    const parsed: unknown = JSON.parse(storage?.getItem(REMOVED_FLOWS_STORAGE_KEY) ?? '[]');
+    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function writeRemovedFlowIds(storage: SendFlowStorage | undefined, ids: Iterable<string>): void {
+  try {
+    storage?.setItem(REMOVED_FLOWS_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // storage unavailable: the person is still removed for this run
+  }
+}
+
+/**
  * The draft that reopens: the in-progress one (never 'sending' or 'sent') that changed most
  * recently, or null when nothing is under way.
  */
@@ -384,9 +407,11 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     const target = sessionsRef.current.find((s) => s.id === id);
     if (!target || target.role === 'member') return false;
     sessionsRef.current = sessionsRef.current.filter((s) => s.id !== id);
+    // Explicit mark: sync only hides a person from pulls when the owner chose to remove them.
+    writeRemovedFlowIds(storage, [...readRemovedFlowIds(storage), target.flowId]);
     setSessions((list) => list.filter((s) => s.id !== id));
     return true;
-  }, []);
+  }, [storage]);
 
   const pruneEmpty = useCallback(() => {
     setSessions((list) =>
