@@ -22,6 +22,7 @@ import { sendNote } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
 import { HomeScreen } from '../screens/HomeScreen';
+import { SetupScreen } from '../screens/SetupScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -76,8 +77,9 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
   const passed = flow.fields['dateOfPassing'] ?? '';
   const service = flow.fields['serviceDate'] ?? '';
   const seen = useRef<Details | null>(null);
+  const { setField, selectedTemplate } = flow;
   useEffect(() => {
-    if (flow.step !== 'details') {
+    if (flow.step !== 'details' && flow.step !== 'announce') {
       seen.current = null;
       return;
     }
@@ -86,11 +88,28 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
     seen.current = now;
     if (!before) return;
     const changed: Details = {};
-    if (before.personName !== name) changed.personName = name;
-    if (before.dateOfPassing !== passed) changed.dateOfPassing = passed;
+    if (before.personName !== name && name !== session.personName) changed.personName = name;
+    if (before.dateOfPassing !== passed && passed !== session.dateOfPassing) changed.dateOfPassing = passed;
     if (before.serviceDate !== service) changed.serviceDate = service;
     if (Object.keys(changed).length > 0) onDetails(id, changed);
-  }, [flow.step, id, name, passed, service, onDetails]);
+  }, [flow.step, id, name, passed, service, onDetails, session]);
+
+  // The name and date typed at setup are already in the first form when it opens. Once per visit to
+  // the form, so clearing a field is never filled back in.
+  const onForm = flow.step === 'details' || flow.step === 'announce';
+  const prefilled = useRef(false);
+  const { personName, dateOfPassing } = session;
+  useEffect(() => {
+    if (!onForm) {
+      prefilled.current = false;
+      return;
+    }
+    if (prefilled.current) return;
+    prefilled.current = true;
+    const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
+    if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
+  }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField]);
 
   const bar = (
     <PersonBar active={session} onOpen={onHome} arrived={pendingArrival} onArrived={clearArrival} />
@@ -125,11 +144,13 @@ export const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): Retur
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
   const { sessions, active, switchTo, addPerson, updateDraft, updateSession } = useDeviceSessions(cache);
   const [atHome, setAtHome] = useState(true);
+  const [settingUp, setSettingUp] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
   const purgedOnBoot = useRef(false);
   const goHome = useCallback(() => {
+    setSettingUp(false);
     setArrived(false);
     setNote(null);
     setAtHome(true);
@@ -171,13 +192,29 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             }}
             onCreate={() => {
               addPerson();
-              open();
+              setNote(null);
+              setSettingUp(true);
+              setAtHome(false);
             }}
             onWhatYoullNeed={() => navigation.navigate('WhatYoullNeed')}
             onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
           />
         )}
       </HomeNavigation>
+    );
+  }
+  if (settingUp) {
+    return (
+      <SetupScreen
+        key={active.id}
+        initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
+        onBack={goHome}
+        onContinue={(details) => {
+          updateSession(active.id, details);
+          setArrived(true);
+          setSettingUp(false);
+        }}
+      />
     );
   }
   return (
