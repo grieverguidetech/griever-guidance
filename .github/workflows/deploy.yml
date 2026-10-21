@@ -119,10 +119,9 @@ jobs:
           for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD; do
             if [ -n "${!name}" ]; then set=$((set+1)); else missing="$missing $name"; fi
           done
-          if [ "$set" -gt 0 ] && [ "$set" -lt 3 ]; then
-            echo "::error::Supabase secrets partly set; missing:$missing"; exit 1
-          elif [ "$set" -eq 0 ]; then
-            echo "::notice::Supabase secrets are not set; skipping db push"
+          # Migrations are frozen until Supabase is retired (aws-be), so a partial set skips, not fails.
+          if [ "$set" -lt 3 ]; then
+            echo "::warning::Supabase secrets not all set (missing:$missing); skipping db push"
             echo "configured=false" >> "$GITHUB_OUTPUT"
           elif [ ! -f infra/supabase/config.toml ]; then
             echo "::notice::infra/supabase/config.toml not found; skipping db push"
