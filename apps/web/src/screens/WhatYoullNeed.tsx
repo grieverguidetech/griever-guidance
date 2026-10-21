@@ -83,6 +83,8 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // Tells a dialog around this row (the sheet) that Escape was used up closing the tip.
+      e.preventDefault();
       setTipOpen(false);
       // Only pull focus back when it was in this row; leave it where the user is otherwise.
       if (wrap.current?.contains(document.activeElement)) infoButton.current?.focus();

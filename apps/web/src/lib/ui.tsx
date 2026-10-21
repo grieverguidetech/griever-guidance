@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, Ref } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react/ArrowLeft';
 import { ListChecks } from '@phosphor-icons/react/ListChecks';
 import { useWhatYoullNeed } from './whatYoullNeedContext';
@@ -36,14 +36,29 @@ export function BackButton({ onClick }: { onClick: () => void }) {
  * "What you'll need" link on the right. Keeps the checklist reachable
  * from anywhere in the flow per the demo-feedback ticket.
  */
-export function TopBar({ onBack, hideChecklist = false }: { onBack?: () => void; hideChecklist?: boolean }) {
-  const onWhatYoullNeed = useWhatYoullNeed();
+export function TopBar({
+  onBack,
+  hideChecklist = false,
+  onChecklist,
+  checklistButtonRef,
+}: {
+  onBack?: () => void;
+  hideChecklist?: boolean;
+  /** Replaces the default (go to the checklist screen), e.g. to open a sheet instead. */
+  onChecklist?: () => void;
+  /** Lets a sheet send focus back to this button when it closes. */
+  checklistButtonRef?: Ref<HTMLButtonElement>;
+}) {
+  const goToChecklist = useWhatYoullNeed();
+  const onWhatYoullNeed = onChecklist ?? goToChecklist;
   return (
     <div className="flex items-center justify-between w-full">
       {onBack && <BackButton onClick={onBack} />}
       {!hideChecklist && (
         <button
+          ref={checklistButtonRef}
           type="button"
+          aria-haspopup={onChecklist ? 'dialog' : undefined}
           onClick={onWhatYoullNeed}
           className="gg-btn gg-btn-secondary gg-btn-bar"
         >
