@@ -72,16 +72,71 @@ describe('the order in the app', () => {
     expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
   });
 
-  it('goes from Create straight to the path, with or without saved contacts', async () => {
+  // Behavior change approved in #110 (replaces "goes from Create straight to the path"):
+  // Create now opens setup first, and Continue leads to the path.
+  it('goes from Create to setup, then to the path, with or without saved contacts', async () => {
     const contact = { contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' };
     for (const contacts of [[], [contact]]) {
       await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], contacts);
       const view = render(<App />);
       fireEvent.press(await screen.findByText("Someone else I've lost"));
+      expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
+      expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
+      fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
+      fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
+      fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
       expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
+      expect(screen.getByText('Writing about Ben')).toBeTruthy();
       expect(screen.queryByText('Choose who to tell')).toBeNull();
       view.unmount();
     }
+  });
+
+  it('Back from setup returns to Home and the new person is not listed', async () => {
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
+    render(<App />);
+    fireEvent.press(await screen.findByText("Someone else I've lost"));
+    await screen.findByText('Who are we writing about?');
+    fireEvent.press(screen.getByLabelText('Back to home'));
+    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(screen.queryByLabelText('Someone new')).toBeNull();
+    expect(screen.getByLabelText('Anna')).toBeTruthy();
+  });
+
+  it('opening an existing person skips setup', async () => {
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
+    expect(screen.queryByText('Who are we writing about?')).toBeNull();
+  });
+
+  it('asks nothing about the name or date again on the announcement form', async () => {
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z', 'May 2, 2026')]);
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
+    fireEvent.press(await screen.findByText('Announce the passing'));
+    await screen.findByPlaceholderText('She was peaceful, and we were with her.');
+    expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
+    expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
+  });
+
+  it('opens the details form with the name from setup already filled', async () => {
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
+    render(<App />);
+    fireEvent.press(await screen.findByText("Someone else I've lost"));
+    await screen.findByText('Who are we writing about?');
+    fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben Cole');
+    fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByText('Choose the type of message you would like to send.');
+    fireEvent.press(screen.getByText('Thank-you note'));
+    await waitFor(async () =>
+      expect((await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes')).props.value).toBe('Ben Cole'),
+    );
+    // The date is kept on the person; this moment's form has no date field, the message reads it from them.
+    const kept = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? "[]") as { personName: string; dateOfPassing: string }[];
+    expect(kept.find((p) => p.personName === "Ben Cole")?.dateOfPassing).toBe('June 7, 2025');
   });
 
   it('returns to Home from the path with the person listed', async () => {
@@ -165,7 +220,7 @@ describe('people who would otherwise be hidden', () => {
     await AsyncStorage.setItem(ACTIVE_KEY, 'a');
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
-    await screen.findByText('Writing about Someone new');
+    await screen.findByText('Who are we writing about?');
     const stored = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { id: string }[];
     expect(stored.map((p) => p.id).sort()).toEqual(['a', 'b']);
   });

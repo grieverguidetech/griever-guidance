@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   FlowFactKey,
   FlowRecord,
@@ -88,6 +88,13 @@ export interface UseSessionsResult {
   clearDraft: (id: string, category: TemplateCategory) => void;
   touchSession: (id: string) => void;
   deleteSession: (id: string) => void;
+  /**
+   * Takes one person off this device, with their drafts, reminders and who was notified. Local only:
+   * nothing is sent, and other sessions are unchanged. Returns false and removes nothing when the
+   * session is unknown or is a 'member' session (a shared person is never removed by a member, C9, C11).
+   * Sync notices the missing session and drops that person's queued edits (see `useFlowSync`).
+   */
+  removeSession: (id: string) => boolean;
   pruneEmpty: () => void;
   setServiceReady: (id: string, ready: boolean) => void;
   scheduleReminder: (id: string, momentKey: MomentKey, dueAt: string) => void;
@@ -127,6 +134,52 @@ type StoredSession = Omit<Session, 'drafts' | 'flowId' | 'ownerId' | 'role'> & {
 };
 
 const STORAGE_KEY = 'gg.sessions.v1';
+
+/**
+ * People the owner removed on this device (`removeSession`). Device-local and shared by every
+ * account on the device, so each mark names the account that owned the person (`ownerId`, null
+ * when the session was never tied to an account). `useFlowSync` keeps a marked person out of that
+ * owner's pulls until the server stops listing them.
+ *
+ * Storage rules: `useFlowSync`'s `storage` option must be the same object as the one given to
+ * `useSessions`. The mobile session cache must also hydrate this key when sync is wired there.
+ */
+export const REMOVED_FLOWS_STORAGE_KEY = 'gg.removedFlows.v1';
+
+export interface RemovedFlow {
+  id: string;
+  ownerId: string | null;
+}
+
+/** The marks, or null when they could not be read (callers must not overwrite then). */
+export function readRemovedFlows(storage: SendFlowStorage | undefined): RemovedFlow[] | null {
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(REMOVED_FLOWS_STORAGE_KEY);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const marks: RemovedFlow[] = [];
+    for (const item of parsed) {
+      if (typeof item === 'string') marks.push({ id: item, ownerId: null });
+      else if (item && typeof item === 'object' && typeof (item as RemovedFlow).id === 'string') {
+        const owner = (item as RemovedFlow).ownerId;
+        marks.push({ id: (item as RemovedFlow).id, ownerId: typeof owner === 'string' ? owner : null });
+      }
+    }
+    return marks;
+  } catch {
+    return null;
+  }
+}
+
+export function writeRemovedFlows(storage: SendFlowStorage | undefined, marks: readonly RemovedFlow[]): void {
+  try {
+    storage?.setItem(REMOVED_FLOWS_STORAGE_KEY, JSON.stringify(marks));
+  } catch {
+    // storage unavailable: the person is still removed for this run
+  }
+}
 
 /**
  * The draft that reopens: the in-progress one (never 'sending' or 'sent') that changed most
@@ -288,6 +341,10 @@ const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
 
 export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));
+  // removeSession must return its boolean synchronously, but a setState updater runs later, so the
+  // latest list is read from this ref (also updated in removeSession itself for back-to-back calls).
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
 
   useEffect(() => {
     save(storage, sessions);
@@ -368,6 +425,18 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const deleteSession = useCallback((id: string) => {
     setSessions((list) => list.filter((s) => s.id !== id));
   }, []);
+
+  const removeSession = useCallback((id: string): boolean => {
+    const target = sessionsRef.current.find((s) => s.id === id);
+    if (!target || target.role === 'member') return false;
+    sessionsRef.current = sessionsRef.current.filter((s) => s.id !== id);
+    // Explicit mark: sync only hides a person from pulls when the owner chose to remove them.
+    // An unreadable list is left alone: writing now would drop the earlier marks.
+    const marks = readRemovedFlows(storage);
+    if (marks) writeRemovedFlows(storage, [...marks.filter((m) => m.id !== target.flowId), { id: target.flowId, ownerId: target.ownerId }]);
+    setSessions((list) => list.filter((s) => s.id !== id));
+    return true;
+  }, [storage]);
 
   const pruneEmpty = useCallback(() => {
     setSessions((list) =>
@@ -465,6 +534,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     clearDraft,
     touchSession,
     deleteSession,
+    removeSession,
     pruneEmpty,
     setServiceReady,
     scheduleReminder,

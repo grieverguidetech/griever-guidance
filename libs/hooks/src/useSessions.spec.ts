@@ -470,3 +470,97 @@ describe('flow ids, owner and role (#133)', () => {
     });
   });
 });
+
+describe('removeSession (#215)', () => {
+  const keep = (id: string, role: 'owner' | 'member', extra: Partial<Session> = {}): Session =>
+    ({
+      id,
+      flowId: `flow-${id}`,
+      ownerId: role === 'member' ? 'someone-else' : null,
+      role,
+      personName: `Person ${id}`,
+      lastOpenedAt: '2026-01-01T00:00:00.000Z',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      drafts: {},
+      recipientsNotified: {},
+      momentCompletedAt: {},
+      remindersScheduled: [],
+      ...extra,
+    }) as unknown as Session;
+
+  function store(sessions: Session[]) {
+    const map = new Map<string, string>([['gg.sessions.v1', JSON.stringify(sessions)]]);
+    const storage: SendFlowStorage = {
+      getItem: (k) => map.get(k) ?? null,
+      setItem: (k, v) => void map.set(k, v),
+      removeItem: (k) => void map.delete(k),
+    };
+    return { storage, saved: () => JSON.parse(map.get('gg.sessions.v1') ?? '[]') as Session[] };
+  }
+
+  it('removes one of three, with its drafts, and leaves the others as they were', () => {
+    const draft = freshDraft({ step: 'review', templateCategory: 'announcement', selectedContactIds: ['c1'] });
+    const { storage, saved } = store([keep('a', 'owner'), keep('b', 'owner', { drafts: { announcement: draft } }), keep('c', 'owner')]);
+    const { result } = renderHook(() => useSessions(storage));
+    const before = result.current.sessions.filter((s) => s.id !== 'b');
+    let removed = false;
+    act(() => {
+      removed = result.current.removeSession('b');
+    });
+    expect(removed).toBe(true);
+    expect(result.current.sessions).toEqual(before);
+    expect(saved().map((s) => s.id)).toEqual(['a', 'c']);
+    expect(JSON.stringify(saved())).not.toContain('"c1"');
+  });
+
+  it('removes the only session, so no session with that id is left', () => {
+    const { storage } = store([keep('a', 'owner')]);
+    const { result } = renderHook(() => useSessions(storage));
+    act(() => void result.current.removeSession('a'));
+    expect(result.current.sessions).toEqual([]);
+  });
+
+  it('refuses a member session and removes nothing (C9, C11)', () => {
+    const { storage, saved } = store([keep('a', 'owner'), keep('m', 'member')]);
+    const { result } = renderHook(() => useSessions(storage));
+    let removed = true;
+    act(() => {
+      removed = result.current.removeSession('m');
+    });
+    expect(removed).toBe(false);
+    expect(result.current.sessions.map((s) => s.id)).toEqual(['a', 'm']);
+    expect(saved().map((s) => s.id)).toEqual(['a', 'm']);
+  });
+
+  it('marks the flow id as removed on this device only for a removal that happened', () => {
+    const { storage } = store([keep('a', 'owner'), keep('m', 'member')]);
+    const { result } = renderHook(() => useSessions(storage));
+    act(() => void result.current.removeSession('m'));
+    expect(storage.getItem('gg.removedFlows.v1')).toBeNull();
+    act(() => void result.current.removeSession('a'));
+    expect(JSON.parse(storage.getItem('gg.removedFlows.v1') ?? '[]')).toEqual([{ id: 'flow-a', ownerId: null }]);
+  });
+
+  it('leaves earlier marks alone when the list cannot be read', () => {
+    const { storage } = store([keep('a', 'owner')]);
+    storage.setItem('gg.removedFlows.v1', 'not json');
+    const { result } = renderHook(() => useSessions(storage));
+    let removed = false;
+    act(() => {
+      removed = result.current.removeSession('a');
+    });
+    expect(removed).toBe(true);
+    expect(storage.getItem('gg.removedFlows.v1')).toBe('not json');
+  });
+
+  it('returns false for an unknown id', () => {
+    const { storage } = store([keep('a', 'owner')]);
+    const { result } = renderHook(() => useSessions(storage));
+    let removed = true;
+    act(() => {
+      removed = result.current.removeSession('nope');
+    });
+    expect(removed).toBe(false);
+    expect(result.current.sessions).toHaveLength(1);
+  });
+});

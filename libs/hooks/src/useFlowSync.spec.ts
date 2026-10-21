@@ -3,7 +3,7 @@ import { FLOW_FACT_KEYS } from '@griever/shared';
 import type { FlowFacts } from '@griever/shared';
 import { freshDraft } from './useSendFlow.js';
 import type { SendFlowStorage } from './useSendFlow.js';
-import { useSessions } from './useSessions.js';
+import { readRemovedFlows, REMOVED_FLOWS_STORAGE_KEY, useSessions, writeRemovedFlows } from './useSessions.js';
 import type { Session } from './useSessions.js';
 import {
   BACKOFF_MAX_MS,
@@ -720,5 +720,132 @@ describe('useFlowSync queue behaviour', () => {
     wake();
     await advance(PULL + BACKOFF_MAX_MS);
     expect(requests.length).toBe(count);
+  });
+});
+
+describe('useFlowSync removed people (#215)', () => {
+  const removedIn = (storage: SendFlowStorage) => (readRemovedFlows(storage) ?? []).map((m) => m.id);
+
+  it('forgets a queued edit for a person removed on purpose and sends nothing for them', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const base = session();
+    const { rerender } = setup([base], { storage });
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    writeRemovedFlows(storage, [{ id: FLOW, ownerId: USER }]); // what removeSession does
+    rerender({ sessions: [] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    // writes == [] also holds without the fix (flush skips a flow with no session); the storage
+    // assertions are the regression guard.
+    expect(writes(requests)).toEqual([]);
+    const saved = JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}');
+    expect(saved.queue).toEqual({});
+    expect(saved.baselines).toEqual({});
+  });
+
+  it('keeps a removed person out of pulls while listed, then forgets the id after a clean pull', async () => {
+    mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
+    await advance(10);
+    writeRemovedFlows(storage, [{ id: FLOW, ownerId: USER }]);
+    rerender({ sessions: [] });
+    await advance(10);
+    await wake();
+    await advance(10);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows).toEqual([]);
+    expect(removedIn(storage)).toEqual([FLOW]);
+    mockFetch(() => ({ status: 200, body: [] }));
+    await wake();
+    await advance(10);
+    expect(removedIn(storage)).toEqual([]);
+  });
+
+  it('restores owned people from the server when storage loads empty (nothing hidden)', async () => {
+    mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
+    await advance(10);
+    rerender({ sessions: [{ ...session(), serviceDate: 'June 3' }] });
+    rerender({ sessions: [] }); // unreadable sessions storage, not a removal
+    await advance(10);
+    await wake();
+    await advance(10);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows.map((r: { id: string }) => r.id)).toEqual([FLOW]);
+    expect(storage.data.has(REMOVED_FLOWS_STORAGE_KEY)).toBe(false);
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').queue[FLOW]).toEqual({ serviceDate: 'June 3' });
+  });
+
+  it('brings a shared person back when access is lost and then regained (C9)', async () => {
+    mockFetch(() => ({ status: 200, body: [] }));
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session({ role: 'member', ownerId: OTHER })], { storage });
+    await advance(10);
+    rerender({ sessions: [] });
+    await advance(10);
+    mockFetch(() => ({ status: 200, body: [record({}, OTHER)] }));
+    await wake();
+    await advance(10);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows.map((r: { id: string }) => r.id)).toEqual([FLOW]);
+  });
+
+  it('never re-adds a removed id on a pull that dropped unreadable records, and keeps the id', async () => {
+    mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
+    await advance(10);
+    writeRemovedFlows(storage, [{ id: FLOW, ownerId: USER }]);
+    rerender({ sessions: [] });
+    await advance(10);
+    mockFetch(() => ({ status: 200, body: [record(), { junk: true }] }));
+    await wake();
+    await advance(10);
+    const call = applyRemoteFlows.mock.calls.at(-1)?.[0];
+    expect(call.dropped).toBe(1);
+    expect(call.flows).toEqual([]);
+    expect(removedIn(storage)).toEqual([FLOW]);
+    mockFetch(() => ({ status: 200, body: [{ junk: true }] }));
+    await wake();
+    await advance(10);
+    expect(removedIn(storage)).toEqual([FLOW]);
+  });
+
+  it("hands a member a person the owner marked, and the member's pull does not prune the mark", async () => {
+    mockFetch(() => ({ status: 200, body: [record({}, USER)] }));
+    const storage = memoryStorage();
+    writeRemovedFlows(storage, [{ id: FLOW, ownerId: USER }]);
+    const { applyRemoteFlows } = setup([], { storage, userId: OTHER });
+    await advance(10);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0].flows.map((r: { id: string }) => r.id)).toEqual([FLOW]);
+    mockFetch(() => ({ status: 200, body: [] }));
+    const again = setup([], { storage, userId: OTHER });
+    await advance(10);
+    expect(again.applyRemoteFlows).toHaveBeenCalled();
+    expect(readRemovedFlows(storage)).toEqual([{ id: FLOW, ownerId: USER }]);
+  });
+
+  it('works with the real useSessions.removeSession', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage({ 'gg.sessions.v1': JSON.stringify([session()]) });
+    const view = renderHook(() => {
+      const s = useSessions(storage);
+      useFlowSync({
+        sessions: s.sessions,
+        userId: USER,
+        getAccessToken: async () => 'tok',
+        enabled: true,
+        storage,
+        subscribe: () => () => undefined,
+        applyRemoteFlows: s.applyRemoteFlows,
+      });
+      return s;
+    });
+    await advance(10);
+    act(() => void view.result.current.removeSession('s1'));
+    expect(removedIn(storage)).toEqual([FLOW]);
+    await advance(PULL + 10);
+    expect(view.result.current.sessions).toEqual([]);
+    expect(writes(requests)).toEqual([]);
   });
 });

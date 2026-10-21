@@ -8,26 +8,27 @@ import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 
 const NAME_PLACEHOLDER = 'e.g. Margaret Ellen Hayes';
 
-// Type a name into the first template's details form, then go back to the first screen.
-async function startWith(name: string) {
-  fireEvent.press(await screen.findByText('Thank-you note'));
-  fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), name);
-  fireEvent.press(screen.getByText('← Back'));
-  await screen.findByText(`Writing about ${name}`);
-}
-
 const START = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
+const SETUP_TITLE = 'Who are we writing about?';
+
+// Create opens setup first (#213, behavior approved in #110). Type the name there and continue to the path.
+async function startWith(name: string) {
+  fireEvent.changeText(await screen.findByLabelText('Their name, required'), name);
+  fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+  await screen.findByText(`Writing about ${name}`);
+}
 
 // Home is where every launch lands; the first person is begun from there.
 async function begin() {
   fireEvent.press(await screen.findByText(START));
-  await screen.findByText('Writing about Someone new');
+  await screen.findByText(SETUP_TITLE);
 }
 
 async function addPerson() {
   fireEvent.press(await screen.findByLabelText('Back to home'));
   fireEvent.press(await screen.findByText(ANOTHER));
+  await screen.findByText(SETUP_TITLE);
 }
 
 afterEach(() => {
@@ -40,7 +41,7 @@ describe('people kept on the phone', () => {
     await begin();
     await startWith('Anna');
     await addPerson();
-    expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
+    expect((screen.getByLabelText('Their name, required')).props.value).toBe('');
     await startWith('Ben');
 
     fireEvent.press(screen.getByLabelText('Back to home'));
@@ -61,8 +62,11 @@ describe('people kept on the phone', () => {
     await begin();
     await startWith('Anna');
     await addPerson();
+    expect(screen.getByLabelText('Their name, required').props.value).toBe('');
+    await startWith('Ben');
     fireEvent.press(await screen.findByText('Thank-you note'));
-    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('');
+    // Only the new person's own name is there; nothing carries over from Anna.
+    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Ben');
   });
 
   it('restores a half-finished draft, not just the names', async () => {
@@ -139,7 +143,7 @@ describe('people kept on the phone', () => {
     await begin();
     fireEvent.press(await screen.findByLabelText('Back to home'));
     fireEvent.press(await screen.findByText(START)); // still nobody named, so still the first start
-    expect(await screen.findByText('Writing about Someone new')).toBeTruthy();
+    expect(await screen.findByText(SETUP_TITLE)).toBeTruthy();
     await waitFor(async () => expect(JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]')).toHaveLength(1));
   });
 
