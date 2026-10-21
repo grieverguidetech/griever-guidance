@@ -36,8 +36,18 @@ export function BackButton({ onClick }: { onClick: () => void }) {
  * "What you'll need" link on the right. Keeps the checklist reachable
  * from anywhere in the flow per the demo-feedback ticket.
  */
-export function TopBar({ onBack, hideChecklist = false }: { onBack?: () => void; hideChecklist?: boolean }) {
-  const onWhatYoullNeed = useWhatYoullNeed();
+export function TopBar({
+  onBack,
+  hideChecklist = false,
+  onChecklist,
+}: {
+  onBack?: () => void;
+  hideChecklist?: boolean;
+  /** Replaces the default (go to the checklist screen), e.g. to open a sheet instead. */
+  onChecklist?: () => void;
+}) {
+  const goToChecklist = useWhatYoullNeed();
+  const onWhatYoullNeed = onChecklist ?? goToChecklist;
   return (
     <div className="flex items-center justify-between w-full">
       {onBack && <BackButton onClick={onBack} />}
