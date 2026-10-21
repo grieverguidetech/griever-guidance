@@ -4,6 +4,8 @@
  */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { contactStore } from '@griever/data-local';
+import { freshDraft } from '@griever/hooks';
 import { App } from './app';
 
 const note = 'She was peaceful and we were with her at the end.';
@@ -54,4 +56,42 @@ describe('after a send (C2)', () => {
     expect(saved.drafts.announcement.selectedContactIds).toHaveLength(1);
     expect(saved.recipientsNotified.announcement).toHaveLength(1);
   }, 30_000); // a whole journey under load
+});
+
+describe('after a Share the service send (C2, #195)', () => {
+  it('keeps none of the edited message in localStorage', async () => {
+    const editedService = 'Come as you are, two o\'clock at Oak Chapel.';
+    await contactStore.put({
+      contactId: 'c-1', name: 'Aunt Carol', phone: '+16175550148', email: null, tier: 'first', source: 'manual', createdAt: 1,
+    });
+    const service = freshDraft({
+      templateCategory: 'service',
+      templateOverrideId: 'share-service',
+      step: 'review',
+      fields: { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' },
+      selectedContactIds: ['c-1'],
+    });
+    window.localStorage.setItem('gg.sessions.v1', JSON.stringify([{
+      id: 's-1', personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Anna', obituaryUrl: '',
+      createdAt: '2026-10-10T00:00:00.000Z', lastOpenedAt: '2026-10-10T00:00:00.000Z',
+      drafts: { service }, draftsUpdatedAt: { service: '2026-10-10T00:00:00.000Z' },
+      serviceReady: true, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+    }]));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+    await user.click(await screen.findByRole('button', { name: /Share the service/ }));
+    const box = await screen.findByLabelText('Your message');
+    await user.clear(box);
+    await user.type(box, editedService);
+    await user.click(screen.getByRole('button', { name: 'Text these people' }));
+    await user.click(await screen.findByRole('button', { name: 'Open Messages' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await screen.findByRole('heading', { name: 'One thing at a time.' });
+
+    const stored = JSON.stringify({ ...window.localStorage });
+    expect(stored).not.toContain('Come as you are');
+    const [saved] = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
+    expect(saved.drafts.service.messageOverride).toBeNull();
+  }, 30_000);
 });

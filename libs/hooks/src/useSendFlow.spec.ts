@@ -82,6 +82,24 @@ describe('useSendFlow — announcement path', () => {
   });
 });
 
+describe('useSendFlow — an edited message', () => {
+  it('keeps the edit when flowers change', () => {
+    const { result } = announcement();
+    act(() => result.current.setMessageOverride('my words'));
+    act(() => result.current.setIncludeFlowers(true));
+    act(() => result.current.setFlorist('f-1'));
+    act(() => result.current.setCustomFlorist('Rose Shop'));
+    act(() => result.current.setFlowerDeliveryTarget('home'));
+    expect(result.current.composedMessage).toBe('my words');
+  });
+
+  it('treats an emptied message as blank, not as the template', () => {
+    const { result } = announcement();
+    act(() => result.current.setMessageOverride(''));
+    expect(result.current.composedMessage).toBe('');
+  });
+});
+
 describe('useSendFlow — sending one contact at a time', () => {
   function readyToSend() {
     const hook = announcement({ step: 'review' });

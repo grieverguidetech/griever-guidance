@@ -336,9 +336,11 @@ export function useSendFlow(
     [state, session],
   );
 
-  const composedMessage = state.messageOverride
-    ? state.messageOverride
-    : composeMessage(selectedTemplate, composedFields);
+  // An empty override is the user's own (blank) text, not a reason to fall back to the template.
+  const composedMessage =
+    state.messageOverride !== null
+      ? state.messageOverride
+      : composeMessage(selectedTemplate, composedFields);
 
   // A moment already under way comes back as it was, not blank. It stays on the picker step, so
   // the picker's own nextStep lands on the moment's first form with everything typed still there.
@@ -400,19 +402,19 @@ export function useSendFlow(
   }, []);
 
   const setIncludeFlowers = useCallback((value: boolean) => {
-    setState((s) => ({ ...s, includeFlowers: value, messageOverride: null }));
+    setState((s) => ({ ...s, includeFlowers: value }));
   }, []);
 
   const setFlorist = useCallback((floristId: string | null) => {
-    setState((s) => ({ ...s, floristId, messageOverride: null }));
+    setState((s) => ({ ...s, floristId }));
   }, []);
 
   const setCustomFlorist = useCallback((value: string) => {
-    setState((s) => ({ ...s, customFlorist: value, messageOverride: null }));
+    setState((s) => ({ ...s, customFlorist: value }));
   }, []);
 
   const setFlowerDeliveryTarget = useCallback((target: 'service' | 'home') => {
-    setState((s) => ({ ...s, flowerDeliveryTarget: target, messageOverride: null }));
+    setState((s) => ({ ...s, flowerDeliveryTarget: target }));
   }, []);
 
   const setTone = useCallback((tone: MessageTone) => {

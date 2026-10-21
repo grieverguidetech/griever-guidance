@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
-import { composeMessage } from '@griever/shared';
+import { composeMessage, SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
@@ -16,12 +16,14 @@ interface Props {
 export function ConfirmScreen({ flow }: Props) {
   const florists = useMockFlorists(flow.place);
   const [editing, setEditing] = useState(false);
+  const [sampleOpen, setSampleOpen] = useState(false);
 
   if (!flow.selectedTemplate) return null;
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
   const recipientCount = flow.selectedContactIds.length;
+  const isBlank = (flow.messageOverride ?? '').trim() === '' && flow.messageOverride !== null;
 
   const selectedFlorist = florists.find((f) => f.id === flow.floristId) ?? null;
   const floristName = selectedFlorist?.name ?? flow.customFlorist;
@@ -34,7 +36,7 @@ export function ConfirmScreen({ flow }: Props) {
     // florist's name, which only exists in this screen's local `message`,
     // not yet in flow state — so SendingScreen's sms: links carry precisely
     // what the griever just read, not a recomputation that could drift.
-    if (!flow.messageOverride) flow.setMessageOverride(message);
+    if (flow.messageOverride === null) flow.setMessageOverride(message);
     // Texting each person from their own number happens one at a time on the
     // next screen — nothing to send from here (no backend call at all).
     flow.startSendJob();
@@ -57,14 +59,18 @@ export function ConfirmScreen({ flow }: Props) {
 
       <div className="gg-card">
         {isAnnouncement && <span className="gg-tag gg-tag-accent-2">Announcement</span>}
-        {editing ? (
-          <textarea
-            className="gg-input"
-            rows={6}
-            autoFocus
-            value={message}
-            onChange={(e) => flow.setMessageOverride(e.target.value)}
-          />
+        {editing || isService ? (
+          <div className="gg-field">
+            <label htmlFor="message-text">Your message</label>
+            <textarea
+              id="message-text"
+              className="gg-input"
+              rows={6}
+              autoFocus={!isService}
+              value={message}
+              onChange={(e) => flow.setMessageOverride(e.target.value)}
+            />
+          </div>
         ) : (
           <p
             className="gg-card-body m-0 whitespace-pre-wrap"
@@ -74,6 +80,29 @@ export function ConfirmScreen({ flow }: Props) {
           </p>
         )}
       </div>
+
+      {isService && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            aria-expanded={sampleOpen}
+            aria-controls="message-sample"
+            onClick={() => setSampleOpen((v) => !v)}
+            className="gg-btn gg-btn-ghost"
+            style={{ minHeight: 44, minWidth: 44 }}
+          >
+            Sample message
+          </button>
+          <p
+            id="message-sample"
+            hidden={!sampleOpen}
+            className="m-0 whitespace-pre-wrap"
+            style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)' }}
+          >
+            {SHARE_SERVICE_SAMPLE}
+          </p>
+        </div>
+      )}
 
       {isService && (
         <FlowersSection flow={flow} florists={florists} />
@@ -102,13 +131,19 @@ export function ConfirmScreen({ flow }: Props) {
       <button
         type="button"
         onClick={handleSend}
-        disabled={recipientCount === 0}
+        disabled={recipientCount === 0 || isBlank}
         className="gg-btn gg-btn-primary gg-btn-block"
       >
         {isAnnouncement
           ? `Text ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}`
           : 'Text these people'}
       </button>
+
+      {isBlank && (
+        <p role="status" className="text-[13px] text-center m-0" style={{ color: 'var(--text-muted)' }}>
+          Add a message before you send it.
+        </p>
+      )}
 
       <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
         You'll text each person from your own number, one at a time.
@@ -218,9 +253,15 @@ function FlowersSection({
             </div>
           </div>
 
+          {flow.messageOverride !== null ? (
+            <p className="gg-reassure m-0 text-[12px] leading-[1.5]">
+              Your edited message is sent as you wrote it. Add the flowers line yourself if you want it.
+            </p>
+          ) : (
           <p className="gg-reassure m-0 text-[12px] leading-[1.5]">
             We'll add one line: “If you'd like to send flowers, {floristLabel} can deliver to {target}.”
           </p>
+          )}
         </div>
       )}
     </div>
