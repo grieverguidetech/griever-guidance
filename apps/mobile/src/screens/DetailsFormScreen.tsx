@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { FlowProps, RootStackParamList } from '../app/App';
+import { SavedNote } from '../components/SavedNote';
 import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
 
 export function DetailsFormScreen({ flow }: FlowProps) {
@@ -67,6 +68,7 @@ export function DetailsFormScreen({ flow }: FlowProps) {
         >
           <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>
+        <SavedNote />
       </ScrollView>
     </KeyboardAvoidingView>
   );

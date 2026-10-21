@@ -20,6 +20,7 @@ import {
 import type { Contact, ContactTier } from '@griever/shared';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
+import { SavedNote } from '../components/SavedNote';
 import { ACCENT, ACCENT_TINT, ERROR, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
 
 interface Props extends FlowProps {
@@ -303,6 +304,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>
       </View>
+      <SavedNote />
     </View>
   );
 }
