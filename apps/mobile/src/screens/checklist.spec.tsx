@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HomeScreen } from './HomeScreen';
-import { CHECKLIST_KEY, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
+import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
 
 const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ goBack: mockGoBack }) }));
@@ -50,6 +50,37 @@ describe('What you\'ll need checklist', () => {
     await waitFor(() => expect(row('Any will or written wishes').props.accessibilityState).toEqual({ checked: true }));
     expect(row('Military discharge papers').props.accessibilityState).toEqual({ checked: true });
     expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: false });
+  });
+});
+
+describe('Social Security tip', () => {
+  const info = () => screen.getByRole('button', { name: 'Why we list this' });
+
+  it('is hidden by default', async () => {
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    expect(screen.queryByText(SSN_TIP)).toBeNull();
+    expect(info().props.accessibilityState).toEqual({ expanded: false });
+  });
+
+  it('opens on a press, closes on a second press, and flips expanded', async () => {
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    fireEvent.press(info());
+    expect(screen.getByText(SSN_TIP).props.accessibilityLiveRegion).toBe('polite');
+    expect(info().props.accessibilityState).toEqual({ expanded: true });
+    fireEvent.press(info());
+    expect(screen.queryByText(SSN_TIP)).toBeNull();
+    expect(info().props.accessibilityState).toEqual({ expanded: false });
+  });
+
+  it('is at least 44 by 44, and the text has no exclamation point', async () => {
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    const style = StyleSheet.flatten(info().props.style as never) as Record<string, number>;
+    expect(style.width).toBeGreaterThanOrEqual(44);
+    expect(style.height).toBeGreaterThanOrEqual(44);
+    expect(SSN_TIP).not.toContain('!');
   });
 });
 

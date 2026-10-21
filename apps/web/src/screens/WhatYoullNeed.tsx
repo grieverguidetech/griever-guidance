@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { accountStore } from '@griever/data-local';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
+import { Info } from '@phosphor-icons/react/Info';
 import { TopBar } from '../lib/ui';
 
 interface ChecklistItem {
@@ -9,12 +10,18 @@ interface ChecklistItem {
   id: string;
   label: string;
   meta?: string;
+  /** A short reason shown when the small info button next to the row is opened. */
+  tip?: string;
 }
+
+/** Same words as the mobile list (a unit test compares the two). */
+export const SSN_TIP =
+  "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.";
 
 const CHECKLIST: ChecklistItem[] = [
   { id: 'will-or-wishes', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },
   { id: 'pre-arranged-plans', label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this' },
-  { id: 'ssn-and-id', label: 'Social Security number and ID' },
+  { id: 'ssn-and-id', label: 'Social Security number and ID', tip: SSN_TIP },
   { id: 'life-insurance', label: 'Life insurance policies' },
   { id: 'military-papers', label: 'Military discharge papers', meta: 'If they served — it may cover the burial' },
 ];
@@ -55,6 +62,82 @@ function useChecklistTicks() {
   return { ticks, toggle, loaded };
 }
 
+interface RowProps {
+  item: ChecklistItem;
+  checked: boolean;
+  loaded: boolean;
+  onToggle: () => void;
+}
+
+function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
+  const [tipOpen, setTipOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const infoButton = useRef<HTMLButtonElement>(null);
+  const tipId = `tip-${item.id}`;
+
+  useEffect(() => {
+    if (!tipOpen) return;
+    // Tap outside closes the tip. Escape closes it and puts focus back on the info button.
+    const onPointerDown = (e: PointerEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setTipOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setTipOpen(false);
+      infoButton.current?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [tipOpen]);
+
+  return (
+    <div ref={wrap} className="flex flex-col">
+      <div className="flex items-start gap-1">
+        <button
+          type="button"
+          aria-pressed={checked}
+          disabled={!loaded}
+          onClick={onToggle}
+          className="flex items-start gap-3 text-left min-h-[44px] flex-1"
+        >
+          {checked ? (
+            <CheckCircle size={22} weight="fill" aria-hidden="true" style={{ color: 'var(--color-accent-700)' }} />
+          ) : (
+            <Circle size={22} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-600)' }} />
+          )}
+          <div>
+            <div className={`text-[14px]${checked ? ' line-through' : ''}`}>{item.label}</div>
+            {item.meta && <div className="gg-card-meta">{item.meta}</div>}
+          </div>
+        </button>
+        {item.tip && (
+          <button
+            ref={infoButton}
+            type="button"
+            aria-label="Why we list this"
+            aria-expanded={tipOpen}
+            aria-controls={tipId}
+            onClick={() => setTipOpen((open) => !open)}
+            className="flex items-center justify-center min-h-[44px] min-w-[44px]"
+          >
+            <Info size={20} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-600)' }} />
+          </button>
+        )}
+      </div>
+      {item.tip && (
+        // Always in the page so the screen reader reads the tip when its text appears.
+        <p id={tipId} role="status" className="gg-card-meta m-0 pl-[34px]">
+          {tipOpen ? item.tip : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   onBack: () => void;
   onEmailList: () => void;
@@ -83,29 +166,9 @@ export function WhatYoullNeed({ onBack, onEmailList }: Props) {
 
       <div className="flex flex-col gap-3">
         <p className="gg-eyebrow m-0">Gather when you can</p>
-        {CHECKLIST.map((item) => {
-          const checked = ticks.includes(item.id);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={checked}
-              disabled={!loaded}
-              onClick={() => toggle(item.id)}
-              className="flex items-start gap-3 text-left min-h-[44px] w-full"
-            >
-              {checked ? (
-                <CheckCircle size={22} weight="fill" aria-hidden="true" style={{ color: 'var(--color-accent-700)' }} />
-              ) : (
-                <Circle size={22} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-600)' }} />
-              )}
-              <div>
-                <div className={`text-[14px]${checked ? ' line-through' : ''}`}>{item.label}</div>
-                {item.meta && <div className="gg-card-meta">{item.meta}</div>}
-              </div>
-            </button>
-          );
-        })}
+        {CHECKLIST.map((item) => (
+          <ChecklistRow key={item.id} item={item} checked={ticks.includes(item.id)} loaded={loaded} onToggle={() => toggle(item.id)} />
+        ))}
       </div>
 
       <button type="button" onClick={onEmailList} className="gg-btn gg-btn-secondary gg-btn-block">

@@ -2,10 +2,12 @@
  * #176: the "What you'll need" list starts unticked, each row toggles, and ticks stay on this
  * device only (IndexedDB), never sent anywhere (C3).
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
-import { WhatYoullNeed } from './WhatYoullNeed';
+import { SSN_TIP, WhatYoullNeed } from './WhatYoullNeed';
 
 const ROWS = [
   'Any will or written wishes',
@@ -94,5 +96,63 @@ describe('What you will need (#176)', () => {
     await user.click(row('Life insurance policies'));
     expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
     vi.restoreAllMocks();
+  });
+});
+
+describe('Social Security tip (#209)', () => {
+  const info = () => screen.getByRole('button', { name: 'Why we list this' });
+
+  it('hides the tip by default and shows no reason line under the item', async () => {
+    renderList();
+    await loaded();
+    expect(info()).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
+  });
+
+  it('opens on click, closes on a second click, and flips aria-expanded', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await loaded();
+    await user.click(info());
+    expect(info()).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent(SSN_TIP);
+    expect(info()).toHaveAttribute('aria-controls', screen.getByRole('status').id);
+    await user.click(info());
+    expect(info()).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
+  });
+
+  it('opens with Enter, closes with Escape, and puts focus back on the button', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await loaded();
+    info().focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByText(SSN_TIP)).toBeInTheDocument();
+    row('Life insurance policies').focus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
+    expect(info()).toHaveFocus();
+  });
+
+  it('closes on a tap outside', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await loaded();
+    await user.click(info());
+    await user.click(screen.getByRole('heading', { name: "What you'll need" }));
+    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
+  });
+
+  it('is at least 44 by 44 and has no exclamation point', () => {
+    renderList();
+    expect(info()).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(SSN_TIP).not.toContain('!');
+  });
+
+  it('uses the same words as the mobile list', () => {
+    const mobile = readFileSync(resolve(process.cwd(), '../mobile/src/screens/WhatYoullNeedScreen.tsx'), 'utf8');
+    const match = mobile.match(/SSN_TIP =\s*"([^"]+)"/);
+    expect(match?.[1]).toBe(SSN_TIP);
   });
 });
