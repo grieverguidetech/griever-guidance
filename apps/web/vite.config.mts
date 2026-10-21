@@ -26,7 +26,16 @@ function announcePort(): PluginOption {
 }
 
 export default defineConfig(() => ({
-  ...vitestConfig('jsdom', { test: { setupFiles: ['src/test-setup.ts'] } }),
+  ...vitestConfig('jsdom', {
+    test: {
+      setupFiles: ['src/test-setup.ts'],
+      // #257: the whole-App journeys are CPU-bound (about 1 s alone, 5 to 30 s when
+      // check:affected runs every project at once). Fewer workers stop the web specs
+      // fighting each other; the longer limit covers the slice that other projects take.
+      maxWorkers: 3,
+      testTimeout: 20_000,
+    },
+  }),
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/web',
   server: {
