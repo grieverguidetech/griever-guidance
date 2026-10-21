@@ -6,7 +6,7 @@ test.describe('first visit', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: HOME_HEADING })).toBeVisible();
     await expect(page.getByRole('button', { name: "Start with someone I've lost" })).toBeVisible();
-    await expect(page.getByRole('button', { name: "What you'll need" })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: "What you'll need" })).toBeVisible();
     await expect(page.getByRole('list')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
   });
@@ -70,7 +70,6 @@ test.describe('What you will need', () => {
       )
       .toContain('life-insurance');
     await page.reload();
-    await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await page.getByRole('button', { name: "What you'll need" }).first().click();
     await expect(page.getByRole('button', { name: /Life insurance policies/ })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: /Military discharge papers/ })).toHaveAttribute('aria-pressed', 'false');

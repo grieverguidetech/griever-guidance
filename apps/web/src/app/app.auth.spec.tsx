@@ -159,7 +159,9 @@ describe('flag on', () => {
       }),
     );
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: HOME });
+    await screen.findByRole('button', { name: 'Your account' });
+    // With accounts on, the list lives on Your account, so Home has no link to it.
+    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
     await act(async () => {});
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();

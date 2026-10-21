@@ -25,7 +25,7 @@ describe('App onboarding', () => {
   it('starts a first visit at Home with nobody listed and no account step', () => {
     render(<App />);
     expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();

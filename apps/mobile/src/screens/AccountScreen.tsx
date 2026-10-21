@@ -23,14 +23,12 @@ export function resetUnsavedName() {
 }
 
 /** The "What you'll need" list, kept on the signed-in account page. Same saved ticks as the checklist screen. */
-function AccountChecklist() {
-  const [tipOpen, setTipOpen] = useState<string | null>(null);
+function AccountChecklist({ tipOpen, onTipChange }: { tipOpen: string | null; onTipChange: (id: string | null) => void }) {
   return (
-    // A touch on the page outside the info button closes an open tip.
-    <View style={styles.checklist} onTouchStart={() => setTipOpen(null)}>
+    <View style={styles.checklist}>
       <Text accessibilityRole="header" style={styles.checklistTitle}>What you'll need</Text>
       <Text style={styles.checklistNote}>Not today. Just so none of it surprises you.</Text>
-      <ChecklistRows tipOpen={tipOpen} onTipChange={setTipOpen} />
+      <ChecklistRows tipOpen={tipOpen} onTipChange={onTipChange} />
     </View>
   );
 }
@@ -52,7 +50,15 @@ function CheckEmail({ onSignIn }: { onSignIn: () => void }) {
  * It also owns saving the name typed at sign-up: once sign-up succeeds the state flips to signed in
  * and the sign-up screen unmounts, so a save started there would never run.
  */
-function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
+function AccountBody({
+  identity,
+  tipOpen,
+  onTipChange,
+}: {
+  identity: UseSupabaseIdentityResult;
+  tipOpen: string | null;
+  onTipChange: (id: string | null) => void;
+}) {
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
   const [awaitingEmail, setAwaitingEmail] = useState(false);
@@ -129,7 +135,7 @@ function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
           }}
         />
         {/* Left out of the name prompt, which has one job. */}
-        {isSignedIn && (savedName || pendingName) ? <AccountChecklist /> : null}
+        {isSignedIn && (savedName || pendingName) ? <AccountChecklist tipOpen={tipOpen} onTipChange={onTipChange} /> : null}
       </>
     );
   }
@@ -169,6 +175,7 @@ function LoadingOrUnavailable({ text }: { text: string }) {
 
 export function AccountScreen({ onBack }: { onBack: () => void }) {
   const identity = useAccount();
+  const [tipOpen, setTipOpen] = useState<string | null>(null);
   // No error left over from an earlier visit should be read out on arrival.
   const clearError = identity?.clearError;
   useEffect(() => clearError?.(), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -179,11 +186,13 @@ export function AccountScreen({ onBack }: { onBack: () => void }) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
+        // A touch anywhere on the page closes an open tip; the info button stops its own touch.
+        onTouchStart={() => setTipOpen(null)}
       >
         <Pressable onPress={onBack} style={styles.back} accessibilityRole="button" accessibilityLabel="Back">
           <Text style={styles.backText}>← Back</Text>
         </Pressable>
-        {identity ? <AccountBody identity={identity} /> : <LoadingOrUnavailable text={UNAVAILABLE} />}
+        {identity ? <AccountBody identity={identity} tipOpen={tipOpen} onTipChange={setTipOpen} /> : <LoadingOrUnavailable text={UNAVAILABLE} />}
       </ScrollView>
     </KeyboardAvoidingView>
   );

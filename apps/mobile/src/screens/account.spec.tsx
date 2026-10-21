@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { AuthClient, ProfileResult, SessionState, SignInResult, SignUpResult } from '@griever/api-client/auth';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
-import { CHECKLIST_KEY } from './WhatYoullNeedScreen';
+import { CHECKLIST_KEY, SSN_TIP } from './WhatYoullNeedScreen';
 import { AccountProvider, useAccount } from '../lib/AccountProvider';
 
 // Jest has no native view tree, so the real findNodeHandle returns null for every component. The
@@ -416,6 +416,22 @@ describe('profile', () => {
       fireEvent.press(row('Life insurance policies'));
       expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
       await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]'));
+    });
+
+    it('closes an open tip on a touch elsewhere, such as Save', async () => {
+      await AsyncStorage.clear();
+      renderAccount(signedInClient());
+      await screen.findAllByRole('checkbox');
+      fireEvent.press(screen.getByRole('button', { name: 'Why we list this' }));
+      expect(screen.getByText(SSN_TIP)).toBeTruthy();
+      fireEvent(screen.getByRole('button', { name: 'Save' }), 'touchStart');
+      expect(screen.queryByText(SSN_TIP)).toBeNull();
+    });
+
+    it('shows the list when the name came from the account, with nothing typed here', async () => {
+      renderAccount(signedInClient({ getProfile: jest.fn(async () => profileWith('Server Name')) }));
+      await screen.findByDisplayValue('Server Name');
+      expect(await screen.findAllByRole('checkbox')).toHaveLength(5);
     });
 
     it('leaves the list out while the account asks for a name', async () => {

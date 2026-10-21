@@ -32,7 +32,7 @@ const sessions = [
 function setup(props: Partial<Parameters<typeof Home>[0]> = {}) {
   const onOpen = vi.fn();
   const onCreate = vi.fn();
-  render(<Home sessions={sessions} onOpen={onOpen} onCreate={onCreate} canCreate {...props} />);
+  render(<Home sessions={sessions} onOpen={onOpen} onCreate={onCreate} canCreate checklistLink {...props} />);
   return { onOpen, onCreate };
 }
 
@@ -130,10 +130,16 @@ describe('Home', () => {
     expect(screen.getAllByRole('button', { name: /Hale/ })).toHaveLength(2);
   });
 
-  it('has no "What you\'ll need" link; the list lives on "Your account" (#190)', () => {
+  it('keeps What you\'ll need reachable', () => {
     setup();
+    expect(screen.getByRole('button', { name: "What you'll need" })).toBeTruthy();
+  });
+
+  it('drops the "What you\'ll need" button once Your account holds the list (#190)', () => {
+    setup({ checklistLink: false });
     expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
-    expect(screen.queryByText('The people you\'re writing about')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe("Who you're writing about");
+    expect(screen.queryByText("The people you're writing about")).toBeNull();
   });
 
   it('says so calmly when nobody is listed yet and the person can create', () => {

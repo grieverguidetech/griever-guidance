@@ -8,7 +8,7 @@ describe('App with the account feature off', () => {
     render(<App />);
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
     expect(screen.getByText("Start with someone I've lost")).toBeTruthy();
-    expect(screen.queryByText("What you'll need")).toBeNull();
+    expect(screen.getByText("What you'll need")).toBeTruthy();
     expect(screen.queryByText('Your account')).toBeNull();
   });
 

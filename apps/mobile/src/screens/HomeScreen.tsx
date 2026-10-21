@@ -20,6 +20,8 @@ export type HomeScreenProps = {
   canCreate: boolean;
   onOpen: (id: string) => void;
   onCreate: () => void;
+  /** Only given while accounts are off. With accounts on, "Your account" holds the list. */
+  onWhatYoullNeed?: () => void;
   /** A calm line after the last person of a send was dealt with. Stays until the person leaves Home. */
   note?: string | null;
   /** Only given when accounts are on. */
@@ -30,7 +32,7 @@ export type HomeScreenProps = {
  * Where every launch lands. The people kept on this phone, newest first, and one way to add
  * another. Nothing here removes anyone (C9).
  */
-export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onAccount, note }: HomeScreenProps) {
+export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount, note }: HomeScreenProps) {
   const people = listed(sessions);
   // The header takes screen-reader focus as Home opens. On iOS the note is queued behind it, so it
   // is read rather than dropped. Android reads the live region below.
@@ -50,6 +52,16 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onAccount, n
           <Text style={styles.noteText}>{note}</Text>
           <Text style={styles.noteSmall}>{NO_COPY_LINE}</Text>
         </View>
+      ) : null}
+      {onWhatYoullNeed ? (
+        <Pressable
+          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
+          onPress={onWhatYoullNeed}
+          accessibilityRole="button"
+          accessibilityLabel="What you'll need"
+        >
+          <Text style={styles.linkText}>What you'll need</Text>
+        </Pressable>
       ) : null}
       {onAccount ? (
         <Pressable style={styles.link} onPress={onAccount} accessibilityRole="button">
@@ -94,6 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   note: { borderWidth: 1, borderColor: MUTED, borderRadius: 10, padding: 16, marginBottom: 16 },
+  pressed: { opacity: 0.7 },
   noteText: { fontSize: 16, color: '#111827', marginBottom: 4 },
   noteSmall: { fontSize: 12, color: MUTED },
   linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },

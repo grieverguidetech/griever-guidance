@@ -872,6 +872,7 @@ function AppBody({
           onContinue={continueFromFirstProfile}
           senderName={auth.profile?.senderName ?? (firstProfile ? signUpName : null)}
           error={auth.error}
+          showChecklist={auth.isSignedIn}
           onBack={() => {
             auth.clearError();
             if (firstProfile) {
@@ -1107,7 +1108,14 @@ function AppBody({
   // Home is also the fallback: a view with nobody open (the path, a flow) never shows a blank screen.
   return (
     <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-      <Home sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate />
+      <Home
+        sessions={sessionList}
+        onOpen={openPerson}
+        onCreate={startNewSession}
+        canCreate
+        // "Your account" shows the list whenever its button shows; otherwise Home keeps the link.
+        checklistLink={!(auth && !sessionEnded)}
+      />
       <div className="flex flex-col items-start gap-2 mt-4">
         {auth && !sessionEnded && (
           <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-ghost !px-0">

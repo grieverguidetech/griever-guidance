@@ -2,6 +2,7 @@ import type { Session } from '@griever/hooks';
 import { namedSessionsByRecent } from '@griever/hooks';
 import { parseCompleteDate } from '@griever/shared';
 import { CaretRight } from '@phosphor-icons/react/CaretRight';
+import { TopBar } from '../lib/ui';
 
 interface Props {
   sessions: Session[];
@@ -9,6 +10,11 @@ interface Props {
   onCreate: () => void;
   /** False hides the create button (members can't start new people). */
   canCreate: boolean;
+  /**
+   * Shows the "What you'll need" button. Off once "Your account" shows the list; on while
+   * accounts are off, so the list never loses its home.
+   */
+  checklistLink: boolean;
 }
 
 /** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
@@ -18,13 +24,14 @@ function passingLabel(value: string | null | undefined): string {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-export function Home({ sessions, onOpen, onCreate, canCreate }: Props) {
+export function Home({ sessions, onOpen, onCreate, canCreate, checklistLink }: Props) {
   const people = namedSessionsByRecent(sessions);
   // "Start with" for a first person; "Someone else" once there is already someone listed.
   const createLabel = people.length > 0 ? "Someone else I've lost" : "Start with someone I've lost";
 
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
+      {checklistLink ? <TopBar /> : null}
       <h1 className="text-[22px]">Who you're writing about</h1>
 
       {people.length > 0 && (

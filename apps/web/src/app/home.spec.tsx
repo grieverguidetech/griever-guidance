@@ -165,11 +165,14 @@ describe('Home as the landing (#112)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
   });
 
-  it('has no "What you\'ll need" link on Home (#190)', async () => {
+  it('returns the checklist to Home when it was opened from Home', async () => {
+    const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await expectHome();
-    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await expectHome();
   });
 });
 

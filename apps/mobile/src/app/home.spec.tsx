@@ -14,7 +14,7 @@ const person = (id: string, personName: string, lastOpenedAt: string, dateOfPass
   }) as Session;
 
 const noop = () => undefined;
-const props = { canCreate: true, onOpen: noop, onCreate: noop };
+const props = { canCreate: true, onOpen: noop, onCreate: noop, onWhatYoullNeed: noop };
 
 describe('HomeScreen', () => {
   it('lists people newest first with the date of passing, and leaves out the unnamed', () => {
@@ -37,11 +37,9 @@ describe('HomeScreen', () => {
     expect(onOpen).toHaveBeenCalledWith('a');
   });
 
-  it('has no What you\'ll need link, and offers a first start when there are no people', () => {
+  it('puts What you\'ll need first, and offers a first start when there are no people', () => {
     render(<HomeScreen {...props} sessions={[]} />);
-    expect(screen.queryByText("What you'll need")).toBeNull();
-    expect(screen.getByText("Who you're writing about")).toBeTruthy();
-    expect(screen.queryByText("The people you're writing about")).toBeNull();
+    expect(screen.getByText("What you'll need")).toBeTruthy();
     expect(screen.getByText("Start with someone I've lost")).toBeTruthy();
     expect(screen.queryByText("Someone else I've lost")).toBeNull();
   });
@@ -205,6 +203,14 @@ describe('Home from every step', () => {
     expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+  });
+});
+
+describe('Home without the checklist link (accounts on)', () => {
+  it('shows no What you\'ll need link when none is given, and keeps Your account', () => {
+    render(<HomeScreen canCreate onOpen={noop} onCreate={noop} onAccount={noop} sessions={[]} />);
+    expect(screen.queryByText("What you'll need")).toBeNull();
+    expect(screen.getByText('Your account')).toBeTruthy();
   });
 });
 

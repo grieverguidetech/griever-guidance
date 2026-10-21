@@ -111,6 +111,18 @@ describe('Profile', () => {
       expect(row('Military discharge papers')).toHaveClass('min-h-[44px]');
     });
 
+    it('drops the top-bar checklist button, since the list is on the page', async () => {
+      render(<Profile {...props} />);
+      await ready();
+      expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
+    });
+
+    it('hides the list when the session has ended', () => {
+      render(<Profile {...props} showChecklist={false} />);
+      expect(screen.queryByRole('heading', { level: 2, name: "What you'll need" })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
+    });
+
     it('is left out of the name prompt and the first visit', () => {
       const { rerender } = render(<Profile {...props} asksName />);
       expect(screen.queryByRole('heading', { level: 2, name: "What you'll need" })).not.toBeInTheDocument();
