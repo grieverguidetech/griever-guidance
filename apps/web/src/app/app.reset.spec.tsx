@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../lib/features', () => ({
   AUTH_ENABLED: true,
   OBITUARY_DRAFTING_ENABLED: false,
+  SHARING_ENABLED: false,
 }));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();

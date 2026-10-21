@@ -5,6 +5,7 @@ import {
   useSupabaseIdentity,
   useContacts,
   useSessions,
+  useMembers,
   freshDraft,
   getContactsRetentionExpiry,
   hasDraftInProgress,
@@ -17,7 +18,7 @@ import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { setSyncUserId } from '../lib/registerSync';
-import { AUTH_ENABLED } from '../lib/features';
+import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { hasStoredSession, loadAuthClient } from '../lib/authClient';
 import type { AuthClientResult } from '../lib/authClient';
 import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
@@ -28,6 +29,8 @@ import { ChooseNewPassword } from '../screens/ChooseNewPassword';
 import { captureRecoveryLink, takeRecoveryLink } from '../lib/recoveryLink';
 import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
+import { PeopleHelping } from '../screens/PeopleHelping';
+import { RemoveMember } from '../screens/RemoveMember';
 import { removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import type { ContactDraft } from '../screens/AddContactsManual';
@@ -297,6 +300,21 @@ function AppBody({
   const sessionList = sessions.sessions;
   // Without auth there is no account gate — everyone is let straight in.
   const isSignedIn = auth ? auth.isSignedIn : true;
+
+  // Family sharing. With either flag off, or nobody signed in, the hook is switched off and makes no
+  // calls. Nothing waits on it (C5): screens render first and the list fills in. The token is read
+  // from the session in memory for each call and goes nowhere else.
+  const sharingOn = AUTH_ENABLED && SHARING_ENABLED && !offline && !!client && !!auth?.isSignedIn;
+  const getAccessToken = useCallback(async () => {
+    try {
+      const state = await client?.getSession();
+      return state?.status === 'signed_in' ? state.session.accessToken : null;
+    } catch {
+      // A failed session read counts as no token: the hook reports "sign in again" rather than loading forever.
+      return null;
+    }
+  }, [client]);
+  const members = useMembers({ getAccessToken, enabled: sharingOn });
 
   const [view, setView] = useState<AppView>(() => {
     if (offline) return 'home';
@@ -866,6 +884,18 @@ function AppBody({
           senderName={auth.profile?.senderName ?? (firstProfile ? signUpName : null)}
           error={auth.error}
           showChecklist={auth.isSignedIn}
+          peopleHelping={
+            // Not during first-time onboarding after sign-up: that screen is only the name.
+            sharingOn && !firstProfile ? (
+              <PeopleHelping
+                view={members.view}
+                status={members.status}
+                message={members.message}
+                onInvite={members.invite}
+                onRevoke={members.revoke}
+              />
+            ) : undefined
+          }
           onBack={() => {
             auth.clearError();
             if (firstProfile) {
@@ -902,6 +932,11 @@ function AppBody({
           onBack={goHome}
           onRemoveEverything={removeEverything}
           signsOut={offline || (auth?.isSignedIn ?? false)}
+          removeMember={
+            sharingOn && members.view?.role === 'owner' ? (
+              <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
+            ) : undefined
+          }
         />
       </Shell>
     );
@@ -1087,7 +1122,9 @@ function AppBody({
         sessions={sessionList}
         onOpen={openPerson}
         onCreate={startNewSession}
-        canCreate
+        // Only a known member loses the button; an unknown or offline profile keeps it, and the
+        // database still refuses a member's insert (C11).
+        canCreate={!(sharingOn && auth?.profile?.accountType === 'member')}
         // "Your account" shows the list whenever its button shows; otherwise Home keeps the link.
         checklistLink={!(auth && !sessionEnded)}
       />
