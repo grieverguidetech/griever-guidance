@@ -128,6 +128,8 @@ jobs:
 
       - run: pnpm nx test data-aws --skip-nx-cache
 
+      - run: pnpm nx test data-access --skip-nx-cache
+
   e2e:
     name: Playwright e2e (desktop, Android, iPhone)
     runs-on: ubuntu-latest
