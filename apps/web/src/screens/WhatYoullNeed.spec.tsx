@@ -95,4 +95,14 @@ describe('What you will need (#176)', () => {
     expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
     vi.restoreAllMocks();
   });
+
+  it('says why the list asks for the Social Security number, right after its label', async () => {
+    renderList();
+    await loaded();
+    // Same literal as the mobile spec (apps cannot import each other), so the two stay equal.
+    expect(row('Social Security number and ID')).toHaveAccessibleName(
+      'Social Security number and ID The funeral home uses it to report the death. This app never asks for it.',
+    );
+    expect(screen.getByText('The funeral home uses it to report the death. This app never asks for it.')).toBeInTheDocument();
+  });
 });
