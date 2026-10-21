@@ -196,7 +196,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
               setSettingUp(true);
               setAtHome(false);
             }}
-            onWhatYoullNeed={() => navigation.navigate('WhatYoullNeed')}
+            onWhatYoullNeed={AUTH_ENABLED ? undefined : () => navigation.navigate('WhatYoullNeed')}
             onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
           />
         )}

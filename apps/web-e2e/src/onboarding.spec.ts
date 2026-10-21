@@ -80,12 +80,12 @@ test.describe('coming back', () => {
   test('a reload lands on Home listing the person, and opening her shows her path', async ({ page }) => {
     await onboard(page);
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeVisible();
     await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
     await page.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeFocused();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeFocused();
   });
 
   test('a half-written message shows Started on the path, and one tap resumes it (#176)', async ({ page }) => {

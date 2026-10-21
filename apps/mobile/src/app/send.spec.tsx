@@ -67,7 +67,7 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
-    expect(screen.getByText("The people you're writing about")).toBeTruthy();
+    expect(screen.getByText("Who you're writing about")).toBeTruthy();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith('Everyone has been told.', { queue: true });
     expect(screen.getByLabelText(/Everyone has been told\. We don't keep a copy/)).toBeTruthy();

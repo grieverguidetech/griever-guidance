@@ -91,7 +91,7 @@ describe('remove everything from this device (#51)', () => {
       ).toBe(true),
     );
     expect(screen.getAllByText('Everything has been removed from this device.')).toHaveLength(2);
-    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument(); // the first screen: Home
+    expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument(); // the first screen: Home
     expect(await snapshot()).toEqual({ contacts: 0, sessions: 0, outbox: 0, sendJobs: 0, account: 0, deviceId: null });
     // The fresh start may write an empty list back, but nothing of ours is left in it.
     expect(JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')).toEqual([]);
@@ -135,7 +135,7 @@ describe('remove everything from this device (#51)', () => {
 
     failOnce.mockRestore();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument());
     expect((await snapshot()).contacts).toBe(0);
   });
 

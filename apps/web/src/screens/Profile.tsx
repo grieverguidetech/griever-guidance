@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { TopBar } from '../lib/ui';
+import { ChecklistRows } from './WhatYoullNeed';
 
 const SAVE_FAILED = "We couldn't save your name. You can try again.";
 const NAME_REQUIRED = 'Please enter your name.';
@@ -23,9 +24,11 @@ interface Props {
   error: string | null;
   /** Optional extra section under the form ("People helping you"). Nothing renders when absent. */
   peopleHelping?: ReactNode;
+  /** False once the session has ended: the list is for a signed-in account page. */
+  showChecklist?: boolean;
 }
 
-export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping }: Props) {
+export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping, showChecklist = true }: Props) {
   const id = useId();
   // Until the person types, show whatever name is known, including one that loads late.
   const [typed, setTyped] = useState<string | null>(null);
@@ -59,9 +62,12 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
     }
   }
 
+  // The name prompt and the first visit stay short: the list shows on the everyday account page.
+  const showList = showChecklist && !asksName && !firstTime;
+
   const form = (
     <form className="flex flex-col gap-4" onSubmit={submit}>
-      <TopBar onBack={onBack} />
+      <TopBar onBack={onBack} hideChecklist={showList} />
       <h1 className="text-[22px]">{asksName ? 'What should we call you?' : 'Your account'}</h1>
       {(asksName || firstTime) && (
         <p id={`${id}-intro`} className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
@@ -112,11 +118,22 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
       )}
     </form>
   );
-  if (!peopleHelping) return form;
+  if (!peopleHelping && !showList) return form;
   // The invite form is its own form, so it sits beside this one, never inside it.
   return (
     <div className="flex flex-col gap-6">
       {form}
+      {showList && (
+        <section aria-labelledby={`${id}-need`} className="flex flex-col gap-3">
+          <h2 id={`${id}-need`} className="text-[16px] m-0">
+            What you'll need
+          </h2>
+          <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
+            Not today. Just so none of it surprises you.
+          </p>
+          <ChecklistRows />
+        </section>
+      )}
       {peopleHelping}
     </div>
   );

@@ -98,7 +98,7 @@ describe('the order in the app', () => {
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');
     fireEvent.press(screen.getByLabelText('Back to home'));
-    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
     expect(screen.queryByLabelText('Someone new')).toBeNull();
     expect(screen.getByLabelText('Anna')).toBeTruthy();
   });
@@ -182,7 +182,7 @@ describe('Home from every step', () => {
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
     fireEvent.press(screen.getByLabelText('Back to home'));
-    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
   it('Android back: a step goes Home; the checklist pops to the path first', async () => {
@@ -202,7 +202,15 @@ describe('Home from every step', () => {
     act(() => void pressBack());
     expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
     act(() => void pressBack());
-    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+  });
+});
+
+describe('Home without the checklist link (accounts on)', () => {
+  it('shows no What you\'ll need link when none is given, and keeps Your account', () => {
+    render(<HomeScreen canCreate onOpen={noop} onCreate={noop} onAccount={noop} sessions={[]} />);
+    expect(screen.queryByText("What you'll need")).toBeNull();
+    expect(screen.getByText('Your account')).toBeTruthy();
   });
 });
 

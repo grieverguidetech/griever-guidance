@@ -20,7 +20,8 @@ export type HomeScreenProps = {
   canCreate: boolean;
   onOpen: (id: string) => void;
   onCreate: () => void;
-  onWhatYoullNeed: () => void;
+  /** Only given while accounts are off. With accounts on, "Your account" holds the list. */
+  onWhatYoullNeed?: () => void;
   /** A calm line after the last person of a send was dealt with. Stays until the person leaves Home. */
   note?: string | null;
   /** Only given when accounts are on. */
@@ -40,7 +41,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
   }, [note]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <ScreenHeader>The people you're writing about</ScreenHeader>
+      <ScreenHeader>Who you're writing about</ScreenHeader>
       {note ? (
         <View
           style={styles.note}
@@ -52,14 +53,16 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
           <Text style={styles.noteSmall}>{NO_COPY_LINE}</Text>
         </View>
       ) : null}
-      <Pressable
-        style={({ pressed }) => [styles.link, pressed && styles.pressed]}
-        onPress={onWhatYoullNeed}
-        accessibilityRole="button"
-        accessibilityLabel="What you'll need"
-      >
-        <Text style={styles.linkText}>What you'll need</Text>
-      </Pressable>
+      {onWhatYoullNeed ? (
+        <Pressable
+          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
+          onPress={onWhatYoullNeed}
+          accessibilityRole="button"
+          accessibilityLabel="What you'll need"
+        >
+          <Text style={styles.linkText}>What you'll need</Text>
+        </Pressable>
+      ) : null}
       {onAccount ? (
         <Pressable style={styles.link} onPress={onAccount} accessibilityRole="button">
           <Text style={styles.linkText}>Your account</Text>
