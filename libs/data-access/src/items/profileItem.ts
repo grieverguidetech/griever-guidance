@@ -34,17 +34,19 @@ export function encodeProfile(profile: Profile): Item {
 }
 
 export function decodeProfile(item: Item): Profile {
-  const profile: Profile = {
-    userId: item['userId'] as string,
-    accountType: item['accountType'] as Profile['accountType'],
-    version: item['version'] as number,
-    createdAt: item['createdAt'] as string,
-    updatedAt: item['updatedAt'] as string,
-  };
-  if (typeof item['senderName'] === 'string') profile.senderName = item['senderName'];
-  if (item['contactSource'] === 'import' || item['contactSource'] === 'manual') {
-    profile.contactSource = item['contactSource'];
+  const { userId, accountType, version, createdAt, updatedAt, senderName, contactSource } = item;
+  if (
+    typeof userId !== 'string' ||
+    (accountType !== 'owner' && accountType !== 'member') ||
+    typeof version !== 'number' ||
+    typeof createdAt !== 'string' ||
+    typeof updatedAt !== 'string'
+  ) {
+    throw new Error('Profile item is broken.');
   }
+  const profile: Profile = { userId, accountType, version, createdAt, updatedAt };
+  if (typeof senderName === 'string') profile.senderName = senderName;
+  if (contactSource === 'import' || contactSource === 'manual') profile.contactSource = contactSource;
   return profile;
 }
 

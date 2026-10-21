@@ -22,7 +22,7 @@ describe('keys', () => {
     expect(memberKey('o1', 'm1')).toEqual({ pk: 'USER#o1', sk: 'MEMBER#m1' });
     expect(inviteKey('o1', UUID)).toEqual({ pk: 'USER#o1', sk: `INVITE#${UUID}` });
     expect(tokenKey(HASH)).toEqual({ pk: `TOKEN#${HASH}`, sk: 'TOKEN' });
-    expect(refGsi('u1', `FLOW#${UUID}`)).toEqual({ gsi1pk: 'REF#u1', gsi1sk: `FLOW#${UUID}` });
+    expect(refGsi('u1', 'FLOW', UUID)).toEqual({ gsi1pk: 'REF#u1', gsi1sk: `FLOW#${UUID}` });
     expect(userPk('a'.repeat(64))).toBe(`USER#${'a'.repeat(64)}`);
   });
 
@@ -40,7 +40,7 @@ describe('keys', () => {
     expect(() => memberOfKey(bad)).toThrow();
     expect(() => memberKey('o1', bad)).toThrow();
     expect(() => memberKey(bad, 'm1')).toThrow();
-    expect(() => refGsi(bad, 'x')).toThrow();
+    expect(() => refGsi(bad, 'FLOW', UUID)).toThrow();
   });
 
   it('refuses a flow or invite id that is not a UUID', () => {
@@ -49,6 +49,18 @@ describe('keys', () => {
       expect(() => flowGuardKey(bad)).toThrow();
       expect(() => inviteKey('u1', bad)).toThrow();
     }
+  });
+
+  it('gives upper and lower case ids the same key', () => {
+    const upper = UUID.toUpperCase();
+    expect(flowKey('u1', upper)).toEqual(flowKey('u1', UUID));
+    expect(flowGuardKey(upper)).toEqual(flowGuardKey(UUID));
+    expect(inviteKey('u1', upper)).toEqual(inviteKey('u1', UUID));
+    expect(refGsi('u1', 'INVITE', upper)).toEqual(refGsi('u1', 'INVITE', UUID));
+  });
+
+  it('refuses a gsi reference with a bad item id', () => {
+    expect(() => refGsi('u1', 'FLOW', 'x#y')).toThrow();
   });
 
   it('refuses a token hash that is not 64 lowercase hex characters', () => {

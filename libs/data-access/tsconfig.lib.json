@@ -17,6 +17,7 @@
   "exclude": [
     "out-tsc",
     "dist",
+    "src/testing/**",
     "src/**/*.spec.ts",
     "src/**/*.test.ts"
   ],

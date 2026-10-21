@@ -1,6 +1,6 @@
 import { GetCommand, QueryCommand, type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import type { Clock } from './clock.js';
-import type { Key } from './keys.js';
+import { userPk, type Key, type SkPrefix } from './keys.js';
 
 export type Item = Record<string, unknown>;
 
@@ -11,6 +11,8 @@ export type Item = Record<string, unknown>;
 export function isLive(item: Item, clock: Clock): boolean {
   const ttl = item['ttl'];
   if (typeof ttl !== 'number') return true;
+  // Epoch seconds are about 1.8e9. A value this large is milliseconds, a bug that would never expire.
+  if (ttl > 1e11) throw new Error('ttl must be epoch seconds, not milliseconds.');
   return ttl * 1000 > clock.now().getTime();
 }
 
@@ -25,14 +27,15 @@ export async function getLive(
   return Item && isLive(Item, clock) ? Item : undefined;
 }
 
-/** A consistent query of one partition, optionally by sort-key prefix. Follows pages. */
+/** A consistent query of one user partition, optionally by sort-key prefix. Follows pages. */
 export async function queryLive(
   doc: DynamoDBDocumentClient,
   table: string,
-  pk: string,
+  userId: string,
   clock: Clock,
-  skPrefix?: string,
+  skPrefix?: SkPrefix,
 ): Promise<Item[]> {
+  const pk = userPk(userId);
   const items: Item[] = [];
   let start: Record<string, unknown> | undefined;
   do {

@@ -1,7 +1,8 @@
 import { isUuid } from '@griever/shared';
 
 /**
- * Every key for the gg-data table (design #187 §1.2). Each builder checks its input first, so a
+ * Rule: key strings are built only in this file. Other files call these builders (a test scans src for
+ * `USER#` templates). Every key for the gg-data table (design #187 §1.2). Each builder checks its input first, so a
  * typed value can never forge another key (no `#`) and no email can end up in a key (C3).
  */
 const USER_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -19,7 +20,8 @@ function userId(value: string): string {
 
 function uuid(what: string, value: string): string {
   if (!isUuid(value)) throw new Error(`Invalid ${what} id for a data key.`);
-  return value;
+  // Lower case, so "ABC..." and "abc..." are the same key and a flow guard stays unique.
+  return value.toLowerCase();
 }
 
 function tokenHash(value: string): string {
@@ -50,9 +52,9 @@ export const tokenKey = (hash: string): Key => ({ pk: `TOKEN#${tokenHash(hash)}`
 export const FLOW_PREFIX = 'FLOW#';
 export const MEMBER_PREFIX = 'MEMBER#';
 export const INVITE_PREFIX = 'INVITE#';
+export type SkPrefix = typeof FLOW_PREFIX | typeof MEMBER_PREFIX | typeof INVITE_PREFIX;
 
 /** gsi1 keys: items that point at a user. Used only by account deletion. */
-export const refGsi = (id: string, sk: string): { gsi1pk: string; gsi1sk: string } => ({
-  gsi1pk: `REF#${userId(id)}`,
-  gsi1sk: sk,
-});
+export function refGsi(id: string, kind: 'FLOW' | 'INVITE', itemId: string): { gsi1pk: string; gsi1sk: string } {
+  return { gsi1pk: `REF#${userId(id)}`, gsi1sk: `${kind}#${uuid(kind.toLowerCase(), itemId)}` };
+}
