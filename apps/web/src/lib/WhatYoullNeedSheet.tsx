@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ChecklistRows } from '../screens/WhatYoullNeed';
 
@@ -7,6 +7,8 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 interface SheetProps {
   title: string;
   onClose: () => void;
+  /** The button that opened the sheet. Safari does not focus a button on click, so pass it. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
@@ -15,21 +17,37 @@ interface SheetProps {
  * and focus goes back to whatever had it before. Render it only while open: the form underneath
  * stays mounted, so nothing typed there is lost. Reusable for other short panels (#194).
  */
-export function Sheet({ title, onClose, children }: SheetProps) {
+export function Sheet({ title, onClose, returnFocusRef, children }: SheetProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [headingFocused, setHeadingFocused] = useState(false);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const returnRef = useRef(returnFocusRef);
+  returnRef.current = returnFocusRef;
 
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
-    panel.current?.focus();
+    heading.current?.focus();
+
+    // Everything behind the sheet is out of reach for keyboard, pointer and screen reader.
+    const root = document.getElementById('root');
+    const wasInert = root?.inert ?? false;
+    const wasHidden = root?.getAttribute('aria-hidden') ?? null;
+    if (root) {
+      root.inert = true;
+      root.setAttribute('aria-hidden', 'true');
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     const onKeyDown = (e: KeyboardEvent) => {
       const el = panel.current;
       if (!el) return;
       if (e.key === 'Escape') {
-        // An open "why we list this" tip takes the first Escape; the sheet takes the next.
-        if (el.querySelector('[aria-expanded="true"]')) return;
+        // Something inside (an open tip) already used this Escape.
+        if (e.defaultPrevented) return;
         e.preventDefault();
         closeRef.current();
         return;
@@ -40,7 +58,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
       const first = items[0];
       const last = items[items.length - 1];
       const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === el)) {
+      if (e.shiftKey && (active === first || active === heading.current)) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && active === last) {
@@ -51,10 +69,18 @@ export function Sheet({ title, onClose, children }: SheetProps) {
         first.focus();
       }
     };
-    document.addEventListener('keydown', onKeyDown);
+    // On window, so inner handlers on document run first and can claim the key.
+    window.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      trigger?.focus();
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (root) {
+        root.inert = wasInert;
+        if (wasHidden === null) root.removeAttribute('aria-hidden');
+        else root.setAttribute('aria-hidden', wasHidden);
+      }
+      // After the page is live again, or the focus call would be ignored.
+      (returnRef.current?.current ?? trigger)?.focus();
     };
   }, []);
 
@@ -71,12 +97,20 @@ export function Sheet({ title, onClose, children }: SheetProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        tabIndex={-1}
         className="w-full max-w-[560px] max-h-[85vh] overflow-y-auto flex flex-col gap-4 p-5"
-        style={{ background: 'var(--surface, #fff)', borderRadius: '16px 16px 0 0' }}
+        style={{ background: 'var(--color-surface)', borderRadius: '16px 16px 0 0' }}
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id={titleId} className="text-[18px] m-0">
+          <h2
+            ref={heading}
+            id={titleId}
+            tabIndex={-1}
+            className="text-[18px] m-0 p-1"
+            // An inset ring: the global focus mark sits off to the left and can leave the screen.
+            style={headingFocused ? { outline: '2px solid transparent', boxShadow: 'inset 0 0 0 2px var(--color-accent-700)' } : undefined}
+            onFocus={() => setHeadingFocused(true)}
+            onBlur={() => setHeadingFocused(false)}
+          >
             {title}
           </h2>
           <button type="button" onClick={onClose} className="gg-btn gg-btn-secondary gg-btn-bar min-h-[44px] min-w-[44px]">
@@ -91,9 +125,9 @@ export function Sheet({ title, onClose, children }: SheetProps) {
 }
 
 /** The "What you'll need" checklist in a sheet. Ticks are the same saved ticks as the full screen. */
-export function WhatYoullNeedSheet({ onClose }: { onClose: () => void }) {
+export function WhatYoullNeedSheet({ onClose, returnFocusRef }: { onClose: () => void; returnFocusRef?: RefObject<HTMLElement | null> }) {
   return (
-    <Sheet title="What you'll need" onClose={onClose}>
+    <Sheet title="What you'll need" onClose={onClose} returnFocusRef={returnFocusRef}>
       <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
         Not today. Just so none of it surprises you.
       </p>

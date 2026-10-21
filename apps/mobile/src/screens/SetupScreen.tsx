@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   BackHandler,
+  findNodeHandle,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -32,9 +34,16 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
   const [date, setDate] = useState(initial.dateOfPassing);
   const canContinue = name.trim() !== '';
   const [sheetOpen, setSheetOpen] = useState(false);
+  const needButton = useRef<View>(null);
   const dateRef = useRef<TextInput>(null);
   const submit = () => {
     if (canContinue) onContinue({ personName: name.trim(), dateOfPassing: date.trim() });
+  };
+
+  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  const focusNeedButton = () => {
+    const handle = needButton.current ? findNodeHandle(needButton.current) : null;
+    if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
   };
 
   // Android's back button means Home here, not leaving the app.
@@ -55,6 +64,7 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
             <Text style={styles.backText}>← Back</Text>
           </Pressable>
           <Pressable
+            ref={needButton}
             style={({ pressed }) => [styles.needButton, pressed && styles.pressed]}
             onPress={() => setSheetOpen(true)}
             accessibilityRole="button"
@@ -114,7 +124,7 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
           <Text style={styles.buttonText}>Continue</Text>
         </Pressable>
       </ScrollView>
-      <WhatYoullNeedSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+      <WhatYoullNeedSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onDismiss={focusNeedButton} />
     </KeyboardAvoidingView>
   );
 }
@@ -123,8 +133,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#ffffff' },
   screen: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  // Wraps under large text instead of pushing a button off the screen.
+  topRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16 },
   needButton: {
+    flexShrink: 1,
     minHeight: 44,
     minWidth: 44,
     justifyContent: 'center',
