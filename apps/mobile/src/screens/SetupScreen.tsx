@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { ScreenHeader, authStyles } from '../components/authForm';
+import { SavedNote } from '../components/SavedNote';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
@@ -123,6 +124,7 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
         >
           <Text style={styles.buttonText}>Continue</Text>
         </Pressable>
+        <SavedNote />
       </ScrollView>
       <WhatYoullNeedSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onDismiss={focusNeedButton} />
     </KeyboardAvoidingView>

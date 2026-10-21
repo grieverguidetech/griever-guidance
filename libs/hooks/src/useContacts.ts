@@ -63,7 +63,11 @@ export function useContacts(store?: ContactStore): UseContactsResult {
       .list()
       .then((loaded) => {
         if (!cancelled) {
-          setContacts(loaded);
+          // Someone added while the read was slow is kept, not wiped by the late answer.
+          setContacts((added) => {
+            const ids = new Set(added.map((c) => c.contactId));
+            return [...loaded.filter((c) => !ids.has(c.contactId)), ...added];
+          });
           setLoading(false);
         }
       })
