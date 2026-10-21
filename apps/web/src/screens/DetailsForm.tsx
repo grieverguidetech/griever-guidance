@@ -1,7 +1,4 @@
-import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { useMockPlaces } from '@griever/hooks';
-import { MapPin } from '@phosphor-icons/react/MapPin';
 import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 import { StartAgain } from '../lib/StartAgain';
 import { DateInput } from '../lib/DateField';
@@ -14,8 +11,7 @@ interface Props {
 }
 
 export function DetailsForm({ flow }: Props) {
-  const { selectedTemplate, fields, setField, setPlace, nextStep, prevStep } = flow;
-  const [locationFocused, setLocationFocused] = useState(false);
+  const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
 
   if (!selectedTemplate) return null;
 
@@ -78,31 +74,15 @@ export function DetailsForm({ flow }: Props) {
                 placeholder={field.placeholder}
               />
             ) : isLocation ? (
-              <div className="relative">
-                <input
-                  id={`field-${field.key}`}
-                  className="gg-input"
-                  type="text"
-                  value={fields[field.key] ?? ''}
-                  onChange={(e) => {
-                    setField(field.key, e.target.value);
-                    setPlace(null);
-                  }}
-                  onFocus={() => setLocationFocused(true)}
-                  onBlur={() => window.setTimeout(() => setLocationFocused(false), 120)}
-                  placeholder={field.placeholder}
-                  autoComplete="off"
-                />
-                {locationFocused && (
-                  <PlacesPanel
-                    query={fields[field.key] ?? ''}
-                    onPick={(place) => {
-                      setPlace(place);
-                      setLocationFocused(false);
-                    }}
-                  />
-                )}
-              </div>
+              <input
+                id={`field-${field.key}`}
+                className="gg-input"
+                type="text"
+                value={fields[field.key] ?? ''}
+                onChange={(e) => setField(field.key, e.target.value)}
+                placeholder={field.placeholder}
+                autoComplete="off"
+              />
             ) : (
               <input
                 id={`field-${field.key}`}
@@ -127,48 +107,6 @@ export function DetailsForm({ flow }: Props) {
       </button>
       <SavedNote />
       <StartAgain flow={flow} />
-    </div>
-  );
-}
-
-function PlacesPanel({
-  query,
-  onPick,
-}: {
-  query: string;
-  onPick: (place: import('@griever/shared').Place) => void;
-}) {
-  const results = useMockPlaces(query);
-  if (results.length === 0) return null;
-
-  return (
-    <div
-      className="gg-card elev-sm absolute left-0 right-0 z-10 !p-0 !gap-0"
-      style={{ marginTop: 6 }}
-    >
-      {results.map((place, i) => (
-        <button
-          key={place.placeId}
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onPick(place)}
-          className="flex items-start gap-[10px] px-3 py-[10px] text-left w-full"
-          style={i === 0 ? { background: 'var(--color-accent-100)' } : undefined}
-        >
-          <MapPin
-            size={18}
-            weight="duotone"
-            style={{ color: 'var(--color-accent-700)', marginTop: 1, flexShrink: 0 }}
-          />
-          <span className="flex flex-col">
-            <span className="text-[14px]">{place.name}</span>
-            <span className="gg-card-meta">{place.formattedAddress}</span>
-          </span>
-        </button>
-      ))}
-      <p className="m-0 px-3 py-2 text-[11px]" style={{ color: 'var(--text-eyebrow)' }}>
-        Addresses from Google Maps — pick one and we'll send the full address.
-      </p>
     </div>
   );
 }

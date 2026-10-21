@@ -91,7 +91,7 @@ lives under that key.
     A3: { status: "pending",  updatedAt: …, values: { selectedContactIds: [] } },
 
     A4: { status: "pending",  updatedAt: …, values: {
-            includeFlowers: false, floristId: null, customFlorist: null,
+            includeFlowers: false, customFlorist: null,
             flowerDeliveryTarget: "service" } },
 
     B1: { status: "pending",  updatedAt: …, values: { personalNote: null } },

@@ -5,8 +5,6 @@ export * from './useSessions.js';
 export * from './usePathMoments.js';
 export * from './useContacts.js';
 export * from './useMockContacts.js';
-export * from './useMockPlaces.js';
-export * from './useMockFlorists.js';
 export * from './useSupabaseIdentity.js';
 export * from './useMembers.js';
 export * from './useFlowSync.js';
