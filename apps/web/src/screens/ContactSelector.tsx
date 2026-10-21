@@ -19,7 +19,7 @@ interface Props {
 
 const TIER_LABELS: Record<ContactTier, string> = {
   first: 'Close family',
-  family: 'Friends & neighbours',
+  family: 'Friends & family',
 };
 
 const TIER_ORDER: ContactTier[] = ['first', 'family'];
