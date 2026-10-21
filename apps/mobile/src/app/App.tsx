@@ -23,6 +23,7 @@ import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions'
 import { PersonBar } from '../components/PersonSwitcher';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SetupScreen } from '../screens/SetupScreen';
+import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
@@ -190,6 +191,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   // If the local read never answers, carry on as if there are no contacts (C5: nothing waits).
   useEffect(() => {
     if (stage !== 'checkContacts') return;
+    announce('Opening…'); // iOS only; Android reads the live region on the screen
     const timer = setTimeout(() => setStage('contacts'), CONTACTS_CHECK_FALLBACK_MS);
     return () => clearTimeout(timer);
   }, [stage]);

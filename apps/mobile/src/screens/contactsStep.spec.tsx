@@ -61,7 +61,8 @@ describe('ContactsStepScreen', () => {
     return { contacts, onContinue, onBack };
   };
 
-  it('imports through the adapter, never expo-contacts directly, and adds only the ones chosen', async () => {
+  it('imports through the adapter, preselects nothing, adds only the one tapped, with no network', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
     mockFetch.mockResolvedValue([
       { key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [], starred: true },
       { key: 'y', displayName: 'Pat', phones: ['+16175550112'], emails: [] },
@@ -69,11 +70,13 @@ describe('ContactsStepScreen', () => {
     const { contacts } = setup();
     fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
     fireEvent.press(await screen.findByLabelText('Pat, +16175550112'));
+    expect(screen.getByText('1 chosen')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(contacts.importContacts).toHaveBeenCalled());
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [picked, source] = (contacts.importContacts as jest.Mock).mock.calls[0] as [{ name: string }[], string];
-    expect(picked.map((c) => c.name)).toEqual(['Sam', 'Pat']);
+    expect(picked.map((c) => c.name)).toEqual(['Pat']);
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(source).toBe('native');
   });
 
@@ -99,16 +102,29 @@ describe('ContactsStepScreen', () => {
     await waitFor(() => expect(contacts.addContact).toHaveBeenCalledWith({ name: 'Aunt Carol', phone: '+16175550148', tier: 'family' }));
   });
 
-  it('keeps Continue off until someone is saved, then continues', () => {
-    const first = setup();
-    expect(screen.getByRole('button', { name: 'Continue' }).props.accessibilityState.disabled).toBe(true);
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(first.onContinue).not.toHaveBeenCalled();
+  it('Done for now is always available, as on web', () => {
+    const { onContinue } = setup();
+    fireEvent.press(screen.getByRole('button', { name: 'Done for now' }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
-  it('Continue and Back call out once someone is saved', () => {
+  it('says what was added, and shows a calm error if saving fails', async () => {
+    const { contacts } = setup();
+    fireEvent.press(screen.getByRole('button', { name: 'Add someone myself' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect((await screen.findByRole('alert')).props.children).toBe('Type a name and a mobile number.');
+    (contacts.addContact as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('disk')));
+    fireEvent.changeText(screen.getByLabelText('Name'), 'Dee');
+    fireEvent.changeText(screen.getByLabelText('Mobile number'), '(617) 555-0148');
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect((await screen.findByRole('alert')).props.children).toBe('We could not save that. Please try again.');
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByText('Added Dee')).toBeTruthy();
+  });
+
+  it('Done for now and Back call out with someone saved', () => {
     const { onContinue, onBack } = setup([dee as unknown as Contact]);
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Done for now' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
     fireEvent.press(screen.getByLabelText('Back'));
     expect(onBack).toHaveBeenCalledTimes(1);
@@ -117,8 +133,7 @@ describe('ContactsStepScreen', () => {
 
 describe('manual add keeps only the seven Contact fields and uses no network (C3, C4)', () => {
   it('stores exactly the Contact fields and never calls fetch', async () => {
-    const fetchSpy = jest.fn();
-    (globalThis as unknown as { fetch: unknown }).fetch = fetchSpy;
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
     await seed([]);
     render(<App />);
     await createBen();
@@ -147,7 +162,7 @@ describe('the contacts step in the app', () => {
     fireEvent.changeText(screen.getByLabelText('Name'), 'Aunt Carol');
     fireEvent.changeText(screen.getByLabelText('Mobile number'), '(617) 555-0148');
     fireEvent.press(screen.getByRole('button', { name: 'Add' }));
-    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Done for now' }));
     expect(await screen.findByText(PATH_TITLE)).toBeTruthy();
     expect(screen.getByText('Writing about Ben')).toBeTruthy();
   });

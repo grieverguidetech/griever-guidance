@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { App } from './App';
@@ -16,15 +16,6 @@ const SETUP_TITLE = 'Who are we writing about?';
 async function startWith(name: string) {
   fireEvent.changeText(await screen.findByLabelText('Their name, required'), name);
   fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-  // An empty phone also asks for contacts once (#226). Add one by hand and carry on.
-  await waitFor(() => expect(screen.queryByText(`Writing about ${name}`) ?? screen.queryByText('Who should we be able to reach?')).toBeTruthy());
-  if (screen.queryByText('Who should we be able to reach?')) {
-    fireEvent.press(screen.getByRole('button', { name: 'Add someone myself' }));
-    fireEvent.changeText(screen.getByLabelText('Name'), 'Dee');
-    fireEvent.changeText(screen.getByLabelText('Mobile number'), '617 555 0148');
-    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
-    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
-  }
   await screen.findByText(`Writing about ${name}`);
 }
 
@@ -39,6 +30,11 @@ async function addPerson() {
   fireEvent.press(await screen.findByText(ANOTHER));
   await screen.findByText(SETUP_TITLE);
 }
+
+// One saved contact, so setup goes straight to the path (the contacts step has its own spec, #226).
+beforeEach(async () => {
+  await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
+});
 
 afterEach(() => {
   jest.restoreAllMocks();

@@ -77,20 +77,18 @@ describe('the order in the app', () => {
   // With no saved contacts the contacts step comes between (#226); see contactsStep.spec.tsx.
   it('goes from Create to setup, then to the path, when contacts are already saved', async () => {
     const contact = { contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' };
-    for (const contacts of [[contact]]) {
-      await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], contacts);
-      const view = render(<App />);
-      fireEvent.press(await screen.findByText("Someone else I've lost"));
-      expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
-      expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
-      fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
-      fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
-      fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-      expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
-      expect(screen.getByText('Writing about Ben')).toBeTruthy();
-      expect(screen.queryByText('Choose who to tell')).toBeNull();
-      view.unmount();
-    }
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], [contact]);
+    const view = render(<App />);
+    fireEvent.press(await screen.findByText("Someone else I've lost"));
+    expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
+    expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
+    fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
+    fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
+    expect(screen.getByText('Writing about Ben')).toBeTruthy();
+    expect(screen.queryByText('Choose who to tell')).toBeNull();
+    view.unmount();
   });
 
   it('Back from setup returns to Home and the new person is not listed', async () => {

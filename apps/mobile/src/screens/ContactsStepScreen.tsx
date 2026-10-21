@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -9,13 +9,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164 } from '@griever/contacts';
 import type { NormalizedContact } from '@griever/contacts';
 import { expoContactsSource } from '../lib/expoContactsSource';
-import { ErrorText, Field, ScreenHeader, authStyles } from '../components/authForm';
+import { ErrorText, Field, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
 type Mode = { kind: 'start' } | { kind: 'adding' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
 
 const BAD_NUMBER = "That number doesn't look right — check the area code and digits.";
+const ADD_FAILED = 'We could not save that. Please try again.';
 const IMPORT_FAILED = 'We could not read your contacts. You can add people by hand instead.';
 
 /**
@@ -42,15 +44,21 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [status, setStatus] = useState('');
+  const phoneRef = useRef<TextInput>(null);
+  const say = (message: string) => {
+    setStatus(message);
+    announce(message);
+  };
 
-  const backFromMode = () => (mode.kind === 'start' ? onBack() : setMode({ kind: 'start' }));
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      backFromMode();
+      if (mode.kind === 'start') onBack();
+      else setMode({ kind: 'start' });
       return true;
     });
     return () => sub.remove();
-  });
+  }, [mode.kind, onBack]);
 
   async function importFromPhone() {
     setImporting(true);
@@ -58,7 +66,8 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
     try {
       const stored = new Set(contacts.contacts.map((c) => c.phone));
       const result = await runImport(expoContactsSource, stored, detectDeviceRegion());
-      setChosen(new Set(result.fresh.filter((c) => c.starred).map((c) => c.key)));
+      // Nothing is preselected: the person chooses (as web).
+      setChosen(new Set());
       setMode({ kind: 'reviewing', fresh: result.fresh });
     } catch (err) {
       // Saying no to the permission is "nothing chosen", not an error.
@@ -72,17 +81,34 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
     const picked = fresh
       .filter((c) => chosen.has(c.key))
       .map((c) => ({ name: c.displayName, phone: c.phone, email: c.email, tier: 'family' as const }));
-    if (picked.length > 0) await contacts.importContacts(picked, 'native');
+    try {
+      if (picked.length > 0) await contacts.importContacts(picked, 'native');
+    } catch {
+      setError(ADD_FAILED);
+      return;
+    }
+    say(`${picked.length} added`);
     setMode({ kind: 'start' });
   }
 
   async function addByHand() {
+    if (!name.trim() || !phone.trim()) {
+      setError('Type a name and a mobile number.');
+      return;
+    }
     const e164 = toE164(phone, detectDeviceRegion());
     if (!e164) {
       setError(BAD_NUMBER);
       return;
     }
-    await contacts.addContact({ name: name.trim(), phone: e164, tier: 'family' });
+    const added = name.trim();
+    try {
+      await contacts.addContact({ name: added, phone: e164, tier: 'family' });
+    } catch {
+      setError(ADD_FAILED);
+      return;
+    }
+    say(`Added ${added}`);
     setName('');
     setPhone('');
     setError(null);
@@ -90,7 +116,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
   }
 
   const back = (
-    <Pressable style={styles.back} onPress={backFromMode} accessibilityRole="button" accessibilityLabel="Back">
+    <Pressable style={styles.back} onPress={() => (mode.kind === 'start' ? onBack() : setMode({ kind: 'start' }))} accessibilityRole="button" accessibilityLabel="Back">
       <Text style={styles.backText}>← Back</Text>
     </Pressable>
   );
@@ -157,13 +183,21 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
   }
 
   if (mode.kind === 'adding') {
-    const canAdd = name.trim() !== '' && phone.trim() !== '';
     return (
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {back}
           <ScreenHeader>Add someone myself</ScreenHeader>
-          <Field label="Name" value={name} onChangeText={setName} autoCapitalize="words" returnKeyType="next" />
+          <Field
+            label="Name"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            textContentType="name"
+            autoComplete="name"
+            returnKeyType="next"
+            onSubmitEditing={() => phoneRef.current?.focus()}
+          />
           <Field
             label="Mobile number"
             value={phone}
@@ -172,14 +206,15 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
               setError(null);
             }}
             keyboardType="phone-pad"
+            textContentType="telephoneNumber"
+            autoComplete="tel"
+            inputRef={phoneRef}
           />
           <ErrorText message={error} />
           <Pressable
-            style={[styles.button, !canAdd && styles.buttonDisabled]}
+            style={styles.button}
             onPress={() => void addByHand()}
-            disabled={!canAdd}
             accessibilityRole="button"
-            accessibilityState={{ disabled: !canAdd }}
           >
             <Text style={styles.buttonText}>Add</Text>
           </Pressable>
@@ -201,6 +236,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
         onPress={() => void importFromPhone()}
         disabled={importing}
         accessibilityRole="button"
+        accessibilityLabel="Bring in from my phone"
         accessibilityState={{ disabled: importing, busy: importing }}
       >
         {importing ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Bring in from my phone</Text>}
@@ -216,6 +252,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
         <Text style={styles.buttonOutlineText}>Add someone myself</Text>
       </Pressable>
       <ErrorText message={error} />
+      <View accessibilityLiveRegion="polite">{status ? <Text style={styles.status}>{status}</Text> : null}</View>
       {saved.length > 0 && (
         <View style={styles.saved}>
           <Text style={styles.eyebrow} accessibilityRole="header">
@@ -230,14 +267,11 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
         </View>
       )}
       <Pressable
-        style={[styles.button, saved.length === 0 && styles.buttonDisabled]}
+        style={styles.button}
         onPress={onContinue}
-        disabled={saved.length === 0}
         accessibilityRole="button"
-        accessibilityState={{ disabled: saved.length === 0 }}
-        accessibilityHint={saved.length === 0 ? 'Add at least one person first' : undefined}
       >
-        <Text style={styles.buttonText}>Continue</Text>
+        <Text style={styles.buttonText}>Done for now</Text>
       </Pressable>
       <Text style={styles.note}>Three is plenty to begin. Nobody needs the whole list today.</Text>
     </ScrollView>
@@ -304,5 +338,6 @@ const styles = StyleSheet.create({
   saved: { marginTop: 24 },
   eyebrow: { fontSize: 13, fontWeight: '600', color: MUTED_STRONG, marginBottom: 8 },
   savedRow: { minHeight: 44, justifyContent: 'center', marginBottom: 4 },
+  status: { fontSize: 13, color: MUTED_STRONG, marginTop: 8 },
   note: { fontSize: 12, fontStyle: 'italic', color: MUTED, textAlign: 'center', marginTop: 16 },
 });
