@@ -74,9 +74,10 @@ describe('the order in the app', () => {
 
   // Behavior change approved in #110 (replaces "goes from Create straight to the path"):
   // Create now opens setup first, and Continue leads to the path.
-  it('goes from Create to setup, then to the path, with or without saved contacts', async () => {
+  // With no saved contacts the contacts step comes between (#226); see contactsStep.spec.tsx.
+  it('goes from Create to setup, then to the path, when contacts are already saved', async () => {
     const contact = { contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' };
-    for (const contacts of [[], [contact]]) {
+    for (const contacts of [[contact]]) {
       await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], contacts);
       const view = render(<App />);
       fireEvent.press(await screen.findByText("Someone else I've lost"));
@@ -122,7 +123,7 @@ describe('the order in the app', () => {
   });
 
   it('opens the details form with the name from setup already filled', async () => {
-    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], [{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]);
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');

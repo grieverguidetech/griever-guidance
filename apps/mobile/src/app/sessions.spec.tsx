@@ -16,6 +16,15 @@ const SETUP_TITLE = 'Who are we writing about?';
 async function startWith(name: string) {
   fireEvent.changeText(await screen.findByLabelText('Their name, required'), name);
   fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+  // An empty phone also asks for contacts once (#226). Add one by hand and carry on.
+  await waitFor(() => expect(screen.queryByText(`Writing about ${name}`) ?? screen.queryByText('Who should we be able to reach?')).toBeTruthy());
+  if (screen.queryByText('Who should we be able to reach?')) {
+    fireEvent.press(screen.getByRole('button', { name: 'Add someone myself' }));
+    fireEvent.changeText(screen.getByLabelText('Name'), 'Dee');
+    fireEvent.changeText(screen.getByLabelText('Mobile number'), '617 555 0148');
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
+  }
   await screen.findByText(`Writing about ${name}`);
 }
 
