@@ -306,8 +306,13 @@ function AppBody({
   // from the session in memory for each call and goes nowhere else.
   const sharingOn = AUTH_ENABLED && SHARING_ENABLED && !offline && !!client && !!auth?.isSignedIn;
   const getAccessToken = useCallback(async () => {
-    const state = await client?.getSession();
-    return state?.status === 'signed_in' ? state.session.accessToken : null;
+    try {
+      const state = await client?.getSession();
+      return state?.status === 'signed_in' ? state.session.accessToken : null;
+    } catch {
+      // A failed session read counts as no token: the hook reports "sign in again" rather than loading forever.
+      return null;
+    }
   }, [client]);
   const members = useMembers({ getAccessToken, enabled: sharingOn });
 
@@ -880,7 +885,8 @@ function AppBody({
           error={auth.error}
           showChecklist={auth.isSignedIn}
           peopleHelping={
-            sharingOn ? (
+            // Not during first-time onboarding after sign-up: that screen is only the name.
+            sharingOn && !firstProfile ? (
               <PeopleHelping
                 view={members.view}
                 status={members.status}
@@ -1118,7 +1124,7 @@ function AppBody({
         onCreate={startNewSession}
         // Only a known member loses the button; an unknown or offline profile keeps it, and the
         // database still refuses a member's insert (C11).
-        canCreate={auth?.profile?.accountType !== 'member'}
+        canCreate={!(sharingOn && auth?.profile?.accountType === 'member')}
         // "Your account" shows the list whenever its button shows; otherwise Home keeps the link.
         checklistLink={!(auth && !sessionEnded)}
       />

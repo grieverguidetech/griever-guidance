@@ -142,6 +142,7 @@ describe('member, flags on', () => {
     // The member note only shows once the profile says member; the button is gone with it.
     expect(await screen.findByText(/the people you're helping will show here/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "Start with someone I've lost" })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "Someone else I've lost" })).not.toBeInTheDocument();
   });
 
   it("says who they are helping on Profile and offers no invite form or remove section", async () => {
@@ -157,6 +158,61 @@ describe('member, flags on', () => {
   });
 });
 
+describe('first-time Profile after sign-up', () => {
+  it('shows only the name form, and People helping you on a later visit', async () => {
+    const c = client('owner');
+    let signedIn = false;
+    c.getSession = vi.fn(async () =>
+      signedIn
+        ? { status: 'signed_in' as const, session: { userId: 'u1', email: 'a@b.co', accessToken: 'tok' } }
+        : { status: 'signed_out' as const },
+    ) as never;
+    c.updateProfile = vi.fn(async () => ({
+      ok: true as const,
+      profile: { id: 'u1', senderName: 'Anna', contactSource: null, accountType: 'owner', createdAt: '', updatedAt: '' },
+    })) as never;
+    c.signUp = vi.fn(async () => {
+      signedIn = true;
+      return { ok: true as const, userId: 'u1' };
+    }) as never;
+    mocks.load.mockResolvedValue({ available: true, client: c });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByLabelText('Your name'), 'Anna');
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await waitFor(() => expect(mocks.getMembers).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Their email')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Your name')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await openProfile(user);
+    expect(await screen.findByRole('heading', { name: 'People helping you' })).toBeInTheDocument();
+  });
+});
+
+describe('session read fails', () => {
+  it('ends as signed out, not loading forever, and Profile still renders', async () => {
+    const c = client('owner');
+    // The identity hook reads the session too; give it a working one on its own calls.
+    let calls = 0;
+    const ok = { status: 'signed_in' as const, session: { userId: 'u1', email: 'a@b.co', accessToken: 'tok' } };
+    c.getSession = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) return ok;
+      throw new Error('network');
+    }) as never;
+    mocks.load.mockResolvedValue({ available: true, client: c });
+    const user = userEvent.setup();
+    render(<App />);
+    await openProfile(user);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+    expect(mocks.getMembers).not.toHaveBeenCalled();
+  });
+});
+
 describe('profile not known to be a member', () => {
   it('keeps "Create a new one" when the profile cannot be read', async () => {
     const c = client('owner');
@@ -168,6 +224,15 @@ describe('profile not known to be a member', () => {
 });
 
 describe('sharing flag off', () => {
+  it('keeps the create button for a member profile', async () => {
+    mocks.sharing = false;
+    signedInAs('member');
+    render(<App />);
+    expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Your account' });
+    expect(screen.queryByText(/the people you're helping will show here/)).not.toBeInTheDocument();
+  });
+
   it('makes no members or invites call and shows no new UI', async () => {
     mocks.sharing = false;
     signedInAs('owner');
