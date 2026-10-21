@@ -4,7 +4,6 @@ import type {
   Template,
   TemplateCategory,
   MessageTone,
-  Place,
   RecipientDeliveryStatus,
   SessionDetails,
 } from '@griever/shared';
@@ -40,9 +39,7 @@ export interface SendFlowState {
   fields: Record<string, string>;
   serviceDetailsKnown: ServiceDetailsKnown;
   selectedContactIds: string[];
-  place: Place | null;
   includeFlowers: boolean;
-  floristId: string | null;
   customFlorist: string;
   flowerDeliveryTarget: 'service' | 'home';
   tone: MessageTone;
@@ -58,11 +55,9 @@ export interface SendFlowActions {
   setTemplateCategory: (category: TemplateCategory) => void;
   setTemplate: (template: Template) => void;
   setField: (key: string, value: string) => void;
-  setPlace: (place: Place | null) => void;
   toggleContact: (contactId: string) => void;
   selectContacts: (contactIds: string[]) => void;
   setIncludeFlowers: (value: boolean) => void;
-  setFlorist: (floristId: string | null) => void;
   setCustomFlorist: (value: string) => void;
   setFlowerDeliveryTarget: (target: 'service' | 'home') => void;
   setTone: (tone: MessageTone) => void;
@@ -109,9 +104,7 @@ const initialState: SendFlowState = {
   fields: {},
   serviceDetailsKnown: null,
   selectedContactIds: [],
-  place: null,
   includeFlowers: false,
-  floristId: null,
   customFlorist: '',
   flowerDeliveryTarget: 'service',
   tone: 'plain',
@@ -177,7 +170,13 @@ export function isDraftStarted(draft: SendFlowDraft | null | undefined): boolean
 }
 
 function fromDraft(draft: SendFlowDraft): SendFlowState {
-  const restored: SendFlowState = { ...initialState, ...draft, sendJob: null };
+  // Drafts saved before the made-up venue and florist lists were removed carry `place` and
+  // `floristId`. Drop them so only the typed place and florist are ever sent.
+  const { place: _place, floristId: _floristId, ...kept } = draft as SendFlowDraft & {
+    place?: unknown;
+    floristId?: unknown;
+  };
+  const restored: SendFlowState = { ...initialState, ...kept, sendJob: null };
   if (restored.step === 'sending') restored.step = 'review';
   // The announcement no longer asks whether the service is known (or collects its details on a
   // step of its own); a draft saved on either of those carries on to the people. What was typed
@@ -265,7 +264,6 @@ function buildComposedFields(
     if (session.obituaryUrl) fields['obituaryUrl'] = session.obituaryUrl;
   }
 
-  if (state.place) fields['serviceLocation'] = state.place.formattedAddress;
   fields['tone'] = state.tone;
   if (state.templateCategory === 'announcement') {
     // No question is asked: the message carries the service details if the session has them
@@ -368,18 +366,6 @@ export function useSendFlow(
     setState((s) => ({ ...s, fields: { ...s.fields, [key]: value }, messageOverride: null }));
   }, []);
 
-  const setPlace = useCallback((place: Place | null) => {
-    setState((s) => ({
-      ...s,
-      place,
-      fields: {
-        ...s.fields,
-        serviceLocation: place ? place.formattedAddress : s.fields['serviceLocation'] ?? '',
-      },
-      messageOverride: null,
-    }));
-  }, []);
-
   const toggleContact = useCallback((contactId: string) => {
     setState((s) => {
       const has = s.selectedContactIds.includes(contactId);
@@ -403,10 +389,6 @@ export function useSendFlow(
 
   const setIncludeFlowers = useCallback((value: boolean) => {
     setState((s) => ({ ...s, includeFlowers: value }));
-  }, []);
-
-  const setFlorist = useCallback((floristId: string | null) => {
-    setState((s) => ({ ...s, floristId }));
   }, []);
 
   const setCustomFlorist = useCallback((value: string) => {
@@ -512,11 +494,9 @@ export function useSendFlow(
     setTemplateCategory,
     setTemplate,
     setField,
-    setPlace,
     toggleContact,
     selectContacts,
     setIncludeFlowers,
-    setFlorist,
     setCustomFlorist,
     setFlowerDeliveryTarget,
     setTone,

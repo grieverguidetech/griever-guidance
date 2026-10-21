@@ -28,8 +28,8 @@ export function ConfirmScreen({ flow }: Props) {
   const message = flow.messageOverride ?? composeMessage(flow.selectedTemplate, fields);
 
   function handleSend() {
-    // Pin the exact text reviewed here — so SendingScreen's sms: links carry precisely
-    // what the griever just read, not a recomputation that could drift.
+    // Pin the exact text reviewed here, so SendingScreen's sms: links carry precisely what the
+    // griever just read and not a recomputation that could drift.
     if (flow.messageOverride === null) flow.setMessageOverride(message);
     // Texting each person from their own number happens one at a time on the
     // next screen — nothing to send from here (no backend call at all).
@@ -184,9 +184,7 @@ function FlowersSection({ flow }: { flow: Flow }) {
               type="text"
               placeholder="Name, phone or website"
               value={flow.customFlorist}
-              onChange={(e) => {
-                flow.setCustomFlorist(e.target.value);
-              }}
+              onChange={(e) => flow.setCustomFlorist(e.target.value)}
             />
           </div>
 

@@ -152,7 +152,7 @@ describe('the order in the app', () => {
   it('opens a draft in progress where it was left when the person is opened from Home', async () => {
     const draft = {
       step: 'details', templateCategory: 'aftercare', templateOverrideId: null, fields: { deceasedName: 'Anna Lee' },
-      serviceDetailsKnown: null, selectedContactIds: [], place: null, includeFlowers: false, floristId: null,
+      serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false,
       customFlorist: '', flowerDeliveryTarget: 'service', tone: 'warm', messageOverride: null,
     };
     await saved([{ ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draft } } as unknown as Session]);
@@ -166,7 +166,7 @@ describe('the order in the app', () => {
 
 const draftOf = (fields: Record<string, string>, step = 'details') => ({
   step, templateCategory: 'aftercare', templateOverrideId: null, fields,
-  serviceDetailsKnown: null, selectedContactIds: [], place: null, includeFlowers: false, floristId: null,
+  serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false,
   customFlorist: '', flowerDeliveryTarget: 'service', tone: 'warm', messageOverride: null,
 });
 

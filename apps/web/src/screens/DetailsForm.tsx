@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function DetailsForm({ flow }: Props) {
-  const { selectedTemplate, fields, setField, setPlace, nextStep, prevStep } = flow;
+  const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
 
   if (!selectedTemplate) return null;
 
@@ -79,10 +79,7 @@ export function DetailsForm({ flow }: Props) {
                 className="gg-input"
                 type="text"
                 value={fields[field.key] ?? ''}
-                onChange={(e) => {
-                  setField(field.key, e.target.value);
-                  setPlace(null);
-                }}
+                onChange={(e) => setField(field.key, e.target.value)}
                 placeholder={field.placeholder}
                 autoComplete="off"
               />

@@ -87,7 +87,6 @@ describe('useSendFlow — an edited message', () => {
     const { result } = announcement();
     act(() => result.current.setMessageOverride('my words'));
     act(() => result.current.setIncludeFlowers(true));
-    act(() => result.current.setFlorist('f-1'));
     act(() => result.current.setCustomFlorist('Rose Shop'));
     act(() => result.current.setFlowerDeliveryTarget('home'));
     expect(result.current.composedMessage).toBe('my words');
@@ -300,5 +299,29 @@ describe('useSendFlow — mounted again with the saved sent draft (#167)', () =>
     expect(result.current.composedMessage).not.toContain('private words');
     // Still not something Home reopens.
     expect(hasDraftInProgress(draft)).toBe(false);
+  });
+});
+
+describe('useSendFlow — a draft saved with a made-up place (#247)', () => {
+  it('sends the typed place, not the old address, and drops place and floristId', () => {
+    const old = {
+      ...freshDraft({
+        templateCategory: 'service',
+        templateOverrideId: 'share-service',
+        step: 'review',
+        fields: { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' },
+      }),
+      place: { placeId: 'x', name: 'Riverside Chapel', formattedAddress: '40 Elm St, Waltham, MA 02451' },
+      floristId: 'f-1',
+    } as SendFlowDraft;
+    const saved: SendFlowDraft[] = [];
+    const { result } = renderHook(() => useSendFlow({ draft: old, onDraftChange: (d) => saved.push(d) }));
+    expect(result.current.composedMessage).toContain('Oak Chapel');
+    expect(result.current.composedMessage).not.toContain('Elm St');
+    expect(result.current.composedFields['serviceLocation']).toBe('Oak Chapel');
+    expect(Object.keys(result.current)).not.toContain('place');
+    act(() => result.current.setField('serviceNotes', 'x'));
+    expect(saved.at(-1)).not.toHaveProperty('place');
+    expect(saved.at(-1)).not.toHaveProperty('floristId');
   });
 });
