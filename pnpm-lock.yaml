@@ -376,6 +376,21 @@ importers:
         specifier: ^1.13.12
         version: 1.13.12
 
+  libs/data-access:
+    dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.1154.0
+        version: 3.1154.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.1154.0
+        version: 3.1154.0(@aws-sdk/client-dynamodb@3.1154.0)
+      '@griever/data-aws':
+        specifier: workspace:*
+        version: link:../data-aws
+      '@griever/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   libs/data-aws:
     dependencies:
       '@aws-sdk/client-dynamodb':

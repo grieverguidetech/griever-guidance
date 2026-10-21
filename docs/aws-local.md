@@ -38,7 +38,7 @@ The code is in `libs/data-aws`. The scripts are in `infra/aws-local`.
 | `gg-data` | `pk` | `sk` | `gsi1` on `gsi1pk` and `gsi1sk` |
 
 - Plan v4 names `gg-content` and its keys. It does not name the keys of the data table.
-  `gg-data` is the simplest choice: generic `pk` and `sk`, and one index for lookups by email.
+  `gg-data` is the simplest choice: generic `pk` and `sk`, and one index (`gsi1`) for items that point at a user, used only by account deletion. No rule reads it.
   A later ticket can change it before any real data exists.
 - `gg-data` has time to live (TTL) on one attribute, named `ttl` (epoch seconds). The table script turns it on, and checks first, so a second run changes nothing.
 - The table script waits until each table is ACTIVE. If a table with the same name has other keys or indexes, it stops with an error. Run `pnpm aws:down` and start again.
