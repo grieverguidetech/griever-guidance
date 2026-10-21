@@ -79,3 +79,8 @@ design_specs
 
 # agent worktrees (PROCESS.md §3)
 .worktrees/
+
+# build artifacts and tool output
+*.tsbuildinfo
+apps/marketing/.astro/
+.specstory/
