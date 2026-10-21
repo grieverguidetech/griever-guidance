@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const original = process.env.EXPO_PUBLIC_FEATURE_PAYMENTS;
 
@@ -28,5 +30,12 @@ describe('PAYMENTS_ENABLED', () => {
 
   it.each(['false', '', 'TRUE', 'True', '1', ' true'])('is off for %j', (value) => {
     expect(paymentsEnabled(value)).toBe(false);
+  });
+
+  // Expo inlines EXPO_PUBLIC_* only for dot access, so bracket access would ship the flag stuck off.
+  it('reads the variable with dot access, so Expo inlines it in the bundle', () => {
+    const source = readFileSync(join(__dirname, 'features.ts'), 'utf8');
+    expect(source).toMatch(/process\.env\.EXPO_PUBLIC_FEATURE_PAYMENTS\b/);
+    expect(source).not.toMatch(/process\.env\[/);
   });
 });
