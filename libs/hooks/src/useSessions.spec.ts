@@ -513,11 +513,10 @@ describe('removeSession (#215)', () => {
     expect(JSON.stringify(saved())).not.toContain('"c1"');
   });
 
-  it('leaves no session active when the open one is removed (the app finds its id gone)', () => {
+  it('removes the only session, so no session with that id is left', () => {
     const { storage } = store([keep('a', 'owner')]);
     const { result } = renderHook(() => useSessions(storage));
     act(() => void result.current.removeSession('a'));
-    expect(result.current.sessions.find((s) => s.id === 'a')).toBeUndefined();
     expect(result.current.sessions).toEqual([]);
   });
 

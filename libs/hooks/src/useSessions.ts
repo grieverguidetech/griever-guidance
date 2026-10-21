@@ -295,7 +295,8 @@ const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
 
 export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));
-  // Lets removeSession answer at once; kept in step by the updater below.
+  // removeSession must return its boolean synchronously, but a setState updater runs later, so the
+  // latest list is read from this ref (also updated in removeSession itself for back-to-back calls).
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
 

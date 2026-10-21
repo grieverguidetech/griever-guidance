@@ -71,6 +71,8 @@ interface Stored {
   baselines: Record<string, FlowFacts>;
   /** People removed on this device, kept until a pull no longer returns them (sync lag). */
   removed?: string[];
+  /** Flows this account owns here, so a later disappearance is known to be a removal. */
+  owned?: string[];
 }
 
 interface SyncState {
@@ -81,6 +83,8 @@ interface SyncState {
   baselines: Map<string, FlowFacts>;
   /** Flow ids removed on this device. A pull that still returns one must not bring the person back. */
   removed: Set<string>;
+  /** Flow ids of sessions this account owns (not shared-in). Only these can become `removed`. */
+  owned: Set<string>;
   /** True once a pull has worked this run: only then do we know which people the server lacks. */
   pulled: boolean;
   /** People the server refused to create; not offered again this run. */
@@ -88,7 +92,7 @@ interface SyncState {
 }
 
 function readStored(storage: SendFlowStorage | undefined, userId: string): SyncState {
-  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), removed: new Set(), pulled: false, refused: new Set() };
+  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), removed: new Set(), owned: new Set(), pulled: false, refused: new Set() };
   if (!storage) return state;
   try {
     const raw = storage.getItem(flowQueueKey(userId));
@@ -104,6 +108,7 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
       if (clean) state.baselines.set(id, clean);
     }
     for (const id of parsed.removed ?? []) if (typeof id === 'string' && isUuid(id)) state.removed.add(id);
+    for (const id of parsed.owned ?? []) if (typeof id === 'string' && isUuid(id)) state.owned.add(id);
     for (const id of parsed.known ?? []) if (typeof id === 'string' && isUuid(id)) state.known.add(id);
   } catch {
     // unreadable storage: start empty
@@ -119,6 +124,7 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
       known: [...state.known],
       baselines: Object.fromEntries(state.baselines),
       removed: [...state.removed],
+      owned: [...state.owned],
     };
     storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
@@ -187,6 +193,11 @@ function scanSessions(
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
     seen.add(s.flowId);
+    if (s.role === 'member') state.owned.delete(s.flowId);
+    else if (!state.owned.has(s.flowId)) {
+      state.owned.add(s.flowId);
+      dirty = true;
+    }
     const facts = toFlowFacts(s);
     const before = state.baselines.get(s.flowId);
     state.baselines.set(s.flowId, facts);
@@ -213,7 +224,8 @@ function scanSessions(
     if (present.has(id)) continue;
     state.baselines.delete(id);
     state.queue.delete(id);
-    state.removed.add(id);
+    // A shared-in person who drops out (access lost) is not a removal: a later pull may list them again.
+    if (state.owned.delete(id)) state.removed.add(id);
     dirty = true;
   }
   for (const id of [...state.baselines.keys()]) {
