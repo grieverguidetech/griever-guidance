@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   FlowFactKey,
   FlowRecord,
@@ -88,6 +88,13 @@ export interface UseSessionsResult {
   clearDraft: (id: string, category: TemplateCategory) => void;
   touchSession: (id: string) => void;
   deleteSession: (id: string) => void;
+  /**
+   * Takes one person off this device, with their drafts, reminders and who was notified. Local only:
+   * nothing is sent, and other sessions are unchanged. Returns false and removes nothing when the
+   * session is unknown or is a 'member' session (a shared person is never removed by a member, C9, C11).
+   * Sync notices the missing session and drops that person's queued edits (see `useFlowSync`).
+   */
+  removeSession: (id: string) => boolean;
   pruneEmpty: () => void;
   setServiceReady: (id: string, ready: boolean) => void;
   scheduleReminder: (id: string, momentKey: MomentKey, dueAt: string) => void;
@@ -288,6 +295,9 @@ const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
 
 export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));
+  // Lets removeSession answer at once; kept in step by the updater below.
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
 
   useEffect(() => {
     save(storage, sessions);
@@ -367,6 +377,14 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
 
   const deleteSession = useCallback((id: string) => {
     setSessions((list) => list.filter((s) => s.id !== id));
+  }, []);
+
+  const removeSession = useCallback((id: string): boolean => {
+    const target = sessionsRef.current.find((s) => s.id === id);
+    if (!target || target.role === 'member') return false;
+    sessionsRef.current = sessionsRef.current.filter((s) => s.id !== id);
+    setSessions((list) => list.filter((s) => s.id !== id));
+    return true;
   }, []);
 
   const pruneEmpty = useCallback(() => {
@@ -465,6 +483,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     clearDraft,
     touchSession,
     deleteSession,
+    removeSession,
     pruneEmpty,
     setServiceReady,
     scheduleReminder,

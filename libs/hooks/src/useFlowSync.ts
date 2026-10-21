@@ -69,6 +69,8 @@ interface Stored {
   known: string[];
   /** The facts last seen per person (facts only), so edits made while sync was off are still found. */
   baselines: Record<string, FlowFacts>;
+  /** People removed on this device, kept until a pull no longer returns them (sync lag). */
+  removed?: string[];
 }
 
 interface SyncState {
@@ -77,6 +79,8 @@ interface SyncState {
   known: Set<string>;
   /** The facts last seen per flow, to tell what the user changed. Saved in storage. */
   baselines: Map<string, FlowFacts>;
+  /** Flow ids removed on this device. A pull that still returns one must not bring the person back. */
+  removed: Set<string>;
   /** True once a pull has worked this run: only then do we know which people the server lacks. */
   pulled: boolean;
   /** People the server refused to create; not offered again this run. */
@@ -84,7 +88,7 @@ interface SyncState {
 }
 
 function readStored(storage: SendFlowStorage | undefined, userId: string): SyncState {
-  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), pulled: false, refused: new Set() };
+  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), removed: new Set(), pulled: false, refused: new Set() };
   if (!storage) return state;
   try {
     const raw = storage.getItem(flowQueueKey(userId));
@@ -99,6 +103,7 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
       const clean = isUuid(id) ? parseFlowFacts(facts) : null;
       if (clean) state.baselines.set(id, clean);
     }
+    for (const id of parsed.removed ?? []) if (typeof id === 'string' && isUuid(id)) state.removed.add(id);
     for (const id of parsed.known ?? []) if (typeof id === 'string' && isUuid(id)) state.known.add(id);
   } catch {
     // unreadable storage: start empty
@@ -113,6 +118,7 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
       queue: Object.fromEntries(state.queue),
       known: [...state.known],
       baselines: Object.fromEntries(state.baselines),
+      removed: [...state.removed],
     };
     storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
@@ -177,6 +183,7 @@ function scanSessions(
   let changed = false;
   let dirty = false;
   const seen = new Set<string>();
+  const present = new Set(sessions.map((s) => s.flowId));
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
     seen.add(s.flowId);
@@ -199,6 +206,15 @@ function scanSessions(
       state.queue.set(s.flowId, coalesceFlowPatches([state.queue.get(s.flowId) ?? {}, diff]));
       changed = true;
     }
+  }
+  // A person who is gone from the device: forget their facts and unsent edits, and remember the id
+  // so a pull that still lists them does not add them back.
+  for (const id of new Set([...state.baselines.keys(), ...state.queue.keys()])) {
+    if (present.has(id)) continue;
+    state.baselines.delete(id);
+    state.queue.delete(id);
+    state.removed.add(id);
+    dirty = true;
   }
   for (const id of [...state.baselines.keys()]) {
     if (seen.has(id)) continue;
@@ -277,7 +293,14 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         return false;
       }
       const state = getState();
-      markKnown(state, result.flows, userId);
+      // Sync lag: a removed person the server still lists is left out. Once a clean pull no longer
+      // lists the id, it is forgotten. A pull that dropped records may be hiding it, so keep it then.
+      const flows = result.flows.filter((r) => !state.removed.has(r.id));
+      if (!result.dropped) {
+        const listed = new Set(result.flows.map((r) => r.id));
+        for (const id of [...state.removed]) if (!listed.has(id)) state.removed.delete(id);
+      }
+      markKnown(state, flows, userId);
       state.pulled = true;
       try {
         scanSessions(state, latest.current.sessions, userId);
@@ -289,7 +312,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         pendingByFlow[id] = FLOW_FACT_KEYS.filter((key) => key in pending);
       }
       // Records already merged into sessions must not look like local edits afterwards.
-      for (const record of result.flows) {
+      for (const record of flows) {
         const base = state.baselines.get(record.id);
         if (!base) continue;
         const pendingKeys = new Set(pendingByFlow[record.id] ?? []);
@@ -298,7 +321,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         state.baselines.set(record.id, next as unknown as FlowFacts);
       }
       writeStored(latest.current.storage, state);
-      latest.current.applyRemoteFlows({ flows: result.flows, dropped: result.dropped }, userId, pendingByFlow);
+      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
       return true;
     };
 

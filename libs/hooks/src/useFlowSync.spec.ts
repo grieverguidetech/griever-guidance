@@ -722,3 +722,78 @@ describe('useFlowSync queue behaviour', () => {
     expect(requests.length).toBe(count);
   });
 });
+
+describe('useFlowSync removed people (#215)', () => {
+  it('never sends a queued edit for a person who was removed', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const base = session();
+    const { rerender } = setup([base], { storage });
+    await advance(10);
+    // The edit is noticed, then the person is removed before the debounce ends.
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    rerender({ sessions: [] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([]);
+    const saved = JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}');
+    expect(saved.queue).toEqual({});
+    expect(saved.baselines).toEqual({});
+    expect(saved.removed).toEqual([FLOW]);
+  });
+
+  it('does not bring the person back when a pull still returns them, then forgets the id', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const { rerender, applyRemoteFlows, wake } = setup([session()], { storage });
+    await advance(10);
+    rerender({ sessions: [] });
+    await advance(10);
+    await wake();
+    await advance(10);
+    const last = applyRemoteFlows.mock.calls.at(-1);
+    expect(last?.[0].flows).toEqual([]);
+    expect(writes(requests)).toEqual([]);
+
+    mockFetch(() => ({ status: 200, body: [] }));
+    await wake();
+    await advance(10);
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').removed).toEqual([]);
+  });
+
+  it('keeps a removed id across a reload', async () => {
+    mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const first = setup([session()], { storage });
+    await advance(10);
+    first.rerender({ sessions: [] });
+    await advance(10);
+    first.unmount();
+    const second = setup([], { storage });
+    await advance(10);
+    expect(second.applyRemoteFlows.mock.calls.at(-1)?.[0].flows).toEqual([]);
+  });
+
+  it('works with the real useSessions.removeSession', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage();
+    const sessionsStore = memoryStorage({ 'gg.sessions.v1': JSON.stringify([session()]) });
+    const view = renderHook(() => {
+      const s = useSessions(sessionsStore);
+      useFlowSync({
+        sessions: s.sessions,
+        userId: USER,
+        getAccessToken: async () => 'tok',
+        enabled: true,
+        storage,
+        subscribe: () => () => undefined,
+        applyRemoteFlows: s.applyRemoteFlows,
+      });
+      return s;
+    });
+    await advance(10);
+    act(() => void view.result.current.removeSession('s1'));
+    await advance(PULL + 10);
+    expect(view.result.current.sessions).toEqual([]);
+    expect(writes(requests)).toEqual([]);
+  });
+});
