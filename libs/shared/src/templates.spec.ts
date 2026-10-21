@@ -3,6 +3,7 @@ import {
   composeMessage,
   historyTagLabel,
   normalizeUrl,
+  SHARE_SERVICE_SAMPLE,
   shareService,
   templates,
 } from './index.js';
@@ -127,5 +128,12 @@ describe('historyTagLabel', () => {
     expect(historyTagLabel('announcement')).toBe('Announcement');
     expect(historyTagLabel('obituary')).toBe('Obituary');
     expect(historyTagLabel('aftercare')).toBe('Service details');
+  });
+});
+
+describe('SHARE_SERVICE_SAMPLE', () => {
+  it('is calm (no exclamation points) and uses placeholders, not names', () => {
+    expect(SHARE_SERVICE_SAMPLE).not.toContain('!');
+    expect(SHARE_SERVICE_SAMPLE).toContain('[Name]');
   });
 });

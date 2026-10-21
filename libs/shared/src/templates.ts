@@ -373,3 +373,12 @@ export const templates: Template[] = [
   thankYouNote,
   obituaryLink,
 ];
+
+/**
+ * A guide shown on "Review your message" for Share the service: what a good
+ * service message covers. Placeholders only, no real names, and a calm tone (C7).
+ */
+export const SHARE_SERVICE_SAMPLE =
+  "[Name]'s service will be held [day and date] at [time], [place and address]. " +
+  'A gathering will follow at [place]. Parking is [where]. ' +
+  'Please come as you are. Your being there will mean a great deal to the family.';

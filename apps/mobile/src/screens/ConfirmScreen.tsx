@@ -1,13 +1,17 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import type { FlowProps } from '../app/App';
 import { ACCENT, MUTED } from '../components/colors';
 
 export function ConfirmScreen({ flow }: FlowProps) {
-  const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob } = flow;
+  const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
+  const [sampleOpen, setSampleOpen] = useState(false);
 
   if (!selectedTemplate) return null;
 
   const recipientCount = selectedContactIds.length;
+  const isService = flow.templateCategory === 'service';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -20,8 +24,36 @@ export function ConfirmScreen({ flow }: FlowProps) {
         your own number, one at a time.
       </Text>
       <View style={styles.messageBox}>
-        <Text style={styles.messageText}>{composedMessage}</Text>
+        {isService ? (
+          <>
+            <Text style={styles.fieldLabel}>Your message</Text>
+            <TextInput
+              style={styles.messageInput}
+              value={composedMessage}
+              onChangeText={setMessageOverride}
+              multiline
+              accessibilityLabel="Your message"
+            />
+          </>
+        ) : (
+          <Text style={styles.messageText}>{composedMessage}</Text>
+        )}
       </View>
+      {isService && (
+        <View style={styles.sample}>
+          <TouchableOpacity
+            style={styles.sampleToggle}
+            onPress={() => setSampleOpen((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: sampleOpen }}
+          >
+            <Text style={styles.sampleToggleText}>
+              {sampleOpen ? 'Hide a sample message' : 'See a sample message'}
+            </Text>
+          </TouchableOpacity>
+          {sampleOpen && <Text style={styles.messageText}>{SHARE_SERVICE_SAMPLE}</Text>}
+        </View>
+      )}
       <TouchableOpacity
         style={styles.button}
         onPress={startSendJob}
@@ -50,6 +82,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   messageText: { fontSize: 14, color: '#374151', lineHeight: 22 },
+  fieldLabel: { fontSize: 13, color: MUTED, marginBottom: 6 },
+  messageInput: { fontSize: 14, color: '#374151', lineHeight: 22, minHeight: 120, textAlignVertical: 'top' },
+  sample: { marginBottom: 24 },
+  sampleToggle: { minHeight: 44, minWidth: 44, justifyContent: 'center' },
+  sampleToggleText: { fontSize: 14, color: ACCENT },
   button: {
     backgroundColor: ACCENT,
     borderRadius: 10,

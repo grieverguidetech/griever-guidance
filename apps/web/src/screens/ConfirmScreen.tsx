@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
-import { composeMessage } from '@griever/shared';
+import { composeMessage, SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
@@ -16,6 +16,7 @@ interface Props {
 export function ConfirmScreen({ flow }: Props) {
   const florists = useMockFlorists(flow.place);
   const [editing, setEditing] = useState(false);
+  const [sampleOpen, setSampleOpen] = useState(false);
 
   if (!flow.selectedTemplate) return null;
 
@@ -57,14 +58,18 @@ export function ConfirmScreen({ flow }: Props) {
 
       <div className="gg-card">
         {isAnnouncement && <span className="gg-tag gg-tag-accent-2">Announcement</span>}
-        {editing ? (
-          <textarea
-            className="gg-input"
-            rows={6}
-            autoFocus
-            value={message}
-            onChange={(e) => flow.setMessageOverride(e.target.value)}
-          />
+        {editing || isService ? (
+          <div className="gg-field">
+            <label htmlFor="message-text">Your message</label>
+            <textarea
+              id="message-text"
+              className="gg-input"
+              rows={6}
+              autoFocus={!isService}
+              value={message}
+              onChange={(e) => flow.setMessageOverride(e.target.value)}
+            />
+          </div>
         ) : (
           <p
             className="gg-card-body m-0 whitespace-pre-wrap"
@@ -74,6 +79,30 @@ export function ConfirmScreen({ flow }: Props) {
           </p>
         )}
       </div>
+
+      {isService && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            aria-expanded={sampleOpen}
+            aria-controls="message-sample"
+            onClick={() => setSampleOpen((v) => !v)}
+            className="gg-btn gg-btn-ghost"
+            style={{ minHeight: 44, minWidth: 44 }}
+          >
+            {sampleOpen ? 'Hide a sample message' : 'See a sample message'}
+          </button>
+          {sampleOpen && (
+            <p
+              id="message-sample"
+              className="gg-card-body m-0 whitespace-pre-wrap"
+              style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)' }}
+            >
+              {SHARE_SERVICE_SAMPLE}
+            </p>
+          )}
+        </div>
+      )}
 
       {isService && (
         <FlowersSection flow={flow} florists={florists} />
