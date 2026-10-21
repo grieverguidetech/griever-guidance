@@ -1,7 +1,7 @@
 # Backend services
 
 Status: description of the code on `main` at commit `c164258` (2026-10-20). The target state in
-section 2 is a proposal (PR #183). It is not built.
+section 2 is a proposal. PR #183 (merged) added the plan in `docs/aws-migration-plan.md`. It is not built.
 
 Audience: Peter (product owner) and future developers. Language: ASD-STE100.
 
@@ -50,7 +50,7 @@ Counts from the code:
 | pgTAP assertions | 199 (14 + 41 + 80 + 64) in 4 files | `infra/supabase/tests/*.sql` |
 | Convex tables | 2 (`sessions`, `counters`) | `apps/gateway/convex/schema.ts` |
 | Convex functions | 4 (`sync:pull`, `sync:push`, `crons:purgeOldDeleted`, `crons:deleteEverything`) | `apps/gateway/convex/sync.ts`, `crons.ts` |
-| GitHub secrets | 12 names | `gh secret list` |
+| GitHub secrets | 11 names | `gh secret list` |
 | GitHub repo variables | 3 (`FEATURE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`) | `gh variable list` |
 
 ---
@@ -76,7 +76,7 @@ user can see in production.
 
 | Item | Why it is dead weight | Evidence |
 |---|---|---|
-| Convex Cloud + `libs/gateway-sync` + `libs/data-sync` + `/sync/pull`, `/sync/push` | `requireUser` throws `auth not configured` when `GG_DEV_AUTH` is not set, and production never sets it | `apps/gateway/convex/auth.ts`; `scripts/check-dev-auth.mjs`; REQUIREMENTS §6 Identity; issue #140 |
+| Convex Cloud + `libs/gateway-sync` + `libs/data-sync` + `/sync/pull`, `/sync/push` | `requireUser` throws `auth not configured` when `GG_DEV_AUTH` is not set, and production never sets it | `apps/gateway/convex/auth.ts`; `scripts/check-dev-auth.mjs`; REQUIREMENTS §6 Identity; issue #203 |
 | Convex deploy step in `deploy.yml` | Deploys functions that cannot run for a real user | `.github/workflows/deploy.yml` (`npx convex deploy`) |
 | `crons:deleteEverything` | Reads a `users` table that is not in `schema.ts` | `apps/gateway/convex/crons.ts` vs `schema.ts`. Whether Convex deploy accepts this: not verified |
 | PostHog secrets | No code reads them | `grep -ri posthog` finds nothing outside `node_modules` |
@@ -86,7 +86,7 @@ user can see in production.
 
 ### 2.3 What we can remove now, without the AWS plan
 
-1. Retire Convex (issue #140): remove `apps/gateway/convex`, `libs/gateway-sync`,
+1. Retire Convex (issue #203; #140 was closed as a duplicate): remove `apps/gateway/convex`, `libs/gateway-sync`,
    `libs/data-sync`, `infra/convex`, the Convex deploy step and the two Convex secrets.
 2. Delete the unused secrets `VITE_POSTHOG_HOST`, `VITE_POSTHOG_PROJECT_TOKEN` and `VITE_API_URL`
    (ask Peter first; PostHog may be planned).
@@ -94,9 +94,9 @@ user can see in production.
 
 These three steps take the backend from 6 vendors to 5, and from 3 server data stores to 1.
 
-### 2.4 Target state (proposed, PR #183, not done)
+### 2.4 Target state (proposed, plan merged in PR #183, not done)
 
-Source: `docs/aws-migration-plan.md` on branch `docs/aws-plan-v4-clerk` (PR #183, draft). Plan v4
+Source: `docs/aws-migration-plan.md` (added by PR #183, merged). Plan v4
 decisions:
 
 1. Clerk (magic link, no password) replaces Supabase Auth.
@@ -338,7 +338,7 @@ Local: `pnpm convex:up` (Docker, `infra/convex/docker-compose.yml`), then `pnpm 
 `libs/data-sync` has 3 spec files (about 7 cases). Gateway specs check input validation only.
 
 **Risks.** Cost and attention for a service that does nothing for users. The web app still starts
-sync triggers on sign-in (`apps/web/src/lib/registerSync.ts`); every call fails. Retire it (#140).
+sync triggers on sign-in (`apps/web/src/lib/registerSync.ts`); every call fails. Retire it (#203).
 
 ### 3.7 Anthropic (`POST /obituary`, `libs/gateway-messages`)
 
@@ -444,7 +444,7 @@ flowchart LR
   CFN --> CDB
 ```
 
-### 4.2 Component diagram: target system (plan v4, proposed, PR #183)
+### 4.2 Component diagram: target system (plan v4, proposed, plan merged in PR #183)
 
 ```mermaid
 flowchart LR
@@ -812,7 +812,7 @@ flowchart TB
 
 ## 5. Open questions
 
-1. **Retire Convex now (#140)?** Recommendation: yes, before any AWS work. It removes one vendor,
+1. **Retire Convex now (#203)?** Recommendation: yes, before any AWS work. It removes one vendor,
    two secrets, two libraries and one deploy step, and it never served a user.
 2. **`/obituary`: on or off?** Recommendation: add auth (the Supabase JWT, later Clerk) and a rate
    limit before the flag goes on. Decide what privacy text the user sees. Confirm whether
@@ -874,9 +874,9 @@ Documents:
 - `REQUIREMENTS.md` §1, §2 (C1 to C11), §6
 - `DATA.md` §3, §4, §7, "Shared people (Supabase)"
 - `AGENTS.md`
-- `docs/aws-migration-plan.md` on branch `docs/aws-plan-v4-clerk` (PR #183, draft)
+- `docs/aws-migration-plan.md` (PR #183, merged)
 
 Live repo metadata (names only, no values printed except feature flags):
 
 - `gh secret list`, `gh variable list`
-- `gh issue list` (issues #131, #140, #146, #166)
+- `gh issue list` (issues #131, #146, #166, #203)
