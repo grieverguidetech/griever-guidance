@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { ScreenHeader, authStyles } from '../components/authForm';
+import { SavedNote } from '../components/SavedNote';
 import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
 
 export type SetupDetails = { personName: string; dateOfPassing: string };
@@ -100,6 +101,7 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
         >
           <Text style={styles.buttonText}>Continue</Text>
         </Pressable>
+        <SavedNote />
       </ScrollView>
     </KeyboardAvoidingView>
   );
