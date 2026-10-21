@@ -18,8 +18,7 @@ function sourceFiles(dir: string): string[] {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
     const isSource = /\.(ts|tsx)$/.test(name) && !/\.spec\./.test(name);
-    // The unused Nx starter screen is not part of the product.
-    return isSource && name !== 'nx-welcome.tsx' ? [path] : [];
+    return isSource ? [path] : [];
   });
 }
 
