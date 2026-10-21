@@ -17,28 +17,50 @@ const make = (id: string, name: string, tier: Contact['tier']): Contact => ({
 });
 
 // Saved order puts a friend first, so the screen has to do the reordering.
-const saved = [make('1', 'Neighbour Ned', 'family'), make('2', 'Mum', 'first'), make('3', 'Cousin Cat', 'family'), make('4', 'Dad', 'first')];
+const saved = [
+  make('1', 'Neighbour Ned', 'family'),
+  make('2', 'Mum', 'first'),
+  make('3', 'Cousin Cat', 'family'),
+  make('4', 'Dad', 'first'),
+];
 
-function renderScreen(contactList: Contact[] = saved) {
+function renderScreen(contactList: Contact[] = saved, templateCategory: string | null = 'announcement') {
   const toggleContact = jest.fn();
-  const flow = { selectedContactIds: [] as string[], toggleContact, nextStep: jest.fn(), prevStep: jest.fn() };
+  const flow = {
+    selectedContactIds: [] as string[],
+    toggleContact,
+    nextStep: jest.fn(),
+    prevStep: jest.fn(),
+    templateCategory,
+  };
   const contacts = { contacts: contactList, loading: false } as unknown as UseContactsResult;
   render(<ContactSelectorScreen flow={flow as never} contacts={contacts} />);
   return { toggleContact };
 }
 
+const headers = () => screen.queryAllByRole('header').map((h) => h.props.children);
+
 describe('ContactSelectorScreen grouping', () => {
-  it('lists Close family before Friends & neighbours, with headings as headers', () => {
+  it('for an announcement, lists Close family before Friends & family, with headings as headers', () => {
     renderScreen();
-    const headers = screen.getAllByRole('header').map((h) => h.props.children);
-    expect(headers).toEqual(['Close family', 'Friends & neighbours']);
-    const rendered = screen.getAllByText(/^(Close family|Friends & neighbours|Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
-    expect(rendered).toEqual(['Close family', 'Mum', 'Dad', 'Friends & neighbours', 'Neighbour Ned', 'Cousin Cat']);
+    expect(headers()).toEqual(['Close family', 'Friends & family']);
+    const rendered = screen
+      .getAllByText(/^(Close family|Friends & family|Mum|Dad|Neighbour Ned|Cousin Cat)$/)
+      .map((n) => n.props.children);
+    expect(rendered).toEqual(['Close family', 'Mum', 'Dad', 'Friends & family', 'Neighbour Ned', 'Cousin Cat']);
   });
 
-  it('omits a heading with no contacts', () => {
-    renderScreen([make('1', 'Neighbour Ned', 'family')]);
-    expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['Friends & neighbours']);
+  it('shows a plain list in saved order, with no headings, for other templates', () => {
+    renderScreen(saved, 'death');
+    expect(headers()).toEqual([]);
+    const rendered = screen.getAllByText(/^(Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
+    expect(rendered).toEqual(['Neighbour Ned', 'Mum', 'Cousin Cat', 'Dad']);
+  });
+
+  it('hides the heading when only one group has people', () => {
+    renderScreen([make('1', 'Neighbour Ned', 'family'), make('3', 'Cousin Cat', 'family')]);
+    expect(headers()).toEqual([]);
+    expect(screen.getByText('Neighbour Ned')).toBeTruthy();
   });
 
   it('preselects no one and sends nothing until the user picks', () => {

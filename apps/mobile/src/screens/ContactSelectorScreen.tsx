@@ -30,12 +30,12 @@ type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] }
 
 const TIER_LABELS: Record<ContactTier, string> = {
   first: 'Close family',
-  family: 'Friends & neighbours',
+  family: 'Friends & family',
 };
 
 const TIER_ORDER: ContactTier[] = ['first', 'family'];
 
-export function groupByTier(list: Contact[]) {
+function groupByTier(list: Contact[]) {
   return TIER_ORDER.map((tier) => ({
     tier,
     title: TIER_LABELS[tier],
@@ -44,7 +44,7 @@ export function groupByTier(list: Contact[]) {
 }
 
 export function ContactSelectorScreen({ flow, contacts }: Props) {
-  const { selectedContactIds, toggleContact, nextStep, prevStep } = flow;
+  const { selectedContactIds, toggleContact, nextStep, prevStep, templateCategory } = flow;
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -54,6 +54,13 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   const [manualError, setManualError] = useState<string | null>(null);
 
   const selectedIds = new Set(selectedContactIds);
+
+  // Same rule as web: group only for announcements, and only when both groups have people.
+  const groups = groupByTier(contacts.contacts);
+  const listSections: { title: string | null; data: Contact[] }[] =
+    templateCategory === 'announcement' && groups.length > 1
+      ? groups
+      : [{ title: null, data: contacts.contacts }];
 
   async function handleImport() {
     setImporting(true);
@@ -224,14 +231,16 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
         <Text style={styles.subtitle}>Choose who should receive this message.</Text>
       </View>
       <SectionList
-        sections={groupByTier(contacts.contacts)}
+        sections={listSections}
         keyExtractor={(item) => item.contactId}
         renderItem={renderContact}
-        renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={styles.sectionHeader}>
-            {section.title}
-          </Text>
-        )}
+        renderSectionHeader={({ section }) =>
+          section.title ? (
+            <Text accessibilityRole="header" style={styles.sectionHeader}>
+              {section.title}
+            </Text>
+          ) : null
+        }
         stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
@@ -285,7 +294,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
   subtitle: { fontSize: 14, color: MUTED },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
-  sectionHeader: { fontSize: 12, fontWeight: '600', color: MUTED_STRONG, marginTop: 8, marginBottom: 8 },
+  sectionHeader: { fontSize: 13, fontWeight: '600', color: MUTED_STRONG, marginTop: 8, marginBottom: 8 },
   empty: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 },
   row: {
     flexDirection: 'row',
