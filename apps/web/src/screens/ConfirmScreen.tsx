@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { useMockFlorists, composedFieldsWithFlorist } from '@griever/hooks';
+import { composedFieldsWithFlorist } from '@griever/hooks';
 import { composeMessage, SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
-import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
-import { Circle } from '@phosphor-icons/react/Circle';
 import { TopBar } from '../lib/ui';
 
 type Flow = ReturnType<typeof useSendFlow>;
@@ -14,7 +12,6 @@ interface Props {
 }
 
 export function ConfirmScreen({ flow }: Props) {
-  const florists = useMockFlorists(flow.place);
   const [editing, setEditing] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
 
@@ -25,16 +22,13 @@ export function ConfirmScreen({ flow }: Props) {
   const recipientCount = flow.selectedContactIds.length;
   const isBlank = (flow.messageOverride ?? '').trim() === '' && flow.messageOverride !== null;
 
-  const selectedFlorist = florists.find((f) => f.id === flow.floristId) ?? null;
-  const floristName = selectedFlorist?.name ?? flow.customFlorist;
+  const floristName = flow.customFlorist;
 
   const fields = composedFieldsWithFlorist(flow, floristName);
   const message = flow.messageOverride ?? composeMessage(flow.selectedTemplate, fields);
 
   function handleSend() {
-    // Pin the exact text reviewed here — including a canned (non-custom)
-    // florist's name, which only exists in this screen's local `message`,
-    // not yet in flow state — so SendingScreen's sms: links carry precisely
+    // Pin the exact text reviewed here — so SendingScreen's sms: links carry precisely
     // what the griever just read, not a recomputation that could drift.
     if (flow.messageOverride === null) flow.setMessageOverride(message);
     // Texting each person from their own number happens one at a time on the
@@ -105,7 +99,7 @@ export function ConfirmScreen({ flow }: Props) {
       )}
 
       {isService && (
-        <FlowersSection flow={flow} florists={florists} />
+        <FlowersSection flow={flow} />
       )}
 
       {isAnnouncement && (
@@ -152,17 +146,8 @@ export function ConfirmScreen({ flow }: Props) {
   );
 }
 
-function FlowersSection({
-  flow,
-  florists,
-}: {
-  flow: Flow;
-  florists: import('@griever/shared').Florist[];
-}) {
-  const venue = flow.place?.name ?? 'the venue';
-  const selectedFlorist = florists.find((f) => f.id === flow.floristId) ?? null;
-  const floristLabel =
-    selectedFlorist?.name ?? (flow.customFlorist.trim() || 'the florist');
+function FlowersSection({ flow }: { flow: Flow }) {
+  const floristLabel = flow.customFlorist.trim() || 'the florist';
   const target = flow.flowerDeliveryTarget === 'home' ? "the family's home" : 'the service';
 
   return (
@@ -188,36 +173,9 @@ function FlowersSection({
 
       {flow.includeFlowers && (
         <div className="flex flex-col gap-2">
-          <p className="gg-eyebrow m-0">Florists near {venue}</p>
-          {florists.map((florist) => {
-            const selected = flow.floristId === florist.id;
-            return (
-              <button
-                key={florist.id}
-                type="button"
-                onClick={() => flow.setFlorist(selected ? null : florist.id)}
-                className={`gg-card gg-card-selectable flex-row items-center justify-between ${
-                  selected ? 'gg-card-selected' : ''
-                }`}
-              >
-                <span className="flex flex-col text-left">
-                  <span className="gg-card-title text-[14px]">{florist.name}</span>
-                  <span className="gg-card-meta">
-                    {florist.distanceLabel} · {florist.deliveryHint}
-                  </span>
-                </span>
-                {selected ? (
-                  <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-accent)' }} />
-                ) : (
-                  <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-400)' }} />
-                )}
-              </button>
-            );
-          })}
-
           <div className="gg-field">
             <label htmlFor="custom-florist">
-              Or a florist you'd prefer
+              A florist you'd like to name
               <span style={{ color: 'var(--text-eyebrow)' }}> (optional)</span>
             </label>
             <input
@@ -228,7 +186,6 @@ function FlowersSection({
               value={flow.customFlorist}
               onChange={(e) => {
                 flow.setCustomFlorist(e.target.value);
-                if (e.target.value) flow.setFlorist(null);
               }}
             />
           </div>
