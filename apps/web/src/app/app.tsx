@@ -31,7 +31,6 @@ import { Settings } from '../screens/Settings';
 import { removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import type { ContactDraft } from '../screens/AddContactsManual';
-import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
 import { SessionSetup } from '../screens/SessionSetup';
 import { Home } from '../screens/Home';
@@ -53,7 +52,6 @@ type AppView =
   | 'profile'
   | 'settings'
   | 'addContactsManual'
-  | 'importContacts'
   | 'whoHearsFirst'
   | 'checkContacts'
   | 'setup'
@@ -269,7 +267,6 @@ const CHECKLIST_RETURNS: AppView[] = [
   // The walk after "Create a new one": the checklist returns to the step it was opened from.
   'setup',
   'addContactsManual',
-  'importContacts',
   'whoHearsFirst',
 ];
 
@@ -298,7 +295,6 @@ function AppBody({
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const sessionList = sessions.sessions;
-  const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
   // Without auth there is no account gate — everyone is let straight in.
   const isSignedIn = auth ? auth.isSignedIn : true;
 
@@ -353,8 +349,6 @@ function AppBody({
   // from a step does not lose it. Cleared when the walk starts and ends.
   const [contactDraft, setContactDraft] = useState<ContactDraft>({ name: '', phone: '', hearsFirst: false });
   const [firstTicks, setFirstTicks] = useState<string[] | null>(null);
-  // Which contacts view the walk used, so Back from who hears first returns to it.
-  const [contactsView, setContactsView] = useState<'addContactsManual' | 'importContacts'>('addContactsManual');
   // The name typed at sign-up, saved once the new account has a session.
   const [pendingName, setPendingName] = useState<string | null>(null);
   // The account has no name: Profile opens with a "What should we call you?" prompt.
@@ -656,7 +650,6 @@ function AppBody({
     setCreating(true);
     setContactDraft({ name: '', phone: '', hearsFirst: false });
     setFirstTicks(null);
-    setContactsView('addContactsManual');
     startSetup();
   }
 
@@ -700,7 +693,7 @@ function AppBody({
 
   function backFromWhoHearsFirst() {
     if (contactsSkipped) backToSetup();
-    else setView(contactsView);
+    else setView('addContactsManual');
   }
 
   function saveWhoHearsFirst(firstIds: string[]) {
@@ -924,28 +917,10 @@ function AppBody({
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
           onDone={() => {
-            setContactsView('addContactsManual');
-            setView('whoHearsFirst');
+                    setView('whoHearsFirst');
           }}
           draft={contactDraft}
           onDraftChange={setContactDraft}
-        />
-      </Shell>
-    );
-  }
-
-  if (view === 'importContacts') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <ImportContacts
-          storedPhones={storedPhones}
-          onBack={() => setView('addContactsManual')}
-          onSwitchToManual={() => setView('addContactsManual')}
-          onContinue={(picked, source) => {
-            contacts.importContacts(picked, source);
-            setContactsView('importContacts');
-            setView('whoHearsFirst');
-          }}
         />
       </Shell>
     );

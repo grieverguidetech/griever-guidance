@@ -68,7 +68,7 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| CT-1 | Import from device contacts | Partial (Android Chrome Contact Picker only) | Done (`expo-contacts`) | |
+| CT-1 | Import from device contacts | Not offered (web import deleted 2026-10-21) | Done (`expo-contacts`) | |
 | CT-2 | Manual contact entry | Done | Partial | Fallback everywhere |
 | CT-3 | Normalize, dedupe, and rank imported contacts | Done | Done | `libs/contacts` |
 | CT-4 | Contacts stored on-device only | Done (IndexedDB) | Done (AsyncStorage) | Shared `ContactStore` interface |
