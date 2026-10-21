@@ -102,11 +102,12 @@ describe('What you will need (#176)', () => {
 describe('Social Security tip (#209)', () => {
   const info = () => screen.getByRole('button', { name: 'Why we list this' });
 
-  it('hides the tip by default and shows no reason line under the item', async () => {
+  it('hides the tip by default and keeps no reason line under the item', async () => {
     renderList();
     await loaded();
     expect(info()).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
+    expect(row('Social Security number and ID').querySelector('.gg-card-meta')).toBeNull();
   });
 
   it('opens on click, closes on a second click, and flips aria-expanded', async () => {
@@ -129,10 +130,30 @@ describe('Social Security tip (#209)', () => {
     info().focus();
     await user.keyboard('{Enter}');
     expect(screen.getByText(SSN_TIP)).toBeInTheDocument();
-    row('Life insurance policies').focus();
     await user.keyboard('{Escape}');
     expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
     expect(info()).toHaveFocus();
+  });
+
+  it('closes on Escape but leaves focus alone when it is outside the row', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await loaded();
+    await user.click(info());
+    const email = screen.getByRole('button', { name: 'Email this list to me' });
+    email.focus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
+    expect(email).toHaveFocus();
+  });
+
+  it('closes when the Social Security row itself is ticked', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await loaded();
+    await user.click(info());
+    await user.click(row('Social Security number and ID'));
+    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
   });
 
   it('closes on a tap outside', async () => {

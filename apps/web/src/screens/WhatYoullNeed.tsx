@@ -84,7 +84,8 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       setTipOpen(false);
-      infoButton.current?.focus();
+      // Only pull focus back when it was in this row; leave it where the user is otherwise.
+      if (wrap.current?.contains(document.activeElement)) infoButton.current?.focus();
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -101,7 +102,10 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
           type="button"
           aria-pressed={checked}
           disabled={!loaded}
-          onClick={onToggle}
+          onClick={() => {
+            setTipOpen(false);
+            onToggle();
+          }}
           className="flex items-start gap-3 text-left min-h-[44px] flex-1"
         >
           {checked ? (

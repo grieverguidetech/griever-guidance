@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { AccessibilityInfo, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -53,7 +53,12 @@ export function WhatYoullNeedScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      // A touch anywhere outside the info button closes the tip.
+      onTouchStart={() => setTipOpen(null)}
+    >
       <Pressable
         onPress={() => navigation.goBack()}
         style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
@@ -97,8 +102,14 @@ export function WhatYoullNeedScreen() {
                 </View>
               </Pressable>
               {item.tip && (
+                <View onTouchStart={(e) => e.stopPropagation()}>
                 <Pressable
-                  onPress={() => setTipOpen((open) => (open === item.id ? null : item.id))}
+                  onPress={() => {
+                    const opening = tipOpen !== item.id;
+                    setTipOpen(opening ? item.id : null);
+                    // Android reads the live region; iOS VoiceOver needs this announcement.
+                    if (opening && item.tip) AccessibilityInfo.announceForAccessibility(item.tip);
+                  }}
                   style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
                   accessibilityRole="button"
                   accessibilityLabel="Why we list this"
@@ -106,6 +117,7 @@ export function WhatYoullNeedScreen() {
                 >
                   <Text style={styles.infoGlyph} allowFontScaling={false}>i</Text>
                 </Pressable>
+                </View>
               )}
             </View>
             {item.tip && tipOpen === item.id && (

@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HomeScreen } from './HomeScreen';
@@ -72,6 +72,36 @@ describe('Social Security tip', () => {
     fireEvent.press(info());
     expect(screen.queryByText(SSN_TIP)).toBeNull();
     expect(info().props.accessibilityState).toEqual({ expanded: false });
+  });
+
+  it('announces the tip on open, not on close', async () => {
+    const spy = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    spy.mockClear(); // the RN jest setup shares this mock across tests
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    fireEvent.press(info());
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(SSN_TIP);
+    fireEvent.press(info());
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('closes on a touch outside the info button', async () => {
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    fireEvent.press(info());
+    expect(screen.getByText(SSN_TIP)).toBeTruthy();
+    fireEvent(screen.getByText("What you'll need"), 'touchStart');
+    expect(screen.queryByText(SSN_TIP)).toBeNull();
+  });
+
+  it('closes when any row is ticked', async () => {
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    fireEvent.press(info());
+    fireEvent.press(row('Life insurance policies'));
+    expect(screen.queryByText(SSN_TIP)).toBeNull();
   });
 
   it('is at least 44 by 44, and the text has no exclamation point', async () => {
