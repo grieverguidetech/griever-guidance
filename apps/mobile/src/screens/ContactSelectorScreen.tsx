@@ -108,6 +108,8 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
       <TouchableOpacity
         style={[styles.row, selected && styles.rowSelected]}
         onPress={() => toggleContact(item.contactId)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected }}
         activeOpacity={0.7}
       >
         <View style={styles.rowInfo}>

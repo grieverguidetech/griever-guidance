@@ -24,18 +24,25 @@ const saved = [
   make('4', 'Dad', 'first'),
 ];
 
-function renderScreen(contactList: Contact[] = saved, templateCategory: string | null = 'announcement') {
+function renderScreen(
+  contactList: Contact[] = saved,
+  templateCategory: string | null = 'announcement',
+  selectedContactIds: string[] = [],
+) {
   const toggleContact = jest.fn();
   const flow = {
-    selectedContactIds: [] as string[],
+    selectedContactIds,
     toggleContact,
     nextStep: jest.fn(),
     prevStep: jest.fn(),
     templateCategory,
   };
   const contacts = { contacts: contactList, loading: false } as unknown as UseContactsResult;
-  render(<ContactSelectorScreen flow={flow as never} contacts={contacts} />);
-  return { toggleContact };
+  const ui = (ids: string[]) => (
+    <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} />
+  );
+  const { rerender } = render(ui(selectedContactIds));
+  return { toggleContact, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
 const headers = () => screen.queryAllByRole('header').map((h) => h.props.children);
@@ -70,5 +77,20 @@ describe('ContactSelectorScreen grouping', () => {
     fireEvent.press(screen.getByText('Mum'));
     expect(toggleContact).toHaveBeenCalledTimes(1);
     expect(toggleContact).toHaveBeenCalledWith('2');
+  });
+
+  it('gives each row the checkbox role and its checked state', () => {
+    renderScreen(saved, 'announcement', ['2']);
+    const rows = screen.getAllByRole('checkbox');
+    expect(rows).toHaveLength(4);
+    expect(screen.getByRole('checkbox', { name: /Mum/, checked: true })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Dad/, checked: false })).toBeTruthy();
+  });
+
+  it('updates the checked state when the selection changes', () => {
+    const { rerender } = renderScreen();
+    expect(screen.getByRole('checkbox', { name: /Mum/, checked: false })).toBeTruthy();
+    rerender(['2']);
+    expect(screen.getByRole('checkbox', { name: /Mum/, checked: true })).toBeTruthy();
   });
 });
