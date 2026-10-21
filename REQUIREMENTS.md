@@ -56,8 +56,8 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | ID-1 | Sign up / sign in with Facebook | Not started | Not started | Planned later (#36); the old Convex-backed path is removed |
 | ID-2 | Sign up / sign in with Instagram | Dropped | Dropped | Personal IG accounts have no login API; Business/Creator only, and no email |
 | ID-3 | Email/password sign-up and sign-in on Supabase Auth, non-enumerating errors | Done (live in production) | Done (flag on only) | `@griever/api-client/auth`, `useSupabaseIdentity`; passwords never reach the gateway |
-| ID-4 | Google sign-in | Not started | Not started | Shown disabled, "coming soon" |
-| ID-5 | X sign-in | Not started | Not started | Shown disabled, "coming soon" |
+| ID-4 | Google sign-in | Not started | Not started | No button in the UI yet |
+| ID-5 | X sign-in | Not started | Not started | No button in the UI yet |
 | ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); shared people sync reads it through Supabase instead (`flows.owner_id`, #130); the Convex `/sync/*` stub is being retired (#140) |
 | ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done (live in production) | Partial | DATA.md "Settled"; mobile is suspended while its flag is off |
 | ID-8 | An owner invites a member by typing their email (in profile) | Not started | Not started | Planned: #116, #117 (database), #120 (shared types), #121, #122, #124 (gateway), #125 (hooks), #126 (web), #129 (mobile). Email is typed, never picked from contacts (C3, C6) |
@@ -354,9 +354,9 @@ sign-in is planned later (#36); Instagram is dropped (personal accounts have no 
 Instagram never supplies an email); Google and X are not built. Nothing in this repo talks to
 Facebook's or Instagram's OAuth endpoints today.
 
-`libs/identity` is the gateway's side, and it answers one question, **who is this**:
+`libs/identity` is the gateway's side, and it answers one question, **who is this**. The token check lives in `libs/gateway-auth`; `libs/identity` uses it:
 
-- `supabaseAuth` (`supabaseJwt.ts`) verifies the caller's Supabase access token against the
+- `supabaseAuth` (`libs/gateway-auth/src/supabaseJwt.ts`) verifies the caller's Supabase access token against the
   project's JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`). It also checks
   `iss = ${SUPABASE_URL}/auth/v1`; a wrong or missing issuer is a 401.
 - Supabase signing-key rotation must use the standby-key step (publish the new key first, then
