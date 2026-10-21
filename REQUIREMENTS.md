@@ -79,7 +79,7 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| SE-1 | Ask for the deceased person's details once per session; every flow reads from it | Done | Done | Mobile: "Create a new one" opens a setup screen (name required, date optional, no obituary field) and saves both to the person; the moment's details form opens with the name filled in (#213) |
+| SE-1 | Ask for the deceased person's details once per session; every flow reads from it | Done | Done | Mobile: "Create a new one" opens a setup screen (name required, date optional, no obituary field) and saves both to the person; the date is free text and the sender name is not asked here; the moment's details form opens with the name filled in (#213) |
 | SE-2 | Sessions survive app close and restore on relaunch; landing offers "continue" first | Done | Partial | Mobile restores people and the open one from AsyncStorage; no "continue" prompt yet |
 | SE-3 | Multiple sessions ("Someone else I've lost") | Done | Done | Mobile: on-device only (#20); no delete (C9); no server sync yet |
 | SE-4 | Guided path landing (C1) ordered around the real planning sequence. On web the path is the hub: every done row is tappable and opens a fresh, empty draft of that moment (no old wording, C2); the done date stays and the count adds up; a moment with a half-written draft shows "Started" and one tap resumes it. "Edit person" is on the path. | Done | Not started | #176. Mobile still has its picker |

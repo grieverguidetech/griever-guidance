@@ -82,7 +82,7 @@ describe('the order in the app', () => {
       fireEvent.press(await screen.findByText("Someone else I've lost"));
       expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
       expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
-      fireEvent.changeText(screen.getByLabelText('Their name'), 'Ben');
+      fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
       fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
       fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
       expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
@@ -99,7 +99,7 @@ describe('the order in the app', () => {
     await screen.findByText('Who are we writing about?');
     fireEvent.press(screen.getByLabelText('Back to home'));
     expect(await screen.findByText("The people you're writing about")).toBeTruthy();
-    expect(screen.getAllByRole('button').map((x) => x.props.accessibilityLabel ?? '').filter((l) => l === 'Someone new')).toEqual([]);
+    expect(screen.queryByLabelText('Someone new')).toBeNull();
     expect(screen.getByLabelText('Anna')).toBeTruthy();
   });
 
@@ -111,12 +111,22 @@ describe('the order in the app', () => {
     expect(screen.queryByText('Who are we writing about?')).toBeNull();
   });
 
+  it('asks nothing about the name or date again on the announcement form', async () => {
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z', 'May 2, 2026')]);
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
+    fireEvent.press(await screen.findByText('Announce the passing'));
+    await screen.findByPlaceholderText('She was peaceful, and we were with her.');
+    expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
+    expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
+  });
+
   it('opens the details form with the name from setup already filled', async () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');
-    fireEvent.changeText(screen.getByLabelText('Their name'), 'Ben Cole');
+    fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben Cole');
     fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Choose the type of message you would like to send.');

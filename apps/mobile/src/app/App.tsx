@@ -79,7 +79,7 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
   const seen = useRef<Details | null>(null);
   const { setField, selectedTemplate } = flow;
   useEffect(() => {
-    if (flow.step !== 'details') {
+    if (flow.step !== 'details' && flow.step !== 'announce') {
       seen.current = null;
       return;
     }

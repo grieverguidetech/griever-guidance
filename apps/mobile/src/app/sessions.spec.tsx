@@ -14,7 +14,7 @@ const SETUP_TITLE = 'Who are we writing about?';
 
 // Create opens setup first (#213, behavior approved in #110). Type the name there and continue to the path.
 async function startWith(name: string) {
-  fireEvent.changeText(await screen.findByLabelText('Their name'), name);
+  fireEvent.changeText(await screen.findByLabelText('Their name, required'), name);
   fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
   await screen.findByText(`Writing about ${name}`);
 }
@@ -41,7 +41,7 @@ describe('people kept on the phone', () => {
     await begin();
     await startWith('Anna');
     await addPerson();
-    expect((screen.getByLabelText('Their name')).props.value).toBe('');
+    expect((screen.getByLabelText('Their name, required')).props.value).toBe('');
     await startWith('Ben');
 
     fireEvent.press(screen.getByLabelText('Back to home'));
@@ -62,7 +62,7 @@ describe('people kept on the phone', () => {
     await begin();
     await startWith('Anna');
     await addPerson();
-    expect(screen.getByLabelText('Their name').props.value).toBe('');
+    expect(screen.getByLabelText('Their name, required').props.value).toBe('');
     await startWith('Ben');
     fireEvent.press(await screen.findByText('Thank-you note'));
     // Only the new person's own name is there; nothing carries over from Anna.
