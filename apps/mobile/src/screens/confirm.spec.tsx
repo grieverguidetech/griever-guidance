@@ -1,6 +1,6 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { Linking } from 'react-native';
+import { AccessibilityInfo, Linking } from 'react-native';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
@@ -26,6 +26,10 @@ function Harness() {
 }
 
 describe('Review your message (Share the service)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('sends the edited text in the sms: link', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     render(<Harness />);
@@ -37,14 +41,27 @@ describe('Review your message (Share the service)', () => {
 
   it('opens and closes the sample with accessibilityState.expanded and a 44 point target', () => {
     render(<Harness />);
-    const toggle = screen.getByRole('button', { name: 'See a sample message' });
+    const toggle = screen.getByRole('button', { name: 'Sample message' });
     expect(toggle.props.accessibilityState).toEqual({ expanded: false });
     const style = StyleSheet.flatten(toggle.props.style);
     expect(style.minHeight).toBeGreaterThanOrEqual(44);
     expect(style.minWidth).toBeGreaterThanOrEqual(44);
     expect(screen.queryByText(SHARE_SERVICE_SAMPLE)).toBeNull();
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     fireEvent.press(toggle);
-    expect(screen.getByRole('button', { name: 'Hide a sample message' }).props.accessibilityState).toEqual({ expanded: true });
+    expect(announce).toHaveBeenCalledWith(SHARE_SERVICE_SAMPLE);
+    expect(screen.getByRole('button', { name: 'Sample message' }).props.accessibilityState).toEqual({ expanded: true });
     expect(screen.getByText(SHARE_SERVICE_SAMPLE)).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Sample message' }));
+    expect(screen.getByRole('button', { name: 'Sample message' }).props.accessibilityState).toEqual({ expanded: false });
+    expect(screen.queryByText(SHARE_SERVICE_SAMPLE)).toBeNull();
+  });
+
+  it('blocks sending a blank message and says why', () => {
+    render(<Harness />);
+    fireEvent.changeText(screen.getByLabelText('Your message'), '   ');
+    expect(screen.getByText('Add a message before you send it.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Text these people' }).props.accessibilityState?.disabled).toBe(true);
+    expect(screen.getByLabelText('Your message').props.value).toBe('   ');
   });
 });

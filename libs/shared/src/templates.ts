@@ -381,4 +381,4 @@ export const templates: Template[] = [
 export const SHARE_SERVICE_SAMPLE =
   "[Name]'s service will be held [day and date] at [time], [place and address]. " +
   'A gathering will follow at [place]. Parking is [where]. ' +
-  'Please come as you are. Your being there will mean a great deal to the family.';
+  'Please come as you are. It would mean a great deal to see you there.';

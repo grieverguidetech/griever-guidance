@@ -1,20 +1,22 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, AccessibilityInfo, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import type { FlowProps } from '../app/App';
-import { ACCENT, MUTED } from '../components/colors';
+import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
 
 export function ConfirmScreen({ flow }: FlowProps) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   if (!selectedTemplate) return null;
 
   const recipientCount = selectedContactIds.length;
   const isService = flow.templateCategory === 'service';
+  const isBlank = isService && composedMessage.trim() === '';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={prevStep} style={styles.backButton}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
@@ -28,7 +30,9 @@ export function ConfirmScreen({ flow }: FlowProps) {
           <>
             <Text style={styles.fieldLabel}>Your message</Text>
             <TextInput
-              style={styles.messageInput}
+              style={[styles.messageInput, focused && styles.messageInputFocused]}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               value={composedMessage}
               onChangeText={setMessageOverride}
               multiline
@@ -43,13 +47,15 @@ export function ConfirmScreen({ flow }: FlowProps) {
         <View style={styles.sample}>
           <TouchableOpacity
             style={styles.sampleToggle}
-            onPress={() => setSampleOpen((v) => !v)}
+            onPress={() => {
+              if (!sampleOpen) AccessibilityInfo.announceForAccessibility(SHARE_SERVICE_SAMPLE);
+              setSampleOpen((v) => !v);
+            }}
             accessibilityRole="button"
+            accessibilityLabel="Sample message"
             accessibilityState={{ expanded: sampleOpen }}
           >
-            <Text style={styles.sampleToggleText}>
-              {sampleOpen ? 'Hide a sample message' : 'See a sample message'}
-            </Text>
+            <Text style={styles.sampleToggleText}>Sample message</Text>
           </TouchableOpacity>
           {sampleOpen && <Text style={styles.messageText}>{SHARE_SERVICE_SAMPLE}</Text>}
         </View>
@@ -57,11 +63,14 @@ export function ConfirmScreen({ flow }: FlowProps) {
       <TouchableOpacity
         style={styles.button}
         onPress={startSendJob}
-        disabled={recipientCount === 0}
+        disabled={recipientCount === 0 || isBlank}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: recipientCount === 0 || isBlank }}
         activeOpacity={0.8}
       >
         <Text style={styles.buttonText}>Text these people</Text>
       </TouchableOpacity>
+      {isBlank && <Text style={styles.blankNote}>Add a message before you send it.</Text>}
     </ScrollView>
   );
 }
@@ -83,7 +92,9 @@ const styles = StyleSheet.create({
   },
   messageText: { fontSize: 14, color: '#374151', lineHeight: 22 },
   fieldLabel: { fontSize: 13, color: MUTED, marginBottom: 6 },
-  messageInput: { fontSize: 14, color: '#374151', lineHeight: 22, minHeight: 120, textAlignVertical: 'top' },
+  messageInput: { borderWidth: 1, borderColor: FIELD_BORDER, borderRadius: 8, padding: 8, fontSize: 14, color: '#374151', lineHeight: 22, minHeight: 120, textAlignVertical: 'top' },
+  messageInputFocused: { borderColor: ACCENT, borderWidth: 2 },
+  blankNote: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 12 },
   sample: { marginBottom: 24 },
   sampleToggle: { minHeight: 44, minWidth: 44, justifyContent: 'center' },
   sampleToggleText: { fontSize: 14, color: ACCENT },
