@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { UseSupabaseIdentityResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
 import { LinkButton, ScreenHeader, announce, authStyles } from '../components/authForm';
@@ -7,6 +7,7 @@ import { MUTED } from '../components/colors';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
 import { ProfileScreen } from './ProfileScreen';
+import { ChecklistRows } from './WhatYoullNeedScreen';
 
 export const UNAVAILABLE = "Accounts aren't available right now.";
 export const CHECK_EMAIL = 'Please check your email to finish setting up your account.';
@@ -19,6 +20,19 @@ const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().
 let unsavedName: Unsaved | null = null;
 export function resetUnsavedName() {
   unsavedName = null;
+}
+
+/** The "What you'll need" list, kept on the signed-in account page. Same saved ticks as the checklist screen. */
+function AccountChecklist() {
+  const [tipOpen, setTipOpen] = useState<string | null>(null);
+  return (
+    // A touch on the page outside the info button closes an open tip.
+    <View style={styles.checklist} onTouchStart={() => setTipOpen(null)}>
+      <Text accessibilityRole="header" style={styles.checklistTitle}>What you'll need</Text>
+      <Text style={styles.checklistNote}>Not today. Just so none of it surprises you.</Text>
+      <ChecklistRows tipOpen={tipOpen} onTipChange={setTipOpen} />
+    </View>
+  );
 }
 
 function CheckEmail({ onSignIn }: { onSignIn: () => void }) {
@@ -97,22 +111,26 @@ function AccountBody({ identity }: { identity: UseSupabaseIdentityResult }) {
   if (identity.isLoading) return <LoadingOrUnavailable text="One moment." />;
   if (isSignedIn || ended) {
     return (
-      <ProfileScreen
-        identity={identity}
-        initialName={pendingName?.name}
-        onSaved={clearPending}
-        sessionEnded={ended}
-        onSignOut={() => {
-          explicitSignOut.current = true;
-          clearPending();
-          void signOut();
-        }}
-        onSignInAgain={() => {
-          clearError();
-          setEnded(false);
-          setMode('signIn');
-        }}
-      />
+      <>
+        <ProfileScreen
+          identity={identity}
+          initialName={pendingName?.name}
+          onSaved={clearPending}
+          sessionEnded={ended}
+          onSignOut={() => {
+            explicitSignOut.current = true;
+            clearPending();
+            void signOut();
+          }}
+          onSignInAgain={() => {
+            clearError();
+            setEnded(false);
+            setMode('signIn');
+          }}
+        />
+        {/* Left out of the name prompt, which has one job. */}
+        {isSignedIn && (savedName || pendingName) ? <AccountChecklist /> : null}
+      </>
     );
   }
   if (awaitingEmail) return <CheckEmail onSignIn={() => switchMode('signIn')} />;
@@ -176,5 +194,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   back: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 16 },
+  checklist: { marginTop: 32 },
+  checklistTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 4 },
+  checklistNote: { fontSize: 13, color: MUTED, marginBottom: 16 },
   backText: { fontSize: 14, color: MUTED },
 });

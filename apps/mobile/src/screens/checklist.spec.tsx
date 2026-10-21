@@ -3,6 +3,8 @@ import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HomeScreen } from './HomeScreen';
+import { AccountScreen } from './AccountScreen';
+import { AccountProvider } from '../lib/AccountProvider';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
 
 const mockGoBack = jest.fn();
@@ -144,5 +146,42 @@ describe('top buttons', () => {
     expect(style.backgroundColor).toBeTruthy();
     fireEvent.press(link);
     expect(onWhatYoullNeed).toHaveBeenCalled();
+  });
+});
+
+describe('the list on Your account and the checklist screen share their ticks (#191)', () => {
+  const client = {
+    getSession: jest.fn(async () => ({ status: 'signed_in', session: { userId: 'u1', email: 'a@b.co', accessToken: 't' } })),
+    getProfile: jest.fn(async () => ({ ok: true, profile: { senderName: 'Sam', contactSource: null } })),
+    startAutoRefresh: jest.fn(async () => undefined),
+    stopAutoRefresh: jest.fn(async () => undefined),
+  } as never;
+
+  it('shows a tick made on Your account in the checklist screen, and the reverse', async () => {
+    await AsyncStorage.clear();
+    const account = render(
+      <AccountProvider client={client}>
+        <AccountScreen onBack={() => undefined} />
+      </AccountProvider>,
+    );
+    await screen.findAllByRole('checkbox');
+    fireEvent.press(row('Life insurance policies'));
+    await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]'));
+    account.unmount();
+
+    const list = render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
+    fireEvent.press(row('Military discharge papers'));
+    await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance","military"]'));
+    list.unmount();
+
+    render(
+      <AccountProvider client={client}>
+        <AccountScreen onBack={() => undefined} />
+      </AccountProvider>,
+    );
+    await screen.findAllByRole('checkbox');
+    expect(row('Military discharge papers').props.accessibilityState).toEqual({ checked: true });
   });
 });

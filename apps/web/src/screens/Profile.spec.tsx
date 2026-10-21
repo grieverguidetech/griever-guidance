@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { accountStore } from '@griever/data-local';
 import { Profile } from './Profile';
+import { WhatYoullNeed } from './WhatYoullNeed';
 
 describe('Profile', () => {
   it('shows the saved name, including one that arrives after opening', () => {
@@ -94,5 +96,47 @@ describe('Profile', () => {
     rerender(<Profile {...props} peopleHelping={<p>slot content</p>} />);
     expect(screen.getByText('slot content')).toBeInTheDocument();
     expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+  });
+
+  describe('What you will need on Your account (#191)', () => {
+    const props = { senderName: 'Anna', onBack: vi.fn(), onSave: vi.fn(), onSignOut: vi.fn(), error: null };
+    const row = (label: string) => screen.getByRole('button', { name: new RegExp(label) });
+    const ready = () => waitFor(() => expect(row('Life insurance policies')).toBeEnabled());
+
+    it('lists the items with aria-pressed and at least 44px rows', async () => {
+      render(<Profile {...props} />);
+      await ready();
+      expect(screen.getByRole('heading', { level: 2, name: "What you'll need" })).toBeInTheDocument();
+      expect(row('Any will or written wishes')).toHaveAttribute('aria-pressed', 'false');
+      expect(row('Military discharge papers')).toHaveClass('min-h-[44px]');
+    });
+
+    it('is left out of the name prompt and the first visit', () => {
+      const { rerender } = render(<Profile {...props} asksName />);
+      expect(screen.queryByRole('heading', { level: 2, name: "What you'll need" })).not.toBeInTheDocument();
+      rerender(<Profile {...props} firstTime onContinue={vi.fn()} />);
+      expect(screen.queryByRole('heading', { level: 2, name: "What you'll need" })).not.toBeInTheDocument();
+    });
+
+    it('shows a tick made here in the checklist screen, and the reverse', async () => {
+      const user = userEvent.setup();
+      const account = render(<Profile {...props} />);
+      await ready();
+      await user.click(row('Life insurance policies'));
+      expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
+      await waitFor(async () => expect(await accountStore.getChecklistTicks()).toContain('life-insurance'));
+      account.unmount();
+
+      const list = render(<WhatYoullNeed onBack={vi.fn()} onEmailList={vi.fn()} />);
+      await waitFor(() => expect(row('Life insurance policies')).toBeEnabled());
+      expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
+      await user.click(row('Military discharge papers'));
+      await waitFor(async () => expect(await accountStore.getChecklistTicks()).toContain('military-papers'));
+      list.unmount();
+
+      render(<Profile {...props} />);
+      await ready();
+      expect(row('Military discharge papers')).toHaveAttribute('aria-pressed', 'true');
+    });
   });
 });
