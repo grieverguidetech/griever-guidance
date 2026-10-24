@@ -2,10 +2,9 @@ import type { RemoteSessionRow } from "@griever/shared";
 import type { SyncTransport, PushAck } from "../transport.js";
 
 /**
- * A minimal in-memory reimplementation of `apps/web/convex/sync.ts`'s
- * pull/push contract (idempotency-by-opId, per-screen merge on push,
- * cursor-ordered pull) — a fake standing in for the real backend, not a
- * shared implementation of it (Convex functions can't run outside Convex).
+ * A minimal in-memory fake of a pull/push sync backend (idempotency-by-opId,
+ * per-screen merge on push, cursor-ordered pull). There is no real backend now
+ * that Convex is removed (#203).
  */
 export function createFakeServer(now: () => number = () => Date.now()) {
   let seq = 0;

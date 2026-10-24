@@ -3,6 +3,11 @@
 Status: description of the code on `main` at commit `c164258` (2026-10-20). The target state in
 section 2 is a proposal. PR #183 (merged) added the plan in `docs/aws-migration-plan.md`. It is not built.
 
+Update (#203, 2026-10-24): Convex was removed. The gateway no longer serves `/sync/pull` or
+`/sync/push`, and `apps/gateway/convex`, `libs/gateway-sync`, `infra/convex` and the Convex deploy
+steps are gone. This document is updated to match. `libs/data-sync` stays in the repo as unused
+client code. The AWS plan (`docs/aws-migration-plan.md`) is left as written.
+
 Audience: Peter (product owner) and future developers. Language: ASD-STE100.
 
 How to read this document:
@@ -26,11 +31,9 @@ vendor services. The gateway calls them, or the apps call them for sign-in only.
 
 | Service | Vendor / host | What it does | Used by | Status | Monthly cost |
 |---|---|---|---|---|---|
-| Gateway (`apps/gateway`) | Cloudflare Workers, `api.grieversguidance.com` | One Hono app. Checks tokens, validates input (C8), calls Supabase, Resend, Anthropic and Convex | Web app; mobile app (only `/obituary` today) | **Live** | Not known (no billing data in repo) |
+| Gateway (`apps/gateway`) | Cloudflare Workers, `api.grieversguidance.com` | One Hono app. Checks tokens, validates input (C8), calls Supabase, Resend and Anthropic | Web app; mobile app (only `/obituary` today) | **Live** | Not known (no billing data in repo) |
 | Supabase Auth | Supabase | Sign-up, sign-in, password reset, sign-in emails. Issues the access token (ES256 JWT) | Web app (supabase-js), mobile app (flag off), gateway (checks JWKS) | **Live on web** (`FEATURE_AUTH=true`). Mobile flag off | Not known |
 | Supabase Postgres + PostgREST | Supabase | Tables `profiles`, `memberships`, `invites`, `flows`. RLS and definer functions enforce the access rules | Gateway only | **Live** for `profiles`. `memberships` and `invites`: server live, UI flag off. `flows`: table built, **no gateway route** | Not known |
-| Convex Cloud | Convex | Tables `sessions` and `counters`, cursor sync (`sync:pull`, `sync:push`), a daily purge cron | Gateway `/sync/*` routes | **Built, deployed on every push to `main`, never worked in production.** `requireUser` always throws in production | Not known |
-| Convex self-hosted | Docker on a developer machine | The same Convex functions, for local development | Developers | Local only | $0 |
 | Resend | Resend | Sends the invite email for `POST /invites` | Gateway | **Built, UI flag off** (`FEATURE_SHARING` is not set) | Not known |
 | Anthropic Messages API | Anthropic | Drafts an obituary (`claude-haiku-4-5-20251001`, max 600 tokens) | Gateway `POST /obituary` | **Feature-flagged off** in the web build. The production key is probably not set (see 3.7) | Pay per token. Not measured |
 | GitHub Actions | GitHub | CI (`ci.yml`), deploy (`deploy.yml`), `e2e-stress.yml`, `mobile-bundle.yml` | Developers | **Live** | Not known |
@@ -41,34 +44,28 @@ Counts from the code:
 
 | Thing | Count | Source |
 |---|---|---|
-| Gateway routes (served) | 11 | `apps/gateway/src/worker.ts` and the four routers |
+| Gateway routes (served) | 9 | `apps/gateway/src/worker.ts` and the three routers |
 | Gateway routes the client calls but the gateway does not serve | 3 (`GET /flows`, `POST /flows`, `PATCH /flows/:id`) | `libs/api-client/src/flows.ts`; issue #131 is open |
-| Gateway libraries | 5 (`gateway-auth`, `identity`, `gateway-flows`, `gateway-messages`, `gateway-sync`) | `libs/` |
+| Gateway libraries | 4 (`gateway-auth`, `identity`, `gateway-flows`, `gateway-messages`) | `libs/` |
 | Supabase tables | 4 | `infra/supabase/migrations/` (4 files) |
 | Supabase RLS policies | 8 | same |
 | Supabase functions | 10 (5 RPC, 1 policy helper, 4 trigger functions) | same |
 | pgTAP assertions | 199 (14 + 41 + 80 + 64) in 4 files | `infra/supabase/tests/*.sql` |
-| Convex tables | 2 (`sessions`, `counters`) | `apps/gateway/convex/schema.ts` |
-| Convex functions | 4 (`sync:pull`, `sync:push`, `crons:purgeOldDeleted`, `crons:deleteEverything`) | `apps/gateway/convex/sync.ts`, `crons.ts` |
-| GitHub secrets | 11 names | `gh secret list` |
+| GitHub secrets | 11 names when counted, before #203. `CONVEX_DEPLOY_KEY` and `CONVEX_URL` are now unused: delete them (Peter) | `gh secret list` |
 | GitHub repo variables | 3 (`FEATURE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`) | `gh variable list` |
 
 ---
 
 ## 2. Do we have too many?
 
-**Short answer: yes, for the work the backend does today.** We have 6 outside vendors in the
-backend path (Cloudflare, Supabase, Convex, Resend, Anthropic, GitHub), plus one unused vendor
-(PostHog). We have 3 server-side data stores (Supabase Postgres, Convex Cloud, Convex Docker) for
-an app whose main data stays on the device. Only one of them (Supabase Postgres) holds data that a
-user can see in production.
+**Short answer: less than before #203, but yes.** After #203 we have 5 outside vendors in the
+backend path (Cloudflare, Supabase, Resend, Anthropic, GitHub), plus one unused vendor (PostHog).
+Only one server data store remains (Supabase Postgres).
 
 ### 2.1 Overlaps
 
 | Overlap | Evidence | Effect |
 |---|---|---|
-| Two server databases for "sync" | Convex holds `sessions` (DATA.md §3). Supabase holds `flows` (DATA.md "Shared people"). REQUIREMENTS §6 says the Convex sync "is not the plan" | Two sync protocols, two client libraries (`libs/data-sync` and `useFlowSync` in `libs/hooks`) |
-| Two Convex deployments | Convex Cloud for production, Docker for local (`infra/convex/README.md`) | Extra setup and secrets (`CONVEX_DEPLOY_KEY`, `CONVEX_URL`) for a service that does not work in production |
 | Two places that enforce access rules | RLS and definer functions in Postgres, plus input checks in the gateway | This is on purpose (defense in depth). Keep it |
 | Two email senders | Supabase Auth sends sign-in emails. Resend sends invite emails | Two sender domains to keep verified. Acceptable |
 
@@ -76,9 +73,6 @@ user can see in production.
 
 | Item | Why it is dead weight | Evidence |
 |---|---|---|
-| Convex Cloud + `libs/gateway-sync` + `libs/data-sync` + `/sync/pull`, `/sync/push` | `requireUser` throws `auth not configured` when `GG_DEV_AUTH` is not set, and production never sets it | `apps/gateway/convex/auth.ts`; `scripts/check-dev-auth.mjs`; REQUIREMENTS §6 Identity; issue #203 |
-| Convex deploy step in `deploy.yml` | Deploys functions that cannot run for a real user | `.github/workflows/deploy.yml` (`npx convex deploy`) |
-| `crons:deleteEverything` | Reads a `users` table that is not in `schema.ts` | `apps/gateway/convex/crons.ts` vs `schema.ts`. Whether Convex deploy accepts this: not verified |
 | PostHog secrets | No code reads them | `grep -ri posthog` finds nothing outside `node_modules` |
 | GitHub secret `VITE_API_URL` | `deploy.yml` hard-codes `VITE_API_URL`. No workflow reads the secret | `.github/workflows/deploy.yml` |
 | `libs/gateway-messages` as its own library | It holds one route (`POST /obituary`). Sending moved to the phone | `libs/gateway-messages/src/router.ts` |
@@ -86,13 +80,14 @@ user can see in production.
 
 ### 2.3 What we can remove now, without the AWS plan
 
-1. Retire Convex (issue #203; #140 was closed as a duplicate): remove `apps/gateway/convex`, `libs/gateway-sync`,
-   `libs/data-sync`, `infra/convex`, the Convex deploy step and the two Convex secrets.
+1. Done in #203: Convex, `apps/gateway/convex`, `libs/gateway-sync`, `infra/convex` and the Convex
+   deploy step are removed. Still to do (Peter): delete the GitHub secrets `CONVEX_DEPLOY_KEY` and
+   `CONVEX_URL`, and the Convex Cloud project. `libs/data-sync` is unused and can go in a later ticket.
 2. Delete the unused secrets `VITE_POSTHOG_HOST`, `VITE_POSTHOG_PROJECT_TOKEN` and `VITE_API_URL`
    (ask Peter first; PostHog may be planned).
 3. Decide on `/obituary` (see 3.7): turn it on with auth and a rate limit, or remove it.
 
-These three steps take the backend from 6 vendors to 5, and from 3 server data stores to 1.
+Step 1 took the backend from 6 vendors to 5, and from 3 server data stores to 1.
 
 ### 2.4 Target state (proposed, plan merged in PR #183, not done)
 
@@ -103,7 +98,7 @@ decisions:
 2. Amazon DynamoDB replaces Supabase Postgres. No RDS.
 3. DynamoDB also holds content (`gg-content` table: checklist, samples, examples).
 4. The gateway stays on Cloudflare Workers.
-5. Convex is removed.
+5. Convex is already removed (#203).
 6. An owner alert to Peter goes through Amazon SES (one email for each new account).
 7. Resend stays for invite emails.
 
@@ -115,7 +110,7 @@ Before and after:
 | User data | Supabase Postgres via PostgREST | DynamoDB via one Lambda data function (function URL, `AWS_IAM`) |
 | Access rules | RLS + definer functions (SQL) | One TypeScript access-rules module in the Lambda |
 | Rule tests | 199 pgTAP assertions | Same cases as Vitest against DynamoDB Local |
-| Session sync | Convex Cloud (does not work) | Removed |
+| Session sync | Removed (#203) | Removed |
 | Content | Code in the apps | DynamoDB `gg-content`, `GET /content`, cached 1 hour in the Worker |
 | Invite email | Resend | Resend |
 | Owner alert | None | Clerk `user.created` webhook → gateway → Lambda `owner-alert` → SES |
@@ -128,18 +123,17 @@ Vendor and service count:
 
 | Count | Before | After (plan v4) |
 |---|---|---|
-| Backend vendors in use | 6 (Cloudflare, Supabase, Convex, Resend, Anthropic, GitHub) | 6 (Cloudflare, Clerk, AWS, Resend, Anthropic, GitHub) |
+| Backend vendors in use | 5 (Cloudflare, Supabase, Resend, Anthropic, GitHub) | 6 (Cloudflare, Clerk, AWS, Resend, Anthropic, GitHub) |
 | Unused vendors | 1 (PostHog secrets) | 0 if the secrets are deleted (not in the plan) |
-| Server data stores | 3 (Supabase Postgres, Convex Cloud, Convex Docker) | 1 (DynamoDB, 2 tables) |
-| Runtime services we call | 6 (Worker, Supabase Auth, PostgREST, Convex Cloud, Resend, Anthropic) | 9 (Worker, Clerk, Lambda data, DynamoDB, Lambda owner-alert, SES, CloudWatch, Resend, Anthropic) |
-| Services that do not work in production | 1 (Convex) | 0 |
+| Server data stores | 1 (Supabase Postgres) | 1 (DynamoDB, 2 tables) |
+| Runtime services we call | 5 (Worker, Supabase Auth, PostgREST, Resend, Anthropic) | 9 (Worker, Clerk, Lambda data, DynamoDB, Lambda owner-alert, SES, CloudWatch, Resend, Anthropic) |
+| Services that do not work in production | 0 | 0 |
 | Estimated AWS cost | n/a | about $0.10 now, about $0.80 at 10 times the load (plan v4 "Cost") |
 
-**Assessment.** Plan v4 removes the dead service (Convex) and the second database. It does not
+**Assessment.** Convex is already gone (#203). Plan v4 removes Supabase's second role. It does not
 reduce the vendor count: Supabase becomes Clerk plus AWS. It adds more small AWS parts (two
 Lambda functions, SES, CloudWatch, Budgets, IAM, CloudFormation), but they sit in one account
-under one bill. The biggest simplification (removing Convex) does not need the AWS move. Do it
-first (2.3).
+under one bill. The biggest simplification (removing Convex) did not need the AWS move and is done.
 
 ---
 
@@ -164,8 +158,8 @@ Node for local development (`src/main.ts`, port 3001).
 | DELETE | `/invites/:id` | `libs/gateway-flows` | Supabase JWT | RPC `revoke_invite` | Live, UI flag off |
 | DELETE | `/members/:memberId` | `libs/gateway-flows` | Supabase JWT | RPC `remove_member` | Live, UI flag off |
 | POST | `/obituary` | `libs/gateway-messages` | **None** | Anthropic Messages API | Deployed, web flag off |
-| GET | `/sync/pull` | `libs/gateway-sync` | `x-gg-user` header only | Convex `sync:pull` | Fails in production |
-| POST | `/sync/push` | `libs/gateway-sync` | `x-gg-user` header only | Convex `sync:push` | Fails in production |
+
+The `/sync/pull` and `/sync/push` routes were removed (#203) and answer 404.
 
 Not served, but called by `libs/api-client/src/flows.ts`: `GET /flows`, `POST /flows`,
 `PATCH /flows/:id` (issue #131).
@@ -183,9 +177,8 @@ Methods: GET, POST, PUT, DELETE. An empty value blocks every origin.
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Worker vars (public) | `wrangler.toml` (empty), overridden by `deploy.yml` from repo variables |
 | `INVITE_FROM_EMAIL`, `WEB_URL` | Worker vars | `wrangler.toml` |
 | `RESEND_API_KEY` | Worker secret | `deploy.yml` from the GitHub secret |
-| `CONVEX_URL` | Worker var | `deploy.yml` from the GitHub secret |
 | `ANTHROPIC_API_KEY` | Read by `/obituary` | `apps/gateway/.env.example` only. Not set by `deploy.yml` |
-| `PORT`, `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_SITE_URL` | Local only | `apps/gateway/.env.example` |
+| `PORT` | Local only | `apps/gateway/.env.example` |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub secrets, deploy only | `deploy.yml` |
 
 **Deploy.** `deploy.yml` job `deploy-gateway`: `wrangler deploy --config apps/gateway/wrangler.toml`
@@ -200,10 +193,7 @@ tokenless `POST /invites` gives 401.
 **Risks.**
 
 1. `POST /obituary` has no auth and no rate limit (see 3.7).
-2. `/sync/*` trusts the `x-gg-user` header. It is safe only because Convex refuses every call in
-   production. If someone sets `GG_DEV_AUTH` on the production Convex deployment, any caller can
-   read any user's sessions. `scripts/check-dev-auth.mjs` guards the deploy.
-3. A revoked Supabase signing key can still verify tokens for up to 5 minutes per isolate.
+2. A revoked Supabase signing key can still verify tokens for up to 5 minutes per isolate.
 
 ### 3.2 Gateway auth (`libs/gateway-auth`)
 
@@ -311,34 +301,12 @@ assertions: `profiles_rls` 14, `members_rls` 41, `invite_functions` 80, `flows_r
    (not verified).
 2. The access rules live in SQL. Plan v4 must port all 199 assertions before a switch.
 
-### 3.6 Convex (`apps/gateway/convex`, `libs/gateway-sync`, `libs/data-sync`)
+### 3.6 Convex (removed)
 
-**Purpose.** Cursor-based sync of the screen-keyed session document (DATA.md §3, §4).
-
-| Function | Kind | What it does |
-|---|---|---|
-| `sync:pull` | query | Sessions for the user with `seq > cursor`, up to `limit` (default 100) |
-| `sync:push` | mutation | Applies `session.upsert` ops, records op ids for idempotency |
-| `crons:purgeOldDeleted` | internal mutation, daily 09:00 UTC | Hard-deletes sessions soft-deleted more than 90 days ago |
-| `crons:deleteEverything` | mutation | Deletes the user's sessions and patches a `users` row (table not in schema) |
-
-**Tables.** `sessions` (indexes `by_sessionId`, `by_user`, `by_user_seq`) and `counters`
-(index `by_user`).
-
-**Auth.** `convex/auth.ts` `requireUser`. It returns `devUserId` only when `GG_DEV_AUTH=1`.
-Otherwise it throws. Production never sets `GG_DEV_AUTH`. **So every production sync call fails.**
-
-**Secrets (names only).** `CONVEX_DEPLOY_KEY`, `CONVEX_URL` (GitHub secrets).
-Local: `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_SITE_URL`.
-
-**Deploy.** `deploy.yml`: `node scripts/check-dev-auth.mjs`, then `npx convex deploy`.
-Local: `pnpm convex:up` (Docker, `infra/convex/docker-compose.yml`), then `pnpm convex:dev`.
-
-**Tests.** No tests for the Convex functions. `libs/gateway-sync` has no spec files.
-`libs/data-sync` has 3 spec files (about 7 cases). Gateway specs check input validation only.
-
-**Risks.** Cost and attention for a service that does nothing for users. The web app still starts
-sync triggers on sign-in (`apps/web/src/lib/registerSync.ts`); every call fails. Retire it (#203).
+Removed in #203. Before removal it held cursor sync for session documents (`sync:pull`,
+`sync:push`, a purge cron) behind `requireUser`, which threw in production, so no sync call ever
+succeeded for a user. The Convex data was test data and was not exported. The Convex Cloud project
+and the GitHub secrets `CONVEX_DEPLOY_KEY` and `CONVEX_URL` may still exist: Peter to delete.
 
 ### 3.7 Anthropic (`POST /obituary`, `libs/gateway-messages`)
 
@@ -385,7 +353,7 @@ probably answers 500 in production. A key set by hand on the Worker: not verifie
 | `e2e-stress.yml` | Not read in detail | Repeat e2e runs (AGENTS.md) |
 | `mobile-bundle.yml` | Not read in detail | Mobile bundle check (not verified) |
 
-`deploy-gateway` order: build `shared` → `check-dev-auth.mjs` → Supabase `db push` → `convex deploy`
+`deploy-gateway` order: build `shared` → Supabase `db push`
 → `wrangler deploy` → `wrangler secret put RESEND_API_KEY`.
 
 ---
@@ -410,7 +378,6 @@ flowchart LR
       ID["libs/identity - /me/profile"]
       FLOWS["libs/gateway-flows - /members, /invites"]
       MSG["libs/gateway-messages - /obituary"]
-      SYNC["libs/gateway-sync - /sync/pull, /sync/push"]
       AUTH["libs/gateway-auth - JWT check, PostgREST helpers"]
     end
   end
@@ -419,11 +386,6 @@ flowchart LR
     SBAUTH["Supabase Auth"]
     REST["PostgREST"]
     PG[("Postgres - profiles, memberships, invites, flows")]
-  end
-
-  subgraph CVX["Convex Cloud"]
-    CFN["sync:pull, sync:push, crons"]
-    CDB[("sessions, counters")]
   end
 
   RESEND["Resend - invite email"]
@@ -440,8 +402,6 @@ flowchart LR
   REST --> PG
   FLOWS -->|"send invite"| RESEND
   MSG -->|"draft, flag off"| ANTH
-  SYNC -.->|"fails in production"| CFN
-  CFN --> CDB
 ```
 
 ### 4.2 Component diagram: target system (plan v4, proposed, plan merged in PR #183)
@@ -628,7 +588,6 @@ sequenceDiagram
   participant CI as ci.yml
   participant DP as deploy.yml
   participant SB as Supabase
-  participant CX as Convex Cloud
   participant CF as Cloudflare
 
   D->>GH: Merge PR to main
@@ -644,9 +603,7 @@ sequenceDiagram
   GH->>DP: workflow_run, only if CI succeeded on a push
   DP->>DP: gate, then check-accounts-config
   par deploy-gateway
-    DP->>CX: check-dev-auth.mjs confirms GG_DEV_AUTH is unset
     DP->>SB: supabase link and db push
-    DP->>CX: npx convex deploy
     DP->>CF: wrangler deploy of the Worker with vars
     DP->>CF: wrangler secret put RESEND_API_KEY
   and deploy-web
@@ -659,8 +616,7 @@ sequenceDiagram
 
 ### 4.7 Class diagram: data model
 
-`AuthUsers` is the Supabase `auth.users` table (managed by Supabase). The Convex classes have no
-foreign keys. `Session.userId` is an opaque string.
+`AuthUsers` is the Supabase `auth.users` table (managed by Supabase).
 
 ```mermaid
 classDiagram
@@ -714,29 +670,6 @@ classDiagram
     +timestamptz deleted_at
   }
 
-  class ConvexSession {
-    +string sessionId
-    +string userId
-    +number schemaVersion
-    +string status
-    +any screens
-    +string cursorScreen
-    +string personName
-    +string dateOfPassing
-    +number lastOpenedAt
-    +number createdAt
-    +number seq
-    +number updatedAt
-    +number deletedAt
-    +string deviceId
-  }
-
-  class ConvexCounter {
-    +string userId
-    +number seq
-    +array appliedOpIds
-  }
-
   AuthUsers "1" -- "0..1" Profile : id
   AuthUsers "1" -- "0..*" Membership : owner_id
   AuthUsers "1" -- "0..1" Membership : member_id
@@ -744,7 +677,6 @@ classDiagram
   AuthUsers "1" -- "0..*" Invite : accepted_by
   AuthUsers "1" -- "0..*" Flow : owner_id
   AuthUsers "1" -- "0..*" Flow : updated_by
-  ConvexCounter "1" -- "0..*" ConvexSession : userId
 ```
 
 Notes on the model:
@@ -754,9 +686,6 @@ Notes on the model:
 2. `invites` has a partial unique index: one open invite per (`owner_id`, `email`).
 3. `flows.id` is made on the device (C5). Members read and update the owner's `flows` rows through
    `my_owner_ids()`.
-4. Convex `sessions` has indexes `by_sessionId`, `by_user` (`userId`, `lastOpenedAt`) and
-   `by_user_seq` (`userId`, `seq`). `counters` has `by_user`.
-
 ### 4.8 Deployment diagram: current
 
 ```mermaid
@@ -781,10 +710,6 @@ flowchart TB
     SPG[("Postgres 17")]
   end
 
-  subgraph CVXC["Convex Cloud"]
-    CVXP["Production deployment"]
-  end
-
   RSD["Resend API"]
   ANT["Anthropic API"]
 
@@ -792,7 +717,6 @@ flowchart TB
   CIW -->|"on success"| DPW
   SEC --> DPW
   DPW -->|"supabase db push"| SPG
-  DPW -->|"npx convex deploy"| CVXP
   DPW -->|"wrangler deploy"| WKR
   DPW -->|"wrangler pages deploy"| PWEB
   DPW -->|"wrangler pages deploy"| PMKT
@@ -804,7 +728,6 @@ flowchart TB
   SREST --> SPG
   WKR --> RSD
   WKR --> ANT
-  WKR -.->|"fails in production"| CVXP
   PWEB -.->|"browser calls"| SAUTH
 ```
 
@@ -812,8 +735,8 @@ flowchart TB
 
 ## 5. Open questions
 
-1. **Retire Convex now (#203)?** Recommendation: yes, before any AWS work. It removes one vendor,
-   two secrets, two libraries and one deploy step, and it never served a user.
+1. **Convex Cloud cleanup.** Convex is removed from the code (#203). Peter: delete the Convex Cloud
+   project and the GitHub secrets `CONVEX_DEPLOY_KEY` and `CONVEX_URL`.
 2. **`/obituary`: on or off?** Recommendation: add auth (the Supabase JWT, later Clerk) and a rate
    limit before the flag goes on. Decide what privacy text the user sees. Confirm whether
    `ANTHROPIC_API_KEY` is set on the Worker (`wrangler secret list`).
@@ -822,17 +745,14 @@ flowchart TB
 5. **`/flows` routes (#131).** The client calls them; the gateway does not serve them. Plan v4
    question 7 recommends building them on the AWS data function. Until then, shared people cannot
    sync. Confirm.
-6. **`crons:deleteEverything`** reads a `users` table that is not in the Convex schema. If Convex
-   stays, fix it. If Convex goes, delete it.
-7. **Rename `libs/gateway-flows`** to a name that matches its job (members and invites)? Low
+6. **Rename `libs/gateway-flows`** to a name that matches its job (members and invites)? Low
    priority; do it when `/flows` routes land.
-8. **Doc drift.** REQUIREMENTS §6 "Stack" and "Database" still name Convex as the data layer and
-   the gateway as "fronting Convex". REQUIREMENTS §6 "Identity" places `supabaseAuth` in
+7. **Doc drift.** REQUIREMENTS §6 "Identity" places `supabaseAuth` in
    `libs/identity`. Update in the ticket that changes the facts (architect role).
-9. **Costs.** The repo has no billing data for Cloudflare, Supabase, Convex, Resend or Anthropic.
+8. **Costs.** The repo has no billing data for Cloudflare, Supabase, Resend or Anthropic.
    Peter: add the plan name and monthly bill for each, so the "too many" question has a money
    answer too.
-10. **Plan v4 vendor count.** The plan swaps Supabase for Clerk plus AWS. It does not cut the
+9. **Plan v4 vendor count.** The plan swaps Supabase for Clerk plus AWS. It does not cut the
     vendor count. Is that acceptable, or should the plan also cover moving invite email to SES
     (plan v4 question 4) to drop Resend later?
 
@@ -845,16 +765,14 @@ Code and configuration:
 - `apps/gateway/src/worker.ts`, `apps/gateway/src/main.ts`
 - `apps/gateway/src/routes.spec.ts`, `apps/gateway/src/worker.spec.ts`
 - `apps/gateway/wrangler.toml`, `apps/gateway/.env.example`, `apps/gateway/package.json`
-- `apps/gateway/convex/schema.ts`, `sync.ts`, `crons.ts`, `auth.ts`, `lib/nextSeq.ts`
 - `libs/gateway-auth/src/supabaseJwt.ts`, `postgrest.ts`, `index.ts`
 - `libs/identity/src/profileRouter.ts`, `supabaseClient.ts`
 - `libs/gateway-flows/src/membersRouter.ts`, `membersClient.ts`, `mailer.ts`, `inviteToken.ts`
 - `libs/gateway-messages/src/router.ts`, `obituaryRoute.ts`
-- `libs/gateway-sync/src/router.ts`, `convexClient.ts`, `convexFunctions.ts`
 - `libs/api-client/src/client.ts`, `flows.ts`, `members.ts`, `supabaseAuth.ts`
 - `libs/data-sync/src/transport.ts`
 - `libs/hooks/src/useFlowSync.ts`
-- `apps/web/src/lib/features.ts`, `apps/web/src/lib/registerSync.ts`, `apps/web/src/lib/authClient.ts`
+- `apps/web/src/lib/features.ts`, `apps/web/src/lib/authClient.ts`
 - `apps/mobile/src/lib/authClient.ts`
 - `apps/web/.env.example`, `apps/mobile/.env.example`
 - `apps/web-e2e/playwright.config.ts`
@@ -865,8 +783,6 @@ Code and configuration:
 - `infra/supabase/migrations/20261012000000_flows.sql`
 - `infra/supabase/tests/profiles_rls.test.sql`, `members_rls.test.sql`,
   `invite_functions.test.sql`, `flows_rls.test.sql`
-- `infra/convex/README.md`, `infra/convex/docker-compose.yml`
-- `scripts/check-dev-auth.mjs`
 - `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`
 
 Documents:

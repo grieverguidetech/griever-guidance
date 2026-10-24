@@ -13,9 +13,6 @@
       "path": "./tsconfig.app.json"
     },
     {
-      "path": "../../libs/gateway-sync/tsconfig.lib.json"
-    },
-    {
       "path": "../../libs/gateway-messages/tsconfig.lib.json"
     },
     {

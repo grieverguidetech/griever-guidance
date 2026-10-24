@@ -15,7 +15,7 @@ is a defect. The ones you will meet first:
 
 - **Offline-first (C5).** Nothing after sign-up may wait on the network. The device is the source
   of truth.
-- **Contacts stay on the device (C3, C4).** They never reach the gateway or Convex. Only contact
+- **Contacts stay on the device (C3, C4).** They never reach the gateway. Only contact
   ids appear in synced data, and only seven fields are kept.
 - **Messages go out through `sms:` deep links (C1).** One contact at a time, from the user's own
   phone. There is no backend SMS path.
@@ -31,7 +31,7 @@ is a defect. The ones you will meet first:
 |---|---|
 | `web` | React, Vite and Tailwind. The browser send flow and account screens. Dev port 5173. |
 | `mobile` | Expo and React Native, core components only. The main user surface. |
-| `gateway` | Hono on Cloudflare Workers (locally on `@hono/node-server`, port 3001). It composes the identity, messages and sync routers into one HTTP surface. It also holds the Convex functions in `apps/gateway/convex/`. `convex/identity.ts` is dead code and is removed in #37. |
+| `gateway` | Hono on Cloudflare Workers (locally on `@hono/node-server`, port 3001). It composes the identity, messages and flows routers into one HTTP surface. |
 | `marketing` | Astro. The public site. |
 | `web-e2e` | Playwright end-to-end tests for the web app. Run in CI only. |
 
@@ -43,17 +43,15 @@ is a defect. The ones you will meet first:
 | `api-client` | Gateway HTTP calls for the app, and the Supabase auth calls. Sync traffic goes through `data-sync` (and the web service worker). |
 | `hooks` | Shared React hooks, such as `useSendFlow` and `useSupabaseIdentity`. Also the `sms:` link builder, `buildSmsLink`. No platform-specific code. |
 | `data-local` | IndexedDB storage in the browser: the session document, the outbox, and contacts. |
-| `data-sync` | The offline sync engine. It flushes the outbox and pulls and pushes changes through the gateway. |
+| `data-sync` | The offline sync engine (outbox, cursor client, merge). It has no backend now that Convex is removed (#203) and no app uses it. |
 | `contacts` | Contact import logic shared by web and mobile: the source interface, normalizing, de-duplicating, and the review-and-commit steps. |
 | `identity` | The gateway's account side. It verifies the Supabase access token and serves `GET` and `PUT /me/profile`. |
 | `gateway-messages` | The gateway's AI-drafted obituary route. Nothing here sends messages. |
-| `gateway-sync` | The gateway's Convex client and the `/sync/pull` and `/sync/push` routes. |
 
-`identity`, `gateway-messages` and `gateway-sync` each own a Hono router and do not import each
+`identity`, `gateway-messages` and `gateway-flows` each own a Hono router and do not import each
 other. `apps/gateway` only mounts them.
 
-Other folders: `infra/supabase/` (migrations and database tests), `infra/convex/` (local Convex in
-Docker, see its [README](infra/convex/README.md)), `scripts/` (deploy guard).
+Other folders: `infra/supabase/` (migrations and database tests), `scripts/`.
 
 ## Stack
 
@@ -62,7 +60,7 @@ Docker, see its [README](infra/convex/README.md)), `scripts/` (deploy guard).
 - **Mobile:** Expo SDK 54 and React Native 0.81. React is pinned to 19.1.0 (a root pnpm override).
 - **Gateway:** Hono on Cloudflare Workers.
 - **Accounts:** Supabase Auth and Postgres, with row-level security. Email and password only.
-- **Session sync:** Convex. It is dev-only today: `/sync/*` is not usable in production yet.
+- **Session sync:** none. Convex was removed (#203).
 - **Marketing:** Astro.
 - **Tests:** Vitest and React Testing Library, jest-expo for mobile, pgTAP for the database,
   Playwright and axe for end-to-end.
@@ -73,7 +71,7 @@ You need:
 
 - Node 22.
 - pnpm 10.34.1. The `packageManager` field in `package.json` pins it; run `corepack enable` once so Corepack uses that version.
-- Docker, for local Supabase and local Convex.
+- Docker, for local Supabase.
 - The [Supabase CLI](https://supabase.com/docs/guides/cli). CI uses 2.116.0.
 
 Then:
@@ -83,8 +81,8 @@ corepack enable
 pnpm install
 ```
 
-`pnpm install && pnpm dev` is enough for the default flow (auth off). Supabase and Convex are
-only needed for accounts and sync.
+`pnpm install && pnpm dev` is enough for the default flow (auth off). Supabase is
+only needed for accounts and sharing.
 
 Run things from the repo root:
 
@@ -101,8 +99,7 @@ pnpm dev:marketing  # Astro
 Env files, with your own values (never commit them):
 
 - Web and mobile: copy `apps/<app>/.env.example` to `apps/<app>/.env.local`.
-- Gateway: `apps/gateway/.env.local` for `CORS_ORIGINS` and the Supabase variables. The Convex
-  admin key goes in `apps/gateway/.env` (see [infra/convex/README.md](infra/convex/README.md)).
+- Gateway: `apps/gateway/.env.local` for `CORS_ORIGINS` and the Supabase variables..
 
  See [Environment variables](#environment-variables).
 
@@ -120,16 +117,6 @@ supabase stop --workdir infra
 After `supabase start`, put its API URL and anon key in the gateway's `SUPABASE_URL` and
 `SUPABASE_ANON_KEY`, and in the web app's `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Also set
 `VITE_FEATURE_AUTH=true` to see the account screens.
-
-### Local Convex (only for session sync)
-
-```sh
-pnpm convex:up      # start the self-hosted backend in Docker
-pnpm convex:dev     # deploy apps/gateway/convex and watch for changes
-pnpm convex:reset   # stop it and delete its data
-```
-
-The admin key steps are in [infra/convex/README.md](infra/convex/README.md).
 
 ### Feature flags
 
@@ -154,8 +141,6 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public; there is no service-role key. The production slots are in
   `wrangler.toml` `[vars]` and stay empty there; the deploy workflow passes them from the repo
   variables of the same name. Unset means `/me/*` answers 503, in production and locally.)
-- `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_SITE_URL` (local Convex only)
-- `CONVEX_DEPLOY_KEY`, `CONVEX_URL` (GitHub secrets; CI and production only)
 
 **`apps/web`**
 - `VITE_API_URL`
@@ -216,8 +201,7 @@ deploys.
 **`deploy.yml`** runs only after CI succeeds on a push to `main` (or by hand; a manual run skips the CI gate). It deploys:
 
 - The gateway to Cloudflare Workers, after running Supabase migrations (`supabase db push`, skipped
-  if the Supabase secrets are not set) and `convex deploy`. `scripts/check-dev-auth.mjs` stops the
-  deploy if the dev auth stub is enabled.
+  if the Supabase secrets are not set).
 - The web app to Cloudflare Pages.
 - The marketing site to Cloudflare Pages.
 

@@ -4,7 +4,7 @@ import type { SyncTransport } from "./transport.js";
 const IDLE_MS = 5_000;
 const FOREGROUND_TICK_MS = 60_000;
 
-/** Also used by `apps/web/public/sw.js` to match the tag it listens for on the `sync` event. */
+/** The Background Sync tag. The Service Worker that listened for it was removed (#203). */
 export const BACKGROUND_SYNC_TAG = "gg-outbox-flush";
 
 export interface TriggerHandle {

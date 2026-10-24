@@ -115,7 +115,7 @@ lives under that key.
    copying — the README's whole session model collapses if two screens can disagree about a name.
 2. **`composedMessage` is never stored.** It is derived from L3 + A2/B1/B2 + the flowers toggle on
    every render. The one exception is a user edit (B4 "Edit wording"), which pins the text into
-   `screens.B4.values.messageOverride` and stops derivation (Convex design only; never synced in shared sync, §5).
+   `screens.B4.values.messageOverride` and stops derivation (never synced in shared sync, §5).
 3. **`screen.status`** is one of `pending` · `active` · `complete` · `seen` · `skipped`. It is what
    C1's path view and the C2 gate read; it is never inferred by checking whether fields are empty.
 4. **`screen.updatedAt` is per-screen.** This is the load-bearing reason for the screen-keyed shape:
@@ -237,7 +237,12 @@ is a restore story, not a live one.
 
 ---
 
-## 3. Server tables (Convex)
+## 3. Server tables (removed Convex design)
+
+> **Removed (#203).** Convex, its `sessions` and `counters` tables, the `/sync/pull` and `/sync/push`
+> routes and the purge cron no longer exist. Nothing in this section is live. It is kept as the
+> design record for the cursor protocol in §4, which `libs/data-sync` still implements with no
+> backend. Shared people sync uses Supabase (see "Shared people (Supabase)").
 
 Two tables, as specified. Both carry the sync envelope described in §4.
 
@@ -302,7 +307,10 @@ without a backend change.
 
 ---
 
-## 4. Cursor-based synchronization
+## 4. Cursor-based synchronization (no live backend)
+
+> **Not live (#203).** The server side of this protocol was Convex and is removed. The web app no
+> longer starts any session sync. `libs/data-sync` keeps the client code, unused.
 
 Single user, multiple devices, no collaboration. That lets us use a **high-water-mark cursor** and
 skip conflict resolution machinery entirely.
@@ -417,21 +425,21 @@ A failed background flush retries with backoff (1s → 2s → 4s → … capped 
 
 ## 5. What is *not* synced
 
-This section covers the original Convex session sync, which is dev-only and being retired (#140).
+This section covers the original Convex session sync, which was removed (#203).
 The family-sharing design below ("Shared people (Supabase)") overrides it where they differ:
 shared person sync never carries contact ids or edited wording (C2, C3).
 
 - **Contacts. Settled: they never leave the device.** Names and mobile numbers of a grieving
   family's circle are the most sensitive data in the app, and they are already on the phone
-  (imported or typed). They stay in IndexedDB. In the dev-only Convex sync the server sees contact
+  (imported or typed). They stay in IndexedDB. In the removed Convex sync the server saw contact
   *ids* inside `screens.*.values.selectedContactIds` and nothing more — never a name, never a
-  number. In shared person sync it sees not even the ids (C3). The cost is accepted, not worked
+  number. In shared person sync the server sees not even the ids (C3). The cost is accepted, not worked
   around: a new device starts fresh (§2). Do not add a "just this once" path that ships a name to
   the server for a preview or a receipt.
 - **Message bodies.** Derived, not stored (§2 rule 2). `messageOverride` (edited wording) is the
   user's own message text. It is kept only in the on-device draft until sent and never syncs (C2).
-  The older Convex design would have synced it as `screens.B4.values.messageOverride`, but nothing
-  writes it there today. #140 removes that path.
+  The removed Convex design would have synced it as `screens.B4.values.messageOverride`, but nothing
+  wrote it there.
 - **Send jobs / delivery receipts.** Server-owned already (README B5); they are read down by their
   own query, not through the session cursor.
 - *(The C3 checklist ticks are **not** synced: they stay in the local `account` store — see §2.1.
@@ -497,61 +505,10 @@ Rules:
 - Account actions (invite, join, remove) need a connection; the sync itself stays invisible and
   never blocks the app or a flow (C5, §4.6).
 
-## 6. Local Convex with Docker
+## 6. Auth seam
 
-```bash
-mkdir -p infra/convex && cd infra/convex
-curl -O https://raw.githubusercontent.com/get-convex/convex-backend/main/self-hosted/docker/docker-compose.yml
-docker compose up -d
-docker compose exec backend ./generate_admin_key.sh    # → CONVEX_SELF_HOSTED_ADMIN_KEY
-```
-
-The backend comes up on `http://127.0.0.1:3210`, HTTP actions on `http://127.0.0.1:3211`, and the
-dashboard on `http://localhost:6791`; state goes to a local SQLite database inside a Docker volume
-by default, which is right for development. Swap in Postgres when this stops being local-only.
-
-`apps/web/.env.local` (git-ignored — the admin key is full administrative access):
-
-```
-CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210
-CONVEX_SELF_HOSTED_ADMIN_KEY=…
-VITE_CONVEX_URL=http://127.0.0.1:3210
-```
-
-Deploy functions with `npx convex dev` against those env vars. Pin the image tag
-(`ghcr.io/get-convex/convex-backend:<rev>`) rather than `latest` so a rebuild doesn't move the
-backend under the team.
-
-**Auth, local phase — settled: stub it.** A dev-only `x-gg-user` header, read by `requireUser`
-behind `GG_DEV_AUTH=1`, is enough to build every screen against. Two conditions on the stub:
-
-```ts
-// convex/auth.ts — the single seam the real thing replaces
-export async function requireUser(ctx): Promise<string> {
-  if (process.env.GG_DEV_AUTH === "1") return devUserFromHeader(ctx);   // local only
-  throw new Error("auth not configured");
-}
-```
-
-1. **One seam.** Every query and mutation calls `requireUser` and nothing else touches identity, so
-   swapping in the real provider is one file.
-2. **It cannot ship.** The env flag is absent in every non-local config, and the build fails if
-   `GG_DEV_AUTH` is set outside development. A stub that silently survives to staging is how
-   single-user apps end up serving each other's sessions.
-
-The real choice — provider OAuth client-side minting a short-lived JWT, vs. Convex Auth's manual
-self-hosted setup — is deferred. It does not change the schema or the sync protocol, which is why
-deferring it is safe. **D1's three social buttons are unbuildable until it lands**, so it blocks
-Flow D, not the data layer.
-
-**Sign-up needs a connection; nothing after it does.** D1/D2 are the only screens in the product
-allowed to require network. If sign-up is attempted offline, D1 says so in its own voice — "We need
-a moment of signal to set this up. Nothing you do after this needs it." — and retries on `online`.
-There is no anonymous session and no claim step: `userId` exists before `sessionId` always, which
-is what keeps the `sessions.userId` binding non-nullable.
-
-**Mobile note:** `127.0.0.1` is the simulator's own loopback. Use the host LAN IP (or an `adb
-reverse` tunnel) for a real device.
+The local Convex setup and its dev auth stub (`GG_DEV_AUTH`, `x-gg-user`) were removed (#203).
+Accounts use Supabase Auth; the gateway verifies the Supabase JWT (see REQUIREMENTS.md §6 "Identity").
 
 ---
 
@@ -561,11 +518,10 @@ reverse` tunnel) for a real device.
 
 - Deleting a session sets `deletedAt`, keeping the tombstone so the cursor pull can propagate the
   delete to the user's other devices (§4.2).
-- A scheduled Convex cron (`crons.daily("purge", …)`) hard-deletes rows whose `deletedAt` is more
-  than 90 days old. Without the purge, "delete" is a lie told in a UI.
-- **"Delete everything"** in settings is the exception: it purges the user's `sessions` rows
-  immediately, nulls the `users` row's personal fields, and clears every local store including the
-  outbox. No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for
+- The 90-day hard purge was a Convex cron. It was removed with Convex (#203). No server holds
+  sessions now, so there is nothing to purge.
+- **"Delete everything"** in settings clears every local store including the
+  outbox. There is no server copy to purge (Convex was removed, #203). No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for
   this is asking for it now.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe
   action on a session row. A mis-swipe here is unforgivable in a way it isn't in a mail app.
