@@ -65,13 +65,13 @@ the role's brief.
 
 - **pnpm** (pinned via `packageManager`) + **Nx**. Never npm or yarn.
 - `apps/`: `web` (React + Vite + Tailwind), `mobile` (Expo), `gateway` (Hono on Cloudflare
-  Workers, fronting Convex), `marketing` (Astro), `web-e2e` (Playwright).
+  Workers, fronting Supabase), `marketing` (Astro), `web-e2e` (Playwright).
 - `libs/`: `shared`, `api-client`, `hooks`, `data-local`, `data-sync`, `contacts`,
-  `identity`, `gateway-messages`, `gateway-sync`.
+  `identity`, `gateway-messages`, `gateway-auth`, `gateway-flows`.
 - Tests: **Vitest** (+ React Testing Library, jest-dom, fake-indexeddb) for unit and
   integration; **Playwright** (+ `@axe-core/playwright`) for e2e. See `PROCESS.md` §7.
 - CI/CD: GitHub Actions. `ci.yml` gates every PR and `main`; `deploy.yml` deploys to Cloudflare
-  (Workers + Pages) and Convex Cloud only after CI passes on `main`, then smoke-tests production.
+  (Workers + Pages) only after CI passes on `main`, then smoke-tests production.
 
 ### Known gotchas
 
@@ -96,8 +96,7 @@ the role's brief.
 ## Commands (root `package.json` is the interface)
 
 `pnpm dev` · `dev:web` · `dev:gateway` · `dev:mobile` · `dev:marketing` · `check` (typecheck +
-test + build) · `check:affected` · `typecheck` · `test` · `build` · `e2e` · `convex:up` ·
-`convex:dev`
+test + build) · `check:affected` · `typecheck` · `test` · `build` · `e2e`
 
 ## The board
 

@@ -1,8 +1,7 @@
 name = "griever-guidance-gateway"
 main = "src/worker.ts"
 compatibility_date = "2025-09-01"
-# nodejs_compat: src/worker.ts (Hono) uses node:crypto's randomUUID, and the
-# Convex SDK needs it too.
+# nodejs_compat: src/worker.ts (Hono) uses node:crypto's randomUUID.
 compatibility_flags = ["nodejs_compat"]
 
 # grieversguidance.com is the official domain (REQUIREMENTS.md §6). Wrangler

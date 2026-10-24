@@ -29,8 +29,8 @@ These are not features; breaking one is a defect regardless of what it enables.
 | # | Constraint | Source |
 |---|---|---|
 | C1 | Messages are sent from the user's own phone via an `sms:` deep link, one contact at a time. No backend SMS path, no bulk send, no business number. Account emails (confirmation, reset, invites) come from the backend. They never carry message content, contacts, or the deceased person's details. | §6 rule 3 |
-| C2 | Message content is never stored — not Convex, not local state after send, not logs, not a history. Person details are not message content, and they sync to Supabase. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
-| C3 | Contact data never reaches the gateway or Convex. Contact data **and contact ids** never reach the gateway, Supabase or Convex in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
+| C2 | Message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to Supabase. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
+| C3 | Contact data never reaches the gateway. Contact data **and contact ids** never reach the gateway or Supabase in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
 | C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
 | C5 | Offline-first: nothing after sign-up may wait on the network, and nothing inside a flow ever does. Only account actions (sign-up, sign-in, reset, invite, revoke an invite, join, remove a member) need a connection, and they say so calmly. The device is authoritative. | DATA.md posture |
 | C6 | Sign-in (email today, Facebook later) is identity only — never a friends list, never a DM path. Members are added only by an owner typing an email. They are never suggested. | §6 "Identity" |
@@ -53,12 +53,12 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| ID-1 | Sign up / sign in with Facebook | Not started | Not started | Planned later (#36); the old Convex-backed path is removed |
+| ID-1 | Sign up / sign in with Facebook | Not started | Not started | Planned later (#36); the old path is removed |
 | ID-2 | Sign up / sign in with Instagram | Dropped | Dropped | Personal IG accounts have no login API; Business/Creator only, and no email |
 | ID-3 | Email/password sign-up and sign-in on Supabase Auth, non-enumerating errors | Done (live in production) | Done (flag on only) | `@griever/api-client/auth`, `useSupabaseIdentity`; passwords never reach the gateway |
 | ID-4 | Google sign-in | Not started | Not started | No button in the UI yet |
 | ID-5 | X sign-in | Not started | Not started | No button in the UI yet |
-| ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); shared people sync reads it through Supabase instead (`flows.owner_id`, #130); the Convex `/sync/*` stub is being retired (#140) |
+| ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); shared people sync reads it through Supabase instead (`flows.owner_id`, #130); the Convex `/sync/*` stub was removed (#203) |
 | ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done (live in production) | Partial | DATA.md "Settled"; mobile is suspended while its flag is off |
 | ID-8 | An owner invites a member by typing their email (in profile) | Not started | Not started | Planned: #116, #117 (database), #120 (shared types), #121, #122, #124 (gateway), #125 (hooks), #126 (web), #129 (mobile). Email is typed, never picked from contacts (C3, C6) |
 | ID-9 | A member joins from the emailed link (web in v1) | Not started | Not started | Planned: #117, #128 (web); mobile join is a follow-up (#139) |
@@ -102,11 +102,11 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
-| DS-1 | Cursor-based pull/push through the gateway, never Convex directly | Done | `libs/data-sync`, `libs/gateway-sync` |
+| DS-1 | Cursor-based pull/push through the gateway | Removed | The Convex backend and the `/sync/*` routes were removed (#203). `libs/data-sync` stays as unused client code. Shared people sync uses Supabase (DS-6) |
 | DS-2 | Send-flow state writes into `libs/data-local`'s screen-keyed store so the outbox has something to flush | Not started | Outbox is currently always empty |
 | DS-3 | Sync is invisible — no spinners or "saving…" states | Partial | DATA.md §4.6 |
-| DS-4 | Deleted sessions soft-delete, hard-purge at 90 days | Done (server) | `convex/crons.ts` |
-| DS-5 | "Delete everything" in settings purges immediately, clears every local store | Partial | Server mutation exists; no settings UI yet |
+| DS-4 | Deleted sessions soft-delete, hard-purge at 90 days | Removed | The Convex purge cron was removed (#203). No server holds sessions now |
+| DS-5 | "Delete everything" in settings purges immediately, clears every local store | Partial | The Convex server mutation was removed (#203). Local clearing only |
 | DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through Supabase; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138). DATA.md "Shared people (Supabase)" |
 
 ### 3.6 Marketing
@@ -172,9 +172,8 @@ Grievers Guidance helps people who have just lost a loved one send funeral and s
 ```
 apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
-              Composes libs/identity, libs/gateway-messages, libs/gateway-sync and
-              libs/gateway-flows into one HTTP surface (CORS + routing) — this app owns no
-              domain logic itself. Also holds the Convex functions (apps/gateway/convex/).
+              Composes libs/identity, libs/gateway-messages and libs/gateway-flows into
+              one HTTP surface (CORS + routing) — this app owns no domain logic itself.
   web/        React + Vite + Tailwind. Browser send flow and account management.
   mobile/     Expo + React Native. The primary user surface — mobile-first, core RN only.
   marketing/  Astro. Public-facing site. No shared business logic.
@@ -188,7 +187,7 @@ libs/
   data-local/       IndexedDB-backed local storage (the screen-keyed session document, outbox,
                     contacts). Browser-only — see DATA.md.
   data-sync/        The offline sync engine (outbox flush, cursor-based pull/push, merge) that
-                    talks to apps/gateway, never to Convex directly. See DATA.md.
+                    has no live backend now that Convex is removed (#203). See DATA.md.
   contacts/         Platform-agnostic contact-import logic shared by web and mobile: the
                     `ContactSource` adapter interface, normalize/dedupe/rank, and the
                     fetch → review → commit pipeline. Device-specific adapters (the web Contact
@@ -198,14 +197,13 @@ libs/
                     See "Identity" below — this is who a user is, never their friends or contacts.
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
                     sending happens entirely on-device (see "The send flow").
-  gateway-sync/     The gateway's Convex client and the /sync/pull, /sync/push routes.
   gateway-auth/     The one shared helper for the gateway's domain libs:
                     Supabase JWT verification and a PostgREST client that acts as the caller.
   gateway-flows/    Invite and member routes (GET /members, POST /invites, POST /invites/accept,
                     DELETE /invites/:id, DELETE /members/:memberId) and the invite mailer; mounted
                     by apps/gateway. The /flows routes are planned (#131).
 
-  identity, gateway-messages, gateway-sync, and gateway-flows each own their own Hono router and
+  identity, gateway-messages, and gateway-flows each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
   together. The only shared code is libs/gateway-auth (rule 2b below).
 ```
@@ -218,8 +216,8 @@ libs/
 |---|---|
 | Mobile | Expo + React Native (core components only) |
 | Web | React + Vite + Tailwind |
-| Gateway | Hono on Cloudflare Workers, fronting Convex |
-| Data | Convex — self-hosted via Docker locally, Convex Cloud in production (see infra/convex/README.md) |
+| Gateway | Hono on Cloudflare Workers, fronting Supabase |
+| Data | Supabase Postgres (accounts, shared people). Convex was removed (#203) |
 | Marketing | Astro |
 | Package manager | pnpm — never npm or yarn |
 | Monorepo | Nx (task running, code generation) |
@@ -256,9 +254,6 @@ pnpm dev:web        # Vite on port 5173
 pnpm dev:mobile     # Expo
 pnpm dev:marketing  # Astro
 pnpm dev            # gateway + web concurrently
-
-pnpm convex:up      # start the local Convex backend + dashboard (Docker)
-pnpm convex:dev     # deploy apps/gateway/convex functions, watch for changes
 ```
 
 ---
@@ -271,11 +266,11 @@ Never define a type in an app that anything else might need. If it crosses a bou
 **2. All API calls go through libs/api-client.**
 Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app code.
 
-**2a. The gateway is the only thing that talks to Convex.**
-`apps/web` (via `libs/data-sync`) calls `apps/gateway`'s REST endpoints, never Convex directly — no Convex client, URL, or credentials in `apps/web`. This is what makes rule 2 true for sync, not just for `/send`/`/history`/etc.
+**2a. The gateway is the only thing that holds server credentials.**
+`apps/web` calls `apps/gateway`'s REST endpoints (and Supabase with the public anon key under RLS). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.)
 
-**2b. Identity, messages, sync, and flows are separate libs — no cross-imports.**
-`libs/identity`, `libs/gateway-messages`, `libs/gateway-sync`, and `libs/gateway-flows` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another (each keeps its own tiny Convex client rather than sharing one). The one exception is a single shared helper lib, `libs/gateway-auth` (Supabase JWT verification plus PostgREST calls made as the caller), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, `libs/gateway-sync`, and `libs/gateway-flows` still never import each other.
+**2b. Identity, messages, and flows are separate libs — no cross-imports.**
+`libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Supabase JWT verification plus PostgREST calls made as the caller), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` still never import each other.
 
 **3. Messages are sent from the user's own phone, never a backend.**
 There is no server-side SMS provider (no Twilio, no `libs/sms`) — a bulk send from a business number reads as impersonal for a grief app. Sending is an `sms:` deep link (`buildSmsLink()` in `libs/hooks`) that opens the device's native Messages app with one contact and the message pre-filled; the user taps Send themselves, one contact at a time. Nothing in this repo may add a backend message-sending path.
@@ -329,7 +324,7 @@ data — only 7 fields survive past the picker/import screen: `contactId`, `name
 
 Contacts are persisted on-device only (IndexedDB on web via `libs/data-local`, AsyncStorage on
 mobile via `apps/mobile/src/lib/contactStore.ts` — same `ContactStore` interface, so `useContacts`
-is shared) — never sent to Convex, never to the gateway. They are **not** kept forever: the saved
+is shared) — never sent to the gateway. They are **not** kept forever: the saved
 list is cleared 30 days after the latest known service date (`CONTACT_RETENTION_DAYS` in
 `libs/hooks/src/useSessions.ts`), on the theory the family may want to reuse it right up until the
 service is behind them, but has no reason to once it is. No service date yet set → no expiry
@@ -371,15 +366,11 @@ Facebook's or Instagram's OAuth endpoints today.
   the caller gets a calm 503. The routes live in `libs/gateway-flows`.
 - Sign-in errors use one generic message whether the email exists or not, so a failed attempt never
   confirms which one (the copy lives in `useSupabaseIdentity`).
-- **The Convex `/sync/pull`/`/sync/push` routes do not work in production, and are not the plan.**
-  They still authenticate via `convex/auth.ts`'s `requireUser` dev stub (`GG_DEV_AUTH`), and a real
-  deployment never sets `GG_DEV_AUTH` (enforced by `scripts/check-dev-auth.mjs`), so `requireUser`
-  throws there regardless of who is signed in. The old question of how `auth.users.id` maps to
-  `sessions.userId` is answered by the shared-people design: person details sync through a
-  Supabase `flows` table whose `flows.owner_id` is `auth.users.id` (#130). The dev-only Convex sync
-  is retired in #140. Separately, nothing in the web send flow (`useSessions`, `useSendFlow`)
-  writes into `libs/data-local`'s screen-keyed store yet, so the outbox sync would flush is
-  currently empty; see DATA.md.
+- **The Convex `/sync/pull` and `/sync/push` routes were removed (#203).** They never worked in
+  production (`requireUser` dev stub, `GG_DEV_AUTH`). Person details sync through a Supabase
+  `flows` table whose `flows.owner_id` is `auth.users.id` (#130). Nothing in the web send flow
+  (`useSessions`, `useSendFlow`) writes into `libs/data-local`'s screen-keyed store, and the web app
+  no longer registers any sync; see DATA.md.
 - **Family sharing (decided at G1, 2026-10-11; not built yet).** An owner adds members only by
   typing an email (C6). Still **no service-role key**: invites use our own single-use token, and a
   joiner redeems it through an RPC called under their own JWT, so row-level security applies to
@@ -387,9 +378,8 @@ Facebook's or Instagram's OAuth endpoints today.
   #122, #128, #130.
 
 **Accounts live in Supabase `profiles`** (see "Supabase boundary" under Database). The Convex
-`identities` and `profiles` tables and their functions (`convex/identity.ts`) are removed (#37).
-Convex holds only `sessions` and `counters`, for dev-only sync. Everything else in
-this repo reaches a user only by their opaque `userId`.
+backend, with its `identities`, `profiles`, `sessions` and `counters` tables, was removed (#37,
+#203). Everything else in this repo reaches a user only by their opaque `userId`.
 
 **What sign-in is not, and cannot become:** it does not, and cannot, give this app a friends list
 or a way to message someone's contacts. Facebook's `user_friends` permission only ever returns
@@ -402,23 +392,18 @@ path described under "Contacts" and "The send flow". The two never merge.
 
 ### Database
 
-Convex — self-hosted via Docker for local development, Convex Cloud in production (two separate
-deployments; see `infra/convex/README.md`). Schema and functions live in `apps/gateway/convex/`,
-identical in both. See `DATA.md` for the full data architecture (the screen-keyed local session
-document, the cursor-based sync protocol, the merge rule).
+Supabase Postgres is the only server database. Convex was removed (#203). See `DATA.md` for the
+data architecture (the screen-keyed local session document and the Supabase shared-people design).
 
-Contact data is never sent to Convex. Contact *ids* never appear in shared person sync (C3); the
-dev-only Convex session sync still carries ids, never a name or number, until it is retired (#140). Message content is never stored anywhere, by anything — not Convex, not a send
-history, not a log — only composed client-side and handed to the device's own Messages app at
-send time (see "The send flow").
+Contact data is never sent to the gateway or Supabase. Contact *ids* never appear in shared person
+sync (C3). Message content is never stored anywhere, by anything — not a send history, not a log —
+only composed client-side and handed to the device's own Messages app at send time (see "The send flow").
 
 **Supabase boundary (accounts).** App state tied to an account (the `profiles` row: sender name and
 contact source; the email lives in Supabase Auth) is stored in Supabase Postgres, with row-level
-security so a user reaches only their own row and no delete policy (C9). Convex's deploy is
-unchanged; session sync (still dev-only) stays there. Contacts, drafts and message content stay on the device and reach no
+security so a user reaches only their own row and no delete policy (C9). Contacts, drafts and message content stay on the device and reach no
 server (C2, C3, C4); only person details sync. Migrations and pgTAP tests live in `infra/supabase/`; migrations must stay backward-compatible
-with the live gateway. Supabase is the only account path: the Convex `identities`/`profiles`
-tables are removed (#37).
+with the live gateway. Supabase is the only account path.
 `checklistTicks` is not carried over yet. Shared people details will live in Supabase too (a
 `flows` table with `flows.owner_id` = `auth.users.id`, plus memberships, #116, #130); see DATA.md
 "Shared people (Supabase)".
@@ -428,14 +413,12 @@ tables are removed (#37).
 ### Environment variables
 
 ```
-apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY, CONVEX_SELF_HOSTED_URL,
-              CONVEX_SELF_HOSTED_ADMIN_KEY, CONVEX_SITE_URL,
+apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
               INVITE_FROM_EMAIL, WEB_URL (wrangler [vars]), RESEND_API_KEY (Worker secret, set by
               deploy.yml from the GitHub secret; skipped when empty, and a key already on the
               Worker stays; to remove it: `wrangler secret delete RESEND_API_KEY --config
               apps/gateway/wrangler.toml`; with no key, POST /invites answers 503)
-              CORS_ORIGINS, CONVEX_DEPLOY_KEY, CONVEX_URL                           (CI/prod only)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (read only when the flag is on)
               VITE_FEATURE_SHARING ("true" enables sharing; default off)
@@ -467,13 +450,13 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No third-party UI component libraries in `apps/mobile` (no NativeBase, React Native Paper, Tamagui, etc.) — use core RN components
 - No backend SMS-sending path (no Twilio, no `libs/sms`, no server-side send route) — see rule 3
 - No shared types defined in apps
-- No contact data reaches the gateway or Convex — on-device storage only (see "Contacts"), and never more than the 6 named `Contact` fields
+- No contact data reaches the gateway — on-device storage only (see "Contacts"), and never more than the 6 named `Contact` fields
 - No raw provider payload (photo, provider ID, labels, etc.) kept past the picker/import screen — normalize down to the 7 `Contact` fields immediately
 - No message content stored anywhere — not the DB, not state, not logs, not a send history; nothing to view or restore once sent (the user's own Messages app is the only record)
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation
-- No cross-imports between `libs/identity`, `libs/gateway-messages`, `libs/gateway-sync`, and `libs/gateway-flows` (only `libs/gateway-auth` is shared)
+- No cross-imports between `libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` (only `libs/gateway-auth` is shared)
 - No contact ids in flow sync (C3), and no invitee picked from contacts: the owner types the email (C6)
 - No service-role key anywhere (see "Identity")
 - No friends-list or peer-to-peer DM API calls to Facebook or Instagram — see "Identity"; neither platform allows either for a personal contact, regardless of sign-in

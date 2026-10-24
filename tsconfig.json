@@ -40,9 +40,6 @@
       "path": "./libs/identity"
     },
     {
-      "path": "./libs/gateway-sync"
-    },
-    {
       "path": "./libs/gateway-auth"
     },
     {

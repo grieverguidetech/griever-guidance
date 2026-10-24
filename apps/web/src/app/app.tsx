@@ -17,7 +17,6 @@ import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
-import { setSyncUserId } from '../lib/registerSync';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { hasStoredSession, loadAuthClient } from '../lib/authClient';
 import type { AuthClientResult } from '../lib/authClient';
@@ -530,12 +529,6 @@ function AppBody({
     await removeEverythingFromDevice(window.localStorage, client ? () => client.signOut() : undefined);
     onRemoved();
   }
-
-  // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
-  // (#39), so the Supabase user id is deliberately not passed in.
-  useEffect(() => {
-    void setSyncUserId(null);
-  }, []);
 
   const sortedSessions = useMemo(() => namedSessionsByRecent([...sessions.sessions]), [sessions.sessions]);
 
