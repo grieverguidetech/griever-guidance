@@ -249,7 +249,9 @@ AWS CLI.
    Recommendation: build them on the data function, so we write them once.
 8. **What happens when an account is deleted?** Clerk sends a `user.deleted` webhook.
    Recommendation: the data function deletes that user's items when it gets the webhook.
-9. **Which AWS region?** Recommendation: `us-east-1`.
+9. **Which AWS region?** Decided (#185): `us-east-2`. The account's region-lock SCP allows only
+   global services (IAM, Budgets, Cost Explorer) in `us-east-1`, so CloudFormation, Lambda and
+   DynamoDB go in `us-east-2`. GitHub Actions must set `aws-region: us-east-2`.
 10. **`POST /obituary` has no sign-in check and no rate limit.** Recommendation: add both before the
     feature is turned on. This is a separate ticket.
 

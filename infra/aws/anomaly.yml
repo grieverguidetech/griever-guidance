@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cost anomaly monitor for Grievers Guidance with a daily email.
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Description: Email that gets the anomaly alerts.
+
+Resources:
+  ServiceMonitor:
+    Type: AWS::CE::AnomalyMonitor
+    Properties:
+      MonitorName: gg-services
+      MonitorType: DIMENSIONAL
+      MonitorDimension: SERVICE
+
+  DailyAlert:
+    Type: AWS::CE::AnomalySubscription
+    Properties:
+      SubscriptionName: gg-anomaly-daily
+      Frequency: DAILY
+      MonitorArnList:
+      - !Ref ServiceMonitor
+      Subscribers:
+      - Type: EMAIL
+        Address: !Ref AlertEmail
+      ThresholdExpression: '{"Dimensions":{"Key":"ANOMALY_TOTAL_IMPACT_ABSOLUTE","Values":["1"],"MatchOptions":["GREATER_THAN_OR_EQUAL"]}}'
