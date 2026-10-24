@@ -226,16 +226,118 @@ The role's **trust policy** says who may assume it:
 
 ### `aws iam get-role` / `aws iam list-attached-role-policies` / `aws iam list-role-policies`
 
-Read back the trust policy and confirmed the role has **no permissions yet**. A role that can be
-assumed but can do nothing is a safe place to stop.
+Read back the trust policy and confirmed the role had **no permissions at that point**. A role
+that can be assumed but can do nothing is a safe place to stop. (Section 9 adds its permissions.)
 
 **System design:**
 
 - **Trust and permissions are separate.** The trust policy is "who can come in." The permissions
   policy is "what they can do once inside." You design and review them separately.
-- **Least privilege.** Next, the GitHub role gets only "run CloudFormation on `gg-*` stacks" and
-  "hand work to `gg-cfn-exec`." The exec role holds the real resource permissions. A stolen GitHub
-  token can then deploy templates, but it cannot touch data directly.
+- **Least privilege.** Next, the GitHub role gets only "run CloudFormation on `gg-app-*` stacks"
+  and "hand work to `gg-cfn-exec`." The exec role holds the real resource permissions. A stolen
+  GitHub token can then deploy templates, but it cannot touch data directly.
+
+---
+
+## 9. Two roles: the deploy role and the exec role
+
+### Same deploy, now with `gg-cfn-exec` and an inline policy
+
+We added a second role, `gg-cfn-exec`, and gave `gg-github-deploy` a small inline policy.
+
+| Role | Who can assume it | What it can do |
+|---|---|---|
+| `gg-github-deploy` | GitHub Actions, this repo, `main` only | Make and run change sets on `gg-app-*` stacks, and pass `gg-cfn-exec` to CloudFormation |
+| `gg-cfn-exec` | The CloudFormation service, for this account only | Nothing yet. Ticket #281 adds Lambda and DynamoDB permissions |
+
+Four details in the policy matter:
+
+1. **`gg-app-*`, not `gg-*`.** `gg-*` would match `gg-github-oidc`, the stack that holds the
+   deploy role itself. Then GitHub could rewrite its own permissions. That is called
+   **privilege escalation**.
+2. **`cloudformation:RoleArn`.** `CreateChangeSet` is allowed only when the change set uses
+   `gg-cfn-exec`. Without this, a change set with no role runs with the caller's own permissions.
+3. **`iam:PassedToService`.** The deploy role may hand `gg-cfn-exec` to CloudFormation and to
+   nothing else.
+4. **`aws:SourceAccount`** on the exec role's trust policy. CloudFormation may use the role only
+   for this account. This blocks the **confused deputy** problem, where a trusted service is
+   tricked into acting for someone else.
+
+**A YAML trap we hit:** `Policies:` was 2 spaces too far left, so YAML read it as a sibling of
+`Properties`. CloudFormation said `Invalid template resource property 'Policies'`. In YAML,
+indentation *is* the structure.
+
+**Another trap:** `validate-template` needs `file://` in front of the path. Without it, the CLI
+sends the path text itself as the template, and you get `unsupported structure`. `deploy` takes a
+plain path with `--template-file`.
+
+---
+
+## 10. Proving the policy: the IAM policy simulator
+
+### `aws iam simulate-principal-policy`
+
+Asks IAM: "if this role tried this action on this resource, would it be allowed?" Nothing runs for
+real. You give it a **who** (`--policy-source-arn`), a **what** (`--action-names`), a **where**
+(`--resource-arns`), and any condition values (`--context-entries`).
+
+IAM answers with its normal decision logic:
+
+1. An explicit `Deny` anywhere: **`explicitDeny`**.
+2. Otherwise, an `Allow` that matches action, resource and conditions: **`allowed`**.
+3. Otherwise: **`implicitDeny`**, the default "no".
+
+Our final results, all with `aws:RequestedRegion=us-east-2`:
+
+| Test | Result |
+|---|---|
+| `CreateChangeSet` on `gg-app-test` with `gg-cfn-exec` | allowed |
+| `CreateChangeSet` on `gg-app-test` with no role | implicitDeny |
+| `CreateChangeSet` on `gg-app-test` with another role | implicitDeny |
+| `ExecuteChangeSet` on `gg-app-test` | allowed |
+| `CreateChangeSet` / `ExecuteChangeSet` on `gg-github-oidc` | implicitDeny |
+| `PassRole` `gg-cfn-exec` to Lambda | implicitDeny |
+| `PassRole` `gg-cfn-exec` to CloudFormation | allowed |
+
+**What surprised us:** the first run said `explicitDeny` even for `gg-app-test`. The result showed
+`AllowedByOrganizations: false`. The simulator **does** apply SCPs, and without a region it hit
+the region lock. Adding `aws:RequestedRegion=us-east-2` fixed it. So any GitHub workflow that uses
+this role must set `aws-region: us-east-2`.
+
+**A zsh trap:** `$A:role` lost the `:r`, because in zsh `:r` is a modifier ("remove extension").
+Use `${A}` with braces when a variable is followed by a colon.
+
+**System design:** test the **denials**, not only the allows. A policy that allows the right thing
+can still allow too much. The guard is only proven when the wrong requests fail.
+
+---
+
+## 11. Lesson 4: CloudFormation basics, in one place
+
+| Word | Meaning |
+|---|---|
+| **Template** | A YAML file that describes resources. It lives in the repo (`infra/aws/*.yml`). |
+| **Stack** | One deployed copy of a template. We have `gg-budgets`, `gg-anomaly` and `gg-github-oidc`. |
+| **Parameter** | A value given at deploy time (`AlertEmail`), so the template holds no private data. |
+| **Change set** | The list of differences between the live stack and the new template. `deploy` makes one, then runs it. |
+| **Capabilities** | Your OK for IAM changes. `CAPABILITY_IAM` for unnamed IAM resources, `CAPABILITY_NAMED_IAM` when you name them. |
+| **Intrinsic functions** | `!Ref` (a parameter or a resource's main ID), `!Sub` (fill `${...}` into a string), `!GetAtt` (one attribute, such as a role's ARN). |
+| **Rollback** | If a create or update fails, CloudFormation undoes it. A failed first create ends in `ROLLBACK_COMPLETE`, and you must delete that stack before you try again. |
+
+The commands, in the order you use them:
+
+1. `aws cloudformation validate-template --template-body file://<path>`: check the shape. Creates
+   nothing.
+2. `aws cloudformation deploy --template-file <path> --stack-name <name> [--parameter-overrides ...] [--capabilities ...]`:
+   create or update the stack.
+3. `aws cloudformation describe-stacks --stack-name <name>`: read the status.
+4. `aws cloudformation describe-stack-events --stack-name <name>`: read what happened, step by
+   step, when something fails.
+5. Read back the real resources (`get-*`, `describe-*`) to check that AWS matches the template.
+
+**System design:** CloudFormation is **declarative**. You write *what* should exist, and
+CloudFormation works out *how* to get there from what exists now. The template, not your memory
+of which commands you ran, is the record of the system.
 
 ---
 
@@ -251,3 +353,5 @@ assumed but can do nothing is a safe place to stop.
 | Read back, don't trust "success" | `describe-*` and `get-*` after every deploy       |
 | End-to-end alerts                | Activated the email contact                       |
 | Least privilege                  | Trust only `main`; two-role deploy design         |
+| Block privilege escalation       | `gg-app-*` prefix; `cloudformation:RoleArn`       |
+| Test the denials                 | The IAM policy simulator                          |

@@ -29,10 +29,16 @@ Resources:
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
-          - Sid: DeployAppStacks
+          - Sid: CreateChangeSetWithExecRole
+            Effect: Allow
+            Action: cloudformation:CreateChangeSet
+            Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/gg-app-*/*
+            Condition:
+              StringEquals:
+                cloudformation:RoleArn: !GetAtt CfnExecRole.Arn
+          - Sid: RunAppChangeSets
             Effect: Allow
             Action:
-            - cloudformation:CreateChangeSet
             - cloudformation:DescribeChangeSet
             - cloudformation:ExecuteChangeSet
             - cloudformation:DeleteChangeSet
