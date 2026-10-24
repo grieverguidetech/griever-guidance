@@ -520,8 +520,8 @@ Accounts use Supabase Auth; the gateway verifies the Supabase JWT (see REQUIREME
   delete to the user's other devices (§4.2).
 - The 90-day hard purge was a Convex cron. It was removed with Convex (#203). No server holds
   sessions now, so there is nothing to purge.
-- **"Delete everything"** in settings is the exception: it clears every local store including the
-  outbox. (The Convex server purge was removed, #203.) No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for
+- **"Delete everything"** in settings clears every local store including the
+  outbox. There is no server copy to purge (Convex was removed, #203). No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for
   this is asking for it now.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe
   action on a session row. A mis-swipe here is unforgivable in a way it isn't in a mail app.

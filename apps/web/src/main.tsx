@@ -3,6 +3,7 @@ import './lib/configureApi';
 import { StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import App from './app/app';
+import { unregisterOldWorker } from './lib/unregisterOldWorker';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement,
@@ -20,3 +21,6 @@ try {
 } catch {
   /* storage blocked; nothing to clean */
 }
+
+// The old service worker file is gone; remove stale registrations.
+void unregisterOldWorker();

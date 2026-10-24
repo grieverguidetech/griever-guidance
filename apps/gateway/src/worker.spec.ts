@@ -124,13 +124,15 @@ describe('gateway: the removed /auth routes', () => {
   });
 });
 
-describe('gateway: unconfigured services fail closed with a plain message', () => {
-  it('the removed /sync routes answer 404 (Convex was removed, #203)', async () => {
+describe('removed sync routes', () => {
+  it('answer 404 (Convex was removed, #203)', async () => {
     const app = await loadApp();
     expect((await app.request('/sync/pull?cursor=0')).status).toBe(404);
     expect((await app.request('/sync/push', json({ deviceId: 'd1', ops: [] }))).status).toBe(404);
   });
+});
 
+describe('gateway: unconfigured services fail closed with a plain message', () => {
   it('obituary without an Anthropic key', async () => {
     const app = await loadApp();
     const res = await app.request('/obituary', json({ fullName: 'A', dateOfBirth: '1', dateOfPassing: '2' }));
