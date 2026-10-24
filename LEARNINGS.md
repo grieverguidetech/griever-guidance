@@ -2,24 +2,31 @@
 
 ## AWS infra (ticket #185)
 
-A running log of every command we used to set up AWS for Grievers Guidance (ticket #185), what
-each one does, and why it matters for system design. Read it top to bottom: the commands are in
-the order we ran them.
+This is a step-by-step story of how we set up AWS for Grievers Guidance. Each command gets two
+short parts:
 
-> This repo is public. Account IDs, emails and codes are shown as `[placeholders]` on purpose.
+- **What it does:** the plain job of the command.
+- **Why it matters:** the system design idea behind it.
 
-## The big picture first
+Read it top to bottom. The commands are in the order we ran them.
 
-We are building **guardrails before features**. Before any app code runs on AWS, we want three
-things in place:
+> This repo is public. So account IDs, emails and codes show as `[placeholders]`.
 
-1. **Know who you are.** Every command runs as some identity. Check it before you change anything.
-2. **Cap the damage.** Budgets and anomaly alerts tell you fast when money leaks.
-3. **No long-lived keys.** GitHub deploys with short-lived credentials (OIDC), not a stored key.
+## The big picture
 
-Everything real lives in **CloudFormation templates** under `infra/aws/`. Direct CLI commands are
-for learning and for checking. That idea is called **infrastructure as code (IaC)**: the repo is
-the source of truth, and you can rebuild the account from it.
+We build **guardrails first** and features later. Think of it like a new house. You put in smoke
+alarms and locks before you move the furniture in.
+
+Before any app code runs on AWS, we want three things:
+
+1. **Know who you are.** Every command runs as someone. Check who before you change anything.
+2. **Cap the damage.** If money starts to leak, an alert tells you fast.
+3. **No stored keys.** GitHub deploys with short-lived passes, not a key that lasts forever.
+
+All the real AWS resources live in **templates** in `infra/aws/`. We type CLI commands to learn
+and to check. We do not type them to build. This idea is called **infrastructure as code
+(IaC)**. The repo is the source of truth. If the account were wiped, you could rebuild it from
+the repo.
 
 ---
 
@@ -27,27 +34,30 @@ the source of truth, and you can rebuild the account from it.
 
 ### `aws login --region us-east-1`
 
-Opens the browser, you sign in, and the CLI gets **temporary credentials**. Nothing permanent is
-saved on disk.
+**What it does:** It opens your browser. You sign in. The CLI gets **temporary credentials**.
+Nothing permanent is saved on your laptop.
 
-**System design:** short-lived credentials are safer than access keys. A leaked key works until
-someone deletes it. A leaked session expires on its own. You will see this idea again with OIDC.
+**Why it matters:** Short-lived credentials are safer than access keys. A stolen key works until
+someone deletes it. A stolen session dies on its own after a while. You will see this idea again
+with GitHub OIDC.
 
 ### `aws sts get-caller-identity`
 
-Answers "who am I right now?" It prints the account and the identity (user or role).
+**What it does:** It answers one question: "Who am I right now?" It prints the account and the
+user or role.
 
-**System design:** always check identity before you change anything. We checked that the ARN did
-**not** end in `:root`. The root user can do everything and cannot be limited, so you use it only
-for the few tasks that need it.
+**Why it matters:** Always check who you are before you change things. We made sure the answer
+did **not** end in `:root`. The root user can do everything, and nothing can limit it. So you use
+root only for the few jobs that need it.
 
 ### `aws configure set region us-east-2` / `aws configure get region`
 
-Sets and reads the default region in `~/.aws/config`. It changes nothing in AWS.
+**What it does:** It saves your default region in `~/.aws/config`, and then reads it back. It
+changes nothing inside AWS.
 
-**System design:** most AWS services are **regional**. A table in Ohio does not exist in
-Virginia. If the region is wrong or empty, commands fail or, worse, create things in a region you
-never look at.
+**Why it matters:** Most AWS services are **regional**. A table in Ohio does not exist in
+Virginia. If the region is wrong or empty, commands fail. Or worse, they build things in a region
+you never look at.
 
 ---
 
@@ -55,20 +65,21 @@ never look at.
 
 ### `git worktree add .worktrees/aws-185 -b feat/aws-account-185 main`
 
-Makes a second folder with its own branch. `main` stays clean in the first folder while the ticket
-lives in the second.
+**What it does:** It makes a second folder with its own branch. Your first folder stays on
+`main`. The ticket work lives in the second folder.
 
 ### `pnpm install --frozen-lockfile --prefer-offline`
 
-Each worktree needs its own `node_modules`. `--frozen-lockfile` means "install exactly what the
-lockfile says, and fail if it doesn't match."
+**What it does:** It installs packages in the new folder. Each worktree needs its own
+`node_modules`. `--frozen-lockfile` means "install exactly what the lockfile says, or stop."
 
 ### `gh project item-edit ...` and `gh issue edit 185 --add-label in-progress`
 
-Moves the ticket to **In progress** on the board, so everyone can see what is being worked on.
+**What it does:** It moves the ticket to **In progress** on the board. Now everyone can see what
+is being worked on.
 
-**System design:** one ticket, one branch, one PR keeps changes small and easy to review. Small
-changes are easier to roll back.
+**Why it matters:** One ticket, one branch, one PR. That keeps each change small. Small changes
+are easy to review and easy to undo.
 
 ---
 
@@ -76,71 +87,84 @@ changes are easier to roll back.
 
 ### `aws cloudformation validate-template --template-body file://infra/aws/budgets.yml`
 
-Asks CloudFormation to read a template and check its shape. It creates nothing. The first time,
-it failed with `AccessDenied ... explicit deny in a service control policy`.
+**What it does:** It asks CloudFormation to read a template and check its shape. It builds
+nothing.
+
+The first time we ran it, it failed:
+
+```text
+AccessDenied ... explicit deny in a service control policy
+```
 
 ### `aws organizations describe-organization`
 
-Shows the Organization this account belongs to, including the management account email. A member
-account can run this read-only call.
+**What it does:** It shows the Organization your account belongs to. It also shows the email of
+the account in charge. It only reads.
 
-**What we learned:** the account is a **member** of an **AWS Organization**. The management
-account (a different account, signed in with root) owns the Organization and its **service control
+**What we learned:** Our account is a **member** of an **AWS Organization**. A different account,
+the **management account**, is in charge. That account sets rules called **service control
 policies (SCPs)**.
 
-An SCP is a guardrail on a whole account. It wins over everything, even a role with full access.
-Our SCP was a **region lock**:
+An SCP is like a rule from the landlord. It beats everything else, even a role with "full
+access." Our SCP was a **region lock**:
 
-| Region      | What is allowed                                                                    |
-| ----------- | ---------------------------------------------------------------------------------- |
-| `us-east-1` | Global services only (IAM, Budgets, Cost Explorer, STS, Route 53, CloudFront, ACM) |
-| `us-west-2` | Almost nothing (Identity Center, Bedrock, support)                                 |
-| `us-east-2` | Everything. This is the home region.                                               |
-| Any other   | Blocked                                                                            |
+| Region | What is allowed |
+|---|---|
+| `us-east-1` | Only global services (IAM, Budgets, Cost Explorer, STS, Route 53, CloudFront, ACM) |
+| `us-west-2` | Almost nothing (Identity Center, Bedrock, support) |
+| `us-east-2` | Everything. This is our home region. |
+| Any other | Blocked |
 
 So we moved Grievers Guidance to **`us-east-2` (Ohio)**.
 
-**System design:** this is **defense in depth**. Even if a role is too powerful, the SCP stops it
-from creating resources in a region you forgot about. Global services (like IAM and Budgets) still
-work, because AWS runs them from `us-east-1` no matter where you call from.
+**Why it matters:** This is **defense in depth**. That means more than one layer of protection.
+Even if a role has too much power, the SCP stops it from building in a region you forgot about.
+Global services like IAM and Budgets still work. AWS runs them from `us-east-1`, wherever you
+call from.
 
 ---
 
-## 4. Budgets: a hard number to watch
+## 4. Budgets: a number to watch
 
 ### `aws cloudformation deploy --template-file infra/aws/budgets.yml --stack-name gg-budgets --parameter-overrides AlertEmail=[your-email]`
 
-Creates or updates a **stack**: one deployed copy of a template. `deploy` builds a **change set**
-(the list of differences), applies it, and waits until it finishes. The result was a $10 monthly
-budget with email alerts at $5 and $10 of **actual** spend.
+**What it does:** It creates (or updates) a **stack**. A stack is one live copy of a template.
+First, `deploy` makes a **change set**, which is a list of what will change. Then it applies the
+change set and waits until it ends.
 
-**System design:** the email is a **parameter**, not written in the template. Templates stay
-reusable and safe to publish. Config goes in at deploy time.
+The result: a $10 monthly budget. It emails you when **actual** spending goes over $5, and again
+over $10.
+
+**Why it matters:** The email is a **parameter**. You give it when you deploy. It is not written
+in the template. So the template is safe to share, and you can reuse it.
 
 ### `aws cloudformation describe-stacks --stack-name gg-budgets`
 
-Shows the stack status. You want `CREATE_COMPLETE` (first deploy) or `UPDATE_COMPLETE` (later
-deploys). `ROLLBACK_COMPLETE` means it failed and CloudFormation undid it.
+**What it does:** It shows the stack's status. Here is what to look for:
+
+- `CREATE_COMPLETE`: the first deploy worked.
+- `UPDATE_COMPLETE`: a later deploy worked.
+- `ROLLBACK_COMPLETE`: it failed, and CloudFormation undid it.
 
 ### `aws cloudformation list-stacks`
 
-Lists every stack in the region, even deleted or failed ones. We used it to prove a deploy had
-never run at all.
+**What it does:** It lists every stack in the region. That includes deleted and failed ones. We
+used it to prove a deploy had never run at all.
 
 ### `aws budgets describe-budgets` / `aws budgets describe-notifications-for-budget`
 
-Read the live budgets and their alerts. This is how we check that AWS matches the template.
+**What it does:** It reads the live budgets and their alerts.
 
-**System design:** "the deploy said success" is not the same as "the thing is right." Always read
-back the real resource.
+**Why it matters:** "The deploy said success" is not the same as "the thing is right." Always
+read back the real resource. Then compare it with what you expected.
 
 ### `aws budgets delete-budget --budget-name monthly-5-usd`
 
-Removed a second $5 budget the setup wizard had made by hand. It was not in our templates and
-would have sent duplicate emails.
+**What it does:** It deletes a second $5 budget. The setup wizard had made it by hand. It was not
+in our templates, and it would have sent you two emails for the same event.
 
-**System design:** resources made outside IaC are **drift**. Drift means the repo no longer tells
-the truth about the account. Keep one source of truth.
+**Why it matters:** Things made outside your templates are called **drift**. Drift means the repo
+no longer tells the truth about the account. Keep one source of truth.
 
 ---
 
@@ -148,26 +172,29 @@ the truth about the account. Keep one source of truth.
 
 ### `aws notificationscontacts list-email-contacts --region us-east-1`
 
-Lists **AWS User Notifications** email contacts and their status. Ours was `inactive`, meaning
-unverified. The budget stack made this contact, so the budget alerts depend on it.
+**What it does:** It lists the email contacts for **AWS User Notifications**, with their status.
+Ours said `inactive`. That means the address was not verified yet. Our budget stack made this
+contact, so the budget alerts depend on it.
 
 ### `aws notificationscontacts get-email-contact --arn [contact-arn]`
 
-Shows one contact with its creation time. The time matched the budget deploy to the second. That
-is how we linked the two.
+**What it does:** It shows one contact and when it was made. The time matched the budget deploy
+to within 8 seconds. That is how we connected the two.
 
 ### `aws notificationscontacts send-activation-code --arn [contact-arn]`
 
-Sends a fresh verification email. Codes expire after 12 hours.
+**What it does:** It sends a fresh verify email. Each code lasts 12 hours.
 
 ### `aws notificationscontacts activate-email-contact --arn [contact-arn] --code [code]`
 
-Activates the contact with the code from the email (it is the `token` in the verify link). We used
-the CLI because the browser was signed in to the wrong account, and the CLI was already in the
-right one. You get only five attempts.
+**What it does:** It turns the contact on with the code from the email. The code is the `token`
+part of the verify link.
 
-**System design:** an alert that never reaches a human is not an alert. **Test the path end to
-end**, not just the part that fires.
+We used the CLI here for a reason. The browser was signed in to the wrong account, but the CLI
+was already in the right one. Be careful: you only get five tries.
+
+**Why it matters:** An alert that never reaches a person is not really an alert. **Test the whole
+path**, from the alarm all the way to your inbox.
 
 ---
 
@@ -175,16 +202,17 @@ end**, not just the part that fires.
 
 ### `aws cloudformation deploy --template-file infra/aws/anomaly.yml --stack-name gg-anomaly --parameter-overrides AlertEmail=[your-email]`
 
-Creates a monitor that watches each AWS service's daily spend, plus a daily email when an anomaly
-costs $1 or more.
+**What it does:** It makes a monitor that watches each AWS service's daily spending. When
+something looks unusual and costs $1 or more, you get a daily email.
 
 ### `aws ce get-anomaly-monitors` / `aws ce get-anomaly-subscriptions`
 
-Read back the monitor and the subscription. The subscriber showed `CONFIRMED`.
+**What it does:** It reads back the monitor and the email subscription. The subscriber said
+`CONFIRMED`.
 
-**System design:** budgets catch "too much in total." Anomaly detection catches "something
-changed." A runaway loop can cost $3 in a day and still be under the budget. Two different signals
-cover two different failures.
+**Why it matters:** A budget catches "too much in total." Anomaly detection catches "something
+changed." For example, a broken loop could cost $3 in one day. That is still under the budget,
+but it is not normal. Two signals catch two kinds of problems.
 
 ---
 
@@ -192,83 +220,98 @@ cover two different failures.
 
 ### `git add infra/aws/budgets.yml infra/aws/anomaly.yml && git commit -m "..."`
 
-Commits the two working templates as a checkpoint before the next lesson.
+**What it does:** It saves the two working templates as a checkpoint before the next lesson.
 
 ---
 
 ## 8. IAM and GitHub OIDC: deploys without stored keys
 
+First, a quick idea. GitHub Actions needs to deploy to AWS. The old way is to store an AWS key in
+GitHub. But a stolen key works until someone deletes it.
+
+**OIDC** works differently. GitHub gives each workflow run a short, signed pass. AWS checks the
+pass and swaps it for credentials that last about one hour. No key is stored anywhere.
+
 ### `aws iam list-open-id-connect-providers` / `aws iam list-roles`
 
-Checked what IAM already had, so we would not make a duplicate.
+**What it does:** It shows what IAM already has. We checked so we would not make a copy.
 
 ### `aws cloudformation deploy --template-file infra/aws/github-oidc.yml --stack-name gg-github-oidc --capabilities CAPABILITY_IAM`
 
-Created the **OIDC provider**. It tells AWS: "trust tokens that GitHub Actions signs, if they are
-meant for `sts.amazonaws.com`."
+**What it does:** It creates the **OIDC provider**. This tells AWS: "Trust passes that GitHub
+Actions signs, if they are meant for `sts.amazonaws.com`."
 
-`--capabilities CAPABILITY_IAM` is you saying "yes, I know this stack touches IAM." CloudFormation
-refuses IAM changes without it, so nobody changes permissions by accident.
+`--capabilities CAPABILITY_IAM` is you saying "Yes, I know this touches IAM." CloudFormation will
+not change IAM without it. That way, nobody changes permissions by accident.
 
-### Same deploy again with `--capabilities CAPABILITY_NAMED_IAM`
+### The same deploy again, with `--capabilities CAPABILITY_NAMED_IAM`
 
-Added the role `gg-github-deploy`. Because we gave the role a fixed **name**, CloudFormation needs
-the stronger `CAPABILITY_NAMED_IAM`. This deploy was an **update**: the change set added the role
-and left the provider alone.
+**What it does:** It adds the role `gg-github-deploy`. We gave the role a fixed **name**, so
+CloudFormation needs the stronger `CAPABILITY_NAMED_IAM`. This deploy was an **update**. The
+change set added the role and left the provider alone.
 
-The role's **trust policy** says who may assume it:
+The role's **trust policy** says who may use the role:
 
-1. Only through the GitHub OIDC provider.
-2. Only tokens meant for AWS STS (`aud`).
-3. Only from this repo's `main` branch (`sub`). Without this line, **any** GitHub repo could
-   assume the role.
-4. At most one hour per session.
+1. Only callers that come through the GitHub OIDC provider.
+2. Only passes meant for AWS STS (`aud`).
+3. Only this repo's `main` branch (`sub`). Without this line, **any** GitHub repo could use the
+   role.
+4. One hour at most for each session.
 
 ### `aws iam get-role` / `aws iam list-attached-role-policies` / `aws iam list-role-policies`
 
-Read back the trust policy and confirmed the role had **no permissions at that point**. A role
-that can be assumed but can do nothing is a safe place to stop. (Section 9 adds its permissions.)
+**What it does:** It reads back the trust policy. At that point, the role had **no
+permissions**. A role that can be used but can do nothing is a safe place to pause. (Section 9
+gives it permissions.)
 
-**System design:**
+**Why it matters:**
 
-- **Trust and permissions are separate.** The trust policy is "who can come in." The permissions
-  policy is "what they can do once inside." You design and review them separately.
-- **Least privilege.** Next, the GitHub role gets only "run CloudFormation on `gg-app-*` stacks"
-  and "hand work to `gg-cfn-exec`." The exec role holds the real resource permissions. A stolen
-  GitHub token can then deploy templates, but it cannot touch data directly.
+- **Trust and permissions are two different things.** The trust policy is "who can come in." The
+  permissions policy is "what they can do once inside." Design and review them one at a time.
+- **Least privilege** means giving only the access a job needs. Next, the GitHub role gets only
+  two powers. It can run CloudFormation on `gg-app-*` stacks. It can hand work to `gg-cfn-exec`.
+  The exec role holds the real power. So a stolen GitHub pass can deploy templates, but it cannot
+  touch data directly.
 
 ---
 
 ## 9. Two roles: the deploy role and the exec role
 
-### Same deploy, now with `gg-cfn-exec` and an inline policy
+### The same deploy, now with `gg-cfn-exec` and a policy
 
-We added a second role, `gg-cfn-exec`, and gave `gg-github-deploy` a small inline policy.
+**What it does:** It adds a second role, `gg-cfn-exec`. It also gives `gg-github-deploy` a small
+policy.
 
-| Role | Who can assume it | What it can do |
+Here is how the two roles split the work:
+
+| Role | Who can use it | What it can do |
 |---|---|---|
-| `gg-github-deploy` | GitHub Actions, this repo, `main` only | Make and run change sets on `gg-app-*` stacks, and pass `gg-cfn-exec` to CloudFormation |
+| `gg-github-deploy` | GitHub Actions, this repo, `main` only | Make and run change sets on `gg-app-*` stacks, and hand `gg-cfn-exec` to CloudFormation |
 | `gg-cfn-exec` | The CloudFormation service, for this account only | Nothing yet. Ticket #281 adds Lambda and DynamoDB permissions |
 
-Four details in the policy matter:
+A good way to picture it: GitHub is a delivery driver. It can drop a box (a template) at the
+loading dock. Only the warehouse staff (`gg-cfn-exec`) can open the box and put things on the
+shelves.
 
-1. **`gg-app-*`, not `gg-*`.** `gg-*` would match `gg-github-oidc`, the stack that holds the
-   deploy role itself. Then GitHub could rewrite its own permissions. That is called
+Four small details in the policy do a lot of work:
+
+1. **`gg-app-*`, not `gg-*`.** `gg-*` would also match `gg-github-oidc`. That is the stack that
+   holds the deploy role itself. Then GitHub could rewrite its own permissions. That is called
    **privilege escalation**.
-2. **`cloudformation:RoleArn`.** `CreateChangeSet` is allowed only when the change set uses
-   `gg-cfn-exec`. Without this, a change set with no role runs with the caller's own permissions.
-3. **`iam:PassedToService`.** The deploy role may hand `gg-cfn-exec` to CloudFormation and to
-   nothing else.
-4. **`aws:SourceAccount`** on the exec role's trust policy. CloudFormation may use the role only
-   for this account. This blocks the **confused deputy** problem, where a trusted service is
-   tricked into acting for someone else.
+2. **`cloudformation:RoleArn`.** GitHub may make a change set only if it uses `gg-cfn-exec`.
+   Without this rule, a change set with no role runs with GitHub's own permissions.
+3. **`iam:PassedToService`.** GitHub may hand `gg-cfn-exec` to CloudFormation, and to nothing
+   else.
+4. **`aws:SourceAccount`** on the exec role. CloudFormation may use the role only for this
+   account. This stops the **confused deputy** problem. That is when a trusted service gets
+   tricked into working for someone else.
 
-**A YAML trap we hit:** `Policies:` was 2 spaces too far left, so YAML read it as a sibling of
-`Properties`. CloudFormation said `Invalid template resource property 'Policies'`. In YAML,
-indentation *is* the structure.
+**A YAML trap we hit:** `Policies:` was two spaces too far left. So YAML thought it was a
+neighbor of `Properties`, not inside it. CloudFormation said `Invalid template resource property
+'Policies'`. In YAML, the spaces *are* the structure.
 
-**Another trap:** `validate-template` needs `file://` in front of the path. Without it, the CLI
-sends the path text itself as the template, and you get `unsupported structure`. `deploy` takes a
+**Another trap:** `validate-template` needs `file://` before the path. Without it, the CLI sends
+the path text itself as the template. Then you get `unsupported structure`. But `deploy` takes a
 plain path with `--template-file`.
 
 ---
@@ -277,17 +320,23 @@ plain path with `--template-file`.
 
 ### `aws iam simulate-principal-policy`
 
-Asks IAM: "if this role tried this action on this resource, would it be allowed?" Nothing runs for
-real. You give it a **who** (`--policy-source-arn`), a **what** (`--action-names`), a **where**
-(`--resource-arns`), and any condition values (`--context-entries`).
+**What it does:** It asks IAM a "what if" question: "If this role tried this action on this
+thing, would it be allowed?" Nothing really runs, so it is safe.
 
-IAM answers with its normal decision logic:
+You give it four things:
 
-1. An explicit `Deny` anywhere: **`explicitDeny`**.
-2. Otherwise, an `Allow` that matches action, resource and conditions: **`allowed`**.
-3. Otherwise: **`implicitDeny`**, the default "no".
+- **Who:** `--policy-source-arn`
+- **What:** `--action-names`
+- **Where:** `--resource-arns`
+- **Extra facts** for conditions: `--context-entries`
 
-Our final results, all with `aws:RequestedRegion=us-east-2`:
+IAM then decides in three steps:
+
+1. Does any rule say `Deny`? Then the answer is **`explicitDeny`**.
+2. If not, does a rule say `Allow`, and match everything? Then it is **`allowed`**.
+3. If not, the answer is **`implicitDeny`**. That is IAM's default "no."
+
+Our final results, all in `us-east-2`:
 
 | Test | Result |
 |---|---|
@@ -299,59 +348,62 @@ Our final results, all with `aws:RequestedRegion=us-east-2`:
 | `PassRole` `gg-cfn-exec` to Lambda | implicitDeny |
 | `PassRole` `gg-cfn-exec` to CloudFormation | allowed |
 
-**What surprised us:** the first run said `explicitDeny` even for `gg-app-test`. The result showed
-`AllowedByOrganizations: false`. The simulator **does** apply SCPs, and without a region it hit
-the region lock. Adding `aws:RequestedRegion=us-east-2` fixed it. So any GitHub workflow that uses
-this role must set `aws-region: us-east-2`.
+**What surprised us:** On the first run, even `gg-app-test` said `explicitDeny`. The output said
+`AllowedByOrganizations: false`. So the simulator **does** check SCPs. We had not told it the
+region, so it hit the region lock. When we added `aws:RequestedRegion=us-east-2`, it worked.
 
-**A zsh trap:** `$A:role` lost the `:r`, because in zsh `:r` is a modifier ("remove extension").
-Use `${A}` with braces when a variable is followed by a colon.
+The lesson from that: any GitHub workflow that uses this role must set `aws-region: us-east-2`.
 
-**System design:** test the **denials**, not only the allows. A policy that allows the right thing
-can still allow too much. The guard is only proven when the wrong requests fail.
+**A zsh trap:** `$A:role` lost its `:r`. In zsh, `:r` is a special code that means "remove the
+file extension." Use `${A}` with braces when a colon comes right after a variable.
+
+**Why it matters:** Test the **no** answers, not only the yes answers. A policy can allow the
+right thing and still allow too much. The guard is proven only when the wrong requests fail.
 
 ---
 
-## 11. Lesson 4: CloudFormation basics, in one place
+## 11. Lesson 4: CloudFormation basics, all in one place
 
-| Word | Meaning |
+Here are the main words:
+
+| Word | What it means |
 |---|---|
 | **Template** | A YAML file that describes resources. It lives in the repo (`infra/aws/*.yml`). |
-| **Stack** | One deployed copy of a template. We have `gg-budgets`, `gg-anomaly` and `gg-github-oidc`. |
-| **Parameter** | A value given at deploy time (`AlertEmail`), so the template holds no private data. |
-| **Change set** | The list of differences between the live stack and the new template. `deploy` makes one, then runs it. |
-| **Capabilities** | Your OK for IAM changes. `CAPABILITY_IAM` for unnamed IAM resources, `CAPABILITY_NAMED_IAM` when you name them. |
-| **Intrinsic functions** | `!Ref` (a parameter or a resource's main ID), `!Sub` (fill `${...}` into a string), `!GetAtt` (one attribute, such as a role's ARN). |
-| **Rollback** | If a create or update fails, CloudFormation undoes it. A failed first create ends in `ROLLBACK_COMPLETE`, and you must delete that stack before you try again. |
+| **Stack** | One live copy of a template. We have `gg-budgets`, `gg-anomaly` and `gg-github-oidc`. |
+| **Parameter** | A value you give at deploy time, like `AlertEmail`. It keeps private data out of the template. |
+| **Change set** | A list of what will change between the live stack and the new template. `deploy` makes one, then runs it. |
+| **Capabilities** | Your OK for IAM changes. Use `CAPABILITY_IAM` when CloudFormation picks the names, and `CAPABILITY_NAMED_IAM` when you pick them. |
+| **Intrinsic functions** | Small helpers. `!Ref` gets a parameter or a resource's main ID. `!Sub` fills `${...}` into a string. `!GetAtt` gets one detail, like a role's ARN. |
+| **Rollback** | If a deploy fails, CloudFormation undoes it. A failed first deploy ends in `ROLLBACK_COMPLETE`. You must delete that stack before you try again. |
 
-The commands, in the order you use them:
+And here are the commands, in the order you use them:
 
-1. `aws cloudformation validate-template --template-body file://<path>`: check the shape. Creates
-   nothing.
+1. `aws cloudformation validate-template --template-body file://<path>`: check the shape. It
+   builds nothing.
 2. `aws cloudformation deploy --template-file <path> --stack-name <name> [--parameter-overrides ...] [--capabilities ...]`:
    create or update the stack.
 3. `aws cloudformation describe-stacks --stack-name <name>`: read the status.
 4. `aws cloudformation describe-stack-events --stack-name <name>`: read what happened, step by
    step, when something fails.
-5. Read back the real resources (`get-*`, `describe-*`) to check that AWS matches the template.
+5. Read back the real resources (`get-*`, `describe-*`). Check that AWS matches the template.
 
-**System design:** CloudFormation is **declarative**. You write *what* should exist, and
-CloudFormation works out *how* to get there from what exists now. The template, not your memory
-of which commands you ran, is the record of the system.
+**Why it matters:** CloudFormation is **declarative**. You write *what* should exist.
+CloudFormation works out *how* to get there from what exists now. So the template is the record
+of the system. You do not have to remember which commands you ran.
 
 ---
 
 ## Ideas to remember
 
-| Idea                             | Where we used it                                  |
-| -------------------------------- | ------------------------------------------------- |
-| Check identity first             | `sts get-caller-identity` before every change     |
-| Short-lived credentials          | `aws login`, GitHub OIDC                          |
-| Guardrails at the top            | The SCP region lock                               |
-| Infrastructure as code           | Every real resource is a template in `infra/aws/` |
-| No drift                         | Deleted the hand-made budget                      |
-| Read back, don't trust "success" | `describe-*` and `get-*` after every deploy       |
-| End-to-end alerts                | Activated the email contact                       |
-| Least privilege                  | Trust only `main`; two-role deploy design         |
-| Block privilege escalation       | `gg-app-*` prefix; `cloudformation:RoleArn`       |
-| Test the denials                 | The IAM policy simulator                          |
+| Idea | Where we used it |
+|---|---|
+| Check who you are first | `sts get-caller-identity` before every change |
+| Short-lived credentials | `aws login`, GitHub OIDC |
+| Guardrails at the top | The SCP region lock |
+| Infrastructure as code | Every real resource is a template in `infra/aws/` |
+| No drift | We deleted the hand-made budget |
+| Read back, don't trust "success" | `describe-*` and `get-*` after every deploy |
+| Test the whole alert path | We turned on the email contact |
+| Least privilege | Trust only `main`; the two-role deploy design |
+| Block privilege escalation | The `gg-app-*` prefix and `cloudformation:RoleArn` |
+| Test the "no" answers | The IAM policy simulator |
