@@ -13,6 +13,25 @@ This is the working loop for anyone changing this repo, human or agent. Entry po
 **Keep this file current.** When you learn something that changes how work should be done here,
 update this file (via `SELF_IMPROVEMENT.md`'s promote step) in the same PR.
 
+## Pace: the engineer learns as the work happens
+
+Peter, 2026-10-24: "we need to start slowing down so the engineer can learn what's happening." Speed
+is not the goal. The human engineer must understand and be able to defend every change that merges.
+
+1. **Start every new session with a Matt Pocock skill.** Before any other work, the orchestrator asks
+   the engineer to run one skill from Matt Pocock's list (https://github.com/mattpocock/skills) that
+   fits the task, and waits for it. For example: `grill-me` to align on a new request, `to-spec` or
+   `to-tickets` to plan, `tdd` to build one piece, `diagnosing-bugs` for a failure. If the skills are
+   not installed yet, installing them is the first step.
+2. **One thing at a time.** At most one ticket in progress unless the engineer asks for more.
+3. **Small gates.** At a gate, give at most 3 short lines of what changed, one thing for the engineer
+   to check themselves, and one yes/no question. No long tables. No agent internals.
+4. **Explain terms on first use.** Name each part of the system in plain words the first time it
+   comes up in a session (for example "the gateway: the app's own server between the phone and the
+   data").
+5. **Merge only after "ready".** The engineer merges only when the orchestrator says CI is green and
+   after the one check. A merge without that check is a failed gate, and the orchestrator says so.
+
 ---
 
 ## 0. Config (nothing here is secret)
