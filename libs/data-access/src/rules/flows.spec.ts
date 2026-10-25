@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+
 import { fixedClock } from '../clock.js';
 import { encodeFlow, type FlowItem } from '../items/flowItem.js';
 import { encodeProfile, getProfile } from '../items/profileItem.js';
@@ -13,7 +14,7 @@ import {
   table,
   up,
 } from '../testing/localTable.js';
-import { createFlow, listFlows } from './flows.js';
+import { createFlow, listFlows, updateFlow } from './flows.js';
 
 const clock = fixedClock('2026-10-24T00:00:00.000Z');
 const OWNER = 'user_owner1';
@@ -236,5 +237,158 @@ describe.runIf(up)('createFlow on DynamoDB Local', () => {
     expect((await getProfile(doc, table, 'user_c_race', clock))?.version).toBe(
       7,
     );
+  });
+});
+
+describe.runIf(up)('updateFlow on DynamoDB Local', () => {
+  const U_OWNER = 'user_u_owner';
+  const U_MEMBER = 'user_u_member';
+  const seed = async () => {
+    const id = randomUUID();
+    await rawPut(encodeFlow(flow(U_OWNER, id)));
+    return id;
+  };
+  const stored = async (id: string) =>
+    getLive(doc, table, flowKey(U_OWNER, id), clock);
+
+  beforeAll(async () => {
+    await createTables();
+    await rawPut({
+      ...memberOfKey(U_MEMBER),
+      entity: 'MEMBER_OF',
+      ownerId: U_OWNER,
+    });
+  });
+  afterAll(dropTables);
+
+  it('lets the owner change facts and records who did it', async () => {
+    const id = await seed();
+    const result = await updateFlow(
+      doc,
+      table,
+      caller(U_OWNER),
+      id,
+      { serviceReady: true },
+      clock,
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({ id, role: 'owner', updatedBy: U_OWNER }),
+    });
+    expect(await stored(id)).toMatchObject({
+      serviceReady: true,
+      personName: 'Grandma',
+      gsi1pk: `REF#${U_OWNER}`,
+    });
+  });
+
+  it("lets a member change the owner's person", async () => {
+    const id = await seed();
+    const result = await updateFlow(
+      doc,
+      table,
+      caller(U_MEMBER),
+      id,
+      { serviceDate: '3 Nov' },
+      clock,
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({ role: 'member', updatedBy: U_MEMBER }),
+    });
+    expect(await stored(id)).toMatchObject({
+      serviceDate: '3 Nov',
+      updatedBy: U_MEMBER,
+      gsi1pk: `REF#${U_MEMBER}`,
+    });
+  });
+
+  it('gives not_found to a stranger and to an unknown id, and changes nothing', async () => {
+    const id = await seed();
+    const before = await stored(id);
+    expect(
+      await updateFlow(
+        doc,
+        table,
+        caller('user_u_stranger'),
+        id,
+        { serviceReady: true },
+        clock,
+      ),
+    ).toEqual({ ok: false, code: 'not_found' });
+    expect(
+      await updateFlow(
+        doc,
+        table,
+        caller(U_OWNER),
+        randomUUID(),
+        { serviceReady: true },
+        clock,
+      ),
+    ).toEqual({ ok: false, code: 'not_found' });
+    expect(await stored(id)).toEqual(before);
+  });
+
+  it('gives not_found to a soft-deleted person', async () => {
+    const id = randomUUID();
+    await rawPut(
+      encodeFlow({
+        ...flow(U_OWNER, id),
+        deletedAt: '2026-10-20T00:00:00.000Z',
+      }),
+    );
+    expect(
+      await updateFlow(
+        doc,
+        table,
+        caller(U_OWNER),
+        id,
+        { serviceReady: true },
+        clock,
+      ),
+    ).toEqual({ ok: false, code: 'not_found' });
+  });
+
+  it('gives not_found when the member is removed mid-write, and changes nothing', async () => {
+    const id = await seed();
+    const before = await stored(id);
+    const result = await updateFlow(
+      doc,
+      table,
+      caller(U_MEMBER),
+      id,
+      { serviceReady: true },
+      clock,
+      {
+        beforeCommit: async () => {
+          await doc.send(
+            new DeleteCommand({ TableName: table, Key: memberOfKey(U_MEMBER) }),
+          );
+        },
+      },
+    );
+    expect(result).toEqual({ ok: false, code: 'not_found' });
+    expect(await stored(id)).toEqual(before);
+    await rawPut({
+      ...memberOfKey(U_MEMBER),
+      entity: 'MEMBER_OF',
+      ownerId: U_OWNER,
+    });
+  });
+
+  it('refuses any key that is not a fact', async () => {
+    const id = await seed();
+    for (const patch of [
+      { ownerId: 'user_x' },
+      { id: randomUUID() },
+      { createdAt: 'x' },
+      { updatedAt: 'x' },
+      { updatedBy: 'x' },
+      { deletedAt: 'x' },
+    ]) {
+      expect(
+        await updateFlow(doc, table, caller(U_OWNER), id, patch, clock),
+      ).toEqual({ ok: false, code: 'invalid' });
+    }
   });
 });

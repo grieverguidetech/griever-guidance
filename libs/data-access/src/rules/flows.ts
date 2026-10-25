@@ -2,9 +2,18 @@ import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import {
   isUuid,
   parseFlowFacts,
+  parseFlowPatch,
   type FlowRecord,
   type FlowRole,
 } from '@griever/shared';
+import {
+  FLOW_PREFIX,
+  flowGuardKey,
+  flowKey,
+  memberOfKey,
+  profileKey,
+  refGsi,
+} from '../keys.js';
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
 import type { DataErrorCode } from '../errors.js';
@@ -14,7 +23,6 @@ import {
   getProfile,
   type Profile,
 } from '../items/profileItem.js';
-import { FLOW_PREFIX, flowGuardKey, memberOfKey, profileKey } from '../keys.js';
 import { getLive, queryLive } from '../read.js';
 import { runAction, type RunOptions, type TransactItem } from '../transact.js';
 
@@ -210,6 +218,139 @@ export async function createFlow(
     throw new Error(
       `createFlow: unexpected failed condition at ${result.failedIndex}.`,
     );
+  } catch (error) {
+    if (error instanceof Refusal) {
+      return { ok: false, code: error.code };
+    }
+    throw error;
+  }
+}
+
+// Positions in the updateFlow transaction.
+const UPDATE_FLOW = 0;
+const UPDATE_MEMBERSHIP = 1;
+
+/** Finds the flow the caller may change: their own, or their owner's when they are a member. */
+async function findEditable(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  caller: Caller,
+  id: string,
+  clock: Clock,
+): Promise<{ flow: FlowItem; role: FlowRole } | undefined> {
+  const own = await getLive(doc, table, flowKey(caller.userId, id), clock);
+  if (own) {
+    return { flow: decodeFlow(own), role: 'owner' };
+  }
+  const ownerId = await memberOwnerId(doc, table, caller.userId, clock);
+  if (!ownerId) {
+    return undefined;
+  }
+  const shared = await getLive(doc, table, flowKey(ownerId, id), clock);
+  if (!shared) {
+    return undefined;
+  }
+  return { flow: decodeFlow(shared), role: 'member' };
+}
+
+/**
+ * Changes facts on a person. The owner and the owner's members may do it. Only facts can change:
+ * any other key, such as ownerId or updatedAt, is invalid. A stranger, an unknown id, a removed
+ * member and a soft-deleted person all get not_found, and nothing changes.
+ */
+export async function updateFlow(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  caller: Caller,
+  id: string,
+  patch: unknown,
+  clock: Clock,
+  options: RunOptions = {},
+): Promise<FlowResult<FlowRecord>> {
+  const parsed = parseFlowPatch(patch);
+  if (!parsed || !isUuid(id)) {
+    return { ok: false, code: 'invalid' };
+  }
+  try {
+    const result = await runAction(
+      doc,
+      async () => {
+        const found = await findEditable(doc, table, caller, id, clock);
+        if (!found || found.flow.deletedAt) {
+          throw new Refusal('not_found');
+        }
+        const { flow, role } = found;
+        const ref = refGsi(caller.userId, 'FLOW', id);
+        const names: Record<string, string> = {
+          '#updatedAt': 'updatedAt',
+          '#updatedBy': 'updatedBy',
+          '#gsi1pk': 'gsi1pk',
+          '#gsi1sk': 'gsi1sk',
+        };
+        const values: Record<string, unknown> = {
+          ':now': clock.now().toISOString(),
+          ':by': caller.userId,
+          ':gsi1pk': ref.gsi1pk,
+          ':gsi1sk': ref.gsi1sk,
+        };
+        const sets = [
+          '#updatedAt = :now',
+          '#updatedBy = :by',
+          '#gsi1pk = :gsi1pk',
+          '#gsi1sk = :gsi1sk',
+        ];
+        for (const [key, value] of Object.entries(parsed)) {
+          names[`#${key}`] = key;
+          values[`:${key}`] = value;
+          sets.push(`#${key} = :${key}`);
+        }
+        const items: TransactItem[] = [
+          {
+            Update: {
+              TableName: table,
+              Key: flowKey(flow.ownerId, id),
+              UpdateExpression: `SET ${sets.join(', ')}`,
+              ConditionExpression:
+                'attribute_exists(pk) AND attribute_not_exists(deletedAt)',
+              ExpressionAttributeNames: names,
+              ExpressionAttributeValues: values,
+            },
+          },
+        ];
+        if (role === 'member') {
+          items.push({
+            ConditionCheck: {
+              TableName: table,
+              Key: memberOfKey(caller.userId),
+              ConditionExpression: 'ownerId = :owner',
+              ExpressionAttributeValues: { ':owner': flow.ownerId },
+            },
+          });
+        }
+        return { items, value: role };
+      },
+      options,
+    );
+    if (result.status === 'busy') {
+      return { ok: false, code: 'busy' };
+    }
+    if (result.status === 'failed') {
+      if (
+        result.failedIndex === UPDATE_FLOW ||
+        result.failedIndex === UPDATE_MEMBERSHIP
+      ) {
+        return { ok: false, code: 'not_found' };
+      }
+      throw new Error(
+        `updateFlow: unexpected failed condition at ${result.failedIndex}.`,
+      );
+    }
+    // Read the item back, so the answer also shows changes other people made at the same time.
+    const saved = await findEditable(doc, table, caller, id, clock);
+    if (!saved) {
+      return { ok: false, code: 'not_found' };
+    }
+    return { ok: true, value: toRecord(saved.flow, result.value) };
   } catch (error) {
     if (error instanceof Refusal) {
       return { ok: false, code: error.code };
