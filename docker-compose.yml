@@ -1,6 +1,9 @@
 # Local AWS stand-ins for the aws-be branch. No AWS account or real keys.
 # Start: pnpm aws:up   Stop: pnpm aws:down   See docs/aws-local.md.
 # (The Convex stack is separate: infra/convex/docker-compose.yml.)
+# One fixed project name, so the main checkout and every worktree share one stack (no port clashes).
+name: griever-guidance
+
 services:
   dynamodb:
     image: amazon/dynamodb-local:3.1.0
