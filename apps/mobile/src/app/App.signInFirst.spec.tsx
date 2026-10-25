@@ -6,12 +6,14 @@ process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
 
 // The account state is driven by hand: loading, signed out, signed in, offline.
 let mockAccount: UseAccountResult | null = null; // eslint-disable-line prefer-const
+let mockLaunch: { hydrated: boolean; signedIn: boolean } | null = { hydrated: true, signedIn: false }; // eslint-disable-line prefer-const
 const mockSetAccount: { current: (a: UseAccountResult | null) => void } = { current: () => undefined };
 jest.mock('../lib/AccountProvider', () => {
   const React = require('react') as typeof import('react');
   const Ctx = React.createContext<UseAccountResult | null>(null);
   return {
     useAccount: () => React.useContext(Ctx),
+    useLaunchState: () => mockLaunch,
     AccountProvider: ({ children }: { children: React.ReactNode }) => {
       const [value, setValue] = React.useState(mockAccount);
       mockSetAccount.current = (a) => {
@@ -29,7 +31,7 @@ jest.mock('@clerk/expo', () => ({
 }));
 jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'mobile://sso-callback' }));
 
-const { App, ACCOUNT_CHECK_FALLBACK_MS } = require('./App') as typeof import('./App');
+const { App } = require('./App') as typeof import('./App');
 
 const account = (over: Partial<UseAccountResult>): UseAccountResult => ({
   status: 'signed_out',
@@ -50,47 +52,49 @@ const signedIn = account({ status: 'signed_in', isSignedIn: true, profile: named
 
 beforeEach(() => {
   mockAccount = signedOut;
+  mockLaunch = { hydrated: true, signedIn: false };
 });
 
 describe('first screen with accounts on', () => {
   it('opens on sign-in when nobody is signed in', async () => {
     render(<App />);
     expect(await screen.findByRole('header', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 
   it('opens on the normal first screen when already signed in', async () => {
     mockAccount = signedIn;
+    mockLaunch = { hydrated: true, signedIn: true };
     render(<App />);
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
     expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
   });
 
-  it('shows Opening and no sign-in or Home while the account state is unknown', async () => {
+  it('shows Opening and no sign-in or Home until the local cache is read', async () => {
     mockAccount = loading;
+    mockLaunch = { hydrated: false, signedIn: false };
     render(<App />);
     expect(await screen.findByText('Opening…')).toBeTruthy();
     expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 
-  it('opens on sign-in once the state turns out to be signed out', async () => {
+  it('opens on sign-in once the cache is read and holds no signed-in marker, even while Clerk is slow', async () => {
     mockAccount = loading;
+    mockLaunch = { hydrated: false, signedIn: false };
     render(<App />);
     await screen.findByText('Opening…');
-    act(() => mockSetAccount.current(signedOut));
-    expect(await screen.findByRole('header', { name: 'Sign in' })).toBeTruthy();
-  });
-
-  it('offline at launch: the account state never answers, so the normal first screen opens', async () => {
-    mockAccount = loading;
-    render(<App />);
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
-    expect(await screen.findByText("Who you're writing about", {}, { timeout: ACCOUNT_CHECK_FALLBACK_MS + 1500 })).toBeTruthy();
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+    act(() => {
+      mockLaunch = { hydrated: true, signedIn: false };
+      mockSetAccount.current(loading);
+    });
+    expect(await screen.findByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(screen.getByText('One moment.')).toBeTruthy();
   });
 
   it('accounts unavailable (no configuration): the normal first screen', async () => {
     mockAccount = null;
+    mockLaunch = null;
     render(<App />);
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
@@ -111,6 +115,7 @@ describe('first screen with accounts on', () => {
 
   it('a session that ends later keeps the person on Home', async () => {
     mockAccount = signedIn;
+    mockLaunch = { hydrated: true, signedIn: true };
     render(<App />);
     await screen.findByText("Who you're writing about");
     act(() => mockSetAccount.current(signedOut));
@@ -123,5 +128,29 @@ describe('first screen with accounts on', () => {
     await screen.findByRole('header', { name: 'Sign in' });
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+  });
+
+  it('Back from the first sign-in screen leaves it for good: Home is Home after a flow', async () => {
+    render(<App />);
+    await screen.findByRole('header', { name: 'Sign in' });
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(await screen.findByText("Start with someone I've lost"));
+    fireEvent.press(await screen.findByLabelText('Back to home'));
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('Sign out on the account screen keeps the person on sign-in', async () => {
+    mockAccount = account({
+      status: 'signed_in',
+      isSignedIn: true,
+      profile: named,
+      signOut: async () => mockSetAccount.current(signedOut),
+    });
+    mockLaunch = { hydrated: true, signedIn: true };
+    render(<App />);
+    fireEvent.press(await screen.findByText('Your account'));
+    fireEvent.press(await screen.findByText('Sign out'));
+    expect(await screen.findByRole('header', { name: 'Sign in' })).toBeTruthy();
   });
 });

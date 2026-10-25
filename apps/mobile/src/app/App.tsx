@@ -14,7 +14,7 @@ import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
-import { AccountProvider, useAccount } from '../lib/AccountProvider';
+import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
@@ -34,36 +34,35 @@ export const CONTACTS_CHECK_FALLBACK_MS = 1500;
  */
 type SetupStage = 'setup' | 'checkContacts' | 'contacts';
 
-/** How long launch waits for the account state before opening the normal first screen (C5: offline is fine). */
-export const ACCOUNT_CHECK_FALLBACK_MS = 1500;
-
 /**
- * Where the app opens, decided once per launch (as web). With accounts on and nobody signed in
- * (Clerk confirmed ready), it opens on sign-in. Signed in, offline, slow, or accounts off or
- * unavailable: the normal first screen. A later sign-out never moves the person (only the Sign out
- * button does, on the account screen).
+ * Where the app opens, decided once per launch (as web), from what this device knew when the local
+ * cache was read: a signed-in marker opens the normal first screen at once (C5, no network); no
+ * marker opens sign-in (the account screen has its own waiting and unavailable states, and Back).
+ * Accounts off or unavailable: the normal first screen. A later sign-out never moves the person;
+ * only the Sign out button does, on the account screen.
  */
-export const useFirstScreen = (): { first: 'pending' | 'home' | 'signIn'; done: () => void } => {
-  const account = useAccount();
+export const useFirstScreen = (): { first: 'pending' | 'home' | 'signIn'; leaveFirst: () => void } => {
+  const launch = useLaunchState();
   const [first, setFirst] = useState<'pending' | 'home' | 'signIn'>(AUTH_ENABLED ? 'pending' : 'home');
-  const known = account !== null && !account.isLoading;
-  const signedIn = account?.isSignedIn ?? false;
+  const hydrated = launch?.hydrated ?? false;
+  const signedIn = launch?.signedIn ?? false;
   useEffect(() => {
     if (first !== 'pending') return;
-    if (account === null) {
+    if (launch === null) {
       setFirst('home');
-      return;
-    }
-    if (known) {
+    } else if (hydrated) {
       setFirst(signedIn ? 'home' : 'signIn');
-      return;
     }
-    const timer = setTimeout(() => setFirst('home'), ACCOUNT_CHECK_FALLBACK_MS);
-    return () => clearTimeout(timer);
-  }, [first, account, known, signedIn]);
-  const done = useCallback(() => setFirst('home'), []);
-  return { first, done };
+  }, [first, launch, hydrated, signedIn]);
+  const leaveFirst = useCallback(() => setFirst('home'), []);
+  return { first, leaveFirst };
 };
+
+const Opening = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+    <Text accessibilityLiveRegion="polite">Opening…</Text>
+  </View>
+);
 
 export type RootStackParamList = {
   Home: undefined;
@@ -189,7 +188,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [arrived, setArrived] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
-  const { first, done: signInDone } = useFirstScreen();
+  const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
   const goHome = useCallback(() => {
     setStage(null);
@@ -240,11 +239,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
 
   if (!active) return null;
   if (first === 'pending') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-        <Text accessibilityLiveRegion="polite">Opening…</Text>
-      </View>
-    );
+    return <Opening />;
   }
   const open = () => {
     setNote(null);
@@ -253,7 +248,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   };
   if (atHome) {
     return (
-      <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onSignedIn={signInDone}>
+      <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
         {(navigation) => (
           <HomeScreen
             sessions={sessions}
@@ -277,11 +272,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     );
   }
   if (stage === 'checkContacts') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-        <Text accessibilityLiveRegion="polite">Opening…</Text>
-      </View>
-    );
+    return <Opening />;
   }
   if (stage === 'contacts') {
     return (
@@ -324,7 +315,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
 type StackNavigation = NativeStackNavigationProp<RootStackParamList>;
 
 // The screens every stack shares: the checklist and, with accounts on, the account.
-const sharedScreens = (onSignedIn?: () => void) => (
+const sharedScreens = (leaveFirst?: () => void) => (
   <>
     <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
       {() => <WhatYoullNeedScreen />}
@@ -333,12 +324,16 @@ const sharedScreens = (onSignedIn?: () => void) => (
       <Stack.Screen name="Account">
         {({ navigation }) => (
           <AccountScreen
-            onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+            onBack={() => {
+              leaveFirst?.();
+              if (navigation.canGoBack()) navigation.goBack();
+              else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+            }}
             // Opened as the first screen: once signed in (and named), land on the normal first screen.
             onSignedIn={
-              onSignedIn
+              leaveFirst
                 ? () => {
-                    onSignedIn();
+                    leaveFirst();
                     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
                   }
                 : undefined
@@ -355,16 +350,16 @@ const screenOptions = { headerShown: false, contentStyle: { backgroundColor: '#f
 const HomeNavigation = ({
   children,
   initialRoute = 'Home',
-  onSignedIn,
+  onLeaveFirst,
 }: {
   children: (navigation: StackNavigation) => ReactNode;
   initialRoute?: 'Home' | 'Account';
-  onSignedIn?: () => void;
+  onLeaveFirst?: () => void;
 }) => (
   <NavigationContainer>
     <Stack.Navigator screenOptions={screenOptions} initialRouteName={initialRoute}>
       <Stack.Screen name="Home">{({ navigation }) => children(navigation)}</Stack.Screen>
-      {sharedScreens(initialRoute === 'Account' ? onSignedIn : undefined)}
+      {sharedScreens(initialRoute === 'Account' ? onLeaveFirst : undefined)}
     </Stack.Navigator>
   </NavigationContainer>
 );
@@ -434,9 +429,7 @@ const SendAppWhenReady = () => {
   return ready ? (
     <SendApp cache={cache} />
   ) : (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-      <Text accessibilityLiveRegion="polite">Opening…</Text>
-    </View>
+    <Opening />
   );
 };
 
