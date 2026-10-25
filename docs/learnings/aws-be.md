@@ -91,3 +91,58 @@ flowchart TD
   changes mid-write, `runAction` reads again on the retry. That second read must also refuse a member.
 - **Could we remove `Refusal`?** Yes, if `runAction` let an action return "no writes, here is the
   answer". That changes `transact.ts`, which is outside #270. We kept `Refusal` for now.
+
+**The mutation test.** We deleted the `MEMBER_OF` check (position 2) and ran the tests. "Refuses a user
+with only a MEMBER_OF item" failed: that user could create a person. "Refuses a member" still passed,
+because the profile check stopped that user first. So each C11 guard has its own test. We restored the
+check, and all tests passed again.
+
+### Step 4: updateFlow, facts only, for the owner or a current member
+
+**What we built.** `updateFlow()` in `libs/data-access/src/rules/flows.ts` changes facts on a person.
+
+**The decision.** On Supabase, column grants allowed only the fact columns, and RLS allowed only the owner
+and members. Here `parseFlowPatch` rejects any key that is not a fact, so `ownerId` or `updatedAt` gets
+`invalid`. The rule then finds the person in the caller's partition, or in the owner's partition for a
+member. A stranger, an unknown id and a soft-deleted person all get `not_found`, not `forbidden`, so a
+stranger cannot learn that a person exists.
+
+```mermaid
+flowchart TD
+  S["updateFlow caller, id, patch"] --> V{"Only facts, and a valid id?"}
+  V -- no --> INV[invalid]
+  V -- yes --> F["Find the person: own partition,<br/>else the owner's if a member"]
+  F --> N{"Found and not soft-deleted?"}
+  N -- no --> NF1["throw Refusal<br/>not_found"]
+  N -- yes --> TX
+
+  subgraph TX ["One transaction"]
+    P0["0 Update facts, updatedAt, updatedBy, gsi1pk<br/>if it exists and has no deletedAt"]
+    P1["1 Member only: check MEMBER_OF<br/>still points at this owner"]
+  end
+
+  TX --> RB["Read the item back"] --> OK[ok: the FlowRecord]
+  TX -. "0 or 1 fails" .-> NF2[not_found, nothing changed]
+```
+
+**Questions and answers.**
+
+- **Why read the item back after the commit?** Two people can edit different facts at the same time.
+  The read shows both edits, not only ours.
+
+### Step 5: profiles, only your own name and contact source
+
+**What we built.** `getProfile()` and `putProfile()` in `libs/data-access/src/rules/profiles.ts`.
+
+**The decision.** On Supabase, column grants let a user change only `sender_name` and `contact_source`,
+and check constraints set the limits. Here a small parser does the same: only those 2 keys, a name of at
+most 100 characters, a source of `import`, `manual` or null, and null clears a field. Both functions use
+`caller.userId`, so no input can point at another user. `accountType`, `version` and `createdAt` are never
+taken from the input.
+
+**Questions and answers.**
+
+- **Why count the name with `[...name].length`?** Postgres `char_length` counts characters. JavaScript
+  `.length` counts UTF-16 units, so one emoji counts as 2. The spread counts it as 1, like Postgres.
+- **Why not cast `senderName as string`?** The cast tells TypeScript the value is never null, but null
+  still reaches the table. We changed `ProfileFields` to allow null, so the types tell the truth.
