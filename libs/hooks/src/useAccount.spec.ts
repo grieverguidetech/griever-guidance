@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { AccountAuth, AccountTokenResult, Profile } from '@griever/shared';
 import { SIGNED_IN_STORAGE_KEY, useAccount } from './useAccount.js';
-import { PROFILE_STORAGE_KEY, identityErrorMessage } from './useSupabaseIdentity.js';
+import { PROFILE_STORAGE_KEY } from './useSupabaseIdentity.js';
 import type { SendFlowStorage } from './useSendFlow.js';
 
 const fetchMock = vi.fn();
@@ -37,6 +37,9 @@ function fakeAuth(over: Partial<AccountAuth> = {}): AccountAuth {
     ...over,
   };
 }
+
+const UNREACHABLE = "We can't reach your account right now. Please try again in a little while.";
+const NEEDS_CONNECTION = "You need a connection to do this. Nothing you've typed is lost.";
 
 const cached = (id: string) =>
   JSON.stringify({ id, senderName: 'Peter', contactSource: null, accountType: 'owner' });
@@ -76,6 +79,30 @@ describe('useAccount boot', () => {
     });
   });
 
+  it("never shows another user's cache, even on the first render", () => {
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u2'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profile).toBeNull();
+  });
+
+  it('ignores a cache with no signed-in marker on the first render', () => {
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1') });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profile).toBeNull();
+  });
+
+  it('drops the previous user profile when the provider switches to another user', async () => {
+    let auth = fakeAuth();
+    const { result, rerender } = renderHook(() => useAccount({ auth }));
+    await waitFor(() => expect(result.current.profile?.id).toBe('u1'));
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    auth = fakeAuth({ userId: 'u2' });
+    rerender();
+    expect(result.current.profile).toBeNull();
+  });
+
   it("discards another user's cache and never shows it", async () => {
     const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('someone-else') });
     fetchMock.mockImplementation(() => new Promise(() => undefined));
@@ -85,7 +112,7 @@ describe('useAccount boot', () => {
   });
 
   it('keeps this user cache while the profile loads', async () => {
-    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1') });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     fetchMock.mockImplementation(() => new Promise(() => undefined));
     const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
     expect(result.current.profile?.senderName).toBe('Peter');
@@ -101,7 +128,7 @@ describe('useAccount boot', () => {
 
   it('treats a 404 as no profile yet, not an error', async () => {
     fetchMock.mockResolvedValue(reply(404, { error: 'none' }));
-    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1') });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
     await waitFor(() => expect(result.current.profile).toBeNull());
     expect(result.current.error).toBeNull();
@@ -110,9 +137,12 @@ describe('useAccount boot', () => {
 
   it('keeps the cache and stays signed in on a 503', async () => {
     fetchMock.mockResolvedValue(reply(503, { error: 'down' }));
-    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1') });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(result.current.isSignedIn).toBe(true);
     expect(result.current.profile?.senderName).toBe('Peter');
     expect(result.current.error).toBeNull();
@@ -130,7 +160,7 @@ describe('useAccount boot', () => {
 
 describe('useAccount offline (C5)', () => {
   it('a token offline result sets offline, keeps the user signed in and keeps the cache', async () => {
-    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1') });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     const auth = fakeAuth({ getToken: async () => ({ ok: false, reason: 'offline' }) });
     const { result } = renderHook(() => useAccount({ auth, storage }));
     await waitFor(() => expect(result.current.offline).toBe(true));
@@ -154,7 +184,7 @@ describe('useAccount offline (C5)', () => {
       saved = await result.current.updateSenderName('Pete');
     });
     expect(saved).toBe(false);
-    expect(result.current.error).toBe(identityErrorMessage('offline'));
+    expect(result.current.error).toBe(NEEDS_CONNECTION);
     expect(result.current.offline).toBe(true);
   });
 });
@@ -180,9 +210,9 @@ describe('useAccount 401 handling', () => {
   it('a second 401 on boot never signs out and shows the unreachable copy', async () => {
     fetchMock.mockResolvedValue(reply(401, { error: 'no' }));
     const signOut = vi.fn(async () => undefined);
-    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1') });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     const { result } = renderHook(() => useAccount({ auth: fakeAuth({ signOut }), storage }));
-    await waitFor(() => expect(result.current.error).toBe(identityErrorMessage('unavailable')));
+    await waitFor(() => expect(result.current.error).toBe(UNREACHABLE));
     expect(signOut).not.toHaveBeenCalled();
     expect(result.current.isSignedIn).toBe(true);
     expect(result.current.profile?.senderName).toBe('Peter');
@@ -203,7 +233,7 @@ describe('useAccount 401 handling', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(signOut).not.toHaveBeenCalled();
     expect(result.current.isSignedIn).toBe(true);
-    expect(result.current.error).toBe(identityErrorMessage('unavailable'));
+    expect(result.current.error).toBe(UNREACHABLE);
   });
 
   it('a refresh that cannot reach the network is offline, not an error', async () => {
@@ -242,7 +272,7 @@ describe('useAccount updateSenderName', () => {
     await act(async () => {
       await result.current.updateSenderName('');
     });
-    expect(result.current.error).toBe(identityErrorMessage('invalid'));
+    expect(result.current.error).toBe(UNREACHABLE);
     act(() => result.current.clearError());
     expect(result.current.error).toBeNull();
   });
@@ -312,6 +342,45 @@ describe('useAccount signOut', () => {
       finish();
     });
     expect(done).toBe(true);
+  });
+
+  it('clears an old error on sign-out', async () => {
+    fetchMock.mockResolvedValue(reply(401, { error: 'no' }));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.error).toBe(UNREACHABLE));
+    await act(async () => {
+      await result.current.signOut();
+    });
+    expect(result.current.error).toBeNull();
+  });
+
+  it('a good save clears offline', async () => {
+    let online = false;
+    const auth = fakeAuth({
+      getToken: async () => (online ? { ok: true, token: 'tok' } : { ok: false, reason: 'offline' }),
+    });
+    const { result } = renderHook(() => useAccount({ auth }));
+    await waitFor(() => expect(result.current.offline).toBe(true));
+    online = true;
+    await act(async () => {
+      await result.current.updateSenderName('Pete');
+    });
+    expect(result.current.offline).toBe(false);
+  });
+
+  it('keeps the device signed out when the provider signOut rejects', async () => {
+    const storage = memoryStorage();
+    const signOut = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth({ signOut }), storage }));
+    await waitFor(() => expect(result.current.profile).not.toBeNull());
+    await act(async () => {
+      await result.current.signOut();
+    });
+    expect(result.current.status).toBe('signed_out');
+    expect(result.current.profile).toBeNull();
+    expect(storage.data).toEqual({});
   });
 
   it('swallows a rejected provider signOut', async () => {

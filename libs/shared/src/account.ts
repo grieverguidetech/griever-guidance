@@ -13,6 +13,10 @@ export type AccountTokenResult =
  * adapter that fills this in; libs never import the provider itself.
  */
 export interface AccountAuth {
+  /**
+   * `signed_out` means the provider has CONFIRMED there is no session. A provider that is offline or
+   * not yet loaded must report `loading` or `signed_in`, never `signed_out` (C5).
+   */
   status: AccountAuthStatus;
   /** null unless `status` is `signed_in`. */
   userId: string | null;

@@ -83,6 +83,19 @@ function writeKey(storage: SendFlowStorage | undefined, key: string, value: stri
   }
 }
 
+/** The cache only counts when it belongs to the user the signed-in marker names. */
+function readOwnCache(storage: SendFlowStorage | undefined): CachedProfile | null {
+  const cache = readCache(storage);
+  if (!cache || !storage) {
+    return null;
+  }
+  try {
+    return cache.id === storage.getItem(SIGNED_IN_STORAGE_KEY) ? cache : null;
+  } catch {
+    return null;
+  }
+}
+
 function toCached(profile: CachedProfile): CachedProfile {
   return {
     id: profile.id,
@@ -99,7 +112,7 @@ function toCached(profile: CachedProfile): CachedProfile {
  */
 export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResult {
   const [offline, setOffline] = useState(false);
-  const [profile, setProfile] = useState<CachedProfile | null>(() => readCache(storage));
+  const [profile, setProfile] = useState<CachedProfile | null>(() => readOwnCache(storage));
   const [error, setError] = useState<string | null>(null);
   // Set by signOut so the screen leaves the signed-in state before the provider answers.
   const [endedHere, setEndedHere] = useState(false);
@@ -122,6 +135,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, null);
     setProfile(null);
     setOffline(false);
+    setError(null);
   }, []);
 
   const fail = useCallback((reason: string) => {
@@ -183,8 +197,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     const stored = readCache(storageRef.current);
     if (stored && stored.id !== authUserId) {
       writeKey(storageRef.current, PROFILE_STORAGE_KEY, null);
-      setProfile(null);
     }
+    setProfile((current) => (current && current.id !== authUserId ? null : current));
     void (async () => {
       const result = await callWithToken(g, (token) => getProfile(token));
       if (!mounted.current || g !== gen.current) {
@@ -206,6 +220,10 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     })();
   }, [authStatus, authUserId, callWithToken, clearLocal, keepProfile, fail]);
 
+  /**
+   * Local state is cleared first and stays cleared even if `auth.signOut()` rejects: on a shared
+   * phone the device must not stay signed in. Adapters must end their local session even offline.
+   */
   const signOut = useCallback(async () => {
     // Local state first, so signing out never waits on the network.
     clearLocal();
@@ -227,6 +245,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
         return result.ok;
       }
       if (result.ok) {
+        setOffline(false);
         keepProfile(toCached(result.profile));
         return true;
       }
