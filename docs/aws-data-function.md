@@ -50,6 +50,20 @@ aws s3 cp .aws-build/lambda.zip "s3://$CODE_BUCKET/$CODE_KEY" --region us-east-2
 
 ## 4. Deploy the data stack
 
+Account deletion (#327) needs a service secret: a random value shared by the data function (CloudFormation
+parameter `ServiceSecret`, NoEcho) and the Worker (GitHub secret `DATA_FUNCTION_SERVICE_SECRET`). Make it once
+and store it without printing it. Keep the same value on every later stack update (pass it again, or use
+`UsePreviousValue`), and rotate by changing both and redeploying.
+
+```text
+SERVICE_SECRET=$(openssl rand -hex 32)
+printf '%s' "$SERVICE_SECRET" | gh secret set DATA_FUNCTION_SERVICE_SECRET
+```
+
+Then set the Clerk webhook: in the Clerk dashboard add an endpoint `https://api.grieversguidance.com/webhooks/clerk`
+subscribed to `user.deleted` only, copy its signing secret (`whsec_...`) and run
+`gh secret set CLERK_WEBHOOK_SECRET` (paste when asked). Then run the Deploy workflow.
+
 Use your Clerk issuer (the repo variable `CLERK_ISSUER`; it is public). The JWKS URL is the issuer
 plus `/.well-known/jwks.json`.
 
@@ -59,7 +73,8 @@ CLERK_ISSUER=${CLERK_ISSUER%/}
 aws cloudformation deploy --stack-name gg-app-data --template-file infra/aws/data.yml \
   --capabilities CAPABILITY_NAMED_IAM --region us-east-2 \
   --parameter-overrides CodeBucket="$CODE_BUCKET" CodeKey="$CODE_KEY" \
-    AuthIssuer="$CLERK_ISSUER" AuthJwksUrl="$CLERK_ISSUER/.well-known/jwks.json"
+    AuthIssuer="$CLERK_ISSUER" AuthJwksUrl="$CLERK_ISSUER/.well-known/jwks.json" \
+    ServiceSecret="$SERVICE_SECRET"
 ```
 
 If the first deploy fails, the stack sits in `ROLLBACK_COMPLETE` and must be deleted before a retry.

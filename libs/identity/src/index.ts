@@ -1,3 +1,4 @@
+import { createClerkWebhookRouter } from './clerkWebhook.js';
 import { createProfileRouter } from './profileRouter.js';
 
 export { createProfileRouter, parseProfileBody } from './profileRouter.js';
@@ -20,6 +21,28 @@ export const profileRouter = createProfileRouter({
   getDataConfig: () => {
     const url = process.env['DATA_FUNCTION_URL']?.trim();
     if (!url) return null;
+    return {
+      url,
+      region: process.env['DATA_FUNCTION_REGION']?.trim(),
+      accessKeyId: process.env['DATA_FUNCTION_ACCESS_KEY_ID'],
+      secretAccessKey: process.env['DATA_FUNCTION_SECRET_ACCESS_KEY'],
+    };
+  },
+});
+
+export { createClerkWebhookRouter, verifySvix } from './clerkWebhook.js';
+export type { ClerkWebhookConfig } from './clerkWebhook.js';
+
+/** POST /webhooks/clerk: a Clerk user.deleted event deletes that user's data (#327). Env is read per request. */
+export const clerkWebhookRouter = createClerkWebhookRouter({
+  getWebhookSecret: () => process.env['CLERK_WEBHOOK_SECRET']?.trim() || null,
+  getServiceSecret: () =>
+    process.env['DATA_FUNCTION_SERVICE_SECRET']?.trim() || null,
+  getDataConfig: () => {
+    const url = process.env['DATA_FUNCTION_URL']?.trim();
+    if (!url) {
+      return null;
+    }
     return {
       url,
       region: process.env['DATA_FUNCTION_REGION']?.trim(),

@@ -166,6 +166,25 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # Account delete (#327): CLERK_WEBHOOK_SECRET verifies the Clerk webhook; DATA_FUNCTION_SERVICE_SECRET
+      # is the second lock on the data function's delete path. Both are Worker secrets set like the keys above.
+      # Each is skipped when its GitHub secret is empty; a value already on the Worker stays.
+      - name: Set the Worker secrets CLERK_WEBHOOK_SECRET and DATA_FUNCTION_SERVICE_SECRET
+        run: |
+          for name in CLERK_WEBHOOK_SECRET DATA_FUNCTION_SERVICE_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::notice::$name is empty; skipped. A value already on the Worker stays."
+              continue
+            fi
+            # Value goes in through env and stdin only; never echoed.
+            printf '%s' "${!name}" | pnpm exec wrangler secret put "$name" --config apps/gateway/wrangler.toml
+          done
+        env:
+          CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+          DATA_FUNCTION_SERVICE_SECRET: ${{ secrets.DATA_FUNCTION_SERVICE_SECRET }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
   deploy-web:
     name: Deploy Web → Cloudflare Pages
     needs: [gate, check-accounts-config]

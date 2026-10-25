@@ -6,7 +6,14 @@
 /** Header that carries the user's own token. It is never sent in `Authorization`. */
 export const DATA_USER_TOKEN_HEADER = 'x-gg-user-token';
 
-/** Every action the data function exposes. `deleteUserData` is deliberately absent: no route reaches it. */
+/**
+ * The service path (#327). Not a user action: it has no user token and is not in DATA_ACTIONS. It needs
+ * the SigV4 signature (Function URL auth) AND this shared-secret header. Body: `{ "userId": "..." }`.
+ */
+export const DATA_SERVICE_DELETE_USER_PATH = '/internal/delete-user';
+export const DATA_SERVICE_SECRET_HEADER = 'x-gg-service-secret';
+
+/** Every action the data function exposes for a signed-in user. Account deletion is not one of them. */
 export const DATA_ACTIONS = [
   'getProfile',
   'putProfile',
@@ -52,5 +59,8 @@ export type DataResult<T = unknown> =
   | { ok: false; code: DataErrorCode; message?: string };
 
 export function isDataErrorCode(value: unknown): value is DataErrorCode {
-  return typeof value === 'string' && (DATA_ERROR_CODES as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' &&
+    (DATA_ERROR_CODES as readonly string[]).includes(value)
+  );
 }

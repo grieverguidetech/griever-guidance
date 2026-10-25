@@ -20,6 +20,11 @@ Parameters:
     Type: String
     Default: https://web.grieversguidance.com
     Description: Comma-separated token origins allowed in the azp claim (DATA_AUTH_AUTHORIZED_PARTIES). Empty allows any.
+  ServiceSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Shared secret for the account-delete path (DATA_SERVICE_SECRET). Same value as the GitHub secret DATA_FUNCTION_SERVICE_SECRET. See docs/aws-data-function.md.
 
 Resources:
   DataTable:
@@ -139,6 +144,7 @@ Resources:
           DATA_AUTH_ISSUER: !Ref AuthIssuer
           DATA_AUTH_JWKS_URL: !Ref AuthJwksUrl
           DATA_AUTH_AUTHORIZED_PARTIES: !Ref AuthorizedParties
+          DATA_SERVICE_SECRET: !Ref ServiceSecret
 
   FunctionUrl:
     Type: AWS::Lambda::Url

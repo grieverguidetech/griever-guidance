@@ -9,3 +9,4 @@ export * from './handler/actions.js';
 export * from './handler/app.js';
 export * from './rules/acceptInvite.js';
 export { wiredRules } from './lambda.js';
+export * from './rules/deleteUser.js';
