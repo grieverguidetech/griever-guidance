@@ -37,7 +37,10 @@
         {
           "contactsPermission": "Grievers Guidance uses your contacts so you can choose who hears about your loss. Nothing is uploaded — the people you pick stay only on this device."
         }
-      ]
+      ],
+      "@clerk/expo",
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }

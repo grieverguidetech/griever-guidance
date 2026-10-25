@@ -10,6 +10,12 @@
       "default": "./src/index.ts"
     },
     "./package.json": "./package.json",
+    "./verify-token": {
+      "@org/source": "./src/verifyToken.ts",
+      "types": "./src/verifyToken.ts",
+      "import": "./src/verifyToken.ts",
+      "default": "./src/verifyToken.ts"
+    },
     "./testing": {
       "types": "./src/testSupabase.ts",
       "import": "./src/testSupabase.ts",

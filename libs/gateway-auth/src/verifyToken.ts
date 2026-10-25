@@ -1,5 +1,7 @@
 import { Jwt } from 'hono/utils/jwt';
-import type { Caller } from '../caller.js';
+import type { Caller } from './caller.js';
+
+export type { Caller } from './caller.js';
 
 /** A public key from a JWKS document. */
 type PublicKey = { kid?: string; alg?: string } & JsonWebKey;
