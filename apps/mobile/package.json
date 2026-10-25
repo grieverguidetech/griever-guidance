@@ -9,6 +9,12 @@
     "name": "mobile",
     "targets": {
       "start": {
+        "executor": "nx:run-commands",
+        "continuous": true,
+        "options": {
+          "cwd": "apps/mobile",
+          "command": "expo start"
+        },
         "dependsOn": [
           "build-deps",
           "watch-deps"
