@@ -11,6 +11,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./verify-token": {
+      "@org/source": "./src/handler/verifyToken.ts",
+      "types": "./src/handler/verifyToken.ts",
+      "import": "./src/handler/verifyToken.ts",
+      "default": "./src/handler/verifyToken.ts"
+    },
     "./package.json": "./package.json"
   },
   "nx": {
