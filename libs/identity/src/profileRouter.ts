@@ -6,8 +6,7 @@ import {
   type ClerkConfig,
   type DataFunctionConfig,
 } from '@griever/gateway-auth';
-import type { AccountContactSource, AccountType, DataResult, Profile } from '@griever/shared';
-import type { ProfileFields } from './supabaseClient.js';
+import type { AccountContactSource, AccountType, DataResult, Profile, ProfileUpdate } from '@griever/shared';
 
 const MAX_SENDER_NAME_LENGTH = 100;
 const ALLOWED_KEYS = ['senderName', 'contactSource'];
@@ -49,7 +48,7 @@ function toProfile(stored: StoredProfile): Profile {
 }
 
 /** Returns the clean fields, or a calm message describing what is wrong (C8). */
-export function parseProfileBody(body: unknown): { fields: ProfileFields } | { error: string } {
+export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { error: string } {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return { error: 'Send your details as a JSON object.' };
   }
@@ -57,7 +56,7 @@ export function parseProfileBody(body: unknown): { fields: ProfileFields } | { e
   const unknown = Object.keys(input).find((key) => !ALLOWED_KEYS.includes(key));
   if (unknown) return { error: 'Only your name and contact source can be saved.' };
 
-  const fields: ProfileFields = {};
+  const fields: ProfileUpdate = {};
   if ('senderName' in input) {
     const name = input['senderName'];
     if (name !== null && (typeof name !== 'string' || [...name].length > MAX_SENDER_NAME_LENGTH)) {
@@ -100,7 +99,7 @@ export function createProfileRouter(config: ProfileRouterConfig) {
   router.get('/me/profile', async (c) => {
     const result = await run(c.get('accessToken'), 'getProfile', {});
     if (!result) return c.json({ error: UNAVAILABLE }, 503);
-    if (!result.ok) return failure(c, result.code);
+    if (!result.ok) return result.code === 'not_found' ? c.json({ error: 'No profile yet.' }, 404) : failure(c, result.code);
     if (!result.data) return c.json({ error: 'No profile yet.' }, 404);
     return c.json(toProfile(result.data));
   });

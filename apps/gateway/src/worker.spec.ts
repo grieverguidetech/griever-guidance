@@ -302,6 +302,32 @@ describe('gateway: /me/profile (Clerk accounts, data function)', () => {
     expect((await app.request('/me/profile', { headers: auth })).status).toBe(503);
   });
 
+  it('503 and no request when the data function URL is remote and the region is unset', async () => {
+    const { auth, fetchMock } = await setup();
+    const app = await loadApp({
+      ...ENV,
+      DATA_FUNCTION_URL: 'https://abc.lambda-url.us-east-2.on.aws',
+      DATA_FUNCTION_ACCESS_KEY_ID: 'AKIAEXAMPLE',
+      DATA_FUNCTION_SECRET_ACCESS_KEY: 'secret',
+      DATA_FUNCTION_REGION: '',
+    });
+    fetchMock.mockClear();
+    const res = await app.request('/me/profile', { headers: auth });
+    expect(res.status).toBe(503);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('lambda-url'))).toBe(false);
+  });
+
+  it('answers a PUT preflight for the web origin', async () => {
+    const { app } = await setup();
+    const res = await app.request('/me/profile', {
+      method: 'OPTIONS',
+      headers: { Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'PUT', 'Access-Control-Request-Headers': 'authorization,content-type' },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe(WEB_ORIGIN);
+    expect(res.headers.get('access-control-allow-methods')).toContain('PUT');
+  });
+
   it('503 when DATA_FUNCTION_URL is unset', async () => {
     const { auth } = await setup();
     const app = await loadApp({ ...ENV, DATA_FUNCTION_URL: '' });

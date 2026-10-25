@@ -5,7 +5,7 @@ import { createProfileRouter, parseProfileBody } from './profileRouter.js';
 
 const ISSUER = 'https://clerk.example.test';
 const USER_ID = 'user_abc123';
-const DATA = { url: 'http://127.0.0.1:3002', region: 'us-east-1' };
+const DATA = { url: 'http://127.0.0.1:3002', region: 'us-east-2' };
 const STORED = {
   userId: USER_ID,
   senderName: 'Ada',
@@ -128,6 +128,16 @@ describe('profile router', () => {
   it('GET is 404 when there is no profile yet', async () => {
     callData.mockResolvedValue({ ok: true, data: null });
     expect((await call('GET')).status).toBe(404);
+  });
+
+  it('GET maps not_found to 404', async () => {
+    callData.mockResolvedValue({ ok: false, code: 'not_found' });
+    expect((await call('GET')).status).toBe(404);
+  });
+
+  it('PUT is 503 when the data function returns ok with no profile', async () => {
+    callData.mockResolvedValue({ ok: true, data: null });
+    expect((await call('PUT', { senderName: 'Ada' })).status).toBe(503);
   });
 
   it('GET is 401 without a token and never calls the data function', async () => {

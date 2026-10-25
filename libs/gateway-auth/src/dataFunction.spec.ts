@@ -4,8 +4,8 @@ import { DataFunctionError, callData } from './dataFunction.js';
 
 const TOKEN = 'user-token-secret-123';
 const REMOTE = {
-  url: 'https://abc.lambda-url.us-east-1.on.aws',
-  region: 'us-east-1',
+  url: 'https://abc.lambda-url.us-east-2.on.aws',
+  region: 'us-east-2',
   accessKeyId: 'AKIAEXAMPLE',
   secretAccessKey: 'secret-key-example',
 };
@@ -39,7 +39,7 @@ describe('callData signing', () => {
     expect(req.method).toBe('POST');
     const auth = req.headers.get('authorization') ?? '';
     expect(auth).toMatch(/^AWS4-HMAC-SHA256 /);
-    expect(auth).toContain('/us-east-1/lambda/aws4_request');
+    expect(auth).toContain('/us-east-2/lambda/aws4_request');
     expect(req.headers.get('x-amz-date')).toMatch(/^\d{8}T\d{6}Z$/);
     expect(await req.json()).toEqual({ action: 'getProfile', args: {} });
   });
@@ -60,7 +60,7 @@ describe('callData signing', () => {
 
   it('never puts the token in Authorization, even when nothing signs the request', async () => {
     const f = stubFetch(json({ ok: true, data: null }));
-    await callData({ url: 'http://localhost:3002', region: 'us-east-1' }, TOKEN, 'getProfile');
+    await callData({ url: 'http://localhost:3002', region: 'us-east-2' }, TOKEN, 'getProfile');
     expect(f.sent().headers.get('authorization')).toBeNull();
   });
 
@@ -68,7 +68,7 @@ describe('callData signing', () => {
     'calls loopback %s unsigned',
     async (url) => {
       const f = stubFetch(json({ ok: true, data: null }));
-      await callData({ url, region: 'us-east-1' }, TOKEN, 'listFlows', {});
+      await callData({ url, region: 'us-east-2' }, TOKEN, 'listFlows', {});
       const req = f.sent();
       expect(req.url.endsWith('/v1')).toBe(true);
       expect(req.headers.get('authorization')).toBeNull();
@@ -80,12 +80,21 @@ describe('callData signing', () => {
   it('throws before any request when a non-loopback url has no key pair', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    await expect(callData({ url: REMOTE.url, region: 'us-east-1' }, TOKEN, 'getProfile')).rejects.toBeInstanceOf(
+    await expect(callData({ url: REMOTE.url, region: 'us-east-2' }, TOKEN, 'getProfile')).rejects.toBeInstanceOf(
       DataFunctionError,
     );
     await expect(
-      callData({ url: REMOTE.url, region: 'us-east-1', accessKeyId: 'a' }, TOKEN, 'getProfile'),
+      callData({ url: REMOTE.url, region: 'us-east-2', accessKeyId: 'a' }, TOKEN, 'getProfile'),
     ).rejects.toBeInstanceOf(DataFunctionError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('throws before any request when a non-loopback url has no region', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { region: _region, ...noRegion } = REMOTE;
+    await expect(callData(noRegion, TOKEN, 'getProfile')).rejects.toThrow(/needs a region/);
+    await expect(callData({ ...noRegion, region: '' }, TOKEN, 'getProfile')).rejects.toThrow(/needs a region/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -93,7 +102,7 @@ describe('callData signing', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     await expect(
-      callData({ url: REMOTE.url, region: 'us-east-1', accessKeyId: '', secretAccessKey: '' }, TOKEN, 'getProfile'),
+      callData({ url: REMOTE.url, region: 'us-east-2', accessKeyId: '', secretAccessKey: '' }, TOKEN, 'getProfile'),
     ).rejects.toThrow(/key pair/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -130,7 +139,7 @@ describe('callData signing', () => {
     async (url) => {
       const fetchMock = vi.fn();
       vi.stubGlobal('fetch', fetchMock);
-      await expect(callData({ url, region: 'us-east-1' }, TOKEN, 'getProfile')).rejects.toBeInstanceOf(
+      await expect(callData({ url, region: 'us-east-2' }, TOKEN, 'getProfile')).rejects.toBeInstanceOf(
         DataFunctionError,
       );
       expect(fetchMock).not.toHaveBeenCalled();
@@ -139,7 +148,7 @@ describe('callData signing', () => {
 
   it('treats an upper-case LOCALHOST as loopback', async () => {
     const f = stubFetch(json({ ok: true, data: null }));
-    await callData({ url: 'http://LOCALHOST:3002', region: 'us-east-1' }, TOKEN, 'getProfile');
+    await callData({ url: 'http://LOCALHOST:3002', region: 'us-east-2' }, TOKEN, 'getProfile');
     expect(f.sent().headers.get('authorization')).toBeNull();
   });
 
