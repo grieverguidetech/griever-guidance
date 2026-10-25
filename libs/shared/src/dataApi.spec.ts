@@ -32,6 +32,7 @@ describe('dataApi', () => {
   it('recognises error codes', () => {
     expect(isDataErrorCode('busy')).toBe(true);
     expect(isDataErrorCode('unauthorized')).toBe(true);
+    expect(isDataErrorCode('unusable')).toBe(true);
     expect(isDataErrorCode('nope')).toBe(false);
     expect(isDataErrorCode(42)).toBe(false);
   });

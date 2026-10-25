@@ -21,7 +21,7 @@ export type ProfileResult =
  * Checks what a user sent to change their profile. Only senderName and contactSource are allowed.
  * Any other key, such as accountType or version, makes the whole input invalid. Null clears a field.
  */
-function parseProfileFields(input: unknown): ProfileFields | null {
+export function parseProfileFields(input: unknown): ProfileFields | null {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     return null;
   }

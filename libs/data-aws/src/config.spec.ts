@@ -1,4 +1,4 @@
-import { loadLocalConfig, LOCAL_ENDPOINTS } from './config.js';
+import { loadLambdaConfig, loadLocalConfig, LOCAL_ENDPOINTS } from './config.js';
 import { createDynamoClient } from './clients.js';
 
 describe('loadLocalConfig', () => {
@@ -86,5 +86,30 @@ describe('createDynamoClient', () => {
       delete process.env['AWS_SECRET_ACCESS_KEY'];
       delete process.env['AWS_SESSION_TOKEN'];
     }
+  });
+});
+
+describe('loadLambdaConfig', () => {
+  it('reads the table, and leaves credentials and endpoints undefined', () => {
+    const config = loadLambdaConfig({
+      GG_DATA_TABLE: 'gg-data-prod',
+      AWS_REGION: 'us-west-2',
+      AWS_ENDPOINT_URL: 'http://localhost:1',
+      AWS_ACCESS_KEY_ID: 'AKIAEXAMPLE',
+    });
+    expect(config.dataTable).toBe('gg-data-prod');
+    expect(config.region).toBe('us-west-2');
+    expect(config.credentials).toBeUndefined();
+    expect(config.dynamoEndpoint).toBeUndefined();
+    expect(config.sesEndpoint).toBeUndefined();
+  });
+
+  it('throws when the table name is missing or blank', () => {
+    expect(() => loadLambdaConfig({})).toThrow('GG_DATA_TABLE');
+    expect(() => loadLambdaConfig({ GG_DATA_TABLE: '  ' })).toThrow('GG_DATA_TABLE');
+  });
+
+  it('throws when the region is missing', () => {
+    expect(() => loadLambdaConfig({ GG_DATA_TABLE: 'gg-data-prod' })).toThrow('AWS_REGION');
   });
 });

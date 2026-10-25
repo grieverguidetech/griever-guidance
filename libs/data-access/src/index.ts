@@ -5,4 +5,7 @@ export * from './keys.js';
 export * from './read.js';
 export * from './transact.js';
 export * from './items/profileItem.js';
+export * from './handler/actions.js';
+export * from './handler/app.js';
+export * from './handler/verifyToken.js';
 export * from './rules/acceptInvite.js';
