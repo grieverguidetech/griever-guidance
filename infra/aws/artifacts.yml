@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Private bucket that holds the zipped data function code for the gg-app-data stack.
+
+Resources:
+  CodeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub gg-artifacts-${AWS::AccountId}-${AWS::Region}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: expire-old-versions
+          Status: Enabled
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 60
+  CodeBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CodeBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: DenyInsecureTransport
+          Effect: Deny
+          Principal: '*'
+          Action: s3:*
+          Resource:
+          - !GetAtt CodeBucket.Arn
+          - !Sub ${CodeBucket.Arn}/*
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+
+Outputs:
+  CodeBucketName:
+    Description: Pass this as the CodeBucket parameter of gg-app-data.
+    Value: !Ref CodeBucket

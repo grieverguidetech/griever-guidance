@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Grievers Guidance data function - tables, Lambda, function URL (AWS_IAM) and the Worker IAM user.
+
+Parameters:
+  CodeBucket:
+    Type: String
+    Description: Bucket from the gg-artifacts stack (output CodeBucketName).
+  CodeKey:
+    Type: String
+    Description: Object key of the zipped bundle, for example lambda-<sha256>.zip.
+  AuthIssuer:
+    Type: String
+    Description: Clerk issuer URL (DATA_AUTH_ISSUER). Public, not a secret.
+    AllowedPattern: ^https://.+
+  AuthJwksUrl:
+    Type: String
+    Description: Clerk JWKS URL (DATA_AUTH_JWKS_URL). Public, not a secret.
+    AllowedPattern: ^https://.+
+  AuthorizedParties:
+    Type: String
+    Default: https://web.grieversguidance.com
+    Description: Comma-separated token origins allowed in the azp claim (DATA_AUTH_AUTHORIZED_PARTIES). Empty allows any.
+
+Resources:
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: gg-data
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+      - { AttributeName: pk, AttributeType: S }
+      - { AttributeName: sk, AttributeType: S }
+      - { AttributeName: gsi1pk, AttributeType: S }
+      - { AttributeName: gsi1sk, AttributeType: S }
+      KeySchema:
+      - { AttributeName: pk, KeyType: HASH }
+      - { AttributeName: sk, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+      - IndexName: gsi1
+        KeySchema:
+        - { AttributeName: gsi1pk, KeyType: HASH }
+        - { AttributeName: gsi1sk, KeyType: RANGE }
+        Projection:
+          ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  ContentTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: gg-content
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+      - { AttributeName: kind, AttributeType: S }
+      - { AttributeName: id, AttributeType: S }
+      KeySchema:
+      - { AttributeName: kind, KeyType: HASH }
+      - { AttributeName: id, KeyType: RANGE }
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/gg-app-data
+      RetentionInDays: 14
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: gg-app-data-function
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: gg-app-data-function
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          # The code uses Get, Query, Update and the item actions behind TransactWriteItems.
+          - Sid: DataTable
+            Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:Query
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:ConditionCheckItem
+            Resource:
+            - !GetAtt DataTable.Arn
+            - !Sub ${DataTable.Arn}/index/gsi1
+          - Sid: ContentTableReadOnly
+            Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:Query
+            Resource: !GetAtt ContentTable.Arn
+          - Sid: WriteLogs
+            Effect: Allow
+            Action:
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/gg-app-data:*
+
+  DataFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: FunctionLogGroup
+    Properties:
+      FunctionName: gg-app-data
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      # The build writes libs/data-access/dist/lambda.mjs; the zip holds it at the root.
+      Handler: lambda.handler
+      Role: !GetAtt FunctionRole.Arn
+      MemorySize: 256
+      ReservedConcurrentExecutions: 10
+      Timeout: 10
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+      Environment:
+        Variables:
+          GG_DATA_TABLE: !Ref DataTable
+          GG_CONTENT_TABLE: !Ref ContentTable
+          DATA_AUTH_ISSUER: !Ref AuthIssuer
+          DATA_AUTH_JWKS_URL: !Ref AuthJwksUrl
+          DATA_AUTH_AUTHORIZED_PARTIES: !Ref AuthorizedParties
+
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt DataFunction.Arn
+      AuthType: AWS_IAM
+
+  WorkerUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: gg-app-data-worker
+      Policies:
+      - PolicyName: invoke-data-function-url
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: InvokeThisFunctionUrl
+            Effect: Allow
+            Action: lambda:InvokeFunctionUrl
+            Resource: !GetAtt DataFunction.Arn
+            Condition:
+              StringEquals:
+                lambda:FunctionUrlAuthType: AWS_IAM
+          # AWS now checks lambda:InvokeFunction too for function URL calls. Same function, URL calls only.
+          - Sid: InvokeThisFunctionViaUrl
+            Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: !GetAtt DataFunction.Arn
+            Condition:
+              Bool:
+                lambda:InvokedViaFunctionUrl: 'true'
+
+Outputs:
+  FunctionUrl:
+    Description: Value of the repo variable DATA_FUNCTION_URL (remove the trailing slash).
+    Value: !GetAtt FunctionUrl.FunctionUrl
+  FunctionName:
+    Value: !Ref DataFunction
+  WorkerUserName:
+    Description: Create its access key with the CLI; see docs/aws-data-function.md.
+    Value: !Ref WorkerUser
+  DataTableName:
+    Value: !Ref DataTable
+  ContentTableName:
+    Value: !Ref ContentTable

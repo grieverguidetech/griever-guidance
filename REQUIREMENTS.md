@@ -419,6 +419,11 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               deploy.yml from the GitHub secret; skipped when empty, and a key already on the
               Worker stays; to remove it: `wrangler secret delete RESEND_API_KEY --config
               apps/gateway/wrangler.toml`; with no key, POST /invites answers 503)
+              DATA_FUNCTION_URL (wrangler var; deploy.yml sets it from the repo variable of the
+              same name, empty = /me/* answers 503), DATA_FUNCTION_REGION (wrangler var, us-east-2;
+              no code default), DATA_FUNCTION_ACCESS_KEY_ID and DATA_FUNCTION_SECRET_ACCESS_KEY
+              (Worker secrets, set by deploy.yml from the GitHub secrets; both skipped when
+              either is empty; rotate every 90 days: docs/aws-data-function.md)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (read only when the flag is on)
               VITE_FEATURE_SHARING ("true" enables sharing; default off)
@@ -427,8 +432,8 @@ apps/mobile   EXPO_PUBLIC_API_URL
 ```
 
 Production repo variables (public, not secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
-(off until the PO sets it to `true`). The gateway's only Worker secret is `RESEND_API_KEY` (from the
-repo secret of the same name).
+(off until the PO sets it to `true`), `DATA_FUNCTION_URL`. The gateway's Worker secrets are `RESEND_API_KEY`,
+`DATA_FUNCTION_ACCESS_KEY_ID` and `DATA_FUNCTION_SECRET_ACCESS_KEY` (from the repo secrets of the same names).
 Web production has `FEATURE_AUTH=true` (since 2026-10-11). To turn accounts off or on again, change it
 and re-run the deploy. Mobile (`EXPO_PUBLIC_*`, EAS) is a follow-up.
 
