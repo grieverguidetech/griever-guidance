@@ -3,7 +3,6 @@ import { accountStore } from '@griever/data-local';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
 import { Info } from '@phosphor-icons/react/Info';
-import { TopBar } from '../lib/ui';
 
 interface ChecklistItem {
   /** The key saved on this device when the row is ticked. Never change one. */
@@ -155,44 +154,6 @@ export function ChecklistRows() {
       {CHECKLIST.map((item) => (
         <ChecklistRow key={item.id} item={item} checked={ticks.includes(item.id)} loaded={loaded} onToggle={() => toggle(item.id)} />
       ))}
-    </div>
-  );
-}
-
-interface Props {
-  onBack: () => void;
-  onEmailList: () => void;
-}
-
-export function WhatYoullNeed({ onBack, onEmailList }: Props) {
-  return (
-    <div className="flex flex-col gap-4">
-      <TopBar onBack={onBack} />
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[22px]">What you'll need</h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          Not today. Just so none of it surprises you.
-        </p>
-      </div>
-
-      <div className="gg-card">
-        <span className="gg-card-kicker">The one people get wrong</span>
-        <span className="gg-card-title text-[15px]">Certified death certificates</span>
-        <p className="gg-card-body m-0">
-          Ask the funeral home for <strong>8 to 10 certified copies</strong>. Banks, insurers and
-          Social Security each keep an original — photocopies are usually refused.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <p className="gg-eyebrow m-0">Gather when you can</p>
-        <ChecklistRows />
-      </div>
-
-      <button type="button" onClick={onEmailList} className="gg-btn gg-btn-secondary gg-btn-block">
-        Email this list to me
-      </button>
-      <p className="gg-reassure text-center m-0 text-[12px]">We won't remind you about this list.</p>
     </div>
   );
 }

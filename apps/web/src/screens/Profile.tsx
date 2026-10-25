@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { TopBar } from '../lib/ui';
-import { ChecklistRows } from './WhatYoullNeed';
+import { ChecklistRows } from '../lib/ChecklistRows';
 
 const SAVE_FAILED = "We couldn't save your name. You can try again.";
 const NAME_REQUIRED = 'Please enter your name.';

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
 import { Profile } from './Profile';
-import { WhatYoullNeed } from './WhatYoullNeed';
+import { ChecklistRows } from '../lib/ChecklistRows';
 
 describe('Profile', () => {
   it('shows the saved name, including one that arrives after opening', () => {
@@ -139,7 +139,7 @@ describe('Profile', () => {
       await waitFor(async () => expect(await accountStore.getChecklistTicks()).toContain('life-insurance'));
       account.unmount();
 
-      const list = render(<WhatYoullNeed onBack={vi.fn()} onEmailList={vi.fn()} />);
+      const list = render(<ChecklistRows />);
       await waitFor(() => expect(row('Life insurance policies')).toBeEnabled());
       expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
       await user.click(row('Military discharge papers'));

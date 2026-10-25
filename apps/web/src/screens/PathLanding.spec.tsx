@@ -39,7 +39,6 @@ describe('PathLanding share', () => {
         session={session}
         onBack={vi.fn()}
         onStartMoment={vi.fn()}
-       
         onEditPerson={vi.fn()}
       />,
     );
@@ -169,7 +168,6 @@ describe('PathLanding paywall demo (#292)', () => {
         session={session}
         onBack={vi.fn()}
         onStartMoment={onStartMoment}
-       
         onEditPerson={vi.fn()}
         paymentsEnabled={paymentsEnabled}
       />,

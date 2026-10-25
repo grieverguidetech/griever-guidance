@@ -1,10 +1,11 @@
 /** #193: "What you'll need" opens as a sheet over "Who are we writing about?". */
 import { useState } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
 import type { Session } from '@griever/hooks';
 import { SessionSetup } from '../screens/SessionSetup';
+import { Profile } from '../screens/Profile';
 import { TopBar } from './ui';
 
 const empty = { personName: '', senderName: '' } as Session;
@@ -154,5 +155,58 @@ describe('What you will need sheet (#193)', () => {
     await user.click(trigger());
     expect(trigger()).toHaveAttribute('aria-haspopup', 'dialog');
     expect(screen.getByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
+  });
+
+  it('keeps the death certificate card and the no-reminder line from the old page', async () => {
+    const user = userEvent.setup();
+    render(<TopBar onBack={vi.fn()} />);
+    await user.click(trigger());
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('The one people get wrong');
+    expect(dialog).toHaveTextContent('Certified death certificates');
+    expect(dialog).toHaveTextContent('8 to 10 certified copies');
+    expect(dialog).toHaveTextContent("We won't remind you about this list.");
+  });
+
+  it('moves focus to the page heading when the button is gone on close', async () => {
+    const user = userEvent.setup();
+    let swap: () => void = () => undefined;
+    function Swap() {
+      const [swapped, setSwapped] = useState(false);
+      swap = () => setSwapped(true);
+      return swapped ? (
+        <h1>Next screen</h1>
+      ) : (
+        <>
+          <h1>First screen</h1>
+          <TopBar onBack={vi.fn()} />
+        </>
+      );
+    }
+    render(<Swap />);
+    await user.click(trigger());
+    // The screen changes behind the sheet, so the opening button unmounts.
+    act(() => swap());
+    expect(screen.queryByRole('button', { name: "What you'll need", hidden: true })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Next screen' })).toHaveFocus();
+  });
+
+  it('keeps the button on the right when there is no Back', () => {
+    render(<TopBar />);
+    expect(trigger()).toHaveClass('ml-auto');
+  });
+
+  it('does not submit the Profile form when Enter is pressed inside the open sheet', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn(async () => true);
+    render(<Profile senderName="Anna" onBack={vi.fn()} onSave={onSave} onSignOut={vi.fn()} error={null} showChecklist={false} />);
+    await user.click(trigger());
+    const row = await screen.findByRole('button', { name: /Life insurance policies/ });
+    await waitFor(() => expect(row).toBeEnabled());
+    row.focus();
+    await user.keyboard('{Enter}');
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

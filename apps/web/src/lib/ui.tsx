@@ -47,7 +47,7 @@ export function TopBar({ onBack, hideChecklist = false }: { onBack?: () => void;
           type="button"
           aria-haspopup="dialog"
           onClick={() => setSheetOpen(true)}
-          className="gg-btn gg-btn-secondary gg-btn-bar"
+          className="gg-btn gg-btn-secondary gg-btn-bar ml-auto"
         >
           <ListChecks size={16} weight="duotone" aria-hidden="true" />
           What you'll need

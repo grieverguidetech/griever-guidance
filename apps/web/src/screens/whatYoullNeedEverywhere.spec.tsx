@@ -28,7 +28,7 @@ const screens: [string, () => ReactElement, string][] = [
   ['SessionSetup', () => <SessionSetup session={session} editing={false} onChange={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />, 'Who are we writing about?'],
   ['PathLanding', () => <PathLanding session={session} onBack={vi.fn()} onStartMoment={vi.fn()} onEditPerson={vi.fn()} />, 'One thing at a time.'],
   ['Settings', () => <Settings onBack={vi.fn()} onRemoveEverything={vi.fn()} />, 'Settings'],
-  ['ForgotPassword', () => <ForgotPassword onBack={vi.fn()} onSubmit={vi.fn()} />, ''],
+  ['ForgotPassword', () => <ForgotPassword onBack={vi.fn()} onSubmit={vi.fn()} />, 'Reset your password'],
   ['Gate', () => <Gate title="Gate title" subtitle="s" notYet={option} ready={option} reassurance="r" onBack={vi.fn()} onChoose={vi.fn()} />, 'Gate title'],
 ];
 
