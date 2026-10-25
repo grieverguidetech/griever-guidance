@@ -7,7 +7,7 @@ import { decodeMember, decodeMemberOf } from '../items/memberItems.js';
 import { getProfile } from '../items/profileItem.js';
 import { INVITE_PREFIX, MEMBER_PREFIX, memberKey, memberOfKey, profileKey } from '../keys.js';
 import { getLive, queryLive } from '../read.js';
-import { runAction, type RunOptions } from '../transact.js';
+import { runAction, type RunOptions, type TransactItem } from '../transact.js';
 import type { FlowResult } from './flows.js';
 
 const byCreatedAt = (a: { createdAt: string }, b: { createdAt: string }) => a.createdAt.localeCompare(b.createdAt);
@@ -44,6 +44,30 @@ export async function listMembers(
   return { role: 'owner', members, invites };
 }
 
+/**
+ * Bumps the owner's profile version with no condition, for writes that change membership or invites
+ * (profileItem.ts: version). A missing profile is created as owner.
+ */
+export function bumpOwnerVersion(table: string, ownerId: string, now: string): TransactItem {
+  return {
+    Update: {
+      TableName: table,
+      Key: profileKey(ownerId),
+      UpdateExpression:
+        'SET #version = if_not_exists(#version, :zero) + :one, updatedAt = :now, accountType = if_not_exists(accountType, :owner), userId = :id, entity = :entity, createdAt = if_not_exists(createdAt, :now)',
+      ExpressionAttributeNames: { '#version': 'version' },
+      ExpressionAttributeValues: {
+        ':zero': 0,
+        ':one': 1,
+        ':now': now,
+        ':owner': 'owner',
+        ':id': ownerId,
+        ':entity': 'PROFILE',
+      },
+    },
+  };
+}
+
 // Positions in the removeMember transaction.
 const REMOVE_MEMBER = 0;
 const REMOVE_MEMBER_OF = 1;
@@ -61,6 +85,10 @@ export async function removeMember(
   clock: Clock,
   options: RunOptions = {},
 ): Promise<FlowResult<null>> {
+  // Removing yourself is never valid, and it would put two writes on one profile item in the Tx.
+  if (memberId === caller.userId) {
+    return { ok: false, code: 'not_found' };
+  }
   let key;
   try {
     key = memberKey(caller.userId, memberId);
@@ -82,7 +110,8 @@ export async function removeMember(
           Delete: {
             TableName: table,
             Key: memberOfKey(memberId),
-            ConditionExpression: 'ownerId = :owner',
+            // A MEMBER# item with no MEMBER_OF (left by a half-finished write) can still be removed.
+            ConditionExpression: 'attribute_not_exists(pk) OR ownerId = :owner',
             ExpressionAttributeValues: { ':owner': caller.userId },
           },
         },
@@ -103,6 +132,7 @@ export async function removeMember(
             },
           },
         },
+        bumpOwnerVersion(table, caller.userId, now),
       ],
       value: null,
     };

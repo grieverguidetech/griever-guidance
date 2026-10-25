@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { fixedClock } from '../clock.js';
 import { decodeInvite, encodeInvite, type InviteItem } from '../items/inviteItems.js';
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
@@ -127,7 +128,6 @@ describe.runIf(up)('createInvite on DynamoDB Local', () => {
     await seedInvite(owner, { email: 'dup@example.test' });
     const result = await createInvite(doc, table, caller(owner), 'DUP@example.test', hash(), clock);
     expect(result).toEqual({ ok: false, code: 'already_invited' });
-    expect(JSON.stringify(result)).not.toMatch(/pk|sk|TOKEN|INVITE#/);
   });
 
   it('refuses a reused hash as already_invited, with no key detail', async () => {
@@ -190,6 +190,61 @@ describe.runIf(up)('createInvite on DynamoDB Local', () => {
     expect(raw?.['revokedAt']).toBeUndefined();
   });
 
+  it('refuses when the caller becomes a member between the read and the commit', async () => {
+    const owner = await newOwner();
+    const result = await createInvite(doc, table, caller(owner), 'a@example.test', hash(), clock, {
+      beforeCommit: async (attempt) => {
+        if (attempt === 1) {
+          await rawPut(encodeMemberOf({ memberId: owner, ownerId: 'user_someone', createdAt: at(-HOUR) }));
+        }
+      },
+      sleep: async () => undefined,
+    });
+    expect(result).toEqual({ ok: false, code: 'forbidden' });
+    expect(await stored(owner)).toEqual([]);
+  });
+
+  it('keeps an external revoke of the expired invite and still creates the new one', async () => {
+    const owner = await newOwner();
+    const old = await seedInvite(owner, { email: 'again@example.test', createdAt: at(-9 * 24 * HOUR), expiresAt: at(-2 * 24 * HOUR) });
+    const external = at(-HOUR);
+    const result = await createInvite(doc, table, caller(owner), 'again@example.test', hash(), clock, {
+      beforeCommit: async (attempt) => {
+        if (attempt === 1) {
+          await doc.send(
+            new UpdateCommand({
+              TableName: table,
+              Key: inviteKey(owner, old.id),
+              UpdateExpression: 'SET revokedAt = :at',
+              ExpressionAttributeValues: { ':at': external },
+            }),
+          );
+        }
+      },
+      sleep: async () => undefined,
+    });
+    expect(result.ok).toBe(true);
+    const items = await stored(owner);
+    expect(items).toHaveLength(2);
+    expect(items.find((i) => i.id === old.id)?.revokedAt).toBe(external);
+  });
+
+  it('lets only one of two interleaved invites to the same email through (race)', async () => {
+    const owner = await newOwner();
+    let second: Awaited<ReturnType<typeof createInvite>> | undefined;
+    const first = await createInvite(doc, table, caller(owner), 'same@example.test', hash(), clock, {
+      beforeCommit: async (attempt) => {
+        if (attempt === 1) {
+          second = await createInvite(doc, table, caller(owner), 'Same@example.test', hash(), clock);
+        }
+      },
+      sleep: async () => undefined,
+    });
+    expect(second?.ok).toBe(true);
+    expect(first).toEqual({ ok: false, code: 'already_invited' });
+    expect((await stored(owner)).filter((i) => i.email === 'same@example.test')).toHaveLength(1);
+  });
+
   it('cannot pass the 10 per 24 hour limit twice at once (race)', async () => {
     const owner = await newOwner();
     for (let i = 0; i < 9; i += 1) {
@@ -220,6 +275,13 @@ describe.runIf(up)('revokeInvite on DynamoDB Local', () => {
     const invite = await seedInvite(owner);
     expect(await revokeInvite(doc, table, caller(owner), invite.id, clock)).toEqual({ ok: true, value: null });
     expect((await stored(owner))[0]?.revokedAt).toBe(clock.now().toISOString());
+    expect((await getProfile(doc, table, owner, clock))?.version).toBe(2);
+  });
+
+  it('does not bump the owner version when the revoke is refused', async () => {
+    const owner = await newOwner();
+    expect(await revokeInvite(doc, table, caller(owner), randomUUID(), clock)).toEqual({ ok: false, code: 'not_found' });
+    expect((await getProfile(doc, table, owner, clock))?.version).toBe(1);
   });
 
   it('answers not_found for another owner, an unknown id, a bad id, a revoked and an accepted invite', async () => {

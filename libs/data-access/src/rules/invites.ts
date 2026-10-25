@@ -9,6 +9,7 @@ import { getProfile } from '../items/profileItem.js';
 import { INVITE_PREFIX, MEMBER_PREFIX, inviteKey, memberOfKey } from '../keys.js';
 import { getLive, queryLive } from '../read.js';
 import { runAction, type TransactItem, type RunOptions } from '../transact.js';
+import { bumpOwnerVersion } from './members.js';
 import { Refusal, profileWrite, type FlowResult } from './flows.js';
 
 /** Same limits as create_invite in Supabase. */
@@ -59,6 +60,7 @@ export async function createInvite(
         if (address === parseInviteEmail(caller.email)) {
           throw new Refusal('invalid');
         }
+        // Compares with the email stored on MEMBER# (the 2026-10-21 decision), not the member's current login email.
         const members = await queryLive(doc, table, caller.userId, clock, MEMBER_PREFIX);
         if (members.some((item) => decodeMember(item).email.toLowerCase() === address)) {
           throw new Refusal('already_member');
@@ -148,6 +150,7 @@ export async function revokeInvite(
         if (!item || !isOpen(decodeInvite(item))) {
           throw new Refusal('not_found');
         }
+        const now = clock.now().toISOString();
         return {
           items: [
             {
@@ -156,9 +159,10 @@ export async function revokeInvite(
                 Key: inviteKey(caller.userId, id),
                 UpdateExpression: 'SET revokedAt = :now',
                 ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt)',
-                ExpressionAttributeValues: { ':now': clock.now().toISOString() },
+                ExpressionAttributeValues: { ':now': now },
               },
             },
+            bumpOwnerVersion(table, caller.userId, now),
           ],
           value: null,
         };

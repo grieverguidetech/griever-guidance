@@ -105,6 +105,14 @@ describe.runIf(up)('removeMember on DynamoDB Local', () => {
     expect(await getLive(doc, table, memberKey('user_r_owner', 'user_r_m'), clock)).toBeUndefined();
     expect(await getLive(doc, table, memberOfKey('user_r_m'), clock)).toBeUndefined();
     expect(await getProfile(doc, table, 'user_r_m', clock)).toMatchObject({ accountType: 'owner', version: 2 });
+    expect(await getProfile(doc, table, 'user_r_owner', clock)).toMatchObject({ accountType: 'owner', version: 2 });
+  });
+
+  it('removes a MEMBER# item that has no MEMBER_OF', async () => {
+    await profile('user_r_o5', 'owner');
+    await rawPut(encodeMember({ ownerId: 'user_r_o5', memberId: 'user_r_m5', email: 'm5@example.test', createdAt: at(-HOUR) }));
+    expect(await removeMember(doc, table, caller('user_r_o5'), 'user_r_m5', clock)).toEqual({ ok: true, value: null });
+    expect(await getLive(doc, table, memberKey('user_r_o5', 'user_r_m5'), clock)).toBeUndefined();
   });
 
   it("answers not_found for another owner's member and changes nothing", async () => {
@@ -114,6 +122,7 @@ describe.runIf(up)('removeMember on DynamoDB Local', () => {
     expect(await removeMember(doc, table, caller('user_r_o1'), 'user_r_m2', clock)).toEqual({ ok: false, code: 'not_found' });
     expect(await getLive(doc, table, memberOfKey('user_r_m2'), clock)).toMatchObject({ ownerId: 'user_r_o2' });
     expect(await getProfile(doc, table, 'user_r_m2', clock)).toMatchObject({ accountType: 'member', version: 1 });
+    expect(await getProfile(doc, table, 'user_r_o1', clock)).toMatchObject({ version: 1 });
   });
 
   it('answers not_found for the caller themself, an unknown id and a bad id', async () => {
