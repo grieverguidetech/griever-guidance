@@ -1,15 +1,16 @@
 import { Jwt } from 'hono/utils/jwt';
+import type { HonoJsonWebKey } from 'hono/utils/jwt/jws';
 import type { Caller } from './caller.js';
 
 export type { Caller } from './caller.js';
 
 /** A public key from a JWKS document. */
-type PublicKey = { kid?: string; alg?: string } & JsonWebKey;
+type PublicKey = { kid?: string; alg?: string } & HonoJsonWebKey;
 
 export interface VerifierOptions {
-  /** Expected `iss` claim, from DATA_AUTH_ISSUER. */
+  /** Expected `iss` claim, from config (the data function: DATA_AUTH_ISSUER; the gateway: CLERK_ISSUER). */
   issuer: string;
-  /** Where the issuer publishes its keys, from DATA_AUTH_JWKS_URL. */
+  /** Where the issuer publishes its keys, from config (the data function: DATA_AUTH_JWKS_URL; the gateway: `${CLERK_ISSUER}/.well-known/jwks.json`). */
   jwksUrl: string;
   /** If set, a token that carries `azp` must name one of these. A token with no `azp` is allowed. */
   authorizedParties?: string[];

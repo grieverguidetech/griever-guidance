@@ -5,7 +5,8 @@ import type { DataAction, DataResult } from '@griever/shared';
 export interface DataFunctionConfig {
   /** Base URL of the data function (Lambda function URL), without `/v1`. */
   url: string;
-  region: string;
+  /** Required for a non-loopback `url`; there is no default. */
+  region?: string;
   /** The gateway's key pair. Optional only for a loopback `url`. */
   accessKeyId?: string;
   secretAccessKey?: string;
@@ -59,6 +60,10 @@ export async function callData<T = unknown>(
   if (!loopback && (!config.accessKeyId || !config.secretAccessKey)) {
     throw new DataFunctionError(null, 'data function needs an AWS key pair for a non-loopback url');
   }
+  // A wrong region signs fine and fails at AWS with a 403, so there is no default.
+  if (!loopback && !config.region) {
+    throw new DataFunctionError(null, 'data function needs a region');
+  }
 
   const url = new URL('/v1', base).toString();
   const init = {
@@ -76,7 +81,7 @@ export async function callData<T = unknown>(
         accessKeyId: config.accessKeyId as string,
         secretAccessKey: config.secretAccessKey as string,
         service: 'lambda',
-        region: config.region,
+        region: config.region as string,
       });
       res = await fetch(await aws.sign(url, init));
     }

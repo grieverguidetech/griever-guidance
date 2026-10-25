@@ -20,6 +20,7 @@ async function loadApp() {
   vi.unstubAllEnvs();
   vi.stubEnv('CORS_ORIGINS', 'https://web.grieversguidance.com');
   vi.stubEnv('ANTHROPIC_API_KEY', '');
+  vi.stubEnv('CLERK_ISSUER', 'https://clerk.example.test');
   vi.stubEnv('SUPABASE_URL', 'https://proj.supabase.test');
   vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
   const mod = await import('./worker.js');

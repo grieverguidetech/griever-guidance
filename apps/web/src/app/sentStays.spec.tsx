@@ -1,26 +1,33 @@
 /**
  * #167, then #176: Done on the last person opens the path with a quiet note (the Sent screen is
  * gone), and the path's Back opens Home.
- * The real App, signed in with a stub auth client (no network, no supabase-js).
+ * The real App, signed in with a fake Clerk (no network, no Clerk).
  *
  * The bounce: when the flow is mounted again while its moment is mid-send or at 'sent', the app
  * used to hand the flow no draft, so it started over on the template picker. The one path that
  * remounts it today: the account's name check answers late, the "What should we call you?" prompt
- * interrupts, and Save returns to the flow. (Supabase's own token refresh on tab focus does not:
- * the identity hook never goes back to loading and does not listen for auth events.)
+ * interrupts, and Save returns to the flow. (A Clerk token refresh does not: the adapter keeps
+ * its status while a token is renewed.)
  */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
-import type { AuthClientResult } from '../lib/authClient';
+import type { ProfileResult } from '@griever/api-client';
+import type { ClerkLoadResult } from '../lib/authClient';
+import { fakeClerk } from '../test-clerk';
 
 const mocks = vi.hoisted(() => ({
-  load: vi.fn<() => Promise<AuthClientResult>>(),
+  loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
+  getProfile: vi.fn(),
+  updateProfile: vi.fn(),
 }));
 vi.mock('../lib/features', () => ({ AUTH_ENABLED: true, OBITUARY_DRAFTING_ENABLED: false, PAYMENTS_ENABLED: false, SHARING_ENABLED: false }));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();
-  return { ...actual, loadAuthClient: mocks.load };
+  return { ...actual, loadClerk: mocks.loadClerk };
+});
+vi.mock('@griever/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@griever/api-client')>();
+  return { ...actual, getProfile: mocks.getProfile, updateProfile: mocks.updateProfile };
 });
 
 import { App } from './app';
@@ -37,23 +44,10 @@ const PROFILE = {
 const note = 'She was peaceful and we were with her at the end.';
 const NAME_CHECK_FALLBACK_MS = 5000;
 
-/** A signed-in client whose profile answers only when `answerProfile` is called. */
-function signedInClient(profile: Promise<ProfileResult>): AuthClient {
-  return {
-    signUp: vi.fn(),
-    signIn: vi.fn(),
-    signOut: vi.fn(async () => ({ ok: true as const, serverRevoked: true })),
-    getSession: vi.fn(async () => ({
-      status: 'signed_in' as const,
-      session: { userId: 'u1', email: 'a@b.co', accessToken: 't' },
-    })),
-    refreshSession: vi.fn(async () => ({ status: 'signed_out' as const })),
-    getProfile: vi.fn(() => profile),
-    updateProfile: vi.fn(async (update: { senderName?: string }) => ({
-      ok: true as const,
-      profile: { ...PROFILE, senderName: update.senderName ?? null },
-    })),
-  } as unknown as AuthClient;
+/** Signed in as u1, with a profile that answers only when `profile` settles. */
+function signedIn(profile: Promise<ProfileResult>) {
+  mocks.getProfile.mockImplementation(() => profile);
+  mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: 'u1' }).load);
 }
 
 /** From Home to the Sending step for one person. */
@@ -100,7 +94,13 @@ function lateProfile() {
 
 beforeEach(() => {
   window.localStorage.clear();
-  mocks.load.mockReset();
+  mocks.loadClerk.mockReset();
+  mocks.getProfile.mockReset();
+  mocks.updateProfile.mockReset();
+  mocks.updateProfile.mockImplementation(async (_token: string, update: { senderName?: string }) => ({
+    ok: true,
+    profile: { ...PROFILE, senderName: update.senderName ?? null },
+  }));
   // jsdom can't follow the sms: link; the hand-off itself is not under test here.
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   // The name check gives up after 5 s and counts as "has a name". Under a slow CI run the
@@ -120,7 +120,7 @@ afterEach(() => {
 describe('after Done on the last person (#167)', () => {
   it('opens the path with the note, stays there after a prompt, and keeps no wording', async () => {
     const { profile, answer } = lateProfile();
-    mocks.load.mockResolvedValue({ available: true, client: signedInClient(profile) });
+    signedIn(profile);
     const user = userEvent.setup();
     render(<App />);
 
@@ -140,7 +140,7 @@ describe('after Done on the last person (#167)', () => {
 
   it('mid-send, comes back on Review when the flow is opened again, not the picker', async () => {
     const { profile, answer } = lateProfile();
-    mocks.load.mockResolvedValue({ available: true, client: signedInClient(profile) });
+    signedIn(profile);
     const user = userEvent.setup();
     render(<App />);
 
@@ -154,10 +154,7 @@ describe('after Done on the last person (#167)', () => {
   }, 30_000);
 
   it('Back on the path opens Home, the people list', async () => {
-    mocks.load.mockResolvedValue({
-      available: true,
-      client: signedInClient(Promise.resolve({ ok: true, profile: { ...PROFILE, senderName: 'Anna' } })),
-    });
+    signedIn(Promise.resolve({ ok: true, profile: { ...PROFILE, senderName: 'Anna' } }));
     const user = userEvent.setup();
     render(<App />);
 

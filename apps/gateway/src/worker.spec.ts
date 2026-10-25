@@ -175,31 +175,56 @@ describe('gateway: obituary drafting', () => {
   });
 });
 
-describe('gateway: /me/profile (Supabase accounts)', () => {
-  const ENV = { SUPABASE_URL, SUPABASE_ANON_KEY: 'anon-key' };
-  const ROW = {
-    id: USER_ID,
-    sender_name: 'Ada',
-    contact_source: null,
-    created_at: '2026-10-11T10:00:00+00:00',
-    updated_at: '2026-10-11T10:00:00+00:00',
+describe('gateway: /me/profile (Clerk accounts, data function)', () => {
+  const CLERK_ISSUER = 'https://clerk.example.test';
+  const DATA_URL = 'http://127.0.0.1:3002';
+  const ENV = {
+    CLERK_ISSUER,
+    CLERK_AUTHORIZED_PARTIES: WEB_ORIGIN,
+    DATA_FUNCTION_URL: DATA_URL,
+  };
+  const STORED = {
+    userId: 'user_abc123',
+    senderName: 'Ada',
+    accountType: 'owner',
+    version: 1,
+    createdAt: '2026-10-11T10:00:00.000Z',
+    updatedAt: '2026-10-11T10:00:00.000Z',
   };
 
-  // Stubs the JWKS and PostgREST; anything else is a test bug.
-  function stubSupabase(keys: Awaited<ReturnType<typeof makeKeys>>, postgrest: () => Response) {
-    const fetchMock = vi.fn(async (url: string, _init?: { headers: Record<string, string> }) => {
-      if (url.endsWith('/auth/v1/.well-known/jwks.json')) return jsonResponse(keys.jwks);
-      if (url.includes('/rest/v1/profiles')) return postgrest();
+  async function makeRsaKey() {
+    const pair = await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['sign', 'verify'],
+    );
+    return {
+      privateJwk: { ...(await crypto.subtle.exportKey('jwk', pair.privateKey)), kid: 'k1', alg: 'RS256' },
+      publicJwk: { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid: 'k1', alg: 'RS256' },
+    };
+  }
+
+  // Stubs the JWKS and the data function; anything else is a test bug.
+  async function setup(data: () => Response = () => jsonResponse({ ok: true, data: STORED })) {
+    const key = await makeRsaKey();
+    const { Jwt } = await import('hono/utils/jwt');
+    const token = await Jwt.sign(
+      {
+        sub: 'user_abc123',
+        iss: CLERK_ISSUER,
+        azp: WEB_ORIGIN,
+        exp: Math.floor(Date.now() / 1000) + 300,
+        email: 'ada@example.test',
+      },
+      key.privateJwk,
+      'RS256',
+    );
+    const fetchMock = vi.fn(async (url: string, _init?: { headers: Record<string, string>; body?: string }) => {
+      if (url === `${CLERK_ISSUER}/.well-known/jwks.json`) return jsonResponse({ keys: [key.publicJwk] });
+      if (url === `${DATA_URL}/v1`) return data();
       throw new Error(`unexpected fetch ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
-    return fetchMock;
-  }
-
-  async function setup(postgrest: () => Response = () => jsonResponse([ROW])) {
-    const keys = await makeKeys();
-    const token = await signJwt(keys.privateKey, keys.kid);
-    const fetchMock = stubSupabase(keys, postgrest);
     const app = await loadApp(ENV);
     const auth = { Authorization: `Bearer ${token}` };
     return { app, auth, token, fetchMock };
@@ -220,29 +245,30 @@ describe('gateway: /me/profile (Supabase accounts)', () => {
     const res = await app.request('/me/profile', { headers: auth });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id: USER_ID,
+      id: 'user_abc123',
       senderName: 'Ada',
       contactSource: null,
       accountType: 'owner',
       createdAt: '2026-10-11T10:00:00.000Z',
       updatedAt: '2026-10-11T10:00:00.000Z',
     });
-    const call = fetchMock.mock.calls.find(([u]) => String(u).includes('/rest/v1/'));
-    const headers = call?.[1]?.headers ?? {};
-    expect(headers['Authorization']).toBe(`Bearer ${token}`);
-    expect(headers['apikey']).toBe('anon-key');
+    const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/v1'));
+    expect(call?.[1]?.headers['x-gg-user-token']).toBe(token);
+    expect(JSON.parse(call?.[1]?.body ?? '{}')).toEqual({ action: 'getProfile', args: {} });
   });
 
-  it('GET 404 when the caller has no row yet', async () => {
-    const { app, auth } = await setup(() => jsonResponse([]));
+  it('GET 404 when the caller has no profile yet', async () => {
+    const { app, auth } = await setup(() => jsonResponse({ ok: true, data: null }));
     expect((await app.request('/me/profile', { headers: auth })).status).toBe(404);
   });
 
-  it('PUT 200 upserts and returns the profile', async () => {
-    const { app, auth } = await setup();
+  it('PUT 200 writes and returns the profile', async () => {
+    const { app, auth, fetchMock } = await setup();
     const res = await app.request('/me/profile', put(auth, { senderName: 'Ada' }));
     expect(res.status).toBe(200);
     expect(((await res.json()) as { senderName: string }).senderName).toBe('Ada');
+    const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/v1'));
+    expect(JSON.parse(call?.[1]?.body ?? '{}')).toEqual({ action: 'putProfile', args: { fields: { senderName: 'Ada' } } });
   });
 
   it.each([{ unknown: 1 }, { senderName: 'x'.repeat(101) }, { contactSource: 'sms' }])(
@@ -253,17 +279,59 @@ describe('gateway: /me/profile (Supabase accounts)', () => {
     },
   );
 
+  it('503 with calm copy when the data function is busy', async () => {
+    const { app, auth } = await setup(() => jsonResponse({ ok: false, code: 'busy', message: 'try later' }));
+    const res = await app.request('/me/profile', { headers: auth });
+    expect(res.status).toBe(503);
+  });
+
+  it('401 when the data function refuses the user token', async () => {
+    const { app, auth } = await setup(() => new Response('', { status: 401 }));
+    expect((await app.request('/me/profile', { headers: auth })).status).toBe(401);
+  });
+
   it('503 when the JWKS cannot be fetched', async () => {
     const { app, auth } = await setup();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('down')));
     expect((await app.request('/me/profile', { headers: auth })).status).toBe(503);
   });
 
-  it('503 when SUPABASE_URL / SUPABASE_ANON_KEY are unset', async () => {
+  it('503 when CLERK_ISSUER is unset', async () => {
     const { auth } = await setup();
-    const app = await loadApp({ SUPABASE_URL: '', SUPABASE_ANON_KEY: '' });
+    const app = await loadApp({ ...ENV, CLERK_ISSUER: '' });
+    expect((await app.request('/me/profile', { headers: auth })).status).toBe(503);
+  });
+
+  it('503 and no request when the data function URL is remote and the region is unset', async () => {
+    const { auth, fetchMock } = await setup();
+    const app = await loadApp({
+      ...ENV,
+      DATA_FUNCTION_URL: 'https://abc.lambda-url.us-east-2.on.aws',
+      DATA_FUNCTION_ACCESS_KEY_ID: 'AKIAEXAMPLE',
+      DATA_FUNCTION_SECRET_ACCESS_KEY: 'secret',
+      DATA_FUNCTION_REGION: '',
+    });
+    fetchMock.mockClear();
     const res = await app.request('/me/profile', { headers: auth });
     expect(res.status).toBe(503);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('lambda-url'))).toBe(false);
+  });
+
+  it('answers a PUT preflight for the web origin', async () => {
+    const { app } = await setup();
+    const res = await app.request('/me/profile', {
+      method: 'OPTIONS',
+      headers: { Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'PUT', 'Access-Control-Request-Headers': 'authorization,content-type' },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe(WEB_ORIGIN);
+    expect(res.headers.get('access-control-allow-methods')).toContain('PUT');
+  });
+
+  it('503 when DATA_FUNCTION_URL is unset', async () => {
+    const { auth } = await setup();
+    const app = await loadApp({ ...ENV, DATA_FUNCTION_URL: '' });
+    expect((await app.request('/me/profile', { headers: auth })).status).toBe(503);
   });
 });
 
