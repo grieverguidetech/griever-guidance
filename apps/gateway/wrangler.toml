@@ -27,6 +27,16 @@ CORS_ORIGINS = "https://web.grieversguidance.com"
 SUPABASE_URL = ""
 SUPABASE_ANON_KEY = ""
 
+# Clerk accounts. The gateway verifies the caller's Clerk session token against
+# the issuer's published keys. No Clerk secret key is used or stored here.
+# CLERK_ISSUER is the https Frontend API URL of the Clerk instance.
+# CLERK_AUTHORIZED_PARTIES is a comma-separated list of web/mobile origins
+# allowed in the token's `azp` claim. Empty means not configured.
+# In production, deploy.yml overrides CLERK_ISSUER from the repo variable of the
+# same name (when set), so both stay empty here.
+CLERK_ISSUER = ""
+CLERK_AUTHORIZED_PARTIES = ""
+
 # Invite emails (POST /invites). The sender address must be on a domain verified
 # in Resend. RESEND_API_KEY is a Worker secret, set by deploy.yml from the
 # GitHub secret of the same name; it never goes in this file. Skipped when the
