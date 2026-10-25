@@ -79,7 +79,7 @@ async function call<T>(
   }
 }
 
-/** Ids go in the path, so each is encoded; the gateway validates them as uuids (C8). */
+/** Ids go in the path, so each is encoded; the gateway validates them: invite ids are uuids, member ids are Clerk ids (C8). */
 const segment = (id: string) => encodeURIComponent(id);
 
 async function callNoBody(

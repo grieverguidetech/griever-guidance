@@ -1,22 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearJwksCache } from '@griever/gateway-auth';
-import { SUPABASE_URL, jsonResponse, makeKeys, signJwt } from '@griever/gateway-auth/testing';
+import { Jwt } from 'hono/utils/jwt';
+import { clearClerkCache, DataFunctionError } from '@griever/gateway-auth';
 import { hashInviteToken } from './inviteToken.js';
 import {
   BAD_BODY,
   BAD_EMAIL,
   BAD_ID,
-  FAILURES,
   SEND_FAILED,
   UNAVAILABLE,
-  UNUSABLE as UNUSABLE_COPY,
+  UNUSABLE,
   createMembersRouter,
+  failureFor,
 } from './membersRouter.js';
 
-const config = { url: SUPABASE_URL, anonKey: 'anon' };
+const ISSUER = 'https://clerk.example.test';
+const DATA = { url: 'http://127.0.0.1:3002', region: 'us-east-2' };
 const MAIL = { apiKey: 're_test_key', from: 'hello@example.test', webUrl: 'https://app.example.test' };
 const INVITE_ID = '22222222-2222-4222-8222-222222222222';
-const MEMBER_ID = '33333333-3333-4333-8333-333333333333';
+const MEMBER_ID = 'user_member123';
+const OWNER_ID = 'user_owner123';
 const TOKEN = 'A'.repeat(43);
 const INVITE = {
   id: INVITE_ID,
@@ -25,50 +27,54 @@ const INVITE = {
   createdAt: '2026-10-12T10:00:00.000Z',
 };
 const OWNER_VIEW = { role: 'owner', members: [], invites: [INVITE] };
-const UNUSABLE = "This invitation can't be used. Ask the person who sent it for a new one.";
 
-const pgError = (code: string, status: number) => jsonResponse({ code, message: 'x' }, status);
+async function makeKey() {
+  const pair = await crypto.subtle.generateKey(
+    { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true,
+    ['sign', 'verify'],
+  );
+  return {
+    privateJwk: { ...(await crypto.subtle.exportKey('jwk', pair.privateKey)), kid: 'k1', alg: 'RS256' },
+    publicJwk: { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid: 'k1', alg: 'RS256' },
+  };
+}
 
 describe('members router', () => {
-  let keys: Awaited<ReturnType<typeof makeKeys>>;
   let token: string;
   let mail = { ...MAIL } as { apiKey?: string; from?: string; webUrl?: string };
-  let supabaseConfig: typeof config | null = config;
-  // Per-test answers for each outside call, keyed by URL suffix.
-  let answers: Record<string, () => Response>;
-  let calls: { url: string; body: string }[];
+  let dataConfig: typeof DATA | null = DATA;
+  let emailCalls: string[];
+  let emailStatus: number;
+  const callData = vi.fn();
 
-  const router = createMembersRouter({ getConfig: () => supabaseConfig, getMail: () => mail });
-
-  beforeEach(async () => {
-    clearJwksCache();
-    keys = await makeKeys();
-    token = await signJwt(keys.privateKey, keys.kid);
-    mail = { ...MAIL };
-    supabaseConfig = config;
-    calls = [];
-    answers = {
-      'rpc/create_invite': () => jsonResponse(INVITE_ID),
-      'rpc/list_members': () => jsonResponse(OWNER_VIEW),
-      'rpc/revoke_invite': () => new Response(null, { status: 204 }),
-      'rpc/remove_member': () => new Response(null, { status: 204 }),
-      'rpc/accept_invite': () => jsonResponse('44444444-4444-4444-8444-444444444444'),
-      'profiles?select=sender_name&limit=1': () => jsonResponse([{ sender_name: 'Ada' }]),
-      'emails': () => jsonResponse({ id: 'e1' }),
-    };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith('/jwks.json') || url.includes('.well-known')) return jsonResponse(keys.jwks);
-        calls.push({ url, body: String(init?.body ?? '') });
-        const key = Object.keys(answers).find((k) => url.endsWith(k));
-        if (!key) throw new Error(`unexpected fetch ${url}`);
-        return answers[key]!();
-      }),
-    );
+  const router = createMembersRouter({
+    getAuthConfig: () => ({ issuer: ISSUER, authorizedParties: [] }),
+    getDataConfig: () => dataConfig,
+    getMail: () => mail,
+    callData: callData as never,
   });
-  afterEach(() => vi.unstubAllGlobals());
+
+  /** Default answers per action; a test overrides one. */
+  const answer = (overrides: Record<string, unknown> = {}) => {
+    const defaults: Record<string, unknown> = {
+      createInvite: { ok: true, data: INVITE },
+      revokeInvite: { ok: true, data: null },
+      listMembers: { ok: true, data: OWNER_VIEW },
+      removeMember: { ok: true, data: null },
+      acceptInvite: { ok: true, data: { ownerId: OWNER_ID } },
+      getProfile: { ok: true, data: { userId: OWNER_ID, senderName: 'Ada', accountType: 'owner' } },
+      ...overrides,
+    };
+    callData.mockImplementation(async (_cfg, _tok, action: string) => {
+      const value = defaults[action];
+      if (value instanceof Error) {
+        throw value;
+      }
+      return value;
+    });
+  };
+  const sent = (action: string) => callData.mock.calls.filter((c) => c[2] === action);
 
   const send = (method: string, path: string, body?: unknown, auth = true) =>
     router.request(path, {
@@ -76,8 +82,34 @@ describe('members router', () => {
       headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${token}` } : {}) },
       body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
     });
-  const sentTo = (suffix: string) => calls.filter((c) => c.url.endsWith(suffix));
-  const noBackendCalls = () => expect(calls).toEqual([]);
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    clearClerkCache();
+    dataConfig = DATA;
+    mail = { ...MAIL };
+    emailCalls = [];
+    emailStatus = 200;
+    answer();
+    const key = await makeKey();
+    token = await Jwt.sign(
+      { sub: OWNER_ID, iss: ISSUER, exp: Math.floor(Date.now() / 1000) + 300, email: 'ada@example.test' },
+      key.privateJwk,
+      'RS256',
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith('emails')) {
+          emailCalls.push(String(init?.body ?? ''));
+          return new Response(JSON.stringify({ id: 'e1' }), { status: emailStatus });
+        }
+        return new Response(JSON.stringify({ keys: [key.publicJwk] }));
+      }),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
 
   describe('auth', () => {
     it.each([
@@ -89,27 +121,32 @@ describe('members router', () => {
     ])('%s %s is 401 without a token', async (method, path, body) => {
       const res = await send(method, path, body, false);
       expect(res.status).toBe(401);
-      noBackendCalls();
+      expect(callData).not.toHaveBeenCalled();
     });
 
-    it('is 503 when Supabase is not configured', async () => {
-      supabaseConfig = null;
+    it('is 503 when the data function is not configured', async () => {
+      dataConfig = null;
       expect((await send('GET', '/members')).status).toBe(503);
     });
   });
 
   describe('GET /members', () => {
-    it('returns the view as is', async () => {
+    it('returns the view as is, calling the data function with the caller token', async () => {
       const res = await send('GET', '/members');
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual(OWNER_VIEW);
+      expect(callData).toHaveBeenCalledWith(DATA, token, 'listMembers', {});
     });
-    it('maps PT403 to 403', async () => {
-      answers['rpc/list_members'] = () => pgError('PT403', 403);
+    it('maps forbidden to 403', async () => {
+      answer({ listMembers: { ok: false, code: 'forbidden' } });
       expect((await send('GET', '/members')).status).toBe(403);
     });
-    it('is 503 when PostgREST fails', async () => {
-      answers['rpc/list_members'] = () => jsonResponse({ message: 'boom' }, 500);
+    it('is 503 when the data function throws', async () => {
+      answer({ listMembers: new DataFunctionError(500, 'boom') });
+      expect((await send('GET', '/members')).status).toBe(503);
+    });
+    it('is 503 when the data function is busy', async () => {
+      answer({ listMembers: { ok: false, code: 'busy' } });
       expect((await send('GET', '/members')).status).toBe(503);
     });
   });
@@ -119,25 +156,31 @@ describe('members router', () => {
       const res = await send('POST', '/invites', { email: '  Sam@Example.test ' });
       expect(res.status).toBe(201);
       expect(await res.json()).toEqual(INVITE);
-      const create = JSON.parse(sentTo('rpc/create_invite')[0]!.body);
-      expect(create.p_email).toBe('sam@example.test');
-      expect(create.p_token_hash).toMatch(/^[0-9a-f]{64}$/);
+      const [, , , args] = sent('createInvite')[0]!;
+      expect(args.email).toBe('sam@example.test');
+      expect(args.tokenHash).toMatch(/^[0-9a-f]{64}$/);
     });
 
-    it('never sends the raw token to PostgREST and puts it in the email only after #t=', async () => {
+    it('does not forward extra fields the data function might return', async () => {
+      answer({ createInvite: { ok: true, data: { ...INVITE, tokenHash: 'secret' } } });
+      expect(await (await send('POST', '/invites', { email: 'sam@example.test' })).json()).toEqual(INVITE);
+    });
+
+    it('never sends the raw token to the data function and puts it in the email only after #t=', async () => {
       await send('POST', '/invites', { email: 'sam@example.test' });
-      const mailBody = JSON.parse(sentTo('emails')[0]!.body);
+      const mailBody = JSON.parse(emailCalls[0]!);
       const raw = /#t=([A-Za-z0-9_-]{43})/.exec(mailBody.text)![1]!;
       expect(mailBody.text).toContain(`https://app.example.test/join#t=${raw}`);
-      expect(mailBody.text.replaceAll(`#t=${raw}`, '')).not.toContain(raw);
-      // The whole Resend request body, subject included: one occurrence, inside #t=.
-      const whole = sentTo('emails')[0]!.body;
-      expect(whole.split(raw)).toHaveLength(2);
-      expect(whole.replace(`#t=${raw}`, '')).not.toContain(raw);
-      for (const c of calls.filter((x) => x.url.startsWith(SUPABASE_URL))) {
-        expect(c.url + c.body).not.toContain(raw);
+      expect(emailCalls[0]!.split(raw)).toHaveLength(2);
+      for (const call of callData.mock.calls) {
+        expect(JSON.stringify(call)).not.toContain(raw);
       }
-      expect(JSON.parse(sentTo('rpc/create_invite')[0]!.body).p_token_hash).toBe(await hashInviteToken(raw));
+      expect(sent('createInvite')[0]![3].tokenHash).toBe(await hashInviteToken(raw));
+    });
+
+    it('puts the owner name in the email when the profile has one', async () => {
+      await send('POST', '/invites', { email: 'sam@example.test' });
+      expect(emailCalls[0]).toContain('Ada');
     });
 
     it.each([
@@ -148,26 +191,27 @@ describe('members router', () => {
       ['email wrong type', { email: 5 }],
       ['malformed email', { email: 'not-an-email' }],
       ['unknown key', { email: 'sam@example.test', role: 'owner' }],
-    ])('400 for %s, before any backend call', async (_l, body) => {
+    ])('400 for %s, before any data call', async (_l, body) => {
       const res = await send('POST', '/invites', body);
       expect(res.status).toBe(400);
-      noBackendCalls();
+      expect(callData).not.toHaveBeenCalled();
     });
 
     it.each([
-      ['PT400', 400],
-      ['PT403', 403],
-      ['PT409', 409],
-      ['PT429', 429],
+      ['invalid', 400],
+      ['forbidden', 403],
+      ['already_invited', 409],
+      ['already_member', 409],
+      ['rate_limited', 429],
     ])('maps %s to %i and sends no email', async (code, status) => {
-      answers['rpc/create_invite'] = () => pgError(code, status);
+      answer({ createInvite: { ok: false, code } });
       const res = await send('POST', '/invites', { email: 'sam@example.test' });
       expect(res.status).toBe(status);
-      expect(sentTo('emails')).toEqual([]);
+      expect(emailCalls).toEqual([]);
     });
 
     it('uses the issue copy for 429', async () => {
-      answers['rpc/create_invite'] = () => pgError('PT429', 429);
+      answer({ createInvite: { ok: false, code: 'rate_limited' } });
       const res = await send('POST', '/invites', { email: 'sam@example.test' });
       expect(await res.json()).toEqual({
         error: "You've sent a lot of invitations today. You can send more tomorrow.",
@@ -175,55 +219,65 @@ describe('members router', () => {
     });
 
     it('revokes the invite and answers 503 when the email fails', async () => {
-      answers['emails'] = () => jsonResponse({}, 500);
+      emailStatus = 500;
       const res = await send('POST', '/invites', { email: 'sam@example.test' });
       expect(res.status).toBe(503);
-      expect(await res.json()).toEqual({
-        error: "The invitation couldn't be sent right now. Please try again in a moment.",
-      });
-      expect(JSON.parse(sentTo('rpc/revoke_invite')[0]!.body)).toEqual({ p_invite_id: INVITE_ID });
+      expect(await res.json()).toEqual({ error: SEND_FAILED });
+      expect(sent('revokeInvite')).toHaveLength(1);
+      expect(sent('revokeInvite')[0]![3]).toEqual({ id: INVITE_ID });
     });
 
     it('retries a failed revoke once and still answers 503', async () => {
-      answers['emails'] = () => jsonResponse({}, 500);
+      emailStatus = 500;
       let n = 0;
-      answers['rpc/revoke_invite'] = () => (n++ === 0 ? jsonResponse({ message: 'x' }, 500) : new Response(null, { status: 204 }));
+      callData.mockImplementation(async (_c, _t, action: string) => {
+        if (action === 'revokeInvite') {
+          return n++ === 0 ? { ok: false, code: 'busy' } : { ok: true, data: null };
+        }
+        return action === 'createInvite' ? { ok: true, data: INVITE } : { ok: true, data: null };
+      });
       const res = await send('POST', '/invites', { email: 'sam@example.test' });
       expect(res.status).toBe(503);
-      expect(sentTo('rpc/revoke_invite')).toHaveLength(2);
+      expect(sent('revokeInvite')).toHaveLength(2);
+    });
+
+    it.each(['not_found', 'forbidden'])('does not retry the revoke after %s', async (code) => {
+      emailStatus = 500;
+      answer({ revokeInvite: { ok: false, code } });
+      expect((await send('POST', '/invites', { email: 'sam@example.test' })).status).toBe(503);
+      expect(sent('revokeInvite')).toHaveLength(1);
     });
 
     it('answers 503 when both revoke attempts fail', async () => {
-      answers['emails'] = () => jsonResponse({}, 500);
-      answers['rpc/revoke_invite'] = () => jsonResponse({ message: 'x' }, 500);
+      emailStatus = 500;
+      answer({ revokeInvite: new DataFunctionError(500, 'x') });
       const res = await send('POST', '/invites', { email: 'sam@example.test' });
       expect(res.status).toBe(503);
-      expect(sentTo('rpc/revoke_invite')).toHaveLength(2);
+      expect(sent('revokeInvite')).toHaveLength(2);
     });
 
     it('answers 503 and creates nothing when RESEND_API_KEY is unset', async () => {
       mail = { ...MAIL, apiKey: undefined };
-      const res = await send('POST', '/invites', { email: 'sam@example.test' });
-      expect(res.status).toBe(503);
-      expect(sentTo('rpc/create_invite')).toEqual([]);
+      expect((await send('POST', '/invites', { email: 'sam@example.test' })).status).toBe(503);
+      expect(sent('createInvite')).toEqual([]);
     });
 
     it('answers 503 and creates nothing when WEB_URL is not https', async () => {
       mail = { ...MAIL, webUrl: 'http://app.example.test' };
       expect((await send('POST', '/invites', { email: 'sam@example.test' })).status).toBe(503);
-      expect(sentTo('rpc/create_invite')).toEqual([]);
+      expect(sent('createInvite')).toEqual([]);
     });
 
-    it('revokes when the new invite cannot be read back', async () => {
-      answers['rpc/list_members'] = () => jsonResponse({ role: 'owner', members: [], invites: [] });
+    it('answers 503 when the data function is unreachable, and sends no email', async () => {
+      answer({ createInvite: new DataFunctionError(null, 'down') });
       expect((await send('POST', '/invites', { email: 'sam@example.test' })).status).toBe(503);
-      expect(sentTo('rpc/revoke_invite')).toHaveLength(1);
-      expect(sentTo('emails')).toEqual([]);
+      expect(emailCalls).toEqual([]);
     });
 
     it('still sends when the owner name cannot be read', async () => {
-      answers['profiles?select=sender_name&limit=1'] = () => jsonResponse({ message: 'x' }, 500);
+      answer({ getProfile: new DataFunctionError(500, 'x') });
       expect((await send('POST', '/invites', { email: 'sam@example.test' })).status).toBe(201);
+      expect(emailCalls).toHaveLength(1);
     });
   });
 
@@ -233,94 +287,95 @@ describe('members router', () => {
     it('returns the owner id and sends only the hash', async () => {
       const res = await accept({ token: TOKEN });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ ownerId: '44444444-4444-4444-8444-444444444444' });
-      const body = sentTo('rpc/accept_invite')[0]!.body;
-      expect(JSON.parse(body)).toEqual({ p_token_hash: await hashInviteToken(TOKEN) });
-      expect(body).not.toContain(TOKEN);
+      expect(await res.json()).toEqual({ ownerId: OWNER_ID });
+      expect(callData).toHaveBeenCalledWith(DATA, token, 'acceptInvite', { tokenHash: await hashInviteToken(TOKEN) });
+      expect(JSON.stringify(sent('acceptInvite')[0]![3])).not.toContain(TOKEN);
     });
 
     it('every failure cause is the same 404, byte for byte', async () => {
-      const outcomes: { status: number; headers: string; text: string }[] = [];
-      const record = async (res: Response) =>
-        outcomes.push({
-          status: res.status,
-          headers: JSON.stringify((() => { const h: string[] = []; res.headers.forEach((v, k) => h.push(`${k}:${v}`)); return h.sort(); })()),
-          text: await res.text(),
-        });
-
-      // Bad shape: never reaches PostgREST.
+      const outcomes: string[] = [];
+      const record = async (res: Response) => {
+        const headers: string[] = [];
+        res.headers.forEach((v, k) => headers.push(`${k}:${v}`));
+        outcomes.push(JSON.stringify({ status: res.status, headers: headers.sort(), text: await res.text() }));
+      };
+      // Bad shape: never reaches the data function.
       for (const body of [{}, { token: 5 }, { token: 'short' }, { token: TOKEN, extra: 1 }, '{nope', []]) {
         await record(await accept(body));
       }
-      noBackendCalls();
-      // Unknown, expired, reused, revoked, wrong email: PostgREST answers PT404 for all of them.
-      answers['rpc/accept_invite'] = () => pgError('PT404', 404);
-      for (let i = 0; i < 5; i++) await record(await accept({ token: TOKEN }));
-      // Defensive: other typed codes from accept never leak a different answer.
-      for (const [code, status] of [['PT400', 400], ['PT403', 403], ['PT429', 429]] as const) {
-        answers['rpc/accept_invite'] = () => pgError(code, status);
+      expect(callData).not.toHaveBeenCalled();
+      // Every domain cause other than conflict and busy.
+      for (const code of ['unusable', 'not_found', 'invalid', 'forbidden', 'rate_limited', 'already_invited']) {
+        answer({ acceptInvite: { ok: false, code } });
         await record(await accept({ token: TOKEN }));
       }
-
-      expect(new Set(outcomes.map((o) => JSON.stringify(o))).size).toBe(1);
-      expect(outcomes[0]).toMatchObject({ status: 404 });
-      expect(JSON.parse(outcomes[0]!.text)).toEqual({ error: UNUSABLE });
+      expect(new Set(outcomes).size).toBe(1);
+      expect(JSON.parse(outcomes[0]!)).toMatchObject({ status: 404 });
+      expect(JSON.parse(JSON.parse(outcomes[0]!).text)).toEqual({ error: UNUSABLE });
     });
 
-    it('maps PT409 invite_conflict to 409', async () => {
-      answers['rpc/accept_invite'] = () => pgError('PT409', 409);
+    it('maps unauthorized to 401 sign in again, not the uniform 404', async () => {
+      answer({ acceptInvite: { ok: false, code: 'unauthorized' } });
+      const res = await accept({ token: TOKEN });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: 'Please sign in again.' });
+    });
+
+    it.each(['invite_conflict', 'already_member'])('maps %s to 409', async (code) => {
+      answer({ acceptInvite: { ok: false, code } });
       expect((await accept({ token: TOKEN })).status).toBe(409);
     });
 
-    it('is 503 when PostgREST is down, not a token failure', async () => {
-      answers['rpc/accept_invite'] = () => jsonResponse({}, 500);
+    it('is 503 when the data function is down or busy, not a token failure', async () => {
+      answer({ acceptInvite: new DataFunctionError(500, 'x') });
+      expect((await accept({ token: TOKEN })).status).toBe(503);
+      answer({ acceptInvite: { ok: false, code: 'busy' } });
       expect((await accept({ token: TOKEN })).status).toBe(503);
     });
   });
 
   describe.each([
-    ['DELETE /invites/:id', (id: string) => `/invites/${id}`, INVITE_ID, 'rpc/revoke_invite', 'p_invite_id'],
-    ['DELETE /members/:memberId', (id: string) => `/members/${id}`, MEMBER_ID, 'rpc/remove_member', 'p_member_id'],
-  ])('%s', (_name, path, id, rpc, arg) => {
+    ['DELETE /invites/:id', (id: string) => `/invites/${id}`, INVITE_ID, 'revokeInvite', 'id', 'not-a-uuid'],
+    ['DELETE /members/:memberId', (id: string) => `/members/${id}`, MEMBER_ID, 'removeMember', 'memberId', 'bad id!'],
+  ])('%s', (_name, path, id, action, arg, badId) => {
     it('answers 204 with an empty body', async () => {
       const res = await send('DELETE', path(id));
       expect(res.status).toBe(204);
       expect(await res.text()).toBe('');
-      expect(JSON.parse(sentTo(rpc)[0]!.body)).toEqual({ [arg]: id });
+      expect(callData).toHaveBeenCalledWith(DATA, token, action, { [arg]: id });
     });
-    it('400 for a non-UUID id, before any backend call', async () => {
-      expect((await send('DELETE', path('not-a-uuid'))).status).toBe(400);
-      noBackendCalls();
+    it('400 for a malformed id, before any data call', async () => {
+      expect((await send('DELETE', path(badId))).status).toBe(400);
+      expect(callData).not.toHaveBeenCalled();
     });
     it.each([
-      ['PT404', 404],
-      ['PT403', 403],
+      ['not_found', 404],
+      ['forbidden', 403],
     ])('maps %s to %i', async (code, status) => {
-      answers[rpc] = () => pgError(code, status);
+      answer({ [action]: { ok: false, code } });
       expect((await send('DELETE', path(id))).status).toBe(status);
+    });
+    it('says the id is bad, not the email, when the data function answers invalid', async () => {
+      answer({ [action]: { ok: false, code: 'invalid' } });
+      const res = await send('DELETE', path(id));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: BAD_ID });
+    });
+    it('is 503 when the data function throws', async () => {
+      answer({ [action]: new DataFunctionError(null, 'x') });
+      expect((await send('DELETE', path(id))).status).toBe(503);
     });
   });
 
   it('has no exclamation point in any message (C7)', async () => {
-    const texts: string[] = [];
-    const grab = async (res: Response) => texts.push(await res.text());
-    for (const code of ['PT400', 'PT403', 'PT404', 'PT409', 'PT429']) {
-      answers['rpc/create_invite'] = () => pgError(code, Number(code.slice(2)));
-      await grab(await send('POST', '/invites', { email: 'sam@example.test' }));
-      answers['rpc/accept_invite'] = () => pgError(code, Number(code.slice(2)));
-      await grab(await send('POST', '/invites/accept', { token: TOKEN }));
-      answers['rpc/revoke_invite'] = () => pgError(code, Number(code.slice(2)));
-      await grab(await send('DELETE', `/invites/${INVITE_ID}`));
+    const codes = ['invalid', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'already_invited', 'rate_limited', 'busy'];
+    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, SEND_FAILED, UNAVAILABLE, UNUSABLE];
+    for (const code of codes) {
+      copy.push(failureFor(code).error);
     }
-    await grab(await send('POST', '/invites', {}));
-    await grab(await send('DELETE', '/invites/not-a-uuid'));
-    answers['rpc/list_members'] = () => jsonResponse({ message: 'x' }, 500);
-    await grab(await send('GET', '/members'));
-    expect(texts.length).toBeGreaterThan(10);
-    for (const t of texts) expect(t).not.toContain('!');
-    // Every copy constant, including ones the loop above may not reach.
-    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, SEND_FAILED, UNAVAILABLE, UNUSABLE_COPY];
-    for (const f of Object.values(FAILURES)) copy.push(f.error);
-    for (const t of copy) expect(t).not.toContain('!');
+    copy.push('Your account already has people in it, so it cannot join another.');
+    for (const text of copy) {
+      expect(text).not.toContain('!');
+    }
   });
 });
