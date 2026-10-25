@@ -49,12 +49,18 @@ export async function callData<T = unknown>(
   } catch {
     throw new DataFunctionError(null, 'data function url is invalid');
   }
+  if (base.pathname !== '/' || base.search !== '' || base.hash !== '') {
+    throw new DataFunctionError(null, 'data function url must be an origin with no path, query or hash');
+  }
   const loopback = isLoopback(base);
+  if (!loopback && base.protocol !== 'https:') {
+    throw new DataFunctionError(null, 'data function url must use https');
+  }
   if (!loopback && (!config.accessKeyId || !config.secretAccessKey)) {
     throw new DataFunctionError(null, 'data function needs an AWS key pair for a non-loopback url');
   }
 
-  const url = `${config.url.replace(/\/+$/, '')}/v1`;
+  const url = new URL('/v1', base).toString();
   const init = {
     method: 'POST',
     headers: { 'content-type': 'application/json', [DATA_USER_TOKEN_HEADER]: userToken },
@@ -79,9 +85,11 @@ export async function callData<T = unknown>(
   }
 
   if (res.status === 401) {
+    await res.body?.cancel();
     return { ok: false, code: 'unauthorized' };
   }
   if (res.status !== 200) {
+    await res.body?.cancel();
     throw new DataFunctionError(res.status, `data function answered ${res.status}`);
   }
 

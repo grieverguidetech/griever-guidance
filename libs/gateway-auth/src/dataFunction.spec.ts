@@ -89,6 +89,60 @@ describe('callData signing', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('throws before any request when the key pair is empty strings', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      callData({ url: REMOTE.url, region: 'us-east-1', accessKeyId: '', secretAccessKey: '' }, TOKEN, 'getProfile'),
+    ).rejects.toThrow(/key pair/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-loopback http url before any request', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(callData({ ...REMOTE, url: 'http://abc.example.com' }, TOKEN, 'getProfile')).rejects.toThrow(
+      /must use https/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://abc.example.com/prod',
+    'https://abc.example.com/?x=1',
+    'https://abc.example.com/#frag',
+    'http://localhost:3002/api',
+  ])('rejects a config url with a path, query or hash: %s', async (url) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(callData({ ...REMOTE, url }, TOKEN, 'getProfile')).rejects.toThrow(/no path, query or hash/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a trailing slash on the origin', async () => {
+    const f = stubFetch(json({ ok: true, data: null }));
+    await callData({ ...REMOTE, url: `${REMOTE.url}/` }, TOKEN, 'getProfile');
+    expect(f.sent().url).toBe(`${REMOTE.url}/v1`);
+  });
+
+  it.each(['http://127.0.0.1.nip.io', 'http://localhost@evil.example', 'http://localhost.'])(
+    'does not treat %s as loopback',
+    async (url) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(callData({ url, region: 'us-east-1' }, TOKEN, 'getProfile')).rejects.toBeInstanceOf(
+        DataFunctionError,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('treats an upper-case LOCALHOST as loopback', async () => {
+    const f = stubFetch(json({ ok: true, data: null }));
+    await callData({ url: 'http://LOCALHOST:3002', region: 'us-east-1' }, TOKEN, 'getProfile');
+    expect(f.sent().headers.get('authorization')).toBeNull();
+  });
+
   it('does not treat a lookalike host as loopback', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

@@ -47,6 +47,7 @@ export type DataErrorCode = (typeof DATA_ERROR_CODES)[number];
 /** A domain outcome. Failures are values, not exceptions. */
 export type DataResult<T = unknown> =
   | { ok: true; data: T }
+  /** `message` is internal to the data function: routes map it to calm copy (C7), never forward it to users. */
   | { ok: false; code: DataErrorCode; message?: string };
 
 export function isDataErrorCode(value: unknown): value is DataErrorCode {
