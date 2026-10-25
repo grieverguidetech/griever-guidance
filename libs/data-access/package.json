@@ -59,6 +59,7 @@
     "@aws-sdk/client-dynamodb": "^3.1154.0",
     "@aws-sdk/lib-dynamodb": "^3.1154.0",
     "@griever/data-aws": "workspace:*",
+    "@griever/gateway-auth": "workspace:*",
     "@griever/shared": "workspace:*",
     "hono": "^4.13.7"
   }
