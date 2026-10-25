@@ -9,3 +9,4 @@ export * from './useSupabaseIdentity.js';
 export * from './useMembers.js';
 export * from './useFlowSync.js';
 export * from './useFirstVisitIntro.js';
+export * from './useAccount.js';
