@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTemplates } from '@griever/hooks';
 import { categoryLabels } from '@griever/shared';
 import type { TemplateCategory } from '@griever/shared';
@@ -13,12 +13,22 @@ import { LOCKED_REASON, PaywallPlaceholder } from './PaywallPlaceholder';
 
 const CATEGORY_ORDER: TemplateCategory[] = ['announcement', 'service', 'aftercare'];
 
-// With payments on, the first announcement is free and the rest is in the full plan (#292).
+// Announcements are free; the rest is in the full plan (#292).
 const FREE_CATEGORIES: TemplateCategory[] = ['announcement'];
 
 /** `paymentsEnabled` defaults to the build flag; a prop so tests can set it. */
 export function TemplatePickerScreen({ flow, paymentsEnabled = PAYMENTS_ENABLED }: FlowProps & { paymentsEnabled?: boolean }) {
   const [paywallOpen, setPaywallOpen] = useState(false);
+  // The locked card that opened the placeholder, so screen-reader focus can go back to it.
+  const cards = useRef<Record<string, View | null>>({});
+  const opener = useRef<string | null>(null);
+  const focusOpener = () => {
+    const node = opener.current ? cards.current[opener.current] : null;
+    const handle = node ? findNodeHandle(node) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
   const templates = useTemplates();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -58,13 +68,20 @@ export function TemplatePickerScreen({ flow, paymentsEnabled = PAYMENTS_ENABLED 
           <Text style={styles.categoryHeading}>{categoryLabels[category]}</Text>
           {group.map((template) =>
             paymentsEnabled && !FREE_CATEGORIES.includes(category) ? (
-              // Not the disabled prop: that would swallow the tap. The state tells screen readers instead.
+              // No disabled prop or state: both swallow the tap, and on Android TalkBack can refuse it.
+              // The hint carries the reason instead.
               <Pressable
                 key={template.id}
+                ref={(node) => {
+                  cards.current[template.id] = node;
+                }}
                 style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-                onPress={() => setPaywallOpen(true)}
+                onPress={() => {
+                  opener.current = template.id;
+                  setPaywallOpen(true);
+                }}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: true }}
+                accessibilityLabel={`${template.name}. ${template.description}`}
                 accessibilityHint={LOCKED_REASON}
               >
                 <Text style={styles.cardTitle}>{template.name}</Text>
@@ -88,7 +105,9 @@ export function TemplatePickerScreen({ flow, paymentsEnabled = PAYMENTS_ENABLED 
           )}
         </View>
       ))}
-      <PaywallPlaceholder visible={paywallOpen} onClose={() => setPaywallOpen(false)} />
+      {paymentsEnabled && (
+        <PaywallPlaceholder visible={paywallOpen} onClose={() => setPaywallOpen(false)} onDismiss={focusOpener} />
+      )}
     </ScrollView>
   );
 }

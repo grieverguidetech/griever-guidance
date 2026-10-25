@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { freshDraft } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
@@ -197,26 +197,61 @@ describe('PathLanding paywall demo (#292)', () => {
       expect(row.getAttribute('aria-describedby')).toBeTruthy();
       expect(row.textContent).toContain('Included with the full plan');
     }
-    expect(screen.getByRole('button', { name: /^Announce the passing|Told close family/ }).getAttribute('aria-disabled')).toBeNull();
+    expect(screen.getByRole('button', { name: /^(Announce the passing|Told close family)/ }).getAttribute('aria-disabled')).toBeNull();
   });
 
-  it('a tap on a locked row opens the dialog and does not start the task; Escape returns focus to the h1', async () => {
+  it('a tap on a locked row opens the dialog and does not start the task; Escape returns focus to that row', async () => {
     const user = userEvent.setup();
     const onStartMoment = vi.fn();
     renderHub(true, onStartMoment);
-    await user.click(locked()[0]);
+    const row = locked()[0];
+    await user.click(row);
     expect(screen.getByRole('dialog', { name: 'The full plan' })).toBeTruthy();
     expect(onStartMoment).not.toHaveBeenCalled();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+    expect(document.activeElement).toBe(row);
   });
 
-  it('Close returns focus to the h1', async () => {
+  it('Close returns focus to the row that opened the dialog', async () => {
     const user = userEvent.setup();
     renderHub(true);
-    await user.click(locked()[1]);
+    const row = locked()[1];
+    await user.click(row);
     await user.click(screen.getByRole('button', { name: 'Close' }));
-    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+    expect(document.activeElement).toBe(row);
+  });
+
+  it('a tap outside the dialog closes it and returns focus to the row', async () => {
+    const user = userEvent.setup();
+    renderHub(true);
+    const row = locked()[0];
+    await user.click(row);
+    await user.pointer({ keys: '[MouseLeft]', target: screen.getByRole('dialog').parentElement as HTMLElement });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(row));
+  });
+
+  it('works from the keyboard: Enter and Space on a locked row open the dialog, and the task does not start', async () => {
+    const user = userEvent.setup();
+    const onStartMoment = vi.fn();
+    renderHub(true, onStartMoment);
+    const row = locked()[0];
+    row.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('dialog', { name: 'The full plan' })).toBeTruthy();
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(row);
+    await user.keyboard(' ');
+    expect(screen.getByRole('dialog', { name: 'The full plan' })).toBeTruthy();
+    expect(onStartMoment).not.toHaveBeenCalled();
+  });
+
+  it('hides the visible reason from the screen reader, which still gets it as the description', () => {
+    renderHub(true);
+    const row = locked()[0];
+    const reason = screen.getAllByText('Included with the full plan')[0];
+    expect(reason.getAttribute('aria-hidden')).toBe('true');
+    expect(row.getAttribute('aria-describedby')).toBe(reason.id);
   });
 });

@@ -115,10 +115,16 @@ export function PathLanding({
     heading.current?.focus();
   }
 
-  // The dialog hands focus back to the heading, which is not focusable until told so.
-  function openPaywall() {
-    heading.current?.setAttribute('tabindex', '-1');
+  // The dialog hands focus back to the locked row that opened it.
+  const opener = useRef<HTMLElement | null>(null);
+  function openPaywall(row: HTMLElement) {
+    opener.current = row;
     setPaywallOpen(true);
+  }
+  function closePaywall() {
+    setPaywallOpen(false);
+    // A click on the dim area moves focus to the page after this handler runs, so put it back once that is done.
+    setTimeout(() => opener.current?.focus(), 0);
   }
 
   return (
@@ -171,7 +177,7 @@ export function PathLanding({
           done: m.status === 'done',
         }))}
       />
-      {paywallOpen && <PaywallPlaceholder onClose={() => setPaywallOpen(false)} returnFocusRef={heading} />}
+      {paywallOpen && <PaywallPlaceholder onClose={closePaywall} returnFocusRef={opener} />}
     </div>
   );
 }
@@ -209,7 +215,7 @@ function MomentRow({
   started: boolean;
   onStart: () => void;
   locked: boolean;
-  onLockedPress: () => void;
+  onLockedPress: (row: HTMLElement) => void;
 }) {
   const copy = MOMENT_COPY[moment.key];
 
@@ -288,14 +294,14 @@ function MomentRow({
  * A task in the full plan (#292). aria-disabled rather than disabled: it stays focusable and a screen
  * reader still reads it, with the reason. The text keeps full contrast; a tap opens the placeholder.
  */
-function LockedRow({ title, body, onPress }: { title: string; body: string; onPress: () => void }) {
+function LockedRow({ title, body, onPress }: { title: string; body: string; onPress: (row: HTMLElement) => void }) {
   const reasonId = useId();
   return (
     <button
       type="button"
       aria-disabled="true"
       aria-describedby={reasonId}
-      onClick={onPress}
+      onClick={(e) => onPress(e.currentTarget)}
       className="flex gap-3 items-start text-left min-h-[44px]"
       style={{ padding: 'var(--space-2) 0' }}
     >
@@ -307,7 +313,7 @@ function LockedRow({ title, body, onPress }: { title: string; body: string; onPr
         <p className="m-0 mt-[2px] text-[13px] leading-[1.5]" style={{ color: 'var(--color-neutral-800)' }}>
           {body}
         </p>
-        <span id={reasonId} className="text-[12px]" style={{ color: 'var(--color-neutral-800)' }}>
+        <span id={reasonId} aria-hidden="true" className="text-[12px]" style={{ color: 'var(--color-neutral-800)' }}>
           {LOCKED_REASON}
         </span>
       </div>
