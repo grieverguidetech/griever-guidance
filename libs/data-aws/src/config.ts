@@ -68,3 +68,20 @@ export function loadLocalConfig(env: Env = process.env): AwsConfig {
     contentTable: read(env, 'GG_CONTENT_TABLE') ?? 'gg-content',
   };
 }
+
+/**
+ * Config for the deployed Lambda. It leaves `credentials` and every endpoint undefined, so the SDK
+ * default chain applies (the function's role) and the clients talk to real AWS. The table name has
+ * no default: a deploy that forgot it must fail at start, not write to a table called "gg-data".
+ */
+export function loadLambdaConfig(env: Env = process.env): AwsConfig {
+  const dataTable = read(env, 'GG_DATA_TABLE');
+  if (!dataTable) {
+    throw new Error('GG_DATA_TABLE is not set.');
+  }
+  return {
+    region: read(env, 'AWS_REGION') ?? 'us-east-1',
+    dataTable,
+    contentTable: read(env, 'GG_CONTENT_TABLE') ?? 'gg-content',
+  };
+}

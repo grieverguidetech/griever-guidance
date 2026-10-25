@@ -21,7 +21,8 @@
     "build": "pnpm nx run-many -t build --exclude=mobile",
     "e2e": "pnpm nx e2e web-e2e",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "check:affected": "pnpm nx affected -t typecheck test && pnpm nx affected -t build --exclude=mobile"
+    "check:affected": "pnpm nx affected -t typecheck test && pnpm nx affected -t build --exclude=mobile",
+    "dev:data": "node --conditions=@org/source --import jiti/register infra/aws-local/run-data-function.ts"
   },
   "private": true,
   "devDependencies": {
@@ -31,6 +32,7 @@
     "@babel/runtime": "~7.27.6",
     "@cloudflare/workers-types": "^4.20260509.1",
     "@expo/cli": "~54.0.16",
+    "@hono/node-server": "^2.1.1",
     "@nx/devkit": "22.7.1",
     "@nx/esbuild": "22.7.1",
     "@nx/expo": "^22.7.1",

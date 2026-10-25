@@ -79,6 +79,9 @@ importers:
       '@expo/cli':
         specifier: ~54.0.16
         version: 54.0.24(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(typescript@5.9.3)
+      '@hono/node-server':
+        specifier: ^2.1.1
+        version: 2.1.1(hono@4.13.7)
       '@nx/devkit':
         specifier: 22.7.1
         version: 22.7.1(nx@22.7.0(@swc-node/register@1.11.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@swc/core@1.15.8(@swc/helpers@0.5.18))(@swc/types@0.1.26)(typescript@5.9.3))(@swc/core@1.15.8(@swc/helpers@0.5.18)))
@@ -390,6 +393,9 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
 
   libs/data-aws:
     dependencies:

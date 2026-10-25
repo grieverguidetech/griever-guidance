@@ -56,6 +56,62 @@ nothing, the code uses the ports above. Never put real keys in the repo.
 - It throws unless each endpoint host is `localhost`, `127.0.0.1` or `::1`. So a local run cannot reach real AWS.
 - Real AWS needs its own config function, built later. It must leave `credentials` unset, so the SDK default chain applies (including `AWS_SESSION_TOKEN`). Nothing in `libs/data-aws` forces fake credentials onto such a config. A test checks this.
 
+## Data function
+
+One HTTP handler in `libs/data-access/src/handler`. It serves `POST /v1` only. The gateway calls it (#269).
+AWS deploy is #281.
+
+```text
+pnpm aws:up && pnpm aws:tables
+DATA_AUTH_ISSUER=... DATA_AUTH_JWKS_URL=... pnpm dev:data
+```
+
+- `pnpm dev:data` listens on `127.0.0.1:3002`, loopback only, against DynamoDB Local.
+- The request body is `{ "action": "...", "args": { ... } }`. The user's token is in the `x-gg-user-token` header.
+- Order of checks: user token (401), envelope (400), the action's args (400), then the rule. The first three never touch DynamoDB.
+- Domain outcomes answer 200 with a `DataResult`. An unexpected error answers 500 with `{"error":"internal"}` and nothing else.
+- A log line holds the action name and the error class. It never holds the token, an email or a token hash.
+- `deleteUserData` has no route. `acceptInvite` is not wired until #272 lands: it answers 500.
+
+| Action | `args` |
+|---|---|
+| `getProfile`, `listFlows`, `listMembers` | none |
+| `putProfile` | `fields` (an object) |
+| `createFlow` | `id` (uuid), `facts` (all six fact keys) |
+| `updateFlow` | `id` (uuid), `patch` (fact keys only) |
+| `createInvite` | `email`, `tokenHash` (64 lower-case hex) |
+| `revokeInvite` | `id` (uuid) |
+| `removeMember` | `memberId` |
+| `acceptInvite` | `tokenHash` (64 lower-case hex) |
+
+An unknown key in `args` is a 400.
+
+### User token (Clerk)
+
+`verifyToken.ts` checks the signature against the JWKS (RS256 only), the issuer and the expiry.
+Keys are cached for 10 minutes. An unknown key id causes one refresh, at most once a minute.
+It uses Hono's JWT code, the same call the `hono/jwk` middleware makes. It does not use the middleware: the middleware reads only `Authorization: Bearer`, and fetches the key list on every request.
+
+| Variable | Meaning |
+|---|---|
+| `DATA_AUTH_ISSUER` | Expected `iss` claim, for example the Clerk frontend API URL |
+| `DATA_AUTH_JWKS_URL` | The issuer's JWKS document |
+| `GG_DATA_TABLE` | Table name. Required on Lambda (no default) |
+
+Required claims. Clerk's default session token has no email, so add `email` and `email_verified` in a Clerk session token customization:
+
+| Claim | Use |
+|---|---|
+| `sub` | User id (`user_...`). Must match the key rules in `keys.ts` |
+| `exp` | Required. A token without it is refused |
+| `email` | Trimmed and lower-cased. Missing or blank: 401 |
+| `email_verified` | Boolean. Missing or not `true`: treated as not verified |
+
+### Lambda bundle
+
+`pnpm nx build data-access` writes one ESM file, `libs/data-access/dist/lambda.mjs`, for Node 22. The AWS SDK is bundled.
+The entry is `handler` (function URL, payload format 2.0, `hono/aws-lambda`). On Lambda, `loadLambdaConfig` leaves credentials and endpoints unset, so the function role applies.
+
 ## Tests
 
 ```text
