@@ -32,6 +32,8 @@ vi.mock('../lib/features', () => ({
     return mocks.authEnabled;
   },
   OBITUARY_DRAFTING_ENABLED: false,
+  PAYMENTS_ENABLED: false,
+  SHARING_ENABLED: false,
 }));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();
@@ -90,7 +92,7 @@ async function fillSignUp(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Password'), 'a-long-password');
 }
 
-const HOME = "The people you're writing about";
+const HOME = "Who you're writing about";
 
 // From Home (where "Your account" sits) to the signed-out sign-up screen.
 async function signOutFromHome(user: ReturnType<typeof userEvent.setup>) {
@@ -136,7 +138,7 @@ beforeEach(() => {
 describe('flag off', () => {
   it('shows Home and never loads the auth client', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     await Promise.resolve();
     expect(mocks.load).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
@@ -159,7 +161,9 @@ describe('flag on', () => {
       }),
     );
     render(<App />);
-    await screen.findByRole('button', { name: "What you'll need" });
+    await screen.findByRole('button', { name: 'Your account' });
+    // With accounts on, the list lives on Your account, so Home has no link to it.
+    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
     await act(async () => {});
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
@@ -189,9 +193,7 @@ describe('flag on', () => {
         fields: { personalNote: 'note kept on this device' },
         serviceDetailsKnown: null,
         selectedContactIds: [],
-        place: null,
         includeFlowers: false,
-        floristId: null,
         customFlorist: '',
         flowerDeliveryTarget: 'service',
         tone: 'plain',

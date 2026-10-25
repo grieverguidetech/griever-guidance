@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTemplates } from '@griever/hooks';
 import { categoryLabels } from '@griever/shared';
 import type { TemplateCategory } from '@griever/shared';
@@ -6,12 +7,28 @@ import type { FlowProps } from '../app/App';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../app/App';
-import { AUTH_ENABLED } from '../lib/features';
-import { ACCENT, MUTED } from '../components/colors';
+import { AUTH_ENABLED, PAYMENTS_ENABLED } from '../lib/features';
+import { ACCENT, MUTED, MUTED_STRONG } from '../components/colors';
+import { LOCKED_REASON, PaywallPlaceholder } from './PaywallPlaceholder';
 
 const CATEGORY_ORDER: TemplateCategory[] = ['announcement', 'service', 'aftercare'];
 
-export function TemplatePickerScreen({ flow }: FlowProps) {
+// Announcements are free; the rest is in the full plan (#292).
+const FREE_CATEGORIES: TemplateCategory[] = ['announcement'];
+
+/** `paymentsEnabled` defaults to the build flag; a prop so tests can set it. */
+export function TemplatePickerScreen({ flow, paymentsEnabled = PAYMENTS_ENABLED }: FlowProps & { paymentsEnabled?: boolean }) {
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  // The locked card that opened the placeholder, so screen-reader focus can go back to it.
+  const cards = useRef<Record<string, View | null>>({});
+  const opener = useRef<string | null>(null);
+  const focusOpener = () => {
+    const node = opener.current ? cards.current[opener.current] : null;
+    const handle = node ? findNodeHandle(node) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
   const templates = useTemplates();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -49,22 +66,48 @@ export function TemplatePickerScreen({ flow }: FlowProps) {
       {grouped.map(({ category, templates: group }) => (
         <View key={category} style={styles.group}>
           <Text style={styles.categoryHeading}>{categoryLabels[category]}</Text>
-          {group.map((template) => (
-            <TouchableOpacity
-              key={template.id}
-              style={styles.card}
-              onPress={() => {
-                flow.setTemplate(template);
-                flow.nextStep();
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cardTitle}>{template.name}</Text>
-              <Text style={styles.cardDescription}>{template.description}</Text>
-            </TouchableOpacity>
-          ))}
+          {group.map((template) =>
+            paymentsEnabled && !FREE_CATEGORIES.includes(category) ? (
+              // No disabled prop or state: both swallow the tap, and on Android TalkBack can refuse it.
+              // The hint carries the reason instead.
+              <Pressable
+                key={template.id}
+                ref={(node) => {
+                  cards.current[template.id] = node;
+                }}
+                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+                onPress={() => {
+                  opener.current = template.id;
+                  setPaywallOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${template.name}. ${template.description}`}
+                accessibilityHint={LOCKED_REASON}
+              >
+                <Text style={styles.cardTitle}>{template.name}</Text>
+                <Text style={styles.lockedDescription}>{template.description}</Text>
+                <Text style={styles.lockedReason}>{LOCKED_REASON}</Text>
+              </Pressable>
+            ) : (
+              <TouchableOpacity
+                key={template.id}
+                style={styles.card}
+                onPress={() => {
+                  flow.setTemplate(template);
+                  flow.nextStep();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cardTitle}>{template.name}</Text>
+                <Text style={styles.cardDescription}>{template.description}</Text>
+              </TouchableOpacity>
+            ),
+          )}
         </View>
       ))}
+      {paymentsEnabled && (
+        <PaywallPlaceholder visible={paywallOpen} onClose={() => setPaywallOpen(false)} onDismiss={focusOpener} />
+      )}
     </ScrollView>
   );
 }
@@ -92,6 +135,9 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: '500', color: '#111827', marginBottom: 4 },
   cardDescription: { fontSize: 14, color: MUTED },
+  lockedDescription: { fontSize: 14, color: MUTED_STRONG },
+  lockedReason: { fontSize: 12, color: MUTED_STRONG, marginTop: 6 },
+  pressed: { opacity: 0.7 },
   whatYoullNeedLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginBottom: 24 },
   accountLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginBottom: 16 },
   accountLinkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },

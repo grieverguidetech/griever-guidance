@@ -45,7 +45,7 @@ export async function addContacts(page: Page, contacts: TestContact[]) {
   await expect(page.getByText(`Added so far — ${contacts.length}`)).toBeVisible();
 }
 
-export const HOME_HEADING = "The people you're writing about";
+export const HOME_HEADING = "Who you're writing about";
 
 /** Home, then "Start with someone I've lost", then their name and date, up to the contacts step. */
 export async function startFirstPerson(

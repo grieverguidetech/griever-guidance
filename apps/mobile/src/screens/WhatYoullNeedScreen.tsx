@@ -21,13 +21,15 @@ const CHECKLIST: { id: string; label: string; meta?: string; tip?: string }[] = 
   { id: 'military', label: 'Military discharge papers', meta: 'If they served — it may cover the burial' },
 ];
 
-export function WhatYoullNeedScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+/**
+ * The tickable rows. Shared by the checklist screen and "Your account", so a tick on one shows on
+ * the other: both read and write the same saved ticks. The caller owns which tip is open, so a
+ * touch elsewhere on its screen can close it.
+ */
+export function ChecklistRows({ tipOpen, onTipChange }: { tipOpen: string | null; onTipChange: (id: string | null) => void }) {
   const [ticked, setTicked] = useState<string[]>([]);
   // Rows show once the saved ticks are read, so a tap can never overwrite them with a partial list.
   const [loaded, setLoaded] = useState(false);
-  const [tipOpen, setTipOpen] = useState<string | null>(null);
-
   useEffect(() => {
     let live = true;
     AsyncStorage.getItem(CHECKLIST_KEY)
@@ -44,13 +46,68 @@ export function WhatYoullNeedScreen() {
 
   const toggle = (id: string) => {
     // Computed from the latest ticks, so two quick taps both count.
-    setTipOpen(null);
+    onTipChange(null);
     setTicked((prev) => {
       const next = prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id];
       void AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).catch(() => undefined);
       return next;
     });
   };
+
+  return (
+    <>
+      {loaded && CHECKLIST.map((item) => {
+        const checked = ticked.includes(item.id);
+        return (
+          <View key={item.id}>
+            <View style={styles.checklistRow}>
+              <Pressable
+                onPress={() => toggle(item.id)}
+                style={({ pressed }) => [styles.checklistItem, styles.checklistMain, pressed && styles.pressed]}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                accessibilityLabel={item.meta ? `${item.label}. ${item.meta}` : item.label}
+              >
+                <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                  {checked ? <Text style={styles.checkmark} allowFontScaling={false}>✓</Text> : null}
+                </View>
+                <View style={styles.checklistText}>
+                  <Text style={[styles.checklistLabel, checked && styles.struck]}>{item.label}</Text>
+                  {item.meta && <Text style={styles.checklistMeta}>{item.meta}</Text>}
+                </View>
+              </Pressable>
+              {item.tip && (
+                <View onTouchStart={(e) => e.stopPropagation()}>
+                <Pressable
+                  onPress={() => {
+                    const opening = tipOpen !== item.id;
+                    onTipChange(opening ? item.id : null);
+                    // Android reads the live region; iOS VoiceOver needs this announcement.
+                    if (opening && item.tip) AccessibilityInfo.announceForAccessibility(item.tip);
+                  }}
+                  style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Why we list this"
+                  accessibilityState={{ expanded: tipOpen === item.id }}
+                >
+                  <Text style={styles.infoGlyph} allowFontScaling={false}>i</Text>
+                </Pressable>
+                </View>
+              )}
+            </View>
+            {item.tip && tipOpen === item.id && (
+              <Text style={styles.tip} accessibilityLiveRegion="polite">{item.tip}</Text>
+            )}
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+export function WhatYoullNeedScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [tipOpen, setTipOpen] = useState<string | null>(null);
 
   return (
     <ScrollView
@@ -81,51 +138,7 @@ export function WhatYoullNeedScreen() {
       </View>
 
       <Text style={styles.gatherHeading}>Gather when you can</Text>
-      {loaded && CHECKLIST.map((item) => {
-        const checked = ticked.includes(item.id);
-        return (
-          <View key={item.id}>
-            <View style={styles.checklistRow}>
-              <Pressable
-                onPress={() => toggle(item.id)}
-                style={({ pressed }) => [styles.checklistItem, styles.checklistMain, pressed && styles.pressed]}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked }}
-                accessibilityLabel={item.meta ? `${item.label}. ${item.meta}` : item.label}
-              >
-                <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                  {checked ? <Text style={styles.checkmark} allowFontScaling={false}>✓</Text> : null}
-                </View>
-                <View style={styles.checklistText}>
-                  <Text style={[styles.checklistLabel, checked && styles.struck]}>{item.label}</Text>
-                  {item.meta && <Text style={styles.checklistMeta}>{item.meta}</Text>}
-                </View>
-              </Pressable>
-              {item.tip && (
-                <View onTouchStart={(e) => e.stopPropagation()}>
-                <Pressable
-                  onPress={() => {
-                    const opening = tipOpen !== item.id;
-                    setTipOpen(opening ? item.id : null);
-                    // Android reads the live region; iOS VoiceOver needs this announcement.
-                    if (opening && item.tip) AccessibilityInfo.announceForAccessibility(item.tip);
-                  }}
-                  style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Why we list this"
-                  accessibilityState={{ expanded: tipOpen === item.id }}
-                >
-                  <Text style={styles.infoGlyph} allowFontScaling={false}>i</Text>
-                </Pressable>
-                </View>
-              )}
-            </View>
-            {item.tip && tipOpen === item.id && (
-              <Text style={styles.tip} accessibilityLiveRegion="polite">{item.tip}</Text>
-            )}
-          </View>
-        );
-      })}
+      <ChecklistRows tipOpen={tipOpen} onTipChange={setTipOpen} />
     </ScrollView>
   );
 }

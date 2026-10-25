@@ -1,10 +1,20 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
 import { ContactSelectorScreen } from './ContactSelectorScreen';
 
-jest.mock('../lib/expoContactsSource', () => ({ expoContactsSource: {} }));
+jest.mock('../lib/expoContactsSource', () => ({
+  expoContactsSource: {
+    id: 'native',
+    preselected: false,
+    isAvailable: async () => true,
+    fetch: async () => [
+      { key: 'x', displayName: 'Starred Sam', phones: ['+16175550111'], emails: [], starred: true },
+      { key: 'y', displayName: 'Plain Pat', phones: ['+16175550112'], emails: [] },
+    ],
+  },
+}));
 
 const make = (id: string, name: string, tier: Contact['tier']): Contact => ({
   contactId: id,
@@ -24,18 +34,25 @@ const saved = [
   make('4', 'Dad', 'first'),
 ];
 
-function renderScreen(contactList: Contact[] = saved, templateCategory: string | null = 'announcement') {
+function renderScreen(
+  contactList: Contact[] = saved,
+  templateCategory: string | null = 'announcement',
+  selectedContactIds: string[] = [],
+) {
   const toggleContact = jest.fn();
   const flow = {
-    selectedContactIds: [] as string[],
+    selectedContactIds,
     toggleContact,
     nextStep: jest.fn(),
     prevStep: jest.fn(),
     templateCategory,
   };
   const contacts = { contacts: contactList, loading: false } as unknown as UseContactsResult;
-  render(<ContactSelectorScreen flow={flow as never} contacts={contacts} />);
-  return { toggleContact };
+  const ui = (ids: string[]) => (
+    <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} />
+  );
+  const { rerender } = render(ui(selectedContactIds));
+  return { toggleContact, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
 const headers = () => screen.queryAllByRole('header').map((h) => h.props.children);
@@ -70,5 +87,40 @@ describe('ContactSelectorScreen grouping', () => {
     fireEvent.press(screen.getByText('Mum'));
     expect(toggleContact).toHaveBeenCalledTimes(1);
     expect(toggleContact).toHaveBeenCalledWith('2');
+  });
+
+  it('gives each row the checkbox role and its checked state', () => {
+    renderScreen(saved, 'announcement', ['2']);
+    const rows = screen.getAllByRole('checkbox');
+    expect(rows).toHaveLength(4);
+    expect(screen.getByRole('checkbox', { name: /Mum/, checked: true })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Dad/, checked: false })).toBeTruthy();
+  });
+
+  it('updates the checked state when the selection changes', () => {
+    const { rerender } = renderScreen();
+    expect(screen.getByRole('checkbox', { name: /Mum/, checked: false })).toBeTruthy();
+    rerender(['2']);
+    expect(screen.getByRole('checkbox', { name: /Mum/, checked: true })).toBeTruthy();
+  });
+
+  it('hides the tick glyph from screen readers so the state is read once', () => {
+    renderScreen(saved, 'announcement', ['2']);
+    const tick = screen.getByText('✓', { includeHiddenElements: true });
+    expect(tick.props.accessibilityElementsHidden).toBe(true);
+    expect(tick.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  it('gives the Bring people across rows the checkbox role and checked state', async () => {
+    renderScreen();
+    fireEvent.press(screen.getByText('Import from contacts'));
+    await waitFor(() => expect(screen.getByText('Bring people across')).toBeTruthy());
+    expect(screen.getByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
+    const plain = screen.getByRole('checkbox', { name: /Plain Pat/, checked: false });
+    fireEvent.press(plain);
+    expect(screen.getByRole('checkbox', { name: /Plain Pat/, checked: true })).toBeTruthy();
+    const ticks = screen.getAllByText('✓', { includeHiddenElements: true });
+    expect(ticks).toHaveLength(2);
+    ticks.forEach((t) => expect(t.props.accessibilityElementsHidden).toBe(true));
   });
 });

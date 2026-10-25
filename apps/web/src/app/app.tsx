@@ -5,6 +5,7 @@ import {
   useSupabaseIdentity,
   useContacts,
   useSessions,
+  useMembers,
   freshDraft,
   getContactsRetentionExpiry,
   hasDraftInProgress,
@@ -16,8 +17,7 @@ import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever
 import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
-import { setSyncUserId } from '../lib/registerSync';
-import { AUTH_ENABLED } from '../lib/features';
+import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { hasStoredSession, loadAuthClient } from '../lib/authClient';
 import type { AuthClientResult } from '../lib/authClient';
 import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
@@ -28,10 +28,11 @@ import { ChooseNewPassword } from '../screens/ChooseNewPassword';
 import { captureRecoveryLink, takeRecoveryLink } from '../lib/recoveryLink';
 import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
+import { PeopleHelping } from '../screens/PeopleHelping';
+import { RemoveMember } from '../screens/RemoveMember';
 import { removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import type { ContactDraft } from '../screens/AddContactsManual';
-import { ImportContacts } from '../screens/ImportContacts';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
 import { SessionSetup } from '../screens/SessionSetup';
 import { Home } from '../screens/Home';
@@ -53,7 +54,6 @@ type AppView =
   | 'profile'
   | 'settings'
   | 'addContactsManual'
-  | 'importContacts'
   | 'whoHearsFirst'
   | 'checkContacts'
   | 'setup'
@@ -269,7 +269,6 @@ const CHECKLIST_RETURNS: AppView[] = [
   // The walk after "Create a new one": the checklist returns to the step it was opened from.
   'setup',
   'addContactsManual',
-  'importContacts',
   'whoHearsFirst',
 ];
 
@@ -298,9 +297,23 @@ function AppBody({
   const contacts = useContacts(contactStore);
   const sessions = useSessions(browserStorage);
   const sessionList = sessions.sessions;
-  const storedPhones = useMemo(() => new Set(contacts.contacts.map((c) => c.phone)), [contacts.contacts]);
   // Without auth there is no account gate — everyone is let straight in.
   const isSignedIn = auth ? auth.isSignedIn : true;
+
+  // Family sharing. With either flag off, or nobody signed in, the hook is switched off and makes no
+  // calls. Nothing waits on it (C5): screens render first and the list fills in. The token is read
+  // from the session in memory for each call and goes nowhere else.
+  const sharingOn = AUTH_ENABLED && SHARING_ENABLED && !offline && !!client && !!auth?.isSignedIn;
+  const getAccessToken = useCallback(async () => {
+    try {
+      const state = await client?.getSession();
+      return state?.status === 'signed_in' ? state.session.accessToken : null;
+    } catch {
+      // A failed session read counts as no token: the hook reports "sign in again" rather than loading forever.
+      return null;
+    }
+  }, [client]);
+  const members = useMembers({ getAccessToken, enabled: sharingOn });
 
   const [view, setView] = useState<AppView>(() => {
     if (offline) return 'home';
@@ -353,8 +366,6 @@ function AppBody({
   // from a step does not lose it. Cleared when the walk starts and ends.
   const [contactDraft, setContactDraft] = useState<ContactDraft>({ name: '', phone: '', hearsFirst: false });
   const [firstTicks, setFirstTicks] = useState<string[] | null>(null);
-  // Which contacts view the walk used, so Back from who hears first returns to it.
-  const [contactsView, setContactsView] = useState<'addContactsManual' | 'importContacts'>('addContactsManual');
   // The name typed at sign-up, saved once the new account has a session.
   const [pendingName, setPendingName] = useState<string | null>(null);
   // The account has no name: Profile opens with a "What should we call you?" prompt.
@@ -519,12 +530,6 @@ function AppBody({
     onRemoved();
   }
 
-  // Sync stays unbound for now. Which id Convex should be keyed by for a Supabase user is open
-  // (#39), so the Supabase user id is deliberately not passed in.
-  useEffect(() => {
-    void setSyncUserId(null);
-  }, []);
-
   const sortedSessions = useMemo(() => namedSessionsByRecent([...sessions.sessions]), [sessions.sessions]);
 
   // Picks the most recent person when none is open. It never creates one: Home's "Create a new
@@ -656,7 +661,6 @@ function AppBody({
     setCreating(true);
     setContactDraft({ name: '', phone: '', hearsFirst: false });
     setFirstTicks(null);
-    setContactsView('addContactsManual');
     startSetup();
   }
 
@@ -700,7 +704,7 @@ function AppBody({
 
   function backFromWhoHearsFirst() {
     if (contactsSkipped) backToSetup();
-    else setView(contactsView);
+    else setView('addContactsManual');
   }
 
   function saveWhoHearsFirst(firstIds: string[]) {
@@ -872,6 +876,19 @@ function AppBody({
           onContinue={continueFromFirstProfile}
           senderName={auth.profile?.senderName ?? (firstProfile ? signUpName : null)}
           error={auth.error}
+          showChecklist={auth.isSignedIn}
+          peopleHelping={
+            // Not during first-time onboarding after sign-up: that screen is only the name.
+            sharingOn && !firstProfile ? (
+              <PeopleHelping
+                view={members.view}
+                status={members.status}
+                message={members.message}
+                onInvite={members.invite}
+                onRevoke={members.revoke}
+              />
+            ) : undefined
+          }
           onBack={() => {
             auth.clearError();
             if (firstProfile) {
@@ -908,6 +925,11 @@ function AppBody({
           onBack={goHome}
           onRemoveEverything={removeEverything}
           signsOut={offline || (auth?.isSignedIn ?? false)}
+          removeMember={
+            sharingOn && members.view?.role === 'owner' ? (
+              <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
+            ) : undefined
+          }
         />
       </Shell>
     );
@@ -923,28 +945,10 @@ function AppBody({
             contacts.addContact({ name, phone, tier: hearsFirst ? 'first' : 'family' })
           }
           onDone={() => {
-            setContactsView('addContactsManual');
-            setView('whoHearsFirst');
+                    setView('whoHearsFirst');
           }}
           draft={contactDraft}
           onDraftChange={setContactDraft}
-        />
-      </Shell>
-    );
-  }
-
-  if (view === 'importContacts') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <ImportContacts
-          storedPhones={storedPhones}
-          onBack={() => setView('addContactsManual')}
-          onSwitchToManual={() => setView('addContactsManual')}
-          onContinue={(picked, source) => {
-            contacts.importContacts(picked, source);
-            setContactsView('importContacts');
-            setView('whoHearsFirst');
-          }}
         />
       </Shell>
     );
@@ -1107,7 +1111,16 @@ function AppBody({
   // Home is also the fallback: a view with nobody open (the path, a flow) never shows a blank screen.
   return (
     <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-      <Home sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate />
+      <Home
+        sessions={sessionList}
+        onOpen={openPerson}
+        onCreate={startNewSession}
+        // Only a known member loses the button; an unknown or offline profile keeps it, and the
+        // database still refuses a member's insert (C11).
+        canCreate={!(sharingOn && auth?.profile?.accountType === 'member')}
+        // "Your account" shows the list whenever its button shows; otherwise Home keeps the link.
+        checklistLink={!(auth && !sessionEnded)}
+      />
       <div className="flex flex-col items-start gap-2 mt-4">
         {auth && !sessionEnded && (
           <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-ghost !px-0">

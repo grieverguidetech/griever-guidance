@@ -1,7 +1,7 @@
 /**
  * Integration tests for the composed gateway: the real Hono app from
- * worker.ts with identity, messages and sync mounted, exercised over HTTP via
- * `app.request`. No Convex, no network — routes are driven to their
+ * worker.ts with identity, messages and flows mounted, exercised over HTTP via
+ * `app.request`. No network — routes are driven to their
  * validation and "not configured" branches, and Anthropic is a stubbed fetch.
  */
 // ES256 test tokens via WebCrypto (the same approach as libs/identity's specs; kept local so
@@ -39,8 +39,6 @@ async function loadApp(env: Record<string, string | undefined> = {}) {
   vi.resetModules();
   vi.unstubAllEnvs();
   vi.stubEnv('CORS_ORIGINS', `${WEB_ORIGIN}, http://localhost:5173`);
-  vi.stubEnv('CONVEX_URL', '');
-  vi.stubEnv('CONVEX_SELF_HOSTED_URL', '');
   vi.stubEnv('ANTHROPIC_API_KEY', '');
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value ?? '');
   // Under nodenext the CJS-typed module nests its default export one level deeper than Vite
@@ -88,7 +86,7 @@ describe('gateway: health and CORS', () => {
 
   it('answers preflight for allowed origins with GET, POST, PUT and DELETE only', async () => {
     const app = await loadApp();
-    const res = await app.request('/sync/push', {
+    const res = await app.request('/obituary', {
       method: 'OPTIONS',
       headers: { Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'POST' },
     });
@@ -112,25 +110,6 @@ describe('gateway: health and CORS', () => {
 });
 
 describe('gateway: every route validates its input (REQUIREMENTS C8)', () => {
-  it('sync/pull requires a cursor', async () => {
-    const app = await loadApp();
-    expect((await app.request('/sync/pull')).status).toBe(400);
-  });
-
-  it.each([null, {}, { deviceId: '', ops: [] }, { deviceId: 'd1', ops: 'nope' }])(
-    'sync/push rejects %j',
-    async (body) => {
-      const app = await loadApp();
-      expect((await app.request('/sync/push', json(body))).status).toBe(400);
-    },
-  );
-
-  it('sync/push rejects a body that is not JSON', async () => {
-    const app = await loadApp();
-    const res = await app.request('/sync/push', { method: 'POST', body: 'not json' });
-    expect(res.status).toBe(400);
-  });
-
   it.each([{}, { fullName: 'A', dateOfBirth: '', dateOfPassing: '2' }])('obituary rejects %j', async (body) => {
     const app = await loadApp({ ANTHROPIC_API_KEY: 'test-key' });
     expect((await app.request('/obituary', json(body))).status).toBe(400);
@@ -145,14 +124,15 @@ describe('gateway: the removed /auth routes', () => {
   });
 });
 
-describe('gateway: unconfigured services fail closed with a plain message', () => {
-  it('sync without Convex', async () => {
+describe('removed sync routes', () => {
+  it('answer 404 (Convex was removed, #203)', async () => {
     const app = await loadApp();
-    const res = await app.request('/sync/pull?cursor=0');
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: 'Sync is not configured.' });
+    expect((await app.request('/sync/pull?cursor=0')).status).toBe(404);
+    expect((await app.request('/sync/push', json({ deviceId: 'd1', ops: [] }))).status).toBe(404);
   });
+});
 
+describe('gateway: unconfigured services fail closed with a plain message', () => {
   it('obituary without an Anthropic key', async () => {
     const app = await loadApp();
     const res = await app.request('/obituary', json({ fullName: 'A', dateOfBirth: '1', dateOfPassing: '2' }));

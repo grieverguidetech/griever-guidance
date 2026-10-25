@@ -102,7 +102,7 @@ export const celebrationOfLife: Template = {
     {
       key: 'eventLocation',
       label: 'Event location',
-      placeholder: 'e.g. The Riverside Club, 88 Harbor Rd, Portland',
+      placeholder: 'e.g. the chapel name and street address',
       required: true,
     },
   ],

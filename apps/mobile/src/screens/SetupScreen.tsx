@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   BackHandler,
+  findNodeHandle,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,7 +13,9 @@ import {
   View,
 } from 'react-native';
 import { ScreenHeader, authStyles } from '../components/authForm';
-import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
+import { SavedNote } from '../components/SavedNote';
+import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
+import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
 export type SetupDetails = { personName: string; dateOfPassing: string };
 
@@ -30,26 +34,46 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
   const [name, setName] = useState(initial.personName);
   const [date, setDate] = useState(initial.dateOfPassing);
   const canContinue = name.trim() !== '';
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const needButton = useRef<View>(null);
   const dateRef = useRef<TextInput>(null);
   const submit = () => {
     if (canContinue) onContinue({ personName: name.trim(), dateOfPassing: date.trim() });
   };
 
+  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  const focusNeedButton = () => {
+    const handle = needButton.current ? findNodeHandle(needButton.current) : null;
+    if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+  };
+
   // Android's back button means Home here, not leaving the app.
   useEffect(() => {
+    if (sheetOpen) return; // the sheet's own Back handler closes it
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       onBack();
       return true;
     });
     return () => sub.remove();
-  }, [onBack]);
+  }, [onBack, sheetOpen]);
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Pressable style={styles.back} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to home">
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
+        <View style={styles.topRow}>
+          <Pressable style={styles.back} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to home">
+            <Text style={styles.backText}>← Back</Text>
+          </Pressable>
+          <Pressable
+            ref={needButton}
+            style={({ pressed }) => [styles.needButton, pressed && styles.pressed]}
+            onPress={() => setSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="What you'll need"
+          >
+            <Text style={styles.needText}>What you'll need</Text>
+          </Pressable>
+        </View>
         <ScreenHeader>Who are we writing about?</ScreenHeader>
         <Text style={authStyles.body}>We'll carry this into every message, so you only type it once.</Text>
         <View style={styles.group}>
@@ -100,7 +124,9 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
         >
           <Text style={styles.buttonText}>Continue</Text>
         </Pressable>
+        <SavedNote />
       </ScrollView>
+      <WhatYoullNeedSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onDismiss={focusNeedButton} />
     </KeyboardAvoidingView>
   );
 }
@@ -109,7 +135,23 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#ffffff' },
   screen: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  back: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 16 },
+  // Wraps under large text instead of pushing a button off the screen.
+  topRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16 },
+  needButton: {
+    flexShrink: 1,
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 10,
+    backgroundColor: ACCENT_TINT,
+  },
+  needText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
+  pressed: { opacity: 0.7 },
+  back: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   backText: { fontSize: 16, color: MUTED },
   group: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },

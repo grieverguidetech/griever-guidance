@@ -112,4 +112,15 @@ describe('Review your message (Share the service)', () => {
     await user.click(screen.getByRole('switch', { name: 'Include a way to send flowers' }));
     expect(screen.getByLabelText('Your message')).toHaveValue('My own words.');
   });
+
+  it('offers only a free-text florist field and puts the typed name in the message', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('switch', { name: 'Include a way to send flowers' }));
+    expect(screen.queryByText(/Florists near/)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/A florist you.d like to name/), "Rose Shop, 617-555-0100");
+    expect(screen.getByLabelText('Your message')).toHaveValue(
+      "Margaret Hayes' service will be held June 14 at 2:00 PM, Oak Chapel. If you'd like to send flowers, Rose Shop, 617-555-0100 can deliver to the service.",
+    );
+  });
 });

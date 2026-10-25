@@ -17,7 +17,7 @@ import type { AuthClientResult } from '../lib/authClient';
 const mocks = vi.hoisted(() => ({
   load: vi.fn<() => Promise<AuthClientResult>>(),
 }));
-vi.mock('../lib/features', () => ({ AUTH_ENABLED: true, OBITUARY_DRAFTING_ENABLED: false }));
+vi.mock('../lib/features', () => ({ AUTH_ENABLED: true, OBITUARY_DRAFTING_ENABLED: false, PAYMENTS_ENABLED: false, SHARING_ENABLED: false }));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();
   return { ...actual, loadAuthClient: mocks.load };
@@ -165,7 +165,7 @@ describe('after Done on the last person (#167)', () => {
     await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' });
     await user.click(screen.getByRole('button', { name: 'Back' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: "The people you're writing about" })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Margaret Hayes/ })).toBeInTheDocument();
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('peaceful');
   }, 30_000);

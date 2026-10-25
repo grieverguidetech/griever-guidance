@@ -35,7 +35,7 @@ Each app holds only its screens and its storage adapters.
 | `@griever/shared` | Message templates (`templates.ts`), `composeMessage`, types (`Contact`, `TemplateCategory`, `MomentKey`), date helpers | Yes | Yes |
 | `@griever/hooks` | `useSendFlow` (the message state machine), `useSessions` (people and drafts), `useContacts`, `usePathMoments`, `useSupabaseIdentity` | Yes | Yes |
 | `@griever/data-local` | IndexedDB stores: contacts, account (checklist ticks, sender name), meta | Yes | No. Mobile has its own AsyncStorage copy in `apps/mobile/src/lib/contactStore.ts`. |
-| `@griever/data-sync` | Device id, gateway URL, service worker and Background Sync registration | Yes (`apps/web/src/lib/registerSync.ts`) | No |
+| `@griever/data-sync` | Removed in #203 (was device id, gateway URL, service worker and Background Sync registration) | No | No |
 | `@griever/contacts` | Contact import sources and phone normalizing | Yes | Yes |
 | `@griever/api-client` | Auth client (`@griever/api-client/auth`), gateway calls | Yes | Yes (auth only) |
 
@@ -284,8 +284,8 @@ The device is the source of truth (C5). Nothing inside a flow waits on the netwo
 | Contacts (only the 7 `Contact` fields, C4) | IndexedDB database `gg`, store `contacts` | key `contactId` | `contactStore` in `libs/data-local`, through `useContacts` |
 | "What you'll need" ticks | IndexedDB `gg`, store `account` | record `checklistTicks` | `accountStore.setChecklistTicks` in `WhatYoullNeed.tsx` |
 | Sender name | IndexedDB `gg`, store `account` | record for the sender name | `accountStore` |
-| Device id, gateway URL | IndexedDB `gg`, store `meta` | `gatewayUrl` and the device id | `registerSync` at boot |
-| Outbox and send jobs | IndexedDB `gg`, stores `outbox`, `sendJobs` | | `libs/data-local` (sync is not bound to a user today; see `setSyncUserId(null)` in `app.tsx`) |
+| Device id, gateway URL | IndexedDB `gg`, store `meta` | Removed in #203 (no sync registration at boot) | None |
+| Outbox and send jobs | IndexedDB `gg`, stores `outbox`, `sendJobs` | | `libs/data-local` (sync was removed in #203) |
 | Supabase session | `localStorage` (supabase-js) | not verified | Only when `AUTH` is on |
 
 The send job (who is being texted right now) is not saved. A reload in the middle of sending comes
@@ -450,7 +450,7 @@ Web app:
 - `apps/web/src/lib/features.ts`
 - `apps/web/src/lib/ui.tsx`
 - `apps/web/src/lib/whatYoullNeedContext.tsx`
-- `apps/web/src/lib/registerSync.ts`
+- `apps/web/src/lib/unregisterOldWorker.ts` (removes the old service worker; `registerSync.ts` was removed in #203)
 - `apps/web/src/lib/removeFromDevice.ts`
 - `apps/web/src/styles.css`
 - `apps/web/.env.example`
