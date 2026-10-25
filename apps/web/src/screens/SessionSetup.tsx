@@ -1,8 +1,6 @@
-import { useRef, useState } from 'react';
 import type { Session } from '@griever/hooks';
 import { TopBar, SavedNote } from '../lib/ui';
 import { DateField, todayISO } from '../lib/DateField';
-import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
 interface Props {
   session: Session;
@@ -14,14 +12,11 @@ interface Props {
 
 export function SessionSetup({ session, editing, onChange, onContinue, onBack }: Props) {
   // Date of death is optional — pre-planning and recent losses both need to proceed.
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const checklistButton = useRef<HTMLButtonElement>(null);
   const canContinue = Boolean(session.personName.trim());
 
   return (
     <div className="flex flex-col gap-4">
-      <TopBar onBack={onBack} onChecklist={() => setSheetOpen(true)} checklistButtonRef={checklistButton} />
-      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <h1 className="text-[22px]">
           {editing ? 'Edit their details' : 'Who are we writing about?'}

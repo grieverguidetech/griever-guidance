@@ -1,8 +1,8 @@
-import { useEffect, useId, useRef } from 'react';
-import type { ReactElement, Ref } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { ReactElement } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react/ArrowLeft';
 import { ListChecks } from '@phosphor-icons/react/ListChecks';
-import { useWhatYoullNeed } from './whatYoullNeedContext';
+import { WhatYoullNeedSheet } from './WhatYoullNeedSheet';
 
 /**
  * Shows `text` above its child on hover or focus. The child is expected to
@@ -32,40 +32,28 @@ export function BackButton({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * Persistent top bar for every flow screen: back button on the left,
- * "What you'll need" link on the right. Keeps the checklist reachable
- * from anywhere in the flow per the demo-feedback ticket.
+ * Persistent top bar for every flow screen: Back on the left, "What you'll need" on the right.
+ * The button opens one shared closable sheet over the current screen, never a separate page (#193, #194).
  */
-export function TopBar({
-  onBack,
-  hideChecklist = false,
-  onChecklist,
-  checklistButtonRef,
-}: {
-  onBack?: () => void;
-  hideChecklist?: boolean;
-  /** Replaces the default (go to the checklist screen), e.g. to open a sheet instead. */
-  onChecklist?: () => void;
-  /** Lets a sheet send focus back to this button when it closes. */
-  checklistButtonRef?: Ref<HTMLButtonElement>;
-}) {
-  const goToChecklist = useWhatYoullNeed();
-  const onWhatYoullNeed = onChecklist ?? goToChecklist;
+export function TopBar({ onBack, hideChecklist = false }: { onBack?: () => void; hideChecklist?: boolean }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const checklistButton = useRef<HTMLButtonElement>(null);
   return (
     <div className="flex items-center justify-between w-full">
       {onBack && <BackButton onClick={onBack} />}
       {!hideChecklist && (
         <button
-          ref={checklistButtonRef}
+          ref={checklistButton}
           type="button"
-          aria-haspopup={onChecklist ? 'dialog' : undefined}
-          onClick={onWhatYoullNeed}
+          aria-haspopup="dialog"
+          onClick={() => setSheetOpen(true)}
           className="gg-btn gg-btn-secondary gg-btn-bar"
         >
           <ListChecks size={16} weight="duotone" aria-hidden="true" />
           What you'll need
         </button>
       )}
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
     </div>
   );
 }

@@ -151,27 +151,28 @@ describe('Home as the landing (#112)', () => {
     await expectHome();
     await user.click(screen.getByRole('button', { name: 'Settings' }));
     await user.click(await screen.findByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
-    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
   });
 
-  it('returns the checklist to Settings when it was opened from Settings', async () => {
+  it('opens the checklist as a sheet over Settings, which stays', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Settings' }));
     await user.click(await screen.findByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
   });
 
-  it('returns the checklist to Home when it was opened from Home', async () => {
+  it('opens the checklist as a sheet over Home, which stays', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await expectHome();
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
     await expectHome();
   });
 });
@@ -315,14 +316,14 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     }
   });
 
-  it('keeps the checklist inside the walk: Back from it returns to the step it was opened from', async () => {
+  it('opens the checklist as a sheet in the walk, and closing it leaves the step as it was', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await heading('Who should we be able to reach?');
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
     expect(await heading('Who should we be able to reach?')).toBeInTheDocument();
   });
 
@@ -335,7 +336,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     await user.type(screen.getByLabelText('Name'), 'Uncle Joe');
     await user.type(screen.getByLabelText('Mobile number'), '617555');
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
     await heading('Who should we be able to reach?');
     expect(screen.getByLabelText('Name')).toHaveValue('Uncle Joe');
     expect(screen.getByLabelText('Mobile number')).toHaveValue('617555');
@@ -346,7 +347,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     await user.click(screen.getByRole('button', { name: 'Done for now' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Aunt Carol' }));
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
     await heading('Who should hear first?');
     expect(screen.getByRole('checkbox', { name: 'Aunt Carol' })).toBeChecked();
   });

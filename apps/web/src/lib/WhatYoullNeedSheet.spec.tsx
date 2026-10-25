@@ -5,15 +5,14 @@ import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
 import type { Session } from '@griever/hooks';
 import { SessionSetup } from '../screens/SessionSetup';
-import { WhatYoullNeedProvider } from './whatYoullNeedContext';
 import { TopBar } from './ui';
 
 const empty = { personName: '', senderName: '' } as Session;
 
-function Harness({ goToScreen = vi.fn() }: { goToScreen?: () => void }) {
+function Harness() {
   const [session, setSession] = useState<Session>(empty);
   return (
-    <WhatYoullNeedProvider onWhatYoullNeed={goToScreen}>
+    <>
       <SessionSetup
         session={session}
         editing={false}
@@ -21,7 +20,7 @@ function Harness({ goToScreen = vi.fn() }: { goToScreen?: () => void }) {
         onContinue={vi.fn()}
         onBack={vi.fn()}
       />
-    </WhatYoullNeedProvider>
+    </>
   );
 }
 
@@ -37,12 +36,10 @@ describe('What you will need sheet (#193)', () => {
 
   it('opens a labelled dialog over the form and does not leave the screen', async () => {
     const user = userEvent.setup();
-    const goToScreen = vi.fn();
-    render(<Harness goToScreen={goToScreen} />);
+    render(<Harness />);
     await user.click(trigger());
     const dialog = screen.getByRole('dialog', { name: "What you'll need" });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(goToScreen).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
   });
 
@@ -151,17 +148,11 @@ describe('What you will need sheet (#193)', () => {
     expect(trigger()).toHaveFocus();
   });
 
-  it('TopBar without onChecklist still goes to the checklist screen', async () => {
+  it('TopBar opens the sheet by itself, so every screen behaves the same (#194)', async () => {
     const user = userEvent.setup();
-    const goToScreen = vi.fn();
-    render(
-      <WhatYoullNeedProvider onWhatYoullNeed={goToScreen}>
-        <TopBar onBack={vi.fn()} />
-      </WhatYoullNeedProvider>,
-    );
+    render(<TopBar onBack={vi.fn()} />);
     await user.click(trigger());
-    expect(goToScreen).toHaveBeenCalledTimes(1);
-    expect(trigger()).not.toHaveAttribute('aria-haspopup');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(trigger()).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(screen.getByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
   });
 });
