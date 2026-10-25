@@ -209,6 +209,7 @@ describe.runIf(up)('createFlow on DynamoDB Local', () => {
 
   it('reads again and succeeds when the profile version moves mid-write', async () => {
     await rawPut(profile('user_c_race', 'owner', 5));
+    const attempts: number[] = [];
     const result = await createFlow(
       doc,
       table,
@@ -218,6 +219,7 @@ describe.runIf(up)('createFlow on DynamoDB Local', () => {
       clock,
       {
         beforeCommit: async (attempt) => {
+          attempts.push(attempt);
           if (attempt === 1) {
             await doc.send(
               new UpdateCommand({
@@ -234,6 +236,8 @@ describe.runIf(up)('createFlow on DynamoDB Local', () => {
       },
     );
     expect(result.ok).toBe(true);
+    // Two attempts: the first failed on the version check. One attempt would mean the check is gone.
+    expect(attempts).toEqual([1, 2]);
     expect((await getProfile(doc, table, 'user_c_race', clock))?.version).toBe(
       7,
     );

@@ -8,6 +8,8 @@ export type DataErrorCode =
   | 'conflict'
   | 'already_invited'
   | 'invite_conflict'
+  | 'already_member'
+  | 'rate_limited'
   | 'busy';
 
 export const BUSY_MESSAGE = 'Something is busy right now. Please try again in a moment.';
@@ -18,5 +20,7 @@ export const HTTP_STATUS: Record<DataErrorCode, number> = {
   conflict: 409,
   already_invited: 409,
   invite_conflict: 409,
+  already_member: 409,
+  rate_limited: 429,
   busy: 503,
 };

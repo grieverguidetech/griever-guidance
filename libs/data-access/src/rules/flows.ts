@@ -83,9 +83,9 @@ export type FlowResult<T> =
   | { ok: false; code: DataErrorCode | 'invalid' };
 
 /** Thrown inside an action when its reads already say no, so nothing is written. */
-class Refusal extends Error {
-  readonly code: DataErrorCode;
-  constructor(code: DataErrorCode) {
+export class Refusal extends Error {
+  readonly code: DataErrorCode | 'invalid';
+  constructor(code: DataErrorCode | 'invalid') {
     super(code);
     this.code = code;
   }
@@ -100,7 +100,7 @@ const CREATE_PROFILE = 3;
  * Bumps the profile version only if nobody changed it since we read it and it is still an owner.
  * With no profile yet, it creates one as owner.
  */
-function profileWrite(
+export function profileWrite(
   table: string,
   userId: string,
   profile: Profile | undefined,
