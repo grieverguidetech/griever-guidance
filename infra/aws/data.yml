@@ -18,8 +18,8 @@ Parameters:
     AllowedPattern: ^https://.+
   AuthorizedParties:
     Type: String
-    Default: ''
-    Description: Optional comma-separated list of allowed token origins (DATA_AUTH_AUTHORIZED_PARTIES).
+    Default: https://web.grieversguidance.com
+    Description: Comma-separated token origins allowed in the azp claim (DATA_AUTH_AUTHORIZED_PARTIES). Empty allows any.
 
 Resources:
   DataTable:
@@ -114,7 +114,7 @@ Resources:
             Action:
             - logs:CreateLogStream
             - logs:PutLogEvents
-            Resource: !Sub ${FunctionLogGroup.Arn}:*
+            Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/gg-app-data:*
 
   DataFunction:
     Type: AWS::Lambda::Function
@@ -127,6 +127,7 @@ Resources:
       Handler: lambda.handler
       Role: !GetAtt FunctionRole.Arn
       MemorySize: 256
+      ReservedConcurrentExecutions: 10
       Timeout: 10
       Code:
         S3Bucket: !Ref CodeBucket

@@ -211,8 +211,10 @@ jobs:
             echo "::notice::DATA_FUNCTION_ACCESS_KEY_ID or DATA_FUNCTION_SECRET_ACCESS_KEY is empty; both skipped. Keys already on the Worker stay."
             exit 0
           fi
-          printf '%s' "$DATA_FUNCTION_ACCESS_KEY_ID" | pnpm exec wrangler secret put DATA_FUNCTION_ACCESS_KEY_ID --config apps/gateway/wrangler.toml
-          printf '%s' "$DATA_FUNCTION_SECRET_ACCESS_KEY" | pnpm exec wrangler secret put DATA_FUNCTION_SECRET_ACCESS_KEY --config apps/gateway/wrangler.toml
+          # One call, so the key id and the secret can never end up from different keys.
+          # Values come from env (jq), never from argv; `secret bulk` reads the JSON from stdin.
+          jq -n '{DATA_FUNCTION_ACCESS_KEY_ID: env.DATA_FUNCTION_ACCESS_KEY_ID, DATA_FUNCTION_SECRET_ACCESS_KEY: env.DATA_FUNCTION_SECRET_ACCESS_KEY}' \
+            | pnpm exec wrangler secret bulk --config apps/gateway/wrangler.toml
           names=$(pnpm exec wrangler secret list --config apps/gateway/wrangler.toml)
           for name in DATA_FUNCTION_ACCESS_KEY_ID DATA_FUNCTION_SECRET_ACCESS_KEY; do
             if ! printf '%s' "$names" | grep -q "\"$name\""; then

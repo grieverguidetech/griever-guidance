@@ -18,7 +18,7 @@ admin session. Later code-only deploys can move into `deploy.yml` in a follow-up
 ## 1. Sign in
 
 ```text
-aws sso login          # or the login you normally use
+aws login
 aws sts get-caller-identity --query Arn --output text
 export AWS_REGION=us-east-2 AWS_DEFAULT_REGION=us-east-2
 ```
@@ -54,17 +54,34 @@ plus `/.well-known/jwks.json`.
 
 ```text
 export CLERK_ISSUER=$(gh variable get CLERK_ISSUER)
+CLERK_ISSUER=${CLERK_ISSUER%/}
 aws cloudformation deploy --stack-name gg-app-data --template-file infra/aws/data.yml \
   --capabilities CAPABILITY_NAMED_IAM --region us-east-2 \
   --parameter-overrides CodeBucket="$CODE_BUCKET" CodeKey="$CODE_KEY" \
     AuthIssuer="$CLERK_ISSUER" AuthJwksUrl="$CLERK_ISSUER/.well-known/jwks.json"
 ```
 
-If the first deploy fails, the stack sits in `ROLLBACK_COMPLETE`. Delete it
-(`aws cloudformation delete-stack --stack-name gg-app-data --region us-east-2`), fix the cause, and run
-this step again. The tables are retained on delete, so if they were created, delete them by hand first
-(they have deletion protection: turn it off with `aws dynamodb update-table --table-name gg-data
---no-deletion-protection-enabled --region us-east-2`). Only do this while the tables are empty.
+If the first deploy fails, the stack sits in `ROLLBACK_COMPLETE` and must be deleted before a retry.
+Do this only while the tables are empty (a first deploy). The tables and some named IAM items are
+retained or protected, so clean up in this order:
+
+```text
+aws cloudformation delete-stack --stack-name gg-app-data --region us-east-2
+aws cloudformation wait stack-delete-complete --stack-name gg-app-data --region us-east-2
+for t in gg-data gg-content; do
+  aws dynamodb update-table --table-name $t --no-deletion-protection-enabled --region us-east-2 \
+    && aws dynamodb delete-table --table-name $t --region us-east-2
+done
+```
+
+- If the stack delete fails because `gg-app-data-worker` still has an access key, delete the key first:
+  `aws iam list-access-keys --user-name gg-app-data-worker`, then
+  `aws iam delete-access-key --user-name gg-app-data-worker --access-key-id <id>`, and delete the stack again.
+- If the user `gg-app-data-worker` or the role `gg-app-data-function` is left behind (fixed names make a
+  retry fail with "already exists"), remove them: `aws iam delete-user-policy --user-name gg-app-data-worker
+  --policy-name invoke-data-function-url` then `aws iam delete-user --user-name gg-app-data-worker`; and
+  `aws iam delete-role-policy --role-name gg-app-data-function --policy-name gg-app-data-function` then
+  `aws iam delete-role --role-name gg-app-data-function`.
 
 ## 5. Read the outputs
 
@@ -93,17 +110,22 @@ Expect `"ENABLED"` twice, `[true, "gsi1"]`, and TTL `ENABLED` on `ttl`. Put the 
 ## 7. Create the Worker access key and store it
 
 This pipes the key straight into GitHub secrets. It prints nothing. `jq` is needed.
-The second command also keeps the pair in two shell variables for step 8; close the terminal
-afterwards.
+It keeps the pair in two shell variables (not exported) for step 8; close the terminal afterwards.
 
 ```text
 KEY_JSON=$(aws iam create-access-key --user-name gg-app-data-worker --output json)
-printf '%s' "$KEY_JSON" | jq -r .AccessKey.AccessKeyId | gh secret set DATA_FUNCTION_ACCESS_KEY_ID
-printf '%s' "$KEY_JSON" | jq -r .AccessKey.SecretAccessKey | gh secret set DATA_FUNCTION_SECRET_ACCESS_KEY
-export AWS_WORKER_KEY=$(printf '%s' "$KEY_JSON" | jq -r .AccessKey.AccessKeyId)
-export AWS_WORKER_SECRET=$(printf '%s' "$KEY_JSON" | jq -r .AccessKey.SecretAccessKey)
+if [ -z "$KEY_JSON" ]; then
+  echo "create-access-key failed; stop here"
+else
+  printf '%s' "$KEY_JSON" | jq -j .AccessKey.AccessKeyId | gh secret set DATA_FUNCTION_ACCESS_KEY_ID
+  printf '%s' "$KEY_JSON" | jq -j .AccessKey.SecretAccessKey | gh secret set DATA_FUNCTION_SECRET_ACCESS_KEY
+  WORKER_KEY=$(printf '%s' "$KEY_JSON" | jq -j .AccessKey.AccessKeyId)
+  WORKER_SECRET=$(printf '%s' "$KEY_JSON" | jq -j .AccessKey.SecretAccessKey)
+fi
 unset KEY_JSON
 ```
+
+Check the two secrets are listed (names only): `gh secret list | grep DATA_FUNCTION`.
 
 Set the URL as a repo variable (public), then run the Deploy workflow (`gh workflow run deploy.yml`)
 so the Worker gets the URL and both secrets:
@@ -121,30 +143,47 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$FN_URL/v1" \
   -H 'content-type: application/json' -d '{"action":"getProfile","args":{}}'
 ```
 
-Signed call with a real user token. Copy a Clerk session token from a signed-in browser session into
-the prompt (it is not echoed). Expect `200`; put the status code in the PR, not the token or body.
+Signed call with a real user token. Clerk session tokens last about 60 seconds, so copy a fresh one
+right before you run this. It is read without echo. Expect `200`; put the status code in the PR, not the
+token or body. The key pair goes to curl on stdin (`-K -`), not on the command line.
 
 ```text
 read -rs USER_TOKEN
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "$FN_URL/v1" \
-  --aws-sigv4 "aws:amz:us-east-2:lambda" --user "$AWS_WORKER_KEY:$AWS_WORKER_SECRET" \
+printf 'user = "%s:%s"\n' "$WORKER_KEY" "$WORKER_SECRET" | curl -s -o /dev/null -w '%{http_code}\n' -K - \
+  -X POST "$FN_URL/v1" --aws-sigv4 "aws:amz:us-east-2:lambda" \
   -H 'content-type: application/json' -H "x-gg-user-token: $USER_TOKEN" \
   -d '{"action":"getProfile","args":{}}'
-unset USER_TOKEN AWS_WORKER_KEY AWS_WORKER_SECRET
+unset USER_TOKEN WORKER_KEY WORKER_SECRET
 ```
 
-Signed with a missing or bad token you should get a domain error (not 403): that proves AWS let the
-call in and the function rejected the user. If the signed call returns `403`, see "If the signed call
-is denied" below.
+With an expired or bad token you should get `401` (not `403`): that proves AWS let the call in and the
+function rejected the user. If the signed call returns `403`, see "If the signed call is denied" below.
 
 The Worker user cannot read the tables. Expect `implicitDeny` for every row:
 
 ```text
 USER_ARN=$(aws iam get-user --user-name gg-app-data-worker --query User.Arn --output text)
 TABLE_ARN=$(aws dynamodb describe-table --table-name gg-data --region us-east-2 --query Table.TableArn --output text)
+CONTENT_ARN=$(aws dynamodb describe-table --table-name gg-content --region us-east-2 --query Table.TableArn --output text)
 aws iam simulate-principal-policy --policy-source-arn "$USER_ARN" \
   --action-names dynamodb:GetItem dynamodb:Query dynamodb:PutItem dynamodb:Scan \
-  --resource-arns "$TABLE_ARN" --query "EvaluationResults[].[EvalActionName,EvalDecision]" --output text
+  --resource-arns "$TABLE_ARN" "$TABLE_ARN/index/gsi1" "$CONTENT_ARN" \
+  --query "EvaluationResults[].[EvalActionName,EvalResourceName,EvalDecision]" --output text
+```
+
+The Worker user can invoke the function through its URL only. Expect `allowed` for the first call and
+`implicitDeny` for the second (no URL context):
+
+```text
+FN_ARN=$(aws cloudformation describe-stack-resources --stack-name gg-app-data --region us-east-2 \
+  --logical-resource-id DataFunction --query "StackResources[0].PhysicalResourceId" --output text | \
+  xargs -I{} aws lambda get-function --function-name {} --region us-east-2 --query Configuration.FunctionArn --output text)
+aws iam simulate-principal-policy --policy-source-arn "$USER_ARN" --action-names lambda:InvokeFunction \
+  --resource-arns "$FN_ARN" \
+  --context-entries ContextKeyName=lambda:InvokedViaFunctionUrl,ContextKeyValues=true,ContextKeyType=boolean \
+  --query "EvaluationResults[].[EvalActionName,EvalDecision]" --output text
+aws iam simulate-principal-policy --policy-source-arn "$USER_ARN" --action-names lambda:InvokeFunction \
+  --resource-arns "$FN_ARN" --query "EvaluationResults[].[EvalActionName,EvalDecision]" --output text
 ```
 
 ## Update the code later
