@@ -12,15 +12,11 @@ import {
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
 import { BUSY_MESSAGE } from '../errors.js';
+import type { acceptInvite } from '../rules/acceptInvite.js';
 import type { createFlow, listFlows, updateFlow } from '../rules/flows.js';
 import type { createInvite, revokeInvite } from '../rules/invites.js';
 import type { listMembers, removeMember } from '../rules/members.js';
 import { parseProfileFields, type getProfile, type putProfile } from '../rules/profiles.js';
-
-/** What `acceptInvite` returns on success. The rule itself lands in #272. */
-export interface AcceptedInvite {
-  ownerId: string;
-}
 
 /**
  * The rules this handler can call. They are injected, so this file never imports a concrete rule
@@ -36,13 +32,7 @@ export interface DataRules {
   revokeInvite: typeof revokeInvite;
   listMembers: typeof listMembers;
   removeMember: typeof removeMember;
-  acceptInvite: (
-    doc: DynamoDBDocumentClient,
-    table: string,
-    caller: Caller,
-    tokenHash: string,
-    clock: Clock,
-  ) => Promise<{ ok: true; value: AcceptedInvite } | { ok: false; code: string }>;
+  acceptInvite: typeof acceptInvite;
 }
 
 /** Everything one action needs, built per request after the token check. */

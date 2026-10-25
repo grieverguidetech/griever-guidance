@@ -71,7 +71,7 @@ DATA_AUTH_ISSUER=... DATA_AUTH_JWKS_URL=... pnpm dev:data
 - Order of checks: user token (401), envelope (400), the action's args (400), then the rule. The first three never touch DynamoDB.
 - Domain outcomes answer 200 with a `DataResult`. An unexpected error answers 500 with `{"error":"internal"}` and nothing else.
 - A log line holds the action name and the error class. It never holds the token, an email or a token hash.
-- `deleteUserData` has no route. `acceptInvite` is not wired until #272 lands: it answers 500.
+- `deleteUserData` has no route.
 
 | Action | `args` |
 |---|---|

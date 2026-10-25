@@ -1,5 +1,6 @@
-import { DATA_USER_TOKEN_HEADER } from '@griever/shared';
+import { DATA_ACTIONS, DATA_USER_TOKEN_HEADER } from '@griever/shared';
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { acceptInvite } from './rules/acceptInvite.js';
 import { createHandler, loadVerifier, wiredRules } from './lambda.js';
 
 const ENV = {
@@ -109,10 +110,8 @@ describe('Lambda adapter with a stub verifier', () => {
 });
 
 describe('wiredRules', () => {
-  it('has a rule for every action, and acceptInvite waits for #272', () => {
-    expect(Object.keys(wiredRules).sort()).toEqual(
-      ['acceptInvite', 'createFlow', 'createInvite', 'getProfile', 'listFlows', 'listMembers', 'putProfile', 'removeMember', 'revokeInvite', 'updateFlow'],
-    );
-    expect(() => (wiredRules.acceptInvite as () => unknown)()).toThrow('acceptInvite is not wired yet');
+  it('has the real rule for every action in DATA_ACTIONS', () => {
+    expect(Object.keys(wiredRules).sort()).toEqual([...DATA_ACTIONS].sort());
+    expect(wiredRules.acceptInvite).toBe(acceptInvite);
   });
 });

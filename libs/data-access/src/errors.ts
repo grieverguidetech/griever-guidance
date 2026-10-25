@@ -8,6 +8,7 @@ export type DataErrorCode =
   | 'conflict'
   | 'already_invited'
   | 'invite_conflict'
+  | 'unusable'
   | 'already_member'
   | 'rate_limited'
   | 'busy';
@@ -20,6 +21,7 @@ export const HTTP_STATUS: Record<DataErrorCode, number> = {
   conflict: 409,
   already_invited: 409,
   invite_conflict: 409,
+  unusable: 404,
   already_member: 409,
   rate_limited: 429,
   busy: 503,

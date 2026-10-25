@@ -2,6 +2,7 @@ import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { DATA_ACTIONS, DATA_USER_TOKEN_HEADER, type DataResult } from '@griever/shared';
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
 import { encodeProfile } from '../items/profileItem.js';
+import { acceptInvite } from '../rules/acceptInvite.js';
 import { createFlow, listFlows, updateFlow } from '../rules/flows.js';
 import { createInvite, revokeInvite } from '../rules/invites.js';
 import { listMembers, removeMember } from '../rules/members.js';
@@ -16,6 +17,7 @@ const OWNER: Caller = { userId: 'user_app_owner', email: 'pat@example.test', ema
 const MEMBER_ID = 'user_app_member';
 const FLOW_ID = '33333333-3333-4333-8333-333333333333';
 const HASH = 'c'.repeat(64);
+const ACCEPT_HASH = 'd'.repeat(64);
 const FACTS = {
   personName: 'Grandma',
   dateOfPassing: null,
@@ -25,8 +27,8 @@ const FACTS = {
   serviceReady: false,
 };
 
-// acceptInvite lands in #272. Until then a stub stands in; the other nine rules are the real ones.
-const acceptInvite = vi.fn<DataRules['acceptInvite']>(async () => ({ ok: true, value: { ownerId: OWNER.userId } }));
+// The guard tests and the 500 test use a stub for acceptInvite so they can see whether it was called.
+const acceptStub = vi.fn<DataRules['acceptInvite']>(async () => ({ ok: true, value: { ownerId: OWNER.userId } }));
 const rules: DataRules = {
   getProfile,
   putProfile,
@@ -39,8 +41,12 @@ const rules: DataRules = {
   removeMember,
   acceptInvite,
 };
+const guardRules: DataRules = { ...rules, acceptInvite: acceptStub };
 
-const verify = vi.fn(async (token: string): Promise<Caller | null> => (token === TOKEN ? OWNER : null));
+const JOINER_TOKEN = 'joiner.token.value';
+const JOINER: Caller = { userId: 'user_app_joiner', email: 'joiner@example.test', emailVerified: true };
+const callers = new Map<string, Caller>([[TOKEN, OWNER], [JOINER_TOKEN, JOINER]]);
+const verify = vi.fn(async (token: string): Promise<Caller | null> => callers.get(token) ?? null);
 const onError = vi.fn();
 const app = createDataApp({ rules, doc, table, verify, onError });
 
@@ -52,15 +58,15 @@ async function call(body: unknown, headers: Record<string, string> = { [DATA_USE
   });
 }
 
-async function act(action: string, args: Record<string, unknown> = {}): Promise<DataResult> {
-  const response = await call({ action, args });
+async function act(action: string, args: Record<string, unknown> = {}, token = TOKEN): Promise<DataResult> {
+  const response = await call({ action, args }, { [DATA_USER_TOKEN_HEADER]: token });
   expect(response.status).toBe(200);
   return (await response.json()) as DataResult;
 }
 
 // These guards must hold in every CI job, so they run on a document client that fails the test if it is used.
 const stub = { send: vi.fn() };
-const guardApp = createDataApp({ rules, doc: stub as unknown as DynamoDBDocumentClient, table: 'guard', verify, onError });
+const guardApp = createDataApp({ rules: guardRules, doc: stub as unknown as DynamoDBDocumentClient, table: 'guard', verify, onError });
 
 async function callGuard(body: unknown, headers: Record<string, string> = { [DATA_USER_TOKEN_HEADER]: TOKEN }) {
   return guardApp.request('/v1', {
@@ -74,7 +80,7 @@ describe('guards before DynamoDB', () => {
   beforeEach(() => {
     stub.send.mockClear();
     onError.mockClear();
-    acceptInvite.mockClear();
+    acceptStub.mockClear();
   });
 
 describe('the user token (no DynamoDB)', () => {
@@ -141,7 +147,7 @@ describe('input checks (C8, no DynamoDB)', () => {
       expect((await callGuard(body)).status).toBe(400);
     }
     expect(stub.send).not.toHaveBeenCalled();
-    expect(acceptInvite).not.toHaveBeenCalled();
+    expect(acceptStub).not.toHaveBeenCalled();
   });
 
   it('serves POST /v1 only', async () => {
@@ -154,7 +160,7 @@ describe('input checks (C8, no DynamoDB)', () => {
 
   it('answers 500 with no detail, and logs the class only, for an error Hono catches', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const app = createDataApp({ rules, doc: stub as unknown as DynamoDBDocumentClient, table: 'guard', verify, onError });
+    const app = createDataApp({ rules: guardRules, doc: stub as unknown as DynamoDBDocumentClient, table: 'guard', verify, onError });
     app.get('/boom', () => {
       throw new RangeError('secret detail pat@example.test');
     });
@@ -221,9 +227,19 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
       expect(await act('removeMember', { memberId: MEMBER_ID })).toEqual({ ok: true, data: null });
     });
 
-    it('acceptInvite, through the stub', async () => {
-      expect(await act('acceptInvite', { tokenHash: HASH })).toEqual({ ok: true, data: { ownerId: OWNER.userId } });
-      expect(acceptInvite).toHaveBeenCalledWith(doc, table, OWNER, HASH, expect.anything());
+    it('acceptInvite, with the real rule: the invited, verified joiner becomes a member', async () => {
+      const invited = await act('createInvite', { email: JOINER.email, tokenHash: ACCEPT_HASH });
+      expect(invited).toMatchObject({ ok: true });
+      expect(await act('acceptInvite', { tokenHash: ACCEPT_HASH }, JOINER_TOKEN)).toEqual({
+        ok: true,
+        data: { ownerId: OWNER.userId },
+      });
+      expect(await act('listMembers', {}, JOINER_TOKEN)).toMatchObject({ ok: true, data: { role: 'member' } });
+    });
+
+    it('acceptInvite answers 200 with unusable for an unknown token and for one already used', async () => {
+      expect(await act('acceptInvite', { tokenHash: 'e'.repeat(64) }, JOINER_TOKEN)).toEqual({ ok: false, code: 'unusable' });
+      expect(await act('acceptInvite', { tokenHash: ACCEPT_HASH }, JOINER_TOKEN)).toEqual({ ok: false, code: 'unusable' });
     });
 
     it('has a happy path for every action in DATA_ACTIONS', () => {
@@ -242,7 +258,7 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
     it('answers an unexpected error with 500, no detail, and a log line without the secrets', async () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const loud = createDataApp({
-        rules: { ...rules, acceptInvite: async () => { throw new Error(`boom ${OWNER.email} ${HASH} ${TOKEN}`); } },
+        rules: { ...guardRules, acceptInvite: async () => { throw new Error(`boom ${OWNER.email} ${HASH} ${TOKEN}`); } },
         doc,
         table,
         verify,

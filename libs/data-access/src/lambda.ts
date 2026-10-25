@@ -3,6 +3,7 @@ import { handle } from 'hono/aws-lambda';
 import { createDataApp, type DataAppOptions } from './handler/app.js';
 import type { DataRules } from './handler/actions.js';
 import { createTokenVerifier } from './handler/verifyToken.js';
+import { acceptInvite } from './rules/acceptInvite.js';
 import { createFlow, listFlows, updateFlow } from './rules/flows.js';
 import { createInvite, revokeInvite } from './rules/invites.js';
 import { listMembers, removeMember } from './rules/members.js';
@@ -14,7 +15,6 @@ type Env = Record<string, string | undefined>;
 
 /**
  * The real rules, wired in one place. The Lambda and `pnpm dev:data` both use this list.
- * acceptInvite waits for #272: until then it throws, which the app answers as a 500 with no detail.
  */
 export const wiredRules: DataRules = {
   getProfile,
@@ -26,9 +26,7 @@ export const wiredRules: DataRules = {
   revokeInvite,
   listMembers,
   removeMember,
-  acceptInvite: () => {
-    throw new Error('acceptInvite is not wired yet');
-  },
+  acceptInvite,
 };
 
 function required(env: Env, name: string): string {
