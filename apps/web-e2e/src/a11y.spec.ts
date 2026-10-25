@@ -49,6 +49,11 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await onboard(page);
     await page.getByRole('button', { name: 'Start' }).click();
   },
+  'task details form': async (page) => {
+    await onboard(page);
+    await page.getByRole('button', { name: 'Start' }).click();
+    await expect(page.getByRole('region', { name: "We'll send" })).toBeVisible();
+  },
 };
 
 for (const [name, open] of Object.entries(screens)) {
@@ -65,6 +70,11 @@ test('add contacts: text meets AA contrast', async ({ page }) => {
 
 test('path landing and announce form: text meets AA contrast', async ({ page }) => {
   await screens['announce form'](page);
+  expect(await violations(page, { contrastOnly: true })).toEqual([]);
+});
+
+test('task details form: text meets AA contrast', async ({ page }) => {
+  await screens['task details form'](page);
   expect(await violations(page, { contrastOnly: true })).toEqual([]);
 });
 

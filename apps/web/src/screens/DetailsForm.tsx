@@ -3,6 +3,7 @@ import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
 import { StartAgain } from '../lib/StartAgain';
 import { DateInput } from '../lib/DateField';
 import { TimeInput } from '../lib/TimeField';
+import { previewMessage } from '@griever/shared';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -96,6 +97,14 @@ export function DetailsForm({ flow }: Props) {
           </div>
         );
       })}
+
+      <section className="gg-card" aria-labelledby="message-preview-title">
+        <h2 id="message-preview-title" className="text-[14px] font-semibold">We'll send</h2>
+        <p className="gg-card-body m-0 whitespace-pre-wrap" style={{ fontSize: 14, lineHeight: 1.7 }}>
+          {previewMessage(selectedTemplate, flow.composedFields)}
+        </p>
+      </section>
+
 
       <button
         type="button"

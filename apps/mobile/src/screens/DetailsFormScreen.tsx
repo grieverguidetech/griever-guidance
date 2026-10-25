@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { FlowProps, RootStackParamList } from '../app/App';
 import { SavedNote } from '../components/SavedNote';
 import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
+import { previewMessage } from '@griever/shared';
 
 export function DetailsFormScreen({ flow }: FlowProps) {
   const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
@@ -60,6 +61,12 @@ export function DetailsFormScreen({ flow }: FlowProps) {
             />
           </View>
         ))}
+        <View style={styles.preview}>
+          <Text style={styles.previewTitle}>We'll send</Text>
+          <Text style={styles.previewText} accessibilityLiveRegion="off">
+            {previewMessage(selectedTemplate, flow.composedFields)}
+          </Text>
+        </View>
         <TouchableOpacity
           style={[styles.button, !canProceed && styles.buttonDisabled]}
           onPress={nextStep}
@@ -84,6 +91,9 @@ const styles = StyleSheet.create({
   whatYoullNeedLink: { minHeight: 44, justifyContent: 'center' },
   whatYoullNeedText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 24 },
+  preview: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16, marginTop: 8, marginBottom: 24 },
+  previewTitle: { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 8 },
+  previewText: { fontSize: 14, color: '#374151', lineHeight: 23 },
   fieldGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },
   optional: { fontWeight: '400', color: MUTED },
