@@ -258,6 +258,8 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
           # Sharing stays off unless the repo variable FEATURE_SHARING is "true".
           VITE_FEATURE_SHARING: ${{ vars.FEATURE_SHARING }}
+          # Paywall stays off unless the repo variable FEATURE_PAYMENTS is "true".
+          VITE_FEATURE_PAYMENTS: ${{ vars.FEATURE_PAYMENTS }}
 
       - run: pnpm exec wrangler pages project create griever-guidance-web --production-branch main || true
         env:

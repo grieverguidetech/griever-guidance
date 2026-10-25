@@ -21,6 +21,7 @@ admin session. Later code-only deploys can move into `deploy.yml` in a follow-up
 aws login
 aws sts get-caller-identity --query Arn --output text
 export AWS_REGION=us-east-2 AWS_DEFAULT_REGION=us-east-2
+export AWS_PAGER=""
 ```
 
 ## 2. Build the bundle and zip it
@@ -88,8 +89,7 @@ done
 ```text
 aws cloudformation describe-stacks --stack-name gg-app-data --region us-east-2 \
   --query "Stacks[0].Outputs[].[OutputKey,OutputValue]" --output text
-export FN_URL=$(aws cloudformation describe-stacks --stack-name gg-app-data --region us-east-2 \
-  --query "Stacks[0].Outputs[?OutputKey=='FunctionUrl'].OutputValue" --output text)
+export FN_URL=$(aws lambda get-function-url-config --function-name gg-app-data --query FunctionUrl --output text)
 FN_URL=${FN_URL%/}
 ```
 
@@ -143,18 +143,18 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$FN_URL/v1" \
   -H 'content-type: application/json' -d '{"action":"getProfile","args":{}}'
 ```
 
-Signed call with a real user token. Clerk session tokens last about 60 seconds, so copy a fresh one
-right before you run this. It is read without echo. Expect `200`; put the status code in the PR, not the
-token or body. The key pair goes to curl on stdin (`-K -`), not on the command line.
+Signed call. Clerk session tokens last about 60 seconds, so copy a fresh one right before you run
+this. Expect `401` without `USER_TOKEN` and `200` with a fresh one. The script prints only the status
+code and the first 120 characters of the body. The script reads the keys from the line, so nothing is
+exported.
 
 ```text
-read -rs USER_TOKEN
-printf 'user = "%s:%s"\n' "$WORKER_KEY" "$WORKER_SECRET" | curl -s -o /dev/null -w '%{http_code}\n' -K - \
-  -X POST "$FN_URL/v1" --aws-sigv4 "aws:amz:us-east-2:lambda" \
-  -H 'content-type: application/json' -H "x-gg-user-token: $USER_TOKEN" \
-  -d '{"action":"getProfile","args":{}}'
-unset USER_TOKEN WORKER_KEY WORKER_SECRET
+WORKER_KEY=... WORKER_SECRET=... FN_URL="$FN_URL" node infra/aws/sign-test.mjs
+WORKER_KEY=... WORKER_SECRET=... FN_URL="$FN_URL" USER_TOKEN=... node infra/aws/sign-test.mjs
 ```
+
+We dropped `curl --aws-sigv4` because it returned `403 Forbidden` for a call that aws4fetch signs
+correctly. We did not find the root cause.
 
 With an expired or bad token you should get `401` (not `403`): that proves AWS let the call in and the
 function rejected the user. If the signed call returns `403`, see "If the signed call is denied" below.
