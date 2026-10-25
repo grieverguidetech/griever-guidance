@@ -1,24 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authStorage, createProfileCache } from './authStorage';
-
-describe('authStorage', () => {
-  it('round-trips a value through AsyncStorage', async () => {
-    await authStorage.setItem('sb-token', '{"a":1}');
-    expect(await authStorage.getItem('sb-token')).toBe('{"a":1}');
-    expect(await AsyncStorage.getItem('sb-token')).toBe('{"a":1}');
-    await authStorage.removeItem('sb-token');
-    expect(await authStorage.getItem('sb-token')).toBeNull();
-  });
-});
+import { createProfileCache } from './authStorage';
 
 describe('createProfileCache', () => {
-  it('reads synchronously after hydrating from AsyncStorage', async () => {
+  it('reads the profile and the signed-in marker synchronously after hydrating from AsyncStorage', async () => {
     await AsyncStorage.setItem('gg.profile.v1', '{"senderName":"Sam","contactSource":null}');
+    await AsyncStorage.setItem('gg.signedIn.v1', 'u1');
     const cache = createProfileCache();
     expect(cache.getItem('gg.profile.v1')).toBeNull();
     await cache.hydrate();
     expect(cache.getItem('gg.profile.v1')).toBe('{"senderName":"Sam","contactSource":null}');
+    expect(cache.getItem('gg.signedIn.v1')).toBe('u1');
   });
 
   it('writes through to AsyncStorage and removes from both', async () => {

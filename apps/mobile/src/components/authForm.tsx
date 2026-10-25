@@ -114,6 +114,21 @@ export function PrimaryButton({ label, pending, onPress }: { label: string; pend
   );
 }
 
+/** An outlined button for a choice that sits beside the primary action. */
+export function SecondaryButton({ label, pending, onPress }: { label: string; pending: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.secondary, (pending || pressed) && styles.buttonDisabled]}
+      onPress={onPress}
+      disabled={pending}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: pending }}
+    >
+      <Text style={styles.secondaryText}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function LinkButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable style={styles.link} onPress={onPress} accessibilityRole="button">
@@ -154,6 +169,17 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
+  secondary: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  secondaryText: { color: ACCENT, fontSize: 15, fontWeight: '500' },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 12 },
   linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
 });

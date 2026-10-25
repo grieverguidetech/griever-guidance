@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import type { UseSupabaseIdentityResult } from '@griever/hooks';
+import type { UseAccountResult } from '@griever/hooks';
 import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { NAME_REQUIRED } from './SignUpScreen';
 
 export const SESSION_ENDED = "You've been signed out. Your work on this device is safe. Sign in again when you're ready.";
 
 type Props = {
-  identity: UseSupabaseIdentityResult;
+  identity: UseAccountResult;
   /** A name typed at sign-up that is not saved yet; shown in the field until it is. */
   initialName?: string | null;
   /** The server ended the session: keep the typed name and offer sign in. */

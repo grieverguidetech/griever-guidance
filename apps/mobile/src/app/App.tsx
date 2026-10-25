@@ -15,7 +15,6 @@ import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider } from '../lib/AccountProvider';
-import { authClient } from '../lib/authClient';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
@@ -382,7 +381,7 @@ const SendAppWhenReady = () => {
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () =>
   AUTH_ENABLED ? (
-    <AccountProvider client={authClient}>
+    <AccountProvider>
       <SendAppWhenReady />
     </AccountProvider>
   ) : (
