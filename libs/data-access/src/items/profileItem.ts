@@ -1,4 +1,7 @@
-import { UpdateCommand, type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import {
+  UpdateCommand,
+  type DynamoDBDocumentClient,
+} from '@aws-sdk/lib-dynamodb';
 import type { AccountContactSource } from '@griever/shared';
 import type { Clock } from '../clock.js';
 import { profileKey } from '../keys.js';
@@ -34,7 +37,15 @@ export function encodeProfile(profile: Profile): Item {
 }
 
 export function decodeProfile(item: Item): Profile {
-  const { userId, accountType, version, createdAt, updatedAt, senderName, contactSource } = item;
+  const {
+    userId,
+    accountType,
+    version,
+    createdAt,
+    updatedAt,
+    senderName,
+    contactSource,
+  } = item;
   if (
     typeof userId !== 'string' ||
     (accountType !== 'owner' && accountType !== 'member') ||
@@ -44,9 +55,16 @@ export function decodeProfile(item: Item): Profile {
   ) {
     throw new Error('Profile item is broken.');
   }
-  const profile: Profile = { userId, accountType, version, createdAt, updatedAt };
+  const profile: Profile = {
+    userId,
+    accountType,
+    version,
+    createdAt,
+    updatedAt,
+  };
   if (typeof senderName === 'string') profile.senderName = senderName;
-  if (contactSource === 'import' || contactSource === 'manual') profile.contactSource = contactSource;
+  if (contactSource === 'import' || contactSource === 'manual')
+    profile.contactSource = contactSource;
   return profile;
 }
 
@@ -61,10 +79,9 @@ export async function getProfile(
 }
 
 export interface ProfileFields {
-  senderName?: string;
-  contactSource?: AccountContactSource;
+  senderName?: string | null;
+  contactSource?: AccountContactSource | null;
 }
-
 /**
  * Creates or updates the profile (access pattern 2). It sets only the given fields and the
  * timestamps. `accountType`, `version` and `createdAt` are set once with `if_not_exists`;
@@ -114,4 +131,3 @@ export async function saveProfileFields(
   );
   return decodeProfile(Attributes as Item);
 }
-
