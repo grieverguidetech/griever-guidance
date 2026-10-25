@@ -74,7 +74,7 @@ const REMOVE_MEMBER_OF = 1;
 
 /**
  * Removes one of the caller's members. One transaction deletes both membership items and sets the
- * member's profile back to owner with a version bump (the Supabase trigger did this). Another owner's
+ * member's profile back to owner with a version bump. Another owner's
  * member, the caller themself, and an unknown id all answer not_found.
  */
 export async function removeMember(

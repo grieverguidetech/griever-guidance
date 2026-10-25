@@ -175,9 +175,8 @@ that costs money; changing design tokens or brand colors.
 read or print `.env*` (other than `.env.example`) or secrets; paste secrets into issues, PRs,
 commits, or prompts; merge your own PR; force-push to `main`.
 
-**Asking for a secret.** State the exact format or prefix (e.g. `SUPABASE_ACCESS_TOKEN` is an
-`sbp_` personal access token from Account → Access Tokens) and give a local check command
-(`supabase login`) to run before setting it.
+**Asking for a secret.** State the exact format or prefix (e.g. `CLERK_PUBLISHABLE_KEY` starts
+`pk_`, never `sk_`) and give a local check command to run before setting it.
 
 **Asking well.** One message per gate: what was done (3–6 lines), what you need decided, your
 recommendation, and the exact next step if approved. Batch questions. Don't ask what the docs
@@ -271,7 +270,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
   Dispatching it is ask-first (§2); propose a `repeat_each` when asking.
 - Axe is a floor, not a claim. Known, tracked failures use Playwright's `test.fail()` with the
   issue named, which turns red once fixed. `.skip` is never allowed.
-- Gateway tests never call Supabase or Anthropic; stub `fetch` and env.
+- Gateway tests never call Clerk, AWS or Anthropic; stub `fetch` and env.
 
 ## 8. Verifying
 
@@ -285,9 +284,9 @@ Then go beyond the tests where the change warrants it:
 
 - **UI changes:** run the app (`pnpm dev`, `pnpm dev:mobile`) and walk the affected screens on a
   phone-width viewport. Type-checking is not the same as working.
-- **Supabase/PostgREST changes:** stubbed tests don't see grants or RLS. Run the code once against
-  the real migrations (`supabase start --workdir infra`, minimal services) before review, and quote
-  the output in the PR.
+- **Data function changes:** stubbed tests don't see real DynamoDB behaviour. Run the code once
+  against DynamoDB Local (`infra/aws-local`, `docs/aws-local.md`) before review, and quote the
+  output in the PR.
 - **Gateway/deploy changes:** `CORS_ORIGINS` must match the real deployed origin exactly.
 - **Mobile dependencies:** pin Expo/React Native packages to the SDK's `bundledNativeModules`
   versions; never `"*"`.

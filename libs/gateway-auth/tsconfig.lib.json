@@ -18,8 +18,7 @@
     "out-tsc",
     "dist",
     "src/**/*.spec.ts",
-    "src/**/*.test.ts",
-    "src/testSupabase.ts"
+    "src/**/*.test.ts"
   ],
   "include": [
     "src/**/*.ts"

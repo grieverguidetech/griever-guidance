@@ -4,9 +4,9 @@
  */
 
 /**
- * Sign-up/sign-in (email and password, on Supabase). Off until the app has
+ * Accounts (sign-up and sign-in through Clerk). Off until the app has
  * users: with it off, nobody is asked for an account, onboarding starts at
- * adding contacts, and the auth client (supabase-js) is never loaded.
+ * adding contacts, and Clerk is never loaded.
  */
 export const AUTH_ENABLED = import.meta.env['VITE_FEATURE_AUTH'] === 'true';
 

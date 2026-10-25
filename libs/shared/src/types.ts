@@ -150,9 +150,9 @@ export interface ObituaryResponse {
 }
 
 /**
- * One row per signed-in account (Supabase `public.profiles`). App state only:
+ * One profile per signed-in account. App state only:
  * no contact or message fields ever belong here (C2, C3, C4). Email lives in
- * Supabase Auth, not on the profile. Timestamps are ISO strings.
+ * Clerk, not on the profile. Timestamps are ISO strings.
  */
 export interface Profile {
   id: string;

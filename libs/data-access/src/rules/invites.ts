@@ -12,7 +12,7 @@ import { runAction, type TransactItem, type RunOptions } from '../transact.js';
 import { bumpOwnerVersion } from './members.js';
 import { Refusal, profileWrite, type FlowResult } from './flows.js';
 
-/** Same limits as create_invite in Supabase. */
+/** Limits on invites. */
 export const INVITES_PER_DAY = 10;
 export const MAX_OPEN_INVITES = 20;
 export const INVITE_LIFETIME_DAYS = 7;

@@ -40,7 +40,7 @@ const ACCEPT_MEMBER = 1;
  *   3 the caller's profile, set to member (version check, or a new profile)
  *   4 the owner's profile, version bump (must still be an owner)
  *   5 the owner has no MEMBER_OF          6.. the caller's own live open invites, revoked
- * These conditions take the place of the row locks in Supabase accept_invite. Any failed condition
+ * These conditions take the place of the row locks in the old SQL accept_invite. Any failed condition
  * means the reads were stale, so the whole action runs again: the new reads then give the right
  * answer. A caller who owns people, has members or is already a member gets invite_conflict, but
  * only after the token checks pass. Every token failure gives the same `unusable` result.

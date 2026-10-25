@@ -9,7 +9,7 @@ export interface ClerkConfig {
   authorizedParties: string[];
 }
 
-/** Set on the Hono context by `clerkAuth`. `userId` and `accessToken` match `supabaseAuth`. */
+/** Set on the Hono context by `clerkAuth`. */
 export interface ClerkAuthVariables {
   userId: string;
   accessToken: string;

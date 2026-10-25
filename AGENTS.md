@@ -65,7 +65,7 @@ the role's brief.
 
 - **pnpm** (pinned via `packageManager`) + **Nx**. Never npm or yarn.
 - `apps/`: `web` (React + Vite + Tailwind), `mobile` (Expo), `gateway` (Hono on Cloudflare
-  Workers, fronting Supabase), `marketing` (Astro), `web-e2e` (Playwright).
+  Workers, fronting the AWS data function), `marketing` (Astro), `web-e2e` (Playwright).
 - `libs/`: `shared`, `api-client`, `hooks`, `data-local`, `data-sync`, `contacts`,
   `identity`, `gateway-messages`, `gateway-auth`, `gateway-flows`.
 - Tests: **Vitest** (+ React Testing Library, jest-dom, fake-indexeddb) for unit and

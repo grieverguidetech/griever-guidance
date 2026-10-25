@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AccountAuth, AccountAuthStatus } from '@griever/shared';
 import { getProfile, updateProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
-import { PROFILE_STORAGE_KEY, identityErrorMessage } from './useSupabaseIdentity.js';
-import type { CachedProfile } from './useSupabaseIdentity.js';
+import { PROFILE_STORAGE_KEY, identityErrorMessage } from './accountCache.js';
+import type { CachedProfile } from './accountCache.js';
 import type { SendFlowStorage } from './useSendFlow.js';
 
 /** Holds the signed-in user id, so a screen can show the right shell before the provider is ready. */

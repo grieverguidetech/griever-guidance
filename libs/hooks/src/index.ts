@@ -5,7 +5,7 @@ export * from './useSessions.js';
 export * from './usePathMoments.js';
 export * from './useContacts.js';
 export * from './useMockContacts.js';
-export * from './useSupabaseIdentity.js';
+export * from './accountCache.js';
 export * from './useMembers.js';
 export * from './useFlowSync.js';
 export * from './useFirstVisitIntro.js';

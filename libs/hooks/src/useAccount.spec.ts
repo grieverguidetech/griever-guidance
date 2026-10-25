@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { AccountAuth, AccountTokenResult, Profile } from '@griever/shared';
 import { SIGNED_IN_STORAGE_KEY, useAccount } from './useAccount.js';
-import { PROFILE_STORAGE_KEY } from './useSupabaseIdentity.js';
+import { PROFILE_STORAGE_KEY } from './accountCache.js';
 import type { SendFlowStorage } from './useSendFlow.js';
 
 const fetchMock = vi.fn();

@@ -1,5 +1,8 @@
 # AWS migration plan (GRI-8)
 
+> **Update (#326):** Supabase is retired. Its code, CI job, deploy steps and `infra/supabase/` were
+> removed. Text below that treats Supabase as current is kept as history.
+
 Status: proposal, version 4.1. This document does not change infrastructure. Date: 2026-10-20.
 Updated 2026-10-24: decision 9 (start fresh, move no data).
 

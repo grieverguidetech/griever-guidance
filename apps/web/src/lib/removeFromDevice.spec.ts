@@ -2,7 +2,7 @@ import { contactStore } from '@griever/data-local';
 import { removeEverythingFromDevice } from './removeFromDevice';
 
 describe('removeEverythingFromDevice', () => {
-  it('removes contacts, gg.* keys and an old supabase session, leaves other keys, and ends the session', async () => {
+  it('removes contacts, gg.* keys and a legacy supabase session, leaves other keys, and ends the session', async () => {
     await contactStore.put({ contactId: 'c1' } as never);
     localStorage.setItem('gg.sessions.v1', '[]');
     localStorage.setItem('sb-abc-auth-token', '{}');

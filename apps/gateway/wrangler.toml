@@ -18,15 +18,6 @@ routes = [
 # no "allow all" mode here; always set this explicitly.
 CORS_ORIGINS = "https://web.grieversguidance.com"
 
-# Supabase project (accounts). The gateway verifies the caller's session token
-# against ${SUPABASE_URL}/auth/v1/.well-known/jwks.json and talks to PostgREST
-# with the anon key plus that token, so RLS applies. The anon key is public by
-# design; there is no service-role key. Empty means /me/* answers 503.
-# In production, deploy.yml overrides both from the repo variables SUPABASE_URL
-# and SUPABASE_ANON_KEY (when set), so these stay empty here.
-SUPABASE_URL = ""
-SUPABASE_ANON_KEY = ""
-
 # Clerk accounts. The gateway verifies the caller's Clerk session token against
 # the issuer's published keys. No Clerk secret key is used or stored here.
 # CLERK_ISSUER is the https Frontend API URL of the Clerk instance.

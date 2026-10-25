@@ -20,9 +20,10 @@ export function markSignOutPending(storage: Pick<Storage, 'setItem'> = globalThi
 
 /**
  * Every localStorage key this app owns: `gg.*` (sessions, drafts, profile cache, pointers, markers)
- * and a Supabase session left on the device by an earlier version.
+ * and a Supabase session left on the device from when Supabase Auth was live.
  */
 function isOurKey(name: string): boolean {
+  // The sb-…-auth-token pattern is a legacy key, keep.
   return name.startsWith('gg.') || /^sb-.+-auth-token(-code-verifier|-user)?$/.test(name);
 }
 

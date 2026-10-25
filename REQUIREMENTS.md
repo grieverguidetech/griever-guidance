@@ -29,8 +29,8 @@ These are not features; breaking one is a defect regardless of what it enables.
 | # | Constraint | Source |
 |---|---|---|
 | C1 | Messages are sent from the user's own phone via an `sms:` deep link, one contact at a time. No backend SMS path, no bulk send, no business number. Account emails (confirmation, reset, invites) come from the backend. They never carry message content, contacts, or the deceased person's details. | §6 rule 3 |
-| C2 | Message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to Supabase. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
-| C3 | Contact data never reaches the gateway. Contact data **and contact ids** never reach the gateway or Supabase in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
+| C2 | Message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to the AWS data function. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
+| C3 | Contact data never reaches the gateway. Contact data **and contact ids** never reach the gateway or the data function in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
 | C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
 | C5 | Offline-first: nothing after sign-up may wait on the network, and nothing inside a flow ever does. Only account actions (sign-up, sign-in, reset, invite, revoke an invite, join, remove a member) need a connection, and they say so calmly. The device is authoritative. | DATA.md posture |
 | C6 | Sign-in (email today, Facebook later) is identity only — never a friends list, never a DM path. Members are added only by an owner typing an email. They are never suggested. | §6 "Identity" |
@@ -38,7 +38,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | C8 | Every gateway route validates its request body/query. | §6 "What not to do" |
 | C9 | Deletion is never offered inside a flow or as a swipe action — only in settings. Removing a member or revoking an invite happens in profile or settings only. | DATA.md §7 |
 | C10 | The product never implies an order to funeral planning other than the real one: pronouncement → custody → burial/cremation → service → obituary → broader public announcement. Telling close family and friends first, one at a time from the user's own phone (the app's "Announce the passing" step), is not that public announcement and can happen at any point. Never ask for an obituary link during setup. | design_specs README |
-| C11 | Members can't create a person. Enforced by database rules (RLS), not just the UI. | §6 "Identity"; DATA.md "Shared people (Supabase)" |
+| C11 | Members can't create a person. Enforced by the data function's rules, not just the UI. | §6 "Identity"; DATA.md "Shared people" |
 
 ---
 
@@ -55,10 +55,10 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 |---|---|---|---|---|
 | ID-1 | Sign up / sign in with Facebook | Not started | Not started | Planned later (#36); the old path is removed |
 | ID-2 | Sign up / sign in with Instagram | Dropped | Dropped | Personal IG accounts have no login API; Business/Creator only, and no email |
-| ID-3 | Email/password sign-up and sign-in on Supabase Auth, non-enumerating errors | Done (live in production) | Done (flag on only) | `@griever/api-client/auth`, `useSupabaseIdentity`; passwords never reach the gateway |
+| ID-3 | Sign-up and sign-in on Clerk, non-enumerating errors | Done (live in production) | Done (flag on only) | Clerk (`apps/web/src/lib/clerk.tsx`, `useAccount`); passwords never reach the gateway. Supabase Auth was retired (#326) |
 | ID-4 | Google sign-in | Not started | Not started | No button in the UI yet |
 | ID-5 | X sign-in | Not started | Not started | No button in the UI yet |
-| ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Supabase JWT (`supabaseAuth` verifies it for `/me/*`); shared people sync reads it through Supabase instead (`flows.owner_id`, #130); the Convex `/sync/*` stub was removed (#203) |
+| ID-6 | Session token verified server-side on `/sync/*`, replacing the `GG_DEV_AUTH` stub | Superseded | — | The session is now a Clerk token (`clerkAuth` verifies it); the Convex `/sync/*` stub was removed (#203) |
 | ID-7 | Account before session — sign-up needs a connection; everything after works offline | Done (live in production) | Partial | DATA.md "Settled"; mobile is suspended while its flag is off |
 | ID-8 | An owner invites a member by typing their email (in profile) | Not started | Not started | Planned: #116, #117 (database), #120 (shared types), #121, #122, #124 (gateway), #125 (hooks), #126 (web), #129 (mobile). Email is typed, never picked from contacts (C3, C6) |
 | ID-9 | A member joins from the emailed link (web in v1) | Not started | Not started | Planned: #117, #128 (web); mobile join is a follow-up (#139) |
@@ -102,12 +102,12 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
-| DS-1 | Cursor-based pull/push through the gateway | Removed | The Convex backend and the `/sync/*` routes were removed (#203). `libs/data-sync` stays as unused client code. Shared people sync uses Supabase (DS-6) |
+| DS-1 | Cursor-based pull/push through the gateway | Removed | The Convex backend and the `/sync/*` routes were removed (#203). `libs/data-sync` stays as unused client code. Shared people sync uses the AWS data function (DS-6) |
 | DS-2 | Send-flow state writes into `libs/data-local`'s screen-keyed store so the outbox has something to flush | Not started | Outbox is currently always empty |
 | DS-3 | Sync is invisible — no spinners or "saving…" states | Partial | DATA.md §4.6 |
 | DS-4 | Deleted sessions soft-delete, hard-purge at 90 days | Removed | The Convex purge cron was removed (#203). No server holds sessions now |
 | DS-5 | "Delete everything" in settings purges immediately, clears every local store | Partial | The Convex server mutation was removed (#203). Local clearing only |
-| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through Supabase; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138). DATA.md "Shared people (Supabase)" |
+| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through the AWS data function; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138). DATA.md "Shared people" |
 
 ### 3.6 Marketing
 
@@ -134,8 +134,8 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 **Reversed by the family-sharing G1 (2026-10-11):** the read-only snapshot direction (#23, #39) is
 dropped. An owner can invite family members by email, members work on the owner's people, and
-person details (not messages, drafts or contacts) sync through Supabase. See C1, C2, C3, C5, C6,
-C9, C11 in §2 and DATA.md "Shared people (Supabase)".
+person details (not messages, drafts or contacts) sync through the AWS data function. See C1, C2, C3, C5, C6,
+C9, C11 in §2 and DATA.md "Shared people".
 
 These need a product-owner decision before the related work can be called done. Do not resolve
 them in code by assumption — raise them.
@@ -192,13 +192,13 @@ libs/
                     `ContactSource` adapter interface, normalize/dedupe/rank, and the
                     fetch → review → commit pipeline. Device-specific adapters (the web Contact
                     Picker, mobile's expo-contacts) live in the app that owns that device API.
-  identity/         The gateway's side of Supabase accounts: verifies the Supabase JWT and serves
+  identity/         The gateway's side of accounts: verifies the Clerk token and serves
                     GET/PUT /me/profile. Owns its own Hono router, mounted by apps/gateway.
                     See "Identity" below — this is who a user is, never their friends or contacts.
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
                     sending happens entirely on-device (see "The send flow").
   gateway-auth/     The one shared helper for the gateway's domain libs:
-                    Supabase JWT verification and a PostgREST client that acts as the caller.
+                    Clerk token verification and the signed client for the AWS data function.
   gateway-flows/    Invite and member routes (GET /members, POST /invites, POST /invites/accept,
                     DELETE /invites/:id, DELETE /members/:memberId) and the invite mailer; mounted
                     by apps/gateway. The /flows routes are planned (#131).
@@ -216,8 +216,9 @@ libs/
 |---|---|
 | Mobile | Expo + React Native (core components only) |
 | Web | React + Vite + Tailwind |
-| Gateway | Hono on Cloudflare Workers, fronting Supabase |
-| Data | Supabase Postgres (accounts, shared people). Convex was removed (#203) |
+| Gateway | Hono on Cloudflare Workers, fronting the AWS data function |
+| Accounts | Clerk |
+| Data | DynamoDB behind an AWS Lambda data function (accounts, shared people). Convex and Supabase were removed (#203, #326) |
 | Marketing | Astro |
 | Package manager | pnpm — never npm or yarn |
 | Monorepo | Nx (task running, code generation) |
@@ -241,7 +242,7 @@ URLs to hand users or hardcode.
 | `api.grieversguidance.com` | gateway (Worker `griever-guidance-gateway`) | `apps/gateway/wrangler.toml` `routes` |
 
 `VITE_API_URL` and `PUBLIC_WEB_URL` are set in `.github/workflows/deploy.yml`; `CORS_ORIGINS` in
-`apps/gateway/wrangler.toml`. `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `FEATURE_AUTH` are GitHub repo
+`apps/gateway/wrangler.toml`. `CLERK_ISSUER`, `DATA_FUNCTION_URL` and `FEATURE_AUTH` are GitHub repo
 variables that the deploy workflow passes to the gateway and the web build.
 
 ---
@@ -267,10 +268,10 @@ Never define a type in an app that anything else might need. If it crosses a bou
 Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app code.
 
 **2a. The gateway is the only thing that holds server credentials.**
-`apps/web` calls `apps/gateway`'s REST endpoints (and Supabase with the public anon key under RLS). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.)
+`apps/web` calls `apps/gateway`'s REST endpoints (and Clerk, with its public publishable key). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.)
 
 **2b. Identity, messages, and flows are separate libs — no cross-imports.**
-`libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Supabase JWT verification plus PostgREST calls made as the caller), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` still never import each other.
+`libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Clerk token verification plus the signed calls to the data function), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` still never import each other.
 
 **3. Messages are sent from the user's own phone, never a backend.**
 There is no server-side SMS provider (no Twilio, no `libs/sms`) — a bulk send from a business number reads as impersonal for a grief app. Sending is an `sms:` deep link (`buildSmsLink()` in `libs/hooks`) that opens the device's native Messages app with one contact and the message pre-filled; the user taps Send themselves, one contact at a time. Nothing in this repo may add a backend message-sending path.
@@ -339,45 +340,36 @@ single stored service date was removed (#85).
 2026-10-11 (`FEATURE_AUTH=true`). `apps/web` shows sign-up/sign-in only when built with
 `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`), and `apps/mobile` only with
 `EXPO_PUBLIC_FEATURE_AUTH=true` (`apps/mobile/src/lib/features.ts`); anything else is off, and
-mobile is not switched on yet. With the flag off, onboarding starts at adding contacts, `useSupabaseIdentity` is not used, and sync
+mobile is not switched on yet. With the flag off, onboarding starts at adding contacts, `useAccount` is not used, and sync
 never starts (it needs a signed-in `userId`).
 
-Accounts are Supabase Auth, email and password only. The client signs up, signs in, and signs out
-through `@griever/api-client/auth` (supabase-js); the session lives in the client and is read
-through the `useSupabaseIdentity` hook (`libs/hooks`), which web and mobile share. Facebook
+Accounts are Clerk. The client signs up, signs in, and signs out through Clerk's own screens on web (they show Clerk's own sign-in error copy; `libs/hooks/src/accountCache.ts` holds only the app's own account-error copy). Mobile signs up with its own `SignUpScreen` using Clerk's `useSignUp`. The
+session lives in Clerk and is read through the `useAccount` hook (`libs/hooks`). Facebook
 sign-in is planned later (#36); Instagram is dropped (personal accounts have no login API, and
 Instagram never supplies an email); Google and X are not built. Nothing in this repo talks to
 Facebook's or Instagram's OAuth endpoints today.
 
 `libs/identity` is the gateway's side, and it answers one question, **who is this**. The token check lives in `libs/gateway-auth`; `libs/identity` uses it:
 
-- `supabaseAuth` (`libs/gateway-auth/src/supabaseJwt.ts`) verifies the caller's Supabase access token against the
-  project's JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`). It also checks
-  `iss = ${SUPABASE_URL}/auth/v1`; a wrong or missing issuer is a 401.
-- Supabase signing-key rotation must use the standby-key step (publish the new key first, then
-  switch), because the gateway refetches the JWKS on an unknown `kid` at most every 30 s. Cached
-  keys also live for 5 minutes (`JWKS_TTL_MS`), so a revoked key can still verify tokens for up to
-  5 minutes per isolate; keep that in mind for an emergency revoke.
-- `profileRouter` serves `GET/PUT /me/profile` (the sender name) against Supabase PostgREST as the
-  signed-in caller (anon key plus their JWT, so row-level security applies). There is no
-  service-role key (see the family-sharing rule below). With `SUPABASE_URL` or `SUPABASE_ANON_KEY` unset the routes answer 503.
+- `clerkAuth` (`libs/gateway-auth/src/clerkAuth.ts`) verifies the caller's Clerk session token against
+  the issuer's published keys (`CLERK_ISSUER`); a wrong or missing issuer is a 401.
+- `profileRouter` serves `GET/PUT /me/profile` (the sender name) through the AWS data function,
+  as the signed-in caller. With `DATA_FUNCTION_URL` unset the routes answer 503.
 - Invitations: `POST /invites` creates the invite and emails the link (via Resend, from
   `INVITE_FROM_EMAIL`, pointing at `WEB_URL`); if the email cannot be sent the invite is revoked and
   the caller gets a calm 503. The routes live in `libs/gateway-flows`.
 - Sign-in errors use one generic message whether the email exists or not, so a failed attempt never
-  confirms which one (the copy lives in `useSupabaseIdentity`).
+  confirms which one (the copy lives in `libs/hooks/src/accountCache.ts`).
 - **The Convex `/sync/pull` and `/sync/push` routes were removed (#203).** They never worked in
-  production (`requireUser` dev stub, `GG_DEV_AUTH`). Person details sync through a Supabase
-  `flows` table whose `flows.owner_id` is `auth.users.id` (#130). Nothing in the web send flow
+  production (`requireUser` dev stub, `GG_DEV_AUTH`). Person details sync through the AWS data function (`flows`, #130). Nothing in the web send flow
   (`useSessions`, `useSendFlow`) writes into `libs/data-local`'s screen-keyed store, and the web app
   no longer registers any sync; see DATA.md.
 - **Family sharing (decided at G1, 2026-10-11; not built yet).** An owner adds members only by
   typing an email (C6). Still **no service-role key**: invites use our own single-use token, and a
-  joiner redeems it through an RPC called under their own JWT, so row-level security applies to
-  every step. Members can't create a person (C11), enforced by RLS. Tickets: #116, #117, #121,
+  joiner redeems it through the data function under their own Clerk token. Members can't create a person (C11), enforced by the data function. Tickets: #116, #117, #121,
   #122, #128, #130.
 
-**Accounts live in Supabase `profiles`** (see "Supabase boundary" under Database). The Convex
+**Accounts live in the data function's `profiles` items** (see "Accounts boundary" under Database). The Convex
 backend, with its `identities`, `profiles`, `sessions` and `counters` tables, was removed (#37,
 #203). Everything else in this repo reaches a user only by their opaque `userId`.
 
@@ -392,21 +384,19 @@ path described under "Contacts" and "The send flow". The two never merge.
 
 ### Database
 
-Supabase Postgres is the only server database. Convex was removed (#203). See `DATA.md` for the
-data architecture (the screen-keyed local session document and the Supabase shared-people design).
+DynamoDB, behind the AWS data function, is the only server database. Convex and Supabase were removed
+(#203, #326). See `DATA.md` for the data architecture (the screen-keyed local session document and
+the shared-people design).
 
-Contact data is never sent to the gateway or Supabase. Contact *ids* never appear in shared person
+Contact data is never sent to the gateway or the data function. Contact *ids* never appear in shared person
 sync (C3). Message content is never stored anywhere, by anything — not a send history, not a log —
 only composed client-side and handed to the device's own Messages app at send time (see "The send flow").
 
-**Supabase boundary (accounts).** App state tied to an account (the `profiles` row: sender name and
-contact source; the email lives in Supabase Auth) is stored in Supabase Postgres, with row-level
-security so a user reaches only their own row and no delete policy (C9). Contacts, drafts and message content stay on the device and reach no
-server (C2, C3, C4); only person details sync. Migrations and pgTAP tests live in `infra/supabase/`; migrations must stay backward-compatible
-with the live gateway. Supabase is the only account path.
-`checklistTicks` is not carried over yet. Shared people details will live in Supabase too (a
-`flows` table with `flows.owner_id` = `auth.users.id`, plus memberships, #116, #130); see DATA.md
-"Shared people (Supabase)".
+**Accounts boundary.** App state tied to an account (the profile: sender name and contact source; the
+email lives in Clerk) is stored in DynamoDB by the data function, and a user reaches only their own
+profile, with no delete path (C9). Contacts, drafts and message content stay on the device and reach no
+server (C2, C3, C4); only person details sync. Shared people details live in the same table
+(`flows` plus memberships, #116, #130); see DATA.md "Shared people".
 
 ---
 
@@ -414,7 +404,7 @@ with the live gateway. Supabase is the only account path.
 
 ```
 apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
-              SUPABASE_URL, SUPABASE_ANON_KEY (public wrangler [vars]; no service-role key)
+              CLERK_ISSUER, CLERK_AUTHORIZED_PARTIES (public wrangler [vars])
               INVITE_FROM_EMAIL, WEB_URL (wrangler [vars]), RESEND_API_KEY (Worker secret, set by
               deploy.yml from the GitHub secret; skipped when empty, and a key already on the
               Worker stays; to remove it: `wrangler secret delete RESEND_API_KEY --config
@@ -425,13 +415,13 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               (Worker secrets, set by deploy.yml from the GitHub secrets; both skipped when
               either is empty; rotate every 90 days: docs/aws-data-function.md)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
-              VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (read only when the flag is on)
+              VITE_CLERK_PUBLISHABLE_KEY (read only when the flag is on)
               VITE_FEATURE_SHARING ("true" enables sharing; default off)
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
 apps/mobile   EXPO_PUBLIC_API_URL
 ```
 
-Production repo variables (public, not secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
+Production repo variables (public, not secrets): `CLERK_ISSUER`, `CLERK_PUBLISHABLE_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
 (off until the PO sets it to `true`), `DATA_FUNCTION_URL`. The gateway's Worker secrets are `RESEND_API_KEY`,
 `DATA_FUNCTION_ACCESS_KEY_ID` and `DATA_FUNCTION_SECRET_ACCESS_KEY` (from the repo secrets of the same names).
 Web production has `FEATURE_AUTH=true` (since 2026-10-11). To turn accounts off or on again, change it
