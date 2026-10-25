@@ -9,7 +9,7 @@ import { App } from './app';
 
 type User = ReturnType<typeof userEvent.setup>;
 
-const OTHER_KEYS = ['gg.profile.v1', 'gg.activeSessionId', 'gg.userId', 'gg.sendflow.v1'];
+const OTHER_KEYS = ['gg.profile.v1', 'gg.activeSessionId', 'gg.userId', 'gg.sendflow.v1', 'sb-demo-auth-token'];
 const REMOVE = 'Remove everything from this device';
 
 async function reachPathLanding(user: User) {

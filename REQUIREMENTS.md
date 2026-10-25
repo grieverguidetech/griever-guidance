@@ -343,7 +343,7 @@ single stored service date was removed (#85).
 mobile is not switched on yet. With the flag off, onboarding starts at adding contacts, `useAccount` is not used, and sync
 never starts (it needs a signed-in `userId`).
 
-Accounts are Clerk. The client signs up, signs in, and signs out through Clerk's own screens; the
+Accounts are Clerk. The client signs up, signs in, and signs out through Clerk's own screens on web (they show Clerk's own sign-in error copy; `libs/hooks/src/accountCache.ts` holds only the app's own account-error copy). Mobile signs up with its own `SignUpScreen` using Clerk's `useSignUp`. The
 session lives in Clerk and is read through the `useAccount` hook (`libs/hooks`). Facebook
 sign-in is planned later (#36); Instagram is dropped (personal accounts have no login API, and
 Instagram never supplies an email); Google and X are not built. Nothing in this repo talks to

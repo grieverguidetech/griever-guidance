@@ -37,7 +37,7 @@ Each app holds only its screens and its storage adapters.
 | `@griever/data-local` | IndexedDB stores: contacts, account (checklist ticks, sender name), meta | Yes | No. Mobile has its own AsyncStorage copy in `apps/mobile/src/lib/contactStore.ts`. |
 | `@griever/data-sync` | Removed in #203 (was device id, gateway URL, service worker and Background Sync registration) | No | No |
 | `@griever/contacts` | Contact import sources and phone normalizing | Yes | Yes |
-| `@griever/api-client` | Auth client (`@griever/api-client/auth`), gateway calls | Yes | Yes (auth only) |
+| `@griever/api-client` | Gateway calls | Yes | Yes |
 
 There is no `ui-web` library in the repo today. The web UI parts live in
 `apps/web/src/lib/ui.tsx` and `apps/web/src/styles.css`.
@@ -74,10 +74,6 @@ router. The browser Back button does not move between views (not verified in a b
 | "Reaching people, one at a time" | `SendingScreen.tsx` | Review | The hub with a finish note after the last person | None |
 | "What you'll need" | `WhatYoullNeed.tsx` | "What you'll need" button on the hub, on Home and setup screens (via `TopBar`), and on flow screens | Back to the screen it was opened from (`CHECKLIST_RETURNS` in `app.tsx`). From a flow or gate it returns to the hub. | None |
 | "Settings" | `Settings.tsx` | Home | Home. "Remove everything from this device" clears the device and restarts at the first screen. | None |
-| "Grievers Guidance" (sign-up) | `SignUp.tsx` | App start | "Your account" (first profile) after sign-up. "Sign in". | `AUTH` |
-| "Sign in" | `CreateAccount.tsx` | Sign-up screen. The "You've been signed out" note. | Home. "Reset your password". | `AUTH` |
-| "Reset your password" | `ForgotPassword.tsx` | "Sign in" | Email is sent; Back to "Sign in" | `AUTH` |
-| "Choose a new password" | `ChooseNewPassword.tsx` | App opened from a reset email link | Home | `AUTH` |
 | "Your account" or "What should we call you?" | `Profile.tsx` | Home ("Your account"). Straight after sign-up. Any screen when the account has no name. | Home, or the screen the name prompt interrupted. Sign out goes to sign-up. | `AUTH` |
 | "Accounts aren't available right now" | inline in `app.tsx` (`AuthGate`) | App start when the auth client fails to load and no session is stored | Same screen ("Try again") | `AUTH` |
 
