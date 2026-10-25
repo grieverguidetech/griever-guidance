@@ -1,0 +1,66 @@
+{
+  "name": "@griever/data-access",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "nx": {
+    "name": "data-access",
+    "targets": {
+      "build": {
+        "executor": "@nx/esbuild:esbuild",
+        "dependsOn": [],
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "defaultConfiguration": "production",
+        "options": {
+          "platform": "node",
+          "outputPath": "libs/data-access/dist",
+          "format": [
+            "esm"
+          ],
+          "bundle": true,
+          "thirdParty": true,
+          "main": "libs/data-access/src/lambda.ts",
+          "tsConfig": "libs/data-access/tsconfig.lib.json",
+          "target": "node22",
+          "outputFileName": "lambda",
+          "esbuildOptions": {
+            "conditions": [
+              "@org/source"
+            ],
+            "outExtension": {
+              ".js": ".mjs"
+            },
+            "banner": {
+              "js": "import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);"
+            }
+          }
+        },
+        "configurations": {
+          "production": {
+            "minify": false
+          }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1154.0",
+    "@aws-sdk/lib-dynamodb": "^3.1154.0",
+    "@griever/data-aws": "workspace:*",
+    "@griever/gateway-auth": "workspace:*",
+    "@griever/shared": "workspace:*",
+    "hono": "^4.13.7"
+  }
+}

@@ -8,12 +8,17 @@
     "dev:mobile": "pnpm nx start mobile",
     "dev:marketing": "pnpm nx serve marketing",
     "dev": "concurrently --names gateway,web --prefix-colors magenta,cyan \"pnpm dev:gateway\" \"pnpm dev:web\"",
+    "aws:up": "docker compose up -d --wait dynamodb ses",
+    "aws:down": "docker compose down",
+    "aws:seed": "node --conditions=@org/source --import jiti/register infra/aws-local/seed.ts",
+    "aws:tables": "node --conditions=@org/source --import jiti/register infra/aws-local/create-tables.ts",
     "typecheck": "pnpm nx run-many -t typecheck",
     "test": "pnpm nx run-many -t test",
     "build": "pnpm nx run-many -t build --exclude=mobile",
     "e2e": "pnpm nx e2e web-e2e",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "check:affected": "pnpm nx affected -t typecheck test && pnpm nx affected -t build --exclude=mobile"
+    "check:affected": "pnpm nx affected -t typecheck test && pnpm nx affected -t build --exclude=mobile",
+    "dev:data": "node --conditions=@org/source --import jiti/register infra/aws-local/run-data-function.ts"
   },
   "private": true,
   "devDependencies": {
@@ -22,6 +27,7 @@
     "@babel/runtime": "~7.27.6",
     "@cloudflare/workers-types": "^4.20260509.1",
     "@expo/cli": "~54.0.16",
+    "@hono/node-server": "^2.1.1",
     "@nx/devkit": "22.7.1",
     "@nx/esbuild": "22.7.1",
     "@nx/expo": "^22.7.1",
@@ -41,6 +47,7 @@
     "@types/react-dom": "19.1.11",
     "@vitejs/plugin-react": "^6.0.0",
     "@vitest/ui": "~4.1.0",
+    "aws-ses-v2-local": "2.10.2",
     "babel-preset-expo": "~54.0.7",
     "concurrently": "^9.2.1",
     "esbuild": "^0.27.0",
@@ -75,6 +82,8 @@
   "packageManager": "pnpm@10.34.1",
   "pnpm": {
     "overrides": {
+      "@clerk/clerk-js": "6.39.0",
+      "@clerk/shared": "4.40.0",
       "react": "19.1.0",
       "react-dom": "19.1.0"
     }

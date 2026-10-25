@@ -10,6 +10,12 @@
       "default": "./src/index.ts"
     },
     "./package.json": "./package.json",
+    "./verify-token": {
+      "@org/source": "./src/verifyToken.ts",
+      "types": "./src/verifyToken.ts",
+      "import": "./src/verifyToken.ts",
+      "default": "./src/verifyToken.ts"
+    },
     "./testing": {
       "types": "./src/testSupabase.ts",
       "import": "./src/testSupabase.ts",
@@ -20,6 +26,8 @@
     "name": "gateway-auth"
   },
   "dependencies": {
+    "@griever/shared": "workspace:*",
+    "aws4fetch": "1.0.20",
     "hono": "^4.13.7"
   }
 }

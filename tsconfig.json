@@ -44,6 +44,12 @@
     },
     {
       "path": "./libs/gateway-flows"
+    },
+    {
+      "path": "./libs/data-aws"
+    },
+    {
+      "path": "./libs/data-access"
     }
   ]
 }
