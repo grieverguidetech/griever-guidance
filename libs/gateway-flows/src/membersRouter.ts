@@ -167,7 +167,8 @@ export function createMembersRouter(config: MembersRouterConfig) {
       // One retry; if both fail the invite expires on its own.
       for (let attempt = 0; attempt < 2; attempt++) {
         const revoked = await run<null>(userToken, 'revokeInvite', { id: invite.id });
-        if (revoked?.ok) {
+        // Retry only when the answer was lost (null) or the data function was busy.
+        if (revoked && (revoked.ok || revoked.code !== 'busy')) {
           break;
         }
       }
@@ -206,6 +207,9 @@ export function createMembersRouter(config: MembersRouterConfig) {
     if (result.code === 'invite_conflict' || result.code === 'already_member' || result.code === 'conflict') {
       return c.json({ error: 'Your account already has people in it, so it cannot join another.' }, 409);
     }
+    if (result.code === 'unauthorized') {
+      return c.json({ error: SIGN_IN_AGAIN }, 401);
+    }
     if (result.code === 'busy') {
       return c.json({ error: UNAVAILABLE }, 503);
     }
@@ -225,6 +229,10 @@ export function createMembersRouter(config: MembersRouterConfig) {
         return c.json({ error: UNAVAILABLE }, 503);
       }
       if (!result.ok) {
+        // Only POST /invites has an email to be invalid; here a bad request means a bad id.
+        if (result.code === 'invalid') {
+          return c.json({ error: BAD_ID }, 400);
+        }
         const { status, error } = failureFor(result.code);
         return c.json({ error }, status);
       }

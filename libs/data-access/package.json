@@ -62,5 +62,8 @@
     "@griever/gateway-auth": "workspace:*",
     "@griever/shared": "workspace:*",
     "hono": "^4.13.7"
+  },
+  "devDependencies": {
+    "@griever/gateway-flows": "workspace:*"
   }
 }

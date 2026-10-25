@@ -241,6 +241,13 @@ describe('members router', () => {
       expect(sent('revokeInvite')).toHaveLength(2);
     });
 
+    it.each(['not_found', 'forbidden'])('does not retry the revoke after %s', async (code) => {
+      emailStatus = 500;
+      answer({ revokeInvite: { ok: false, code } });
+      expect((await send('POST', '/invites', { email: 'sam@example.test' })).status).toBe(503);
+      expect(sent('revokeInvite')).toHaveLength(1);
+    });
+
     it('answers 503 when both revoke attempts fail', async () => {
       emailStatus = 500;
       answer({ revokeInvite: new DataFunctionError(500, 'x') });
@@ -298,13 +305,20 @@ describe('members router', () => {
       }
       expect(callData).not.toHaveBeenCalled();
       // Every domain cause other than conflict and busy.
-      for (const code of ['unusable', 'not_found', 'invalid', 'forbidden', 'rate_limited', 'already_invited', 'unauthorized']) {
+      for (const code of ['unusable', 'not_found', 'invalid', 'forbidden', 'rate_limited', 'already_invited']) {
         answer({ acceptInvite: { ok: false, code } });
         await record(await accept({ token: TOKEN }));
       }
       expect(new Set(outcomes).size).toBe(1);
       expect(JSON.parse(outcomes[0]!)).toMatchObject({ status: 404 });
       expect(JSON.parse(JSON.parse(outcomes[0]!).text)).toEqual({ error: UNUSABLE });
+    });
+
+    it('maps unauthorized to 401 sign in again, not the uniform 404', async () => {
+      answer({ acceptInvite: { ok: false, code: 'unauthorized' } });
+      const res = await accept({ token: TOKEN });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: 'Please sign in again.' });
     });
 
     it.each(['invite_conflict', 'already_member'])('maps %s to 409', async (code) => {
@@ -340,6 +354,12 @@ describe('members router', () => {
     ])('maps %s to %i', async (code, status) => {
       answer({ [action]: { ok: false, code } });
       expect((await send('DELETE', path(id))).status).toBe(status);
+    });
+    it('says the id is bad, not the email, when the data function answers invalid', async () => {
+      answer({ [action]: { ok: false, code: 'invalid' } });
+      const res = await send('DELETE', path(id));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: BAD_ID });
     });
     it('is 503 when the data function throws', async () => {
       answer({ [action]: new DataFunctionError(null, 'x') });

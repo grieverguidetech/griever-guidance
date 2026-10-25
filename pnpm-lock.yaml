@@ -417,6 +417,10 @@ importers:
       hono:
         specifier: ^4.13.7
         version: 4.13.7
+    devDependencies:
+      '@griever/gateway-flows':
+        specifier: workspace:*
+        version: link:../gateway-flows
 
   libs/data-aws:
     dependencies:
