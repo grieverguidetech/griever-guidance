@@ -79,5 +79,11 @@ export function createDataApp(options: DataAppOptions): Hono {
     }
   });
 
+  // Hono would log the raw error message. Log the class only.
+  app.onError((error, c) => {
+    onError('unhandled', error.name);
+    return c.json({ error: 'internal' }, 500);
+  });
+
   return app;
 }

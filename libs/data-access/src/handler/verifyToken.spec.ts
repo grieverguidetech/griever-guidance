@@ -57,6 +57,50 @@ describe('createTokenVerifier', () => {
     expect(await verify(await Jwt.sign({ ...goodClaims(), ...change }, privateJwk))).toBeNull();
   });
 
+  it('allows a few seconds of clock difference, and no more', async () => {
+    const { privateJwk, publicJwk } = await makeKey('k1');
+    const verify = createTokenVerifier({ issuer: ISSUER, jwksUrl: JWKS_URL, fetch: jwksFetch(publicJwk) });
+    const sign = (change: object) => Jwt.sign({ ...goodClaims(), ...change }, privateJwk);
+    expect(await verify(await sign({ iat: nowSeconds() + 2 }))).not.toBeNull();
+    expect(await verify(await sign({ nbf: nowSeconds() + 2 }))).not.toBeNull();
+    expect(await verify(await sign({ exp: nowSeconds() - 2 }))).not.toBeNull();
+    expect(await verify(await sign({ iat: nowSeconds() + 30 }))).toBeNull();
+    expect(await verify(await sign({ nbf: nowSeconds() + 30 }))).toBeNull();
+    expect(await verify(await sign({ exp: nowSeconds() - 10 }))).toBeNull();
+    expect(await verify(await sign({ iat: 'now' }))).toBeNull();
+  });
+
+  describe('authorized parties (azp)', () => {
+    const setup = async () => {
+      const { privateJwk, publicJwk } = await makeKey('k1');
+      const verify = createTokenVerifier({
+        issuer: ISSUER,
+        jwksUrl: JWKS_URL,
+        fetch: jwksFetch(publicJwk),
+        authorizedParties: ['https://app.example.test', 'https://web.example.test'],
+      });
+      return { verify, sign: (change: object) => Jwt.sign({ ...goodClaims(), ...change }, privateJwk) };
+    };
+
+    it('accepts a listed party, and a token with no azp', async () => {
+      const { verify, sign } = await setup();
+      expect(await verify(await sign({ azp: 'https://web.example.test' }))).not.toBeNull();
+      expect(await verify(await sign({}))).not.toBeNull();
+    });
+
+    it('refuses an azp that is not listed or not a string', async () => {
+      const { verify, sign } = await setup();
+      expect(await verify(await sign({ azp: 'https://evil.example.test' }))).toBeNull();
+      expect(await verify(await sign({ azp: 5 }))).toBeNull();
+    });
+
+    it('does not look at azp when no parties are set', async () => {
+      const { privateJwk, publicJwk } = await makeKey('k1');
+      const verify = createTokenVerifier({ issuer: ISSUER, jwksUrl: JWKS_URL, fetch: jwksFetch(publicJwk) });
+      expect(await verify(await Jwt.sign({ ...goodClaims(), azp: 'anything' }, privateJwk))).not.toBeNull();
+    });
+  });
+
   it('refuses a token signed by a different key with the same key id', async () => {
     const trusted = await makeKey('k1');
     const attacker = await makeKey('k1');
@@ -81,7 +125,7 @@ describe('createTokenVerifier', () => {
     await verify(token);
     await verify(token);
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(fetcher).toHaveBeenCalledWith(JWKS_URL);
+    expect(fetcher).toHaveBeenCalledWith(JWKS_URL, { signal: expect.any(AbortSignal) });
   });
 
   it('refreshes once for an unknown key id, but not more than once a minute', async () => {
@@ -111,5 +155,38 @@ describe('createTokenVerifier', () => {
       fetch: vi.fn(async () => new Response('down', { status: 503 })),
     });
     await expect(verify(await Jwt.sign(goodClaims(), privateJwk))).rejects.toThrow('signing keys');
+  });
+
+  it('keeps using cached keys when a refresh fails, and tries again after a minute', async () => {
+    const { privateJwk, publicJwk } = await makeKey('k1');
+    let clock = 0;
+    let down = false;
+    const fetcher = vi.fn(async () => (down ? new Response('down', { status: 503 }) : Response.json({ keys: [publicJwk] })));
+    const verify = createTokenVerifier({ issuer: ISSUER, jwksUrl: JWKS_URL, fetch: fetcher, now: () => clock });
+    const token = await Jwt.sign(goodClaims(), privateJwk);
+    expect(await verify(token)).not.toBeNull();
+    down = true;
+    clock = 11 * 60 * 1000;
+    expect(await verify(token)).not.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    // Within a minute of the failed try there is no new fetch.
+    clock += 30_000;
+    expect(await verify(token)).not.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    clock += 31_000;
+    await verify(token);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails on a cold start when the key fetch times out', async () => {
+    const { privateJwk } = await makeKey('k1');
+    const verify = createTokenVerifier({
+      issuer: ISSUER,
+      jwksUrl: JWKS_URL,
+      fetch: vi.fn(async () => {
+        throw new DOMException('The operation timed out.', 'TimeoutError');
+      }),
+    });
+    await expect(verify(await Jwt.sign(goodClaims(), privateJwk))).rejects.toThrow('timed out');
   });
 });

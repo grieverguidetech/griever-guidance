@@ -1,3 +1,4 @@
+import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { DATA_ACTIONS, DATA_USER_TOKEN_HEADER, type DataResult } from '@griever/shared';
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
 import { encodeProfile } from '../items/profileItem.js';
@@ -57,6 +58,116 @@ async function act(action: string, args: Record<string, unknown> = {}): Promise<
   return (await response.json()) as DataResult;
 }
 
+// These guards must hold in every CI job, so they run on a document client that fails the test if it is used.
+const stub = { send: vi.fn() };
+const guardApp = createDataApp({ rules, doc: stub as unknown as DynamoDBDocumentClient, table: 'guard', verify, onError });
+
+async function callGuard(body: unknown, headers: Record<string, string> = { [DATA_USER_TOKEN_HEADER]: TOKEN }) {
+  return guardApp.request('/v1', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+}
+
+describe('guards before DynamoDB', () => {
+  beforeEach(() => {
+    stub.send.mockClear();
+    onError.mockClear();
+    acceptInvite.mockClear();
+  });
+
+describe('the user token (no DynamoDB)', () => {
+  it.each([
+    ['is missing', {}],
+    ['is empty', { [DATA_USER_TOKEN_HEADER]: '' }],
+    ['is wrong', { [DATA_USER_TOKEN_HEADER]: 'a.b.c' }],
+    ['is in Authorization instead', { authorization: `Bearer ${TOKEN}` }],
+  ])('answers 401 with no DynamoDB call when it %s', async (_name, headers) => {
+    const response = await callGuard({ action: 'listFlows', args: {} }, headers);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'unauthorized' });
+    expect(stub.send).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 before it reads a bad body', async () => {
+    expect((await callGuard('{not json', {})).status).toBe(401);
+  });
+
+  it('answers 500 with no detail when the verifier itself fails', async () => {
+    verify.mockRejectedValueOnce(new Error('keys down for pat@example.test'));
+    const response = await callGuard({ action: 'listFlows', args: {} });
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe('{"error":"internal"}');
+    expect(stub.send).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith('verify', 'Error');
+  });
+});
+
+describe('input checks (C8, no DynamoDB)', () => {
+  it.each([
+    ['a body that is not JSON', '{nope'],
+    ['an empty body', ''],
+    ['an array', []],
+    ['a missing args', { action: 'listFlows' }],
+    ['a missing action', { args: {} }],
+    ['an extra envelope key', { action: 'listFlows', args: {}, extra: 1 }],
+    ['args that is an array', { action: 'listFlows', args: [] }],
+    ['an action that is not a string', { action: 5, args: {} }],
+    ['an unknown action', { action: 'dropEverything', args: {} }],
+    ['deleteUserData', { action: 'deleteUserData', args: {} }],
+  ])('answers 400 with no DynamoDB call for %s', async (_name, body) => {
+    const response = await callGuard(body);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'bad_request' });
+    expect(stub.send).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 before any call when createFlow has an unknown key', async () => {
+    const response = await callGuard({ action: 'createFlow', args: { id: FLOW_ID, facts: { ...FACTS, ownerId: 'user_x' } } });
+    expect(response.status).toBe(400);
+    expect(stub.send).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 before any call for bad args of other actions', async () => {
+    for (const body of [
+      { action: 'createFlow', args: { id: 'nope', facts: FACTS } },
+      { action: 'updateFlow', args: { id: FLOW_ID, patch: { updatedBy: 'x' } } },
+      { action: 'createInvite', args: { email: 'nope', tokenHash: HASH } },
+      { action: 'removeMember', args: { memberId: 'user#x' } },
+      { action: 'acceptInvite', args: { tokenHash: 'abc' } },
+      { action: 'listFlows', args: { ownerId: 'user_x' } },
+    ]) {
+      expect((await callGuard(body)).status).toBe(400);
+    }
+    expect(stub.send).not.toHaveBeenCalled();
+    expect(acceptInvite).not.toHaveBeenCalled();
+  });
+
+  it('serves POST /v1 only', async () => {
+    expect((await guardApp.request('/v1', { method: 'GET' })).status).toBe(404);
+    expect((await guardApp.request('/v2', { method: 'POST', headers: { [DATA_USER_TOKEN_HEADER]: TOKEN } })).status).toBe(404);
+    expect((await guardApp.request('/', { method: 'POST', headers: { [DATA_USER_TOKEN_HEADER]: TOKEN } })).status).toBe(404);
+    expect(stub.send).not.toHaveBeenCalled();
+  });
+});
+
+  it('answers 500 with no detail, and logs the class only, for an error Hono catches', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const app = createDataApp({ rules, doc: stub as unknown as DynamoDBDocumentClient, table: 'guard', verify, onError });
+    app.get('/boom', () => {
+      throw new RangeError('secret detail pat@example.test');
+    });
+    const response = await app.request('/boom');
+    const consoleCalls = spy.mock.calls.length;
+    spy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe('{"error":"internal"}');
+    expect(onError).toHaveBeenCalledWith('unhandled', 'RangeError');
+    expect(consoleCalls).toBe(0);
+  });
+});
+
 describe.runIf(up)('data app on DynamoDB Local', () => {
   const send = vi.spyOn(doc, 'send');
   const now = new Date().toISOString();
@@ -76,81 +187,6 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
   beforeEach(() => {
     send.mockClear();
     onError.mockClear();
-  });
-
-  describe('the user token', () => {
-    it.each([
-      ['is missing', {}],
-      ['is empty', { [DATA_USER_TOKEN_HEADER]: '' }],
-      ['is wrong', { [DATA_USER_TOKEN_HEADER]: 'a.b.c' }],
-      ['is in Authorization instead', { authorization: `Bearer ${TOKEN}` }],
-    ])('answers 401 with no DynamoDB call when it %s', async (_name, headers) => {
-      const response = await call({ action: 'listFlows', args: {} }, headers);
-      expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({ error: 'unauthorized' });
-      expect(send).not.toHaveBeenCalled();
-    });
-
-    it('answers 401 before it reads a bad body', async () => {
-      expect((await call('{not json', {})).status).toBe(401);
-    });
-
-    it('answers 500 with no detail when the verifier itself fails', async () => {
-      verify.mockRejectedValueOnce(new Error('keys down for pat@example.test'));
-      const response = await call({ action: 'listFlows', args: {} });
-      expect(response.status).toBe(500);
-      expect(await response.text()).toBe('{"error":"internal"}');
-      expect(send).not.toHaveBeenCalled();
-      expect(onError).toHaveBeenCalledWith('verify', 'Error');
-    });
-  });
-
-  describe('input checks (C8)', () => {
-    it.each([
-      ['a body that is not JSON', '{nope'],
-      ['an empty body', ''],
-      ['an array', []],
-      ['a missing args', { action: 'listFlows' }],
-      ['a missing action', { args: {} }],
-      ['an extra envelope key', { action: 'listFlows', args: {}, extra: 1 }],
-      ['args that is an array', { action: 'listFlows', args: [] }],
-      ['an action that is not a string', { action: 5, args: {} }],
-      ['an unknown action', { action: 'dropEverything', args: {} }],
-      ['deleteUserData', { action: 'deleteUserData', args: {} }],
-    ])('answers 400 with no DynamoDB call for %s', async (_name, body) => {
-      const response = await call(body);
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: 'bad_request' });
-      expect(send).not.toHaveBeenCalled();
-    });
-
-    it('answers 400 before any call when createFlow has an unknown key', async () => {
-      const response = await call({ action: 'createFlow', args: { id: FLOW_ID, facts: { ...FACTS, ownerId: 'user_x' } } });
-      expect(response.status).toBe(400);
-      expect(send).not.toHaveBeenCalled();
-    });
-
-    it('answers 400 before any call for bad args of other actions', async () => {
-      for (const body of [
-        { action: 'createFlow', args: { id: 'nope', facts: FACTS } },
-        { action: 'updateFlow', args: { id: FLOW_ID, patch: { updatedBy: 'x' } } },
-        { action: 'createInvite', args: { email: 'nope', tokenHash: HASH } },
-        { action: 'removeMember', args: { memberId: 'user#x' } },
-        { action: 'acceptInvite', args: { tokenHash: 'abc' } },
-        { action: 'listFlows', args: { ownerId: 'user_x' } },
-      ]) {
-        expect((await call(body)).status).toBe(400);
-      }
-      expect(send).not.toHaveBeenCalled();
-      expect(acceptInvite).not.toHaveBeenCalled();
-    });
-
-    it('serves POST /v1 only', async () => {
-      expect((await app.request('/v1', { method: 'GET' })).status).toBe(404);
-      expect((await app.request('/v2', { method: 'POST', headers: { [DATA_USER_TOKEN_HEADER]: TOKEN } })).status).toBe(404);
-      expect((await app.request('/', { method: 'POST', headers: { [DATA_USER_TOKEN_HEADER]: TOKEN } })).status).toBe(404);
-      expect(send).not.toHaveBeenCalled();
-    });
   });
 
   describe('one happy path per action', () => {
@@ -228,11 +264,16 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
       }
     });
 
-    it('never puts the token, an email or a hash in a normal response', async () => {
-      const response = await call({ action: 'listMembers', args: {} });
-      const text = await response.text();
-      expect(text).not.toContain(TOKEN);
-      expect(text).not.toContain(OWNER.email);
+    it('never puts the token in an error response', async () => {
+      for (const response of [
+        await call({ action: 'nope', args: {} }),
+        await call('{nope'),
+        await call({ action: 'updateFlow', args: { id: '99999999-9999-4999-8999-999999999999', patch: { personName: 'X' } } }),
+      ]) {
+        const text = await response.text();
+        expect(text).not.toContain(TOKEN);
+        expect(text).not.toContain(OWNER.email);
+      }
     });
   });
 });

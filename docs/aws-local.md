@@ -96,9 +96,18 @@ It uses Hono's JWT code, the same call the `hono/jwk` middleware makes. It does 
 |---|---|
 | `DATA_AUTH_ISSUER` | Expected `iss` claim, for example the Clerk frontend API URL |
 | `DATA_AUTH_JWKS_URL` | The issuer's JWKS document |
+| `DATA_AUTH_AUTHORIZED_PARTIES` | Optional. Comma list of allowed `azp` values (the app origins). If set and the token has `azp`, it must be in the list. A token with no `azp` is allowed, because mobile may send no Origin |
 | `GG_DATA_TABLE` | Table name. Required on Lambda (no default) |
+| `AWS_REGION` | Required on Lambda. Lambda sets it. Do not set `AWS_ENDPOINT_URL*` on the function: the SDK still reads them |
 
-Required claims. Clerk's default session token has no email, so add `email` and `email_verified` in a Clerk session token customization:
+Required claims. Clerk's default session token has no email, so add `email` and `email_verified` in a Clerk session token customization (Sessions, Customize session token):
+
+```text
+{"email": "{{user.primary_email_address}}", "email_verified": "{{user.email_verified}}"}
+```
+
+Checks on time claims: `exp` must be present. `exp`, `iat` and `nbf` get 5 seconds of clock leeway.
+The key list fetch times out after 3 seconds. If a refresh fails, cached keys stay in use. A cold start with no keys answers 500.
 
 | Claim | Use |
 |---|---|

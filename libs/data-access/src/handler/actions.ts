@@ -1,6 +1,7 @@
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import {
   DATA_ACTIONS,
+  isDataErrorCode,
   isUuid,
   parseFlowFacts,
   parseFlowPatch,
@@ -14,7 +15,7 @@ import { BUSY_MESSAGE } from '../errors.js';
 import type { createFlow, listFlows, updateFlow } from '../rules/flows.js';
 import type { createInvite, revokeInvite } from '../rules/invites.js';
 import type { listMembers, removeMember } from '../rules/members.js';
-import type { getProfile, putProfile } from '../rules/profiles.js';
+import { parseProfileFields, type getProfile, type putProfile } from '../rules/profiles.js';
 
 /** What `acceptInvite` returns on success. The rule itself lands in #272. */
 export interface AcceptedInvite {
@@ -69,10 +70,6 @@ function hasExactKeys(args: Args, keys: readonly string[]): boolean {
   return own.length === keys.length && keys.every((key) => Object.prototype.hasOwnProperty.call(args, key));
 }
 
-function isPlainObject(value: unknown): value is Args {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function uuidArg(value: unknown): value is string {
   return typeof value === 'string' && isUuid(value);
 }
@@ -82,7 +79,10 @@ function toResult(outcome: { ok: true; value: unknown } | { ok: false; code: str
   if (outcome.ok) {
     return { ok: true, data: outcome.value };
   }
-  const code = outcome.code as Extract<DataResult, { ok: false }>['code'];
+  const { code } = outcome;
+  if (!isDataErrorCode(code)) {
+    throw new Error('A rule returned an unknown error code.');
+  }
   return code === 'busy' ? { ok: false, code, message: BUSY_MESSAGE } : { ok: false, code };
 }
 
@@ -94,10 +94,10 @@ const PREPARE: Record<DataAction, Prepare> = {
     return async (c) => ({ ok: true, data: await c.rules.getProfile(c.doc, c.table, c.caller, c.clock) });
   },
   putProfile: (args) => {
-    if (!hasExactKeys(args, ['fields']) || !isPlainObject(args['fields'])) {
+    const fields = hasExactKeys(args, ['fields']) ? parseProfileFields(args['fields']) : null;
+    if (!fields) {
       return null;
     }
-    const fields = args['fields'];
     return async (c) => toResult(await c.rules.putProfile(c.doc, c.table, c.caller, fields, c.clock));
   },
   listFlows: (args) => {

@@ -83,6 +83,10 @@ describe('args validation (C8)', () => {
     ['putProfile fields is a string', 'putProfile', { fields: 'x' }],
     ['putProfile fields is an array', 'putProfile', { fields: [] }],
     ['putProfile fields is null', 'putProfile', { fields: null }],
+    ['putProfile fields has a version', 'putProfile', { fields: { version: 9 } }],
+    ['putProfile fields has an unknown key', 'putProfile', { fields: { senderName: 'Pat', accountType: 'owner' } }],
+    ['putProfile senderName is too long', 'putProfile', { fields: { senderName: 'x'.repeat(101) } }],
+    ['putProfile contactSource is unknown', 'putProfile', { fields: { contactSource: 'scraped' } }],
     ['createFlow id is not a uuid', 'createFlow', { id: 'nope', facts: FACTS }],
     ['createFlow id is a number', 'createFlow', { id: 1, facts: FACTS }],
     ['createFlow facts has an unknown key', 'createFlow', { id: ID, facts: { ...FACTS, draft: 'x' } }],
@@ -132,6 +136,19 @@ describe('running an action', () => {
       ok: false,
       code: 'forbidden',
     });
+  });
+
+  it('throws, rather than passing on, a code it does not know', async () => {
+    const rules = stubRules();
+    rules.revokeInvite.mockResolvedValueOnce({ ok: false, code: 'made_up' } as never);
+    await expect(prepareAction('revokeInvite', GOOD['revokeInvite']!)!(context(rules))).rejects.toThrow('unknown error code');
+  });
+
+  it('passes the parsed profile fields to the rule', async () => {
+    const rules = stubRules();
+    const c = context(rules);
+    await prepareAction('putProfile', { fields: { senderName: null } })!(c);
+    expect(rules.putProfile).toHaveBeenCalledWith(c.doc, 'gg-test', caller, { senderName: null }, c.clock);
   });
 
   it('gives busy a calm message', async () => {

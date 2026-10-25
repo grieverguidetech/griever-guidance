@@ -108,4 +108,8 @@ describe('loadLambdaConfig', () => {
     expect(() => loadLambdaConfig({})).toThrow('GG_DATA_TABLE');
     expect(() => loadLambdaConfig({ GG_DATA_TABLE: '  ' })).toThrow('GG_DATA_TABLE');
   });
+
+  it('throws when the region is missing', () => {
+    expect(() => loadLambdaConfig({ GG_DATA_TABLE: 'gg-data-prod' })).toThrow('AWS_REGION');
+  });
 });
