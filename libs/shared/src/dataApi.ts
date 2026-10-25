@@ -40,6 +40,7 @@ export const DATA_ERROR_CODES = [
   'rate_limited',
   'already_member',
   'unauthorized',
+  'unusable',
 ] as const;
 
 export type DataErrorCode = (typeof DATA_ERROR_CODES)[number];
