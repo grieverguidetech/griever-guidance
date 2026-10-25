@@ -22,3 +22,17 @@
 - Ask the human only at gates or when blocked; batch questions; include a recommendation.
 - Edits on `main` are for small changes the product owner explicitly asks for. Everything else
   goes through a ticket branch and PR.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for grieverguidetech/griever-guidance, used through `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The 5 default triage labels, except `ready-for-agent`, which uses our existing `ready` label. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and one `docs/adr/` at the repo root. See `docs/agents/domain.md`.
