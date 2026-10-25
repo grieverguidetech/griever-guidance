@@ -2,7 +2,6 @@ import { useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
-  useSupabaseIdentity,
   useContacts,
   useSessions,
   useMembers,
@@ -13,19 +12,15 @@ import {
   namedSessionsByRecent,
   latestInProgressDraft,
 } from '@griever/hooks';
-import type { Session, SendFlowDraft, UseSupabaseIdentityResult } from '@griever/hooks';
-import type { AuthClient, ProfileResult } from '@griever/api-client/auth';
+import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
+import { getProfile } from '@griever/api-client';
+import type { ProfileResult } from '@griever/api-client';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
-import { hasStoredSession, loadAuthClient } from '../lib/authClient';
-import type { AuthClientResult } from '../lib/authClient';
+import { hasSignedInMarker, loadClerk } from '../lib/authClient';
+import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
-import { SignUp } from '../screens/SignUp';
-import { CreateAccount } from '../screens/CreateAccount';
-import { ForgotPassword } from '../screens/ForgotPassword';
-import { ChooseNewPassword } from '../screens/ChooseNewPassword';
-import { captureRecoveryLink, takeRecoveryLink } from '../lib/recoveryLink';
 import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { PeopleHelping } from '../screens/PeopleHelping';
@@ -47,10 +42,7 @@ import { Flow } from './Flow';
 import type { FlowFinish } from './Flow';
 
 type AppView =
-  | 'signup'
-  | 'createAccount'
-  | 'forgotPassword'
-  | 'chooseNewPassword'
+  | 'signIn'
   | 'profile'
   | 'settings'
   | 'addContactsManual'
@@ -96,16 +88,6 @@ function Shell({
   );
 }
 
-function WithIdentity({
-  client,
-  children,
-}: {
-  client: AuthClient;
-  children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode;
-}) {
-  return <>{children(useSupabaseIdentity({ client, storage: browserStorage }), client)}</>;
-}
-
 /** An always-present status region; the words appear only after a pause, so a quick load never flashes. */
 function Loading() {
   const [show, setShow] = useState(false);
@@ -120,32 +102,60 @@ function Loading() {
   );
 }
 
+function AccountsUnavailable({ onRetry }: { onRetry: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Focus the heading so the message is announced; a retry that fails again mounts this anew.
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
+  return (
+    <Shell onWhatYoullNeed={noop}>
+      <div className="flex flex-col gap-3 pt-[52px]">
+        <h1 ref={heading} tabIndex={-1} className="text-[22px]">Accounts aren't available right now</h1>
+        <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
+          Nothing you've written is lost. You can try again in a moment.
+        </p>
+        <button type="button" className="gg-btn gg-btn-secondary gg-btn-block" onClick={onRetry}>
+          Try again
+        </button>
+      </div>
+    </Shell>
+  );
+}
+
 /**
- * Loads the Supabase client (its own chunk) and only then mounts the identity hook, which needs
- * a client at render time. Rendered only when AUTH_ENABLED is on.
+ * Loads Clerk (its own chunk) and mounts the account provider. Rendered only when AUTH_ENABLED is
+ * on. If Clerk can't be had, a device that holds the signed-in marker still opens for local work (C5).
  */
 function AuthGate({
   children,
   removed,
   onRemoved,
 }: {
-  children: (auth: UseSupabaseIdentityResult, client: AuthClient) => ReactNode;
+  children: (state: ClerkAccountReady, SignInScreen: ClerkModules['SignInScreen']) => ReactNode;
   removed: boolean;
   onRemoved: () => void;
 }) {
-  const [loaded, setLoaded] = useState<AuthClientResult | null>(null);
-  // Bumped by "Try again"; loadAuthClient forgets a failed load, so this runs it afresh.
+  const [loaded, setLoaded] = useState<ClerkLoadResult | null>(null);
+  // Bumped by "Try again"; loadClerk forgets a failed load, so this runs it afresh.
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
-    void loadAuthClient().then((result) => {
-      if (live) setLoaded(result);
+    void loadClerk().then((result) => {
+      if (live) {
+        setLoaded(result);
+      }
     });
     return () => {
       live = false;
     };
   }, [attempt]);
+
+  const retry = () => {
+    setLoaded(null);
+    setAttempt((n) => n + 1);
+  };
 
   if (!loaded) {
     return (
@@ -154,34 +164,20 @@ function AuthGate({
       </Shell>
     );
   }
-  if (!loaded.available && hasStoredSession()) {
-    // Accounts can't be reached, but this device holds a signed-in session: the work on it is
+  if (!loaded.available && hasSignedInMarker()) {
+    // Accounts can't be reached, but this device holds a signed-in marker: the work on it is
     // theirs and stays reachable (C5). No account actions, and nothing here touches the network.
     return <AppBody auth={null} offline removed={removed} onRemoved={onRemoved} />;
   }
   if (!loaded.available) {
-    return (
-      <Shell onWhatYoullNeed={noop}>
-        <div className="flex flex-col gap-3 pt-[52px]">
-          <h1 className="text-[22px]">Accounts aren't available right now</h1>
-          <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
-            Nothing you've written is lost. You can try again in a moment.
-          </p>
-          <button
-            type="button"
-            className="gg-btn gg-btn-secondary gg-btn-block"
-            onClick={() => {
-              setLoaded(null);
-              setAttempt((n) => n + 1);
-            }}
-          >
-            Try again
-          </button>
-        </div>
-      </Shell>
-    );
+    return <AccountsUnavailable onRetry={retry} />;
   }
-  return <WithIdentity client={loaded.client}>{children}</WithIdentity>;
+  const { ClerkAccount, SignInScreen } = loaded;
+  return (
+    <ClerkAccount>
+      {(state) => (state.unavailable ? <AccountsUnavailable onRetry={retry} /> : children(state, SignInScreen))}
+    </ClerkAccount>
+  );
 }
 
 function noop() {
@@ -208,13 +204,20 @@ export function App() {
     return () => clearTimeout(timer);
   }, [removals]);
   // With the flag off nothing auth-related loads or renders, and the app is as it was.
-  // Before anything can load or fail: take a reset token out of the address bar.
-  if (AUTH_ENABLED) captureRecoveryLink();
   const body = !AUTH_ENABLED ? (
     <AppBody key={removals} auth={null} removed={removed} onRemoved={onRemoved} />
   ) : (
     <AuthGate key={removals} removed={removed} onRemoved={onRemoved}>
-      {(auth, client) => <AppBody auth={auth} client={client} removed={removed} onRemoved={onRemoved} />}
+      {(state, SignInScreen) => (
+        <AppBody
+          auth={state.account}
+          getAccessToken={state.getAccessToken}
+          endSession={state.signOut}
+          SignInScreen={SignInScreen}
+          removed={removed}
+          onRemoved={onRemoved}
+        />
+      )}
     </AuthGate>
   );
   return (
@@ -242,13 +245,14 @@ const CONTACTS_CHECK_FALLBACK_MS = 1500;
  * Asks the server whether the account has a name, in the background. A slow or failed answer
  * counts as "has a name": it must never hold anyone back (C5), and Profile is always reachable.
  */
-async function accountLacksName(client: AuthClient): Promise<boolean> {
+async function accountLacksName(getAccessToken: () => Promise<string | null>): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<false>((resolve) => {
     timer = setTimeout(() => resolve(false), NAME_CHECK_TIMEOUT_MS);
   });
   try {
-    return await Promise.race([client.getProfile().then(lacksName), timedOut]);
+    const lookup = getAccessToken().then(async (token) => (token ? lacksName(await getProfile(token)) : false));
+    return await Promise.race([lookup, timedOut]);
   } catch {
     return false;
   } finally {
@@ -261,9 +265,7 @@ const CHECKLIST_RETURNS: AppView[] = [
   'home',
   'settings',
   'profile',
-  'signup',
-  'createAccount',
-  'forgotPassword',
+  'signIn',
   'pathLanding',
   'checkContacts',
   // The walk after "Create a new one": the checklist returns to the step it was opened from.
@@ -276,21 +278,27 @@ const CHECKLIST_RETURNS: AppView[] = [
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary'];
 
 function isAccountView(view: AppView): boolean {
-  return view === 'signup' || view === 'createAccount' || view === 'forgotPassword';
+  return view === 'signIn';
 }
 
 function AppBody({
   auth,
-  client,
+  getAccessToken,
+  endSession,
+  SignInScreen,
   offline = false,
   removed = false,
   onRemoved,
 }: {
-  auth: UseSupabaseIdentityResult | null;
+  auth: UseAccountResult | null;
   /** Everything was just removed from this device: say so on the first screen. */
   removed?: boolean;
   onRemoved: () => void;
-  client?: AuthClient;
+  /** The token for the signed-in account, or null. Absent when there is no account to ask. */
+  getAccessToken?: () => Promise<string | null>;
+  /** Ends the Clerk session; used by "Remove everything from this device". */
+  endSession?: () => Promise<void>;
+  SignInScreen?: ClerkModules['SignInScreen'];
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
 }) {
@@ -303,30 +311,18 @@ function AppBody({
   // Family sharing. With either flag off, or nobody signed in, the hook is switched off and makes no
   // calls. Nothing waits on it (C5): screens render first and the list fills in. The token is read
   // from the session in memory for each call and goes nowhere else.
-  const sharingOn = AUTH_ENABLED && SHARING_ENABLED && !offline && !!client && !!auth?.isSignedIn;
-  const getAccessToken = useCallback(async () => {
-    try {
-      const state = await client?.getSession();
-      return state?.status === 'signed_in' ? state.session.accessToken : null;
-    } catch {
-      // A failed session read counts as no token: the hook reports "sign in again" rather than loading forever.
-      return null;
-    }
-  }, [client]);
-  const members = useMembers({ getAccessToken, enabled: sharingOn });
+  const sharingOn = AUTH_ENABLED && SHARING_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn;
+  // A failed token read counts as no token: the hook reports "sign in again" rather than loading forever.
+  const memberToken = useCallback(async () => (getAccessToken ? getAccessToken().catch(() => null) : null), [getAccessToken]);
+  const members = useMembers({ getAccessToken: memberToken, enabled: sharingOn });
 
   const [view, setView] = useState<AppView>(() => {
     if (offline) return 'home';
-    // Opened from a reset email: the new-password screen, not sign-up.
-    if (AUTH_ENABLED && captureRecoveryLink()) return 'chooseNewPassword';
-    if (AUTH_ENABLED) return 'signup';
+    if (AUTH_ENABLED) return 'signIn';
     // Home is always the first screen, with or without people (A2b); contacts come later in the walk.
     return 'home';
   });
   const firstView = useRef(view);
-  // A save can finish after the person has moved on; it reads the screen from here and never navigates.
-  const viewRef = useRef(view);
-  viewRef.current = view;
   // Shown once, on the first screen after a removal; leaving it ends it for good.
   const [showRemoved, setShowRemoved] = useState(removed);
   useEffect(() => {
@@ -366,20 +362,10 @@ function AppBody({
   // from a step does not lose it. Cleared when the walk starts and ends.
   const [contactDraft, setContactDraft] = useState<ContactDraft>({ name: '', phone: '', hearsFirst: false });
   const [firstTicks, setFirstTicks] = useState<string[] | null>(null);
-  // The name typed at sign-up, saved once the new account has a session.
-  const [pendingName, setPendingName] = useState<string | null>(null);
   // The account has no name: Profile opens with a "What should we call you?" prompt.
   const [needsName, setNeedsName] = useState(false);
-  // Profile is open straight after sign-up: Continue (or Save) goes on to Home.
-  const [firstProfile, setFirstProfile] = useState(false);
-  // The name typed at sign-up, shown on that first Profile even before the saved one is known.
-  const [signUpName, setSignUpName] = useState('');
-  // The background save of that name failed while Profile was still open: say so there, calmly.
-  const [nameSaveFailed, setNameSaveFailed] = useState(false);
-  // The name a save is in flight for, so Continue does not send the same one twice.
-  const savingName = useRef<string | null>(null);
   const [askingName, setAskingName] = useState(false);
-  // Bumped on every sign-in attempt and every sign-out. A name check started under an earlier
+  // Bumped on every sign-in and every sign-out. A name check started under an earlier
   // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
   const accountGeneration = useRef(0);
   // Where the prompt interrupted, so Save or Back returns there and onboarding carries on.
@@ -397,7 +383,6 @@ function AppBody({
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
   useFocusHeadingOnChange(view);
-  const updateSenderName = auth?.updateSenderName;
   const clearError = auth?.clearError;
 
   const openProfile = useCallback(
@@ -405,8 +390,6 @@ function AppBody({
       // A stale error from another screen would otherwise show here without being announced.
       clearError?.();
       setAskingName(asksName);
-      setFirstProfile(false);
-      setNameSaveFailed(false);
       setReturnTo(from);
       setNeedsName(false);
       setView('profile');
@@ -414,47 +397,22 @@ function AppBody({
     [clearError],
   );
 
-  // Sign-in resolves asynchronously (the boot-time session check, or a form), so the next view
-  // can't be decided in useState's initializer. A new account sees Profile first; everyone else
-  // lands on Home.
+  // Sign-in resolves asynchronously (the boot-time session check, or the Clerk form), so the
+  // next view can't be decided in useState's initializer. Everyone lands on Home.
   useEffect(() => {
     if (!signedIn || !isAccountView(view)) return;
-    if (pendingName !== null && updateSenderName) {
+    setFlowCategory(undefined);
+    setView('home');
+    // Ask in the background whether the account has a name. It never holds anyone back, and it
+    // clears a prompt left over from an earlier session.
+    if (getAccessToken) {
+      accountGeneration.current += 1;
       const generation = accountGeneration.current;
-      const name = pendingName;
-      savingName.current = name;
-      void updateSenderName(name).then((saved) => {
-        savingName.current = null;
-        if (saved || generation !== accountGeneration.current) return;
-        // Only the first Profile is told: the person has moved on otherwise, and a late answer
-        // must not pull them back. The sign-in check asks for the name next time. If the save
-        // failed because the session ended, the effect further down drops the request instead.
-        if (viewRef.current !== 'profile') return;
-        clearError?.();
-        setNameSaveFailed(true);
-        setNeedsName(true);
+      void accountLacksName(getAccessToken).then((lacks) => {
+        if (generation === accountGeneration.current) setNeedsName(lacks);
       });
-      setPendingName(null);
-      setSignUpName(name);
-      setAskingName(false);
-      setNameSaveFailed(false);
-      setFirstProfile(true);
-      setView('profile');
-    } else {
-      setFirstProfile(false);
-      setNameSaveFailed(false);
-      setFlowCategory(undefined);
-      setView('home');
-      // Boot-time session or form sign-in: ask in the background whether the account has a name.
-      // It never holds anyone back, and it clears a prompt left over from an earlier session.
-      if (client) {
-        const generation = accountGeneration.current;
-        void accountLacksName(client).then((lacks) => {
-          if (generation === accountGeneration.current) setNeedsName(lacks);
-        });
-      }
     }
-  }, [signedIn, view, pendingName, updateSenderName, clearError, client]);
+  }, [signedIn, view, getAccessToken]);
 
   // Orphan unnamed people from the old flow would otherwise sit on the device; tidy them once.
   const pruneEmpty = sessions.pruneEmpty;
@@ -476,16 +434,16 @@ function AppBody({
     if (needsName) setNeedsName(false);
   }, [signedOut, needsName]);
 
-  // Only the Sign out button sends the person back to sign-up. A session that ended some other
+  // Only the Sign out button sends the person back to sign-in. A session that ended some other
   // way keeps them where they are (C5), with a note.
   useEffect(() => {
     if (signedOut && leftOnPurpose && !isAccountView(view)) {
       setLeftOnPurpose(false);
       setFlowCategory(undefined);
-      setView('signup');
+      setView('signIn');
     }
   }, [signedOut, leftOnPurpose, view]);
-  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view) && view !== 'chooseNewPassword';
+  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
   // One polite region that is always there, so the note is announced when its text appears.
   const signedOutNote = auth ? (
     <div role="status" aria-live="polite" className="text-[13px]">
@@ -494,7 +452,7 @@ function AppBody({
           <p className="m-0">You've been signed out. Your work on this device is safe. Sign in again when you're ready.</p>
           <button
             type="button"
-            onClick={() => setView('createAccount')}
+            onClick={() => setView('signIn')}
             className="gg-btn gg-btn-ghost self-start !px-0"
           >
             Sign in
@@ -525,8 +483,8 @@ function AppBody({
   );
 
   async function removeEverything() {
-    // Local only: signOut here is supabase-js's local scope. It deletes nothing on a server.
-    await removeEverythingFromDevice(window.localStorage, client ? () => client.signOut() : undefined);
+    // Local only: ending the Clerk session deletes nothing on a server.
+    await removeEverythingFromDevice(window.localStorage, endSession);
     onRemoved();
   }
 
@@ -614,23 +572,6 @@ function AppBody({
 
   function goHome() {
     setView('home');
-  }
-
-  /** Leaves the first Profile for Home. A name still missing is asked for at the next sign-in. */
-  function leaveFirstProfile() {
-    setFirstProfile(false);
-    setNameSaveFailed(false);
-    setNeedsName(false);
-    setView('home');
-  }
-
-  /** Continue on the first Profile: a changed or unsaved name is saved in the background, never awaited (C5). */
-  function continueFromFirstProfile(name: string) {
-    const known = auth?.profile?.senderName ?? '';
-    if (name && updateSenderName && savingName.current !== name && (nameSaveFailed || name !== known)) {
-      void updateSenderName(name);
-    }
-    leaveFirstProfile();
   }
 
   /** Makes this person the active one and opens their path. A half-written message shows "Started" there (#25). */
@@ -772,7 +713,7 @@ function AppBody({
     setView('setup');
   }
 
-  // While a stored session is being checked, render nothing rather than flash "signup" first.
+  // While Clerk is loading or a stored session is being checked, show nothing but the quiet status.
   if (auth?.isLoading) {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed}>
@@ -783,85 +724,10 @@ function AppBody({
 
   // ---- Flow D: account + contacts onboarding ----
 
-  if (auth && view === 'signup') {
+  if (auth && SignInScreen && view === 'signIn') {
     return (
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <SignUp
-          error={auth.error}
-          onSignIn={() => {
-            auth.clearError();
-            setView('createAccount');
-          }}
-          onSubmit={async ({ name, email, password }) => {
-            setPendingName(name);
-            const ok = await auth.signUp(email, password);
-            if (!ok) setPendingName(null);
-            return ok;
-          }}
-        />
-      </Shell>
-    );
-  }
-
-  if (auth && view === 'createAccount') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <CreateAccount
-          error={auth.error}
-          onForgotPassword={() => {
-            auth.clearError();
-            setView('forgotPassword');
-          }}
-          onBack={() => {
-            auth.clearError();
-            setView('signup');
-          }}
-          onSubmit={async ({ email, password }) => {
-            // A name left over from a sign-up that is still waiting on email confirmation
-            // must not overwrite the name on an existing account.
-            setPendingName(null);
-            accountGeneration.current += 1;
-            // The name check runs once signed in (the effect above), never holding sign-in back.
-            return auth.signIn(email, password);
-          }}
-        />
-      </Shell>
-    );
-  }
-
-  if (auth && view === 'forgotPassword') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <ForgotPassword
-          onBack={() => setView('createAccount')}
-          onSubmit={(email) => auth.requestReset(email, window.location.origin)}
-        />
-      </Shell>
-    );
-  }
-
-  if (auth && view === 'chooseNewPassword') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
-        <ChooseNewPassword
-          openLink={() => auth.openRecoveryLink(takeRecoveryLink())}
-          onSubmit={auth.completeReset}
-          onAskForNewLink={() => setView('forgotPassword')}
-          onBackToSignIn={() => setView('createAccount')}
-          onContinue={() => {
-            // Same as a sign-in: ask for a name if the account has none.
-            setPendingName(null);
-            accountGeneration.current += 1;
-            const generation = accountGeneration.current;
-            if (client) {
-              void accountLacksName(client).then((lacks) => {
-                if (generation === accountGeneration.current) setNeedsName(lacks);
-              });
-            }
-            setFlowCategory(undefined);
-            setView('home');
-          }}
-        />
+        <SignInScreen />
       </Shell>
     );
   }
@@ -871,15 +737,11 @@ function AppBody({
       <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
         <Profile
           asksName={askingName}
-          firstTime={firstProfile}
-          saveFailed={firstProfile && nameSaveFailed}
-          onContinue={continueFromFirstProfile}
-          senderName={auth.profile?.senderName ?? (firstProfile ? signUpName : null)}
+          senderName={auth.profile?.senderName ?? null}
           error={auth.error}
           showChecklist={auth.isSignedIn}
           peopleHelping={
-            // Not during first-time onboarding after sign-up: that screen is only the name.
-            sharingOn && !firstProfile ? (
+            sharingOn ? (
               <PeopleHelping
                 view={members.view}
                 status={members.status}
@@ -891,10 +753,6 @@ function AppBody({
           }
           onBack={() => {
             auth.clearError();
-            if (firstProfile) {
-              leaveFirstProfile();
-              return;
-            }
             setAskingName(false);
             setView(askingName ? returnTo : 'home');
           }}
@@ -907,7 +765,6 @@ function AppBody({
             return saved;
           }}
           onSignOut={() => {
-            setFirstProfile(false);
             accountGeneration.current += 1;
             setLeftOnPurpose(true);
             setCreating(false);

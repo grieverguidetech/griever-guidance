@@ -1,9 +1,27 @@
 import { clearAllLocalData } from '@griever/data-local';
 
 /** What the browser storage needs to give back: just enough to list and drop keys. */
-export type KeyStorage = Pick<Storage, 'length' | 'key' | 'removeItem'>;
+export type KeyStorage = Pick<Storage, 'length' | 'key' | 'removeItem' | 'setItem'>;
 
-/** Every localStorage key this app owns: `gg.*` (sessions, drafts, profile cache, pointers) and supabase-js's session. */
+/**
+ * Set when ending the Clerk session failed (for example offline). The next online load finishes
+ * the sign-out; until then the person is treated as signed out on this device.
+ */
+export const SIGN_OUT_PENDING_KEY = 'gg.signOutPending';
+
+/** Never throws: storage trouble must not stop a sign-out. */
+export function markSignOutPending(storage: Pick<Storage, 'setItem'> = globalThis.localStorage): void {
+  try {
+    storage.setItem(SIGN_OUT_PENDING_KEY, '1');
+  } catch {
+    /* storage blocked; the sign-out is retried only if the session is still there */
+  }
+}
+
+/**
+ * Every localStorage key this app owns: `gg.*` (sessions, drafts, profile cache, pointers, markers)
+ * and a Supabase session left on the device by an earlier version.
+ */
 function isOurKey(name: string): boolean {
   return name.startsWith('gg.') || /^sb-.+-auth-token(-code-verifier|-user)?$/.test(name);
 }
@@ -19,7 +37,7 @@ function removeOurKeys(storage: KeyStorage): void {
 
 /**
  * Removes everything this app keeps on this device: IndexedDB (people, contacts, drafts, outbox,
- * sends, account, sync identity), our localStorage keys, and the stored sign-in. Local only: no
+ * sends, account, sync identity), our localStorage keys, and the signed-in marker. Local only: no
  * request is made and nothing on a server or another phone is touched.
  */
 export async function removeEverythingFromDevice(
@@ -28,11 +46,15 @@ export async function removeEverythingFromDevice(
 ): Promise<void> {
   await clearAllLocalData();
   removeOurKeys(storage);
-  // supabase-js ends a local-scope session without a request; any failure still leaves the keys gone.
+  let sessionEnded = true;
   try {
     await endLocalSession?.();
   } catch {
-    /* the stored session was already removed above */
+    sessionEnded = false;
   }
   removeOurKeys(storage);
+  // The purge above is done either way; a session Clerk could not end (offline) is finished on the next online load.
+  if (!sessionEnded) {
+    markSignOutPending(storage);
+  }
 }

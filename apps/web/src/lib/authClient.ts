@@ -1,81 +1,61 @@
-import type { AuthClient } from '@griever/api-client/auth';
+import type { ComponentType, ReactNode } from 'react';
+import type { UseAccountResult } from '@griever/hooks';
+import { SIGNED_IN_STORAGE_KEY } from '@griever/hooks';
 
-export type AuthClientResult = { available: true; client: AuthClient } | { available: false };
-
-let loading: Promise<AuthClientResult> | null = null;
-
-function readEnv(name: string): string {
-  const value: unknown = import.meta.env[name];
-  return typeof value === 'string' ? value.trim() : '';
+/** What the signed-in app needs from the account provider. `signOut` rejects when Clerk could not be reached. */
+export interface ClerkAccountReady {
+  unavailable: false;
+  account: UseAccountResult;
+  getAccessToken: () => Promise<string | null>;
+  signOut: () => Promise<void>;
 }
 
-async function create(): Promise<AuthClientResult> {
-  const url = readEnv('VITE_SUPABASE_URL');
-  const anonKey = readEnv('VITE_SUPABASE_ANON_KEY');
-  if (!url || !anonKey) return { available: false };
+/** `unavailable`: Clerk is missing a key or did not load in time, and there is no signed-in marker to fall back on. */
+export type ClerkAccountState = ClerkAccountReady | { unavailable: true };
+
+export interface ClerkModules {
+  ClerkAccount: ComponentType<{ children: (state: ClerkAccountState) => ReactNode }>;
+  SignInScreen: ComponentType;
+}
+
+export type ClerkLoadResult = ({ available: true } & ClerkModules) | { available: false };
+
+let loading: Promise<ClerkLoadResult> | null = null;
+
+async function create(): Promise<ClerkLoadResult> {
   try {
-    // A dynamic import so supabase-js is its own chunk. Nothing downloads it unless
-    // AUTH_ENABLED is on and this is called.
-    const { createAuthClient } = await import('@griever/api-client/auth');
-    return { available: true, client: createAuthClient({ url, anonKey, storage: window.localStorage }) };
+    // Dynamic imports so Clerk is its own chunk. Nothing downloads it unless AUTH_ENABLED is on
+    // and this is called.
+    const [account, signIn] = await Promise.all([import('./clerk'), import('../screens/SignIn')]);
+    return { available: true, ClerkAccount: account.ClerkAccount, SignInScreen: signIn.SignInScreen };
   } catch {
     return { available: false };
   }
 }
 
 /**
- * Loads the Supabase auth client once. `useSupabaseIdentity` reads its client only at mount, so
- * every caller must get this same object. Only call it when AUTH_ENABLED is on.
+ * Loads the Clerk modules once. Only call it when AUTH_ENABLED is on.
  */
-export function loadAuthClient(): Promise<AuthClientResult> {
+export function loadClerk(): Promise<ClerkLoadResult> {
   loading ??= create().then((result) => {
     // A failed load (for example a dropped connection) may be tried again on the next mount.
-    if (!result.available) loading = null;
+    if (!result.available) {
+      loading = null;
+    }
     return result;
   });
   return loading;
 }
 
 /**
- * The key supabase-js stores a session under: `sb-<first label of the project host>-auth-token`
- * (SupabaseClient.ts, `defaultStorageKey`). Our client does not override it.
+ * True when a signed-in marker (the user id, written by useAccount) is saved on this device. Reads
+ * storage only, never the network, so it works when Clerk is unavailable. With a marker the app
+ * opens for local work; without one it cannot tell who is signed in (C5).
  */
-function sessionKeyFor(url: string): string | null {
-  try {
-    return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
-  } catch {
-    return null;
-  }
-}
-
-function looksLikeSession(raw: string | null): boolean {
-  if (!raw) return false;
-  try {
-    const value: unknown = JSON.parse(raw);
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-    const token = (value as { refresh_token?: unknown }).refresh_token;
-    return typeof token === 'string' && token !== '';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * True when a Supabase session is already saved on this device. Reads storage only, never the
- * network, so it works when the auth chunk or the env is unavailable. With no project URL (the
- * env is missing) the exact key is unknown, so any `sb-*-auth-token` entry counts.
- */
-export function hasStoredSession(storageOverride?: Storage): boolean {
+export function hasSignedInMarker(storageOverride?: Pick<Storage, 'getItem'>): boolean {
   try {
     const storage = storageOverride ?? globalThis.localStorage;
-    if (!storage) return false;
-    const key = sessionKeyFor(readEnv('VITE_SUPABASE_URL'));
-    if (key) return looksLikeSession(storage.getItem(key));
-    for (let i = 0; i < storage.length; i++) {
-      const name = storage.key(i);
-      if (name && /^sb-.+-auth-token$/.test(name) && looksLikeSession(storage.getItem(name))) return true;
-    }
-    return false;
+    return Boolean(storage?.getItem(SIGNED_IN_STORAGE_KEY));
   } catch {
     return false;
   }
