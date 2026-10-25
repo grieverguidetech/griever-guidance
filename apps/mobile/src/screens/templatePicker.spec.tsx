@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { Modal } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { TemplatePickerScreen } from './TemplatePickerScreen';
 import type { FlowProps } from '../app/App';
 
@@ -33,10 +33,10 @@ describe('TemplatePickerScreen paywall demo (#292)', () => {
     }
     expect(screen.getAllByText('Included with the full plan')).toHaveLength(2);
     for (const open of ['Announce the passing']) {
-      expect(lockedCards().some((c) => JSON.stringify(c.props.children).includes(open))).toBe(false);
+      expect(lockedCards().some((c) => within(c).queryByText(open) !== null)).toBe(false);
     }
     for (const shut of ['Share the service', 'Thank-you note']) {
-      expect(lockedCards().some((c) => JSON.stringify(c.props.children).includes(shut))).toBe(true);
+      expect(lockedCards().some((c) => within(c).queryByText(shut) !== null)).toBe(true);
     }
   });
 
