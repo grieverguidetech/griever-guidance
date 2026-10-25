@@ -25,14 +25,14 @@ jest.mock('@clerk/expo/resource-cache', () => ({ resourceCache: { name: 'resourc
 const { App } = require('./App') as typeof import('./App');
 
 describe('App with the account feature and a Clerk key on', () => {
-  it('renders the send flow at once while Clerk is still loading', async () => {
+  it('opens the normal first screen when Clerk never finishes loading (offline at launch)', async () => {
     render(<App />);
-    expect(await screen.findByText('Your account')).toBeTruthy();
+    expect(await screen.findByText('Your account', {}, { timeout: 3000 })).toBeTruthy();
   });
 
   it('mounts Clerk with the publishable key, the secure token cache and the resource cache', async () => {
     render(<App />);
-    await screen.findByText('Your account');
+    await screen.findByText('Your account', {}, { timeout: 3000 });
     expect(mockProviderProps).toHaveBeenCalledWith(
       expect.objectContaining({
         publishableKey: 'pk_test_example',
