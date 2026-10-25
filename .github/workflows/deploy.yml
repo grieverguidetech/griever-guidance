@@ -35,28 +35,47 @@ jobs:
       - run: echo "Deploying ${{ env.DEPLOY_SHA }}"
 
   # Fails closed before anything ships: with the accounts flag on, the web
-  # build needs the Supabase URL and anon key, and the anon key must not be a
-  # secret key (it is baked into public JS). Values are never printed; only
-  # variable names and the JWT role are.
+  # build needs the Clerk publishable key (pk_) and the Worker needs the Clerk
+  # issuer (https). A secret key (sk_) is refused because the publishable key
+  # is baked into public JS. Values are never printed; only variable names are.
+  # SUPABASE_* are no longer required; they are still passed on until #204
+  # removes them, so the anon key keeps its secret-key guard.
   check-accounts-config:
     name: Check accounts config
     needs: gate
     runs-on: ubuntu-latest
     steps:
-      - name: Check FEATURE_AUTH, SUPABASE_URL and SUPABASE_ANON_KEY
+      - name: Check FEATURE_AUTH, CLERK_PUBLISHABLE_KEY and CLERK_ISSUER
         run: |
           if [ "$FEATURE_SHARING" = "true" ] && [ "$FEATURE_AUTH" != "true" ]; then
             echo "::error::FEATURE_SHARING is true but FEATURE_AUTH is not. Sharing needs accounts, so turn FEATURE_AUTH on first or set FEATURE_SHARING back."
             exit 1
           fi
+          # A secret key is refused whatever the flag says: the publishable key is baked into public JS.
+          case "$CLERK_PUBLISHABLE_KEY" in
+            sk_*)
+              echo "::error::CLERK_PUBLISHABLE_KEY looks like a secret key (sk_). Use the publishable key (pk_)."; exit 1 ;;
+          esac
           if [ "$FEATURE_AUTH" = "true" ]; then
             missing=""
-            [ -n "$SUPABASE_URL" ] || missing="$missing SUPABASE_URL"
-            [ -n "$SUPABASE_ANON_KEY" ] || missing="$missing SUPABASE_ANON_KEY"
+            [ -n "$CLERK_PUBLISHABLE_KEY" ] || missing="$missing CLERK_PUBLISHABLE_KEY"
+            [ -n "$CLERK_ISSUER" ] || missing="$missing CLERK_ISSUER"
             if [ -n "$missing" ]; then
               echo "::error::FEATURE_AUTH is true but these repo variables are empty:$missing"
               exit 1
             fi
+            case "$CLERK_PUBLISHABLE_KEY" in
+              pk_test_*)
+                echo "::warning::CLERK_PUBLISHABLE_KEY is a test (development) key" ;;
+              pk_*) ;;
+              *)
+                echo "::error::CLERK_PUBLISHABLE_KEY must start with pk_"; exit 1 ;;
+            esac
+            case "$CLERK_ISSUER" in
+              https://?*) ;;
+              *)
+                echo "::error::CLERK_ISSUER must start with https://"; exit 1 ;;
+            esac
           fi
           case "$SUPABASE_ANON_KEY" in
             sb_secret*)
@@ -76,7 +95,8 @@ jobs:
         env:
           FEATURE_AUTH: ${{ vars.FEATURE_AUTH }}
           FEATURE_SHARING: ${{ vars.FEATURE_SHARING }}
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+          CLERK_ISSUER: ${{ vars.CLERK_ISSUER }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
 
   deploy-gateway:
@@ -140,17 +160,19 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
-      # SUPABASE_URL / SUPABASE_ANON_KEY are public repo variables. Empty ones
-      # are not passed, so the wrangler.toml defaults (and a 503 on /me/*) stay.
+      # SUPABASE_* and CLERK_ISSUER are public repo variables. Empty ones are
+      # not passed, so the wrangler.toml defaults (and a 503 on /me/*) stay.
       - name: Deploy the Worker
         run: |
           args=()
           if [ -n "$SUPABASE_URL" ]; then args+=(--var "SUPABASE_URL:$SUPABASE_URL"); fi
           if [ -n "$SUPABASE_ANON_KEY" ]; then args+=(--var "SUPABASE_ANON_KEY:$SUPABASE_ANON_KEY"); fi
+          if [ -n "$CLERK_ISSUER" ]; then args+=(--var "CLERK_ISSUER:$CLERK_ISSUER"); fi
           pnpm exec wrangler deploy --config apps/gateway/wrangler.toml "${args[@]}"
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          CLERK_ISSUER: ${{ vars.CLERK_ISSUER }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -203,6 +225,7 @@ jobs:
           VITE_FEATURE_AUTH: ${{ vars.FEATURE_AUTH }}
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
           # Sharing stays off unless the repo variable FEATURE_SHARING is "true".
           VITE_FEATURE_SHARING: ${{ vars.FEATURE_SHARING }}
 

@@ -2,7 +2,7 @@ import { createDocClient, createDynamoClient, loadLambdaConfig } from '@griever/
 import { handle } from 'hono/aws-lambda';
 import { createDataApp, type DataAppOptions } from './handler/app.js';
 import type { DataRules } from './handler/actions.js';
-import { createTokenVerifier } from './handler/verifyToken.js';
+import { createTokenVerifier } from '@griever/gateway-auth/verify-token';
 import { acceptInvite } from './rules/acceptInvite.js';
 import { createFlow, listFlows, updateFlow } from './rules/flows.js';
 import { createInvite, revokeInvite } from './rules/invites.js';

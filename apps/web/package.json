@@ -6,6 +6,8 @@
     "name": "web"
   },
   "dependencies": {
+    "@clerk/localizations": "4.23.0",
+    "@clerk/react": "6.17.8",
     "@griever/api-client": "workspace:*",
     "@griever/contacts": "workspace:*",
     "@griever/data-local": "workspace:*",
