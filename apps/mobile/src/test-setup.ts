@@ -31,3 +31,17 @@ jest.mock('expo-contacts', () => ({
   requestPermissionsAsync: jest.fn(),
   getContactsAsync: jest.fn(),
 }));
+
+// @clerk/clerk-js opens a BroadcastChannel as soon as it is imported and never closes it. Under
+// Jest 30 that open port keeps the test process alive after the last test, so a run with a single
+// worker (CI=true on a small runner) never exits. Unref every channel so it cannot hold the process.
+const NativeBroadcastChannel = (globalThis as { BroadcastChannel?: typeof BroadcastChannel }).BroadcastChannel;
+if (NativeBroadcastChannel) {
+  class UnrefedBroadcastChannel extends NativeBroadcastChannel {
+    constructor(name: string) {
+      super(name);
+      (this as unknown as { unref?: () => void }).unref?.();
+    }
+  }
+  (globalThis as { BroadcastChannel?: typeof BroadcastChannel }).BroadcastChannel = UnrefedBroadcastChannel;
+}
