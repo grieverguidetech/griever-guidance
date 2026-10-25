@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { AccessibilityInfo, findNodeHandle, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ChecklistRows } from '../screens/WhatYoullNeedScreen';
 import { ACCENT, ACCENT_TINT, MUTED } from './colors';
@@ -27,7 +27,7 @@ export function Sheet({
   onBodyTouch?: () => void;
   children: ReactNode;
 }) {
-  const heading = useRef<Text>(null);
+  const heading = useRef<ComponentRef<typeof Text>>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled?.()

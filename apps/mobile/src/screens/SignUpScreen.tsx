@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
-import type { TextInput } from 'react-native';
+import { useRef, useState, type ComponentRef } from 'react';
+import { Text, TextInput, View } from 'react-native';
 import { useSignUp } from '@clerk/expo';
 import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { NEW_CODE_SENT } from './SignInScreen';
@@ -28,8 +27,8 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   async function run(busyText: string, action: () => Promise<void>) {
     if (pending) {

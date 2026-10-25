@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
-import type { TextInput } from 'react-native';
+import { useRef, useState, type ComponentRef } from 'react';
+import { Text, TextInput, View } from 'react-native';
 import { useSignIn } from '@clerk/expo';
 import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { SocialButtons } from '../components/SocialButtons';
@@ -26,7 +25,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   async function run(busyText: string, action: () => Promise<void>) {
     if (pending) {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { ComponentProps, Ref } from 'react';
+import type { ComponentProps, ComponentRef, Ref } from 'react';
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -20,7 +20,7 @@ export function announce(message: string) {
 
 /** A screen heading that takes screen-reader focus when it appears (after a screen swap). */
 export function ScreenHeader({ children }: { children: ReactNode }) {
-  const ref = useRef<Text>(null);
+  const ref = useRef<ComponentRef<typeof Text>>(null);
   useEffect(() => {
     const handle = ref.current ? findNodeHandle(ref.current) : null;
     if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
@@ -58,7 +58,7 @@ export function Field({
   value: string;
   onChangeText: (v: string) => void;
   hint?: string;
-  inputRef?: Ref<TextInput>;
+  inputRef?: Ref<ComponentRef<typeof TextInput>>;
 } & InputProps) {
   return (
     <View style={styles.fieldGroup}>

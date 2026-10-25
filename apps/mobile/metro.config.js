@@ -1,5 +1,5 @@
 const { withNxMetro } = require('@nx/expo');
-const { getDefaultConfig } = require('@expo/metro-config');
+const { getDefaultConfig } = require('expo/metro-config');
 const { mergeConfig } = require('metro-config');
 
 const defaultConfig = getDefaultConfig(__dirname);
@@ -15,6 +15,7 @@ const customConfig = {
   cacheVersion: 'mobile',
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
+    enableBabelRCLookup: false,
   },
   resolver: {
     assetExts: assetExts.filter((ext) => ext !== 'svg'),

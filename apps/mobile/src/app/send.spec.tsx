@@ -50,7 +50,7 @@ describe('picking an announcement', () => {
 
 describe('the end of a send', () => {
   const toSending = async (pick: string[], template = 'Announce the passing') => {
-    jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
     fireEvent.press(await screen.findByText(template));
     if (template !== 'Share the obituary') fireEvent.press(await screen.findByText('Continue'));

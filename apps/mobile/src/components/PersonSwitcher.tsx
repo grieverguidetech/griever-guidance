@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type ComponentRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,7 +26,7 @@ export function PersonBar({
   onArrived: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const ref = useRef<View>(null);
+  const ref = useRef<ComponentRef<typeof View>>(null);
   // Android's back button means Home here, not leaving the app.
   // Only while this screen is showing, and only when there is nothing to pop (e.g. the checklist
   // opened from here goes back to here first).
