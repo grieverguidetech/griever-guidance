@@ -2,12 +2,11 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { profileRouter } from '@griever/identity';
 import { messagesRouter } from '@griever/gateway-messages';
-import { syncRouter } from '@griever/gateway-sync';
 import { membersRouter } from '@griever/gateway-flows';
 
 /**
- * The gateway composes four independent domain libs — identity, messages,
- * sync, and flows each own their routes and business logic, with no cross-imports
+ * The gateway composes three independent domain libs — identity, messages,
+ * and flows each own their routes and business logic, with no cross-imports
  * between them. This file's only job is wiring them into one HTTP surface
  * (CORS + routing) — it should never grow domain logic of its own.
  *
@@ -37,7 +36,6 @@ app.use(
 app.get('/health', (c) => c.json({ ok: true }));
 app.route('/', profileRouter);
 app.route('/', messagesRouter);
-app.route('/', syncRouter);
 app.route('/', membersRouter);
 
 export default app;

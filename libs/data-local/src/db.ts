@@ -41,10 +41,9 @@ export interface AccountRecord {
  * IndexedDB. `activeSessionId`/`userId` stay in `localStorage` since only the
  * main thread needs them, synchronously, at boot.
  *
- * `deviceId`/`devUserId`/`gatewayUrl` are here for the same reason: the
- * Service Worker (`apps/web/public/sw.js`) needs them to identify itself and
- * find the gateway when it wakes on a Background Sync event, and the main
- * thread is what writes them at boot (see `apps/web/src/lib/registerSync.ts`).
+ * `deviceId`/`devUserId`/`gatewayUrl` were written for a Service Worker
+ * Background Sync flush. That worker and the Convex sync were removed (#203);
+ * nothing writes these keys now.
  */
 export type MetaRecord =
   | { key: "schemaVersion" | "lastKnownServerTime" | "syncCursor" | "lastSyncAt"; value: number }

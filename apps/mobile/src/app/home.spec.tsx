@@ -74,22 +74,21 @@ describe('the order in the app', () => {
 
   // Behavior change approved in #110 (replaces "goes from Create straight to the path"):
   // Create now opens setup first, and Continue leads to the path.
-  it('goes from Create to setup, then to the path, with or without saved contacts', async () => {
+  // With no saved contacts the contacts step comes between (#226); see contactsStep.spec.tsx.
+  it('goes from Create to setup, then to the path, when contacts are already saved', async () => {
     const contact = { contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' };
-    for (const contacts of [[], [contact]]) {
-      await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], contacts);
-      const view = render(<App />);
-      fireEvent.press(await screen.findByText("Someone else I've lost"));
-      expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
-      expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
-      fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
-      fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
-      fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-      expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
-      expect(screen.getByText('Writing about Ben')).toBeTruthy();
-      expect(screen.queryByText('Choose who to tell')).toBeNull();
-      view.unmount();
-    }
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], [contact]);
+    const view = render(<App />);
+    fireEvent.press(await screen.findByText("Someone else I've lost"));
+    expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
+    expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
+    fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
+    fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
+    expect(screen.getByText('Writing about Ben')).toBeTruthy();
+    expect(screen.queryByText('Choose who to tell')).toBeNull();
+    view.unmount();
   });
 
   it('Back from setup returns to Home and the new person is not listed', async () => {
@@ -98,7 +97,7 @@ describe('the order in the app', () => {
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');
     fireEvent.press(screen.getByLabelText('Back to home'));
-    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
     expect(screen.queryByLabelText('Someone new')).toBeNull();
     expect(screen.getByLabelText('Anna')).toBeTruthy();
   });
@@ -122,7 +121,7 @@ describe('the order in the app', () => {
   });
 
   it('opens the details form with the name from setup already filled', async () => {
-    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
+    await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], [{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]);
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');
@@ -152,7 +151,7 @@ describe('the order in the app', () => {
   it('opens a draft in progress where it was left when the person is opened from Home', async () => {
     const draft = {
       step: 'details', templateCategory: 'aftercare', templateOverrideId: null, fields: { deceasedName: 'Anna Lee' },
-      serviceDetailsKnown: null, selectedContactIds: [], place: null, includeFlowers: false, floristId: null,
+      serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false,
       customFlorist: '', flowerDeliveryTarget: 'service', tone: 'warm', messageOverride: null,
     };
     await saved([{ ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draft } } as unknown as Session]);
@@ -166,7 +165,7 @@ describe('the order in the app', () => {
 
 const draftOf = (fields: Record<string, string>, step = 'details') => ({
   step, templateCategory: 'aftercare', templateOverrideId: null, fields,
-  serviceDetailsKnown: null, selectedContactIds: [], place: null, includeFlowers: false, floristId: null,
+  serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false,
   customFlorist: '', flowerDeliveryTarget: 'service', tone: 'warm', messageOverride: null,
 });
 
@@ -182,7 +181,7 @@ describe('Home from every step', () => {
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
     fireEvent.press(screen.getByLabelText('Back to home'));
-    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
   it('Android back: a step goes Home; the checklist pops to the path first', async () => {
@@ -202,7 +201,15 @@ describe('Home from every step', () => {
     act(() => void pressBack());
     expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
     act(() => void pressBack());
-    expect(await screen.findByText("The people you're writing about")).toBeTruthy();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+  });
+});
+
+describe('Home without the checklist link (accounts on)', () => {
+  it('shows no What you\'ll need link when none is given, and keeps Your account', () => {
+    render(<HomeScreen canCreate onOpen={noop} onCreate={noop} onAccount={noop} sessions={[]} />);
+    expect(screen.queryByText("What you'll need")).toBeNull();
+    expect(screen.getByText('Your account')).toBeTruthy();
   });
 });
 

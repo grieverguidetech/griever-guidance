@@ -42,40 +42,6 @@
           }
         }
       },
-      "prune-lockfile": {
-        "dependsOn": [
-          "build"
-        ],
-        "cache": true,
-        "executor": "@nx/js:prune-lockfile",
-        "outputs": [
-          "{workspaceRoot}/apps/gateway/dist/package.json",
-          "{workspaceRoot}/apps/gateway/dist/pnpm-lock.yaml"
-        ],
-        "options": {
-          "buildTarget": "build"
-        }
-      },
-      "copy-workspace-modules": {
-        "dependsOn": [
-          "build"
-        ],
-        "cache": true,
-        "outputs": [
-          "{workspaceRoot}/apps/gateway/dist/workspace_modules"
-        ],
-        "executor": "@nx/js:copy-workspace-modules",
-        "options": {
-          "buildTarget": "build"
-        }
-      },
-      "prune": {
-        "dependsOn": [
-          "prune-lockfile",
-          "copy-workspace-modules"
-        ],
-        "executor": "nx:noop"
-      },
       "serve": {
         "continuous": true,
         "executor": "@nx/js:node",
@@ -101,12 +67,8 @@
   "dependencies": {
     "@griever/identity": "workspace:*",
     "@griever/gateway-messages": "workspace:*",
-    "@griever/gateway-sync": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "hono": "^4.13.7",
     "@griever/gateway-flows": "workspace:*"
-  },
-  "devDependencies": {
-    "convex": "^1.45.0"
   }
 }

@@ -8,8 +8,6 @@ const EXPECTED_ROUTES = [
   'GET /me/profile',
   'PUT /me/profile',
   'POST /obituary',
-  'GET /sync/pull',
-  'POST /sync/push',
   'GET /members',
   'DELETE /members/:memberId',
   'POST /invites',
@@ -21,8 +19,6 @@ async function loadApp() {
   vi.resetModules();
   vi.unstubAllEnvs();
   vi.stubEnv('CORS_ORIGINS', 'https://web.grieversguidance.com');
-  vi.stubEnv('CONVEX_URL', '');
-  vi.stubEnv('CONVEX_SELF_HOSTED_URL', '');
   vi.stubEnv('ANTHROPIC_API_KEY', '');
   vi.stubEnv('SUPABASE_URL', 'https://proj.supabase.test');
   vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
@@ -43,8 +39,6 @@ describe('gateway route inventory (C8)', () => {
   });
 
   it.each([
-    ['GET', '/sync/pull'],
-    ['POST', '/sync/push'],
     ['POST', '/obituary'],
   ])('%s %s refuses an empty request with 400', async (method, path) => {
     const app = await loadApp();

@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 /**
  * An accessible, low-effort time field, mirroring `DateField`. Uses the native
  * `<input type="time">` so each platform's own picker (mobile wheel, desktop
@@ -71,30 +69,5 @@ export function TimeInput({
         }
       }}
     />
-  );
-}
-
-interface TimeFieldProps extends Omit<TimeInputProps, 'describedBy'> {
-  label: ReactNode;
-  hint?: ReactNode;
-}
-
-/** Label + control + optional hint, wrapped in a `.gg-field`. */
-export function TimeField({ id, label, hint, ...input }: TimeFieldProps) {
-  const hintId = hint ? `${id}-hint` : undefined;
-  return (
-    <div className="gg-field">
-      <label htmlFor={id}>{label}</label>
-      <TimeInput id={id} describedBy={hintId} {...input} />
-      {hint && (
-        <p
-          id={hintId}
-          className="m-0 mt-1 text-[12px] leading-[1.5]"
-          style={{ color: 'var(--text-hint)' }}
-        >
-          {hint}
-        </p>
-      )}
-    </div>
   );
 }

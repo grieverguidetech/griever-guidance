@@ -80,18 +80,23 @@ test.describe('coming back', () => {
   test('a reload lands on Home listing the person, and opening her shows her path', async ({ page }) => {
     await onboard(page);
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeVisible();
     await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
     await page.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: "The people you're writing about" })).toBeFocused();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeFocused();
   });
 
   test('a half-written message shows Started on the path, and one tap resumes it (#176)', async ({ page }) => {
     await onboard(page);
     await page.getByRole('button', { name: 'Start' }).click();
     await page.getByLabel(/Anything you'd like to add/).fill('She was peaceful.');
+    // The draft reaches localStorage a render or two after the keystroke. Reload only once it is
+    // there, or the reload can cut the save short and the path shows no "Started" (#238).
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('gg.sessions.v1') ?? ''))
+      .toContain('She was peaceful.');
     await page.reload();
     await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();

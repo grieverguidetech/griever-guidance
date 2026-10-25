@@ -9,7 +9,7 @@ import type { AuthClientResult } from '../lib/authClient';
 
 const mocks = vi.hoisted(() => ({ load: vi.fn<() => Promise<AuthClientResult>>() }));
 
-vi.mock('../lib/features', () => ({ AUTH_ENABLED: true, OBITUARY_DRAFTING_ENABLED: false }));
+vi.mock('../lib/features', () => ({ AUTH_ENABLED: true, OBITUARY_DRAFTING_ENABLED: false, SHARING_ENABLED: false }));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();
   return { ...actual, loadAuthClient: mocks.load };

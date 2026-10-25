@@ -83,6 +83,8 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // Tells a dialog around this row (the sheet) that Escape was used up closing the tip.
+      e.preventDefault();
       setTipOpen(false);
       // Only pull focus back when it was in this row; leave it where the user is otherwise.
       if (wrap.current?.contains(document.activeElement)) infoButton.current?.focus();
@@ -142,13 +144,27 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
   );
 }
 
+/**
+ * The tickable rows. Shared by the checklist screen and "Your account", so a tick on one shows on
+ * the other: both read and write the same saved ticks.
+ */
+export function ChecklistRows() {
+  const { ticks, toggle, loaded } = useChecklistTicks();
+  return (
+    <div className="flex flex-col gap-3">
+      {CHECKLIST.map((item) => (
+        <ChecklistRow key={item.id} item={item} checked={ticks.includes(item.id)} loaded={loaded} onToggle={() => toggle(item.id)} />
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   onBack: () => void;
   onEmailList: () => void;
 }
 
 export function WhatYoullNeed({ onBack, onEmailList }: Props) {
-  const { ticks, toggle, loaded } = useChecklistTicks();
   return (
     <div className="flex flex-col gap-4">
       <TopBar onBack={onBack} />
@@ -170,9 +186,7 @@ export function WhatYoullNeed({ onBack, onEmailList }: Props) {
 
       <div className="flex flex-col gap-3">
         <p className="gg-eyebrow m-0">Gather when you can</p>
-        {CHECKLIST.map((item) => (
-          <ChecklistRow key={item.id} item={item} checked={ticks.includes(item.id)} loaded={loaded} onToggle={() => toggle(item.id)} />
-        ))}
+        <ChecklistRows />
       </div>
 
       <button type="button" onClick={onEmailList} className="gg-btn gg-btn-secondary gg-btn-block">

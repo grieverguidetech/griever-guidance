@@ -8,7 +8,7 @@ This is the working loop for anyone changing this repo, human or agent. Entry po
 3. **`REQUIREMENTS.md`**: what must be true (§1–§5) and the architecture and rules that keep it
    true (§6). Treat §2 and §6 as binding.
 4. **`SELF_IMPROVEMENT.md`**: mistakes already made here, so you don't repeat them.
-5. **`DATA.md`**: when the work touches storage, sync, sessions, or Convex.
+5. **`DATA.md`**: when the work touches storage, sync, or sessions.
 
 **Keep this file current.** When you learn something that changes how work should be done here,
 update this file (via `SELF_IMPROVEMENT.md`'s promote step) in the same PR.
@@ -52,7 +52,7 @@ so in one line and goes straight to a ticket.
 ### Intake → Refine (G1)
 
 1. **Read the rules that apply.** `REQUIREMENTS.md` §2 and §6 always. `DATA.md` if the change
-   touches storage, sync, sessions, or Convex. The relevant `design_specs/` handoff if it touches a
+   touches storage, sync, or sessions. The relevant `design_specs/` handoff if it touches a
    screen.
 2. **Find the requirement.** Locate the row in `REQUIREMENTS.md` this work moves. If there isn't
    one, the work may not be wanted. Ask, or add the row as part of the change.
@@ -148,7 +148,7 @@ docs inside a ticket; running typecheck/tests/builds; reading CI e2e results; `g
 labels and board items for approved work; opening PRs; commenting on issues; watching CI.
 
 **Ask first (a gate or a question):** approving scope; merging; pushing to `main`; changing
-GitHub secrets/variables or Cloudflare/Convex settings; manual deploys (`workflow_dispatch`);
+GitHub secrets/variables or Cloudflare settings; manual deploys (`workflow_dispatch`);
 deleting files you didn't create; dispatching the `E2E stress` workflow (propose a `repeat_each` when asking); adding a dependency outside the ticket that planned it; anything
 that costs money; changing design tokens or brand colors.
 
@@ -219,7 +219,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
   device.
 - **No silent mocks.** If a feature isn't backed by real infrastructure yet, ship it disabled with
   honest copy ("coming soon"), not a mock that fakes success. A mocked sign-up that wrote nothing
-  to Convex was a real bug here.
+  to a server was a real bug here.
 - **Delete dead code** when you replace something. Don't leave both paths.
 - Write user-facing copy last and read it aloud as the person in `REQUIREMENTS.md` §1.
 - **Tests ship with the code** (§7). A ticket without tests for its new behavior isn't done.
@@ -252,7 +252,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
   Dispatching it is ask-first (§2); propose a `repeat_each` when asking.
 - Axe is a floor, not a claim. Known, tracked failures use Playwright's `test.fail()` with the
   issue named, which turns red once fixed. `.skip` is never allowed.
-- Gateway tests never call Convex or Anthropic; stub `fetch` and env.
+- Gateway tests never call Supabase or Anthropic; stub `fetch` and env.
 
 ## 8. Verifying
 
@@ -264,15 +264,12 @@ pnpm check:affected   # same, only what your branch touched
 
 Then go beyond the tests where the change warrants it:
 
-- **Convex changes:** exercise the function against the local backend (`pnpm convex:up`,
-  `pnpm convex:dev`) and say what you called and what came back.
 - **UI changes:** run the app (`pnpm dev`, `pnpm dev:mobile`) and walk the affected screens on a
   phone-width viewport. Type-checking is not the same as working.
 - **Supabase/PostgREST changes:** stubbed tests don't see grants or RLS. Run the code once against
   the real migrations (`supabase start --workdir infra`, minimal services) before review, and quote
   the output in the PR.
-- **Gateway/deploy changes:** `apps/gateway` runs the Convex CLI from its own directory under pnpm's
-  strict isolation, and `CORS_ORIGINS` must match the real deployed origin exactly.
+- **Gateway/deploy changes:** `CORS_ORIGINS` must match the real deployed origin exactly.
 - **Mobile dependencies:** pin Expo/React Native packages to the SDK's `bundledNativeModules`
   versions; never `"*"`.
 - **Mobile device-API changes:** check the `.web.ts` stub still loads. Native-only modules crash

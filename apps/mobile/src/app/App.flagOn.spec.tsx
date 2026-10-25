@@ -7,6 +7,12 @@ process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
 const { App } = require('./App') as typeof import('./App');
 
 describe('App with the account feature on', () => {
+  it('has no What you\'ll need link on Home; the list lives on Your account', async () => {
+    render(<App />);
+    await screen.findByText('Your account');
+    expect(screen.queryByText("What you'll need")).toBeNull();
+  });
+
   it('shows the account link and opens the account screen', async () => {
     render(<App />);
     fireEvent.press(await screen.findByText('Your account'));

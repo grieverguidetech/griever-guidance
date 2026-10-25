@@ -1,6 +1,7 @@
 # AWS migration plan (GRI-8)
 
-Status: proposal, version 4. This document does not change infrastructure. Date: 2026-10-20.
+Status: proposal, version 4.1. This document does not change infrastructure. Date: 2026-10-20.
+Updated 2026-10-24: decision 9 (start fresh, move no data).
 
 ## Overview
 
@@ -29,6 +30,9 @@ Peter's decisions:
 8. Owner alerts: one email to Peter for each new account, with a summary of counts. Site-use
    counts come from the built-in Lambda and DynamoDB metrics in CloudWatch only. No digest, no
    custom metrics.
+9. **Start fresh. Move no data** (2026-10-24). Convex and Supabase hold only test data and 3 to 4
+   test users, not customers. We drop them. There is no import and no move day. The test users
+   sign up again on Clerk.
 
 The plan in short:
 
@@ -87,17 +91,15 @@ The ticks on the device are keyed by the checklist id, so a checklist id never c
 an item, we mark it hidden and keep the id. Every item has a `version` number, so the apps can tell
 when the bundled copy is out of date. Content has no user data, so it is not under C2.
 
-**Moving users to Clerk.** Users keep their email address. They lose their password, because magic
-link needs none. Before move day, we import each Supabase user into Clerk by email, with the email
-marked as verified. Clerk makes a new user id. The import script records the old Supabase id next
-to the new Clerk id. The data import then writes every item under the Clerk id. After the switch,
-each user signs in once with a magic link. Their data is there.
+**Users on Clerk.** We do not move users (decision 9). Every user, including the test users,
+signs up on Clerk. Clerk makes the user id, and every DynamoDB item is written under that id from
+the start.
 
 **How the new-account alert works.**
 
 - **Detection:** Clerk sends `user.created` when an account is made. This is better than version 3,
   which could only see an account at its first sign-in. The gateway route checks the webhook
-  signature (Svix) and ignores users that the import script made, by their import marker.
+  signature (Svix).
 - **Sending:** the gateway starts the `owner-alert` function and does not wait for it. If the email
   fails, it is logged and not retried. The next email has correct totals anyway, because they are
   counted at send time.
@@ -152,30 +154,24 @@ no extra charge. We do not use custom metrics, and the Worker makes no `PutMetri
 
 1. Set up the AWS account on the Paid plan. Turn on MFA for the root user.
 2. Add the budget alerts, the anomaly alert and the GitHub deploy role (`infra/aws/`).
-3. Export Convex production data and count it. If the count is 0, remove Convex.
+3. Remove Convex (#203). Its data is test data, so we do not export it (decision 9).
 4. Make the Clerk application. Turn on email magic link and turn off passwords. Add the Clerk DNS
    records in Cloudflare. Use a Clerk development instance for CI and preview.
 5. Build the data function, the access-rules module and both tables. Port all 199 pgTAP cases to
    Vitest. Run them in CI against DynamoDB Local.
 6. Move sign-in in the web app, the mobile app and `libs/gateway-auth` from Supabase to Clerk. Keep
-   it behind the existing `AUTH` feature flag until move day.
+   it behind the existing `AUTH` feature flag until the switch (step 9).
 7. Load the content table from the current code copy. Add `GET /content` with the Worker cache.
    Point GRI-9, GRI-11, GRI-12, GRI-13 and GRI-16 at it.
 8. Verify the `grieversguidance.com` domain in SES (DKIM records in Cloudflare). Verify Peter's
    address. Add the Clerk `user.created` webhook. Send a test alert. Stay in the SES sandbox.
-9. Write the import scripts (TypeScript): users into Clerk, then the 4 tables into DynamoDB under
-   the new Clerk ids. Each script can run again with the same result. Rehearse with a copy of
-   production data in the Clerk development instance.
-10. Move day, about 45 minutes on a quiet weekday night: put the gateway in read-only mode. Writes
-    answer a calm 503. The sync queue keeps edits on the device and retries (DATA.md), so no edit
-    is lost. Import users into Clerk, export the 4 tables and import them.
-11. Check: the user count in Clerk matches Supabase. The item count for each table matches the row
-    count, and a SHA-256 checksum of each table (sorted, with ids mapped) matches the export. If a
-    check fails, stay on Supabase and end the window. Nothing was changed there.
-12. Switch the apps and the gateway to Clerk and the data function. Turn off read-only mode. Users
-    sign in again once, with a magic link.
-13. Fallback: keep the Supabase project unchanged and paused for writes for 30 days. After 30
-    days, export a final backup and delete the Supabase project.
+9. Switch the apps and the gateway to Clerk and the data function. No data moves (decision 9). The
+   test users sign up again on Clerk.
+10. When the new stack works in production, delete the Supabase project. No backup, because it
+    holds only test data.
+
+Steps 9 to 13 of version 4 (import scripts, move day, count and checksum checks, and a 30-day
+Supabase fallback) were dropped on 2026-10-24 with #202.
 
 ## Cost
 
@@ -223,7 +219,8 @@ The lessons follow the Steps above:
 7. The content table (step 7): `aws dynamodb put-item`, `aws dynamodb query`.
 8. SES domain and sandbox (step 8): `aws sesv2 create-email-identity`, `aws sesv2 get-account`, `aws sesv2 send-email`.
 9. The new-account alert and site-use counts (step 8): `aws lambda invoke --invocation-type Event`, `aws cloudwatch get-metric-data`.
-10. Import and checks (steps 9 to 11): `aws dynamodb batch-write-item`, `aws dynamodb scan --select COUNT`.
+10. Counting what is in a table (step 9): `aws dynamodb scan --select COUNT`. (The import lesson
+    was dropped with decision 9.)
 
 Clerk is not an AWS service, so its setup (step 4) uses the Clerk dashboard and its API, not the
 AWS CLI.
@@ -241,15 +238,17 @@ AWS CLI.
    does not return to the app reliably. I have not checked Clerk's Expo support for email links.
 4. **Invite email: keep Resend or move to SES?** Recommendation: keep Resend now. Owner alerts go
    only to your verified address, so SES can stay in the sandbox.
-5. **Users must sign in again once after the switch.** Their sessions end on move day.
-   Recommendation: accept this. Show a calm note on the sign-in screen that explains the change.
+5. **Users must sign in again once after the switch.** Closed by decision 9: there are no real
+   users to move, so there is no move day and no note.
 6. **Who can edit content?** Recommendation: only Peter, with the content script and his AWS
    access. No admin screen now.
 7. **Build the `/flows` gateway routes (#131) on Supabase first, or on the data function?**
    Recommendation: build them on the data function, so we write them once.
 8. **What happens when an account is deleted?** Clerk sends a `user.deleted` webhook.
    Recommendation: the data function deletes that user's items when it gets the webhook.
-9. **Which AWS region?** Recommendation: `us-east-1`.
+9. **Which AWS region?** Decided (#185): `us-east-2`. The account's region-lock SCP allows only
+   global services (IAM, Budgets, Cost Explorer) in `us-east-1`, so CloudFormation, Lambda and
+   DynamoDB go in `us-east-2`. GitHub Actions must set `aws-region: us-east-2`.
 10. **`POST /obituary` has no sign-in check and no rate limit.** Recommendation: add both before the
     feature is turned on. This is a separate ticket.
 

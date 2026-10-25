@@ -1,8 +1,7 @@
 /**
  * The screen-keyed local session document (DATA.md §2) and its merge rule
- * (§4.4). Shared between the Convex functions (`apps/web/convex/`, which
- * apply this same merge server-side per the brief's step 4) and the client
- * sync engine (`libs/data-sync`), so the two can never drift.
+ * (§4.4). Used by the client sync engine (`libs/data-sync`). No server applies
+ * it now that Convex is removed (#203).
  */
 
 export type ScreenStatus = "pending" | "active" | "complete" | "seen" | "skipped";
@@ -49,7 +48,7 @@ export interface SessionDocument {
   cursorScreen: string | null;
 }
 
-/** A `sessions` row as returned by Convex's `pull` (DATA.md §3/§4.2) — a `SessionDocument`
+/** A `sessions` row as once returned by the removed Convex `pull` (DATA.md §3/§4.2) — a `SessionDocument`
  * plus the server's sync envelope and the fields denormalized for the previous-sessions picker. */
 export interface RemoteSessionRow extends SessionDocument {
   personName: string | null;
