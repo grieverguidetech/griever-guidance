@@ -2,12 +2,17 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "rootDir": "src",
     "module": "esnext",
     "moduleResolution": "bundler",
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
-    "lib": ["es2022", "dom"]
+    "lib": [
+      "es2022",
+      "dom"
+    ]
   },
   "exclude": [
     "out-tsc",
@@ -16,19 +21,18 @@
     "src/**/*.spec.ts",
     "src/**/*.test.ts"
   ],
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "references": [
     {
       "path": "../shared/tsconfig.lib.json"
     },
     {
-      "path": "../gateway-auth/tsconfig.lib.json"
-    },
-    {
       "path": "../data-aws/tsconfig.lib.json"
     },
     {
-      "path": "../gateway-flows/tsconfig.lib.json"
+      "path": "../gateway-auth/tsconfig.lib.json"
     }
   ]
 }

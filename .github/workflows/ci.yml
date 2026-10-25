@@ -89,12 +89,11 @@ jobs:
       - if: steps.detect.outputs.present == 'true'
         run: supabase test db --workdir infra
 
-  # DynamoDB Local + SES stand-in integration tests (#210). Runs only on PRs into the
-  # aws-be integration branch and on the final aws-be to main PR, so other PRs are unchanged. Here the tests fail, not skip, if a
-  # service is unreachable (AWS_LOCAL_REQUIRED).
+  # DynamoDB Local + SES stand-in integration tests (#210). Runs on every PR and every push to main
+  # (no path filter: it is a small job). The tests fail, not skip, if a service is unreachable
+  # (AWS_LOCAL_REQUIRED).
   aws-local:
     name: AWS local stack (DynamoDB Local, SES stand-in)
-    if: github.event_name == 'pull_request' && (github.base_ref == 'aws-be' || github.head_ref == 'aws-be')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -129,6 +128,8 @@ jobs:
       - run: pnpm nx test data-aws --skip-nx-cache
 
       - run: pnpm nx test data-access --skip-nx-cache
+
+      - run: pnpm nx test gateway-flows --skip-nx-cache
 
   e2e:
     name: Playwright e2e (desktop, Android, iPhone)

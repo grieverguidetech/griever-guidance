@@ -26,9 +26,6 @@
   "references": [
     {
       "path": "./tsconfig.lib.json"
-    },
-    {
-      "path": "../gateway-flows/tsconfig.lib.json"
     }
   ]
 }

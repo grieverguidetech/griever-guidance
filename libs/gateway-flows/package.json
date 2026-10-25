@@ -12,11 +12,20 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "gateway-flows"
+    "name": "gateway-flows",
+    "implicitDependencies": [
+      "!data-access",
+      "!data-aws"
+    ]
   },
   "dependencies": {
     "@griever/gateway-auth": "workspace:*",
     "@griever/shared": "workspace:*",
     "hono": "^4.13.7"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1154.0",
+    "@griever/data-access": "workspace:*",
+    "@griever/data-aws": "workspace:*"
   }
 }

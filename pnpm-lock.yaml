@@ -417,10 +417,6 @@ importers:
       hono:
         specifier: ^4.13.7
         version: 4.13.7
-    devDependencies:
-      '@griever/gateway-flows':
-        specifier: workspace:*
-        version: link:../gateway-flows
 
   libs/data-aws:
     dependencies:
@@ -486,6 +482,16 @@ importers:
       hono:
         specifier: ^4.13.7
         version: 4.13.7
+    devDependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.1154.0
+        version: 3.1154.0
+      '@griever/data-access':
+        specifier: workspace:*
+        version: link:../data-access
+      '@griever/data-aws':
+        specifier: workspace:*
+        version: link:../data-aws
 
   libs/gateway-messages:
     dependencies:

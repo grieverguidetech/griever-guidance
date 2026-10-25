@@ -1,16 +1,30 @@
 import { Jwt } from 'hono/utils/jwt';
 import { clearClerkCache } from '@griever/gateway-auth';
-import { createMembersRouter } from '@griever/gateway-flows';
+import { DeleteTableCommand } from '@aws-sdk/client-dynamodb';
+import { createDataApp, wiredRules, type Caller } from '@griever/data-access';
+import {
+  createDocClient,
+  createDynamoClient,
+  ensureTables,
+  isDynamoReachable,
+  loadLocalConfig,
+} from '@griever/data-aws';
 import { DATA_USER_TOKEN_HEADER, type DataResult } from '@griever/shared';
-import type { Caller } from './caller.js';
-import { createDataApp } from './handler/app.js';
-import { wiredRules } from './lambda.js';
-import { createTables, doc, dropTables, required, table, up } from './testing/localTable.js';
+import { createMembersRouter } from './membersRouter.js';
+
+// A random table pair on DynamoDB Local for this file. CI sets AWS_LOCAL_REQUIRED=true.
+const suffix = Math.random().toString(36).slice(2, 8);
+const config = { ...loadLocalConfig(), dataTable: `gg-test-flows-${suffix}`, contentTable: `gg-test-flows-c-${suffix}` };
+const dynamo = createDynamoClient(config);
+const doc = createDocClient(dynamo);
+const table = config.dataTable;
+const up = await isDynamoReachable(dynamo);
+const required = process.env['AWS_LOCAL_REQUIRED'] === 'true';
 
 /**
  * The gateway member routes against the real data function rules on DynamoDB Local (`pnpm aws:up`).
  * The only fakes are the Clerk key set, the token check, and the mail API. CI runs this with the
- * `data-access` tests in the aws-local job (AWS_LOCAL_REQUIRED=true).
+ * `gateway-flows` tests in the aws-local job (AWS_LOCAL_REQUIRED=true).
  */
 const ISSUER = 'https://clerk.example.test';
 const OWNER: Caller = { userId: 'user_sharing_owner', email: 'owner@example.test', emailVerified: true };
@@ -30,7 +44,7 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
   let router: ReturnType<typeof createMembersRouter>;
 
   beforeAll(async () => {
-    await createTables();
+    await ensureTables(dynamo, config);
     clearClerkCache();
     const pair = await crypto.subtle.generateKey(
       { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
@@ -86,7 +100,9 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
 
   afterAll(async () => {
     vi.unstubAllGlobals();
-    await dropTables();
+    for (const TableName of [config.dataTable, config.contentTable]) {
+      await dynamo.send(new DeleteTableCommand({ TableName }));
+    }
   });
 
   const send = (token: string, method: string, path: string, body?: unknown) =>
