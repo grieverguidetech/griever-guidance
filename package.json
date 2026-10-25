@@ -82,7 +82,7 @@
   "packageManager": "pnpm@10.34.1",
   "pnpm": {
     "overrides": {
-      "@clerk/clerk-js": "6.39.0",
+      "@clerk/clerk-js": "6.39.1",
       "@clerk/shared": "4.40.0",
       "react": "19.3.0",
       "react-dom": "19.3.0",

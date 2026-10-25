@@ -38,7 +38,7 @@
     }
   },
   "dependencies": {
-    "@clerk/expo": "4.10.1",
+    "@clerk/expo": "4.13.0",
     "@griever/shared": "workspace:*",
     "@griever/hooks": "workspace:*",
     "@griever/api-client": "workspace:*",

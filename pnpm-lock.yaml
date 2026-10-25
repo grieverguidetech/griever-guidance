@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@clerk/clerk-js': 6.39.0
+  '@clerk/clerk-js': 6.39.1
   '@clerk/shared': 4.40.0
   react: 19.3.0
   react-dom: 19.3.0
@@ -237,8 +237,8 @@ importers:
   apps/mobile:
     dependencies:
       '@clerk/expo':
-        specifier: 4.10.1
-        version: 4.10.1(@types/react@19.3.0)(expo-auth-session@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3))(expo-constants@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-crypto@58.0.6(expo@58.0.7))(expo-secure-store@58.0.2(expo@58.0.7))(expo-web-browser@58.0.6(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)))(expo@58.0.7)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)
+        specifier: 4.13.0
+        version: 4.13.0(@types/react@19.3.0)(expo-auth-session@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3))(expo-constants@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-crypto@58.0.6(expo@58.0.7))(expo-secure-store@58.0.2(expo@58.0.7))(expo-web-browser@58.0.6(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)))(expo@58.0.7)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)
       '@griever/api-client':
         specifier: workspace:*
         version: link:../../libs/api-client
@@ -1350,18 +1350,19 @@ packages:
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
 
-  '@clerk/clerk-js@6.39.0':
-    resolution: {integrity: sha512-1vGRCP+220kawQn827xgrcdUubSrCVmSlQT64WBHQoM60FaXkAzNaK7aPNEIMTRfg5Ync4SNBwCBr9YbwIUZLg==}
+  '@clerk/clerk-js@6.39.1':
+    resolution: {integrity: sha512-QtxMDDgtnZ6V/N3rOcjyEGqXHsugWOSFYzv176htNF57wN5lcRieUxwEYbXfpOdq2z4FYmS2bUDB1s+5AU0QsA==}
     engines: {node: '>=20.9.0'}
 
-  '@clerk/expo@4.10.1':
-    resolution: {integrity: sha512-HHOUfqwb5YNaWgTqAAwiEpIXGgJEXEuDaWGPmA/4RalwlluaVAX3jbKOwQ3QOXOzh0oYlpm09rt0XxJFrc3dZQ==}
+  '@clerk/expo@4.13.0':
+    resolution: {integrity: sha512-Hxss//4FE4lWCEtiLRchhnQOkWwy3KJUjPDj8khqqZ+K78ujqwPPaNDoQDM3c2O2gEd1Snp7KaHO4CQKkwehMA==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       '@clerk/expo-biometrics': '>=0.1.0'
       '@clerk/expo-google-signin': '>=0.1.0'
+      '@clerk/expo-native-components': '>=0.1.0'
       '@clerk/expo-passkeys': '>=0.0.6'
-      expo: '>=54 <58'
+      expo: '>=54 <59'
       expo-apple-authentication: '>=7.0.0'
       expo-auth-session: '>=5'
       expo-constants: 58.0.10
@@ -1376,6 +1377,8 @@ packages:
       '@clerk/expo-biometrics':
         optional: true
       '@clerk/expo-google-signin':
+        optional: true
+      '@clerk/expo-native-components':
         optional: true
       '@clerk/expo-passkeys':
         optional: true
@@ -11331,7 +11334,7 @@ snapshots:
 
   '@bcoe/v8-coverage@0.2.3': {}
 
-  '@clerk/clerk-js@6.39.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)':
+  '@clerk/clerk-js@6.39.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)':
     dependencies:
       '@base-org/account': 2.0.1(@types/react@19.3.0)(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)
       '@clerk/shared': 4.40.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -11359,9 +11362,9 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@clerk/expo@4.10.1(@types/react@19.3.0)(expo-auth-session@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3))(expo-constants@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-crypto@58.0.6(expo@58.0.7))(expo-secure-store@58.0.2(expo@58.0.7))(expo-web-browser@58.0.6(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)))(expo@58.0.7)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)':
+  '@clerk/expo@4.13.0(@types/react@19.3.0)(expo-auth-session@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3))(expo-constants@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-crypto@58.0.6(expo@58.0.7))(expo-secure-store@58.0.2(expo@58.0.7))(expo-web-browser@58.0.6(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)))(expo@58.0.7)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)':
     dependencies:
-      '@clerk/clerk-js': 6.39.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)
+      '@clerk/clerk-js': 6.39.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)
       '@clerk/react': 6.17.8(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@clerk/shared': 4.40.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       base-64: 1.0.0
