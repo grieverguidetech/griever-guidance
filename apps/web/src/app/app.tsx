@@ -103,10 +103,15 @@ function Loading() {
 }
 
 function AccountsUnavailable({ onRetry }: { onRetry: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Focus the heading so the message is announced; a retry that fails again mounts this anew.
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
   return (
     <Shell onWhatYoullNeed={noop}>
       <div className="flex flex-col gap-3 pt-[52px]">
-        <h1 className="text-[22px]">Accounts aren't available right now</h1>
+        <h1 ref={heading} tabIndex={-1} className="text-[22px]">Accounts aren't available right now</h1>
         <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
           Nothing you've written is lost. You can try again in a moment.
         </p>

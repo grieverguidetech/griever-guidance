@@ -257,6 +257,12 @@ describe('Clerk cannot be reached (C5)', () => {
     expect(screen.queryByRole('button', { name: 'Sign in with the test provider' })).not.toBeInTheDocument();
   });
 
+  it('focuses the heading so the message is announced', async () => {
+    render(<App />);
+    const heading = await screen.findByRole('heading', { name: "Accounts aren't available right now" });
+    expect(document.activeElement).toBe(heading);
+  });
+
   it('opens the local work with a calm note and no account actions when the signed-in marker exists', async () => {
     window.localStorage.setItem('gg.signedIn.v1', 'u1');
     window.localStorage.setItem('gg.sessions.v1', JSON.stringify([LOCAL_SESSION]));

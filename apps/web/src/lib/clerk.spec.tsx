@@ -15,12 +15,14 @@ type Auth = {
 
 const mocks = vi.hoisted(() => ({
   auth: null as unknown as Auth,
+  clerkStatus: 'ready' as 'ready' | 'degraded' | 'loading',
   providerProps: null as null | Record<string, unknown>,
   getProfile: vi.fn(),
 }));
 
 vi.mock('@clerk/react', () => ({
   useAuth: () => mocks.auth,
+  useClerk: () => ({ status: mocks.clerkStatus }),
   ClerkProvider: (props: Record<string, unknown> & { children: React.ReactNode }) => {
     mocks.providerProps = props;
     return <>{props.children}</>;
@@ -57,6 +59,7 @@ function strings(value: unknown, path = ''): Array<[string, string]> {
 beforeEach(() => {
   window.localStorage.clear();
   mocks.providerProps = null;
+  mocks.clerkStatus = 'ready';
   mocks.getProfile.mockReset();
   setAuth();
   vi.stubGlobal('navigator', { ...navigator, onLine: true });
@@ -123,20 +126,16 @@ describe('useClerkAuth status', () => {
     expect(result.current.auth.status).toBe('loading');
   });
 
-  it('with the marker, stays loading until the give-up time, then opens signed_in for local work', () => {
-    vi.useFakeTimers();
+  it('with the marker, is signed_in from the marker at once while Clerk loads, and getToken stays offline', async () => {
     window.localStorage.setItem('gg.signedIn.v1', 'user_1');
     setAuth({ isLoaded: false, isSignedIn: undefined, userId: undefined });
     const { result } = renderHook(() => useClerkAuth());
-    expect(result.current.auth.status).toBe('loading');
-    act(() => {
-      vi.advanceTimersByTime(CLERK_GIVE_UP_MS);
-    });
     expect(result.current.auth).toMatchObject({ status: 'signed_in', userId: 'user_1' });
     expect(result.current.unavailable).toBe(false);
+    expect(await result.current.auth.getToken()).toEqual({ ok: false, reason: 'offline' });
   });
 
-  it('with the marker and an offline browser, opens signed_in at once', () => {
+  it('with the marker and an offline browser, is signed_in from the marker', () => {
     window.localStorage.setItem('gg.signedIn.v1', 'user_1');
     vi.stubGlobal('navigator', { ...navigator, onLine: false });
     setAuth({ isLoaded: false, isSignedIn: undefined, userId: undefined });
@@ -144,15 +143,37 @@ describe('useClerkAuth status', () => {
     expect(result.current.auth).toMatchObject({ status: 'signed_in', userId: 'user_1' });
   });
 
-  it('opens for local work when the browser goes offline while Clerk is still loading', () => {
+  it('does not trust a signed-out answer from a degraded Clerk: the marker keeps the person signed in (C5)', () => {
     window.localStorage.setItem('gg.signedIn.v1', 'user_1');
-    setAuth({ isLoaded: false, isSignedIn: undefined, userId: undefined });
+    mocks.clerkStatus = 'degraded';
+    setAuth({ isSignedIn: false, userId: null });
+    const { result } = renderHook(() => useClerkAuth());
+    expect(result.current.auth).toMatchObject({ status: 'signed_in', userId: 'user_1' });
+  });
+
+  it('does not trust a signed-out answer while the browser is offline (C5)', () => {
+    window.localStorage.setItem('gg.signedIn.v1', 'user_1');
+    vi.stubGlobal('navigator', { ...navigator, onLine: false });
+    setAuth({ isSignedIn: false, userId: null });
+    const { result } = renderHook(() => useClerkAuth());
+    expect(result.current.auth.status).toBe('signed_in');
+  });
+
+  it('is loading, not signed_out, for a degraded Clerk with no marker', () => {
+    mocks.clerkStatus = 'degraded';
+    setAuth({ isSignedIn: false, userId: null });
     const { result } = renderHook(() => useClerkAuth());
     expect(result.current.auth.status).toBe('loading');
-    act(() => {
-      window.dispatchEvent(new Event('offline'));
-    });
+  });
+
+  it('reconciles to signed_out when Clerk loads and confirms there is no session', () => {
+    window.localStorage.setItem('gg.signedIn.v1', 'user_1');
+    setAuth({ isLoaded: false, isSignedIn: undefined, userId: undefined });
+    const { result, rerender } = renderHook(() => useClerkAuth());
     expect(result.current.auth.status).toBe('signed_in');
+    setAuth({ isSignedIn: false, userId: null });
+    rerender();
+    expect(result.current.auth.status).toBe('signed_out');
   });
 });
 
@@ -219,22 +240,48 @@ describe('useClerkAuth signOut', () => {
     expect(mocks.auth.signOut).not.toHaveBeenCalled();
   });
 
+  it('reports signed_out while a sign-out is pending, whatever Clerk says, even when signOut keeps failing', async () => {
+    window.localStorage.setItem('gg.signOutPending', '1');
+    window.localStorage.setItem('gg.signedIn.v1', 'user_1');
+    setAuth({ signOut: vi.fn(() => Promise.reject(new Error('network'))) });
+    const { result } = renderHook(() => useClerkAuth());
+    await act(async () => {});
+    expect(mocks.auth.signOut).toHaveBeenCalled();
+    expect(result.current.auth).toMatchObject({ status: 'signed_out', userId: null });
+    expect(window.localStorage.getItem('gg.signOutPending')).toBe('1');
+  });
+
+  it('reads the flag on every render: a failed signOut turns the status to signed_out', async () => {
+    setAuth({ signOut: vi.fn(() => Promise.reject(new Error('network'))) });
+    const { result } = renderHook(() => useClerkAuth());
+    expect(result.current.auth.status).toBe('signed_in');
+    await act(async () => {
+      await result.current.auth.signOut().catch(() => undefined);
+    });
+    expect(result.current.auth.status).toBe('signed_out');
+  });
+
   it('finishes a pending sign-out once Clerk loads, then clears the flag', async () => {
     window.localStorage.setItem('gg.signOutPending', '1');
     const { result } = renderHook(() => useClerkAuth());
-    // Not signed in while the sign-out is being finished.
-    expect(result.current.auth.status).toBe('loading');
+    expect(result.current.auth.status).toBe('signed_out');
     await act(async () => {});
     expect(mocks.auth.signOut).toHaveBeenCalledOnce();
     expect(window.localStorage.getItem('gg.signOutPending')).toBeNull();
   });
 
-  it('keeps the flag when the pending sign-out fails again', async () => {
+  it('retries a pending sign-out when the browser comes back online', async () => {
     window.localStorage.setItem('gg.signOutPending', '1');
-    setAuth({ signOut: vi.fn(() => Promise.reject(new Error('network'))) });
+    vi.stubGlobal('navigator', { ...navigator, onLine: false });
     renderHook(() => useClerkAuth());
     await act(async () => {});
-    expect(window.localStorage.getItem('gg.signOutPending')).toBe('1');
+    expect(mocks.auth.signOut).not.toHaveBeenCalled();
+    vi.stubGlobal('navigator', { ...navigator, onLine: true });
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    expect(mocks.auth.signOut).toHaveBeenCalledOnce();
+    expect(window.localStorage.getItem('gg.signOutPending')).toBeNull();
   });
 });
 
@@ -265,7 +312,15 @@ describe('ClerkAccount', () => {
     expect(await screen.findByText('signed_in')).toBeInTheDocument();
     await act(async () => {});
     expect(token).toBe('jwt');
-    expect(mocks.providerProps).toMatchObject({ publishableKey: 'pk_test_abc', localization });
+    expect(mocks.providerProps).toMatchObject({
+      publishableKey: 'pk_test_abc',
+      localization,
+      appearance: {
+        variables: { colorDanger: '#aa0b56', colorRing: '#006786', colorMutedForeground: '#5e5d5c' },
+        options: { animations: false },
+        elements: { formFieldInput: { minHeight: 44 }, socialButtonsBlockButton: { minHeight: 44 } },
+      },
+    });
     expect(window.localStorage.getItem('gg.signedIn.v1')).toBe('user_1');
   });
 });

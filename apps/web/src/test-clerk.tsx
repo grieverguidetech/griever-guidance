@@ -13,7 +13,7 @@ export interface FakeClerkOptions {
   /** Signed in as this user at load; omit for signed out. */
   userId?: string;
   getToken?: AccountAuth['getToken'];
-  /** Runs before the fake session ends; a rejection is passed on, the session still ends. */
+  /** Runs before the fake session ends; a rejection is passed on and the session stays. */
   signOut?: () => Promise<void>;
 }
 
@@ -23,6 +23,11 @@ export interface FakeClerk {
   signIn: (userId: string) => void;
   /** The session ends somewhere else (another tab, an expired cookie). */
   endElsewhere: () => void;
+}
+
+/** The real adapter reports signed_out while a sign-out is pending; so does the fake. */
+function pendingSignOut(): boolean {
+  return window.localStorage.getItem('gg.signOutPending') !== null;
 }
 
 export function fakeClerk(options: FakeClerkOptions = {}): FakeClerk {
@@ -51,16 +56,14 @@ export function fakeClerk(options: FakeClerkOptions = {}): FakeClerk {
     const id = useUser();
     const signOut = useMemo(
       () => async () => {
-        try {
-          await options.signOut?.();
-        } finally {
-          setUser(null);
-        }
+        // Like Clerk: a sign-out that fails leaves the session in place.
+        await options.signOut?.();
+        setUser(null);
       },
       [],
     );
     const auth = useMemo<AccountAuth>(
-      () => ({ status: id ? 'signed_in' : 'signed_out', userId: id, getToken, signOut }),
+      () => ({ status: id && !pendingSignOut() ? 'signed_in' : 'signed_out', userId: id && !pendingSignOut() ? id : null, getToken, signOut }),
       [id, signOut],
     );
     const account = useAccount({ auth, storage: window.localStorage });

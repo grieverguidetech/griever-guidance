@@ -3,9 +3,9 @@
  * `AccountAuth` seam (libs/shared), and `ClerkAccount` feeds it to `useAccount`. Loaded lazily and
  * only when AUTH_ENABLED is on (see authClient.ts).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
-import { ClerkProvider, useAuth } from '@clerk/react';
+import { ClerkProvider, useAuth, useClerk } from '@clerk/react';
 import { enUS } from '@clerk/localizations';
 import { SIGNED_IN_STORAGE_KEY, useAccount } from '@griever/hooks';
 import type { AccountAuth, AccountTokenResult } from '@griever/shared';
@@ -69,65 +69,79 @@ function signedInMarker(): string | null {
 }
 
 /**
- * `signed_out` only once Clerk has loaded and says there is no session. Until then: `loading`, or
- * with the signed-in marker and a Clerk that has not loaded in time (or an offline browser),
- * `signed_in` for local work (C5).
+ * `signed_out` only when Clerk is `ready`, the browser is online and Clerk says there is no
+ * session, or when a sign-out is pending on this device. Otherwise a device with the signed-in
+ * marker is `signed_in` from the marker at once, without waiting for Clerk (C5), and is reconciled
+ * when Clerk answers. With no marker the status is `loading`.
  */
 export function useClerkAuth(): { auth: AccountAuth; unavailable: boolean } {
   const clerk = useAuth();
+  const instance = useClerk();
   const latest = useRef(clerk);
   latest.current = clerk;
   const { isLoaded, isSignedIn, userId } = clerk;
+  const ready = instance.status === 'ready';
 
+  // Re-render when the flag or the connection changes underneath us.
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
   const [gaveUp, setGaveUp] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => {
+      setOnline(false);
+      setGaveUp(true);
+    };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
   useEffect(() => {
     if (isLoaded) {
       setGaveUp(false);
       return;
     }
     const timer = setTimeout(() => setGaveUp(true), CLERK_GIVE_UP_MS);
-    const onOffline = () => setGaveUp(true);
-    window.addEventListener('offline', onOffline);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('offline', onOffline);
-    };
+    return () => clearTimeout(timer);
   }, [isLoaded]);
 
-  // A sign-out that could not reach Clerk earlier is finished as soon as Clerk loads.
-  const [finishing, setFinishing] = useState(pendingSignOut);
+  // A sign-out that could not reach Clerk earlier is retried whenever Clerk is loaded and we are online.
+  const pending = pendingSignOut();
+  const retrying = useRef(false);
   useEffect(() => {
-    if (!isLoaded || !finishing) {
+    if (!pending || !isLoaded || !online || retrying.current) {
       return;
     }
-    let live = true;
+    retrying.current = true;
     void latest.current
       .signOut()
       .then(() => {
         window.localStorage.removeItem(SIGN_OUT_PENDING_KEY);
       })
       .catch(() => {
-        // Still pending; the next online load tries again.
+        // Still pending; the next online event tries again.
       })
       .finally(() => {
-        if (live) {
-          setFinishing(false);
-        }
+        retrying.current = false;
+        bump();
       });
-    return () => {
-      live = false;
-    };
-  }, [isLoaded, finishing]);
+  }, [pending, isLoaded, online]);
 
   const marker = signedInMarker();
   let status: AccountAuth['status'] = 'loading';
   let currentUserId: string | null = null;
-  if (finishing) {
-    status = 'loading';
-  } else if (isLoaded) {
+  if (pending) {
+    status = 'signed_out';
+  } else if (isLoaded && ready && online) {
     status = isSignedIn && userId ? 'signed_in' : 'signed_out';
     currentUserId = status === 'signed_in' ? (userId ?? null) : null;
-  } else if (gaveUp && hasSignedInMarker()) {
+  } else if (isLoaded && isSignedIn && userId) {
+    status = 'signed_in';
+    currentUserId = userId;
+  } else if (marker) {
     status = 'signed_in';
     currentUserId = marker;
   }
@@ -158,6 +172,7 @@ export function useClerkAuth(): { auth: AccountAuth; unavailable: boolean } {
       await latest.current.signOut();
     } catch (error) {
       markSignOutPending();
+      bump();
       throw error;
     }
   }, []);
@@ -192,6 +207,22 @@ function stayHere(): void {
   window.history.replaceState(null, '', window.location.pathname + window.location.search);
 }
 
+/**
+ * Applies to every Clerk view. Colors are the computed-contrast fixes from the a11y review; sizes
+ * give 44 px touch targets; animations are off for calm and reduced motion. Style objects, not
+ * Tailwind classes: Tailwind does not see Clerk's markup.
+ */
+export const appearance = {
+  variables: { colorDanger: '#aa0b56', colorRing: '#006786', colorMutedForeground: '#5e5d5c' },
+  options: { animations: false },
+  elements: {
+    formFieldInput: { minHeight: 44, maxHeight: 'none' },
+    formButtonPrimary: { minHeight: 44 },
+    socialButtonsBlockButton: { minHeight: 44 },
+    formFieldInputShowPasswordButton: { minWidth: 44, minHeight: 44 },
+  },
+} as const;
+
 export function ClerkAccount({ children }: { children: (state: ClerkAccountState) => ReactNode }) {
   const publishableKey = String(import.meta.env['VITE_CLERK_PUBLISHABLE_KEY'] ?? '').trim();
   if (!publishableKey) {
@@ -201,6 +232,7 @@ export function ClerkAccount({ children }: { children: (state: ClerkAccountState
     <ClerkProvider
       publishableKey={publishableKey}
       localization={localization}
+      appearance={appearance}
       routerPush={stayHere}
       routerReplace={stayHere}
       afterSignOutUrl="/"

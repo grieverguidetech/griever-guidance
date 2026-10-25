@@ -13,11 +13,7 @@ export function SignInScreen() {
           We'll help you tell people what they need to know. First, somewhere safe to keep it.
         </p>
       </div>
-      <SignIn
-        withSignUp
-        routing="hash"
-        appearance={{ elements: { rootBox: 'w-full', cardBox: 'w-full max-w-full shadow-none' } }}
-      />
+      <SignIn withSignUp routing="hash" />
     </div>
   );
 }
