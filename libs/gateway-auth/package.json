@@ -20,6 +20,8 @@
     "name": "gateway-auth"
   },
   "dependencies": {
+    "@griever/shared": "workspace:*",
+    "aws4fetch": "1.0.20",
     "hono": "^4.13.7"
   }
 }
