@@ -1,10 +1,11 @@
 import { Jwt } from 'hono/utils/jwt';
+import type { HonoJsonWebKey } from 'hono/utils/jwt/jws';
 import type { Caller } from './caller.js';
 
 export type { Caller } from './caller.js';
 
 /** A public key from a JWKS document. */
-type PublicKey = { kid?: string; alg?: string } & JsonWebKey;
+type PublicKey = { kid?: string; alg?: string } & HonoJsonWebKey;
 
 export interface VerifierOptions {
   /** Expected `iss` claim, from DATA_AUTH_ISSUER. */

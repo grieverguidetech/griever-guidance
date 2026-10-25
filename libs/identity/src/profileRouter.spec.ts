@@ -1,11 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearJwksCache } from '@griever/gateway-auth';
-import { SUPABASE_URL, USER_ID, jsonResponse, makeKeys, signJwt } from '@griever/gateway-auth/testing';
+import { Jwt } from 'hono/utils/jwt';
+import { clearClerkCache, DataFunctionError } from '@griever/gateway-auth';
 import { createProfileRouter, parseProfileBody } from './profileRouter.js';
-import type { Profile } from '@griever/shared';
-import type { ProfilesClient } from './supabaseClient.js';
 
-const PROFILE: Profile = {
+const ISSUER = 'https://clerk.example.test';
+const USER_ID = 'user_abc123';
+const DATA = { url: 'http://127.0.0.1:3002', region: 'us-east-1' };
+const STORED = {
+  userId: USER_ID,
+  senderName: 'Ada',
+  contactSource: 'manual',
+  accountType: 'owner',
+  version: 3,
+  createdAt: '2026-10-11T10:00:00.000Z',
+  updatedAt: '2026-10-11T10:00:00.000Z',
+};
+const PROFILE = {
   id: USER_ID,
   senderName: 'Ada',
   contactSource: 'manual',
@@ -13,6 +23,18 @@ const PROFILE: Profile = {
   createdAt: '2026-10-11T10:00:00.000Z',
   updatedAt: '2026-10-11T10:00:00.000Z',
 };
+
+async function makeKey() {
+  const pair = await crypto.subtle.generateKey(
+    { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true,
+    ['sign', 'verify'],
+  );
+  return {
+    privateJwk: { ...(await crypto.subtle.exportKey('jwk', pair.privateKey)), kid: 'k1', alg: 'RS256' },
+    publicJwk: { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid: 'k1', alg: 'RS256' },
+  };
+}
 
 describe('parseProfileBody', () => {
   it('accepts the two allowed fields, including null', () => {
@@ -47,12 +69,14 @@ describe('parseProfileBody', () => {
 });
 
 describe('profile router', () => {
-  let keys: Awaited<ReturnType<typeof makeKeys>>;
   let token: string;
-  const client: ProfilesClient = { get: vi.fn(), upsert: vi.fn() };
-  const config = { url: SUPABASE_URL, anonKey: 'anon' };
-  const createClient = vi.fn(() => client);
-  const router = createProfileRouter({ getConfig: () => config, createClient });
+  const callData = vi.fn();
+  let dataConfig: typeof DATA | null = DATA;
+  const router = createProfileRouter({
+    getAuthConfig: () => ({ issuer: ISSUER, authorizedParties: [] }),
+    getDataConfig: () => dataConfig,
+    callData: callData as never,
+  });
 
   const call = (method: string, body?: unknown, auth = true) =>
     router.request('/me/profile', {
@@ -65,49 +89,90 @@ describe('profile router', () => {
     });
 
   beforeEach(async () => {
-    clearJwksCache();
     vi.clearAllMocks();
-    keys = await makeKeys();
-    token = await signJwt(keys.privateKey, keys.kid);
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => jsonResponse(keys.jwks)));
+    clearClerkCache();
+    dataConfig = DATA;
+    const key = await makeKey();
+    token = await Jwt.sign(
+      { sub: USER_ID, iss: ISSUER, exp: Math.floor(Date.now() / 1000) + 300, email: 'ada@example.test' },
+      key.privateJwk,
+      'RS256',
+    );
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({ keys: [key.publicJwk] }))));
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('GET returns the profile and builds the client from the caller token', async () => {
-    vi.mocked(client.get).mockResolvedValue(PROFILE);
+  it('GET reads through the data function with the caller token and returns the shared shape', async () => {
+    callData.mockResolvedValue({ ok: true, data: STORED });
     const res = await call('GET');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(PROFILE);
-    expect(createClient).toHaveBeenCalledWith(config, token);
-    expect(client.get).toHaveBeenCalledWith(USER_ID);
+    expect(callData).toHaveBeenCalledWith(DATA, token, 'getProfile', {});
   });
 
-  it('GET passes accountType through for a member', async () => {
-    vi.mocked(client.get).mockResolvedValue({ ...PROFILE, accountType: 'member' });
-    expect((await (await call('GET')).json()).accountType).toBe('member');
+  it('GET maps missing optional fields to null and passes a member through', async () => {
+    callData.mockResolvedValue({
+      ok: true,
+      data: { userId: USER_ID, accountType: 'member', version: 1, createdAt: 'a', updatedAt: 'b' },
+    });
+    expect(await (await call('GET')).json()).toEqual({
+      id: USER_ID,
+      senderName: null,
+      contactSource: null,
+      accountType: 'member',
+      createdAt: 'a',
+      updatedAt: 'b',
+    });
   });
 
-  it('GET is 404 when there is no row yet', async () => {
-    vi.mocked(client.get).mockResolvedValue(null);
+  it('GET is 404 when there is no profile yet', async () => {
+    callData.mockResolvedValue({ ok: true, data: null });
     expect((await call('GET')).status).toBe(404);
   });
 
-  it('GET is 401 without a token', async () => {
+  it('GET is 401 without a token and never calls the data function', async () => {
     expect((await call('GET', undefined, false)).status).toBe(401);
-    expect(client.get).not.toHaveBeenCalled();
+    expect(callData).not.toHaveBeenCalled();
   });
 
-  it('GET is 503 when the data store fails', async () => {
-    vi.mocked(client.get).mockRejectedValue(new Error('boom'));
+  it('GET is 401 when the data function says unauthorized', async () => {
+    callData.mockResolvedValue({ ok: false, code: 'unauthorized' });
+    const res = await call('GET');
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Please sign in again.' });
+  });
+
+  it('GET is 503 with calm copy when the data function is busy, ignoring its message', async () => {
+    callData.mockResolvedValue({ ok: false, code: 'busy', message: 'internal detail' });
+    const res = await call('GET');
+    expect(res.status).toBe(503);
+    const text = JSON.stringify(await res.json());
+    expect(text).toContain('Please try again in a moment.');
+    expect(text).not.toContain('internal detail');
+  });
+
+  it('GET is 503 when the data function call throws', async () => {
+    callData.mockRejectedValue(new DataFunctionError(500, 'data function answered 500'));
     expect((await call('GET')).status).toBe(503);
   });
 
-  it('PUT upserts only the caller row with the validated fields', async () => {
-    vi.mocked(client.upsert).mockResolvedValue(PROFILE);
+  it('GET is 503 when the data function URL is unset', async () => {
+    dataConfig = null;
+    expect((await call('GET')).status).toBe(503);
+    expect(callData).not.toHaveBeenCalled();
+  });
+
+  it('PUT sends only the validated fields and returns the shared shape', async () => {
+    callData.mockResolvedValue({ ok: true, data: STORED });
     const res = await call('PUT', { senderName: 'Ada' });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(PROFILE);
-    expect(client.upsert).toHaveBeenCalledWith(USER_ID, { senderName: 'Ada' });
+    expect(callData).toHaveBeenCalledWith(DATA, token, 'putProfile', { fields: { senderName: 'Ada' } });
+  });
+
+  it('PUT maps invalid from the data function to 400', async () => {
+    callData.mockResolvedValue({ ok: false, code: 'invalid' });
+    expect((await call('PUT', { senderName: 'Ada' })).status).toBe(400);
   });
 
   it.each([
@@ -119,7 +184,7 @@ describe('profile router', () => {
   ])('PUT 400 for %s and writes nothing', async (_l, body) => {
     const res = await call('PUT', body);
     expect(res.status).toBe(400);
-    expect(client.upsert).not.toHaveBeenCalled();
+    expect(callData).not.toHaveBeenCalled();
   });
 
   it('PUT 400 for invalid JSON', async () => {
@@ -131,8 +196,8 @@ describe('profile router', () => {
     expect(res.status).toBe(400);
   });
 
-  it('503 when Supabase is not configured', async () => {
-    const unset = createProfileRouter({ getConfig: () => null, createClient });
+  it('503 when CLERK_ISSUER is not configured', async () => {
+    const unset = createProfileRouter({ getAuthConfig: () => null, getDataConfig: () => DATA, callData: callData as never });
     const res = await unset.request('/me/profile', { headers: { Authorization: `Bearer ${token}` } });
     expect(res.status).toBe(503);
   });

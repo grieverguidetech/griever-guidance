@@ -6,14 +6,27 @@ export { createProfilesClient } from './supabaseClient.js';
 export type { ProfileFields, ProfilesClient } from './supabaseClient.js';
 
 /**
- * GET/PUT /me/profile against Supabase, as the signed-in caller (anon key plus
- * their JWT, so row-level security applies). Env is read per request; unset
+ * GET/PUT /me/profile through the data function, as the signed-in Clerk caller. Env is read per request; unset
  * means these routes answer 503 rather than the gateway failing to start.
  */
 export const profileRouter = createProfileRouter({
-  getConfig: () => {
-    const url = process.env['SUPABASE_URL'];
-    const anonKey = process.env['SUPABASE_ANON_KEY'];
-    return url && anonKey ? { url: url.replace(/\/+$/, ''), anonKey } : null;
+  getAuthConfig: () => {
+    const issuer = process.env['CLERK_ISSUER']?.trim();
+    if (!issuer) return null;
+    const authorizedParties = (process.env['CLERK_AUTHORIZED_PARTIES'] ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+    return { issuer, authorizedParties };
+  },
+  getDataConfig: () => {
+    const url = process.env['DATA_FUNCTION_URL']?.trim();
+    if (!url) return null;
+    return {
+      url,
+      region: process.env['DATA_FUNCTION_REGION'] ?? 'us-east-1',
+      accessKeyId: process.env['DATA_FUNCTION_ACCESS_KEY_ID'],
+      secretAccessKey: process.env['DATA_FUNCTION_SECRET_ACCESS_KEY'],
+    };
   },
 });
