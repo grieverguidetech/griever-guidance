@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { UseSupabaseIdentityResult } from '@griever/hooks';
+import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
-import { LinkButton, ScreenHeader, announce, authStyles } from '../components/authForm';
+import { ScreenHeader, authStyles } from '../components/authForm';
 import { MUTED } from '../components/colors';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
@@ -10,7 +10,6 @@ import { ProfileScreen } from './ProfileScreen';
 import { ChecklistRows } from './WhatYoullNeedScreen';
 
 export const UNAVAILABLE = "Accounts aren't available right now.";
-export const CHECK_EMAIL = 'Please check your email to finish setting up your account.';
 
 // A name typed at sign-up stays here until it is saved, even if the person leaves this screen.
 // It is tied to the sign-up email so it can never be applied to a different account.
@@ -33,17 +32,6 @@ function AccountChecklist({ tipOpen, onTipChange }: { tipOpen: string | null; on
   );
 }
 
-function CheckEmail({ onSignIn }: { onSignIn: () => void }) {
-  useEffect(() => announce(CHECK_EMAIL), []);
-  return (
-    <>
-      <ScreenHeader>Check your email</ScreenHeader>
-      <Text accessibilityLiveRegion="polite" style={authStyles.body}>{CHECK_EMAIL}</Text>
-      <LinkButton label="Sign in" onPress={onSignIn} />
-    </>
-  );
-}
-
 /**
  * Picks sign in, sign up or profile from the identity state. Reached from the first screen.
  *
@@ -55,13 +43,12 @@ function AccountBody({
   tipOpen,
   onTipChange,
 }: {
-  identity: UseSupabaseIdentityResult;
+  identity: UseAccountResult;
   tipOpen: string | null;
   onTipChange: (id: string | null) => void;
 }) {
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
-  const [awaitingEmail, setAwaitingEmail] = useState(false);
   const [ended, setEnded] = useState(false);
   const explicitSignOut = useRef(false);
   const attempted = useRef<Unsaved | null>(null);
@@ -80,7 +67,6 @@ function AccountBody({
     if (isSignedIn) {
       setEnded(false);
     } else {
-      setAwaitingEmail(false);
       if (!explicitSignOut.current) setEnded(true);
     }
   }
@@ -110,7 +96,6 @@ function AccountBody({
 
   function switchMode(next: 'signIn' | 'signUp') {
     clearError();
-    setAwaitingEmail(false);
     setMode(next);
   }
 
@@ -139,22 +124,16 @@ function AccountBody({
       </>
     );
   }
-  if (awaitingEmail) return <CheckEmail onSignIn={() => switchMode('signIn')} />;
   if (mode === 'signUp') {
     return (
       <SignUpScreen
-        identity={identity}
         onSwitchToSignIn={() => switchMode('signIn')}
-        onCreated={(name, email) => {
-          setPendingName({ name, email });
-          setAwaitingEmail(true);
-        }}
+        onCreated={(name, email) => setPendingName({ name, email })}
       />
     );
   }
   return (
     <SignInScreen
-      identity={identity}
       onSwitchToSignUp={() => switchMode('signUp')}
       onAttempt={(email) => {
         // Signing in as someone else: the sign-up name is not theirs.

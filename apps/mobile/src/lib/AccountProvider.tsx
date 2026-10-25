@@ -1,20 +1,21 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useSupabaseIdentity } from '@griever/hooks';
-import type { UseSupabaseIdentityResult } from '@griever/hooks';
-import type { AuthClient } from '@griever/api-client/auth';
+import { useAccount as useAccountState } from '@griever/hooks';
+import type { UseAccountResult } from '@griever/hooks';
+import type { AccountAuth } from '@griever/shared';
 import { createProfileCache } from './authStorage';
-import { useAutoRefreshWithAppState } from './useAutoRefreshWithAppState';
+import { AUTH_ENABLED } from './features';
+import { CLERK_PUBLISHABLE_KEY, ClerkBoundary, useClerkAccountAuth } from './clerk';
 
 /** null means accounts are unavailable (missing configuration). */
-const AccountContext = createContext<UseSupabaseIdentityResult | null>(null);
+const AccountContext = createContext<UseAccountResult | null>(null);
 
-export function useAccount(): UseSupabaseIdentityResult | null {
+export function useAccount(): UseAccountResult | null {
   return useContext(AccountContext);
 }
 
 /** What the account screen sees while the profile cache loads. Every action does nothing. */
-const LOADING: UseSupabaseIdentityResult = {
+const LOADING: UseAccountResult = {
   status: 'loading',
   isSignedIn: false,
   isLoading: true,
@@ -22,48 +23,36 @@ const LOADING: UseSupabaseIdentityResult = {
   profile: null,
   error: null,
   clearError: () => undefined,
-  signUp: async () => false,
-  signIn: async () => false,
   signOut: async () => undefined,
   updateSenderName: async () => false,
-  // Password reset has no mobile screen yet; these are never reached.
-  requestReset: async () => ({ ok: false, message: '' }),
-  openRecoveryLink: async () => ({ ok: false, message: '' }),
-  completeReset: async () => ({ ok: false, message: '' }),
 };
 
 /** Calls the hook and hands the result up. Renders nothing. */
-function IdentityRunner({
-  client,
+function AccountRunner({
+  auth,
   storage,
-  onIdentity,
+  onAccount,
 }: {
-  client: AuthClient;
+  auth: AccountAuth;
   storage: ReturnType<typeof createProfileCache>;
-  onIdentity: (identity: UseSupabaseIdentityResult) => void;
+  onAccount: (account: UseAccountResult) => void;
 }) {
-  const hook = useSupabaseIdentity({ client, storage });
+  const hook = useAccountState({ auth, storage });
   // The hook returns a new object every render; rebuild only when one of its fields changes.
   /* eslint-disable react-hooks/exhaustive-deps */
-  const identity = useMemo(
+  const account = useMemo(
     () => hook,
-    [hook.status, hook.offline, hook.profile, hook.error, hook.signUp, hook.signIn, hook.signOut, hook.updateSenderName, hook.clearError],
+    [hook.status, hook.offline, hook.profile, hook.error, hook.signOut, hook.updateSenderName, hook.clearError],
   );
   /* eslint-enable react-hooks/exhaustive-deps */
-  useEffect(() => onIdentity(identity), [identity, onIdentity]);
+  useEffect(() => onAccount(account), [account, onAccount]);
   return null;
 }
 
-/**
- * The children (the send flow) always render straight away. The identity hook starts after the
- * profile cache has loaded, because it reads that cache once at mount; until then accounts show
- * as loading. The send flow never waits on accounts.
- */
-function Identity({ client, children }: { client: AuthClient; children: ReactNode }) {
+/** The profile cache, read from AsyncStorage once. `ready` flips when it can be trusted. */
+function useProfileCache() {
   const storage = useMemo(() => createProfileCache(), []);
-  useAutoRefreshWithAppState(client);
   const [ready, setReady] = useState(false);
-  const [identity, setIdentity] = useState<UseSupabaseIdentityResult>(LOADING);
   useEffect(() => {
     let live = true;
     void storage.hydrate().then(() => live && setReady(true));
@@ -71,15 +60,53 @@ function Identity({ client, children }: { client: AuthClient; children: ReactNod
       live = false;
     };
   }, [storage]);
+  return { storage, ready };
+}
+
+type ProfileCache = ReturnType<typeof useProfileCache>;
+
+/**
+ * The children (the send flow) always render straight away. The account hook starts after the
+ * profile cache has loaded, because it reads that cache once at mount; until then accounts show
+ * as loading. The send flow never waits on accounts.
+ */
+function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: ProfileCache; children: ReactNode }) {
+  const [account, setAccount] = useState<UseAccountResult>(LOADING);
   return (
     <>
-      {ready ? <IdentityRunner client={client} storage={storage} onIdentity={setIdentity} /> : null}
-      <AccountContext.Provider value={identity}>{children}</AccountContext.Provider>
+      {cache.ready ? <AccountRunner auth={auth} storage={cache.storage} onAccount={setAccount} /> : null}
+      <AccountContext.Provider value={account}>{children}</AccountContext.Provider>
     </>
   );
 }
 
-export function AccountProvider({ client, children }: { client: AuthClient | null; children: ReactNode }) {
-  if (!client) return <AccountContext.Provider value={null}>{children}</AccountContext.Provider>;
-  return <Identity client={client}>{children}</Identity>;
+/** For tests and any provider that needs no cache of its own. */
+export function AccountStateProvider({ auth, children }: { auth: AccountAuth; children: ReactNode }) {
+  return (
+    <AccountState auth={auth} cache={useProfileCache()}>
+      {children}
+    </AccountState>
+  );
+}
+
+function ClerkAccountState({ children }: { children: ReactNode }) {
+  const cache = useProfileCache();
+  const auth = useClerkAccountAuth(cache.storage, cache.ready);
+  return (
+    <AccountState auth={auth} cache={cache}>
+      {children}
+    </AccountState>
+  );
+}
+
+/** Clerk mounts only when the flag is on and the publishable key is set; otherwise accounts are unavailable. */
+export function AccountProvider({ children }: { children: ReactNode }) {
+  if (!AUTH_ENABLED || !CLERK_PUBLISHABLE_KEY) {
+    return <AccountContext.Provider value={null}>{children}</AccountContext.Provider>;
+  }
+  return (
+    <ClerkBoundary publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <ClerkAccountState>{children}</ClerkAccountState>
+    </ClerkBoundary>
+  );
 }

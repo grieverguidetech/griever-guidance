@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { useState } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import type { AuthClient, ProfileResult, SessionState, SignInResult, SignUpResult } from '@griever/api-client/auth';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import type { ProfileResult } from '@griever/api-client';
+import type { AccountAuth } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { CHECKLIST_KEY, SSN_TIP } from './WhatYoullNeedScreen';
-import { AccountProvider, useAccount } from '../lib/AccountProvider';
+import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
 
 // Jest has no native view tree, so the real findNodeHandle returns null for every component. The
 // heading focus test needs a handle to exist; only this one function is replaced.
@@ -15,101 +17,119 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   findNodeHandle: () => 1,
 }));
 
-const signedIn: SessionState = { status: 'signed_in', session: { userId: 'u1', email: 'a@b.co', accessToken: 't' } };
-const noProfile: ProfileResult = { ok: false, reason: 'no_profile' };
+// The profile calls go through the gateway; here they are plain functions.
+const mockGetProfile = jest.fn<() => Promise<ProfileResult>>();
+const mockUpdateProfile = jest.fn<(token: string, u: { senderName?: string | null }) => Promise<ProfileResult>>();
+jest.mock('@griever/api-client', () => ({
+  ...jest.requireActual<object>('@griever/api-client'),
+  getProfile: () => mockGetProfile(),
+  updateProfile: (token: string, u: { senderName?: string | null }) => mockUpdateProfile(token, u),
+}));
+
+// Clerk's screens-side hooks. `finalize` signs the fake auth in, the way Clerk's finalize starts the session.
+const mockAuthControl: { setSignedIn: (v: boolean) => void } = { setSignedIn: () => undefined };
+const mockSignIn = {
+  status: 'complete',
+  password: jest.fn(async () => ({ error: null })),
+  finalize: jest.fn(async () => ({ error: null as unknown })),
+  reset: jest.fn(),
+};
+const mockSignUp = {
+  status: 'complete',
+  password: jest.fn(async () => ({ error: null })),
+  verifications: { sendEmailCode: jest.fn(async () => ({ error: null })), verifyEmailCode: jest.fn(async () => ({ error: null })) },
+  finalize: jest.fn(async () => ({ error: null as unknown })),
+};
+jest.mock('@clerk/expo', () => ({
+  useSignIn: () => ({ signIn: mockSignIn }),
+  useSignUp: () => ({ signUp: mockSignUp }),
+  useSSO: () => ({ startSSOFlow: jest.fn() }),
+}));
+jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'mobile://sso-callback' }));
+
 const profileWith = (senderName: string | null): ProfileResult => ({
   ok: true,
-  profile: { senderName, contactSource: null } as never,
+  profile: { id: 'u1', senderName, contactSource: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' },
 });
+const noProfile: ProfileResult = { ok: false, reason: 'no_profile' };
 const OFFLINE = "You need a connection to do this. Nothing you've typed is lost.";
 
-function stubClient(overrides: Partial<Record<keyof AuthClient, unknown>> = {}) {
-  const client = {
-    signUp: jest.fn(async (): Promise<SignUpResult> => ({ ok: true, userId: 'u1' })),
-    signIn: jest.fn(async (): Promise<SignInResult> => ({ ok: true, userId: 'u1' })),
-    signOut: jest.fn(async () => ({ ok: true as const, serverRevoked: true })),
-    getSession: jest.fn(async (): Promise<SessionState> => ({ status: 'signed_out' })),
-    refreshSession: jest.fn(async (): Promise<SessionState> => ({ status: 'signed_out' })),
-    startAutoRefresh: jest.fn(async () => undefined),
-    stopAutoRefresh: jest.fn(async () => undefined),
-    getProfile: jest.fn(async (): Promise<ProfileResult> => noProfile),
-    updateProfile: jest.fn(async (u: { senderName?: string | null }): Promise<ProfileResult> => profileWith(u.senderName ?? '')),
+/** Fake sign-in provider: signed out until a screen finalizes, loading while `loading`. */
+function Harness({ initial = false, children }: { initial?: boolean; children: React.ReactNode }) {
+  const [signedIn, setSignedIn] = useState(initial);
+  mockAuthControl.setSignedIn = setSignedIn;
+  const auth: AccountAuth = {
+    status: signedIn ? 'signed_in' : 'signed_out',
+    userId: signedIn ? 'u1' : null,
+    getToken: async () => (signedIn ? { ok: true, token: 't' } : { ok: false, reason: 'signed_out' }),
+    signOut: async () => setSignedIn(false),
   };
-  Object.assign(client, overrides);
-  return client as unknown as AuthClient & typeof client;
+  return <AccountStateProvider auth={auth}>{children}</AccountStateProvider>;
 }
 
-/** A client that is signed out until a sign-in or sign-up, then signed in. */
-function clientSignedInAfterAuth(overrides: Partial<Record<keyof AuthClient, unknown>> = {}) {
-  const client = stubClient(overrides);
-  client.getSession.mockResolvedValueOnce({ status: 'signed_out' }).mockResolvedValue(signedIn);
-  return client;
-}
-
-function renderAccount(client: AuthClient | null) {
+function renderAccount(initial = false) {
   return render(
-    <AccountProvider client={client}>
+    <Harness initial={initial}>
       <AccountScreen onBack={() => undefined} />
-    </AccountProvider>,
+    </Harness>,
   );
 }
 
 const type = (label: string, text: string) => fireEvent.changeText(screen.getByLabelText(label), text);
 const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
 const value = (label: string) => screen.getByLabelText(label).props.value;
+const finalizeSignsIn = (fn: typeof mockSignIn.finalize) => fn.mockImplementation(async () => (act(() => mockAuthControl.setSignedIn(true)), { error: null }));
 
-beforeEach(() => {
+beforeEach(async () => {
   resetUnsavedName();
   jest.restoreAllMocks();
+  await AsyncStorage.clear();
+  mockGetProfile.mockReset().mockResolvedValue(noProfile);
+  mockUpdateProfile.mockReset().mockImplementation(async (_t, u) => profileWith(u.senderName ?? ''));
+  mockSignIn.finalize.mockReset();
+  mockSignUp.finalize.mockReset();
+  mockSignIn.finalize.mockResolvedValue({ error: null });
+  mockSignUp.finalize.mockResolvedValue({ error: null });
+  finalizeSignsIn(mockSignIn.finalize);
+  finalizeSignsIn(mockSignUp.finalize);
 });
 
 describe('missing configuration', () => {
   it('shows the calm unavailable state under a header', () => {
-    renderAccount(null);
+    render(
+      <AccountProvider>
+        <AccountScreen onBack={() => undefined} />
+      </AccountProvider>,
+    );
     expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
     expect(screen.getByText("Accounts aren't available right now.")).toBeTruthy();
   });
 });
 
 describe('sign in', () => {
-  it('signs in and shows the profile', async () => {
-    const client = clientSignedInAfterAuth({ getProfile: jest.fn(async () => profileWith('Sam')) });
-    renderAccount(client);
+  it('shows the profile once Clerk has signed the person in', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount();
     await screen.findByLabelText('Email');
-    type('Email', ' a@b.co ');
+    type('Email', 'a@b.co');
     type('Password', 'secret-pass');
     press('Sign in');
     await screen.findByDisplayValue('Sam');
     expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
-    expect(client.signIn).toHaveBeenCalledWith('a@b.co', 'secret-pass');
   });
 
   it('asks for a name when the account has none', async () => {
-    const client = clientSignedInAfterAuth({ getProfile: jest.fn(async () => profileWith(null)) });
-    renderAccount(client);
+    mockGetProfile.mockResolvedValue(profileWith(null));
+    renderAccount();
     await screen.findByLabelText('Email');
-    type('Email', 'a@b.co');
-    type('Password', 'secret-pass');
     press('Sign in');
     await screen.findByRole('header', { name: 'What should we call you?' });
     expect(screen.getByText('This is the name on your account.')).toBeTruthy();
   });
 
-  it('keeps the typed fields and shows the hook copy on a wrong password', async () => {
-    const client = stubClient({ signIn: jest.fn(async () => ({ ok: false, reason: 'invalid_credentials' })) });
-    renderAccount(client);
-    await screen.findByLabelText('Email');
-    type('Email', 'a@b.co');
-    type('Password', 'nope');
-    press('Sign in');
-    await screen.findByText("That email and password don't match. Please try again.");
-    expect(value('Email')).toBe('a@b.co');
-    expect(value('Password')).toBe('nope');
-  });
-
   it('does not carry the error over to the sign-up screen', async () => {
-    const client = stubClient({ signIn: jest.fn(async () => ({ ok: false, reason: 'invalid_credentials' })) });
-    renderAccount(client);
+    mockSignIn.password.mockResolvedValueOnce({ error: { code: 'form_password_incorrect' } } as never);
+    renderAccount();
     await screen.findByLabelText('Email');
     press('Sign in');
     await screen.findByText("That email and password don't match. Please try again.");
@@ -117,202 +137,13 @@ describe('sign in', () => {
     await screen.findByLabelText('Your name');
     expect(screen.queryByText("That email and password don't match. Please try again.")).toBeNull();
   });
-});
 
-describe('sign up', () => {
-  async function openSignUp(client: AuthClient) {
-    renderAccount(client);
-    fireEvent.press(await screen.findByRole('button', { name: 'Create an account' }));
-    await screen.findByLabelText('Your name');
-  }
-  function fill(name = 'Sam', password = 'a-long-password') {
-    type('Your name', name);
-    type('Email', 'sam@x.co');
-    type('Password', password);
-  }
-
-  it('saves the name after the account is created', async () => {
-    const client = clientSignedInAfterAuth();
-    await openSignUp(client);
-    fill(' Sam ');
-    press('Create account');
-    await waitFor(() => expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Sam' }));
-    expect(client.signUp).toHaveBeenCalledWith('sam@x.co', 'a-long-password');
-    await screen.findByDisplayValue('Sam');
-  });
-
-  it('never applies the sign-up name to a different account', async () => {
-    const client = stubClient();
-    await openSignUp(client);
-    type('Your name', 'Sam');
-    type('Email', 'a@x.co');
-    type('Password', 'a-long-password');
-    press('Create account');
-    await screen.findByText('Please check your email to finish setting up your account.');
-    // Someone else signs in on this phone.
-    client.getSession.mockResolvedValue(signedIn);
-    press('Sign in');
-    await screen.findByLabelText('Email');
-    type('Email', 'b@x.co');
-    type('Password', 'another-password');
-    press('Sign in');
-    await screen.findByRole('header', { name: 'What should we call you?' });
-    expect(client.updateProfile).not.toHaveBeenCalled();
-    expect(value('Your name')).toBe('');
-  });
-
-  it('still saves the sign-up name when the same email signs in after confirming', async () => {
-    const client = stubClient();
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    await screen.findByText('Please check your email to finish setting up your account.');
-    client.getSession.mockResolvedValue(signedIn);
-    press('Sign in');
-    await screen.findByLabelText('Email');
-    type('Email', ' SAM@x.co ');
-    type('Password', 'a-long-password');
-    press('Sign in');
-    await waitFor(() => expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Sam' }));
-  });
-
-  it('does not let an old unsaved name overwrite a newer saved one', async () => {
-    const client = clientSignedInAfterAuth({
-      updateProfile: jest
-        .fn<(u: { senderName?: string | null }) => Promise<ProfileResult>>()
-        .mockResolvedValueOnce({ ok: false, reason: 'offline' })
-        .mockImplementation(async (u) => profileWith(u.senderName ?? '')),
-    });
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    await screen.findByText(OFFLINE);
-    type('Your name', 'Samantha');
-    press('Save');
-    await screen.findByText('Saved.');
-    screen.unmount();
-    renderAccount(client);
-    await screen.findByLabelText('Your name');
-    expect(screen.queryByDisplayValue('Sam')).toBeNull();
-    expect(client.updateProfile.mock.calls.map((c) => c[0])).toEqual([{ senderName: 'Sam' }, { senderName: 'Samantha' }]);
-  });
-
-  it('asks for a name when the profile still has none after sign-up', async () => {
-    const client = clientSignedInAfterAuth({ updateProfile: jest.fn(async () => profileWith('')) });
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    await screen.findByRole('header', { name: 'What should we call you?' });
-  });
-
-  it('keeps the typed name in the field when saving it fails', async () => {
-    const client = clientSignedInAfterAuth({ updateProfile: jest.fn(async () => ({ ok: false, reason: 'offline' })) });
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    await screen.findByText(OFFLINE);
-    expect(value('Your name')).toBe('Sam');
-    expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
-  });
-
-  it('shows the duplicate-email copy and keeps the fields', async () => {
-    const client = stubClient({ signUp: jest.fn(async () => ({ ok: false, reason: 'email_taken' })) });
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    await screen.findByText('This email already has an account. Sign in instead.');
-    expect(value('Your name')).toBe('Sam');
-    expect(value('Email')).toBe('sam@x.co');
-    expect(value('Password')).toBe('a-long-password');
-    expect(client.updateProfile).not.toHaveBeenCalled();
-  });
-
-  it('keeps the fields when offline', async () => {
-    const client = stubClient({ signUp: jest.fn(async () => ({ ok: false, reason: 'offline' })) });
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    await screen.findByText(OFFLINE);
-    expect(value('Email')).toBe('sam@x.co');
-    expect(value('Password')).toBe('a-long-password');
-  });
-
-  it('shows the password hint and attaches it to the input', async () => {
-    await openSignUp(stubClient());
-    expect(screen.getByText('Use at least 8 characters.', { includeHiddenElements: true })).toBeTruthy();
-    expect(screen.getByLabelText('Password').props.accessibilityHint).toBe('Use at least 8 characters.');
-  });
-
-  it('does not call the network for a short password', async () => {
-    const client = stubClient();
-    await openSignUp(client);
-    fill('Sam', 'short');
-    press('Create account');
-    await screen.findByText('Please choose a password with at least 8 characters.');
-    expect(client.signUp).not.toHaveBeenCalled();
-    expect(value('Password')).toBe('short');
-  });
-
-  it('does not call the network for a name of only spaces', async () => {
-    const client = stubClient();
-    await openSignUp(client);
-    fill('   ');
-    press('Create account');
-    await screen.findByText('Please enter your name.');
-    expect(client.signUp).not.toHaveBeenCalled();
-  });
-
-  it('disables submit while the request is pending', async () => {
-    let finish: (r: SignUpResult) => void = () => undefined;
-    const client = stubClient({ signUp: jest.fn(() => new Promise<SignUpResult>((r) => (finish = r))) });
-    await openSignUp(client);
-    fill();
-    press('Create account');
-    const busy = await screen.findByRole('button', { name: 'Creating account' });
-    expect(busy.props.accessibilityState).toMatchObject({ disabled: true, busy: true });
-    fireEvent.press(busy);
-    expect(client.signUp).toHaveBeenCalledTimes(1);
-    finish({ ok: false, reason: 'failed' });
-    await screen.findByRole('button', { name: 'Create account' });
-  });
-
-  it('asks the person to check their email, announces it and moves focus', async () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
-    const client = stubClient();
-    await openSignUp(client);
-    fill();
-    focus.mockClear();
-    press('Create account');
-    await screen.findByText('Please check your email to finish setting up your account.');
-    expect(screen.getByRole('header', { name: 'Check your email' })).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith('Please check your email to finish setting up your account.');
-    expect(focus).toHaveBeenCalledTimes(1);
-    expect(client.updateProfile).not.toHaveBeenCalled();
-  });
-});
-
-describe('AccountProvider', () => {
-  it('renders the app right away while the profile cache loads', () => {
-    jest.spyOn(AsyncStorage, 'getItem').mockReturnValue(new Promise(() => undefined));
-    function Probe() {
-      return <Text>{`app visible, accounts ${useAccount()?.status}`}</Text>;
-    }
-    render(
-      <AccountProvider client={stubClient()}>
-        <Probe />
-      </AccountProvider>,
-    );
-    expect(screen.getByText('app visible, accounts loading')).toBeTruthy();
-  });
-});
-
-describe('announcements', () => {
   it('announces errors on iOS only', async () => {
     const run = async () => {
       const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
       announce.mockClear();
-      renderAccount(stubClient({ signIn: jest.fn(async () => ({ ok: false, reason: 'offline' })) }));
+      mockSignIn.password.mockResolvedValueOnce({ error: { code: 'network_error' } } as never);
+      renderAccount();
       await screen.findByLabelText('Email');
       press('Sign in');
       await screen.findByText(OFFLINE);
@@ -326,25 +157,112 @@ describe('announcements', () => {
   });
 });
 
+describe('sign up', () => {
+  async function openSignUp() {
+    renderAccount();
+    fireEvent.press(await screen.findByRole('button', { name: 'Create an account' }));
+    await screen.findByLabelText('Your name');
+  }
+  async function createAccount(name = 'Sam', email = 'sam@x.co') {
+    type('Your name', name);
+    type('Email', email);
+    type('Password', 'a-long-password');
+    press('Create account');
+    await screen.findByLabelText('6-digit code');
+    type('6-digit code', '123456');
+    await act(async () => press('Create account'));
+  }
+
+  it('saves the name after the account is created', async () => {
+    await openSignUp();
+    await createAccount(' Sam ');
+    await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Sam' }));
+    await screen.findByDisplayValue('Sam');
+  });
+
+  it('never applies the sign-up name to a different account', async () => {
+    mockSignUp.finalize.mockResolvedValueOnce({ error: { code: 'network_error' } });
+    await openSignUp();
+    await createAccount();
+    await screen.findByText(OFFLINE);
+    // Someone else signs in on this phone.
+    press('Use a different email');
+    press('I already have an account');
+    await screen.findByLabelText('Password');
+    type('Email', 'b@x.co');
+    type('Password', 'another-password');
+    press('Sign in');
+    await screen.findByRole('header', { name: 'What should we call you?' });
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    expect(value('Your name')).toBe('');
+  });
+
+  it('does not let an old unsaved name overwrite a newer saved one', async () => {
+    mockUpdateProfile.mockResolvedValueOnce({ ok: false, reason: 'offline' });
+    await openSignUp();
+    await createAccount();
+    await screen.findByText(OFFLINE);
+    type('Your name', 'Samantha');
+    press('Save');
+    await screen.findByText('Saved.');
+    screen.unmount();
+    renderAccount(true);
+    await screen.findByLabelText('Your name');
+    expect(screen.queryByDisplayValue('Sam')).toBeNull();
+    expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }, { senderName: 'Samantha' }]);
+  });
+
+  it('asks for a name when the profile still has none after sign-up', async () => {
+    mockUpdateProfile.mockResolvedValue(profileWith(''));
+    await openSignUp();
+    await createAccount();
+    await screen.findByRole('header', { name: 'What should we call you?' });
+  });
+
+  it('keeps the typed name in the field when saving it fails', async () => {
+    mockUpdateProfile.mockResolvedValue({ ok: false, reason: 'offline' });
+    await openSignUp();
+    await createAccount();
+    await screen.findByText(OFFLINE);
+    expect(value('Your name')).toBe('Sam');
+    expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
+  });
+});
+
+describe('AccountStateProvider', () => {
+  it('renders the app right away while the profile cache loads', () => {
+    jest.spyOn(AsyncStorage, 'getItem').mockReturnValue(new Promise(() => undefined));
+    function Probe() {
+      return <Text>{`app visible, accounts ${useAccount()?.status}`}</Text>;
+    }
+    render(
+      <Harness initial>
+        <Probe />
+      </Harness>,
+    );
+    expect(screen.getByText('app visible, accounts loading')).toBeTruthy();
+  });
+});
+
 describe('profile', () => {
-  const signedInClient = (overrides: Partial<Record<keyof AuthClient, unknown>> = {}) =>
-    stubClient({ getSession: jest.fn(async () => signedIn), getProfile: jest.fn(async () => profileWith('Sam')), ...overrides });
+  beforeEach(() => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+  });
 
   it('edits and saves the sender name', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     announce.mockClear();
-    const client = signedInClient();
-    renderAccount(client);
+    renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
     await screen.findByText('Saved.');
-    expect(client.updateProfile).toHaveBeenCalledWith({ senderName: 'Samantha' });
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Samantha' });
     expect(announce).toHaveBeenCalledWith('Saved.');
   });
 
   it('shows "Saved." on the first save, when the account had no profile yet', async () => {
-    const client = signedInClient({ getProfile: jest.fn(async () => noProfile) });
-    renderAccount(client);
+    mockGetProfile.mockResolvedValue(noProfile);
+    renderAccount(true);
     await screen.findByRole('header', { name: 'What should we call you?' });
     type('Your name', 'Sam');
     press('Save');
@@ -353,8 +271,8 @@ describe('profile', () => {
   });
 
   it('shows the error and keeps the typed name when saving fails', async () => {
-    const client = signedInClient({ updateProfile: jest.fn(async () => ({ ok: false, reason: 'offline' })) });
-    renderAccount(client);
+    mockUpdateProfile.mockResolvedValue({ ok: false, reason: 'offline' });
+    renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
     await screen.findByText(OFFLINE);
@@ -362,24 +280,23 @@ describe('profile', () => {
   });
 
   it('does not save a name of only spaces', async () => {
-    const client = signedInClient();
-    renderAccount(client);
+    renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), '   ');
     press('Save');
     await screen.findByText('Please enter your name.');
-    expect(client.updateProfile).not.toHaveBeenCalled();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
   });
 
-  it('uses the new offline copy', async () => {
-    renderAccount(signedInClient({ getSession: jest.fn(async () => ({ status: 'offline' })) }));
+  it('uses the offline copy when the profile cannot be fetched', async () => {
+    mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
+    renderAccount(true);
     await screen.findByText('You are offline. You can change your name when you are connected.');
   });
 
-  it('keeps the view, the note and the typed name when the server ends the session', async () => {
-    const client = signedInClient({ updateProfile: jest.fn(async () => ({ ok: false, reason: 'signed_out' })) });
-    renderAccount(client);
+  it('keeps the view, the note and the typed name when the session ends', async () => {
+    renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
-    press('Save');
+    act(() => mockAuthControl.setSignedIn(false));
     await screen.findByText("You've been signed out. Your work on this device is safe. Sign in again when you're ready.");
     expect(value('Your name')).toBe('Samantha');
     press('Sign in');
@@ -388,7 +305,7 @@ describe('profile', () => {
   });
 
   it('goes to sign in without the note after an explicit sign out', async () => {
-    renderAccount(signedInClient());
+    renderAccount(true);
     await screen.findByDisplayValue('Sam');
     press('Sign out');
     await screen.findByLabelText('Email');
@@ -399,19 +316,19 @@ describe('profile', () => {
     const row = (name: string) => screen.getByRole('checkbox', { name: new RegExp(`^${name}`) });
 
     it('lists the items as checkboxes of at least 44 high, unticked to start', async () => {
-      await AsyncStorage.clear();
-      renderAccount(signedInClient());
+      renderAccount(true);
       await screen.findByDisplayValue('Sam');
       expect(screen.getByRole('header', { name: "What you'll need" })).toBeTruthy();
       const boxes = await screen.findAllByRole('checkbox');
       expect(boxes).toHaveLength(5);
-      for (const box of boxes) expect(box.props.accessibilityState).toEqual({ checked: false });
+      for (const box of boxes) {
+        expect(box.props.accessibilityState).toEqual({ checked: false });
+      }
       expect(StyleSheet.flatten(row('Life insurance policies').props.style).minHeight).toBeGreaterThanOrEqual(44);
     });
 
     it('saves a tick with the same key as the checklist screen', async () => {
-      await AsyncStorage.clear();
-      renderAccount(signedInClient());
+      renderAccount(true);
       await screen.findAllByRole('checkbox');
       fireEvent.press(row('Life insurance policies'));
       expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
@@ -419,8 +336,7 @@ describe('profile', () => {
     });
 
     it('closes an open tip on a touch elsewhere, such as Save', async () => {
-      await AsyncStorage.clear();
-      renderAccount(signedInClient());
+      renderAccount(true);
       await screen.findAllByRole('checkbox');
       fireEvent.press(screen.getByRole('button', { name: 'Why we list this' }));
       expect(screen.getByText(SSN_TIP)).toBeTruthy();
@@ -429,13 +345,15 @@ describe('profile', () => {
     });
 
     it('shows the list when the name came from the account, with nothing typed here', async () => {
-      renderAccount(signedInClient({ getProfile: jest.fn(async () => profileWith('Server Name')) }));
+      mockGetProfile.mockResolvedValue(profileWith('Server Name'));
+      renderAccount(true);
       await screen.findByDisplayValue('Server Name');
       expect(await screen.findAllByRole('checkbox')).toHaveLength(5);
     });
 
     it('leaves the list out while the account asks for a name', async () => {
-      renderAccount(signedInClient({ getProfile: jest.fn(async () => profileWith(null)) }));
+      mockGetProfile.mockResolvedValue(profileWith(null));
+      renderAccount(true);
       await screen.findByRole('header', { name: 'What should we call you?' });
       expect(screen.queryByRole('checkbox')).toBeNull();
     });

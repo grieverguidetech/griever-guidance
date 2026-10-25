@@ -2,12 +2,17 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AccountAuth } from '@griever/shared';
 import { HomeScreen } from './HomeScreen';
 import { AccountScreen } from './AccountScreen';
-import { AccountProvider } from '../lib/AccountProvider';
+import { AccountStateProvider } from '../lib/AccountProvider';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
 
 const mockGoBack = jest.fn();
+jest.mock('@griever/api-client', () => ({
+  ...jest.requireActual<object>('@griever/api-client'),
+  getProfile: async () => ({ ok: true, profile: { id: 'u1', senderName: 'Sam', contactSource: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' } }),
+}));
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ goBack: mockGoBack }) }));
 
 // The row's detail line is part of its label, so match on the start of the name.
@@ -150,20 +155,16 @@ describe('top buttons', () => {
 });
 
 describe('the list on Your account and the checklist screen share their ticks (#191)', () => {
-  const client = {
-    getSession: jest.fn(async () => ({ status: 'signed_in', session: { userId: 'u1', email: 'a@b.co', accessToken: 't' } })),
-    getProfile: jest.fn(async () => ({ ok: true, profile: { senderName: 'Sam', contactSource: null } })),
-    startAutoRefresh: jest.fn(async () => undefined),
-    stopAutoRefresh: jest.fn(async () => undefined),
-  } as never;
+  const auth: AccountAuth = { status: 'signed_in', userId: 'u1', getToken: async () => ({ ok: true, token: 't' }), signOut: async () => undefined };
+  const accountScreen = (
+    <AccountStateProvider auth={auth}>
+      <AccountScreen onBack={() => undefined} />
+    </AccountStateProvider>
+  );
 
   it('shows a tick made on Your account in the checklist screen, and the reverse', async () => {
     await AsyncStorage.clear();
-    const account = render(
-      <AccountProvider client={client}>
-        <AccountScreen onBack={() => undefined} />
-      </AccountProvider>,
-    );
+    const account = render(accountScreen);
     await screen.findAllByRole('checkbox');
     fireEvent.press(row('Life insurance policies'));
     await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]'));
@@ -176,11 +177,7 @@ describe('the list on Your account and the checklist screen share their ticks (#
     await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance","military"]'));
     list.unmount();
 
-    render(
-      <AccountProvider client={client}>
-        <AccountScreen onBack={() => undefined} />
-      </AccountProvider>,
-    );
+    render(accountScreen);
     await screen.findAllByRole('checkbox');
     expect(row('Military discharge papers').props.accessibilityState).toEqual({ checked: true });
   });
