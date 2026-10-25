@@ -11,12 +11,6 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./verify-token": {
-      "@org/source": "./src/handler/verifyToken.ts",
-      "types": "./src/handler/verifyToken.ts",
-      "import": "./src/handler/verifyToken.ts",
-      "default": "./src/handler/verifyToken.ts"
-    },
     "./package.json": "./package.json"
   },
   "nx": {
@@ -65,6 +59,7 @@
     "@aws-sdk/client-dynamodb": "^3.1154.0",
     "@aws-sdk/lib-dynamodb": "^3.1154.0",
     "@griever/data-aws": "workspace:*",
+    "@griever/gateway-auth": "workspace:*",
     "@griever/shared": "workspace:*",
     "hono": "^4.13.7"
   }

@@ -377,6 +377,9 @@ importers:
       '@griever/data-aws':
         specifier: workspace:*
         version: link:../data-aws
+      '@griever/gateway-auth':
+        specifier: workspace:*
+        version: link:../gateway-auth
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared
@@ -427,9 +430,6 @@ importers:
 
   libs/gateway-auth:
     dependencies:
-      '@griever/data-access':
-        specifier: workspace:*
-        version: link:../data-access
       '@griever/shared':
         specifier: workspace:*
         version: link:../shared

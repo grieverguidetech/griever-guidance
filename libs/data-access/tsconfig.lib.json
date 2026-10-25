@@ -30,6 +30,9 @@
     },
     {
       "path": "../data-aws/tsconfig.lib.json"
+    },
+    {
+      "path": "../gateway-auth/tsconfig.lib.json"
     }
   ]
 }
