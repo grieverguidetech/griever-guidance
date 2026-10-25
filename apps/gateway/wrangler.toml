@@ -46,3 +46,12 @@ CLERK_AUTHORIZED_PARTIES = ""
 INVITE_FROM_EMAIL = "Grievers Guidance <invites@grieversguidance.com>"
 # The web app origin (REQUIREMENTS.md section 6 domain table); invite links point here.
 WEB_URL = "https://web.grieversguidance.com"
+
+# Data function (AWS Lambda function URL, AuthType AWS_IAM; infra/aws/data.yml). The gateway
+# signs each call with SigV4 using the Worker secrets DATA_FUNCTION_ACCESS_KEY_ID and
+# DATA_FUNCTION_SECRET_ACCESS_KEY (set by deploy.yml from GitHub secrets; never in this file).
+# The URL is only known after the AWS deploy, so deploy.yml overrides DATA_FUNCTION_URL from the
+# repo variable of the same name (when set). Empty means /me/* answers 503.
+# The region has no code default; the project's SCP allows only us-east-2.
+DATA_FUNCTION_URL = ""
+DATA_FUNCTION_REGION = "us-east-2"

@@ -168,11 +168,15 @@ jobs:
           if [ -n "$SUPABASE_URL" ]; then args+=(--var "SUPABASE_URL:$SUPABASE_URL"); fi
           if [ -n "$SUPABASE_ANON_KEY" ]; then args+=(--var "SUPABASE_ANON_KEY:$SUPABASE_ANON_KEY"); fi
           if [ -n "$CLERK_ISSUER" ]; then args+=(--var "CLERK_ISSUER:$CLERK_ISSUER"); fi
+          # The data function URL is only known after the AWS deploy (docs/aws-data-function.md).
+          # Unset means the wrangler.toml default (empty), and the gateway answers 503 for /me/*.
+          if [ -n "$DATA_FUNCTION_URL" ]; then args+=(--var "DATA_FUNCTION_URL:$DATA_FUNCTION_URL"); fi
           pnpm exec wrangler deploy --config apps/gateway/wrangler.toml "${args[@]}"
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
           CLERK_ISSUER: ${{ vars.CLERK_ISSUER }}
+          DATA_FUNCTION_URL: ${{ vars.DATA_FUNCTION_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -195,6 +199,30 @@ jobs:
           fi
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # The data function key pair is two Worker secrets, set like RESEND_API_KEY.
+      # Skipped when either GitHub secret is empty; keys already on the Worker stay.
+      # Both go in through env and stdin only; never echoed. Rotation: docs/aws-data-function.md.
+      - name: Set the Worker secrets DATA_FUNCTION_ACCESS_KEY_ID and DATA_FUNCTION_SECRET_ACCESS_KEY
+        run: |
+          if [ -z "$DATA_FUNCTION_ACCESS_KEY_ID" ] || [ -z "$DATA_FUNCTION_SECRET_ACCESS_KEY" ]; then
+            echo "::notice::DATA_FUNCTION_ACCESS_KEY_ID or DATA_FUNCTION_SECRET_ACCESS_KEY is empty; both skipped. Keys already on the Worker stay."
+            exit 0
+          fi
+          printf '%s' "$DATA_FUNCTION_ACCESS_KEY_ID" | pnpm exec wrangler secret put DATA_FUNCTION_ACCESS_KEY_ID --config apps/gateway/wrangler.toml
+          printf '%s' "$DATA_FUNCTION_SECRET_ACCESS_KEY" | pnpm exec wrangler secret put DATA_FUNCTION_SECRET_ACCESS_KEY --config apps/gateway/wrangler.toml
+          names=$(pnpm exec wrangler secret list --config apps/gateway/wrangler.toml)
+          for name in DATA_FUNCTION_ACCESS_KEY_ID DATA_FUNCTION_SECRET_ACCESS_KEY; do
+            if ! printf '%s' "$names" | grep -q "\"$name\""; then
+              echo "::error::$name is not listed on the Worker after the put"
+              exit 1
+            fi
+          done
+        env:
+          DATA_FUNCTION_ACCESS_KEY_ID: ${{ secrets.DATA_FUNCTION_ACCESS_KEY_ID }}
+          DATA_FUNCTION_SECRET_ACCESS_KEY: ${{ secrets.DATA_FUNCTION_SECRET_ACCESS_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
