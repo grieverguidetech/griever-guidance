@@ -152,8 +152,16 @@ function LoadingOrUnavailable({ text }: { text: string }) {
   );
 }
 
-export function AccountScreen({ onBack }: { onBack: () => void }) {
+export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSignedIn?: () => void }) {
   const identity = useAccount();
+  // Opened as the first screen: leave once signed in and the account has a name (the name prompt comes first).
+  const named = !!identity?.isSignedIn && !!identity.profile?.senderName?.trim();
+  // Kept in a ref so a new function on each render can't fire this twice.
+  const signedInRef = useRef(onSignedIn);
+  signedInRef.current = onSignedIn;
+  useEffect(() => {
+    if (named) signedInRef.current?.();
+  }, [named]);
   const [tipOpen, setTipOpen] = useState<string | null>(null);
   // No error left over from an earlier visit should be read out on arrival.
   const clearError = identity?.clearError;

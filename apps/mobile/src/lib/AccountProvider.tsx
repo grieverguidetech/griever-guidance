@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useAccount as useAccountState } from '@griever/hooks';
+import { SIGNED_IN_STORAGE_KEY, useAccount as useAccountState } from '@griever/hooks';
 import type { UseAccountResult } from '@griever/hooks';
 import type { AccountAuth } from '@griever/shared';
 import { createProfileCache } from './authStorage';
@@ -12,6 +12,18 @@ const AccountContext = createContext<UseAccountResult | null>(null);
 
 export function useAccount(): UseAccountResult | null {
   return useContext(AccountContext);
+}
+
+/**
+ * What the device knew at launch, for choosing the first screen. `hydrated` flips once the local
+ * cache is read; `signedIn` is then the gg.signedIn.v1 marker (set for anyone who has signed in here).
+ * null means accounts are unavailable (missing configuration).
+ */
+export type LaunchState = { hydrated: boolean; signedIn: boolean };
+const LaunchContext = createContext<LaunchState | null>(null);
+
+export function useLaunchState(): LaunchState | null {
+  return useContext(LaunchContext);
 }
 
 /** What the account screen sees while the profile cache loads. Every action does nothing. */
@@ -72,10 +84,16 @@ type ProfileCache = ReturnType<typeof useProfileCache>;
  */
 function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: ProfileCache; children: ReactNode }) {
   const [account, setAccount] = useState<UseAccountResult>(LOADING);
+  const launch = useMemo<LaunchState>(
+    () => ({ hydrated: cache.ready, signedIn: cache.ready && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
+    [cache.ready, cache.storage],
+  );
   return (
     <>
       {cache.ready ? <AccountRunner auth={auth} storage={cache.storage} onAccount={setAccount} /> : null}
-      <AccountContext.Provider value={account}>{children}</AccountContext.Provider>
+      <LaunchContext.Provider value={launch}>
+        <AccountContext.Provider value={account}>{children}</AccountContext.Provider>
+      </LaunchContext.Provider>
     </>
   );
 }

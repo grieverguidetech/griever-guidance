@@ -14,7 +14,7 @@ import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
-import { AccountProvider } from '../lib/AccountProvider';
+import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
@@ -33,6 +33,36 @@ export const CONTACTS_CHECK_FALLBACK_MS = 1500;
  * here and in `afterSetup` below; nothing else in the flow needs to know the order.
  */
 type SetupStage = 'setup' | 'checkContacts' | 'contacts';
+
+/**
+ * Where the app opens, decided once per launch (as web), from what this device knew when the local
+ * cache was read: a signed-in marker opens the normal first screen at once (C5, no network); no
+ * marker opens sign-in (the account screen has its own waiting and unavailable states, and Back).
+ * Accounts off or unavailable: the normal first screen. A later sign-out never moves the person;
+ * only the Sign out button does, on the account screen.
+ */
+export const useFirstScreen = (): { first: 'pending' | 'home' | 'signIn'; leaveFirst: () => void } => {
+  const launch = useLaunchState();
+  const [first, setFirst] = useState<'pending' | 'home' | 'signIn'>(AUTH_ENABLED ? 'pending' : 'home');
+  const hydrated = launch?.hydrated ?? false;
+  const signedIn = launch?.signedIn ?? false;
+  useEffect(() => {
+    if (first !== 'pending') return;
+    if (launch === null) {
+      setFirst('home');
+    } else if (hydrated) {
+      setFirst(signedIn ? 'home' : 'signIn');
+    }
+  }, [first, launch, hydrated, signedIn]);
+  const leaveFirst = useCallback(() => setFirst('home'), []);
+  return { first, leaveFirst };
+};
+
+const Opening = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+    <Text accessibilityLiveRegion="polite">Opening…</Text>
+  </View>
+);
 
 export type RootStackParamList = {
   Home: undefined;
@@ -158,6 +188,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [arrived, setArrived] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
+  const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
   const goHome = useCallback(() => {
     setStage(null);
@@ -207,6 +238,9 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   }, [contacts.loading, clearAll, sessions]);
 
   if (!active) return null;
+  if (first === 'pending') {
+    return <Opening />;
+  }
   const open = () => {
     setNote(null);
     setArrived(true);
@@ -214,7 +248,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   };
   if (atHome) {
     return (
-      <HomeNavigation>
+      <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
         {(navigation) => (
           <HomeScreen
             sessions={sessions}
@@ -238,11 +272,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     );
   }
   if (stage === 'checkContacts') {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-        <Text accessibilityLiveRegion="polite">Opening…</Text>
-      </View>
-    );
+    return <Opening />;
   }
   if (stage === 'contacts') {
     return (
@@ -285,24 +315,51 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
 type StackNavigation = NativeStackNavigationProp<RootStackParamList>;
 
 // The screens every stack shares: the checklist and, with accounts on, the account.
-const sharedScreens = () => (
+const sharedScreens = (leaveFirst?: () => void) => (
   <>
     <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
       {() => <WhatYoullNeedScreen />}
     </Stack.Screen>
     {AUTH_ENABLED && (
-      <Stack.Screen name="Account">{({ navigation }) => <AccountScreen onBack={navigation.goBack} />}</Stack.Screen>
+      <Stack.Screen name="Account">
+        {({ navigation }) => (
+          <AccountScreen
+            onBack={() => {
+              leaveFirst?.();
+              if (navigation.canGoBack()) navigation.goBack();
+              else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+            }}
+            // Opened as the first screen: once signed in (and named), land on the normal first screen.
+            onSignedIn={
+              leaveFirst
+                ? () => {
+                    leaveFirst();
+                    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+                  }
+                : undefined
+            }
+          />
+        )}
+      </Stack.Screen>
     )}
   </>
 );
 
 const screenOptions = { headerShown: false, contentStyle: { backgroundColor: '#ffffff' } } as const;
 
-const HomeNavigation = ({ children }: { children: (navigation: StackNavigation) => ReactNode }) => (
+const HomeNavigation = ({
+  children,
+  initialRoute = 'Home',
+  onLeaveFirst,
+}: {
+  children: (navigation: StackNavigation) => ReactNode;
+  initialRoute?: 'Home' | 'Account';
+  onLeaveFirst?: () => void;
+}) => (
   <NavigationContainer>
-    <Stack.Navigator screenOptions={screenOptions}>
+    <Stack.Navigator screenOptions={screenOptions} initialRouteName={initialRoute}>
       <Stack.Screen name="Home">{({ navigation }) => children(navigation)}</Stack.Screen>
-      {sharedScreens()}
+      {sharedScreens(initialRoute === 'Account' ? onLeaveFirst : undefined)}
     </Stack.Navigator>
   </NavigationContainer>
 );
@@ -372,9 +429,7 @@ const SendAppWhenReady = () => {
   return ready ? (
     <SendApp cache={cache} />
   ) : (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-      <Text accessibilityLiveRegion="polite">Opening…</Text>
-    </View>
+    <Opening />
   );
 };
 

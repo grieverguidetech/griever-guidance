@@ -1,6 +1,7 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 // Each spec file has its own module registry, so setting these before App is first required is enough.
 process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
@@ -24,13 +25,28 @@ jest.mock('@clerk/expo/resource-cache', () => ({ resourceCache: { name: 'resourc
 
 const { App } = require('./App') as typeof import('./App');
 
+beforeEach(async () => {
+  await AsyncStorage.clear();
+});
+
 describe('App with the account feature and a Clerk key on', () => {
-  it('renders the send flow at once while Clerk is still loading', async () => {
+  it('no marker and Clerk still loading (offline): opens on the account screen, and Back reaches Home', async () => {
     render(<App />);
-    expect(await screen.findByText('Your account')).toBeTruthy();
+    expect(await screen.findByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(screen.getByText('One moment.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+  });
+
+  it('opens the normal first screen at once when the device holds a signed-in marker, though Clerk is still loading', async () => {
+    await AsyncStorage.setItem('gg.signedIn.v1', 'user_1');
+    render(<App />);
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
   });
 
   it('mounts Clerk with the publishable key, the secure token cache and the resource cache', async () => {
+    await AsyncStorage.setItem('gg.signedIn.v1', 'user_1');
     render(<App />);
     await screen.findByText('Your account');
     expect(mockProviderProps).toHaveBeenCalledWith(
