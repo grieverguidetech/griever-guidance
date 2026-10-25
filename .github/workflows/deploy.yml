@@ -286,10 +286,10 @@ jobs:
         run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors https://web.grieversguidance.com/ | grep -q 'id="root"'
       - name: Marketing site responds
         run: curl -fsS --retry 5 --retry-delay 10 --retry-all-errors -o /dev/null https://grieversguidance.com/
-      # With Supabase configured the gateway must reject a tokenless request
-      # (401), not answer 503 "not configured".
+      # With Clerk configured the gateway must reject a tokenless request
+      # (401), not answer 503 "not configured". Profile routes use Clerk since #280.
       - name: Gateway /me/profile rejects a missing token
-        if: vars.SUPABASE_URL != ''
+        if: vars.CLERK_ISSUER != ''
         run: |
           code=000
           for i in 1 2 3 4 5; do
