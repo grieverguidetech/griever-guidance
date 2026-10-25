@@ -32,6 +32,7 @@ vi.mock('../lib/features', () => ({
     return mocks.authEnabled;
   },
   OBITUARY_DRAFTING_ENABLED: false,
+  PAYMENTS_ENABLED: false,
   SHARING_ENABLED: false,
 }));
 vi.mock('../lib/authClient', async (importOriginal) => {
