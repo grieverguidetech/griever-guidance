@@ -14,7 +14,11 @@
     "@griever/data-sync": "workspace:*",
     "@griever/hooks": "workspace:*",
     "@griever/shared": "workspace:*",
-    "@phosphor-icons/react": "^2.1.10"
+    "@phosphor-icons/react": "^2.1.10",
+    "@griever/ui": "workspace:*",
+    "@griever/copy": "workspace:*",
+    "@griever/tokens": "workspace:*",
+    "react-native-web": "0.21.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",

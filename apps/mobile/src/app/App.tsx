@@ -21,6 +21,7 @@ import { sendNote } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
 import { HomeScreen } from '../screens/HomeScreen';
+import { PrototypeHubScreen } from '../screens/PrototypeHubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
@@ -246,6 +247,10 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setArrived(true);
     setAtHome(false);
   };
+  if (process.env.EXPO_PUBLIC_PROTO_HUB === '1') {
+    // PROTOTYPE #322: show the shared hub instead of Home.
+    return <PrototypeHubScreen />;
+  }
   if (atHome) {
     return (
       <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>

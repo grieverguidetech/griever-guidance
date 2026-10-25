@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PROTOTYPE #322 pathLanding copy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["heading","intro","forName","back","checklist","editPerson","start","continue","tagStarted","tagNext","person","people","metaStarted","metaSendAgain","moments"],
+  "properties": {
+    "heading": { "type": "string", "minLength": 1 },
+    "intro": { "type": "string", "minLength": 1 },
+    "forName": { "type": "string", "pattern": "\\{name\\}" },
+    "back": { "type": "string" }, "checklist": { "type": "string" }, "editPerson": { "type": "string" },
+    "start": { "type": "string" }, "continue": { "type": "string" },
+    "tagStarted": { "type": "string" }, "tagNext": { "type": "string" },
+    "person": { "type": "string" }, "people": { "type": "string" },
+    "metaStarted": { "type": "string" }, "metaSendAgain": { "type": "string" },
+    "moments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["announce","service","obituary","thanks"],
+      "patternProperties": {
+        "^(announce|service|obituary|thanks)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title","body","doneLabel"],
+          "properties": { "title": {"type":"string"}, "body": {"type":"string"}, "doneLabel": {"type":"string"} }
+        }
+      }
+    }
+  }
+}

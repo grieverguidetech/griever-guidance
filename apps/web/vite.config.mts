@@ -27,6 +27,8 @@ function announcePort(): PluginOption {
 
 export default defineConfig(() => ({
   ...vitestConfig('jsdom', {
+    // PROTOTYPE #322: shared React Native components render on web through react-native-web.
+    resolve: { alias: { 'react-native': 'react-native-web' } },
     test: {
       setupFiles: ['src/test-setup.ts'],
       // #257: the whole-App journeys are CPU-bound (about 1 s alone, 5 to 30 s when

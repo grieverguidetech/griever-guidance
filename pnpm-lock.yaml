@@ -245,12 +245,21 @@ importers:
       '@griever/contacts':
         specifier: workspace:*
         version: link:../../libs/contacts
+      '@griever/copy':
+        specifier: workspace:*
+        version: link:../../libs/copy
       '@griever/hooks':
         specifier: workspace:*
         version: link:../../libs/hooks
       '@griever/shared':
         specifier: workspace:*
         version: link:../../libs/shared
+      '@griever/tokens':
+        specifier: workspace:*
+        version: link:../../libs/tokens
+      '@griever/ui':
+        specifier: workspace:*
+        version: link:../../libs/ui
       '@react-native-async-storage/async-storage':
         specifier: 2.2.0
         version: 2.2.0(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))
@@ -351,6 +360,9 @@ importers:
       '@griever/contacts':
         specifier: workspace:*
         version: link:../../libs/contacts
+      '@griever/copy':
+        specifier: workspace:*
+        version: link:../../libs/copy
       '@griever/data-local':
         specifier: workspace:*
         version: link:../../libs/data-local
@@ -363,9 +375,18 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../../libs/shared
+      '@griever/tokens':
+        specifier: workspace:*
+        version: link:../../libs/tokens
+      '@griever/ui':
+        specifier: workspace:*
+        version: link:../../libs/ui
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react-native-web:
+        specifier: 0.21.4
+        version: 0.21.4(encoding@0.1.13)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.2.4
@@ -393,6 +414,12 @@ importers:
       libphonenumber-js:
         specifier: ^1.13.12
         version: 1.13.12
+
+  libs/copy:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
 
   libs/data-access:
     dependencies:
@@ -522,6 +549,30 @@ importers:
 
   libs/shared:
     dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/tokens:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/ui:
+    dependencies:
+      '@griever/copy':
+        specifier: workspace:*
+        version: link:../copy
+      '@griever/tokens':
+        specifier: workspace:*
+        version: link:../tokens
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-native:
+        specifier: 0.88.0-rc.4
+        version: 0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)
       tslib:
         specifier: ^2.3.0
         version: 2.8.1

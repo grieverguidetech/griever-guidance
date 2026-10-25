@@ -2,11 +2,13 @@ import { useId, useRef, useState } from 'react';
 import type { Session } from '@griever/hooks';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Moment, MomentKey, TemplateCategory } from '@griever/shared';
-import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
 import { Lock } from '@phosphor-icons/react/Lock';
-import { Eyebrow, TopBar } from '../lib/ui';
+import { PrototypeHub } from '@griever/ui';
+import type { PrototypeHubRow } from '@griever/ui';
+import { prototypePathLandingCopy } from '@griever/copy';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 import { formatDate } from '../lib/format';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { ShareDetailsButton } from './ShareDetailsButton';
@@ -104,6 +106,8 @@ export function PathLanding({
 }: Props) {
   const moments = usePathMoments(session);
   const heading = useRef<HTMLHeadingElement>(null);
+  const checklistButton = useRef<HTMLButtonElement>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   // The Close button leaves the page, so focus goes to the heading rather than being lost.
   function closeNote() {
@@ -124,39 +128,39 @@ export function PathLanding({
     setTimeout(() => opener.current?.focus(), 0);
   }
 
+  // PROTOTYPE #322: the header, heading and rows come from the shared React Native hub (libs/ui).
+  const rows: PrototypeHubRow[] = moments.map((moment) => {
+    const people = moment.recipientCount ?? 0;
+    const meta = `${people} ${people === 1 ? prototypePathLandingCopy.person : prototypePathLandingCopy.people}${
+      moment.completedAt ? ` · ${formatDate(moment.completedAt)}` : ''
+    } · ${isDraftStarted(session.drafts[CATEGORY_BY_KEY[moment.key]]) ? prototypePathLandingCopy.metaStarted : prototypePathLandingCopy.metaSendAgain}`;
+    return {
+      key: moment.key,
+      status: moment.status,
+      started: isDraftStarted(session.drafts[CATEGORY_BY_KEY[moment.key]]),
+      locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
+      meta,
+    };
+  });
+
   return (
-    <div className="flex flex-col gap-4 pt-[52px] min-h-full">
-      <TopBar onBack={onBack} />
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-3">
-          <Eyebrow name={session.personName} />
-          <button type="button" onClick={onEditPerson} className="gg-btn gg-btn-ghost text-[12px]">
-            <PencilSimple size={13} weight="regular" aria-hidden="true" />
-            Edit person
-          </button>
-        </div>
-        <h1 ref={heading} className="text-[22px]">
-          One thing at a time.
-        </h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          Here's what usually comes next.
-        </p>
-      </div>
-
-      <FinishNoteCard note={note} onClose={closeNote} />
-
-      <div className="flex flex-col gap-2">
-        {moments.map((moment) => (
-          <MomentRow
-            key={moment.key}
-            moment={moment}
-            started={isDraftStarted(session.drafts[CATEGORY_BY_KEY[moment.key]])}
-            onStart={() => onStartMoment(moment.key)}
-            locked={paymentsEnabled && PAID_MOMENTS.includes(moment.key)}
-            onLockedPress={openPaywall}
-          />
-        ))}
-      </div>
+    <div className="flex flex-col gap-4 min-h-full">
+      <PrototypeHub
+        copy={prototypePathLandingCopy}
+        personName={session.personName}
+        rows={rows}
+        lockedReason={LOCKED_REASON}
+        onBack={onBack}
+        onChecklist={() => setSheetOpen(true)}
+        onEditPerson={onEditPerson}
+        onStartMoment={onStartMoment}
+        onLockedPress={(target) => openPaywall(target as HTMLElement)}
+        headingRef={heading}
+        checklistRef={checklistButton}
+      >
+        <FinishNoteCard note={note} onClose={closeNote} />
+      </PrototypeHub>
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
 
       <ShareDetailsButton
         session={session}
