@@ -7,7 +7,8 @@ import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
-import { SSN_TIP, WhatYoullNeed } from './WhatYoullNeed';
+import { ChecklistRows, SSN_TIP } from './ChecklistRows';
+import { WhatYoullNeedSheet } from './WhatYoullNeedSheet';
 
 const ROWS = [
   'Any will or written wishes',
@@ -18,7 +19,7 @@ const ROWS = [
 ];
 
 function renderList() {
-  return render(<WhatYoullNeed onBack={vi.fn()} onEmailList={vi.fn()} />);
+  return render(<ChecklistRows />);
 }
 
 /** Rows are off until the saved ticks are read. */
@@ -26,7 +27,7 @@ const loaded = () => waitFor(() => expect(row('Life insurance policies')).toBeEn
 
 const row = (label: string) => screen.getByRole('button', { name: new RegExp(label) });
 
-describe('What you will need (#176)', () => {
+describe('Checklist rows (#176)', () => {
   it('starts with every item unticked, including will and funeral plans', async () => {
     renderList();
     await loaded();
@@ -75,7 +76,7 @@ describe('What you will need (#176)', () => {
     vi.stubGlobal('fetch', fetchSpy);
     try {
       const user = userEvent.setup();
-      renderList();
+      render(<WhatYoullNeedSheet onClose={vi.fn()} />);
       await loaded();
       await user.click(row('Pre-arranged funeral plans'));
       await waitFor(async () => expect(await accountStore.getChecklistTicks()).toEqual(['pre-arranged-plans']));
@@ -137,14 +138,19 @@ describe('Social Security tip (#209)', () => {
 
   it('closes on Escape but leaves focus alone when it is outside the row', async () => {
     const user = userEvent.setup();
-    renderList();
+    render(
+      <>
+        <button type="button">Elsewhere</button>
+        <ChecklistRows />
+      </>,
+    );
     await loaded();
     await user.click(info());
-    const email = screen.getByRole('button', { name: 'Email this list to me' });
-    email.focus();
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    elsewhere.focus();
     await user.keyboard('{Escape}');
     expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-    expect(email).toHaveFocus();
+    expect(elsewhere).toHaveFocus();
   });
 
   it('closes when the Social Security row itself is ticked', async () => {
@@ -158,10 +164,15 @@ describe('Social Security tip (#209)', () => {
 
   it('closes on a tap outside', async () => {
     const user = userEvent.setup();
-    renderList();
+    render(
+      <>
+        <h1>Elsewhere on the page</h1>
+        <ChecklistRows />
+      </>,
+    );
     await loaded();
     await user.click(info());
-    await user.click(screen.getByRole('heading', { name: "What you'll need" }));
+    await user.click(screen.getByRole('heading', { name: 'Elsewhere on the page' }));
     expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
   });
 

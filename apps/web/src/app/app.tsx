@@ -20,7 +20,6 @@ import { contactStore } from '@griever/data-local';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
-import { WhatYoullNeedProvider } from '../lib/whatYoullNeedContext';
 import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { PeopleHelping } from '../screens/PeopleHelping';
@@ -35,7 +34,6 @@ import { PathLanding } from '../screens/PathLanding';
 import { finishNoteSpoken } from '../screens/PathLanding';
 import type { FinishNote } from '../screens/PathLanding';
 import { Gate } from '../screens/Gate';
-import { WhatYoullNeed } from '../screens/WhatYoullNeed';
 import { ShareObituary } from '../screens/ShareObituary';
 import { ObituaryScreen } from '../screens/ObituaryScreen';
 import { Flow } from './Flow';
@@ -52,7 +50,6 @@ type AppView =
   | 'home'
   | 'pathLanding'
   | 'gate'
-  | 'whatYoullNeed'
   | 'shareObituary'
   | 'flow'
   | 'obituary';
@@ -71,18 +68,16 @@ const browserStorage =
 // type on every render, remounting the screen and wiping what was typed.
 function Shell({
   children,
-  onWhatYoullNeed,
   notice,
 }: {
   children: React.ReactNode;
-  onWhatYoullNeed: () => void;
   notice?: ReactNode;
 }) {
   return (
     <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
       <div className="w-full max-w-[420px] px-5 py-8">
         {notice}
-        <WhatYoullNeedProvider onWhatYoullNeed={onWhatYoullNeed}>{children}</WhatYoullNeedProvider>
+        {children}
       </div>
     </div>
   );
@@ -109,7 +104,7 @@ function AccountsUnavailable({ onRetry }: { onRetry: () => void }) {
     heading.current?.focus();
   }, []);
   return (
-    <Shell onWhatYoullNeed={noop}>
+    <Shell>
       <div className="flex flex-col gap-3 pt-[52px]">
         <h1 ref={heading} tabIndex={-1} className="text-[22px]">Accounts aren't available right now</h1>
         <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
@@ -159,7 +154,7 @@ function AuthGate({
 
   if (!loaded) {
     return (
-      <Shell onWhatYoullNeed={noop}>
+      <Shell>
         <Loading />
       </Shell>
     );
@@ -178,10 +173,6 @@ function AuthGate({
       {(state) => (state.unavailable ? <AccountsUnavailable onRetry={retry} /> : children(state, SignInScreen))}
     </ClerkAccount>
   );
-}
-
-function noop() {
-  // The checklist is not reachable before the app has loaded.
 }
 
 const REMOVED_MESSAGE = 'Everything has been removed from this device.';
@@ -259,20 +250,6 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
     clearTimeout(timer);
   }
 }
-
-/** Screens the checklist returns to; from anywhere else (the flow, a gate) it returns to the path. */
-const CHECKLIST_RETURNS: AppView[] = [
-  'home',
-  'settings',
-  'profile',
-  'signIn',
-  'pathLanding',
-  'checkContacts',
-  // The walk after "Create a new one": the checklist returns to the step it was opened from.
-  'setup',
-  'addContactsManual',
-  'whoHearsFirst',
-];
 
 /** Views that need a person to be open; with nobody open Home is shown instead. */
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary'];
@@ -372,13 +349,6 @@ function AppBody({
   const [returnTo, setReturnTo] = useState<AppView>('home');
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
-  // The checklist goes back to where it was opened from: Home, or otherwise the path as before.
-  const checklistBack = useRef<AppView>('pathLanding');
-  const openWhatYoullNeed = useCallback(() => {
-    if (view === 'whatYoullNeed') return;
-    checklistBack.current = CHECKLIST_RETURNS.includes(view) ? view : 'pathLanding';
-    setView('whatYoullNeed');
-  }, [view]);
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
@@ -585,11 +555,6 @@ function AppBody({
     setView('pathLanding');
   }
 
-  function backFromChecklist() {
-    const target = checklistBack.current;
-    setView(target === 'pathLanding' && !active ? 'home' : target);
-  }
-
   function startSetup() {
     const created = sessions.createSession();
     setActiveId(created.id);
@@ -716,7 +681,7 @@ function AppBody({
   // While Clerk is loading or a stored session is being checked, show nothing but the quiet status.
   if (auth?.isLoading) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed}>
+      <Shell>
         <Loading />
       </Shell>
     );
@@ -726,7 +691,7 @@ function AppBody({
 
   if (auth && SignInScreen && view === 'signIn') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <SignInScreen />
       </Shell>
     );
@@ -734,7 +699,7 @@ function AppBody({
 
   if (auth && view === 'profile') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <Profile
           asksName={askingName}
           senderName={auth.profile?.senderName ?? null}
@@ -777,7 +742,7 @@ function AppBody({
 
   if (view === 'settings') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <Settings
           onBack={goHome}
           onRemoveEverything={removeEverything}
@@ -794,7 +759,7 @@ function AppBody({
 
   if (view === 'addContactsManual') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <AddContactsManual
           contacts={contacts.contacts}
           onBack={backToSetup}
@@ -813,7 +778,7 @@ function AppBody({
 
   if (view === 'checkContacts') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <Loading />
       </Shell>
     );
@@ -821,7 +786,7 @@ function AppBody({
 
   if (view === 'whoHearsFirst') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <WhoHearsFirst
           contacts={contacts.contacts}
           onBack={backFromWhoHearsFirst}
@@ -837,7 +802,7 @@ function AppBody({
 
   if (view === 'obituary') {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <ObituaryScreen
           session={activeDetails}
           onBack={() => setView('shareObituary')}
@@ -847,20 +812,9 @@ function AppBody({
     );
   }
 
-  if (view === 'whatYoullNeed') {
-    return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
-        <WhatYoullNeed
-          onBack={backFromChecklist}
-          onEmailList={backFromChecklist}
-        />
-      </Shell>
-    );
-  }
-
   if (view === 'gate' && active) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <Gate
           title="Have the arrangements been made?"
           subtitle="This message needs a date, time and place from the funeral home."
@@ -885,7 +839,7 @@ function AppBody({
 
   if (view === 'shareObituary' && active && activeDetails) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <ShareObituary
           session={activeDetails}
           onBack={() => goToPathLanding()}
@@ -904,7 +858,7 @@ function AppBody({
 
   if (view === 'setup' && active) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <SessionSetup
           session={active}
           editing={setupEditing}
@@ -931,7 +885,7 @@ function AppBody({
           ? chosen
           : null;
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <Flow
           key={active.id}
           session={activeDetails}
@@ -951,12 +905,11 @@ function AppBody({
 
   if (view === 'pathLanding' && active) {
     return (
-      <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+      <Shell notice={endedNote}>
         <PathLanding
           session={active}
           onBack={goHome}
           onStartMoment={startMoment}
-          onWhatYoullNeed={openWhatYoullNeed}
           onEditPerson={() => editPerson('pathLanding')}
           note={finishNote}
           onCloseNote={() => setFinishNote(null)}
@@ -967,7 +920,7 @@ function AppBody({
 
   // Home is also the fallback: a view with nobody open (the path, a flow) never shows a blank screen.
   return (
-    <Shell onWhatYoullNeed={openWhatYoullNeed} notice={endedNote}>
+    <Shell notice={endedNote}>
       <Home
         sessions={sessionList}
         onOpen={openPerson}

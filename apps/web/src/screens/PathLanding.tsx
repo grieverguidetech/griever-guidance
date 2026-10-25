@@ -5,9 +5,8 @@ import type { Moment, MomentKey, TemplateCategory } from '@griever/shared';
 import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
-import { ListChecks } from '@phosphor-icons/react/ListChecks';
 import { Lock } from '@phosphor-icons/react/Lock';
-import { BackButton, Eyebrow } from '../lib/ui';
+import { Eyebrow, TopBar } from '../lib/ui';
 import { formatDate } from '../lib/format';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { ShareDetailsButton } from './ShareDetailsButton';
@@ -87,7 +86,6 @@ interface Props {
   session: Session;
   onBack: () => void;
   onStartMoment: (key: MomentKey) => void;
-  onWhatYoullNeed: () => void;
   onEditPerson: () => void;
   note?: FinishNote | null;
   onCloseNote?: () => void;
@@ -99,7 +97,6 @@ export function PathLanding({
   session,
   onBack,
   onStartMoment,
-  onWhatYoullNeed,
   onEditPerson,
   note = null,
   onCloseNote,
@@ -129,7 +126,7 @@ export function PathLanding({
 
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
-      <BackButton onClick={onBack} />
+      <TopBar onBack={onBack} />
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3">
           <Eyebrow name={session.personName} />
@@ -147,15 +144,6 @@ export function PathLanding({
       </div>
 
       <FinishNoteCard note={note} onClose={closeNote} />
-
-      <button
-        type="button"
-        onClick={onWhatYoullNeed}
-        className="gg-btn gg-btn-secondary gg-btn-block"
-      >
-        <ListChecks size={18} weight="duotone" aria-hidden="true" />
-        What you'll need
-      </button>
 
       <div className="flex flex-col gap-2">
         {moments.map((moment) => (

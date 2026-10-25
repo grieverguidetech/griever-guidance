@@ -23,7 +23,7 @@ export interface ContentItem {
 }
 
 /**
- * Copy of the CHECKLIST in apps/web/src/screens/WhatYoullNeed.tsx (`meta` is `reason` here). That
+ * Copy of the CHECKLIST in apps/web/src/lib/ChecklistRows.tsx (`meta` is `reason` here). That
  * constant is private to the screen, so a unit test reads the file and fails if id, label, meta or
  * tip drift apart. The mobile screen has the same label, meta and tip, with its own ids.
  * Never change an id: ticks on devices use it.

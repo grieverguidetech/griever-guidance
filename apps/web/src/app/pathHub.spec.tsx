@@ -134,8 +134,12 @@ describe('the note after the last person', () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
 
+    // The sheet is not a move to another screen, so the note stays.
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { name: 'One thing at a time.' });
     expect(screen.queryByText('Everyone has been told.')).not.toBeInTheDocument();
   }, 20_000);

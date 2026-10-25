@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useFocusHeadingOnChange, TopBar } from './ui';
-import { WhatYoullNeedProvider } from './whatYoullNeedContext';
 
 function Screen({ view, headingFrom, tick }: { view: string; headingFrom: number; tick: number }) {
   useFocusHeadingOnChange(view);
@@ -44,11 +43,7 @@ describe('top buttons (#176)', () => {
   const css = readFileSync(join(import.meta.dirname, '..', 'styles.css'), 'utf8');
 
   it('Back and What you will need are bordered buttons, not bare links', () => {
-    render(
-      <WhatYoullNeedProvider onWhatYoullNeed={vi.fn()}>
-        <TopBar onBack={vi.fn()} />
-      </WhatYoullNeedProvider>,
-    );
+    render(<TopBar onBack={vi.fn()} />);
     for (const name of ['Back', "What you'll need"]) {
       const button = screen.getByRole('button', { name });
       expect(button).toHaveClass('gg-btn-secondary'); // the visible border

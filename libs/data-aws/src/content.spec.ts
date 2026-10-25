@@ -60,7 +60,7 @@ describe('parseChecklist', () => {
 
 describe('checklist seed', () => {
   it('matches the web screen CHECKLIST in full: id, label, meta and tip', () => {
-    const screen = parseChecklist(read('apps/web/src/screens/WhatYoullNeed.tsx'));
+    const screen = parseChecklist(read('apps/web/src/lib/ChecklistRows.tsx'));
     expect(screen.length).toBeGreaterThan(0);
     expect(seedAsScreen()).toEqual(screen);
   });

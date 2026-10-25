@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { accountStore } from '@griever/data-local';
 import userEvent from '@testing-library/user-event';
 import { freshDraft } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
@@ -38,7 +39,6 @@ describe('PathLanding share', () => {
         session={session}
         onBack={vi.fn()}
         onStartMoment={vi.fn()}
-        onWhatYoullNeed={vi.fn()}
         onEditPerson={vi.fn()}
       />,
     );
@@ -58,7 +58,7 @@ describe('PathLanding Home link (#112)', () => {
   it('has a Back control, and no other-people list or "Someone else I\'ve lost"', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
-    render(<PathLanding session={session} onBack={onBack} onStartMoment={vi.fn()} onWhatYoullNeed={vi.fn()} onEditPerson={vi.fn()} />);
+    render(<PathLanding session={session} onBack={onBack} onStartMoment={vi.fn()} onEditPerson={vi.fn()} />);
     expect(screen.queryByText("Other people you're writing about")).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "Someone else I've lost" })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -70,7 +70,7 @@ function renderPath(
   over: Partial<Session> = {},
   props: { note?: FinishNote | null; onCloseNote?: () => void } = {},
 ) {
-  const handlers = { onBack: vi.fn(), onStartMoment: vi.fn(), onWhatYoullNeed: vi.fn(), onEditPerson: vi.fn() };
+  const handlers = { onBack: vi.fn(), onStartMoment: vi.fn(), onEditPerson: vi.fn() };
   render(<PathLanding session={{ ...session, ...over }} {...handlers} {...props} />);
   return handlers;
 }
@@ -168,7 +168,6 @@ describe('PathLanding paywall demo (#292)', () => {
         session={session}
         onBack={vi.fn()}
         onStartMoment={onStartMoment}
-        onWhatYoullNeed={vi.fn()}
         onEditPerson={vi.fn()}
         paymentsEnabled={paymentsEnabled}
       />,
@@ -253,5 +252,44 @@ describe('PathLanding paywall demo (#292)', () => {
     const reason = screen.getAllByText('Included with the full plan')[0];
     expect(reason.getAttribute('aria-hidden')).toBe('true');
     expect(row.getAttribute('aria-describedby')).toBe(reason.id);
+  });
+});
+
+describe('PathLanding "What you\'ll need" in the header (#194)', () => {
+  afterEach(async () => {
+    cleanup();
+    await accountStore.setChecklistTicks([]);
+    document.body.style.overflow = '';
+  });
+
+  it('is a top-bar button next to Back, and the body has no second one', () => {
+    renderPath();
+    const buttons = screen.getAllByRole('button', { name: "What you'll need" });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveClass('gg-btn-bar');
+    expect(buttons[0].parentElement).toBe(screen.getByRole('button', { name: 'Back' }).parentElement);
+  });
+
+  it('tabs from Back to "What you\'ll need" to the page content', async () => {
+    const user = userEvent.setup();
+    renderPath();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Edit person' })).toHaveFocus();
+  });
+
+  it('opens the closable sheet without leaving the hub, and returns focus', async () => {
+    const user = userEvent.setup();
+    renderPath();
+    const trigger = screen.getByRole('button', { name: "What you'll need" });
+    await user.click(trigger);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 });

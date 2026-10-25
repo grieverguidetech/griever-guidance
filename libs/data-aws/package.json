@@ -24,7 +24,7 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/apps/web/src/screens/WhatYoullNeed.tsx",
+          "{workspaceRoot}/apps/web/src/lib/ChecklistRows.tsx",
           "{workspaceRoot}/apps/mobile/src/screens/WhatYoullNeedScreen.tsx"
         ]
       }

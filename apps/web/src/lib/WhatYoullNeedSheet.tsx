@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { ChecklistRows } from '../screens/WhatYoullNeed';
+import { ChecklistRows } from './ChecklistRows';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -80,7 +80,21 @@ export function Sheet({ title, onClose, returnFocusRef, children }: SheetProps) 
         else root.setAttribute('aria-hidden', wasHidden);
       }
       // After the page is live again, or the focus call would be ignored.
-      (returnRef.current?.current ?? trigger)?.focus();
+      const target = returnRef.current?.current ?? trigger;
+      if (target?.isConnected) {
+        target.focus();
+      } else {
+        // The screen was swapped while the sheet was open: land on the new page's heading, or Back.
+        const fallback =
+          document.querySelector<HTMLElement>('h1') ??
+          Array.from(document.querySelectorAll<HTMLElement>('button')).find((b) => b.textContent?.trim() === 'Back');
+        if (fallback) {
+          if (!fallback.hasAttribute('tabindex') && fallback.tagName === 'H1') {
+            fallback.setAttribute('tabindex', '-1');
+          }
+          fallback.focus();
+        }
+      }
     };
   }, []);
 
@@ -131,7 +145,19 @@ export function WhatYoullNeedSheet({ onClose, returnFocusRef }: { onClose: () =>
       <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
         Not today. Just so none of it surprises you.
       </p>
-      <ChecklistRows />
+      <div className="gg-card">
+        <span className="gg-card-kicker">The one people get wrong</span>
+        <span className="gg-card-title text-[15px]">Certified death certificates</span>
+        <p className="gg-card-body m-0">
+          Ask the funeral home for <strong>8 to 10 certified copies</strong>. Banks, insurers and
+          Social Security each keep an original — photocopies are usually refused.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3">
+        <p className="gg-eyebrow m-0">Gather when you can</p>
+        <ChecklistRows />
+      </div>
+      <p className="gg-reassure text-center m-0 text-[12px]">We won't remind you about this list.</p>
     </Sheet>
   );
 }
