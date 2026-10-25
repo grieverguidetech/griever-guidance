@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { Session } from '@griever/hooks';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Moment, MomentKey, TemplateCategory } from '@griever/shared';
@@ -6,9 +6,15 @@ import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
 import { ListChecks } from '@phosphor-icons/react/ListChecks';
+import { Lock } from '@phosphor-icons/react/Lock';
 import { BackButton, Eyebrow } from '../lib/ui';
 import { formatDate } from '../lib/format';
+import { PAYMENTS_ENABLED } from '../lib/features';
 import { ShareDetailsButton } from './ShareDetailsButton';
+import { LOCKED_REASON, PaywallPlaceholder } from './PaywallPlaceholder';
+
+/** The moments in the full plan. The announcement is free. */
+const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 
 const MOMENT_COPY: Record<MomentKey, { title: string; body: string; doneLabel: string }> = {
   announce: {
@@ -85,6 +91,8 @@ interface Props {
   onEditPerson: () => void;
   note?: FinishNote | null;
   onCloseNote?: () => void;
+  /** Defaults to the build flag; a prop so tests can set it. */
+  paymentsEnabled?: boolean;
 }
 
 export function PathLanding({
@@ -95,14 +103,22 @@ export function PathLanding({
   onEditPerson,
   note = null,
   onCloseNote,
+  paymentsEnabled = PAYMENTS_ENABLED,
 }: Props) {
   const moments = usePathMoments(session);
   const heading = useRef<HTMLHeadingElement>(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   // The Close button leaves the page, so focus goes to the heading rather than being lost.
   function closeNote() {
     onCloseNote?.();
     heading.current?.setAttribute('tabindex', '-1');
     heading.current?.focus();
+  }
+
+  // The dialog hands focus back to the heading, which is not focusable until told so.
+  function openPaywall() {
+    heading.current?.setAttribute('tabindex', '-1');
+    setPaywallOpen(true);
   }
 
   return (
@@ -142,6 +158,8 @@ export function PathLanding({
             moment={moment}
             started={isDraftStarted(session.drafts[CATEGORY_BY_KEY[moment.key]])}
             onStart={() => onStartMoment(moment.key)}
+            locked={paymentsEnabled && PAID_MOMENTS.includes(moment.key)}
+            onLockedPress={openPaywall}
           />
         ))}
       </div>
@@ -153,6 +171,7 @@ export function PathLanding({
           done: m.status === 'done',
         }))}
       />
+      {paywallOpen && <PaywallPlaceholder onClose={() => setPaywallOpen(false)} returnFocusRef={heading} />}
     </div>
   );
 }
@@ -183,12 +202,20 @@ function MomentRow({
   moment,
   started,
   onStart,
+  locked,
+  onLockedPress,
 }: {
   moment: Moment;
   started: boolean;
   onStart: () => void;
+  locked: boolean;
+  onLockedPress: () => void;
 }) {
   const copy = MOMENT_COPY[moment.key];
+
+  if (locked) {
+    return <LockedRow title={copy.title} body={copy.body} onPress={onLockedPress} />;
+  }
 
   if (moment.status === 'done') {
     // Tapping opens a new, empty message for this moment (C2: no old wording is kept).
@@ -252,6 +279,37 @@ function MomentRow({
         <p className="m-0 mt-[2px] text-[13px] leading-[1.5]" style={{ color: 'var(--color-neutral-800)' }}>
           {copy.body}
         </p>
+      </div>
+    </button>
+  );
+}
+
+/**
+ * A task in the full plan (#292). aria-disabled rather than disabled: it stays focusable and a screen
+ * reader still reads it, with the reason. The text keeps full contrast; a tap opens the placeholder.
+ */
+function LockedRow({ title, body, onPress }: { title: string; body: string; onPress: () => void }) {
+  const reasonId = useId();
+  return (
+    <button
+      type="button"
+      aria-disabled="true"
+      aria-describedby={reasonId}
+      onClick={onPress}
+      className="flex gap-3 items-start text-left min-h-[44px]"
+      style={{ padding: 'var(--space-2) 0' }}
+    >
+      <Lock size={22} weight="duotone" aria-hidden="true" style={{ color: 'var(--color-neutral-700)', marginTop: 1 }} />
+      <div>
+        <div className="text-[15px]" style={{ color: 'var(--color-neutral-800)' }}>
+          {title}
+        </div>
+        <p className="m-0 mt-[2px] text-[13px] leading-[1.5]" style={{ color: 'var(--color-neutral-800)' }}>
+          {body}
+        </p>
+        <span id={reasonId} className="text-[12px]" style={{ color: 'var(--color-neutral-800)' }}>
+          {LOCKED_REASON}
+        </span>
       </div>
     </button>
   );

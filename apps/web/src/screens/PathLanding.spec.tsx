@@ -160,3 +160,63 @@ describe('PathLanding hub (#176)', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
   });
 });
+
+describe('PathLanding paywall demo (#292)', () => {
+  const renderHub = (paymentsEnabled: boolean, onStartMoment = vi.fn()) =>
+    render(
+      <PathLanding
+        session={session}
+        onBack={vi.fn()}
+        onStartMoment={onStartMoment}
+        onWhatYoullNeed={vi.fn()}
+        onEditPerson={vi.fn()}
+        paymentsEnabled={paymentsEnabled}
+      />,
+    );
+  const locked = () => screen.queryAllByRole('button').filter((b) => b.getAttribute('aria-disabled') === 'true');
+
+  it('flag off: no row is locked, no reason is shown, and a row starts its task', async () => {
+    const user = userEvent.setup();
+    const onStartMoment = vi.fn();
+    renderHub(false, onStartMoment);
+    expect(locked()).toHaveLength(0);
+    expect(screen.queryByText('Included with the full plan')).toBeNull();
+    await user.click(screen.getByRole('button', { name: /^Share the obituary/ }));
+    expect(onStartMoment).toHaveBeenCalledWith('obituary');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('flag on: the service and thank-you rows lock and read the reason; the announcement stays open', () => {
+    renderHub(true);
+    expect(locked().map((b) => b.textContent)).toEqual([
+      expect.stringContaining('Share the service'),
+      expect.stringContaining('Send thank-yous'),
+    ]);
+    for (const row of locked()) {
+      expect(row.hasAttribute('disabled')).toBe(false);
+      expect(row.getAttribute('aria-describedby')).toBeTruthy();
+      expect(row.textContent).toContain('Included with the full plan');
+    }
+    expect(screen.getByRole('button', { name: /^Announce the passing|Told close family/ }).getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('a tap on a locked row opens the dialog and does not start the task; Escape returns focus to the h1', async () => {
+    const user = userEvent.setup();
+    const onStartMoment = vi.fn();
+    renderHub(true, onStartMoment);
+    await user.click(locked()[0]);
+    expect(screen.getByRole('dialog', { name: 'The full plan' })).toBeTruthy();
+    expect(onStartMoment).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+  });
+
+  it('Close returns focus to the h1', async () => {
+    const user = userEvent.setup();
+    renderHub(true);
+    await user.click(locked()[1]);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+  });
+});
