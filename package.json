@@ -18,6 +18,7 @@
     "e2e": "pnpm nx e2e web-e2e",
     "check": "pnpm typecheck && pnpm test && pnpm build",
     "check:affected": "pnpm nx affected -t typecheck test && pnpm nx affected -t build --exclude=mobile",
+    "dev:local": "bash tools/scripts/dev-local.sh",
     "dev:data": "node --conditions=@org/source --import jiti/register infra/aws-local/run-data-function.ts"
   },
   "private": true,

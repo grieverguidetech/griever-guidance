@@ -17,6 +17,22 @@ pnpm aws:down    # stop both and delete their data
 - `pnpm aws:tables` creates the tables only.
 - The data lives in memory. After `pnpm aws:down`, run `pnpm aws:seed` again.
 
+## One command for the whole stack
+
+```text
+pnpm dev:local web      # or: pnpm dev:local mobile
+```
+
+The script `tools/scripts/dev-local.sh` does the manual steps for you:
+
+1. It reads only the `CLERK_ISSUER` line from `apps/gateway/.env`. It never prints the value.
+2. It runs `pnpm aws:up` and `pnpm aws:tables`. Both are safe to run again.
+3. It starts the data function (port 3002) and the gateway (port 3001) in the background. Log lines start with `[data]` or `[gateway]`.
+4. It waits until both ports listen (60 seconds at most), then runs web or mobile in the foreground.
+5. Ctrl+C stops the data function and the gateway. DynamoDB Local keeps running; stop it with `pnpm aws:down`.
+
+If Docker is not running, or something already listens on 3001 or 3002, the script says so and stops.
+
 ## What runs
 
 | Service | Image or package | Port |
