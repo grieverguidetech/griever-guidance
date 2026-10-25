@@ -14,6 +14,7 @@ jest.mock('@clerk/expo', () => ({
     return props.children;
   },
   useAuth: () => ({ isLoaded: false, isSignedIn: undefined, userId: undefined, sessionId: undefined, getToken: jest.fn(), signOut: jest.fn() }),
+  useClerk: () => ({ status: 'loading' }),
   useSignIn: jest.fn(),
   useSignUp: jest.fn(),
   useSSO: jest.fn(),
@@ -29,8 +30,9 @@ describe('App with the account feature and a Clerk key on', () => {
     expect(await screen.findByText('Your account')).toBeTruthy();
   });
 
-  it('mounts Clerk with the publishable key, the secure token cache and the resource cache', () => {
+  it('mounts Clerk with the publishable key, the secure token cache and the resource cache', async () => {
     render(<App />);
+    await screen.findByText('Your account');
     expect(mockProviderProps).toHaveBeenCalledWith(
       expect.objectContaining({
         publishableKey: 'pk_test_example',

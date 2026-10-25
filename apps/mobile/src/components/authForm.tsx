@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import type { ReactNode } from 'react';
-import { ACCENT, MUTED } from './colors';
+import { ACCENT, MUTED, MUTED_STRONG } from './colors';
 
 /** iOS only: Android reads the live region / alert role, so announcing there would say it twice. */
 export function announce(message: string) {
@@ -43,6 +43,7 @@ type InputProps = Pick<
   | 'returnKeyType'
   | 'onSubmitEditing'
   | 'editable'
+  | 'maxLength'
 >;
 
 export function Field({
@@ -103,7 +104,7 @@ export function ErrorText({ message }: { message: string | null }) {
 export function PrimaryButton({ label, pending, onPress }: { label: string; pending: boolean; onPress: () => void }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.button, (pending || pressed) && styles.buttonDisabled]}
+      style={({ pressed }) => [styles.button, pending && styles.buttonPending, pressed && styles.pressed]}
       onPress={onPress}
       disabled={pending}
       accessibilityRole="button"
@@ -118,21 +119,21 @@ export function PrimaryButton({ label, pending, onPress }: { label: string; pend
 export function SecondaryButton({ label, pending, onPress }: { label: string; pending: boolean; onPress: () => void }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.secondary, (pending || pressed) && styles.buttonDisabled]}
+      style={({ pressed }) => [styles.secondary, pending && styles.secondaryPending, pressed && styles.pressed]}
       onPress={onPress}
       disabled={pending}
       accessibilityRole="button"
-      accessibilityState={{ disabled: pending }}
+      accessibilityState={{ disabled: pending, busy: pending }}
     >
-      <Text style={styles.secondaryText}>{label}</Text>
+      <Text style={[styles.secondaryText, pending && styles.secondaryTextPending]}>{label}</Text>
     </Pressable>
   );
 }
 
-export function LinkButton({ label, onPress }: { label: string; onPress: () => void }) {
+export function LinkButton({ label, onPress, pending = false }: { label: string; onPress: () => void; pending?: boolean }) {
   return (
-    <Pressable style={styles.link} onPress={onPress} accessibilityRole="button">
-      <Text style={styles.linkText}>{label}</Text>
+    <Pressable style={styles.link} onPress={onPress} accessibilityRole="button" accessibilityState={{ busy: pending }}>
+      <Text style={[styles.linkText, pending && styles.secondaryTextPending]}>{label}</Text>
     </Pressable>
   );
 }
@@ -167,7 +168,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
-  buttonDisabled: { opacity: 0.4 },
+  // A busy button gets a solid dark fill instead of fading: white on MUTED_STRONG is 7.57:1.
+  buttonPending: { backgroundColor: MUTED_STRONG },
+  pressed: { opacity: 0.7 },
   buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
   secondary: {
     minHeight: 44,
@@ -179,7 +182,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 12,
   },
+  secondaryPending: { borderColor: MUTED_STRONG },
   secondaryText: { color: ACCENT, fontSize: 15, fontWeight: '500' },
+  secondaryTextPending: { color: MUTED_STRONG },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 12 },
   linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
 });

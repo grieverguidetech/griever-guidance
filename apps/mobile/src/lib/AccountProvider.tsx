@@ -49,15 +49,10 @@ function AccountRunner({
   return null;
 }
 
-/**
- * The children (the send flow) always render straight away. The account hook starts after the
- * profile cache has loaded, because it reads that cache once at mount; until then accounts show
- * as loading. The send flow never waits on accounts.
- */
-export function AccountStateProvider({ auth, children }: { auth: AccountAuth; children: ReactNode }) {
+/** The profile cache, read from AsyncStorage once. `ready` flips when it can be trusted. */
+function useProfileCache() {
   const storage = useMemo(() => createProfileCache(), []);
   const [ready, setReady] = useState(false);
-  const [account, setAccount] = useState<UseAccountResult>(LOADING);
   useEffect(() => {
     let live = true;
     void storage.hydrate().then(() => live && setReady(true));
@@ -65,16 +60,43 @@ export function AccountStateProvider({ auth, children }: { auth: AccountAuth; ch
       live = false;
     };
   }, [storage]);
+  return { storage, ready };
+}
+
+type ProfileCache = ReturnType<typeof useProfileCache>;
+
+/**
+ * The children (the send flow) always render straight away. The account hook starts after the
+ * profile cache has loaded, because it reads that cache once at mount; until then accounts show
+ * as loading. The send flow never waits on accounts.
+ */
+function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: ProfileCache; children: ReactNode }) {
+  const [account, setAccount] = useState<UseAccountResult>(LOADING);
   return (
     <>
-      {ready ? <AccountRunner auth={auth} storage={storage} onAccount={setAccount} /> : null}
+      {cache.ready ? <AccountRunner auth={auth} storage={cache.storage} onAccount={setAccount} /> : null}
       <AccountContext.Provider value={account}>{children}</AccountContext.Provider>
     </>
   );
 }
 
+/** For tests and any provider that needs no cache of its own. */
+export function AccountStateProvider({ auth, children }: { auth: AccountAuth; children: ReactNode }) {
+  return (
+    <AccountState auth={auth} cache={useProfileCache()}>
+      {children}
+    </AccountState>
+  );
+}
+
 function ClerkAccountState({ children }: { children: ReactNode }) {
-  return <AccountStateProvider auth={useClerkAccountAuth()}>{children}</AccountStateProvider>;
+  const cache = useProfileCache();
+  const auth = useClerkAccountAuth(cache.storage, cache.ready);
+  return (
+    <AccountState auth={auth} cache={cache}>
+      {children}
+    </AccountState>
+  );
 }
 
 /** Clerk mounts only when the flag is on and the publishable key is set; otherwise accounts are unavailable. */

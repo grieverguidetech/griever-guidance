@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
@@ -31,6 +31,13 @@ jest.mock('@clerk/expo', () => ({
   useSSO: () => ({ startSSOFlow: mockStartSSO }),
 }));
 jest.mock('expo-auth-session', () => ({ makeRedirectUri: (o: { scheme: string; path: string }) => `${o.scheme}://${o.path}` }));
+
+// Jest has no native view tree, so findNodeHandle returns null; the heading focus tests need a handle.
+// This path is specific to react-native 0.81 (Expo SDK 54). Re-check it when react-native is upgraded.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
 
 const OFFLINE = "You need a connection to do this. Nothing you've typed is lost.";
 const type = (label: string, text: string) => fireEvent.changeText(screen.getByLabelText(label), text);
@@ -146,6 +153,75 @@ describe('sign in', () => {
     expect(mockSignIn.create).not.toHaveBeenCalled();
   });
 
+  it('moves screen-reader focus to the new heading when the step changes', async () => {
+    renderSignIn();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
+    focus.mockClear();
+    press('Email me a code instead');
+    await screen.findByRole('header', { name: 'Check your email' });
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockClear();
+    press('Use a different email');
+    await screen.findByRole('header', { name: 'Sign in' });
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('says "We sent a new code." in a live region after a resend', async () => {
+    renderSignIn();
+    press('Email me a code instead');
+    await screen.findByLabelText('6-digit code');
+    mockSignIn.emailCode.sendCode.mockClear();
+    press('Send a new code');
+    const note = await screen.findByText('We sent a new code.');
+    let region = note.parent;
+    while (region && !region.props.accessibilityLiveRegion) {
+      region = region.parent;
+    }
+    expect(region?.props.accessibilityLiveRegion).toBe('polite');
+    expect(mockSignIn.emailCode.sendCode).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits the code field to 6 characters', async () => {
+    renderSignIn();
+    press('Email me a code instead');
+    expect((await screen.findByLabelText('6-digit code')).props.maxLength).toBe(6);
+  });
+
+  it('does not mention a password when the email has no account on the code path', async () => {
+    mockSignIn.create.mockImplementation(fail('form_identifier_not_found'));
+    renderSignIn();
+    press('Email me a code instead');
+    await screen.findByText("We couldn't send a code to that email. Please check it and try again.");
+    expect(screen.queryByText(/password/i)).toBeNull();
+  });
+
+  it('maps the combined wrong email or password code to the same calm copy', async () => {
+    mockSignIn.password.mockImplementation(fail('form_password_or_identifier_incorrect'));
+    renderSignIn();
+    press('Sign in');
+    await screen.findByText("That email and password don't match. Please try again.");
+  });
+
+  it('gives a neutral line, not "can\'t reach your account", when sign-in stops on a second factor', async () => {
+    mockSignIn.password.mockImplementation(async () => {
+      mockSignIn.status = 'needs_second_factor';
+      return { error: null };
+    });
+    renderSignIn();
+    press('Sign in');
+    await screen.findByText("That didn't finish. Please try another way to sign in.");
+  });
+
+  it('marks the buttons busy while a request is pending', async () => {
+    mockSignIn.password.mockImplementation(() => new Promise(() => undefined));
+    renderSignIn();
+    press('Sign in');
+    const busy = await screen.findByRole('button', { name: 'Signing in' });
+    expect(busy.props.accessibilityState).toMatchObject({ busy: true });
+    expect(screen.getByRole('button', { name: 'Continue with Google' }).props.accessibilityState).toMatchObject({ busy: false });
+    expect(screen.getByRole('button', { name: 'Email me a code instead' }).props.accessibilityState).toMatchObject({ busy: true });
+  });
+
   describe('Google and Facebook', () => {
     it('starts Google with the app redirect and activates the new session', async () => {
       const setActive = jest.fn(async () => undefined);
@@ -164,6 +240,27 @@ describe('sign in', () => {
       await screen.findByText('Please use your email or Google to sign in.');
       expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_facebook', redirectUrl: 'mobile://sso-callback' });
       expect(setActive).not.toHaveBeenCalled();
+    });
+
+    it('shows the connection copy when the browser never opened (Clerk not loaded)', async () => {
+      mockStartSSO.mockResolvedValue({ createdSessionId: null, authSessionResult: null });
+      renderSignIn();
+      press('Continue with Google');
+      await screen.findByText(OFFLINE);
+    });
+
+    it('shows the generic copy when the sign-up needs something other than an email', async () => {
+      mockStartSSO.mockResolvedValue({ createdSessionId: null, authSessionResult: { type: 'success' }, signUp: { missingFields: ['phone_number'] } });
+      renderSignIn();
+      press('Continue with Google');
+      await screen.findByText("We can't reach your account right now. Please try again in a little while.");
+    });
+
+    it('marks both buttons busy while the browser flow runs', async () => {
+      mockStartSSO.mockImplementation(() => new Promise(() => undefined));
+      renderSignIn();
+      press('Continue with Facebook');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Continue with Google' }).props.accessibilityState).toMatchObject({ disabled: true, busy: true }));
     });
 
     it('says nothing when the person closes the browser', async () => {
@@ -271,6 +368,31 @@ describe('sign up', () => {
     press('Create account');
     await screen.findByText('Please enter your name.');
     expect(mockSignUp.password).not.toHaveBeenCalled();
+  });
+
+  it('moves focus to the code heading and offers a new code', async () => {
+    renderSignUp();
+    fill();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
+    focus.mockClear();
+    press('Create account');
+    await screen.findByRole('header', { name: 'Check your email' });
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText('6-digit code')).props.maxLength).toBe(6);
+    press('Send a new code');
+    await screen.findByText('We sent a new code.');
+  });
+
+  it('gives a neutral line when sign-up stops before it is complete', async () => {
+    mockSignUp.verifications.verifyEmailCode.mockImplementation(ok);
+    renderSignUp();
+    fill();
+    press('Create account');
+    await screen.findByLabelText('6-digit code');
+    type('6-digit code', '123456');
+    press('Create account');
+    await screen.findByText("That didn't finish. Please try another way to sign in.");
+    expect(mockSignUp.finalize).not.toHaveBeenCalled();
   });
 
   it('disables submit while the request is pending', async () => {

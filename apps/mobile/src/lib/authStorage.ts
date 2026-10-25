@@ -2,8 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PROFILE_STORAGE_KEY, SIGNED_IN_STORAGE_KEY } from '@griever/hooks';
 import type { SendFlowStorage } from '@griever/hooks';
 
-// Both keys are read once at mount: the profile, and the marker that says whose profile it is.
-const HYDRATED_KEYS = [PROFILE_STORAGE_KEY, SIGNED_IN_STORAGE_KEY];
+/** Set before Clerk is asked to sign out and cleared when it has. Same key as web. */
+export const SIGN_OUT_PENDING_KEY = 'gg.signOutPending';
+
+// Read once at mount: the profile, the marker that says whose profile it is, and the unfinished sign-out flag.
+const HYDRATED_KEYS = [PROFILE_STORAGE_KEY, SIGNED_IN_STORAGE_KEY, SIGN_OUT_PENDING_KEY];
 
 /**
  * `useAccount` reads its profile cache synchronously, but AsyncStorage is async. So the cache is a

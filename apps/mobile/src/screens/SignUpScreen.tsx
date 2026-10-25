@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { TextInput } from 'react-native';
 import { useSignUp } from '@clerk/expo';
-import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, authStyles } from '../components/authForm';
+import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, announce, authStyles } from '../components/authForm';
+import { NEW_CODE_SENT } from './SignInScreen';
 import { SocialButtons } from '../components/SocialButtons';
-import { clerkMessage } from '../lib/clerkMessages';
+import { NEUTRAL_STOP, clerkMessage } from '../lib/clerkMessages';
 
 type Props = {
   onSwitchToSignIn: () => void;
@@ -26,34 +27,37 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
   const [step, setStep] = useState<'form' | 'code'>('form');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
-  async function run(action: () => Promise<void>) {
+  async function run(busyText: string, action: () => Promise<void>) {
     if (pending) {
       return;
     }
     setPending(true);
     setError(null);
+    setNotice(null);
+    announce(busyText);
     try {
       await action();
     } catch (thrown) {
-      setError(clerkMessage(thrown));
+      setError(clerkMessage(thrown, step === 'code' ? 'code' : 'password'));
     } finally {
       setPending(false);
     }
   }
 
   /** Returns true when Clerk reported an error (and it is now on screen). */
-  function failed({ error: clerkError }: { error: unknown }): boolean {
+  function failed({ error: clerkError }: { error: unknown }, flow: 'password' | 'code' = 'password'): boolean {
     if (clerkError) {
-      setError(clerkMessage(clerkError));
+      setError(clerkMessage(clerkError, flow));
     }
     return Boolean(clerkError);
   }
 
   const submit = () =>
-    run(async () => {
+    run('Creating account', async () => {
       // Checked here so a typing mistake never costs a network call.
       if (!name.trim()) {
         return setError(NAME_REQUIRED);
@@ -64,18 +68,18 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
       if (failed(await signUp.password({ emailAddress: email.trim(), password }))) {
         return;
       }
-      if (!failed(await signUp.verifications.sendEmailCode())) {
+      if (!failed(await signUp.verifications.sendEmailCode(), 'code')) {
         setStep('code');
       }
     });
 
   const verify = () =>
-    run(async () => {
-      if (failed(await signUp.verifications.verifyEmailCode({ code: code.trim() }))) {
+    run('Checking the code', async () => {
+      if (failed(await signUp.verifications.verifyEmailCode({ code: code.trim() }), 'code')) {
         return;
       }
       if (signUp.status !== 'complete') {
-        return setError(clerkMessage(null));
+        return setError(NEUTRAL_STOP);
       }
       // The session starts at finalize and this screen unmounts, so hand the name up first.
       onCreated(name.trim(), email.trim());
@@ -83,13 +87,16 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
     });
 
   const resend = () =>
-    run(async () => {
-      failed(await signUp.verifications.sendEmailCode());
+    run('Sending a new code', async () => {
+      if (!failed(await signUp.verifications.sendEmailCode(), 'code')) {
+        setNotice(NEW_CODE_SENT);
+        announce(NEW_CODE_SENT);
+      }
     });
 
   if (step === 'code') {
     return (
-      <View>
+      <View key={step}>
         <ScreenHeader>Check your email</ScreenHeader>
         <Text style={authStyles.body}>{`We sent a 6-digit code to ${email.trim()}.`}</Text>
         <Field
@@ -101,17 +108,20 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
           autoComplete="sms-otp"
           autoCapitalize="none"
           autoCorrect={false}
+          maxLength={6}
           returnKeyType="go"
           onSubmitEditing={verify}
         />
         <ErrorText message={error} />
+        <View accessibilityLiveRegion="polite">{notice ? <Text style={authStyles.body}>{notice}</Text> : null}</View>
         <PrimaryButton label={pending ? 'Checking' : 'Create account'} pending={pending} onPress={verify} />
-        <LinkButton label="Send a new code" onPress={() => void resend()} />
+        <LinkButton label="Send a new code" pending={pending} onPress={() => void resend()} />
         <LinkButton
           label="Use a different email"
           onPress={() => {
             setCode('');
             setError(null);
+            setNotice(null);
             setStep('form');
           }}
         />
@@ -120,7 +130,7 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
   }
 
   return (
-    <View>
+    <View key={step}>
       <ScreenHeader>Create an account</ScreenHeader>
       <Text style={authStyles.body}>Your name is used as the sender on messages you send.</Text>
       <Field
