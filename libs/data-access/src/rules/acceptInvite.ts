@@ -25,8 +25,12 @@ import { Refusal, type FlowResult } from './flows.js';
 
 const TOKEN_HASH = /^[0-9a-f]{64}$/;
 
-/** One Tx may hold 100 items. Five are fixed; the rest retire the joiner's own open invites. */
-const MAX_OWN_OPEN_INVITES = 95;
+/** One Tx may hold 100 items. Six are fixed (positions 0 to 5); the rest retire the joiner's own live invites. */
+const FIXED_ITEMS = 6;
+const MAX_OWN_OPEN_INVITES = 100 - FIXED_ITEMS;
+
+// Positions in the acceptInvite transaction. A failed condition reports its position.
+const ACCEPT_MEMBER = 1;
 
 /**
  * Accepts an invite as the caller. The link works once, only for the invited email, and only while
@@ -35,7 +39,7 @@ const MAX_OWN_OPEN_INVITES = 95;
  *   2 the invite, marked accepted (must still be open and unexpired)
  *   3 the caller's profile, set to member (version check, or a new profile)
  *   4 the owner's profile, version bump (must still be an owner)
- *   5 the owner has no MEMBER_OF          6.. the caller's own open invites, revoked
+ *   5 the owner has no MEMBER_OF          6.. the caller's own live open invites, revoked
  * These conditions take the place of the row locks in Supabase accept_invite. Any failed condition
  * means the reads were stale, so the whole action runs again: the new reads then give the right
  * answer. A caller who owns people, has members or is already a member gets invite_conflict, but
@@ -82,13 +86,18 @@ export async function acceptInvite(
 
         const profile = await getProfile(doc, table, caller.userId, clock);
         await refuseIfCallerIsTied(doc, table, caller.userId, profile, clock);
+        // Expired invites already fail the expiry check, so only live ones are retired.
         const own = (
           await queryLive(doc, table, caller.userId, clock, INVITE_PREFIX)
         )
           .map(decodeInvite)
-          .filter(isOpen);
+          .filter(
+            (item) =>
+              isOpen(item) && Date.parse(item.expiresAt) > nowDate.getTime(),
+          );
+        // createInvite caps live invites at 20, so this is a safety net, never a normal path.
         if (own.length > MAX_OWN_OPEN_INVITES) {
-          throw new Error('acceptInvite: too many open invites to retire.');
+          throw new Refusal('invite_conflict');
         }
 
         const items: TransactItem[] = [
@@ -138,11 +147,14 @@ export async function acceptInvite(
             }),
           ),
         ];
-        // Every condition is a stale-read check, so every position re-runs the action.
+        // Every condition except the MEMBER# put is a stale-read check, so those positions re-run the
+        // action. An orphan MEMBER# item (no MEMBER_OF) would fail the put forever and no read sees it.
         return {
           items,
           value: { ownerId: invite.ownerId },
-          retryOn: items.map((_, index) => index),
+          retryOn: items
+            .map((_, index) => index)
+            .filter((index) => index !== ACCEPT_MEMBER),
         };
       },
       options,
@@ -152,6 +164,9 @@ export async function acceptInvite(
     }
     if (result.status === 'busy') {
       return { ok: false, code: 'busy' };
+    }
+    if (result.failedIndex === ACCEPT_MEMBER) {
+      return { ok: false, code: 'unusable' };
     }
     throw new Error(
       `acceptInvite: unexpected failed condition at ${result.failedIndex}.`,
@@ -177,7 +192,8 @@ async function findInvite(
     return undefined;
   }
   const item = await getLive(doc, table, inviteKey(ownerId, inviteId), clock);
-  return item ? decodeInvite(item) : undefined;
+  const invite = item ? decodeInvite(item) : undefined;
+  return invite?.tokenHash === tokenHash ? invite : undefined;
 }
 
 /**

@@ -27,7 +27,7 @@ import {
 } from '../testing/localTable.js';
 import { acceptInvite } from './acceptInvite.js';
 import { createFlow } from './flows.js';
-import { revokeInvite } from './invites.js';
+import { createInvite, revokeInvite } from './invites.js';
 import { removeMember } from './members.js';
 
 const clock = fixedClock('2026-10-24T12:00:00.000Z');
@@ -205,6 +205,11 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
     const owner = uid('uowner');
     const joiner = uid('ujoiner');
     const joinerEmail = `${joiner}@example.test`;
+    // Other owners a mode creates, so the snapshot covers every partition the invite touches.
+    let extra: string[] = [];
+    beforeEach(() => {
+      extra = [];
+    });
     const modes: Record<
       string,
       () => Promise<{ hash: string; who?: ReturnType<typeof caller> }>
@@ -244,6 +249,7 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       }),
       'owner is a member': async () => {
         const other = uid('memberowner');
+        extra.push(other);
         await profile(other, 'member');
         await rawPut(
           encodeMemberOf({
@@ -256,12 +262,15 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       },
       'owner is not an owner': async () => {
         const other = uid('notowner');
+        extra.push(other);
         await profile(other, 'member');
         return { hash: (await seedInvite(other, joinerEmail)).tokenHash };
       },
-      'owner has no profile': async () => ({
-        hash: (await seedInvite(uid('noprofile'), joinerEmail)).tokenHash,
-      }),
+      'owner has no profile': async () => {
+        const other = uid('noprofile');
+        extra.push(other);
+        return { hash: (await seedInvite(other, joinerEmail)).tokenHash };
+      },
     };
 
     beforeAll(async () => {
@@ -273,7 +282,7 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       'answers the same result for: %s, and writes nothing',
       async (mode) => {
         const { hash: token, who } = await modes[mode]!();
-        const before = await snapshot(owner, joiner);
+        const before = await snapshot(owner, joiner, ...extra);
 
         const result = await acceptInvite(
           doc,
@@ -285,9 +294,47 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
 
         expect(result).toEqual(UNUSABLE);
         expect(JSON.stringify(result)).toBe(JSON.stringify(UNUSABLE));
-        expect(await snapshot(owner, joiner)).toBe(before);
+        expect(await snapshot(owner, joiner, ...extra)).toBe(before);
       },
     );
+
+    it('answers unusable for an orphan MEMBER# item, and writes nothing', async () => {
+      const orphanOwner = uid('oowner');
+      const orphan = uid('orphan');
+      await profile(orphanOwner);
+      await profile(orphan);
+      await rawPut(
+        encodeMember({
+          ownerId: orphanOwner,
+          memberId: orphan,
+          email: 'x@example.test',
+          createdAt: at(-HOUR),
+        }),
+      );
+      const invite = await seedInvite(orphanOwner, `${orphan}@example.test`);
+      const before = await snapshot(orphanOwner, orphan);
+
+      expect(
+        await acceptInvite(doc, table, caller(orphan), invite.tokenHash, clock),
+      ).toEqual(UNUSABLE);
+      expect(await snapshot(orphanOwner, orphan)).toBe(before);
+    });
+
+    it('answers unusable when the stored hash differs from the token', async () => {
+      const mismatch = hash();
+      const real = await seedInvite(owner, joinerEmail);
+      await rawPut(encodeToken(mismatch, owner, real.id));
+
+      expect(
+        await acceptInvite(
+          doc,
+          table,
+          caller(joiner, joinerEmail),
+          mismatch,
+          clock,
+        ),
+      ).toEqual(UNUSABLE);
+    });
   });
 
   describe('invite_conflict', () => {
@@ -382,6 +429,121 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       expect(
         await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock),
       ).toEqual(UNUSABLE);
+    });
+  });
+
+  describe('own invites', () => {
+    it('revokes live open invites and leaves expired ones as they are', async () => {
+      const owner = uid('owner');
+      const joiner = uid('joiner');
+      await profile(owner);
+      await profile(joiner);
+      const live = await seedInvite(joiner, 'live@example.test');
+      const expired = await seedInvite(joiner, 'old@example.test', {
+        expiresAt: at(-HOUR),
+      });
+      const invite = await seedInvite(owner, `${joiner}@example.test`);
+
+      await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock);
+
+      expect((await readInvite(live)).revokedAt).toBe(
+        clock.now().toISOString(),
+      );
+      expect((await readInvite(expired)).revokedAt).toBeUndefined();
+    });
+
+    it('accepts with the most live invites one transaction can retire', async () => {
+      const owner = uid('owner');
+      const joiner = uid('joiner');
+      await profile(owner);
+      await profile(joiner);
+      for (let i = 0; i < 94; i += 1) {
+        await seedInvite(joiner, `friend${i}@example.test`);
+      }
+      const invite = await seedInvite(owner, `${joiner}@example.test`);
+
+      expect(
+        await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock),
+      ).toEqual({ ok: true, value: { ownerId: owner } });
+    });
+
+    it('refuses with invite_conflict, not an exception, above that number', async () => {
+      const owner = uid('owner');
+      const joiner = uid('joiner');
+      await profile(owner);
+      await profile(joiner);
+      for (let i = 0; i < 95; i += 1) {
+        await seedInvite(joiner, `friend${i}@example.test`);
+      }
+      const invite = await seedInvite(owner, `${joiner}@example.test`);
+
+      expect(
+        await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock),
+      ).toEqual({ ok: false, code: 'invite_conflict' });
+    });
+
+    it('retires an invite the joiner creates during accept', async () => {
+      const owner = uid('owner');
+      const joiner = uid('joiner');
+      await profile(owner);
+      await profile(joiner);
+      const invite = await seedInvite(owner, `${joiner}@example.test`);
+      let created: Awaited<ReturnType<typeof createInvite>> | undefined;
+
+      const result = await acceptInvite(
+        doc,
+        table,
+        caller(joiner),
+        invite.tokenHash,
+        clock,
+        {
+          ...noSleep,
+          beforeCommit: async (attempt) => {
+            if (attempt === 1) {
+              created = await createInvite(
+                doc,
+                table,
+                caller(joiner),
+                'late@example.test',
+                hash(),
+                clock,
+              );
+            }
+          },
+        },
+      );
+
+      expect(result).toEqual({ ok: true, value: { ownerId: owner } });
+      expect(created).toMatchObject({ ok: true });
+      const late = created as { ok: true; value: { id: string } };
+      expect(
+        decodeInvite(
+          (await getLive(doc, table, inviteKey(joiner, late.value.id), clock))!,
+        ).revokedAt,
+      ).toBe(clock.now().toISOString());
+    });
+
+    it('lets the owner remove the new member right after accept', async () => {
+      const owner = uid('owner');
+      const joiner = uid('joiner');
+      await profile(owner);
+      await profile(joiner);
+      const invite = await seedInvite(owner, `${joiner}@example.test`);
+      await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock);
+
+      expect(
+        await removeMember(doc, table, caller(owner), joiner, clock),
+      ).toEqual({ ok: true, value: null });
+
+      expect(
+        await getLive(doc, table, memberOfKey(joiner), clock),
+      ).toBeUndefined();
+      expect(
+        await getLive(doc, table, memberKey(owner, joiner), clock),
+      ).toBeUndefined();
+      expect(await getProfile(doc, table, joiner, clock)).toMatchObject({
+        accountType: 'owner',
+      });
     });
   });
 
@@ -646,29 +808,6 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       expect(
         await getLive(doc, table, memberOfKey(joiner), clock),
       ).toBeUndefined();
-    });
-
-    it('the owner removes the new member right after accept: nothing is left half done', async () => {
-      const owner = uid('owner');
-      const joiner = uid('joiner');
-      await profile(owner);
-      await profile(joiner);
-      const invite = await seedInvite(owner, `${joiner}@example.test`);
-      await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock);
-
-      expect(
-        await removeMember(doc, table, caller(owner), joiner, clock),
-      ).toEqual({ ok: true, value: null });
-
-      expect(
-        await getLive(doc, table, memberOfKey(joiner), clock),
-      ).toBeUndefined();
-      expect(
-        await getLive(doc, table, memberKey(owner, joiner), clock),
-      ).toBeUndefined();
-      expect(await getProfile(doc, table, joiner, clock)).toMatchObject({
-        accountType: 'owner',
-      });
     });
 
     it('the owner becomes a member during accept: accept says unusable', async () => {
