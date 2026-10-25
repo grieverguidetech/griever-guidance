@@ -1,23 +1,37 @@
-// Invite and member routes. Every route sits behind supabaseAuth and calls #117's SQL functions as
-// the signed-in caller. Input is checked before any PostgREST call (C8); copy is calm (C7).
+// Invite and member routes. Every route sits behind clerkAuth and calls the data function as the
+// signed-in caller. Input is checked before any data call (C8); copy is calm (C7).
 import { Hono, type Context } from 'hono';
-import { supabaseAuth, type SupabaseAuthVariables, type SupabaseConfig } from '@griever/gateway-auth';
-import { INVITE_TOKEN_PATTERN, isUuid, parseInviteEmail, type PendingInvite } from '@griever/shared';
+import {
+  callData,
+  clerkAuth,
+  type ClerkAuthVariables,
+  type ClerkConfig,
+  type DataFunctionConfig,
+} from '@griever/gateway-auth';
+import {
+  INVITE_TOKEN_PATTERN,
+  isUuid,
+  parseInviteEmail,
+  type DataResult,
+  type MembersView,
+  type PendingInvite,
+} from '@griever/shared';
 import { hashInviteToken, newInviteToken } from './inviteToken.js';
 import { buildInviteLink, sendInviteEmail } from './mailer.js';
-import {
-  acceptInvite,
-  createInvite,
-  getOwnName,
-  listMembers,
-  removeMember,
-  revokeInvite,
-  type MembersFailure,
-} from './membersClient.js';
+
+type CallData = typeof callData;
+type Env = { Variables: ClerkAuthVariables };
+
+// Same pattern the data function uses for a member id (a Clerk user id).
+const MEMBER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 export interface MembersRouterConfig {
-  /** Read per request; null when SUPABASE_URL / SUPABASE_ANON_KEY are unset. */
-  getConfig: () => SupabaseConfig | null;
+  /** Read per request; null when CLERK_ISSUER is unset. */
+  getAuthConfig: () => ClerkConfig | null;
+  /** Read per request; null when the data function URL is unset. */
+  getDataConfig: () => DataFunctionConfig | null;
+  /** Overridable in tests. */
+  callData?: CallData;
   /** Read per request; any field may be unset. */
   getMail: () => { apiKey?: string; from?: string; webUrl?: string };
 }
@@ -29,14 +43,32 @@ export const BAD_EMAIL = 'Enter a valid email address.';
 export const BAD_BODY = 'Send the invitation as a JSON object with an email address.';
 export const BAD_ID = 'That request could not be understood.';
 
-// What each PostgREST answer (PTnnn becomes HTTP nnn) says to the caller, outside accept.
-export const FAILURES: Record<MembersFailure, { status: 400 | 403 | 404 | 409 | 429; error: string }> = {
-  invalid: { status: 400, error: BAD_EMAIL },
-  forbidden: { status: 403, error: 'Only the person who owns this account can do that.' },
-  not_found: { status: 404, error: 'That could not be found.' },
-  conflict: { status: 409, error: 'That person is already invited or already helping.' },
-  rate_limited: { status: 429, error: "You've sent a lot of invitations today. You can send more tomorrow." },
-};
+type Failure = { status: 400 | 401 | 403 | 404 | 409 | 429 | 503; error: string };
+
+const SIGN_IN_AGAIN = 'Please sign in again.';
+
+/** What each data function failure says to the caller, outside accept. Unknown codes and busy are 503. */
+export function failureFor(code: string): Failure {
+  switch (code) {
+    case 'invalid':
+      return { status: 400, error: BAD_EMAIL };
+    case 'unauthorized':
+      return { status: 401, error: SIGN_IN_AGAIN };
+    case 'forbidden':
+      return { status: 403, error: 'Only the person who owns this account can do that.' };
+    case 'not_found':
+      return { status: 404, error: 'That could not be found.' };
+    case 'conflict':
+    case 'already_invited':
+    case 'already_member':
+    case 'invite_conflict':
+      return { status: 409, error: 'That person is already invited or already helping.' };
+    case 'rate_limited':
+      return { status: 429, error: "You've sent a lot of invitations today. You can send more tomorrow." };
+    default:
+      return { status: 503, error: UNAVAILABLE };
+  }
+}
 
 /** The body must be an object with exactly the allowed keys; returns it, or null. */
 async function readObject(req: Request, allowed: string[]): Promise<Record<string, unknown> | null> {
@@ -52,40 +84,58 @@ async function readObject(req: Request, allowed: string[]): Promise<Record<strin
 }
 
 export function createMembersRouter(config: MembersRouterConfig) {
-  const router = new Hono<{ Variables: SupabaseAuthVariables }>();
+  const router = new Hono<Env>();
+  const call = config.callData ?? callData;
 
   for (const path of ['/members', '/members/*', '/invites', '/invites/*']) {
-    router.use(path, supabaseAuth(config.getConfig));
+    router.use(path, clerkAuth(config.getAuthConfig));
+  }
+
+  /** Runs one action as the caller. Returns the result, or null if the data function is unreachable. */
+  async function run<T>(
+    userToken: string,
+    action: 'createInvite' | 'revokeInvite' | 'listMembers' | 'removeMember' | 'acceptInvite' | 'getProfile',
+    args: Record<string, unknown>,
+  ): Promise<DataResult<T> | null> {
+    const data = config.getDataConfig();
+    if (!data) {
+      return null;
+    }
+    try {
+      return await call<T>(data, userToken, action, args);
+    } catch {
+      return null;
+    }
   }
 
   router.get('/members', async (c) => {
-    const supabase = config.getConfig();
-    if (!supabase) return c.json({ error: UNAVAILABLE }, 503);
-    try {
-      const result = await listMembers(supabase, c.get('accessToken'));
-      if (!result.ok) {
-        const { status, error } = FAILURES[result.reason];
-        return c.json({ error }, status);
-      }
-      return c.json(result.value);
-    } catch {
+    const result = await run<MembersView>(c.get('accessToken'), 'listMembers', {});
+    if (!result) {
       return c.json({ error: UNAVAILABLE }, 503);
     }
+    if (!result.ok) {
+      const { status, error } = failureFor(result.code);
+      return c.json({ error }, status);
+    }
+    return c.json(result.data);
   });
 
   router.post('/invites', async (c) => {
-    const supabase = config.getConfig();
-    if (!supabase) return c.json({ error: UNAVAILABLE }, 503);
-
     const body = await readObject(c.req.raw, ['email']);
-    if (!body) return c.json({ error: BAD_BODY }, 400);
+    if (!body) {
+      return c.json({ error: BAD_BODY }, 400);
+    }
     const email = typeof body['email'] === 'string' ? parseInviteEmail(body['email']) : null;
-    if (!email) return c.json({ error: BAD_EMAIL }, 400);
+    if (!email) {
+      return c.json({ error: BAD_EMAIL }, 400);
+    }
 
     // Without a way to send the email, no invite is made at all.
     const mail = config.getMail();
-    if (!mail.apiKey || !mail.from || !mail.webUrl) return c.json({ error: SEND_FAILED }, 503);
-    const jwt = c.get('accessToken');
+    if (!mail.apiKey || !mail.from || !mail.webUrl) {
+      return c.json({ error: SEND_FAILED }, 503);
+    }
+    const userToken = c.get('accessToken');
     const token = newInviteToken();
     let link: string;
     try {
@@ -94,102 +144,123 @@ export function createMembersRouter(config: MembersRouterConfig) {
       return c.json({ error: SEND_FAILED }, 503);
     }
 
-    let id: string;
-    try {
-      const created = await createInvite(supabase, jwt, email, await hashInviteToken(token));
-      if (!created.ok) {
-        const { status, error } = FAILURES[created.reason];
-        return c.json({ error }, status);
-      }
-      id = created.value;
-    } catch {
+    const created = await run<PendingInvite>(userToken, 'createInvite', {
+      email,
+      tokenHash: await hashInviteToken(token),
+    });
+    if (!created) {
       return c.json({ error: UNAVAILABLE }, 503);
     }
+    if (!created.ok) {
+      const { status, error } = failureFor(created.code);
+      return c.json({ error }, status);
+    }
+    const invite: PendingInvite = {
+      id: created.data.id,
+      email: created.data.email,
+      expiresAt: created.data.expiresAt,
+      createdAt: created.data.createdAt,
+    };
 
     // From here on an open invite exists: any failure revokes it so none is left unsendable.
     const undo = async () => {
       // One retry; if both fail the invite expires on its own.
       for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          if ((await revokeInvite(supabase, jwt, id)).ok) break;
-        } catch {
-          // Try once more.
+        const revoked = await run<null>(userToken, 'revokeInvite', { id: invite.id });
+        if (revoked?.ok) {
+          break;
         }
       }
       return c.json({ error: SEND_FAILED }, 503);
     };
 
-    let invite: PendingInvite | undefined;
-    let ownerName: string | null = null;
-    try {
-      const list = await listMembers(supabase, jwt);
-      if (list.ok && list.value.role === 'owner') invite = list.value.invites.find((i) => i.id === id);
-      ownerName = await getOwnName(supabase, jwt).catch(() => null);
-    } catch {
-      return undo();
-    }
-    if (!invite) return undo();
+    const profile = await run<{ senderName?: string } | null>(userToken, 'getProfile', {});
+    const ownerName = profile?.ok ? (profile.data?.senderName ?? null) : null;
 
     const sent = await sendInviteEmail({ apiKey: mail.apiKey, from: mail.from, to: email, ownerName, link });
-    if (!sent.ok) return undo();
+    if (!sent.ok) {
+      return undo();
+    }
 
     return c.json(invite, 201);
   });
 
   router.post('/invites/accept', async (c) => {
-    const supabase = config.getConfig();
-    if (!supabase) return c.json({ error: UNAVAILABLE }, 503);
     const unusable = () => c.json({ error: UNUSABLE }, 404);
 
     const body = await readObject(c.req.raw, ['token']);
     const token = body?.['token'];
-    if (typeof token !== 'string' || !INVITE_TOKEN_PATTERN.test(token)) return unusable();
-
-    try {
-      const result = await acceptInvite(supabase, c.get('accessToken'), await hashInviteToken(token));
-      if (result.ok) return c.json({ ownerId: result.value });
-      if (result.reason === 'conflict') {
-        return c.json({ error: 'Your account already has people in it, so it cannot join another.' }, 409);
-      }
+    if (typeof token !== 'string' || !INVITE_TOKEN_PATTERN.test(token)) {
       return unusable();
-    } catch {
+    }
+
+    const result = await run<{ ownerId: string }>(c.get('accessToken'), 'acceptInvite', {
+      tokenHash: await hashInviteToken(token),
+    });
+    if (!result) {
       return c.json({ error: UNAVAILABLE }, 503);
     }
+    if (result.ok) {
+      return c.json({ ownerId: result.data.ownerId });
+    }
+    if (result.code === 'invite_conflict' || result.code === 'already_member' || result.code === 'conflict') {
+      return c.json({ error: 'Your account already has people in it, so it cannot join another.' }, 409);
+    }
+    if (result.code === 'busy') {
+      return c.json({ error: UNAVAILABLE }, 503);
+    }
+    // Every other cause looks the same to the caller, by design.
+    return unusable();
   });
 
-  const remove = (
-    call: (supabase: SupabaseConfig, jwt: string, id: string) => ReturnType<typeof revokeInvite>,
-    param: 'id' | 'memberId',
-  ) =>
-    async (c: Context<{ Variables: SupabaseAuthVariables }>) => {
-      const supabase = config.getConfig();
-      if (!supabase) return c.json({ error: UNAVAILABLE }, 503);
+  const remove =
+    (action: 'revokeInvite' | 'removeMember', param: 'id' | 'memberId') => async (c: Context<Env>) => {
       const id = c.req.param(param) ?? '';
-      if (!isUuid(id)) return c.json({ error: BAD_ID }, 400);
-      try {
-        const result = await call(supabase, c.get('accessToken'), id);
-        if (!result.ok) {
-          const { status, error } = FAILURES[result.reason];
-          return c.json({ error }, status);
-        }
-        return c.body(null, 204);
-      } catch {
+      const valid = param === 'id' ? isUuid(id) : MEMBER_ID_PATTERN.test(id);
+      if (!valid) {
+        return c.json({ error: BAD_ID }, 400);
+      }
+      const result = await run<null>(c.get('accessToken'), action, { [param]: id });
+      if (!result) {
         return c.json({ error: UNAVAILABLE }, 503);
       }
+      if (!result.ok) {
+        const { status, error } = failureFor(result.code);
+        return c.json({ error }, status);
+      }
+      return c.body(null, 204);
     };
 
-  router.delete('/invites/:id', remove(revokeInvite, 'id'));
-  router.delete('/members/:memberId', remove(removeMember, 'memberId'));
+  router.delete('/invites/:id', remove('revokeInvite', 'id'));
+  router.delete('/members/:memberId', remove('removeMember', 'memberId'));
 
   return router;
 }
 
 /** The live router: env is read per request, so unset values mean 503, not a failed start. */
 export const membersRouter = createMembersRouter({
-  getConfig: () => {
-    const url = process.env['SUPABASE_URL'];
-    const anonKey = process.env['SUPABASE_ANON_KEY'];
-    return url && anonKey ? { url: url.replace(/\/+$/, ''), anonKey } : null;
+  getAuthConfig: () => {
+    const issuer = process.env['CLERK_ISSUER']?.trim();
+    if (!issuer) {
+      return null;
+    }
+    const authorizedParties = (process.env['CLERK_AUTHORIZED_PARTIES'] ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+    return { issuer, authorizedParties };
+  },
+  getDataConfig: () => {
+    const url = process.env['DATA_FUNCTION_URL']?.trim();
+    if (!url) {
+      return null;
+    }
+    return {
+      url,
+      region: process.env['DATA_FUNCTION_REGION']?.trim(),
+      accessKeyId: process.env['DATA_FUNCTION_ACCESS_KEY_ID'],
+      secretAccessKey: process.env['DATA_FUNCTION_SECRET_ACCESS_KEY'],
+    };
   },
   getMail: () => ({
     apiKey: process.env['RESEND_API_KEY'],

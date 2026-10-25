@@ -4,35 +4,9 @@
  * `app.request`. No network — routes are driven to their
  * validation and "not configured" branches, and Anthropic is a stubbed fetch.
  */
-// ES256 test tokens via WebCrypto (the same approach as libs/identity's specs; kept local so
-// this app does not import another project's source by relative path).
-const USER_ID = '11111111-1111-4111-8111-111111111111';
-const b64url = (data: ArrayBuffer | string): string => {
-  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
-async function makeKeys(kid = 'key-1') {
-  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
-  const publicJwk = { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid, alg: 'ES256', use: 'sig' };
-  return { privateKey: pair.privateKey, jwks: { keys: [publicJwk] }, kid };
-}
-async function signJwt(privateKey: Awaited<ReturnType<typeof makeKeys>>['privateKey'], kid: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = b64url(JSON.stringify({ alg: 'ES256', typ: 'JWT', kid }));
-  const payload = b64url(JSON.stringify({ iss: `${SUPABASE_URL}/auth/v1`, sub: USER_ID, aud: 'authenticated', iat: now, exp: now + 3600 }));
-  const sig = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    privateKey,
-    new TextEncoder().encode(`${header}.${payload}`),
-  );
-  return `${header}.${payload}.${b64url(sig)}`;
-}
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-const SUPABASE_URL = 'https://proj.supabase.test';
 const WEB_ORIGIN = 'https://web.grieversguidance.com';
 
 async function loadApp(env: Record<string, string | undefined> = {}) {
@@ -336,28 +310,43 @@ describe('gateway: /me/profile (Clerk accounts, data function)', () => {
 });
 
 describe('gateway: POST /invites reads the mail settings by their env names', () => {
+  const CLERK_ISSUER = 'https://clerk.example.test';
+  const DATA_URL = 'http://127.0.0.1:3002';
   const INVITE_ID = '22222222-2222-4222-8222-222222222222';
   const MAIL_ENV = {
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY: 'anon-key',
+    CLERK_ISSUER,
+    DATA_FUNCTION_URL: DATA_URL,
     INVITE_FROM_EMAIL: 'X <x@example.test>',
     WEB_URL: 'https://web.example.test',
   };
   const invite = {
     id: INVITE_ID,
     email: 'friend@example.test',
-    expiresAt: '2026-10-19T10:00:00+00:00',
-    createdAt: '2026-10-12T10:00:00+00:00',
+    expiresAt: '2026-10-19T10:00:00.000Z',
+    createdAt: '2026-10-12T10:00:00.000Z',
   };
 
   async function setup(env: Record<string, string | undefined>) {
-    const keys = await makeKeys();
-    const token = await signJwt(keys.privateKey, keys.kid);
-    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
-      if (url.endsWith('/auth/v1/.well-known/jwks.json')) return jsonResponse(keys.jwks);
-      if (url.endsWith('/rpc/create_invite')) return jsonResponse(INVITE_ID);
-      if (url.endsWith('/rpc/list_members')) return jsonResponse({ role: 'owner', members: [], invites: [invite] });
-      if (url.includes('/rest/v1/profiles')) return jsonResponse([{ sender_name: 'Ada' }]);
+    const pair = await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['sign', 'verify'],
+    );
+    const privateJwk = { ...(await crypto.subtle.exportKey('jwk', pair.privateKey)), kid: 'k1', alg: 'RS256' };
+    const publicJwk = { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid: 'k1', alg: 'RS256' };
+    const { Jwt } = await import('hono/utils/jwt');
+    const token = await Jwt.sign(
+      { sub: 'user_abc123', iss: CLERK_ISSUER, exp: Math.floor(Date.now() / 1000) + 300, email: 'ada@example.test' },
+      privateJwk,
+      'RS256',
+    );
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === `${CLERK_ISSUER}/.well-known/jwks.json`) return jsonResponse({ keys: [publicJwk] });
+      if (url === `${DATA_URL}/v1`) {
+        const { action } = JSON.parse(String(init?.body));
+        if (action === 'createInvite') return jsonResponse({ ok: true, data: invite });
+        if (action === 'getProfile') return jsonResponse({ ok: true, data: { userId: 'user_abc123', senderName: 'Ada' } });
+      }
       if (url === 'https://api.resend.com/emails') return jsonResponse({ id: 'email-1' });
       throw new Error(`unexpected fetch ${url}`);
     });
@@ -371,10 +360,16 @@ describe('gateway: POST /invites reads the mail settings by their env names', ()
     return { app, req, fetchMock };
   }
 
+  const dataActions = (fetchMock: { mock: { calls: unknown[][] } }) =>
+    fetchMock.mock.calls
+      .filter(([url]) => url === `${DATA_URL}/v1`)
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)).action);
+
   it('sends the email with the configured key, sender and web origin', async () => {
     const { app, req, fetchMock } = await setup({ ...MAIL_ENV, RESEND_API_KEY: 're_test' });
     const res = await app.request('/invites', req);
     expect(res.status).toBe(201);
+    expect(dataActions(fetchMock)).toContain('createInvite');
 
     const call = fetchMock.mock.calls.find(([url]) => url === 'https://api.resend.com/emails');
     expect(call).toBeDefined();
@@ -389,8 +384,7 @@ describe('gateway: POST /invites reads the mail settings by their env names', ()
     const { app, req, fetchMock } = await setup(MAIL_ENV);
     const res = await app.request('/invites', req);
     expect(res.status).toBe(503);
-    const urls = fetchMock.mock.calls.map(([url]) => url);
-    expect(urls.some((url) => url.endsWith('/rpc/create_invite'))).toBe(false);
-    expect(urls).not.toContain('https://api.resend.com/emails');
+    expect(dataActions(fetchMock)).not.toContain('createInvite');
+    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain('https://api.resend.com/emails');
   });
 });
