@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { callDeleteUser, type DataFunctionConfig } from '@griever/gateway-auth';
+import { callDeleteUser, DataFunctionError, type DataFunctionConfig } from '@griever/gateway-auth';
 
+const MAX_BODY_BYTES = 64 * 1024;
 const MAX_AGE_SECONDS = 5 * 60;
 const USER_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -16,6 +17,29 @@ export interface ClerkWebhookConfig {
   deleteUser?: DeleteUser;
   /** Overridable in tests. Seconds since the epoch. */
   now?: () => number;
+}
+
+/** Reads the body as text, or returns null once it passes the cap. */
+async function readCapped(stream: ReadableStream<Uint8Array> | null): Promise<string | null> {
+  if (!stream) {
+    return '';
+  }
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      return text + decoder.decode();
+    }
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
 }
 
 function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
@@ -102,7 +126,15 @@ export function createClerkWebhookRouter(config: ClerkWebhookConfig) {
     if (!secret) {
       return c.json({ error: 'Not configured.' }, 503);
     }
-    const body = await c.req.text();
+    // Cap the body before reading it: by Content-Length, and by bytes read when it is missing.
+    const declared = c.req.header('content-length');
+    if (declared !== undefined && Number(declared) > MAX_BODY_BYTES) {
+      return c.json({ error: 'Too large.' }, 413);
+    }
+    const body = await readCapped(c.req.raw.body);
+    if (body === null) {
+      return c.json({ error: 'Too large.' }, 413);
+    }
     const valid = await verifySvix(
       secret,
       {
@@ -127,6 +159,11 @@ export function createClerkWebhookRouter(config: ClerkWebhookConfig) {
       return c.body(null, 204);
     }
     const userId = event.data?.id;
+    // Clerk's DeletedObject does not require `id`. With no id there is nothing to delete, and a retry
+    // would not help, so answer 204.
+    if (userId === undefined || userId === null) {
+      return c.body(null, 204);
+    }
     if (typeof userId !== 'string' || !USER_ID.test(userId)) {
       return c.json({ error: 'Invalid body.' }, 400);
     }
@@ -138,7 +175,11 @@ export function createClerkWebhookRouter(config: ClerkWebhookConfig) {
     }
     try {
       await remove(data, serviceSecret, userId);
-    } catch {
+    } catch (error) {
+      // 404 from the data function means the service path is off (no secret set there): not configured.
+      if (error instanceof DataFunctionError && error.status === 404) {
+        return c.json({ error: 'Not configured.' }, 503);
+      }
       return c.json({ error: 'Could not delete.' }, 502);
     }
     return c.body(null, 204);

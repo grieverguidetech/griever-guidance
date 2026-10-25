@@ -537,7 +537,13 @@ User-token checks on `/v1` are unchanged. `deleteUser` (libs/data-access/src/rul
 user's whole partition (profile, flows, members, invites, MEMBER_OF), the FLOW# guards and TOKEN# items of
 what they owned, their MEMBER# row under an owner, and invites they accepted. It frees their members
 (back to owner) and sets `updatedBy` to null on flows they last edited. Idempotent; their partition goes last
-so a retry after a crash finds the same work. A failure answers 502 and Clerk retries.
+so a retry after a crash finds the same work. A failure answers 502 and Clerk retries. If the data function answers 404 (no
+`DATA_SERVICE_SECRET` set, so the path is off) the webhook answers 503 "not configured"; Clerk retries that too,
+so once Peter sets the secret a later retry succeeds, and an event that exhausts its retries is lost until
+re-sent from the Clerk dashboard. A `user.deleted` payload may have no `id` (Clerk's DeletedObject does not
+require it); the webhook answers 204 for that, since a retry cannot help. Bodies over 64 KB answer 413.
+Known gap: gsi1 is eventually consistent, so a flow edited by the user less than about 1 second before the delete
+can keep `updatedBy` pointing at the gone id. Low risk: the id is never shown and the flow stays readable.
 
 ## 8. Still open
 

@@ -23,8 +23,9 @@ Parameters:
   ServiceSecret:
     Type: String
     NoEcho: true
-    MinLength: 32
-    Description: Shared secret for the account-delete path (DATA_SERVICE_SECRET). Same value as the GitHub secret DATA_FUNCTION_SERVICE_SECRET. See docs/aws-data-function.md.
+    Default: ''
+    AllowedPattern: '^$|^.{32,}$'
+    Description: Optional shared secret for the account-delete path (DATA_SERVICE_SECRET), 32+ characters. Empty keeps that path off (404). Same value as the GitHub secret DATA_FUNCTION_SERVICE_SECRET. See docs/aws-data-function.md.
 
 Resources:
   DataTable:
@@ -133,7 +134,7 @@ Resources:
       Role: !GetAtt FunctionRole.Arn
       MemorySize: 256
       ReservedConcurrentExecutions: 10
-      Timeout: 10
+      Timeout: 30
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey

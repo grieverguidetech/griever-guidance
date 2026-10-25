@@ -234,6 +234,35 @@ describe.runIf(up)('deleteUser on DynamoDB Local', () => {
   });
 });
 
+describe.runIf(up)('deleteUser with many items', () => {
+  it('deletes about 1000 items (500 owned, plus guards) in one call', async () => {
+    await createTables();
+    const BIG = 'user_del_big';
+    await profile(BIG);
+    const ids = Array.from({ length: 250 }, () => randomUUID());
+    for (let i = 0; i < ids.length; i += 25) {
+      await Promise.all(
+        ids.slice(i, i + 25).flatMap((id, n) => {
+          const hash = (i + n).toString(16).padStart(64, '0');
+          return [
+            rawPut(encodeFlow({ id, ownerId: BIG, facts, createdAt: NOW, updatedAt: NOW, updatedBy: BIG })),
+            rawPut(flowGuard(id, BIG)),
+            rawPut(encodeInvite({ id, ownerId: BIG, email: 'b@example.test', tokenHash: hash, createdAt: NOW, expiresAt: NOW })),
+            rawPut(encodeToken(hash, BIG, id)),
+          ];
+        }),
+      );
+    }
+    const started = Date.now();
+    await deleteUser(doc, table, BIG, clock);
+    const ms = Date.now() - started;
+    console.info(`deleteUser of 1001 items took ${ms} ms`);
+    expect((await scan()).filter((i) => i['ownerId'] === BIG || i['pk'] === `USER#${BIG}`)).toEqual([]);
+    expect(ms).toBeLessThan(8000);
+    await dropTables();
+  });
+});
+
 function flowGuard(flowId: string, ownerId: string) {
   return { ...flowGuardKey(flowId), entity: 'FLOW_GUARD', ownerId };
 }
