@@ -242,7 +242,7 @@ is a restore story, not a live one.
 > **Removed (#203).** Convex, its `sessions` and `counters` tables, the `/sync/pull` and `/sync/push`
 > routes and the purge cron no longer exist. Nothing in this section is live. It is kept as the
 > design record for the cursor protocol in §4, which `libs/data-sync` still implements with no
-> backend. Shared people sync uses Supabase (see "Shared people (Supabase)").
+> backend. Shared people sync uses the AWS data function (see "Shared people").
 
 Two tables, as specified. Both carry the sync envelope described in §4.
 
@@ -426,7 +426,7 @@ A failed background flush retries with backoff (1s → 2s → 4s → … capped 
 ## 5. What is *not* synced
 
 This section covers the original Convex session sync, which was removed (#203).
-The family-sharing design below ("Shared people (Supabase)") overrides it where they differ:
+The family-sharing design below ("Shared people") overrides it where they differ:
 shared person sync never carries contact ids or edited wording (C2, C3).
 
 - **Contacts. Settled: they never leave the device.** Names and mobile numbers of a grieving
@@ -445,7 +445,7 @@ shared person sync never carries contact ids or edited wording (C2, C3).
 - *(The C3 checklist ticks are **not** synced: they stay in the local `account` store — see §2.1.
   They are the one thing that outlives a session.)*
 
-### Shared people (Supabase)
+### Shared people
 
 **Decided design (family-sharing G1, 2026-10-11). The client sync queue (`useFlowSync`, #134) is
 built; it is not turned on in either app yet (#135, #136).** Built by #116 (memberships and
@@ -453,9 +453,9 @@ invites tables), #117 (invite functions), #130 (the `flows` table), #131 (gatewa
 sync), #135, #136 (turning it on). Supersedes the read-only snapshot idea in #39.
 
 An owner can invite family members by email. Members work on the owner's people. The shared
-record is a `flows` row in Supabase Postgres, one per person, with `flows.owner_id` =
-`auth.users.id`. Row-level security lets the owner and the owner's members read and write it;
-only an owner can create one (C11).
+record is a `flows` item in DynamoDB (written by the AWS data function), one per person, owned by
+the owner's Clerk user id. The data function lets the owner and the owner's members read and write it;
+only an owner can create one (C11). This was Supabase Postgres until #325 and #326 moved it.
 
 **What syncs** (exactly six person fields):
 
@@ -508,7 +508,7 @@ Rules:
 ## 6. Auth seam
 
 The local Convex setup and its dev auth stub (`GG_DEV_AUTH`, `x-gg-user`) were removed (#203).
-Accounts use Supabase Auth; the gateway verifies the Supabase JWT (see REQUIREMENTS.md §6 "Identity").
+Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §6 "Identity").
 
 ---
 

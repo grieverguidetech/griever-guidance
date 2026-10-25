@@ -15,11 +15,6 @@
       "types": "./src/verifyToken.ts",
       "import": "./src/verifyToken.ts",
       "default": "./src/verifyToken.ts"
-    },
-    "./testing": {
-      "types": "./src/testSupabase.ts",
-      "import": "./src/testSupabase.ts",
-      "default": "./src/testSupabase.ts"
     }
   },
   "nx": {

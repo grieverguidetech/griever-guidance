@@ -8,7 +8,7 @@ import {
   type ProfileFields,
 } from '../items/profileItem';
 
-/** Same limit as the Supabase check: char_length(sender_name) <= 100. */
+/** Longest sender name, in characters. */
 export const SENDER_NAME_MAX_LENGTH = 100;
 
 const PROFILE_KEYS = new Set(['senderName', 'contactSource']);

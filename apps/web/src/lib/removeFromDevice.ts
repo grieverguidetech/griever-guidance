@@ -19,11 +19,10 @@ export function markSignOutPending(storage: Pick<Storage, 'setItem'> = globalThi
 }
 
 /**
- * Every localStorage key this app owns: `gg.*` (sessions, drafts, profile cache, pointers, markers)
- * and a Supabase session left on the device by an earlier version.
+ * Every localStorage key this app owns: `gg.*` (sessions, drafts, profile cache, pointers, markers).
  */
 function isOurKey(name: string): boolean {
-  return name.startsWith('gg.') || /^sb-.+-auth-token(-code-verifier|-user)?$/.test(name);
+  return name.startsWith('gg.');
 }
 
 function removeOurKeys(storage: KeyStorage): void {

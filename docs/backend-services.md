@@ -1,5 +1,9 @@
 # Backend services
 
+> **Historical snapshot.** Supabase was retired in #326 (code, CI job, deploy steps and
+> `infra/supabase/` are gone). Accounts are Clerk and data is DynamoDB behind the AWS data function.
+> Everything below that describes Supabase as live is the state on 2026-10-20.
+
 Status: description of the code on `main` at commit `c164258` (2026-10-20). The target state in
 section 2 is a proposal. PR #183 (merged) added the plan in `docs/aws-migration-plan.md`. It is not built.
 

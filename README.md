@@ -40,18 +40,18 @@ is a defect. The ones you will meet first:
 | Library | What it is for |
 |---|---|
 | `shared` | Types, interfaces and message templates used by more than one project. |
-| `api-client` | Gateway HTTP calls for the app, and the Supabase auth calls. Sync traffic goes through `data-sync` (and the web service worker). |
-| `hooks` | Shared React hooks, such as `useSendFlow` and `useSupabaseIdentity`. Also the `sms:` link builder, `buildSmsLink`. No platform-specific code. |
+| `api-client` | Gateway HTTP calls for the app. Sync traffic goes through `data-sync` (and the web service worker). |
+| `hooks` | Shared React hooks, such as `useSendFlow` and `useAccount`. Also the `sms:` link builder, `buildSmsLink`. No platform-specific code. |
 | `data-local` | IndexedDB storage in the browser: the session document, the outbox, and contacts. |
 | `data-sync` | The offline sync engine (outbox, cursor client, merge). It has no backend now that Convex is removed (#203) and no app uses it. |
 | `contacts` | Contact import logic shared by web and mobile: the source interface, normalizing, de-duplicating, and the review-and-commit steps. |
-| `identity` | The gateway's account side. It verifies the Supabase access token and serves `GET` and `PUT /me/profile`. |
+| `identity` | The gateway's account side. It verifies the Clerk token and serves `GET` and `PUT /me/profile`. |
 | `gateway-messages` | The gateway's AI-drafted obituary route. Nothing here sends messages. |
 
 `identity`, `gateway-messages` and `gateway-flows` each own a Hono router and do not import each
 other. `apps/gateway` only mounts them.
 
-Other folders: `infra/supabase/` (migrations and database tests), `scripts/`.
+Other folders: `infra/aws/` (CloudFormation) and `infra/aws-local/` (local DynamoDB tools), `scripts/`.
 
 ## Stack
 
@@ -59,10 +59,10 @@ Other folders: `infra/supabase/` (migrations and database tests), `scripts/`.
 - **Web:** React, Vite, Tailwind.
 - **Mobile:** Expo SDK 54 and React Native 0.81. React is pinned to 19.1.0 (a root pnpm override).
 - **Gateway:** Hono on Cloudflare Workers.
-- **Accounts:** Supabase Auth and Postgres, with row-level security. Email and password only.
+- **Accounts:** Clerk. **Data:** DynamoDB behind an AWS Lambda data function. Supabase was retired (#326).
 - **Session sync:** none. Convex was removed (#203).
 - **Marketing:** Astro.
-- **Tests:** Vitest and React Testing Library, jest-expo for mobile, pgTAP for the database,
+- **Tests:** Vitest and React Testing Library, jest-expo for mobile, DynamoDB Local for the data function,
   Playwright and axe for end-to-end.
 
 ## Local setup
@@ -71,8 +71,6 @@ You need:
 
 - Node 22.
 - pnpm 10.34.1. The `packageManager` field in `package.json` pins it; run `corepack enable` once so Corepack uses that version.
-- Docker, for local Supabase.
-- The [Supabase CLI](https://supabase.com/docs/guides/cli). CI uses 2.116.0.
 
 Then:
 
@@ -81,8 +79,8 @@ corepack enable
 pnpm install
 ```
 
-`pnpm install && pnpm dev` is enough for the default flow (auth off). Supabase is
-only needed for accounts and sharing.
+`pnpm install && pnpm dev` is enough for the default flow (auth off). Clerk keys and the
+data function (`pnpm dev:data`) are only needed for accounts and sharing.
 
 Run things from the repo root:
 
@@ -99,24 +97,9 @@ pnpm dev:marketing  # Astro
 Env files, with your own values (never commit them):
 
 - Web and mobile: copy `apps/<app>/.env.example` to `apps/<app>/.env.local`.
-- Gateway: `apps/gateway/.env.local` for `CORS_ORIGINS` and the Supabase variables..
+- Gateway: `apps/gateway/.env.local` for `CORS_ORIGINS` and the Clerk and data function variables.
 
  See [Environment variables](#environment-variables).
-
-### Local Supabase
-
-Accounts live in Supabase. The config and migrations are in `infra/supabase/`, so the CLI needs
-`--workdir infra`:
-
-```sh
-supabase start --workdir infra      # start local Postgres and Auth (needs Docker)
-supabase test db --workdir infra    # run the pgTAP row-level security tests
-supabase stop --workdir infra
-```
-
-After `supabase start`, put its API URL and anon key in the gateway's `SUPABASE_URL` and
-`SUPABASE_ANON_KEY`, and in the web app's `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Also set
-`VITE_FEATURE_AUTH=true` to see the account screens.
 
 ### Feature flags
 
@@ -138,27 +121,26 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 - `PORT`
 - `CORS_ORIGINS` (comma-separated allowed origins; empty blocks every cross-origin request)
 - `ANTHROPIC_API_KEY`
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public; there is no service-role key. The production slots are in
-  `wrangler.toml` `[vars]` and stay empty there; the deploy workflow passes them from the repo
-  variables of the same name. Unset means `/me/*` answers 503, in production and locally.)
+- `CLERK_ISSUER`, `CLERK_AUTHORIZED_PARTIES` (public. The production slots are in `wrangler.toml`
+  `[vars]`; the deploy workflow passes `CLERK_ISSUER` from the repo variable of the same name.)
+- `DATA_FUNCTION_URL` and the other `DATA_FUNCTION_*` names (unset means `/me/*` answers 503).
 
 **`apps/web`**
 - `VITE_API_URL`
 - `VITE_FEATURE_AUTH`, `VITE_FEATURE_OBITUARY_DRAFTING`
-- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (read only when `VITE_FEATURE_AUTH` is `true`)
+- `VITE_CLERK_PUBLISHABLE_KEY` (read only when `VITE_FEATURE_AUTH` is `true`)
 
 **Production (GitHub repo variables, not secrets)**
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public values). The deploy workflow passes them to the
-  gateway and, as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, to the web build.
+- `CLERK_ISSUER`, `CLERK_PUBLISHABLE_KEY`, `DATA_FUNCTION_URL` (public values). The deploy workflow
+  passes them to the gateway and the web build.
 - `FEATURE_AUTH` becomes `VITE_FEATURE_AUTH` in the web build. To turn accounts on: set
-  `FEATURE_AUTH=true` and re-run the deploy. With it `true`, the deploy stops if either Supabase
+  `FEATURE_AUTH=true` and re-run the deploy. With it `true`, the deploy stops if a Clerk
   variable is empty or the key looks like a secret key.
 - Mobile (`EXPO_PUBLIC_*`, EAS) is not wired yet.
 
 **`apps/mobile`**
 - `EXPO_PUBLIC_API_URL`
 - `EXPO_PUBLIC_FEATURE_AUTH`
-- `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
 **`apps/marketing`**
 - `PUBLIC_WEB_URL` (set in the deploy workflow)
@@ -175,7 +157,6 @@ pnpm build
 
 - Libraries and web use **Vitest** with React Testing Library and `fake-indexeddb`.
 - Mobile uses **jest-expo** (`pnpm nx test mobile`).
-- The database uses **pgTAP** (`supabase test db --workdir infra`).
 - Tests must not use `.only`, `.skip` or `.todo`. CI fails if they do.
 
 **End-to-end tests run only in CI. Never run them on your machine** (no `pnpm e2e`, `nx e2e`, or
@@ -192,7 +173,7 @@ separate from `ci.yml` so a mobile-only failure cannot block a deploy, and it is
 **`ci.yml`** runs on every pull request and every push to `main`. It has three jobs:
 
 1. Check: forbid `.only`/`.skip`/`.todo`, then affected typecheck, test and build.
-2. Supabase: start a local database and run `supabase test db`.
+2. AWS local stack: DynamoDB Local and an SES stand-in, for the data function tests.
 3. E2E: Playwright on desktop, Android and iPhone profiles.
 
 **`mobile-bundle.yml`** runs on the same triggers and exports the Android bundle. It does not gate
@@ -200,13 +181,12 @@ deploys.
 
 **`deploy.yml`** runs only after CI succeeds on a push to `main` (or by hand; a manual run skips the CI gate). It deploys:
 
-- The gateway to Cloudflare Workers, after running Supabase migrations (`supabase db push`, skipped
-  if the Supabase secrets are not set).
+- The gateway to Cloudflare Workers.
 - The web app to Cloudflare Pages.
 - The marketing site to Cloudflare Pages.
 
 A smoke test then checks `api.grieversguidance.com/health`, `web.grieversguidance.com` and
-`grieversguidance.com`. Migrations must stay compatible with the gateway that is already live.
+`grieversguidance.com`.
 
 Live addresses: `grieversguidance.com`, `www.grieversguidance.com`, `web.grieversguidance.com`,
 `api.grieversguidance.com/health`.

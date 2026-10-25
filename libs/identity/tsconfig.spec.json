@@ -14,8 +14,7 @@
     "src/**/*.spec.ts",
     "src/**/*.spec.tsx",
     "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/testSupabase.ts"
+    "src/**/*.test.tsx"
   ],
   "references": [
     {

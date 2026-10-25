@@ -33,7 +33,7 @@ Each app holds only its screens and its storage adapters.
 | Library | What the front end uses it for | Web | Mobile |
 |---|---|---|---|
 | `@griever/shared` | Message templates (`templates.ts`), `composeMessage`, types (`Contact`, `TemplateCategory`, `MomentKey`), date helpers | Yes | Yes |
-| `@griever/hooks` | `useSendFlow` (the message state machine), `useSessions` (people and drafts), `useContacts`, `usePathMoments`, `useSupabaseIdentity` | Yes | Yes |
+| `@griever/hooks` | `useSendFlow` (the message state machine), `useSessions` (people and drafts), `useContacts`, `usePathMoments`, `useAccount` | Yes | Yes |
 | `@griever/data-local` | IndexedDB stores: contacts, account (checklist ticks, sender name), meta | Yes | No. Mobile has its own AsyncStorage copy in `apps/mobile/src/lib/contactStore.ts`. |
 | `@griever/data-sync` | Removed in #203 (was device id, gateway URL, service worker and Background Sync registration) | No | No |
 | `@griever/contacts` | Contact import sources and phone normalizing | Yes | Yes |
@@ -270,7 +270,7 @@ flowchart TD
 | GRI-14 | Hub: move "What you'll need" into the header next to Back | `PathLanding.tsx` |
 | GRI-15, GRI-19, GRI-20, GRI-21 | Paywall behind a `PAYMENTS` flag: first announcement free, locked tasks, a calm note, card details | New flag in `features.ts` (does not exist yet) |
 | GRI-16 | "Review your message" for "Share the service": the user can edit the text and see a sample. Today only the announcement review has "Edit wording". | `ConfirmScreen.tsx` (web and mobile) |
-| GRI-23 | Magic-link sign-in with Clerk. Replaces Supabase Auth. | `SignUp.tsx`, `CreateAccount.tsx`, `authClient.ts`, `useSupabaseIdentity` |
+| GRI-23 | Magic-link sign-in with Clerk. Replaces Supabase Auth. | `SignIn.tsx`, `authClient.ts`, `useAccount`. The old `SignUp`, `CreateAccount`, `ForgotPassword` and `ChooseNewPassword` screens were removed (#326) |
 
 ## 4. State and data on the device
 
@@ -286,7 +286,7 @@ The device is the source of truth (C5). Nothing inside a flow waits on the netwo
 | Sender name | IndexedDB `gg`, store `account` | record for the sender name | `accountStore` |
 | Device id, gateway URL | IndexedDB `gg`, store `meta` | Removed in #203 (no sync registration at boot) | None |
 | Outbox and send jobs | IndexedDB `gg`, stores `outbox`, `sendJobs` | | `libs/data-local` (sync was removed in #203) |
-| Supabase session | `localStorage` (supabase-js) | not verified | Only when `AUTH` is on |
+| Clerk session | Clerk's own storage | not verified | Only when `AUTH` is on |
 
 The send job (who is being texted right now) is not saved. A reload in the middle of sending comes
 back on the review screen. A finished send keeps no wording (C2).
@@ -368,7 +368,7 @@ variable keeps the feature off.
 
 | Name | App | Env var | Default | Effect |
 |---|---|---|---|---|
-| `AUTH_ENABLED` | web | `VITE_FEATURE_AUTH` | off | On: the app starts at sign-up, loads the Supabase client in its own chunk, and shows account screens and "Your account". Off: the app starts at Home and loads no auth code. |
+| `AUTH_ENABLED` | web | `VITE_FEATURE_AUTH` | off | On: the app starts at sign-up, loads Clerk in its own chunk, and shows account screens and "Your account". Off: the app starts at Home and loads no auth code. |
 | `OBITUARY_DRAFTING_ENABLED` | web | `VITE_FEATURE_OBITUARY_DRAFTING` | off | On: "Write the obituary" calls the gateway obituary route. Off: the button shows, disabled, with an "in beta" tooltip. The deploy workflow does not set this variable, so production is off. |
 | `SHARING_ENABLED` | web | `VITE_FEATURE_SHARING` | off | Meant to turn on family sharing (invite, join, remove). No screen reads it yet. The deploy check fails if `FEATURE_SHARING` is on and `FEATURE_AUTH` is off. |
 | `AUTH_ENABLED` | mobile | `EXPO_PUBLIC_FEATURE_AUTH` | off | On: wraps the app in `AccountProvider` and adds "Your account" on Home and the picker. Off: no account code runs. |
