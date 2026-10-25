@@ -1,16 +1,17 @@
 /**
- * Family sharing wired into the real App (#127), with a stub auth client and a stubbed members
+ * Family sharing wired into the real App (#127), with a fake Clerk and a stubbed profile and members
  * api-client. No network. Flags are mocked so each test picks its own setup.
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { AuthClient } from '@griever/api-client/auth';
 import type { MembersView } from '@griever/shared';
-import type { AuthClientResult } from '../lib/authClient';
+import type { ClerkLoadResult } from '../lib/authClient';
+import { fakeClerk } from '../test-clerk';
 
 const mocks = vi.hoisted(() => ({
   sharing: true,
-  load: vi.fn<() => Promise<AuthClientResult>>(),
+  loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
+  getProfile: vi.fn(),
   getMembers: vi.fn(),
   createInvite: vi.fn(),
   revokeInvite: vi.fn(),
@@ -27,12 +28,13 @@ vi.mock('../lib/features', () => ({
 }));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();
-  return { ...actual, loadAuthClient: mocks.load };
+  return { ...actual, loadClerk: mocks.loadClerk };
 });
 vi.mock('@griever/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@griever/api-client')>();
   return {
     ...actual,
+    getProfile: mocks.getProfile,
     getMembers: mocks.getMembers,
     createInvite: mocks.createInvite,
     revokeInvite: mocks.revokeInvite,
@@ -43,8 +45,8 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-function client(accountType: 'owner' | 'member'): AuthClient {
-  const profile = {
+function profileFor(accountType: 'owner' | 'member') {
+  return {
     id: 'u1',
     senderName: 'Anna',
     contactSource: null,
@@ -52,15 +54,6 @@ function client(accountType: 'owner' | 'member'): AuthClient {
     createdAt: '2026-10-11T00:00:00.000Z',
     updatedAt: '2026-10-11T00:00:00.000Z',
   };
-  return {
-    getSession: vi.fn(async () => ({
-      status: 'signed_in' as const,
-      session: { userId: 'u1', email: 'a@b.co', accessToken: 'tok' },
-    })),
-    getProfile: vi.fn(async () => ({ ok: true as const, profile })),
-    refreshSession: vi.fn(async () => ({ status: 'signed_out' as const })),
-    signOut: vi.fn(async () => ({ ok: true as const, serverRevoked: true })),
-  } as unknown as AuthClient;
 }
 
 const OWNER_VIEW: MembersView = {
@@ -70,8 +63,9 @@ const OWNER_VIEW: MembersView = {
 };
 const MEMBER_VIEW: MembersView = { role: 'member', owner: { id: 'o1', name: 'Anna' } };
 
-function signedInAs(accountType: 'owner' | 'member') {
-  mocks.load.mockResolvedValue({ available: true, client: client(accountType) });
+function signedInAs(accountType: 'owner' | 'member', options: Parameters<typeof fakeClerk>[0] = {}) {
+  mocks.getProfile.mockResolvedValue({ ok: true, profile: profileFor(accountType) });
+  mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: 'u1', ...options }).load);
 }
 
 async function openProfile(user: ReturnType<typeof userEvent.setup>) {
@@ -81,7 +75,7 @@ async function openProfile(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   mocks.sharing = true;
   window.localStorage.clear();
-  for (const m of [mocks.load, mocks.getMembers, mocks.createInvite, mocks.revokeInvite, mocks.removeMember]) {
+  for (const m of [mocks.loadClerk, mocks.getProfile, mocks.getMembers, mocks.createInvite, mocks.revokeInvite, mocks.removeMember]) {
     m.mockReset();
   }
   mocks.getMembers.mockResolvedValue({ ok: true, view: OWNER_VIEW });
@@ -158,53 +152,9 @@ describe('member, flags on', () => {
   });
 });
 
-describe('first-time Profile after sign-up', () => {
-  it('shows only the name form, and People helping you on a later visit', async () => {
-    const c = client('owner');
-    let signedIn = false;
-    c.getSession = vi.fn(async () =>
-      signedIn
-        ? { status: 'signed_in' as const, session: { userId: 'u1', email: 'a@b.co', accessToken: 'tok' } }
-        : { status: 'signed_out' as const },
-    ) as never;
-    c.updateProfile = vi.fn(async () => ({
-      ok: true as const,
-      profile: { id: 'u1', senderName: 'Anna', contactSource: null, accountType: 'owner', createdAt: '', updatedAt: '' },
-    })) as never;
-    c.signUp = vi.fn(async () => {
-      signedIn = true;
-      return { ok: true as const, userId: 'u1' };
-    }) as never;
-    mocks.load.mockResolvedValue({ available: true, client: c });
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(await screen.findByLabelText('Your name'), 'Anna');
-    await user.type(screen.getByLabelText('Email'), 'anna@example.com');
-    await user.type(screen.getByLabelText('Password'), 'a-long-password');
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
-    await screen.findByRole('heading', { level: 1, name: 'Your account' });
-    await waitFor(() => expect(mocks.getMembers).toHaveBeenCalled());
-    expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Their email')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Your name')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await openProfile(user);
-    expect(await screen.findByRole('heading', { name: 'People helping you' })).toBeInTheDocument();
-  });
-});
-
-describe('session read fails', () => {
-  it('ends as signed out, not loading forever, and Profile still renders', async () => {
-    const c = client('owner');
-    // The identity hook reads the session too; give it a working one on its own calls.
-    let calls = 0;
-    const ok = { status: 'signed_in' as const, session: { userId: 'u1', email: 'a@b.co', accessToken: 'tok' } };
-    c.getSession = vi.fn(async () => {
-      calls += 1;
-      if (calls === 1) return ok;
-      throw new Error('network');
-    }) as never;
-    mocks.load.mockResolvedValue({ available: true, client: c });
+describe('token cannot be had', () => {
+  it('shows Profile and makes no members call (the token is the adapter\'s, and it is offline)', async () => {
+    signedInAs('owner', { getToken: async () => ({ ok: false as const, reason: 'offline' as const }) });
     const user = userEvent.setup();
     render(<App />);
     await openProfile(user);
@@ -215,9 +165,8 @@ describe('session read fails', () => {
 
 describe('profile not known to be a member', () => {
   it('keeps "Create a new one" when the profile cannot be read', async () => {
-    const c = client('owner');
-    c.getProfile = vi.fn(async () => ({ ok: false as const, reason: 'network' as const })) as never;
-    mocks.load.mockResolvedValue({ available: true, client: c });
+    signedInAs('owner');
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'failed' });
     render(<App />);
     expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
   });
