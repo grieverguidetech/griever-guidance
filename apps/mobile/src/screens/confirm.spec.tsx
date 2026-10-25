@@ -31,7 +31,7 @@ describe('Review your message (Share the service)', () => {
   });
 
   it('sends the edited text in the sms: link', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     render(<Harness />);
     fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are, 2 PM at Oak Chapel.');
     fireEvent.press(screen.getByText('Text these people'));

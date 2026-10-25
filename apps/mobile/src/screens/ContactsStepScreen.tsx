@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -45,7 +45,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState('');
-  const phoneRef = useRef<TextInput>(null);
+  const phoneRef = useRef<ComponentRef<typeof TextInput>>(null);
   const say = (message: string) => {
     setStatus(message);
     announce(message);

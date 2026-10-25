@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, View, Text, TouchableOpacity, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTemplates } from '@griever/hooks';
 import { categoryLabels } from '@griever/shared';
@@ -20,7 +20,7 @@ const FREE_CATEGORIES: TemplateCategory[] = ['announcement'];
 export function TemplatePickerScreen({ flow, paymentsEnabled = PAYMENTS_ENABLED }: FlowProps & { paymentsEnabled?: boolean }) {
   const [paywallOpen, setPaywallOpen] = useState(false);
   // The locked card that opened the placeholder, so screen-reader focus can go back to it.
-  const cards = useRef<Record<string, View | null>>({});
+  const cards = useRef<Record<string, ComponentRef<typeof View> | null>>({});
   const opener = useRef<string | null>(null);
   const focusOpener = () => {
     const node = opener.current ? cards.current[opener.current] : null;

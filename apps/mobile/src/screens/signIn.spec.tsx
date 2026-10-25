@@ -5,23 +5,24 @@ import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
 
 type Result = Promise<{ error: unknown }>;
+type Call = (...args: unknown[]) => Result;
 const ok = async () => ({ error: null });
 const fail = (code: string) => async () => ({ error: { code } });
 
 const mockSignIn = {
   status: 'needs_first_factor',
-  password: jest.fn<() => Result>(),
-  create: jest.fn<() => Result>(),
-  emailCode: { sendCode: jest.fn<() => Result>(), verifyCode: jest.fn<() => Result>() },
-  mfa: { sendEmailCode: jest.fn<() => Result>(), verifyEmailCode: jest.fn<() => Result>() },
-  finalize: jest.fn<() => Result>(),
+  password: jest.fn<Call>(),
+  create: jest.fn<Call>(),
+  emailCode: { sendCode: jest.fn<Call>(), verifyCode: jest.fn<Call>() },
+  mfa: { sendEmailCode: jest.fn<Call>(), verifyEmailCode: jest.fn<Call>() },
+  finalize: jest.fn<Call>(),
   reset: jest.fn(async () => ({ error: null })),
 };
 const mockSignUp = {
   status: 'missing_requirements',
-  password: jest.fn<() => Result>(),
-  verifications: { sendEmailCode: jest.fn<() => Result>(), verifyEmailCode: jest.fn<() => Result>() },
-  finalize: jest.fn<() => Result>(),
+  password: jest.fn<Call>(),
+  verifications: { sendEmailCode: jest.fn<Call>(), verifyEmailCode: jest.fn<Call>() },
+  finalize: jest.fn<Call>(),
 };
 const mockStartSSO = jest.fn<(p: { strategy: string; redirectUrl: string }) => Promise<unknown>>();
 
@@ -224,7 +225,7 @@ describe('sign in', () => {
 
   describe('Google and Facebook', () => {
     it('starts Google with the app redirect and activates the new session', async () => {
-      const setActive = jest.fn(async () => undefined);
+      const setActive = jest.fn(async (_args: unknown) => undefined);
       mockStartSSO.mockResolvedValue({ createdSessionId: 'sess_1', setActive });
       renderSignIn();
       press('Continue with Google');

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import {
   AccessibilityInfo,
   BackHandler,
@@ -35,8 +35,8 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
   const [date, setDate] = useState(initial.dateOfPassing);
   const canContinue = name.trim() !== '';
   const [sheetOpen, setSheetOpen] = useState(false);
-  const needButton = useRef<View>(null);
-  const dateRef = useRef<TextInput>(null);
+  const needButton = useRef<ComponentRef<typeof View>>(null);
+  const dateRef = useRef<ComponentRef<typeof TextInput>>(null);
   const submit = () => {
     if (canContinue) onContinue({ personName: name.trim(), dateOfPassing: date.trim() });
   };
