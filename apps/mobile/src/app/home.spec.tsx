@@ -175,7 +175,7 @@ describe('Home from every step', () => {
     jest.restoreAllMocks();
   });
 
-  it('goes Home from a resumed details step', async () => {
+  it('Back from a resumed details step chains through the hub to Home', async () => {
     const anna = { ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({ deceasedName: 'Anna' }) } };
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);

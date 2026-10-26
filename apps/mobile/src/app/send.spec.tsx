@@ -110,13 +110,39 @@ describe('picking an announcement', () => {
     expect(screen.queryByLabelText('Back to home')).toBeNull();
   });
 
-  it('opens What you will need in a sheet on Who should know?', async () => {
+  it('opens What you will need in a sheet on Who should know?, and focus returns when it closes', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
     await screen.findByText('Who should know?');
+    focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
+    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it('moves screen-reader focus to the title when a details form opens', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna();
+    await screen.findByText('One thing at a time.');
+    focus.mockClear();
+    await startMoment('Send thank-yous');
+    await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it('says who is open when the person arrives from Home', async () => {
+    const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByText('One thing at a time.');
+    await startMoment('Announce the passing');
+    await screen.findByLabelText(/Anything you'd like to add/);
+    expect(say).toHaveBeenCalledWith('Now writing about Anna');
   });
 
   it('opens What you will need in a sheet on Announce, and focus returns to the button when it closes', async () => {

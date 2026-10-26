@@ -93,7 +93,7 @@ is no hub screen, no gate and no obituary screen.
 
 | Screen (heading users see) | File | Reached from | Goes to | Feature flag |
 |---|---|---|---|---|
-| "The people you're writing about" | `HomeScreen.tsx` | App start. "Home" in the person bar. End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
+| "The people you're writing about" | `HomeScreen.tsx` | App start. "Back" on the hub (there is no Home link in the send steps; Back from a first form goes to the hub, and Back there goes Home). End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
 | "One thing at a time." (hub, shared with web from libs/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | Details form for the chosen step. "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
 | Template name, for example "Announce the passing" or "Share the service" | `DetailsFormScreen.tsx` | Hub. Used for the `announce` and `details` steps. | Contact selector | None |
 | "Who should know?", "Add from your contacts" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |

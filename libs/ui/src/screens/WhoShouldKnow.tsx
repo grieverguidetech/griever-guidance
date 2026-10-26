@@ -73,7 +73,7 @@ export interface WhoShouldKnowProps {
   onWhatYoullNeed?: () => void;
   /** For the sheet that "What you'll need" opens to return focus to. */
   checklistRef?: Ref<ButtonNode>;
-  /** Mobile only: "Bring people across" (import from the phone's contacts). Leave unset on web. */
+  /** Mobile only: "Add from your contacts" (import from the phone's contacts). Leave unset on web. */
   bringAcross?: {
     onPress: () => void;
     /** The import is running. */
@@ -296,7 +296,7 @@ function Alert({ message, id }: { message?: string; id?: string }) {
 }
 
 /** The "2 selected" line: a polite live region, and announced on iOS when it changes (iOS ignores live regions). */
-function SelectedCount({ label }: { label: string }) {
+export function SelectedCount({ label }: { label: string }) {
   const first = useRef(true);
   useEffect(() => {
     if (first.current) {

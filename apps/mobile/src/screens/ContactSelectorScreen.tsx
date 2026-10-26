@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
+import { AccessibilityInfo, findNodeHandle, FlatList, Text, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Body, Button, Heading, PersonRow, WhoShouldKnow } from '@griever/ui';
+import { Body, Button, Heading, PersonRow, SelectedCount, WhoShouldKnow } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
@@ -37,6 +38,26 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
+  const importButton = useRef<ButtonNode>(null);
+  const reviewHeading = useRef<ComponentRef<typeof Text>>(null);
+  const wasReviewing = useRef(false);
+  const reviewing = mode.kind === 'reviewing';
+  const focusNode = (node: unknown) => {
+    const handle = node ? findNodeHandle(node as never) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+  // Focus follows the view: the review heading on the way in, the import button on the way back.
+  useEffect(() => {
+    if (reviewing) {
+      wasReviewing.current = true;
+      focusNode(reviewHeading.current);
+    } else if (wasReviewing.current) {
+      wasReviewing.current = false;
+      focusNode(importButton.current);
+    }
+  }, [reviewing]);
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
 
   // Same rule as web: group only for announcements, and only when both groups have people.
@@ -86,42 +107,57 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
         return next;
       });
     return (
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-        <View style={styles.review}>
-          <View style={styles.topBar}>
-            <Button label={copy.back} variant="header" onPress={() => setMode({ kind: 'list' })} />
+      <FlatList
+        style={styles.flex}
+        contentContainerStyle={[styles.content, styles.review]}
+        data={mode.fresh}
+        keyExtractor={(item) => item.key}
+        ListHeaderComponent={
+          <View style={styles.review}>
+            <View style={styles.topBar}>
+              <Button label={copy.back} variant="header" onPress={() => setMode({ kind: 'list' })} />
+            </View>
+            <View style={styles.head}>
+              <Heading level={1} headingRef={reviewHeading}>
+                {copy.bringAcross}
+              </Heading>
+              <Body tone="muted">{copy.importIntro}</Body>
+            </View>
+            {mode.fresh.length === 0 ? <Body tone="muted">{copy.importEmpty}</Body> : null}
           </View>
-          <View style={styles.head}>
-            <Heading level={1}>{copy.bringAcross}</Heading>
-            <Body tone="muted">{copy.importIntro}</Body>
+        }
+        renderItem={({ item }) => (
+          <PersonRow
+            person={{ id: item.key, name: item.displayName, phone: item.phone }}
+            selected={reviewSelected.has(item.key)}
+            onToggle={() => toggleReview(item.key)}
+          />
+        )}
+        ItemSeparatorComponent={Gap}
+        ListFooterComponent={
+          <View style={styles.review}>
+            <View style={styles.footerRow}>
+              <SelectedCount label={fill(copy.chosen, { count: reviewSelected.size })} />
+              <Button
+                label={copy.add}
+                ariaDisabled={none}
+                announceDisabled
+                hint={none ? copy.chooseOne : undefined}
+                onPress={() => {
+                  if (!none) {
+                    void commitReview();
+                  }
+                }}
+              />
+            </View>
+            {none ? (
+              <Body small tone="muted" hidden>
+                {copy.chooseOne}
+              </Body>
+            ) : null}
           </View>
-          {mode.fresh.length === 0 ? <Body tone="muted">{copy.importEmpty}</Body> : null}
-          {mode.fresh.map((item) => (
-            <PersonRow
-              key={item.key}
-              person={{ id: item.key, name: item.displayName, phone: item.phone }}
-              selected={reviewSelected.has(item.key)}
-              onToggle={() => toggleReview(item.key)}
-            />
-          ))}
-          <View style={styles.footerRow}>
-            <Body tone="muted" live>
-              {fill(copy.chosen, { count: reviewSelected.size })}
-            </Body>
-            <Button
-              label={copy.add}
-              ariaDisabled={none}
-              announceDisabled
-              hint={none ? copy.chooseOne : undefined}
-              onPress={() => {
-                if (!none) {
-                  void commitReview();
-                }
-              }}
-            />
-          </View>
-        </View>
-      </ScrollView>
+        }
+      />
     );
   }
 
@@ -146,7 +182,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           onWhatYoullNeed={() => setChecklistOpen(true)}
           checklistRef={checklistButton}
           onContinue={nextStep}
-          bringAcross={{ onPress: handleImport, busy: importing, notice: importError ?? undefined }}
+          bringAcross={{ buttonRef: importButton, onPress: handleImport, busy: importing, notice: importError ?? undefined }}
           footer={<SavedNote />}
         />
       </ScrollView>
@@ -155,7 +191,10 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   );
 }
 
+const Gap = () => <View style={styles.gap} />;
+
 const styles = StyleSheet.create({
+  gap: { height: spacing[2] },
   flex: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing[3], paddingTop: spacing[4] },
   review: { gap: spacing[3] },
