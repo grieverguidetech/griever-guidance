@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { Platform } from 'react-native';
 import { fonts } from '@griever/tokens';
 
@@ -19,4 +20,20 @@ export function serifWeight(weight: 'regular' | 'semibold'): '400' | '600' | und
     return undefined;
   }
   return weight === 'semibold' ? '600' : '400';
+}
+
+/**
+ * Whether the serif has finished loading on native (web and tests: always true). React Native does
+ * not re-read a font for text already drawn without it, so the font style below changes when this
+ * does, and the text updates. The mobile app provides the value from its font loader.
+ */
+export const SerifReadyContext = createContext(true);
+
+/** `fontFamily` and `fontWeight` for the serif. Until it is ready on native, the system font. */
+export function useSerifStyle(weight: 'regular' | 'semibold'): { fontFamily?: string; fontWeight?: '400' | '600' } {
+  const ready = useContext(SerifReadyContext);
+  if (Platform.OS !== 'web' && !ready) {
+    return {};
+  }
+  return { fontFamily: serifFamily(weight), fontWeight: serifWeight(weight) };
 }

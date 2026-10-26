@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { colors } from '@griever/tokens';
-import { serifFamily, serifWeight } from './typography';
+import { useSerifStyle } from './typography';
 
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -24,8 +24,9 @@ function headingProps(level: HeadingLevel): Record<string, unknown> {
 }
 
 export function Heading({ level, children, headingRef }: HeadingProps) {
+  const font = useSerifStyle('semibold');
   return (
-    <Text ref={headingRef} style={[styles.base, { fontSize: sizeByLevel[level] }]} {...headingProps(level)}>
+    <Text ref={headingRef} style={[styles.base, font, { fontSize: sizeByLevel[level] }]} {...headingProps(level)}>
       {children}
     </Text>
   );
@@ -33,8 +34,6 @@ export function Heading({ level, children, headingRef }: HeadingProps) {
 
 const styles = StyleSheet.create({
   base: {
-    fontFamily: serifFamily('semibold'),
-    fontWeight: serifWeight('semibold'),
     color: colors.ink,
   },
 });

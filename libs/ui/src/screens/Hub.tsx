@@ -1,5 +1,6 @@
+import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -24,6 +25,7 @@ export interface HubCopy {
   tagNext: string;
   metaStarted: string;
   lockedReason: string;
+  notInAppYet: string;
   moments: Record<HubMomentKey, { title: string; body: string; doneLabel: string }>;
 }
 
@@ -35,6 +37,8 @@ export interface HubRow {
   started: boolean;
   /** In the full plan: stays focusable and opens the paywall placeholder. */
   locked: boolean;
+  /** This host cannot do this step yet: shown with a calm reason, and not pressable. */
+  unavailable?: boolean;
   /** The small line under a done step, already built (see doneRowMeta in libs/copy). */
   meta?: string;
 }
@@ -48,7 +52,7 @@ export interface HubProps {
   onWhatYoullNeed: () => void;
   onEdit: () => void;
   onStart: (key: HubMomentKey) => void;
-  /** `opener` is the pressed row on web, so focus can go back to it. Undefined on native. */
+  /** `opener` is the row's node (DOM node on web, host instance on native), so focus can go back to it. */
   onLocked: (opener: unknown) => void;
   /** Between the heading and the steps, for example the note after a send. */
   children?: ReactNode;
@@ -80,8 +84,12 @@ export function Hub(props: HubProps) {
       </View>
       <View style={styles.head}>
         <View style={styles.eyebrowRow}>
-          <Eyebrow>{props.eyebrow}</Eyebrow>
-          <Button label={copy.editPerson} variant="ghost" onPress={props.onEdit} />
+          <View style={styles.eyebrowText}>
+            <Eyebrow>{props.eyebrow}</Eyebrow>
+          </View>
+          <View style={styles.noShrink}>
+            <Button label={copy.editPerson} variant="ghost" onPress={props.onEdit} />
+          </View>
         </View>
         <Heading level={1} headingRef={props.headingRef}>
           {copy.heading}
@@ -102,22 +110,23 @@ export function Hub(props: HubProps) {
 function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
   const text = copy.moments[row.key];
 
-  if (row.locked) {
-    const reasonId = `hub-locked-${row.key}`;
+  if (row.unavailable) {
+    // Text only, not a button: nothing to press, so nothing that sends (see the host's reason).
     return (
-      <Row
-        ariaDisabled
-        describedBy={reasonId}
-        hint={copy.lockedReason}
-        onPress={(event) => onLocked((event as { currentTarget?: unknown } | undefined)?.currentTarget)}
-      >
-        <Body tone="strong">{text.title}</Body>
+      // `accessible` groups the lines into one screen-reader stop on native. On web it would make a
+      // focusable div with no action, so web gets plain text.
+      <View accessible={Platform.OS !== 'web'} style={styles.plain}>
+        <Body tone="muted">{text.title}</Body>
         <Body>{text.body}</Body>
-        <Body id={reasonId} hidden small>
-          {copy.lockedReason}
+        <Body tone="muted" small>
+          {copy.notInAppYet}
         </Body>
-      </Row>
+      </View>
     );
+  }
+
+  if (row.locked) {
+    return <LockedStep title={text.title} body={text.body} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
   if (row.status === 'done') {
@@ -159,4 +168,29 @@ const styles = StyleSheet.create({
   head: { gap: spacing[1] },
   eyebrowRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   rows: { gap: spacing[2] },
+  // The name may be long; it wraps, and the Edit person button keeps its full width.
+  eyebrowText: { flexShrink: 1 },
+  noShrink: { flexShrink: 0 },
+  plain: { paddingVertical: spacing[2], gap: 2 },
 });
+
+/** A step in the full plan: stays focusable and explained, and a press asks for the paywall. */
+function LockedStep(props: { title: string; body: string; reason: string; onLocked: (opener: unknown) => void }) {
+  const reasonId = useId();
+  const row = useRef<unknown>(null);
+  return (
+    <Row
+      ariaDisabled
+      rowRef={row}
+      describedBy={reasonId}
+      hint={props.reason}
+      onPress={() => props.onLocked(row.current)}
+    >
+      <Body tone="strong">{props.title}</Body>
+      <Body>{props.body}</Body>
+      <Body id={reasonId} hidden small>
+        {props.reason}
+      </Body>
+    </Row>
+  );
+}

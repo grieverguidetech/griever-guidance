@@ -15,6 +15,7 @@ const copy: HubCopy = {
   tagNext: 'Next',
   metaStarted: 'Started',
   lockedReason: 'Included with the full plan',
+  notInAppYet: 'Not in the app yet.',
   moments: {
     announce: { title: 'Announce the passing', body: 'A gentle note.', doneLabel: 'Told close family' },
     service: { title: 'Share the service', body: 'Once the date is set.', doneLabel: 'Shared the service' },
@@ -131,5 +132,30 @@ describe('Hub', () => {
     expect(note.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(steps.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(document.body).getAllByRole('button').length).toBe(7);
+  });
+
+  it('shows an unavailable step as text with its reason: no button, nothing to press', () => {
+    const h = setup({ rows: rows.map((r) => (r.key === 'obituary' ? { ...r, unavailable: true } : r)) });
+    expect(screen.getByText('Share the obituary')).toBeInTheDocument();
+    expect(screen.getByText('Not in the app yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Share the obituary/ })).not.toBeInTheDocument();
+    expect(h.onStart).not.toHaveBeenCalled();
+    // Plain text on web: not a tab stop.
+    expect(screen.getByText('Not in the app yet.').closest('[tabindex]')).toBeNull();
+  });
+
+  it('keeps the HTML valid: no div inside any button', () => {
+    setup();
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.querySelector('div'), button.outerHTML).toBeNull();
+    }
+  });
+
+  it('gives every step row and header button at least 44 pixels', () => {
+    setup();
+    for (const button of screen.getAllByRole('button')) {
+      const style = getComputedStyle(button);
+      expect(parseInt(style.minHeight, 10), button.textContent ?? '').toBeGreaterThanOrEqual(44);
+    }
   });
 });

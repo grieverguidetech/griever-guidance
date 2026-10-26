@@ -4,7 +4,8 @@ import type { GestureResponderEvent } from 'react-native';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { colors, minTouchTarget, spacing } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
-import { serifFamily, serifWeight } from './typography';
+import { Phrasing } from './phrasing';
+import { useSerifStyle } from './typography';
 
 /** The element a button renders: a DOM node on web, a host instance on native. */
 export type ButtonNode = ComponentRef<typeof Pressable>;
@@ -66,12 +67,12 @@ export function Button({
     extra['aria-haspopup'] = 'dialog';
   }
 
+  const font = useSerifStyle('semibold');
   const unavailableFill = ariaDisabled && variant === 'primary';
   return (
     <Pressable
       ref={setRef}
       role="button"
-      accessibilityState={{ disabled: ariaDisabled }}
       accessibilityHint={hint}
       onPress={onPress}
       style={({ pressed }) => [
@@ -82,9 +83,11 @@ export function Button({
       ]}
       {...extra}
     >
-      <Text style={[styles.label, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled)]}>
-        {label}
-      </Text>
+      <Phrasing>
+        <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled)]}>
+          {label}
+        </Text>
+      </Phrasing>
     </Pressable>
   );
 }
@@ -118,8 +121,6 @@ const styles = StyleSheet.create({
   // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
   unavailableFill: { backgroundColor: colors['neutral-700'] },
   label: {
-    fontFamily: serifFamily('semibold'),
-    fontWeight: serifWeight('semibold'),
   },
   labelPrimary: { fontSize: 15 },
   labelLink: { fontSize: 14 },

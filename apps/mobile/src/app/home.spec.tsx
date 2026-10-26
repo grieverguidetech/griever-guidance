@@ -186,7 +186,7 @@ describe('Home from every step', () => {
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
-  it('Android back: a step goes Home, and so does the hub', async () => {
+  it('Android back: the hub goes Home; a first form goes to the hub; a later step goes Home', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
       handlers.push(h as () => boolean);
@@ -195,15 +195,25 @@ describe('Home from every step', () => {
     // Like React Native: newest handler first, stop at the first that handles it.
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('One thing at a time.');
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
 
+    // The first form: Android back is the same as the on-screen Back, to the hub.
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
     await screen.findByPlaceholderText('She was peaceful, and we were with her.');
+    act(() => void pressBack());
+    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+
+    // A later step still goes Home.
+    fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+    await screen.findByPlaceholderText('She was peaceful, and we were with her.');
+    fireEvent.press(await screen.findByText('Continue'));
+    await screen.findByText('Select recipients');
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });

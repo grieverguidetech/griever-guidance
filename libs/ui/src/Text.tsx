@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { colors } from '@griever/tokens';
-import { serifFamily, serifWeight } from './typography';
+import { useSerifStyle } from './typography';
 
 export interface EyebrowProps {
   children: ReactNode;
@@ -9,7 +9,8 @@ export interface EyebrowProps {
 
 /** The small accent line above a heading, for example "For Margaret". */
 export function Eyebrow({ children }: EyebrowProps) {
-  return <Text style={styles.eyebrow}>{children}</Text>;
+  const font = useSerifStyle('regular');
+  return <Text style={[styles.eyebrow, font]}>{children}</Text>;
 }
 
 export type BodyTone = 'default' | 'strong' | 'muted';
@@ -27,6 +28,7 @@ export interface BodyProps {
 
 /** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
 export function Body({ children, tone = 'default', small = false, id, hidden = false }: BodyProps) {
+  const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};
   if (id) {
     extra['id'] = id;
@@ -34,21 +36,17 @@ export function Body({ children, tone = 'default', small = false, id, hidden = f
   if (hidden) {
     extra['aria-hidden'] = true;
   }
-  return <Text style={[styles.body, styles[tone], small && styles.small]} {...extra}>{children}</Text>;
+  return <Text style={[styles.body, font, styles[tone], small && styles.small]} {...extra}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({
   eyebrow: {
-    fontFamily: serifFamily('regular'),
-    fontWeight: serifWeight('regular'),
     fontSize: 11,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
     color: colors['accent-700'],
   },
   body: {
-    fontFamily: serifFamily('regular'),
-    fontWeight: serifWeight('regular'),
     fontSize: 13,
     lineHeight: 20,
   },

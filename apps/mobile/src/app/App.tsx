@@ -25,6 +25,7 @@ import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
+import { SerifReadyContext } from '@griever/ui';
 import { useSerifFonts } from '../lib/serifFonts';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
@@ -129,6 +130,13 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onDraft
       }
     }
   }, [pendingStart, flow.templateCategory, flow.step, nextStep]);
+  // The picker is gone. If the flow is ever on it with nothing chosen, go back to the hub rather than stay blank.
+  const stuckOnPicker = flow.step === 'template' && !pendingStart;
+  useEffect(() => {
+    if (stuckOnPicker) {
+      onHub();
+    }
+  }, [stuckOnPicker, onHub]);
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
@@ -173,8 +181,16 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onDraft
     if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
   }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField]);
 
+  // On a moment's first form, Back (on screen and Android's) returns to the hub.
+  const onFirstForm = flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template';
   const bar = (
-    <PersonBar active={session} onOpen={onHome} arrived={pendingArrival} onArrived={clearArrival} />
+    <PersonBar
+      active={session}
+      onOpen={onHome}
+      onHardwareBack={onFirstForm ? onHub : undefined}
+      arrived={pendingArrival}
+      onArrived={clearArrival}
+    />
   );
 
   // Done on the last person ends the send. Home keeps no wording of it (C2) and sets no timer.
@@ -191,7 +207,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onDraft
     ...stepped,
     prevStep: () => {
       // The step before this one is the picker: go to the hub instead.
-      if (flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template') {
+      if (onFirstForm) {
         onHub();
       } else {
         stepped.prevStep();
@@ -492,13 +508,18 @@ const SendAppWhenReady = () => {
 
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
-  useSerifFonts();
-  return AUTH_ENABLED ? (
-    <AccountProvider>
-      <SendAppWhenReady />
-    </AccountProvider>
-  ) : (
-    <SendAppWhenReady />
+  const fontsSettled = useSerifFonts();
+  // Shared components (libs/ui) switch from the system font to the serif when it arrives.
+  return (
+    <SerifReadyContext.Provider value={fontsSettled}>
+      {AUTH_ENABLED ? (
+        <AccountProvider>
+          <SendAppWhenReady />
+        </AccountProvider>
+      ) : (
+        <SendAppWhenReady />
+      )}
+    </SerifReadyContext.Provider>
   );
 };
 

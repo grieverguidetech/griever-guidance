@@ -19,9 +19,12 @@ export function PersonBar({
   onOpen,
   arrived,
   onArrived,
+  onHardwareBack,
 }: {
   active: Session;
   onOpen: () => void;
+  /** What Android's back button does here, when it is not Home (for example, back to the hub). */
+  onHardwareBack?: () => void;
   arrived: boolean;
   onArrived: () => void;
 }) {
@@ -35,11 +38,11 @@ export function PersonBar({
     useCallback(() => {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
         if (navigation.canGoBack()) return false;
-        onOpen();
+        (onHardwareBack ?? onOpen)();
         return true;
       });
       return () => sub.remove();
-    }, [navigation, onOpen]),
+    }, [navigation, onOpen, onHardwareBack]),
   );
   useEffect(() => {
     if (!arrived) return;
