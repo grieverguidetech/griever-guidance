@@ -7,9 +7,12 @@ import { fonts } from '@griever/tokens';
  * uses the face apps/mobile registers with expo-font. Until it has loaded (or if it fails) React
  * Native shows the system font, because a family name that is not registered is ignored.
  */
-export function serifFamily(weight: 'regular' | 'semibold'): string {
+export function serifFamily(weight: 'regular' | 'semibold', italic = false): string {
   if (Platform.OS === 'web') {
     return fonts.serifWeb;
+  }
+  if (italic) {
+    return weight === 'semibold' ? fonts.serifSemiBoldItalic : fonts.serifItalic;
   }
   return weight === 'semibold' ? fonts.serifSemiBold : fonts.serifRegular;
 }
@@ -30,10 +33,10 @@ export function serifWeight(weight: 'regular' | 'semibold'): '400' | '600' | und
 export const SerifReadyContext = createContext(true);
 
 /** `fontFamily` and `fontWeight` for the serif. Until it is ready on native, the system font. */
-export function useSerifStyle(weight: 'regular' | 'semibold'): { fontFamily?: string; fontWeight?: '400' | '600' } {
+export function useSerifStyle(weight: 'regular' | 'semibold', italic = false): { fontFamily?: string; fontWeight?: '400' | '600' } {
   const ready = useContext(SerifReadyContext);
   if (Platform.OS !== 'web' && !ready) {
     return {};
   }
-  return { fontFamily: serifFamily(weight), fontWeight: serifWeight(weight) };
+  return { fontFamily: serifFamily(weight, italic), fontWeight: serifWeight(weight) };
 }

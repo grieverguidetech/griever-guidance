@@ -109,7 +109,7 @@ export function Button({
         styles.base,
         styles[variant],
         unavailableFill && styles.unavailableFill,
-        pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedTertiary : styles.pressed),
+        pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
       ]}
       {...extra}
     >
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   header: { borderColor: colors['accent-600'] },
   pressed: { opacity: 0.7 },
   // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
-  pressedTertiary: { backgroundColor: colors['accent-100'] },
+  pressedWash: { backgroundColor: colors['accent-100'] },
   // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
   // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
   unavailableFill: { backgroundColor: colors['neutral-700'] },

@@ -66,10 +66,10 @@ describe('SetupScreen', () => {
     expect(focus).toHaveBeenCalledWith(1);
   });
 
-  it('has a name placeholder and a 16pt back link', () => {
+  it('has a name placeholder and a 44pt outlined back button', () => {
     setup();
     expect(screen.getByPlaceholderText('e.g. Margaret Hayes')).toBeTruthy();
-    expect(StyleSheet.flatten(screen.getByText('← Back').props.style)).toEqual(expect.objectContaining({ fontSize: 16 }));
+    expect(StyleSheet.flatten(screen.getByLabelText('Back to home').props.style)).toEqual(expect.objectContaining({ minHeight: 44, borderWidth: 1 }));
   });
 
   it('explains the disabled Continue, and drops the hint once a name is typed', () => {

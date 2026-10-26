@@ -59,4 +59,8 @@ describe('top buttons (#176)', () => {
     expect(css).toMatch(/\.gg-btn-secondary\s*{[^}]*border-color:/);
     expect(css).toMatch(/\.gg-btn\s*{[^}]*border:\s*1px solid/);
   });
+
+  it('the top-bar border is accent-600, the same outline as the mobile header button', () => {
+    expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*border-color:\s*var\(--color-accent-600\)/);
+  });
 });

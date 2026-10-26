@@ -3,6 +3,7 @@ import type { ComponentRef, ReactNode, Ref } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
+import { SerifText } from '../SerifText';
 import type { ButtonNode } from '../Button';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
@@ -288,9 +289,9 @@ function Alert({ message, id }: { message?: string; id?: string }) {
   }
   const extra: Record<string, unknown> = id ? { id } : {};
   return (
-    <Text role="alert" style={styles.error} {...extra}>
+    <SerifText role="alert" style={styles.error} {...extra}>
       {message}
-    </Text>
+    </SerifText>
   );
 }
 

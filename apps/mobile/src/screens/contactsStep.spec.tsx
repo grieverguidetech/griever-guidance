@@ -126,7 +126,7 @@ describe('ContactsStepScreen', () => {
     const { onContinue, onBack } = setup([dee as unknown as Contact]);
     fireEvent.press(screen.getByRole('button', { name: 'Done for now' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
-    fireEvent.press(screen.getByLabelText('Back'));
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
@@ -180,7 +180,7 @@ describe('the contacts step in the app', () => {
     render(<App />);
     await createBen();
     await screen.findByText(CONTACTS_TITLE);
-    fireEvent.press(screen.getByLabelText('Back'));
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText('Their name, required')).props.value).toBe('Ben');
   });
 

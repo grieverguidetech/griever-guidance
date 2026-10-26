@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SerifText as Text } from '@griever/ui';
+import { SerifText as Text, Button } from '@griever/ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
 import { ScreenHeader, authStyles } from '../components/authForm';
@@ -177,9 +177,9 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
         // A touch anywhere on the page closes an open tip; the info button stops its own touch.
         onTouchStart={() => setTipOpen(null)}
       >
-        <Pressable onPress={onBack} style={styles.back} accessibilityRole="button" accessibilityLabel="Back">
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
+        <View style={styles.backRow}>
+          <Button label="Back" variant="header" onPress={onBack} />
+        </View>
         {identity ? <AccountBody identity={identity} tipOpen={tipOpen} onTipChange={setTipOpen} /> : <LoadingOrUnavailable text={UNAVAILABLE} />}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -190,9 +190,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  back: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 16 },
+  backRow: { alignSelf: 'flex-start', marginBottom: 16 },
   checklist: { marginTop: 32 },
   checklistTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 4 },
   checklistNote: { fontSize: 13, color: MUTED, marginBottom: 16 },
-  backText: { fontSize: 14, color: MUTED },
 });

@@ -1,15 +1,27 @@
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, TextInput } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput } from 'react-native';
 import { useSerifStyle } from './typography';
 
-const BOLD = new Set(['600', '700', '800', '900', 'bold']);
+// The web stack has only 400 and 600, so 500 reads as semibold too.
+const SEMIBOLD = new Set(['500', '600', '700', '800', '900', 'bold']);
 
-/** Semibold where the caller asked for a bold weight, otherwise regular. */
+/**
+ * The serif for the caller's weight and slant. Does nothing if the caller chose its own family.
+ * On native the face carries weight and slant, so the caller's fontWeight and fontStyle are cleared
+ * (a "bold" must not stack on the semibold face).
+ */
 function useFontFor(style: ComponentProps<typeof Text>['style']) {
-  const weight = StyleSheet.flatten(style)?.fontWeight;
-  const font = useSerifStyle(weight !== undefined && BOLD.has(String(weight)) ? 'semibold' : 'regular');
-  // The weight comes from the family on native; a caller's "bold" must not stack on the semibold face.
-  return [font, style, font.fontFamily ? { fontWeight: font.fontWeight } : null];
+  const flat = StyleSheet.flatten(style);
+  const weight = flat?.fontWeight;
+  const font = useSerifStyle(
+    weight !== undefined && SEMIBOLD.has(String(weight)) ? 'semibold' : 'regular',
+    flat?.fontStyle === 'italic',
+  );
+  if (flat?.fontFamily || !font.fontFamily) {
+    return style;
+  }
+  const native = Platform.OS !== 'web';
+  return [font, style, native ? { fontWeight: undefined, fontStyle: undefined } : { fontWeight: font.fontWeight }];
 }
 
 /**

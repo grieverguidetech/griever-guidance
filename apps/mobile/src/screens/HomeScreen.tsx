@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SerifText as Text } from '@griever/ui';
+import { Button, SerifText as Text } from '@griever/ui';
 import type { Session } from '@griever/hooks';
 import { PrimaryButton, ScreenHeader, authStyles } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';
@@ -55,14 +55,9 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
         </View>
       ) : null}
       {onWhatYoullNeed ? (
-        <Pressable
-          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
-          onPress={onWhatYoullNeed}
-          accessibilityRole="button"
-          accessibilityLabel="What you'll need"
-        >
-          <Text style={styles.linkText}>What you'll need</Text>
-        </Pressable>
+        <View style={styles.headerRow}>
+          <Button label="What you'll need" variant="header" onPress={onWhatYoullNeed} />
+        </View>
       ) : null}
       {onAccount ? (
         <Pressable style={styles.link} onPress={onAccount} accessibilityRole="button">
@@ -94,6 +89,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60 },
+  headerRow: { alignSelf: 'flex-start', marginBottom: 8 },
   link: {
     alignSelf: 'flex-start',
     minHeight: 44,
