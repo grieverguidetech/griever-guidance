@@ -4,7 +4,7 @@ import { workspaceRoot } from '@nx/devkit';
 
 /**
  * E2E runs against a production build of apps/web served by `vite preview`
- * on its own port. It never reuses a running server, so a `pnpm dev` on 5173
+ * on its own port. It never reuses a running server, so a `pnpm dev:local web` on 5173
  * (or another worktree's run) can't be tested by mistake. The app is
  * offline-first, so no gateway is needed; anything that would reach the
  * network is stubbed in the spec that needs it.

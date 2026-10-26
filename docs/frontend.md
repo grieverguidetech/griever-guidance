@@ -409,11 +409,10 @@ Use `pnpm`. Do not use npm or yarn. Run commands from the repo root.
 ### 7.1 Run the apps
 
 1. Install packages: `pnpm install --frozen-lockfile`.
-2. Run the web app and the gateway together: `pnpm dev`.
-3. Run only the web app: `pnpm dev:web`.
-4. Run the mobile app (Expo): `pnpm dev:mobile`.
-5. Run the marketing site: `pnpm dev:marketing`.
-6. To turn on a flag locally, copy `apps/web/.env.example` and set the flag to `true`. Do not put
+2. Run the web app with the whole local stack: `pnpm dev:local web`.
+3. Run the mobile app (Expo) with the whole local stack: `pnpm dev:local mobile`.
+4. Run the marketing site: `pnpm dev:marketing`.
+5. To turn on a flag locally, copy `apps/web/.env.example` and set the flag to `true`. Do not put
    secrets in the example file.
 
 ### 7.2 Build and check
