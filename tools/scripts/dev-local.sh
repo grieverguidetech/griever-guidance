@@ -80,9 +80,27 @@ export DATA_AUTH_JWKS_URL="$ISSUER/.well-known/jwks.json"
 pnpm dev:data 2>&1 | label data &
 DATA_PGID="$(ps -o pgid= -p "$!" | tr -d ' ')"
 
-HOST=0.0.0.0 pnpm dev:gateway 2>&1 | label gateway &
+env HOST=0.0.0.0 pnpm dev:gateway 2>&1 | label gateway &
 GATEWAY_PGID="$(ps -o pgid= -p "$!" | tr -d ' ')"
 set +m
+
+# A phone reaches the gateway only through the Mac LAN IP, so the gateway must bind 0.0.0.0.
+# Prints only the IP and a match or no-match; never the env file values.
+check_mobile_reach() {
+  local ip env_file="apps/mobile/.env.local"
+  ip="$(ipconfig getifaddr en0 2> /dev/null || true)"
+  if [ -z "$ip" ]; then
+    echo "dev:local: warning: no LAN IP on en0. A phone cannot reach the gateway."
+    return 0
+  fi
+  echo "dev:local: gateway LAN URL: http://$ip:$GATEWAY_PORT"
+  if ! (exec 3<>"/dev/tcp/$ip/$GATEWAY_PORT") 2> /dev/null; then
+    echo "dev:local: warning: the gateway does not answer on $ip:$GATEWAY_PORT. It may bind loopback only."
+  fi
+  if [ ! -f "$env_file" ] || [ "$(grep -c "^EXPO_PUBLIC_API_URL=.*$ip" "$env_file")" -eq 0 ]; then
+    echo "dev:local: warning: EXPO_PUBLIC_API_URL in $env_file does not point at $ip. Update it and restart Expo."
+  fi
+}
 
 wait_for_port() {
   local port="$1" name="$2" waited=0
@@ -98,6 +116,10 @@ wait_for_port() {
 
 wait_for_port "$DATA_PORT" "data function"
 wait_for_port "$GATEWAY_PORT" "gateway"
+
+if [ "$TARGET" = "mobile" ]; then
+  check_mobile_reach
+fi
 
 echo "dev:local: starting $TARGET. Press Ctrl+C to stop everything."
 pnpm "dev:$TARGET"
