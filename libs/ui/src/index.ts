@@ -23,3 +23,5 @@ export { WhoShouldKnow } from './screens/WhoShouldKnow';
 export type { WhoPerson, WhoShouldKnowCopy, WhoShouldKnowProps } from './screens/WhoShouldKnow';
 export { Review } from './screens/Review';
 export type { ReviewCopy, ReviewProps } from './screens/Review';
+export { ShareObituary } from './screens/ShareObituary';
+export type { ShareObituaryCopy, ShareObituaryProps } from './screens/ShareObituary';

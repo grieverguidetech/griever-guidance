@@ -17,12 +17,6 @@ const paywallCopy = screenCopy('paywall');
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 
-/**
- * Steps this app cannot do yet. Mobile has no step for the obituary link (C10), so the hub lists
- * the obituary with a calm reason instead of sending someone to contacts with no link.
- */
-const NOT_IN_APP_YET: MomentKey[] = ['obituary'];
-
 /** Where a moment's drafts are kept. */
 export const CATEGORY_BY_MOMENT: Record<MomentKey, TemplateCategory> = {
   announce: 'announcement',
@@ -109,7 +103,6 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
       status: moment.status,
       started,
       locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
-      unavailable: NOT_IN_APP_YET.includes(moment.key),
       meta:
         moment.status === 'done'
           ? doneRowMeta(copy, {

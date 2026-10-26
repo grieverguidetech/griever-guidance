@@ -88,8 +88,7 @@ function optionalText(
  */
 function optionalUrl(value: string | null | undefined): string | null {
   const url = normalizeUrl(stripNul(value ?? ''));
-  if (url.length > FLOW_FACT_MAX_LENGTH.obituaryUrl) return null;
-  return isHttpUrl(url) ? url : null;
+  return isValidObituaryLink(url) ? url : null;
 }
 
 /**
@@ -198,6 +197,20 @@ const isNullableText = (value: unknown, max: number): boolean =>
 // Stricter than the database check: http or https only, no whitespace (so no javascript: or data:).
 const HTTP_URL = /^https?:\/\/\S+$/i;
 const isHttpUrl = (value: string): boolean => HTTP_URL.test(value);
+
+/**
+ * The one rule for an obituary link, used by the screens and by the save step. A bare
+ * "example.com/obit" is fine (https:// is added). Another scheme such as ftp://, a space, an empty
+ * value, or more than 2048 characters is not.
+ */
+export function isValidObituaryLink(raw: string | undefined): boolean {
+  const value = raw?.trim() ?? '';
+  if (value.includes('://') && !/^https?:\/\//i.test(value)) {
+    return false;
+  }
+  const url = normalizeUrl(value);
+  return url.length <= FLOW_FACT_MAX_LENGTH.obituaryUrl && isHttpUrl(url);
+}
 
 function validField(key: FlowFactKey, value: unknown): boolean {
   switch (key) {
