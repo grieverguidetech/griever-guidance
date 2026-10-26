@@ -27,6 +27,9 @@ function announcePort(): PluginOption {
 
 export default defineConfig(() => ({
   ...vitestConfig('jsdom', {
+    // Shared components (libs/ui) are written for React Native; on web they render through
+    // react-native-web. This alias applies to Vitest, `vite dev` and `vite build` alike.
+    resolve: { alias: { 'react-native': 'react-native-web' } },
     test: {
       setupFiles: ['src/test-setup.ts'],
       // #257: the whole-App journeys are CPU-bound (about 1 s alone, 5 to 30 s when

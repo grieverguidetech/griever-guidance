@@ -239,6 +239,9 @@ importers:
       '@clerk/expo':
         specifier: 4.13.0
         version: 4.13.0(@types/react@19.3.0)(expo-auth-session@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3))(expo-constants@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-crypto@58.0.6(expo@58.0.7))(expo-secure-store@58.0.2(expo@58.0.7))(expo-web-browser@58.0.6(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)))(expo@58.0.7)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(zod@4.6.7)
+      '@expo-google-fonts/source-serif-4':
+        specifier: 0.4.1
+        version: 0.4.1
       '@griever/api-client':
         specifier: workspace:*
         version: link:../../libs/api-client
@@ -251,6 +254,9 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../../libs/shared
+      '@griever/tokens':
+        specifier: workspace:*
+        version: link:../../libs/tokens
       '@react-native-async-storage/async-storage':
         specifier: 2.2.0
         version: 2.2.0(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))
@@ -275,6 +281,9 @@ importers:
       expo-crypto:
         specifier: 58.0.6
         version: 58.0.6(expo@58.0.7)
+      expo-font:
+        specifier: 58.0.7
+        version: 58.0.7(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       expo-secure-store:
         specifier: 58.0.2
         version: 58.0.2(expo@58.0.7)
@@ -363,9 +372,15 @@ importers:
       '@griever/shared':
         specifier: workspace:*
         version: link:../../libs/shared
+      '@griever/ui':
+        specifier: workspace:*
+        version: link:../../libs/ui
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react-native-web:
+        specifier: 0.21.4
+        version: 0.21.4(encoding@0.1.13)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.2.4
@@ -393,6 +408,16 @@ importers:
       libphonenumber-js:
         specifier: ^1.13.12
         version: 1.13.12
+
+  libs/copy:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+    devDependencies:
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
 
   libs/data-access:
     dependencies:
@@ -525,6 +550,31 @@ importers:
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
+
+  libs/tokens:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/ui:
+    dependencies:
+      '@griever/tokens':
+        specifier: workspace:*
+        version: link:../tokens
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-native:
+        specifier: 0.88.0-rc.4
+        version: 0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0)
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+    devDependencies:
+      react-native-web:
+        specifier: 0.21.4
+        version: 0.21.4(encoding@0.1.13)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
 
 packages:
 
@@ -2014,6 +2064,9 @@ packages:
   '@eslint/plugin-kit@0.7.1':
     resolution: {integrity: sha512-rZAP3aVgB9ds9KOeUSL+zZ21hPmo8dh6fnIFwRQj5EAZl9gzR7wxYbYXYysAM8CTqGmUGyp2S4kUdV17MnGuWQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@expo-google-fonts/source-serif-4@0.4.1':
+    resolution: {integrity: sha512-Ej4UXDjW1kwYPHG8YLq6fK1bqnJGb3K35J3S5atSL0ScKFAFLKvndxoTWeCls7mybtlS9x99hzwDeXCBkiI3rA==}
 
   '@expo/cli@58.1.6':
     resolution: {integrity: sha512-lj5JKKlLTDBljReG4OvG2gW0ZAFLjjmga2MvHlo3/xj4+AzeI9nMcwauOb6UC6ERAaj2gVNPx6+XFOdFH9ckyw==}
@@ -11741,6 +11794,8 @@ snapshots:
     dependencies:
       '@eslint/core': 1.2.1
       levn: 0.4.1
+
+  '@expo-google-fonts/source-serif-4@0.4.1': {}
 
   '@expo/cli@58.1.6(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.14)(expo-constants@58.0.10(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-font@58.0.7(expo@58.0.7)(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo@58.0.7)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0-rc.4(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)':
     dependencies:

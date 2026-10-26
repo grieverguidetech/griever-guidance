@@ -35,16 +35,19 @@
   ],
   "references": [
     {
-      "path": "../../libs/contacts/tsconfig.lib.json"
+      "path": "../../libs/tokens/tsconfig.lib.json"
     },
     {
-      "path": "../../libs/api-client/tsconfig.lib.json"
+      "path": "../../libs/contacts/tsconfig.lib.json"
     },
     {
       "path": "../../libs/hooks/tsconfig.lib.json"
     },
     {
       "path": "../../libs/shared/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api-client/tsconfig.lib.json"
     }
   ]
 }
