@@ -55,7 +55,12 @@ function renderScreen(
   return { toggleContact, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
-const headers = () => screen.queryAllByRole('header').map((h) => h.props.children);
+// The screen's own title is a heading too; the tier headings are the rest.
+const headers = () =>
+  screen
+    .queryAllByRole('heading')
+    .map((h) => h.props.children)
+    .filter((text) => text !== 'Who should know?');
 
 describe('ContactSelectorScreen grouping', () => {
   it('for an announcement, lists Close family before Friends & family, with headings as headers', () => {
@@ -82,7 +87,7 @@ describe('ContactSelectorScreen grouping', () => {
 
   it('preselects no one and sends nothing until the user picks', () => {
     const { toggleContact } = renderScreen();
-    expect(screen.getByText('No recipients selected')).toBeTruthy();
+    expect(screen.getByText('0 selected')).toBeTruthy();
     expect(toggleContact).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText('Mum'));
     expect(toggleContact).toHaveBeenCalledTimes(1);
@@ -113,7 +118,7 @@ describe('ContactSelectorScreen grouping', () => {
 
   it('gives the Bring people across rows the checkbox role and checked state', async () => {
     renderScreen();
-    fireEvent.press(screen.getByText('Import from contacts'));
+    fireEvent.press(screen.getByRole('button', { name: 'Bring people across' }));
     await waitFor(() => expect(screen.getByText('Bring people across')).toBeTruthy());
     expect(screen.getByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
     const plain = screen.getByRole('checkbox', { name: /Plain Pat/, checked: false });

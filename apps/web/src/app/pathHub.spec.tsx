@@ -72,7 +72,7 @@ describe('the note after the last person', () => {
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+    await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Copy message' }));
@@ -103,7 +103,7 @@ describe('the note after the last person', () => {
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+    await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Skip' }));
@@ -123,7 +123,7 @@ describe('the note after the last person', () => {
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+    await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
     await user.click(screen.getByRole('button', { name: 'Copy message' }));
@@ -188,10 +188,10 @@ describe('reopening a done moment', () => {
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     // A fresh draft: nobody is pre-selected, not even the person already told.
-    const carol = await screen.findByRole('button', { name: /Aunt Carol/ });
-    expect(carol).toHaveAttribute('aria-pressed', 'false');
+    const carol = await screen.findByRole('checkbox', { name: /Aunt Carol/ });
+    expect(carol).not.toBeChecked();
     await user.click(carol);
-    await user.click(screen.getByRole('button', { name: /Uncle Joe/ }));
+    await user.click(screen.getByRole('checkbox', { name: /Uncle Joe/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: /^Text 2 people|^Text these people/ }));
     await user.click(screen.getByRole('button', { name: 'Copy message' }));

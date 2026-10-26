@@ -1,67 +1,37 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  SectionList,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
-import {
-  Cancelled,
-  detectDeviceRegion,
-  runImport,
-  toE164,
-  type NormalizedContact,
-} from '@griever/contacts';
-import type { Contact, ContactTier } from '@griever/shared';
+import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
+import { screenCopy } from '@griever/copy';
+import { colors, spacing } from '@griever/tokens';
+import { WhoShouldKnow } from '@griever/ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
 import { SavedNote } from '../components/SavedNote';
-import { ACCENT, ACCENT_TINT, ERROR, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
+import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
 }
 
-type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] } | { kind: 'adding' };
+type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
 
-const TIER_LABELS: Record<ContactTier, string> = {
-  first: 'Close family',
-  family: 'Friends & family',
-};
+const copy = screenCopy('whoShouldKnow');
 
-const TIER_ORDER: ContactTier[] = ['first', 'family'];
-
-function groupByTier(list: Contact[]) {
-  return TIER_ORDER.map((tier) => ({
-    tier,
-    title: TIER_LABELS[tier],
-    data: list.filter((c) => (c.tier ?? 'family') === tier),
-  })).filter((s) => s.data.length > 0);
-}
-
+/**
+ * The list is the shared WhoShouldKnow in libs/ui. This holds what is mobile only: Bring people
+ * across (import from the phone's contacts) and its review list.
+ */
 export function ContactSelectorScreen({ flow, contacts }: Props) {
-  const { selectedContactIds, toggleContact, nextStep, prevStep, templateCategory } = flow;
+  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep, templateCategory } = flow;
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
-  const [manualName, setManualName] = useState('');
-  const [manualPhone, setManualPhone] = useState('');
-  const [manualError, setManualError] = useState<string | null>(null);
-
-  const selectedIds = new Set(selectedContactIds);
 
   // Same rule as web: group only for announcements, and only when both groups have people.
-  const groups = groupByTier(contacts.contacts);
-  const listSections: { title: string | null; data: Contact[] }[] =
-    templateCategory === 'announcement' && groups.length > 1
-      ? groups
-      : [{ title: null, data: contacts.contacts }];
+  const tiers = new Set(contacts.contacts.map((c) => c.tier ?? 'family'));
+  const grouped = templateCategory === 'announcement' && tiers.size > 1;
 
   async function handleImport() {
     setImporting(true);
@@ -81,55 +51,16 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   }
 
   async function commitReview() {
-    if (mode.kind !== 'reviewing') return;
+    if (mode.kind !== 'reviewing') {
+      return;
+    }
     const picked = mode.fresh
       .filter((c) => reviewSelected.has(c.key))
       .map((c) => ({ name: c.displayName, phone: c.phone, email: c.email, tier: 'family' as const }));
-    if (picked.length > 0) await contacts.importContacts(picked, 'native');
-    setMode({ kind: 'list' });
-  }
-
-  async function handleAddManual() {
-    if (!manualName.trim() || !manualPhone.trim()) return;
-    const phone = toE164(manualPhone, detectDeviceRegion());
-    if (!phone) {
-      setManualError("That number doesn't look right — check the area code and digits.");
-      return;
+    if (picked.length > 0) {
+      await contacts.importContacts(picked, 'native');
     }
-    await contacts.addContact({ name: manualName.trim(), phone, tier: 'family' });
-    setManualName('');
-    setManualPhone('');
-    setManualError(null);
     setMode({ kind: 'list' });
-  }
-
-  function renderContact({ item }: { item: Contact }) {
-    const selected = selectedIds.has(item.contactId);
-    return (
-      <TouchableOpacity
-        style={[styles.row, selected && styles.rowSelected]}
-        onPress={() => toggleContact(item.contactId)}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: selected }}
-        activeOpacity={0.7}
-      >
-        <View style={styles.rowInfo}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.phone}>{item.phone}</Text>
-        </View>
-        <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-          {selected && (
-            <Text
-              style={styles.checkmark}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-            >
-              ✓
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
   }
 
   if (mode.kind === 'reviewing') {
@@ -139,7 +70,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           <TouchableOpacity onPress={() => setMode({ kind: 'list' })}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Bring people across</Text>
+          <Text style={styles.title}>{copy.bringAcross}</Text>
           <Text style={styles.subtitle}>Choose only the ones you want — the rest stay where they are.</Text>
         </View>
         <FlatList
@@ -157,8 +88,11 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
                 onPress={() =>
                   setReviewSelected((current) => {
                     const next = new Set(current);
-                    if (next.has(item.key)) next.delete(item.key);
-                    else next.add(item.key);
+                    if (next.has(item.key)) {
+                      next.delete(item.key);
+                    } else {
+                      next.add(item.key);
+                    }
                     return next;
                   })
                 }
@@ -191,51 +125,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
             disabled={reviewSelected.size === 0}
             activeOpacity={0.8}
           >
-            <Text style={styles.buttonText}>Add</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  if (mode.kind === 'adding') {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setMode({ kind: 'list' })}>
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Add someone by hand</Text>
-        </View>
-        <View style={styles.formArea}>
-          <Text style={styles.label}>Name</Text>
-          <TextInput
-            style={styles.input}
-            value={manualName}
-            onChangeText={setManualName}
-            placeholder="e.g. Aunt Carol"
-            placeholderTextColor={MUTED}
-          />
-          <Text style={styles.label}>Mobile number</Text>
-          <TextInput
-            style={styles.input}
-            value={manualPhone}
-            onChangeText={(v) => {
-              setManualPhone(v);
-              setManualError(null);
-            }}
-            placeholder="(617) 555-0148"
-            placeholderTextColor={MUTED}
-            keyboardType="phone-pad"
-          />
-          {manualError && <Text style={styles.errorText}>{manualError}</Text>}
-          <TouchableOpacity
-            style={[styles.button, styles.buttonBlock, (!manualName.trim() || !manualPhone.trim()) && styles.buttonDisabled]}
-            onPress={handleAddManual}
-            disabled={!manualName.trim() || !manualPhone.trim()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>Add</Text>
+            <Text style={styles.buttonText}>{copy.add}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -243,80 +133,40 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={prevStep}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Select recipients</Text>
-        <Text style={styles.subtitle}>Choose who should receive this message.</Text>
-      </View>
-      <SectionList
-        sections={listSections}
-        keyExtractor={(item) => item.contactId}
-        renderItem={renderContact}
-        renderSectionHeader={({ section }) =>
-          section.title ? (
-            <Text accessibilityRole="header" style={styles.sectionHeader}>
-              {section.title}
-            </Text>
-          ) : null
-        }
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          contacts.loading ? (
-            <ActivityIndicator color={MUTED} style={{ marginTop: 24 }} />
-          ) : (
-            <Text style={styles.empty}>No one saved yet — bring people across or add them by hand.</Text>
-          )
-        }
-      />
-      {importError && <Text style={[styles.errorText, styles.errorSpacing]}>{importError}</Text>}
-      <View style={styles.addRow}>
-        <TouchableOpacity style={styles.addButton} onPress={handleImport} disabled={importing} activeOpacity={0.8}>
-          {importing ? (
-            <ActivityIndicator color={ACCENT} size="small" />
-          ) : (
-            <Text style={styles.addButtonText}>Import from contacts</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setMode({ kind: 'adding' })}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.addButtonText}>Add by hand</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.footer}>
-        <Text style={styles.count}>
-          {selectedContactIds.length === 0
-            ? 'No recipients selected'
-            : `${selectedContactIds.length} selected`}
-        </Text>
-        <TouchableOpacity
-          style={[styles.button, selectedContactIds.length === 0 && styles.buttonDisabled]}
-          onPress={nextStep}
-          disabled={selectedContactIds.length === 0}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
-      <SavedNote />
-    </View>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <WhoShouldKnow
+          copy={copy}
+          people={contacts.contacts.map((c) => ({ id: c.contactId, name: c.name, phone: c.phone, tier: c.tier }))}
+          grouped={grouped}
+          selectedIds={selectedContactIds}
+          loading={contacts.loading}
+          onToggle={toggleContact}
+          onSelectAll={selectContacts}
+          toE164={(raw) => toE164(raw, detectDeviceRegion())}
+          onAddPerson={async ({ name, phone }) => {
+            const created = await contacts.addContact({ name, phone, tier: 'family' });
+            toggleContact(created.contactId);
+          }}
+          onBack={prevStep}
+          onContinue={nextStep}
+          bringAcross={{ onPress: handleImport, busy: importing, notice: importError ?? undefined }}
+          footer={<SavedNote />}
+        />
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing[3], paddingTop: spacing[4] },
   container: { flex: 1, backgroundColor: '#ffffff' },
   header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
   backText: { fontSize: 14, color: MUTED, marginBottom: 24 },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
   subtitle: { fontSize: 14, color: MUTED },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
-  sectionHeader: { fontSize: 13, fontWeight: '600', color: MUTED_STRONG, marginTop: 8, marginBottom: 8 },
   empty: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 },
   row: {
     flexDirection: 'row',
@@ -343,23 +193,6 @@ const styles = StyleSheet.create({
   },
   checkboxSelected: { backgroundColor: ACCENT, borderColor: ACCENT },
   checkmark: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
-  addRow: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-  },
-  addButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: FIELD_BORDER,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  addButtonText: { color: ACCENT, fontSize: 13, fontWeight: '500' },
-  errorText: { fontSize: 12, color: ERROR },
-  errorSpacing: { paddingHorizontal: 24, marginBottom: 8 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -375,18 +208,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
   },
-  buttonBlock: { alignItems: 'center', paddingHorizontal: 0, marginTop: 8 },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: '#ffffff', fontSize: 14, fontWeight: '500' },
-  formArea: { paddingHorizontal: 24 },
-  label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6, marginTop: 16 },
-  input: {
-    borderWidth: 1,
-    borderColor: FIELD_BORDER,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#111827',
-  },
 });

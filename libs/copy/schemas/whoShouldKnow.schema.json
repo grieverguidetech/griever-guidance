@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Who should know? screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "introGrouped",
+    "introUngrouped",
+    "back",
+    "checklist",
+    "tierFirst",
+    "tierFamily",
+    "selectAll",
+    "addAnother",
+    "nameLabel",
+    "namePlaceholder",
+    "phoneLabel",
+    "phonePlaceholder",
+    "add",
+    "cancel",
+    "badNumber",
+    "selected",
+    "continue",
+    "empty",
+    "bringAcross"
+  ],
+  "properties": {
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "introGrouped": {
+      "$ref": "#/$defs/text"
+    },
+    "introUngrouped": {
+      "$ref": "#/$defs/text"
+    },
+    "back": {
+      "$ref": "#/$defs/text"
+    },
+    "tierFirst": {
+      "$ref": "#/$defs/text"
+    },
+    "tierFamily": {
+      "$ref": "#/$defs/text"
+    },
+    "selectAll": {
+      "$ref": "#/$defs/text"
+    },
+    "addAnother": {
+      "$ref": "#/$defs/text"
+    },
+    "nameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "namePlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "phonePlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "add": {
+      "$ref": "#/$defs/text"
+    },
+    "cancel": {
+      "$ref": "#/$defs/text"
+    },
+    "badNumber": {
+      "$ref": "#/$defs/text"
+    },
+    "selected": {
+      "type": "string",
+      "pattern": "\\{count\\}"
+    },
+    "continue": {
+      "$ref": "#/$defs/text"
+    },
+    "empty": {
+      "$ref": "#/$defs/text"
+    },
+    "bringAcross": {
+      "$ref": "#/$defs/text"
+    },
+    "checklist": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

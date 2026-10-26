@@ -96,7 +96,7 @@ is no hub screen, no gate and no obituary screen.
 | "The people you're writing about" | `HomeScreen.tsx` | App start. "Home" in the person bar. End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
 | "One thing at a time." (hub, shared with web from libs/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | Details form for the chosen step. "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
 | Template name, for example "Announce the passing" or "Share the service" | `DetailsFormScreen.tsx` | Hub. Used for the `announce` and `details` steps. | Contact selector | None |
-| "Select recipients", "Bring people across", "Add someone by hand" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |
+| "Who should know?", "Bring people across" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |
 | "Review your message" | `ConfirmScreen.tsx` | Contact selector | Sending | None |
 | "Texting people, one at a time" | `SendingScreen.tsx` | Confirm | Home with a note | None |
 | "What you'll need" | `WhatYoullNeedScreen.tsx` | Home and picker | Back | None |

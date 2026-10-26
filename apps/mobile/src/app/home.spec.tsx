@@ -213,7 +213,7 @@ describe('Home from every step', () => {
     fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
     await screen.findByPlaceholderText('She was peaceful, and we were with her.');
     fireEvent.press(await screen.findByText('Continue'));
-    await screen.findByText('Select recipients');
+    await screen.findByText('Who should know?');
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });

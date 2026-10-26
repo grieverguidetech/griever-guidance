@@ -25,7 +25,7 @@ async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Start' }));
   await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
   await user.click(screen.getByRole('button', { name: 'Continue' }));
-  await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+  await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
   await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(screen.getByRole('button', { name: 'Edit wording' }));
   const box = screen.getByRole('textbox');

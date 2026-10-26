@@ -64,7 +64,7 @@ async function toSending(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Start' }));
   await user.type(screen.getByLabelText(/Anything you'd like to add/), note);
   await user.click(screen.getByRole('button', { name: 'Continue' }));
-  await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+  await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
   await user.click(screen.getByRole('button', { name: 'Continue' }));
   await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
   await screen.findByRole('heading', { level: 1, name: 'Reaching people, one at a time' });

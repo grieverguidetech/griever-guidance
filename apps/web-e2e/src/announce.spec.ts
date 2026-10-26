@@ -19,7 +19,7 @@ async function toReview(page: Page) {
 
   await expect(page.getByRole('heading', { name: 'Who should know?' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
-  await page.getByRole('button', { name: /Aunt Carol/ }).click();
+  await page.getByRole('checkbox', { name: /Aunt Carol/ }).click();
   await page.getByRole('button', { name: /Bob Smith/ }).click();
   await expect(page.getByText('2 selected')).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
