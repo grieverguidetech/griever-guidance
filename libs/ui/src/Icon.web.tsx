@@ -4,11 +4,12 @@ import type { IconProps } from './iconPaths';
 export type { IconName, IconProps } from './iconPaths';
 
 /** Web twin of Icon.tsx: a plain inline svg, so the web bundle does not need react-native-svg. */
-export function Icon({ name, size = ICON_DEFAULT_SIZE, color, trailing = false }: IconProps) {
+export function Icon({ name, size = ICON_DEFAULT_SIZE, color, trailing = false, testID }: IconProps) {
   const paths = ICON_PATHS[name];
   return (
     <svg
       aria-hidden="true"
+      data-testid={testID}
       focusable="false"
       width={size}
       height={size}

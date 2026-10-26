@@ -20,6 +20,9 @@ export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClo
     AccessibilityInfo.isReduceMotionEnabled?.()
       ?.then(setReduceMotion)
       .catch(() => undefined);
+    // The setting can change while the app is open.
+    const subscription = AccessibilityInfo.addEventListener?.('reduceMotionChanged', setReduceMotion);
+    return () => subscription?.remove();
   }, []);
   const focusHeading = () => {
     const handle = heading.current ? findNodeHandle(heading.current) : null;

@@ -6,7 +6,7 @@ import type { Session } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { doneRowMeta, fill, screenCopy } from '@griever/copy';
 import { Hub, PaywallSheet } from '@griever/ui';
-import type { HubRow } from '@griever/ui';
+import type { ButtonNode, HubRow } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
@@ -52,6 +52,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
+  const checklistButton = useRef<ButtonNode>(null);
   // The locked row that opened the placeholder, so screen-reader focus can go back to it.
   const opener = useRef<unknown>(null);
   const sheetOpen = useRef(false);
@@ -83,6 +84,14 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
     setPaywallOpen(false);
     if (Platform.OS !== 'ios') {
       setTimeout(focusOpener, 0);
+    }
+  };
+
+  // iOS tells us when the checklist sheet is gone; Android returns to the last focused view by itself.
+  const focusChecklistButton = () => {
+    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
 
@@ -127,8 +136,9 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
           setPaywallOpen(true);
         }}
         headingRef={heading}
+        checklistRef={checklistButton}
       />
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} />
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
       {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
     </ScrollView>
   );

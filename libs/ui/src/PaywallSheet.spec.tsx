@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef, useRef, useState } from 'react';
@@ -65,5 +67,16 @@ describe('PaywallSheet (#292, #341)', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(opener).toHaveFocus();
+  });
+});
+
+describe('PaywallSheet source', () => {
+  it('holds no paywall words: they come from libs/copy', () => {
+    const source = readFileSync(join(import.meta.dirname, 'PaywallSheet.tsx'), 'utf8');
+    const json = JSON.parse(readFileSync(join(import.meta.dirname, '../../copy/screens/paywall.json'), 'utf8')) as Record<string, string>;
+    for (const text of Object.values(json)) {
+      // As a whole literal or JSX text; "onClose" and the like do not count.
+      expect(source, text).not.toMatch(new RegExp(`['"\`>]\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*['"\`<]`));
+    }
   });
 });

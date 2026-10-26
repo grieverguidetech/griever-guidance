@@ -6,6 +6,7 @@
 /** Keys match the Tailwind `--color-*` names, so `accent-700` is `--color-accent-700`. */
 export const colors = {
   bg: '#f3f2f2',
+  white: '#ffffff',
   surface: '#eae9e9',
   ink: '#201e1d',
   accent: '#0088b0',

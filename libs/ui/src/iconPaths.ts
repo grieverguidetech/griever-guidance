@@ -9,6 +9,8 @@ export interface IconProps {
   color: string;
   /** Sits at the far right of its parent, centred up and down. The parent needs room (padding). */
   trailing?: boolean;
+  /** For tests: the lock must be findable even though it is hidden from assistive tech. */
+  testID?: string;
 }
 
 export const ICON_PATHS: Record<IconName, { body: string; shackle: string }> = {

@@ -105,8 +105,7 @@ describe('Hub', () => {
   it('puts a decorative lock icon at the end of a locked row, outside its name and description', () => {
     setup();
     const locked = screen.getByRole('button', { name: /Send thank-yous/ });
-    const icon = locked.querySelector('svg');
-    expect(icon).not.toBeNull();
+    const icon = within(locked).getByTestId('lock-icon');
     expect(icon).toHaveAttribute('aria-hidden', 'true');
     expect(icon).toHaveAttribute('focusable', 'false');
     // The name and reason are the words only.
@@ -116,8 +115,7 @@ describe('Hub', () => {
 
   it('shows no lock on rows that are not locked', () => {
     setup();
-    expect(screen.getByRole('button', { name: /Share the obituary/ }).querySelector('svg')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Start' }).querySelector('svg')).toBeNull();
+    expect(screen.getAllByTestId('lock-icon')).toHaveLength(1);
   });
 
   it('Back and What you will need are 44px tertiary buttons with no fill or border', () => {

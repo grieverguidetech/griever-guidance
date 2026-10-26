@@ -11,20 +11,17 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 /**
  * A dialog over the current screen, drawn as a bottom sheet. Focus moves in, Tab stays inside,
  * Escape or Close shuts it, and focus goes back to whatever had it before (or `returnFocusRef`).
- * The page underneath stays mounted, so nothing typed there is lost.
+ * The page underneath stays mounted, so nothing typed there is lost. The page root (`inertRootId`,
+ * default "root") is made inert while open, so it must not contain the sheet: it is portalled to body.
  */
-export function Sheet({ title, closeLabel, visible = true, onClose, returnFocusRef, children }: SheetProps) {
+export function Sheet({ visible = true, ...rest }: SheetProps) {
   if (!visible) {
     return null;
   }
-  return (
-    <OpenSheet title={title} closeLabel={closeLabel} onClose={onClose} returnFocusRef={returnFocusRef}>
-      {children}
-    </OpenSheet>
-  );
+  return <OpenSheet {...rest} />;
 }
 
-function OpenSheet({ title, closeLabel, onClose, returnFocusRef, children }: SheetProps) {
+function OpenSheet({ title, closeLabel, onClose, returnFocusRef, fallbackFocusRef, inertRootId = 'root', children }: SheetProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -33,13 +30,15 @@ function OpenSheet({ title, closeLabel, onClose, returnFocusRef, children }: She
   closeRef.current = onClose;
   const returnRef = useRef(returnFocusRef);
   returnRef.current = returnFocusRef;
+  const fallbackRef = useRef(fallbackFocusRef);
+  fallbackRef.current = fallbackFocusRef;
 
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
     heading.current?.focus();
 
     // Everything behind the sheet is out of reach for keyboard, pointer and screen reader.
-    const root = document.getElementById('root');
+    const root = document.getElementById(inertRootId);
     const wasInert = root?.inert ?? false;
     const wasHidden = root?.getAttribute('aria-hidden') ?? null;
     if (root) {
@@ -98,20 +97,18 @@ function OpenSheet({ title, closeLabel, onClose, returnFocusRef, children }: She
         }
       }
       // After the page is live again, or the focus call would be ignored.
-      const target = (returnRef.current?.current as HTMLElement | null | undefined) ?? trigger;
+      const target = returnRef.current?.current ?? trigger;
       if (target?.isConnected) {
         target.focus();
-      } else {
-        // The screen was swapped while the sheet was open: land on the new page's heading, or Back.
-        const fallback =
-          document.querySelector<HTMLElement>('h1') ??
-          Array.from(document.querySelectorAll<HTMLElement>('button')).find((b) => b.textContent?.trim() === 'Back');
-        if (fallback) {
-          if (!fallback.hasAttribute('tabindex') && fallback.tagName === 'H1') {
-            fallback.setAttribute('tabindex', '-1');
-          }
-          fallback.focus();
+        return;
+      }
+      // The screen was swapped while the sheet was open: use the caller's fallback, else the page heading.
+      const fallback = fallbackRef.current?.current ?? document.querySelector<HTMLElement>('h1');
+      if (fallback?.isConnected) {
+        if (fallback instanceof HTMLElement && !fallback.hasAttribute('tabindex')) {
+          fallback.setAttribute('tabindex', '-1');
         }
+        fallback.focus();
       }
     };
   }, []);

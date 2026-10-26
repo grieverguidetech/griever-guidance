@@ -187,7 +187,7 @@ function LockedStep(props: { title: string; body: string; reason: string; onLock
       hint={props.reason}
       onPress={() => props.onLocked(row.current)}
       // Decorative: the reason text and hint are what assistive tech reads.
-      trailing={<Icon name="lock" color={colors['neutral-700']} trailing />}
+      trailing={<Icon name="lock" testID="lock-icon" color={colors['neutral-700']} trailing />}
     >
       <Body tone="strong">{props.title}</Body>
       <Body>{props.body}</Body>
