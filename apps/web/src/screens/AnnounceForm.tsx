@@ -29,6 +29,7 @@ export function AnnounceForm({ flow, onEditSession }: Props) {
       <Announce
         copy={copy}
         eyebrow={fill(copy.forName, { name })}
+        eyebrowTone="accent2"
         recap={announceRecap(session, copy)}
         note={fields['personalNote'] ?? ''}
         onNoteChange={(note) => setField('personalNote', note)}

@@ -71,4 +71,18 @@ describe('Announce', () => {
     await user.type(screen.getByLabelText(/Anything you'd like to add/), 'T');
     expect(h.onNoteChange).toHaveBeenCalledWith('T');
   });
+
+  it('names the note field by its visible label, with (optional) as its own lighter text', () => {
+    setup();
+    const field = screen.getByRole('textbox', { name: "Anything you'd like to add (optional)" });
+    const label = screen.getByText("Anything you'd like to add");
+    expect(label.closest('[aria-hidden="true"]')).toBeNull();
+    expect(field).toHaveAttribute('aria-labelledby', label.closest('[id]')?.id);
+    expect(getComputedStyle(screen.getByText('(optional)')).color).toBe('rgb(96, 93, 93)');
+  });
+
+  it('draws the eyebrow in the second accent when asked', () => {
+    setup({ eyebrowTone: 'accent2' });
+    expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(170, 11, 86)');
+  });
 });

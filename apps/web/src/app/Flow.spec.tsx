@@ -173,3 +173,16 @@ describe('leaving a first form', () => {
     expect(screen.queryByText('Do you know the service details?')).not.toBeInTheDocument();
   });
 });
+
+describe('Announce the passing', () => {
+  it('opens What you will need as a dialog, and closing it puts focus back on the button', async () => {
+    const user = userEvent.setup();
+    renderFlow(freshDraft({ templateCategory: 'announcement', step: 'announce' }));
+    const button = screen.getByRole('button', { name: "What you'll need" });
+    await user.click(button);
+    expect(await screen.findByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+});

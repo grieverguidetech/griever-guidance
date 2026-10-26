@@ -241,6 +241,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [stage, setStage] = useState<SetupStage | null>(null);
   const [arrived, setArrived] = useState(false);
   const [atHub, setAtHub] = useState(false);
+  // Setup was opened from the announce step (Edit): Back there returns to that step, as on web.
+  const [editingFromFlow, setEditingFromFlow] = useState(false);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
@@ -248,6 +250,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const purgedOnBoot = useRef(false);
   const goHome = useCallback(() => {
     setStage(null);
+    setEditingFromFlow(false);
     setArrived(false);
     setAtHub(false);
     setStartCategory(null);
@@ -353,8 +356,9 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       <SetupScreen
         key={active.id}
         initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
-        onBack={goHome}
+        onBack={editingFromFlow ? () => { setEditingFromFlow(false); setStage(null); } : goHome}
         onContinue={(details) => {
+          setEditingFromFlow(false);
           updateSession(active.id, details);
           if (contactsLoading) setStage('checkContacts');
           else afterSetup();
@@ -387,7 +391,10 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       arrived={arrived}
       startCategory={startCategory}
       onHub={() => setAtHub(true)}
-      onEditPerson={() => setStage('setup')}
+      onEditPerson={() => {
+        setEditingFromFlow(true);
+        setStage('setup');
+      }}
       onDraftChange={updateDraft}
       onDetails={updateSession}
       onHome={goHome}

@@ -1,5 +1,6 @@
+import { useId } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -27,6 +28,7 @@ export interface AnnounceProps {
   copy: AnnounceCopy;
   /** The eyebrow line, for example "For Margaret". */
   eyebrow: string;
+  eyebrowTone?: 'accent' | 'accent2';
   /** The "From your details" line, already built (see announceRecap in libs/copy). */
   recap: string;
   /** The optional note (flow field personalNote). */
@@ -47,9 +49,10 @@ export interface AnnounceProps {
  * "Announce the passing": confirms the person's details and takes an optional note. Built from
  * libs/ui so web (through react-native-web) and mobile show the same screen. It owns no state.
  */
-export function Announce({ copy, eyebrow, recap, onBack, onWhatYoullNeed, onEdit, onContinue, note, onNoteChange, footer, headingRef, checklistRef }: AnnounceProps) {
+export function Announce({ copy, eyebrow, eyebrowTone, recap, onBack, onWhatYoullNeed, onEdit, onContinue, note, onNoteChange, footer, headingRef, checklistRef }: AnnounceProps) {
   const inputFont = useSerifStyle('regular');
   const noteLabel = `${copy.noteLabel} ${copy.optional}`;
+  const labelId = useId();
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
@@ -57,7 +60,7 @@ export function Announce({ copy, eyebrow, recap, onBack, onWhatYoullNeed, onEdit
         <Button label={copy.checklist} variant="tertiary" outlined opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
       </View>
       <View style={styles.head}>
-        <Eyebrow>{eyebrow}</Eyebrow>
+        <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>
         <Heading level={1} headingRef={headingRef}>
           {copy.heading}
         </Heading>
@@ -69,16 +72,18 @@ export function Announce({ copy, eyebrow, recap, onBack, onWhatYoullNeed, onEdit
         </Body>
         <Body>{recap}</Body>
         <View style={styles.start}>
-          <Button label={copy.edit} variant="tertiary" onPress={onEdit} />
+          <Button label={copy.edit} variant="ghost" onPress={onEdit} />
         </View>
       </Card>
       <View style={styles.field}>
-        {/* The input carries the label for assistive tech; this copy is only for sighted users. */}
-        <View aria-hidden>
-          <Body tone="strong">{noteLabel}</Body>
-        </View>
+        <Body tone="strong" id={labelId}>
+          {copy.noteLabel} <Text style={styles.optional}>{copy.optional}</Text>
+        </Body>
         <TextInput
           style={[styles.input, inputFont]}
+          // Web names the field from the visible label; native reads the label text directly.
+          aria-labelledby={labelId}
+          {...webFieldHook}
           accessibilityLabel={noteLabel}
           multiline
           numberOfLines={3}
@@ -94,10 +99,14 @@ export function Announce({ copy, eyebrow, recap, onBack, onWhatYoullNeed, onEdit
   );
 }
 
+/** Web: lets apps/web/src/styles.css draw its field focus ring (data-gg-field). Ignored on native. */
+const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
+
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   start: { alignSelf: 'flex-start' },
+  optional: { color: colors['neutral-700'], fontWeight: '400' },
   field: { gap: spacing[1] },
   input: {
     minHeight: 88,
