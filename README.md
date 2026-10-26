@@ -79,20 +79,18 @@ corepack enable
 pnpm install
 ```
 
-`pnpm install && pnpm dev` is enough for the default flow (auth off). Clerk keys and the
-data function (`pnpm dev:data`) are only needed for accounts and sharing.
+`pnpm dev:local web` (or `mobile`) runs the whole local stack: DynamoDB Local, the data
+function, the gateway, then the app. See `docs/aws-local.md`.
 
 Run things from the repo root:
 
 ```sh
-pnpm dev            # gateway and web together
-pnpm dev:gateway    # gateway on port 3001
-pnpm dev:web        # web on port 5173
-pnpm dev:mobile     # Expo
-pnpm dev:marketing  # Astro
+pnpm dev:local web     # data, gateway (port 3001), then web (port 5173)
+pnpm dev:local mobile  # data, gateway on 0.0.0.0, then Expo
+pnpm dev:marketing     # Astro (no backend)
 ```
 
-`pnpm dev:mobile` builds the workspace libs mobile imports first and rebuilds them on change (`mobile:watch-deps`); `pnpm nx run mobile:export` builds them first too.
+`pnpm dev:local mobile` builds the workspace libs mobile imports first and rebuilds them on change (`mobile:watch-deps`); `pnpm nx run mobile:export` builds them first too.
 
 Env files, with your own values (never commit them):
 

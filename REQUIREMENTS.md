@@ -250,11 +250,9 @@ variables that the deploy workflow passes to the gateway and the web build.
 ### Running the project
 
 ```sh
-pnpm dev:gateway    # Hono via @hono/node-server, port 3001
-pnpm dev:web        # Vite on port 5173
-pnpm dev:mobile     # Expo
-pnpm dev:marketing  # Astro
-pnpm dev            # gateway + web concurrently
+pnpm dev:local web     # DynamoDB Local, data function, gateway (port 3001), Vite (port 5173)
+pnpm dev:local mobile  # the same stack, gateway on 0.0.0.0, then Expo
+pnpm dev:marketing     # Astro
 ```
 
 ---

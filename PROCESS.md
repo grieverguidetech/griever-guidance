@@ -259,7 +259,7 @@ developer needs one mid-ticket, it comments on the issue, labels `blocked`, and 
 - **E2E never runs on a local machine.** It runs in CI's `e2e` job (and on the dedicated e2e
   server once #18 lands). Read results with `gh pr checks` and `gh run view --log-failed`.
 - E2E builds the web app and serves it on its own port (`4300`, override with `E2E_PORT`) and
-  **never reuses** a running server, so a `pnpm dev` or another worktree's run can't be tested by
+  **never reuses** a running server, so a `pnpm dev:local` or another worktree's run can't be tested by
   mistake. It runs on desktop Chrome, Pixel 7, and iPhone 15 (WebKit). The person this is for is
   on a phone. `BASE_URL=<url>` runs it against a deployed site.
 - Test what the user experiences: role- and label-based locators, real copy. Constraints C1–C11
@@ -282,7 +282,7 @@ pnpm check:affected   # same, only what your branch touched
 
 Then go beyond the tests where the change warrants it:
 
-- **UI changes:** run the app (`pnpm dev`, `pnpm dev:mobile`) and walk the affected screens on a
+- **UI changes:** run the app (`pnpm dev:local web`, `pnpm dev:local mobile`) and walk the affected screens on a
   phone-width viewport. Type-checking is not the same as working.
 - **Data function changes:** stubbed tests don't see real DynamoDB behaviour. Run the code once
   against DynamoDB Local (`infra/aws-local`, `docs/aws-local.md`) before review, and quote the

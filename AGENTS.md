@@ -95,7 +95,7 @@ the role's brief.
 
 ## Commands (root `package.json` is the interface)
 
-`pnpm dev` · `dev:web` · `dev:gateway` · `dev:mobile` · `dev:marketing` · `check` (typecheck +
+`pnpm dev:local web|mobile` · `dev:marketing` · `check` (typecheck +
 test + build) · `check:affected` · `typecheck` · `test` · `build` · `e2e`
 
 ## The board

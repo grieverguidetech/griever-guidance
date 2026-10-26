@@ -80,7 +80,7 @@ export DATA_AUTH_JWKS_URL="$ISSUER/.well-known/jwks.json"
 pnpm dev:data 2>&1 | label data &
 DATA_PGID="$(ps -o pgid= -p "$!" | tr -d ' ')"
 
-env HOST=0.0.0.0 pnpm dev:gateway 2>&1 | label gateway &
+env HOST=0.0.0.0 pnpm nx serve gateway 2>&1 | label gateway &
 GATEWAY_PGID="$(ps -o pgid= -p "$!" | tr -d ' ')"
 set +m
 
@@ -122,4 +122,8 @@ if [ "$TARGET" = "mobile" ]; then
 fi
 
 echo "dev:local: starting $TARGET. Press Ctrl+C to stop everything."
-pnpm "dev:$TARGET"
+if [ "$TARGET" = "mobile" ]; then
+  pnpm nx start mobile
+else
+  pnpm nx serve web
+fi

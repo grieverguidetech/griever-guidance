@@ -102,6 +102,8 @@ jobs:
   e2e:
     name: Playwright e2e (desktop, Android, iPhone)
     runs-on: ubuntu-latest
+    # A hung browser install once held this job for 47 minutes; fail fast instead.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -114,14 +116,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Key the browser cache on the Playwright version, not the whole lockfile, so an unrelated
+      # dependency change does not force a slow browser download.
+      - name: Playwright version
+        id: pw-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         id: pw-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium webkit
 
       - if: steps.pw-cache.outputs.cache-hit == 'true'
