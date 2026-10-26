@@ -1,9 +1,16 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { BackHandler, Modal } from 'react-native';
+import { AccessibilityInfo, BackHandler, Modal } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
 import { HubScreen } from './HubScreen';
+
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+// This path is specific to this react-native version. Re-check it when react-native is upgraded.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
 
 const anna = {
   id: 'a',
@@ -36,16 +43,40 @@ describe('HubScreen', () => {
     expect(screen.getByText('For Anna')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Start' })).toHaveLength(1);
     expect(screen.getByRole('button', { name: /Share the service/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Share the obituary/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Send thank-yous/ })).toBeTruthy();
+  });
+
+  it('lists the obituary with a calm reason and no way to start it (no link step on mobile, C10)', () => {
+    const { onStart } = setup();
+    expect(screen.getByText('Share the obituary')).toBeTruthy();
+    expect(screen.getByText('Not in the app yet. You can do this one on the web.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Share the obituary/ })).toBeNull();
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
+  it('keeps the obituary unavailable when it is the next step', () => {
+    const done = {
+      ...anna,
+      recipientsNotified: { announcement: ['c1'], service: ['c1'] },
+      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z', service: '2026-10-03T12:00:00.000Z' },
+    } as unknown as Session;
+    setup(done);
+    expect(screen.queryByRole('button', { name: 'Start' })).toBeNull();
+    expect(screen.getByText('Not in the app yet. You can do this one on the web.')).toBeTruthy();
+  });
+
+  it('moves screen-reader focus to the heading when it opens', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    setup();
+    expect(focus).toHaveBeenCalledWith(1);
   });
 
   it('starts the announcement from Start, and a later step from its row', () => {
     const { onStart } = setup();
     fireEvent.press(screen.getByRole('button', { name: 'Start' }));
     expect(onStart).toHaveBeenLastCalledWith('announce');
-    fireEvent.press(screen.getByRole('button', { name: /Share the obituary/ }));
-    expect(onStart).toHaveBeenLastCalledWith('obituary');
+    fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
+    expect(onStart).toHaveBeenLastCalledWith('thanks');
   });
 
   it('answers Back and Edit person', () => {
@@ -88,20 +119,46 @@ describe('HubScreen', () => {
     expect(screen.getByText('Not today. Just so none of it surprises you.')).toBeTruthy();
   });
 
-  it('with payments on, locks the paid steps: they read as unavailable, say why, and open the placeholder', () => {
+  it('Android Back goes Home, but not while a sheet is open', () => {
+    let handler: (() => boolean) | undefined;
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, h) => {
+      handler = h as () => boolean;
+      return { remove: () => undefined };
+    });
+    const { onBack } = setup();
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    let handled = true;
+    act(() => {
+      handled = handler?.() ?? true;
+    });
+    expect(handled).toBe(false);
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it('with payments on, locks the paid steps: focusable, not disabled, with the reason as a hint', () => {
     const { onStart } = setup(anna, true);
     const service = screen.getByRole('button', { name: /Share the service/ });
-    expect(service.props.accessibilityState).toEqual({ disabled: true });
+    // No accessibility disabled state: on native it swallows the tap, and TalkBack can refuse it (#292).
+    expect(service.props.accessibilityState?.disabled).not.toBe(true);
     expect(service.props.accessibilityHint).toBe('Included with the full plan');
-    expect(screen.getByRole('button', { name: /Share the obituary/ }).props.accessibilityState).toEqual({ disabled: false });
+    expect(screen.getByRole('button', { name: /Send thank-yous/ }).props.accessibilityHint).toBe('Included with the full plan');
     fireEvent.press(service);
     expect(onStart).not.toHaveBeenCalled();
     expect(screen.getByText('Payment details will go here.')).toBeTruthy();
   });
 
+  it('after the placeholder is dismissed, screen-reader focus goes back to the locked row', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    setup(anna, true);
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
+    expect(focus).toHaveBeenCalledWith(1);
+  });
+
   it('with payments off, locks nothing', () => {
     setup(anna, false);
-    expect(screen.getByRole('button', { name: /Share the service/ }).props.accessibilityState).toEqual({ disabled: false });
+    expect(screen.getByRole('button', { name: /Share the service/ }).props.accessibilityHint).toBeUndefined();
   });
 
   it('uses no exclamation points', () => {

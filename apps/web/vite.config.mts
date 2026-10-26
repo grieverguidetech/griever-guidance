@@ -29,9 +29,12 @@ export default defineConfig(() => ({
   ...vitestConfig('jsdom', {
     // Shared components (libs/ui) are written for React Native; on web they render through
     // react-native-web. This alias applies to Vitest, `vite dev` and `vite build` alike.
-    resolve: { alias: { 'react-native': 'react-native-web' } },
+    // .web.tsx files in libs/ui win over their native twins.
+    resolve: { alias: { 'react-native': 'react-native-web/dist/index.js' }, extensions: ['.web.tsx', '.web.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'], },
     test: {
       setupFiles: ['src/test-setup.ts'],
+      // The ES build of react-native-web, so libs/ui/src/phrasing.web.tsx and Text share one context.
+      server: { deps: { inline: ['react-native-web'] } },
       // #257: the whole-App journeys are CPU-bound (about 1 s alone, 5 to 30 s when
       // check:affected runs every project at once). Fewer workers stop the web specs
       // fighting each other; the longer limit covers the slice that other projects take.

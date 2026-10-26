@@ -14,6 +14,7 @@
   "metaStarted": "Started",
   "metaSendAgain": "Send again",
   "lockedReason": "Included with the full plan",
+  "notInAppYet": "Not in the app yet. You can do this one on the web.",
   "moments": {
     "announce": { "title": "Announce the passing", "body": "A gentle note letting people know.", "doneLabel": "Told close family" },
     "service": { "title": "Share the service", "body": "Once you've set the date with the funeral home.", "doneLabel": "Shared the service" },

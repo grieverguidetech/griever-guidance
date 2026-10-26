@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { BackHandler, ScrollView, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
+import { AccessibilityInfo, BackHandler, findNodeHandle, ScrollView, StyleSheet, Text } from 'react-native';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
@@ -15,6 +16,12 @@ const copy = screenCopy('pathLanding');
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
+
+/**
+ * Steps this app cannot do yet. Mobile has no step for the obituary link (C10), so the hub lists
+ * the obituary with a calm reason instead of sending someone to contacts with no link.
+ */
+const NOT_IN_APP_YET: MomentKey[] = ['obituary'];
 
 /** Where a moment's drafts are kept. */
 export const CATEGORY_BY_MOMENT: Record<MomentKey, TemplateCategory> = {
@@ -44,15 +51,38 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
   const moments = usePathMoments(session);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const heading = useRef<ComponentRef<typeof Text>>(null);
+  // The locked row that opened the placeholder, so screen-reader focus can go back to it.
+  const opener = useRef<unknown>(null);
+  const sheetOpen = useRef(false);
+  sheetOpen.current = checklistOpen || paywallOpen;
 
-  // Android Back goes Home, as the Back button does. An open sheet takes Back first (its own handler).
+  // The heading takes screen-reader focus when the hub opens (after a screen swap).
+  useEffect(() => {
+    const handle = heading.current ? findNodeHandle(heading.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  }, []);
+
+  // Android Back goes Home, as the Back button does. A sheet that is open takes Back first.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (sheetOpen.current) {
+        return false;
+      }
       onBack();
       return true;
     });
     return () => sub.remove();
   }, [onBack]);
+
+  const focusOpener = () => {
+    const handle = opener.current ? findNodeHandle(opener.current as ComponentRef<typeof Text>) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
 
   const rows: HubRow[] = moments.map((moment) => {
     const started = isDraftStarted(session.drafts[CATEGORY_BY_MOMENT[moment.key]]);
@@ -61,6 +91,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
       status: moment.status,
       started,
       locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
+      unavailable: NOT_IN_APP_YET.includes(moment.key),
       meta:
         moment.status === 'done'
           ? doneRowMeta(copy, {
@@ -82,10 +113,14 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
         onWhatYoullNeed={() => setChecklistOpen(true)}
         onEdit={onEditPerson}
         onStart={onStart}
-        onLocked={() => setPaywallOpen(true)}
+        onLocked={(row) => {
+          opener.current = row;
+          setPaywallOpen(true);
+        }}
+        headingRef={heading}
       />
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} />
-      {paymentsEnabled && <PaywallPlaceholder visible={paywallOpen} onClose={() => setPaywallOpen(false)} />}
+      {paymentsEnabled && <PaywallPlaceholder visible={paywallOpen} onClose={() => setPaywallOpen(false)} onDismiss={focusOpener} />}
     </ScrollView>
   );
 }

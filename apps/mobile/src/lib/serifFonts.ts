@@ -17,7 +17,12 @@ export const serifFontFiles = {
 /**
  * Registers the serif. Nothing waits on it: until it is ready, or if it fails, text shows in the
  * system font. Waiting would put a blank screen in front of someone who needs the app now.
+ *
+ * Returns true once the fonts have loaded (or failed). React Native does not re-read a font family
+ * for text that already drew in the system font, so libs/ui changes its font style when this turns true
+ * (SerifReadyContext).
  */
-export function useSerifFonts(): void {
-  useFonts(serifFontFiles);
+export function useSerifFonts(): boolean {
+  const [loaded, error] = useFonts(serifFontFiles);
+  return loaded || error !== null;
 }

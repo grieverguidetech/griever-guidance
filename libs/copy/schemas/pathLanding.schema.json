@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": [
     "heading", "intro", "forName", "back", "checklist", "editPerson", "start", "continue",
-    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "lockedReason", "finishNote", "moments"
+    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "lockedReason", "notInAppYet", "finishNote", "moments"
   ],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
@@ -23,6 +23,7 @@
     "metaStarted": { "$ref": "#/$defs/text" },
     "metaSendAgain": { "$ref": "#/$defs/text" },
     "lockedReason": { "$ref": "#/$defs/text" },
+    "notInAppYet": { "$ref": "#/$defs/text" },
     "finishNote": {
       "type": "object",
       "additionalProperties": false,

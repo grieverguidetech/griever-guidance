@@ -149,6 +149,41 @@ describe('people kept on the phone', () => {
     expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
   });
 
+  describe('the hub hands over to a moment (no picker, never a blank screen)', () => {
+    const resumed = (templateCategory: 'announcement' | 'aftercare', step: 'review' | 'details', fields: Record<string, string>) =>
+      ({ ...freshDraft({}), templateCategory, step, fields });
+    const withDrafts = async (drafts: Record<string, unknown>) => {
+      const person = {
+        id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x',
+        drafts, draftsUpdatedAt: { aftercare: '2026-10-02T00:00:00.000Z' },
+        serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+      };
+      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
+      await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
+    };
+
+    it('Continue on a moment left past its first form reopens it where it was', async () => {
+      await withDrafts({ aftercare: resumed('aftercare', 'review', { deceasedName: 'Anna Lee' }) });
+      render(<App />);
+      fireEvent.press(await screen.findByLabelText('Anna'));
+      await openThankYous();
+      expect(await screen.findByText('Review your message')).toBeTruthy();
+    });
+
+    it("another moment's Start goes to that moment's first form, and the first moment's draft stays", async () => {
+      const kept = resumed('aftercare', 'review', { deceasedName: 'Anna Lee' });
+      await withDrafts({ aftercare: kept });
+      render(<App />);
+      fireEvent.press(await screen.findByLabelText('Anna'));
+      fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+      expect(await screen.findByPlaceholderText('She was peaceful, and we were with her.')).toBeTruthy();
+      await waitFor(async () => {
+        const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
+        expect(saved.drafts.aftercare).toEqual(kept);
+      });
+    });
+  });
+
   it('reuses a blank person instead of adding another', async () => {
     render(<App />);
     await begin();

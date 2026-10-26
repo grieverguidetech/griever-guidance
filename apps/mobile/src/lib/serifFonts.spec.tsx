@@ -25,4 +25,11 @@ describe('serif fonts', () => {
     expect(mockUseFonts).toHaveBeenCalledWith(serifFontFiles);
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
+
+  it('still shows the first screen once the fonts have loaded (no remount: shared text just changes font)', async () => {
+    mockUseFonts.mockReturnValue([true, null]);
+    render(<App />);
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    mockUseFonts.mockReturnValue([false, null]);
+  });
 });
