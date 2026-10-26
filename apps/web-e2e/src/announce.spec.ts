@@ -65,10 +65,17 @@ test('sends one person at a time, then opens the path with a quiet note (C1)', a
 
   // Done on the last person opens the path at once; nothing times out (#176).
   await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
+  // The screen-reader status repeats the note about 100 ms later, so match only the visible note.
+  const shownNote = page.locator(':not([role="status"])');
   await expect(
-    page.getByText('You told 1 of 2. You can text the others from your own Messages app any time.'),
+    page
+      .getByText('You told 1 of 2. You can text the others from your own Messages app any time.')
+      .and(shownNote),
   ).toBeVisible();
-  await expect(page.getByText(/We don't keep a copy of what was sent/)).toBeVisible();
+  await expect(page.getByText(/We don't keep a copy of what was sent/).and(shownNote)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: /You told 1 of 2/ })).toContainText(
+    "We don't keep a copy of what was sent",
+  );
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByText(/You told 1 of 2/)).toHaveCount(0);
 });
