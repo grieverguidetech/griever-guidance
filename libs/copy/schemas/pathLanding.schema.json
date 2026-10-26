@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the path landing (hub) screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading", "intro", "forName", "back", "checklist", "editPerson", "start", "continue",
+    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "moments"
+  ],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "intro": { "$ref": "#/$defs/text" },
+    "forName": { "type": "string", "pattern": "\\{name\\}" },
+    "back": { "$ref": "#/$defs/text" },
+    "checklist": { "$ref": "#/$defs/text" },
+    "editPerson": { "$ref": "#/$defs/text" },
+    "start": { "$ref": "#/$defs/text" },
+    "continue": { "$ref": "#/$defs/text" },
+    "tagStarted": { "$ref": "#/$defs/text" },
+    "tagNext": { "$ref": "#/$defs/text" },
+    "person": { "$ref": "#/$defs/text" },
+    "people": { "$ref": "#/$defs/text" },
+    "metaStarted": { "$ref": "#/$defs/text" },
+    "metaSendAgain": { "$ref": "#/$defs/text" },
+    "moments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["announce", "service", "obituary", "thanks"],
+      "properties": {
+        "announce": { "$ref": "#/$defs/moment" },
+        "service": { "$ref": "#/$defs/moment" },
+        "obituary": { "$ref": "#/$defs/moment" },
+        "thanks": { "$ref": "#/$defs/moment" }
+      }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "moment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "body", "doneLabel"],
+      "properties": {
+        "title": { "$ref": "#/$defs/text" },
+        "body": { "$ref": "#/$defs/text" },
+        "doneLabel": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}

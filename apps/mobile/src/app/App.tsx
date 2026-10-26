@@ -24,6 +24,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
+import { useSerifFonts } from '../lib/serifFonts';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
 export const CONTACTS_CHECK_FALLBACK_MS = 1500;
@@ -434,13 +435,15 @@ const SendAppWhenReady = () => {
 };
 
 // With the flag off this is exactly the send flow; no account code runs.
-export const App = () =>
-  AUTH_ENABLED ? (
+export const App = () => {
+  useSerifFonts();
+  return AUTH_ENABLED ? (
     <AccountProvider>
       <SendAppWhenReady />
     </AccountProvider>
   ) : (
     <SendAppWhenReady />
   );
+};
 
 export default App;

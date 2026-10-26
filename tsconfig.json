@@ -50,6 +50,15 @@
     },
     {
       "path": "./libs/data-access"
+    },
+    {
+      "path": "./libs/tokens"
+    },
+    {
+      "path": "./libs/copy"
+    },
+    {
+      "path": "./libs/ui"
     }
   ]
 }
