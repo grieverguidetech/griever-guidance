@@ -32,6 +32,15 @@ export interface AdapterInputs {
   signOut(): Promise<void>;
 }
 
+/** Clerk reports a lost connection with the code `network_error`, or the fetch's own TypeError. */
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return true;
+  }
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 'network_error';
+}
+
 /**
  * Maps Clerk to the shared `AccountAuth` seam (the same rules as the web adapter). `signed_out` only
  * when a sign-out is pending on this device, or Clerk is `ready` and says there is no session.
@@ -58,6 +67,8 @@ export function toAccountAuth({ clerk, ready, hydrated, signOutPending, marker, 
   return {
     status,
     userId,
+    // A marker-based signed_in has no token source until Clerk has loaded and is ready or holds the session (#343).
+    settled: clerk.isLoaded && (ready || clerk.isSignedIn === true),
     async getToken(options) {
       if (status === 'signed_out') {
         return { ok: false, reason: 'signed_out' };
@@ -71,9 +82,10 @@ export function toAccountAuth({ clerk, ready, hydrated, signOutPending, marker, 
       try {
         const token = await clerk.getToken({ skipCache: options?.forceRefresh === true });
         return token ? { ok: true, token } : { ok: false, reason: 'signed_out' };
-      } catch {
+      } catch (error) {
         // Any failure to get a token keeps the person signed in; only a null token means signed out.
-        return { ok: false, reason: 'offline' };
+        // Only a network failure reads as offline; anything else is a plain failure (#343).
+        return { ok: false, reason: isNetworkError(error) ? 'offline' : 'failed' };
       }
     },
     signOut,

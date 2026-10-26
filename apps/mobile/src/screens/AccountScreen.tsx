@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { screenCopy } from '@griever/copy';
 import { SerifText as Text, Button } from '@griever/ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
@@ -10,7 +11,9 @@ import { SignUpScreen } from './SignUpScreen';
 import { ProfileScreen } from './ProfileScreen';
 import { ChecklistRows } from './WhatYoullNeedScreen';
 
-export const UNAVAILABLE = "Accounts aren't available right now.";
+const copy = screenCopy('account');
+
+export const UNAVAILABLE = copy.unavailable;
 
 // A name typed at sign-up stays here until it is saved, even if the person leaves this screen.
 // It is tied to the sign-up email so it can never be applied to a different account.
@@ -41,10 +44,12 @@ function AccountChecklist({ tipOpen, onTipChange }: { tipOpen: string | null; on
  */
 function AccountBody({
   identity,
+  onBack,
   tipOpen,
   onTipChange,
 }: {
   identity: UseAccountResult;
+  onBack: () => void;
   tipOpen: string | null;
   onTipChange: (id: string | null) => void;
 }) {
@@ -100,7 +105,9 @@ function AccountBody({
     setMode(next);
   }
 
-  if (identity.isLoading) return <LoadingOrUnavailable text="One moment." />;
+  if (identity.isLoading) {
+    return <LoadingOrUnavailable text={copy.loading} onBack={onBack} />;
+  }
   if (isSignedIn || ended) {
     return (
       <>
@@ -108,6 +115,7 @@ function AccountBody({
           identity={identity}
           initialName={pendingName?.name}
           onSaved={clearPending}
+          onBack={onBack}
           sessionEnded={ended}
           onSignOut={() => {
             explicitSignOut.current = true;
@@ -127,27 +135,43 @@ function AccountBody({
   }
   if (mode === 'signUp') {
     return (
-      <SignUpScreen
-        onSwitchToSignIn={() => switchMode('signIn')}
-        onCreated={(name, email) => setPendingName({ name, email })}
-      />
+      <>
+        <BackRow onBack={onBack} />
+        <SignUpScreen
+          onSwitchToSignIn={() => switchMode('signIn')}
+          onCreated={(name, email) => setPendingName({ name, email })}
+        />
+      </>
     );
   }
   return (
-    <SignInScreen
-      onSwitchToSignUp={() => switchMode('signUp')}
-      onAttempt={(email) => {
-        // Signing in as someone else: the sign-up name is not theirs.
-        if (pendingName && !sameEmail(pendingName.email, email)) clearPending();
-      }}
-    />
+    <>
+      <BackRow onBack={onBack} />
+      <SignInScreen
+        onSwitchToSignUp={() => switchMode('signUp')}
+        onAttempt={(email) => {
+          // Signing in as someone else: the sign-up name is not theirs.
+          if (pendingName && !sameEmail(pendingName.email, email)) clearPending();
+        }}
+      />
+    </>
   );
 }
 
-function LoadingOrUnavailable({ text }: { text: string }) {
+/** Back for the screens that are not the shared Account (which has its own). */
+function BackRow({ onBack }: { onBack: () => void }) {
+  return (
+    <View style={styles.backRow}>
+      <Button label={copy.back} variant="header" onPress={onBack} />
+    </View>
+  );
+}
+
+function LoadingOrUnavailable({ text, onBack }: { text: string; onBack: () => void }) {
   return (
     <>
-      <ScreenHeader>Your account</ScreenHeader>
+      <BackRow onBack={onBack} />
+      <ScreenHeader>{copy.heading}</ScreenHeader>
       <Text style={authStyles.body}>{text}</Text>
     </>
   );
@@ -177,10 +201,11 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
         // A touch anywhere on the page closes an open tip; the info button stops its own touch.
         onTouchStart={() => setTipOpen(null)}
       >
-        <View style={styles.backRow}>
-          <Button label="Back" variant="header" onPress={onBack} />
-        </View>
-        {identity ? <AccountBody identity={identity} tipOpen={tipOpen} onTipChange={setTipOpen} /> : <LoadingOrUnavailable text={UNAVAILABLE} />}
+        {identity ? (
+          <AccountBody identity={identity} onBack={onBack} tipOpen={tipOpen} onTipChange={setTipOpen} />
+        ) : (
+          <LoadingOrUnavailable text={UNAVAILABLE} onBack={onBack} />
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -86,6 +86,24 @@ describe('toAccountAuth getToken', () => {
     expect(await auth.getToken()).toEqual({ ok: false, reason: 'offline' });
   });
 
+  it('maps any other getToken failure to failed, not offline (#343)', async () => {
+    const auth = adapt({
+      clerk: {
+        getToken: async () => {
+          throw new Error('Something broke');
+        },
+      },
+    });
+    expect(await auth.getToken()).toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('is not settled until Clerk has loaded and is ready or holds a session (#343)', () => {
+    expect(adapt({ clerk: notLoaded, marker: 'u' }).settled).toBe(false);
+    expect(adapt({ ready: false, marker: 'u', clerk: { isSignedIn: false, userId: null } }).settled).toBe(false);
+    expect(adapt().settled).toBe(true);
+    expect(adapt({ ready: false }).settled).toBe(true);
+  });
+
   it('does not ask Clerk for a token when signed out, and reads an unconfirmed Clerk as offline', async () => {
     const getToken = jest.fn(async () => 'tok');
     expect(await adapt({ clerk: { isSignedIn: false, getToken } }).getToken()).toEqual({ ok: false, reason: 'signed_out' });

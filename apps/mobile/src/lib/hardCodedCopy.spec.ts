@@ -18,6 +18,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'whoShouldKnow', file: 'screens/ContactSelectorScreen.tsx' },
   { copy: 'review', file: 'screens/ConfirmScreen.tsx' },
   { copy: 'shareObituary', file: 'screens/ShareObituaryScreen.tsx' },
+  { copy: 'account', file: 'screens/ProfileScreen.tsx' },
 ];
 
 describe('migrated screens do not hard-code copy', () => {

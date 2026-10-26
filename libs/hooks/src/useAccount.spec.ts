@@ -159,6 +159,26 @@ describe('useAccount boot', () => {
 });
 
 describe('useAccount offline (C5)', () => {
+  it('does not load the profile, or say offline, while the provider has not settled; loads when it does (#343)', async () => {
+    const getToken = vi.fn(async () => ({ ok: true as const, token: 'tok' }));
+    const unsettled = fakeAuth({ settled: false, getToken: async () => ({ ok: false, reason: 'offline' }) });
+    const { result, rerender } = renderHook(({ auth }) => useAccount({ auth }), { initialProps: { auth: unsettled } });
+    await act(async () => undefined);
+    expect(result.current.offline).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    rerender({ auth: fakeAuth({ settled: true, getToken }) });
+    await waitFor(() => expect(result.current.profile?.senderName).toBe('Peter'));
+    expect(result.current.offline).toBe(false);
+  });
+
+  it('a token that failed for a non-network reason is an error, not offline (#343)', async () => {
+    const auth = fakeAuth({ getToken: async () => ({ ok: false, reason: 'failed' }) });
+    const { result } = renderHook(() => useAccount({ auth }));
+    await act(async () => undefined);
+    expect(result.current.offline).toBe(false);
+    expect(result.current.isSignedIn).toBe(true);
+  });
+
   it('a token offline result sets offline, keeps the user signed in and keeps the cache', async () => {
     const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     const auth = fakeAuth({ getToken: async () => ({ ok: false, reason: 'offline' }) });

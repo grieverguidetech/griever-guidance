@@ -1,13 +1,15 @@
-import { useId, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
-import { TopBar } from '../lib/ui';
+import { useId, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
+import { screenCopy } from '@griever/copy';
+import { Account } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
 import { ChecklistRows } from '../lib/ChecklistRows';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
-const SAVE_FAILED = "We couldn't save your name. You can try again.";
-const NAME_REQUIRED = 'Please enter your name.';
+const copy = screenCopy('account');
 
 interface Props {
-  /** True when the account has no name yet: asks "What should we call you?" instead. */
+  /** True when the account has no name yet: asks for a name instead of showing the account page. */
   asksName?: boolean;
   /** The saved name, if one is known yet. It can arrive after the screen opens. */
   senderName: string | null;
@@ -28,6 +30,7 @@ interface Props {
   showChecklist?: boolean;
 }
 
+/** The screen is the shared Account in libs/ui; this holds what is web only: saving, the sheet, and the list under the form. */
 export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping, showChecklist = true }: Props) {
   const id = useId();
   // Until the person types, show whatever name is known, including one that loads late.
@@ -35,17 +38,20 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const checklistButton = useRef<ButtonNode>(null);
   const value = typed ?? senderName ?? '';
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (pending) return;
+  async function submit() {
+    if (pending) {
+      return;
+    }
     if (firstTime) {
       onContinue?.(value.trim());
       return;
     }
     if (!value.trim()) {
-      setNameError(NAME_REQUIRED);
+      setNameError(copy.nameRequired);
       return;
     }
     setNameError(null);
@@ -65,68 +71,71 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
   // The name prompt and the first visit stay short: the list shows on the everyday account page.
   const showList = showChecklist && !asksName && !firstTime;
 
-  const form = (
-    <form className="flex flex-col gap-4" onSubmit={submit}>
-      <TopBar onBack={onBack} hideChecklist={showList} />
-      <h1 className="text-[22px]">{asksName ? 'What should we call you?' : 'Your account'}</h1>
-      {(asksName || firstTime) && (
-        <p id={`${id}-intro`} className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          {asksName ? 'This is the name on your account.' : 'This is the name on your account. You can change it later.'}
-        </p>
-      )}
+  let message = '';
+  if (nameError) {
+    message = nameError;
+  } else if (saveFailed) {
+    message = copy.saveFailed;
+  } else if (error) {
+    message = error;
+  } else if (saved) {
+    message = copy.saved;
+  }
+  const isError = Boolean(nameError || error || saveFailed);
 
-      <div className="gg-field">
-        <label htmlFor={`${id}-name`}>Your name</label>
-        <input
-          id={`${id}-name`}
-          className="gg-input"
-          type="text"
-          autoComplete="name"
-          autoCapitalize="words"
-          required={!firstTime}
-          aria-describedby={asksName || firstTime ? `${id}-intro` : undefined}
-          value={value}
-          onChange={(e) => {
-            setTyped(e.target.value);
-            setSaved(false);
-            setNameError(null);
-          }}
-        />
-      </div>
+  let intro: string | undefined;
+  if (firstTime) {
+    intro = copy.firstTimeIntro;
+  } else if (asksName) {
+    intro = copy.askIntro;
+  }
+  let primaryLabel = copy.save;
+  if (firstTime) {
+    primaryLabel = copy.continue;
+  } else if (pending) {
+    primaryLabel = copy.saving;
+  }
 
-      <div
-        aria-live="polite"
-        className="text-[13px]"
-        style={nameError || error || saveFailed ? { color: 'var(--color-danger, #b91c1c)' } : undefined}
-      >
-        {nameError ?? (saveFailed ? SAVE_FAILED : (error ?? (saved ? 'Your name is saved.' : '')))}
-      </div>
-
-      {firstTime ? (
-        <button type="submit" className="gg-btn gg-btn-primary gg-btn-block">
-          Continue
-        </button>
-      ) : (
-        <>
-          <button type="submit" aria-disabled={pending} className="gg-btn gg-btn-primary gg-btn-block">
-            {pending ? 'Saving…' : 'Save'}
-          </button>
-          <button type="button" onClick={onSignOut} className="gg-btn gg-btn-ghost gg-btn-block">
-            Sign out
-          </button>
-        </>
-      )}
-    </form>
+  const screen = (
+    <Account
+      copy={copy}
+      asksName={asksName}
+      intro={intro}
+      name={value}
+      onNameChange={(next) => {
+        setTyped(next);
+        setSaved(false);
+        setNameError(null);
+      }}
+      primaryLabel={primaryLabel}
+      primaryBusy={pending}
+      onPrimary={() => void submit()}
+      onSignOut={firstTime ? undefined : onSignOut}
+      status={{ message, tone: isError ? 'danger' : 'muted' }}
+      onBack={onBack}
+      // The list is on the page when it shows, so the button would be a second way to the same thing.
+      onWhatYoullNeed={showList ? undefined : () => setSheetOpen(true)}
+      checklistRef={checklistButton}
+    />
   );
-  if (!peopleHelping && !showList) return form;
-  // The invite form is its own form, so it sits beside this one, never inside it.
+  const sheet = sheetOpen ? (
+    <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />
+  ) : null;
+  if (!peopleHelping && !showList) {
+    return (
+      <>
+        {screen}
+        {sheet}
+      </>
+    );
+  }
   return (
     <div className="flex flex-col gap-6">
-      {form}
+      {screen}
       {showList && (
         <section aria-labelledby={`${id}-need`} className="flex flex-col gap-3">
           <h2 id={`${id}-need`} className="text-[16px] m-0">
-            What you'll need
+            {copy.checklist}
           </h2>
           <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
             Not today. Just so none of it surprises you.
@@ -135,6 +144,7 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
         </section>
       )}
       {peopleHelping}
+      {sheet}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import pathLanding from '../screens/pathLanding.json';
+import account from '../screens/account.json';
 import announce from '../screens/announce.json';
 import paywall from '../screens/paywall.json';
 import review from '../screens/review.json';
@@ -8,6 +9,6 @@ import signUp from '../screens/signUp.json';
 import whoShouldKnow from '../screens/whoShouldKnow.json';
 
 /** Every screen's copy. To add a screen: JSON in screens/, schema in schemas/, one line here. */
-export const screens = { announce, pathLanding, paywall, review, shareObituary, signIn, signUp, whoShouldKnow } as const;
+export const screens = { account, announce, pathLanding, paywall, review, shareObituary, signIn, signUp, whoShouldKnow } as const;
 
 export type ScreenName = keyof typeof screens;

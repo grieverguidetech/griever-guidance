@@ -6,7 +6,7 @@ export type AccountAuthStatus = 'loading' | 'signed_in' | 'signed_out';
  */
 export type AccountTokenResult =
   | { ok: true; token: string }
-  | { ok: false; reason: 'signed_out' | 'offline' };
+  | { ok: false; reason: 'signed_out' | 'offline' | 'failed' };
 
 /**
  * The only seam between the app's sign-in provider and the shared libs. Each app writes a small
@@ -20,6 +20,12 @@ export interface AccountAuth {
   status: AccountAuthStatus;
   /** null unless `status` is `signed_in`. */
   userId: string | null;
+  /**
+   * False while the provider cannot yet give a token (it is still loading), although `status` already
+   * says `signed_in` from a stored marker. The profile load waits for true and runs when it flips.
+   * Leave unset when the provider is always ready.
+   */
+  settled?: boolean;
   /** `forceRefresh` asks for a new token instead of a cached one; used once after a 401. */
   getToken(options?: { forceRefresh?: boolean }): Promise<AccountTokenResult>;
   signOut(): Promise<void>;
