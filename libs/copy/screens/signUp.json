@@ -1,0 +1,26 @@
+{
+  "heading": "Create an account",
+  "intro": "Your name is used as the sender on messages you send.",
+  "nameLabel": "Your name",
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "passwordHint": "Use at least {min} characters.",
+  "passwordTooShort": "Please choose a password with at least {min} characters.",
+  "nameRequired": "Please enter your name.",
+  "submit": "Create account",
+  "submitBusy": "Creating account",
+  "busyAnnounce": "Creating account",
+  "haveAccount": "I already have an account",
+  "code": {
+    "heading": "Check your email",
+    "intro": "We sent a 6-digit code to {email}.",
+    "label": "6-digit code",
+    "submit": "Create account",
+    "submitBusy": "Checking",
+    "busyAnnounce": "Checking the code",
+    "resend": "Send a new code",
+    "resendBusy": "Sending a new code",
+    "newCodeSent": "We sent a new code.",
+    "differentEmail": "Use a different email"
+  }
+}

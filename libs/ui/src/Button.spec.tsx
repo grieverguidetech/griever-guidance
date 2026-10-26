@@ -13,6 +13,15 @@ describe('Button', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('stays focusable and pressable on web when busy (busy is a native accessibility state)', async () => {
+    const onPress = vi.fn();
+    render(<Button label="Save" onPress={onPress} busy />);
+    const button = screen.getByRole('button', { name: 'Save' });
+    expect(button).not.toBeDisabled();
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+  });
+
   it('is a real button element', () => {
     render(<Button label="Start" onPress={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Start' }).tagName).toBe('BUTTON');

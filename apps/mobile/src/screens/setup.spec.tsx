@@ -20,7 +20,7 @@ const setup = (initial = { personName: '', dateOfPassing: '' }) => {
 describe('SetupScreen', () => {
   it('has a header, labelled inputs and no obituary field (C10)', () => {
     setup();
-    expect(screen.getByRole('header', { name: 'Who are we writing about?' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Who are we writing about?' })).toBeTruthy();
     expect(screen.getByLabelText('Their name, required')).toBeTruthy();
     expect(screen.getByLabelText('Date of passing')).toBeTruthy();
     expect(screen.queryByLabelText(/obituary/i)).toBeNull();

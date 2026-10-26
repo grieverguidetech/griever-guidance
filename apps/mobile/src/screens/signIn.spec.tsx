@@ -110,7 +110,7 @@ describe('sign in', () => {
     });
     renderSignIn();
     press('Sign in');
-    await screen.findByRole('header', { name: 'Check your email' });
+    await screen.findByRole('heading', { name: 'Check your email' });
     expect(mockSignIn.mfa.sendEmailCode).toHaveBeenCalledTimes(1);
     type('6-digit code', ' 123456 ');
     press('Sign in');
@@ -125,7 +125,7 @@ describe('sign in', () => {
     });
     renderSignIn();
     press('Email me a code instead');
-    await screen.findByRole('header', { name: 'Check your email' });
+    await screen.findByRole('heading', { name: 'Check your email' });
     expect(mockSignIn.create).toHaveBeenCalledWith({ identifier: 'a@b.co' });
     expect(mockSignIn.emailCode.sendCode).toHaveBeenCalledWith({ emailAddress: 'a@b.co' });
     expect(mockSignIn.password).not.toHaveBeenCalled();
@@ -159,11 +159,11 @@ describe('sign in', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
     focus.mockClear();
     press('Email me a code instead');
-    await screen.findByRole('header', { name: 'Check your email' });
+    await screen.findByRole('heading', { name: 'Check your email' });
     expect(focus).toHaveBeenCalledTimes(1);
     focus.mockClear();
     press('Use a different email');
-    await screen.findByRole('header', { name: 'Sign in' });
+    await screen.findByRole('heading', { name: 'Sign in' });
     expect(focus).toHaveBeenCalledTimes(1);
   });
 
@@ -233,6 +233,13 @@ describe('sign in', () => {
       expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_google', redirectUrl: 'mobile://sso-callback' });
     });
 
+    it('starts Facebook with its own strategy and the app redirect', async () => {
+      mockStartSSO.mockResolvedValue({ createdSessionId: null, authSessionResult: { type: 'cancel' } });
+      renderSignIn();
+      press('Continue with Facebook');
+      await waitFor(() => expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_facebook', redirectUrl: 'mobile://sso-callback' }));
+    });
+
     it('says to use email or Google when Facebook gives no email, and makes no session', async () => {
       const setActive = jest.fn(async () => undefined);
       mockStartSSO.mockResolvedValue({ createdSessionId: null, setActive, signUp: { missingFields: ['email_address'] } });
@@ -281,6 +288,19 @@ describe('sign in', () => {
     });
   });
 
+  it('uses the shared look: error in web\'s danger pink, focus ring in the accent, serif heading', async () => {
+    mockSignIn.password.mockImplementation(fail('form_password_incorrect'));
+    renderSignIn();
+    fireEvent(screen.getByLabelText('Email'), 'focus');
+    expect(StyleSheet.flatten(screen.getByLabelText('Email').props.style)).toMatchObject({ borderColor: '#006786', borderWidth: 2 });
+    fireEvent(screen.getByLabelText('Email'), 'blur');
+    expect(StyleSheet.flatten(screen.getByLabelText('Email').props.style)).toMatchObject({ borderWidth: 1 });
+    press('Sign in');
+    const alert = await screen.findByRole('alert');
+    expect(StyleSheet.flatten(alert.props.style).color).toBe('#aa0b56');
+    expect(StyleSheet.flatten(screen.getByRole('heading', { name: 'Sign in' }).props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
+  });
+
   it('has no exclamation marks and touch targets of at least 44', () => {
     renderSignIn();
     expect(screen.queryAllByText(/!/)).toHaveLength(0);
@@ -309,7 +329,7 @@ describe('sign up', () => {
     renderSignUp();
     fill(' Sam ');
     press('Create account');
-    await screen.findByRole('header', { name: 'Check your email' });
+    await screen.findByRole('heading', { name: 'Check your email' });
     expect(mockSignUp.password).toHaveBeenCalledWith({ emailAddress: 'sam@x.co', password: 'a-long-password' });
     expect(mockSignUp.verifications.sendEmailCode).toHaveBeenCalledTimes(1);
     expect(mockSignUp.finalize).not.toHaveBeenCalled();
@@ -377,7 +397,7 @@ describe('sign up', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
     focus.mockClear();
     press('Create account');
-    await screen.findByRole('header', { name: 'Check your email' });
+    await screen.findByRole('heading', { name: 'Check your email' });
     expect(focus).toHaveBeenCalledTimes(1);
     expect((screen.getByLabelText('6-digit code')).props.maxLength).toBe(6);
     press('Send a new code');

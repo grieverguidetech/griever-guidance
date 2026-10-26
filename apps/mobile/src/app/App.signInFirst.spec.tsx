@@ -58,7 +58,7 @@ beforeEach(() => {
 describe('first screen with accounts on', () => {
   it('opens on sign-in when nobody is signed in', async () => {
     render(<App />);
-    expect(await screen.findByRole('header', { name: 'Sign in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 
@@ -67,7 +67,7 @@ describe('first screen with accounts on', () => {
     mockLaunch = { hydrated: true, signedIn: true };
     render(<App />);
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
   });
 
   it('shows Opening and no sign-in or Home until the local cache is read', async () => {
@@ -75,7 +75,7 @@ describe('first screen with accounts on', () => {
     mockLaunch = { hydrated: false, signedIn: false };
     render(<App />);
     expect(await screen.findByText('Opening…')).toBeTruthy();
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 
@@ -88,7 +88,7 @@ describe('first screen with accounts on', () => {
       mockLaunch = { hydrated: true, signedIn: false };
       mockSetAccount.current(loading);
     });
-    expect(await screen.findByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeTruthy();
     expect(screen.getByText('One moment.')).toBeTruthy();
   });
 
@@ -101,16 +101,16 @@ describe('first screen with accounts on', () => {
 
   it('after sign-in with a name, lands on the normal first screen', async () => {
     render(<App />);
-    await screen.findByRole('header', { name: 'Sign in' });
+    await screen.findByRole('heading', { name: 'Sign in' });
     act(() => mockSetAccount.current(signedIn));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
   it('after sign-in without a name, asks for the name first and stays there', async () => {
     render(<App />);
-    await screen.findByRole('header', { name: 'Sign in' });
+    await screen.findByRole('heading', { name: 'Sign in' });
     act(() => mockSetAccount.current(account({ status: 'signed_in', isSignedIn: true })));
-    expect(await screen.findByRole('header', { name: 'What should we call you?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'What should we call you?' })).toBeTruthy();
   });
 
   it('a session that ends later keeps the person on Home', async () => {
@@ -120,24 +120,24 @@ describe('first screen with accounts on', () => {
     await screen.findByText("Who you're writing about");
     act(() => mockSetAccount.current(signedOut));
     expect(screen.getByText("Who you're writing about")).toBeTruthy();
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
   });
 
   it('Back from the first sign-in screen goes to the normal first screen', async () => {
     render(<App />);
-    await screen.findByRole('header', { name: 'Sign in' });
+    await screen.findByRole('heading', { name: 'Sign in' });
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
   it('Back from the first sign-in screen leaves it for good: Home is Home after a flow', async () => {
     render(<App />);
-    await screen.findByRole('header', { name: 'Sign in' });
+    await screen.findByRole('heading', { name: 'Sign in' });
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     fireEvent.press(await screen.findByText("Start with someone I've lost"));
     fireEvent.press(await screen.findByLabelText('Back to home'));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
   });
 
   it('Sign out on the account screen keeps the person on sign-in', async () => {
@@ -151,6 +151,6 @@ describe('first screen with accounts on', () => {
     render(<App />);
     fireEvent.press(await screen.findByText('Your account'));
     fireEvent.press(await screen.findByText('Sign out'));
-    expect(await screen.findByRole('header', { name: 'Sign in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
   });
 });

@@ -1,0 +1,27 @@
+{
+  "heading": "Sign in",
+  "intro": "Sign in to keep your name on your messages.",
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "submit": "Sign in",
+  "submitBusy": "Signing in",
+  "busyAnnounce": "Signing in",
+  "emailCode": "Email me a code instead",
+  "emailCodeBusy": "Sending a code",
+  "createAccount": "Create an account",
+  "google": "Continue with Google",
+  "facebook": "Continue with Facebook",
+  "browserAnnounce": "Opening your browser",
+  "code": {
+    "heading": "Check your email",
+    "intro": "We sent a 6-digit code to {email}.",
+    "label": "6-digit code",
+    "submit": "Sign in",
+    "submitBusy": "Checking",
+    "busyAnnounce": "Checking the code",
+    "resend": "Send a new code",
+    "resendBusy": "Sending a new code",
+    "newCodeSent": "We sent a new code.",
+    "differentEmail": "Use a different email"
+  }
+}

@@ -10,4 +10,4 @@ export { Row } from './Row';
 export type { RowProps } from './Row';
 export { Hub } from './screens/Hub';
 export type { HubCopy, HubMomentKey, HubProps, HubRow } from './screens/Hub';
-export { SerifReadyContext } from './typography';
+export { SerifReadyContext, useSerifStyle } from './typography';

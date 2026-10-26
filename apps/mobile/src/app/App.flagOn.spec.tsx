@@ -27,7 +27,7 @@ describe('App with the account feature on', () => {
     fireEvent.press(await screen.findByText('Your account'));
     // No Clerk key in tests, so accounts are unavailable and the screen says so calmly.
     expect(await screen.findByText("Accounts aren't available right now.")).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
     expect(mockClerkProvider).not.toHaveBeenCalled();
   });
 

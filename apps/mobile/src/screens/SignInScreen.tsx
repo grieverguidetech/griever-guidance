@@ -1,7 +1,8 @@
 import { useRef, useState, type ComponentRef } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useSignIn } from '@clerk/expo';
-import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, announce, authStyles } from '../components/authForm';
+import { fill, screenCopy } from '@griever/copy';
+import { ErrorText, Field, Intro, LinkButton, Notice, PrimaryButton, ScreenHeader, announce } from '../components/authForm';
 import { SocialButtons } from '../components/SocialButtons';
 import { NEUTRAL_STOP, clerkMessage } from '../lib/clerkMessages';
 
@@ -11,7 +12,9 @@ type Props = {
   onAttempt: (email: string) => void;
 };
 
-export const NEW_CODE_SENT = 'We sent a new code.';
+const copy = screenCopy('signIn');
+
+export const NEW_CODE_SENT = copy.code.newCodeSent;
 
 // On success the account route re-renders into the profile, so no "done" callback is needed.
 export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
@@ -66,7 +69,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
   }
 
   const signInWithPassword = () =>
-    run('Signing in', async () => {
+    run(copy.busyAnnounce, async () => {
       onAttempt(email.trim());
       if (!failed(await signIn.password({ emailAddress: email.trim(), password }))) {
         await afterFirstStep();
@@ -74,7 +77,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
     });
 
   const sendCode = () =>
-    run('Sending a code', async () => {
+    run(copy.emailCodeBusy, async () => {
       if (!email.trim()) {
         return setError(clerkMessage({ code: 'form_param_format_invalid' }));
       }
@@ -89,7 +92,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
     });
 
   const resendCode = () =>
-    run('Sending a new code', async () => {
+    run(copy.code.resendBusy, async () => {
       if (!failed(afterPassword ? await signIn.mfa.sendEmailCode() : await signIn.emailCode.sendCode(), 'code')) {
         setNotice(NEW_CODE_SENT);
         announce(NEW_CODE_SENT);
@@ -97,7 +100,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
     });
 
   const verifyCode = () =>
-    run('Checking the code', async () => {
+    run(copy.code.busyAnnounce, async () => {
       const result = afterPassword ? await signIn.mfa.verifyEmailCode({ code: code.trim() }) : await signIn.emailCode.verifyCode({ code: code.trim() });
       if (!failed(result, 'code')) {
         await afterFirstStep();
@@ -115,10 +118,10 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
   if (step === 'code') {
     return (
       <View key={step}>
-        <ScreenHeader>Check your email</ScreenHeader>
-        <Text style={authStyles.body}>{`We sent a 6-digit code to ${email.trim()}.`}</Text>
+        <ScreenHeader>{copy.code.heading}</ScreenHeader>
+        <Intro>{fill(copy.code.intro, { email: email.trim() })}</Intro>
         <Field
-          label="6-digit code"
+          label={copy.code.label}
           value={code}
           onChangeText={setCode}
           keyboardType="number-pad"
@@ -131,20 +134,20 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
           onSubmitEditing={verifyCode}
         />
         <ErrorText message={error} />
-        <View accessibilityLiveRegion="polite">{notice ? <Text style={authStyles.body}>{notice}</Text> : null}</View>
-        <PrimaryButton label={pending ? 'Checking' : 'Sign in'} pending={pending} onPress={verifyCode} />
-        <LinkButton label="Send a new code" pending={pending} onPress={() => void resendCode()} />
-        <LinkButton label="Use a different email" onPress={() => void startOver()} />
+        <Notice message={notice} />
+        <PrimaryButton label={pending ? copy.code.submitBusy : copy.code.submit} pending={pending} onPress={verifyCode} />
+        <LinkButton label={copy.code.resend} pending={pending} onPress={() => void resendCode()} />
+        <LinkButton label={copy.code.differentEmail} onPress={() => void startOver()} />
       </View>
     );
   }
 
   return (
     <View key={step}>
-      <ScreenHeader>Sign in</ScreenHeader>
-      <Text style={authStyles.body}>Sign in to keep your name on your messages.</Text>
+      <ScreenHeader>{copy.heading}</ScreenHeader>
+      <Intro>{copy.intro}</Intro>
       <Field
-        label="Email"
+        label={copy.emailLabel}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -156,7 +159,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
         onSubmitEditing={() => passwordRef.current?.focus()}
       />
       <Field
-        label="Password"
+        label={copy.passwordLabel}
         inputRef={passwordRef}
         value={password}
         onChangeText={setPassword}
@@ -168,10 +171,10 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
         onSubmitEditing={signInWithPassword}
       />
       <ErrorText message={error} />
-      <PrimaryButton label={pending ? 'Signing in' : 'Sign in'} pending={pending} onPress={signInWithPassword} />
-      <LinkButton label="Email me a code instead" pending={pending} onPress={() => void sendCode()} />
+      <PrimaryButton label={pending ? copy.submitBusy : copy.submit} pending={pending} onPress={signInWithPassword} />
+      <LinkButton label={copy.emailCode} pending={pending} onPress={() => void sendCode()} />
       <SocialButtons onStart={() => setError(null)} onError={setError} />
-      <LinkButton label="Create an account" onPress={onSwitchToSignUp} />
+      <LinkButton label={copy.createAccount} onPress={onSwitchToSignUp} />
     </View>
   );
 }
