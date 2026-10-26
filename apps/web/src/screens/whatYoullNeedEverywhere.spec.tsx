@@ -43,7 +43,7 @@ describe('"What you\'ll need" opens the same sheet on every screen (#194)', () =
     const buttons = screen.getAllByRole('button', { name: "What you'll need" });
     expect(buttons).toHaveLength(1);
     const trigger = buttons[0];
-    expect(trigger).toHaveClass('gg-btn-bar');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
     await user.click(trigger);
     expect(screen.getByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
     if (title) {

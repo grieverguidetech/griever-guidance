@@ -7,7 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
-import { TemplatePickerScreen } from '../screens/TemplatePickerScreen';
+import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
@@ -21,6 +21,7 @@ import { sendNote } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
 import { HomeScreen } from '../screens/HomeScreen';
+import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
@@ -67,7 +68,7 @@ const Opening = () => (
 
 export type RootStackParamList = {
   Home: undefined;
-  TemplatePicker: undefined;
+  Starting: undefined;
   DetailsForm: undefined;
   ContactSelector: undefined;
   Confirm: undefined;
@@ -87,6 +88,10 @@ type SessionProps = {
   session: Session;
   contacts: ReturnType<typeof useContacts>;
   arrived: boolean;
+  /** The step chosen on the hub: the flow opens on that moment's first form, not the picker. */
+  startCategory: TemplateCategory | null;
+  /** Back from a moment's first form: return to the hub (the picker is gone). */
+  onHub: () => void;
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
@@ -96,7 +101,7 @@ type SessionProps = {
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, startCategory, onHub, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
@@ -108,6 +113,22 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
     drafts: session.drafts,
     onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
   });
+  // The hub chose a moment: pick its category, then step past the picker once the flow has it.
+  const { setTemplateCategory, nextStep } = flow;
+  const [pendingStart, setPendingStart] = useState(startCategory);
+  useEffect(() => {
+    if (pendingStart && flow.templateCategory !== pendingStart) {
+      setTemplateCategory(pendingStart);
+    }
+  }, [pendingStart, flow.templateCategory, setTemplateCategory]);
+  useEffect(() => {
+    if (pendingStart && flow.templateCategory === pendingStart) {
+      setPendingStart(null);
+      if (flow.step === 'template') {
+        nextStep();
+      }
+    }
+  }, [pendingStart, flow.templateCategory, flow.step, nextStep]);
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
@@ -165,7 +186,19 @@ const SendSession = ({ session, contacts, arrived, onDraftChange, onDetails, onH
     onFinished(sendNote(templateCategory, sendJob?.recipients ?? []));
   }, [step, templateCategory, sendJob, onFinished]);
 
-  return <Navigation flow={withoutServiceKnown(flow)} contacts={contacts} bar={bar} />;
+  const stepped = withoutServiceKnown(flow);
+  const flowWithHub = {
+    ...stepped,
+    prevStep: () => {
+      // The step before this one is the picker: go to the hub instead.
+      if (flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template') {
+        onHub();
+      } else {
+        stepped.prevStep();
+      }
+    },
+  };
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} />;
 };
 
 // The announcement path has a "do you know the service details" step that mobile has no screen
@@ -187,6 +220,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [atHome, setAtHome] = useState(true);
   const [stage, setStage] = useState<SetupStage | null>(null);
   const [arrived, setArrived] = useState(false);
+  const [atHub, setAtHub] = useState(false);
+  const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
@@ -194,11 +229,15 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const goHome = useCallback(() => {
     setStage(null);
     setArrived(false);
+    setAtHub(false);
+    setStartCategory(null);
     setNote(null);
     setAtHome(true);
   }, []);
   const finish = useCallback((text: string) => {
     setArrived(false);
+    setAtHub(false);
+    setStartCategory(null);
     setNote(text);
     setAtHome(true);
   }, []);
@@ -206,6 +245,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   // Setup is over: open the path. The one place the last setup step hands over (#227 changes this).
   const finishSetup = useCallback(() => {
     setArrived(true);
+    setStartCategory(null);
+    setAtHub(true);
     setStage(null);
   }, []);
 
@@ -245,6 +286,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const open = () => {
     setNote(null);
     setArrived(true);
+    setStartCategory(null);
+    setAtHub(true);
     setAtHome(false);
   };
   if (atHome) {
@@ -299,12 +342,31 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       />
     );
   }
+  if (atHub) {
+    return (
+      <HubScreen
+        key={active.id}
+        session={active}
+        onBack={goHome}
+        onStart={(key: MomentKey) => {
+          setStartCategory(CATEGORY_BY_MOMENT[key]);
+          setAtHub(false);
+        }}
+        onEditPerson={() => {
+          setAtHub(false);
+          setStage('setup');
+        }}
+      />
+    );
+  }
   return (
     <SendSession
       key={active.id}
       session={active}
       contacts={contacts}
       arrived={arrived}
+      startCategory={startCategory}
+      onHub={() => setAtHub(true)}
       onDraftChange={updateDraft}
       onDetails={updateSession}
       onHome={goHome}
@@ -365,7 +427,7 @@ const HomeNavigation = ({
   </NavigationContainer>
 );
 
-// The Home link, the arrival announcement and Android back live on every step, not just the picker.
+// The Home link, the arrival announcement and Android back live on every step.
 const withBar = (bar: ReactNode, screen: ReactNode) => (
   <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
     {bar}
@@ -386,14 +448,8 @@ const Navigation = ({
     <NavigationContainer>
       <Stack.Navigator screenOptions={screenOptions}>
         {flow.step === 'template' && (
-          <Stack.Screen name="TemplatePicker">
-            {() => (
-              <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
-                {bar}
-                <TemplatePickerScreen flow={flow} />
-              </View>
-            )}
-          </Stack.Screen>
+          // Only for the moment between choosing a step on the hub and its first form opening.
+          <Stack.Screen name="Starting">{() => <View style={{ flex: 1, backgroundColor: '#ffffff' }} />}</Stack.Screen>
         )}
         {(flow.step === 'details' || flow.step === 'announce' || flow.step === 'serviceKnown') && (
           <Stack.Screen name="DetailsForm">{() => withBar(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>

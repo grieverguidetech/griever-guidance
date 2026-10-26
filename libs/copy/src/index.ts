@@ -50,3 +50,14 @@ export function fill(template: string, values: Record<string, string | number>):
     throw new Error(`Missing value for {${key}} in "${template}"`);
   });
 }
+
+/** The small grey line under a finished step: "2 people · May 30 · Send again". */
+export function doneRowMeta(
+  copy: ScreenCopy<'pathLanding'>,
+  row: { recipientCount?: number; dateLabel?: string; started: boolean },
+): string {
+  const count = row.recipientCount ?? 0;
+  const people = `${count} ${count === 1 ? copy.person : copy.people}`;
+  const date = row.dateLabel ? ` · ${row.dateLabel}` : '';
+  return `${people}${date} · ${row.started ? copy.metaStarted : copy.metaSendAgain}`;
+}

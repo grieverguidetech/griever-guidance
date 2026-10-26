@@ -19,7 +19,7 @@ jest.mock('../lib/expoContactsSource', () => ({
 }));
 
 const CONTACTS_TITLE = 'Who should we be able to reach?';
-const PATH_TITLE = 'Choose the type of message you would like to send.';
+const PATH_TITLE = 'One thing at a time.';
 
 const anna = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '',
@@ -164,7 +164,7 @@ describe('the contacts step in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Add' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Done for now' }));
     expect(await screen.findByText(PATH_TITLE)).toBeTruthy();
-    expect(screen.getByText('Writing about Ben')).toBeTruthy();
+    expect(screen.getByText('For Ben')).toBeTruthy();
   });
 
   it('skips the step when the store already has contacts', async () => {

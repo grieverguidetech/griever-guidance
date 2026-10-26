@@ -115,7 +115,6 @@ describe('PathLanding finish note (#176)', () => {
     const onCloseNote = vi.fn();
     renderPath({}, { note: { moment: 'service', told: 1, total: 1 }, onCloseNote });
     const close = screen.getByRole('button', { name: 'Close note' });
-    expect(close).toHaveClass('gg-btn-bar'); // 44px minimum width
     await user.click(close);
     expect(onCloseNote).toHaveBeenCalledOnce();
     // The button leaves the page, so focus goes to the heading.
@@ -266,7 +265,7 @@ describe('PathLanding "What you\'ll need" in the header (#194)', () => {
     renderPath();
     const buttons = screen.getAllByRole('button', { name: "What you'll need" });
     expect(buttons).toHaveLength(1);
-    expect(buttons[0]).toHaveClass('gg-btn-bar');
+    expect(buttons[0]).toHaveAttribute('aria-haspopup', 'dialog');
     expect(buttons[0].parentElement).toBe(screen.getByRole('button', { name: 'Back' }).parentElement);
   });
 

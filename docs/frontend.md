@@ -93,9 +93,9 @@ is no hub screen, no gate and no obituary screen.
 
 | Screen (heading users see) | File | Reached from | Goes to | Feature flag |
 |---|---|---|---|---|
-| "The people you're writing about" | `HomeScreen.tsx` | App start. "Home" in the person bar. End of a send, with a note. | Template picker or the latest draft of a person. "What you'll need". "Your account" (AUTH). | None |
-| "Grievers Guidance" (template picker) | `TemplatePickerScreen.tsx` | Opening a person with no draft under way | Details form | None |
-| Template name, for example "Announce the passing" or "Share the service" | `DetailsFormScreen.tsx` | Picker. Used for the `announce` and `details` steps. | Contact selector | None |
+| "The people you're writing about" | `HomeScreen.tsx` | App start. "Home" in the person bar. End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
+| "One thing at a time." (hub, shared with web from libs/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | Details form for the chosen step. "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
+| Template name, for example "Announce the passing" or "Share the service" | `DetailsFormScreen.tsx` | Hub. Used for the `announce` and `details` steps. | Contact selector | None |
 | "Select recipients", "Bring people across", "Add someone by hand" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |
 | "Review your message" | `ConfirmScreen.tsx` | Contact selector | Sending | None |
 | "Texting people, one at a time" | `SendingScreen.tsx` | Confirm | Home with a note | None |

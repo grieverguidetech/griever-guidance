@@ -13,10 +13,19 @@
   "people": "people",
   "metaStarted": "Started",
   "metaSendAgain": "Send again",
+  "lockedReason": "Included with the full plan",
   "moments": {
     "announce": { "title": "Announce the passing", "body": "A gentle note letting people know.", "doneLabel": "Told close family" },
     "service": { "title": "Share the service", "body": "Once you've set the date with the funeral home.", "doneLabel": "Shared the service" },
     "obituary": { "title": "Share the obituary", "body": "Most papers want it 1–3 days before the service.", "doneLabel": "Shared the obituary" },
     "thanks": { "title": "Send thank-yous", "body": "Afterwards, for flowers and the people who came.", "doneLabel": "Sent thank-yous" }
+  },
+  "finishNote": {
+    "allTold": { "announce": "Everyone has been told.", "service": "The service details have been shared.", "obituary": "The obituary has been shared.", "thanks": "Your thank-yous have been sent." },
+    "partial": "You told {told} of {total}. You can text the others from your own Messages app any time.",
+    "none": "No one was texted this time. You can come back to this any time.",
+    "noCopy": "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
+    "close": "Close",
+    "closeLabel": "Close note"
   }
 }

@@ -16,8 +16,11 @@ const SETUP_TITLE = 'Who are we writing about?';
 async function startWith(name: string) {
   fireEvent.changeText(await screen.findByLabelText('Their name, required'), name);
   fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-  await screen.findByText(`Writing about ${name}`);
+  await screen.findByText(`For ${name}`); // the hub: the person's plan
 }
+
+const backFromHub = () => fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+const openThankYous = async () => fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
 
 // Home is where every launch lands; the first person is begun from there.
 async function begin() {
@@ -26,7 +29,7 @@ async function begin() {
 }
 
 async function addPerson() {
-  fireEvent.press(await screen.findByLabelText('Back to home'));
+  backFromHub();
   fireEvent.press(await screen.findByText(ANOTHER));
   await screen.findByText(SETUP_TITLE);
 }
@@ -49,11 +52,11 @@ describe('people kept on the phone', () => {
     expect((screen.getByLabelText('Their name, required')).props.value).toBe('');
     await startWith('Ben');
 
-    fireEvent.press(screen.getByLabelText('Back to home'));
+    backFromHub();
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
     expect(screen.getByLabelText('Ben')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Anna'));
-    expect(await screen.findByText('Writing about Anna')).toBeTruthy();
+    expect(await screen.findByText('For Anna')).toBeTruthy();
 
     // Each person is a separate record on the phone, holding only their own details.
     await waitFor(async () => {
@@ -69,7 +72,7 @@ describe('people kept on the phone', () => {
     await addPerson();
     expect(screen.getByLabelText('Their name, required').props.value).toBe('');
     await startWith('Ben');
-    fireEvent.press(await screen.findByText('Thank-you note'));
+    await openThankYous();
     // Only the new person's own name is there; nothing carries over from Anna.
     expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Ben');
   });
@@ -78,13 +81,14 @@ describe('people kept on the phone', () => {
     const first = render(<App />);
     await begin();
     await startWith('Anna');
-    fireEvent.press(screen.getByText('Thank-you note'));
+    await openThankYous();
     fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Lee');
     await waitFor(async () => expect((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '').toContain('Anna Lee'));
     first.unmount();
 
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna Lee')); // typing the name renamed the person
+    await openThankYous();
     expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
   });
 
@@ -104,7 +108,7 @@ describe('people kept on the phone', () => {
     first.unmount();
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    expect(await screen.findByText('Writing about Anna')).toBeTruthy();
+    expect(await screen.findByText('For Anna')).toBeTruthy();
   });
 
   it("opens the person's latest moment and leaves their other moment's draft alone (#83)", async () => {
@@ -121,6 +125,7 @@ describe('people kept on the phone', () => {
     await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
+    await openThankYous();
     fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Marie');
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
@@ -140,6 +145,7 @@ describe('people kept on the phone', () => {
     await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
+    await openThankYous();
     expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
   });
 
@@ -180,7 +186,7 @@ describe('people kept on the phone', () => {
     render(<App />);
     await begin();
     await startWith('Anna');
-    fireEvent.press(screen.getByLabelText('Back to home'));
+    backFromHub();
     await screen.findByLabelText('Anna');
     expect(screen.queryByText(/delete|remove/i)).toBeNull();
     expect(screen.queryByLabelText(/delete|remove/i)).toBeNull();

@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": [
     "heading", "intro", "forName", "back", "checklist", "editPerson", "start", "continue",
-    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "moments"
+    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "lockedReason", "finishNote", "moments"
   ],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
@@ -22,6 +22,30 @@
     "people": { "$ref": "#/$defs/text" },
     "metaStarted": { "$ref": "#/$defs/text" },
     "metaSendAgain": { "$ref": "#/$defs/text" },
+    "lockedReason": { "$ref": "#/$defs/text" },
+    "finishNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allTold", "partial", "none", "noCopy", "close", "closeLabel"],
+      "properties": {
+        "allTold": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["announce", "service", "obituary", "thanks"],
+          "properties": {
+            "announce": { "$ref": "#/$defs/text" },
+            "service": { "$ref": "#/$defs/text" },
+            "obituary": { "$ref": "#/$defs/text" },
+            "thanks": { "$ref": "#/$defs/text" }
+          }
+        },
+        "partial": { "type": "string", "pattern": "\\{told\\}.*\\{total\\}" },
+        "none": { "$ref": "#/$defs/text" },
+        "noCopy": { "$ref": "#/$defs/text" },
+        "close": { "$ref": "#/$defs/text" },
+        "closeLabel": { "$ref": "#/$defs/text" }
+      }
+    },
     "moments": {
       "type": "object",
       "additionalProperties": false,

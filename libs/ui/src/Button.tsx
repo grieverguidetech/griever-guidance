@@ -1,14 +1,22 @@
 import { useCallback } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
-import { Platform, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import { colors, minTouchTarget, spacing } from '@griever/tokens';
+import { applyAriaDisabled } from './ariaDisabled';
 import { serifFamily, serifWeight } from './typography';
 
 /** The element a button renders: a DOM node on web, a host instance on native. */
 export type ButtonNode = ComponentRef<typeof Pressable>;
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+/**
+ * Looks follow the mobile app's buttons (decision by Peter, 2026-10-25): rounded 10px corners,
+ * a solid accent-700 primary, an accent outline for secondary, and a tinted outlined "link" button
+ * (HomeScreen's What you'll need) as `tinted`. No icons. Palette and serif still follow web.
+ */
+export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost';
+
+const BUTTON_RADIUS = 10;
 
 export interface ButtonProps {
   label: string;
@@ -26,35 +34,6 @@ export interface ButtonProps {
   /** Web only: tells assistive tech the button opens a dialog. */
   opensDialog?: boolean;
   buttonRef?: Ref<ButtonNode>;
-}
-
-/**
- * react-native-web's Pressable drops `aria-disabled` and only supports a real `disabled`, which
- * removes the button from the tab order. For an unavailable-but-focusable button the attribute is
- * set on the DOM node here. Native uses the accessibility state instead.
- */
-/** The two DOM methods used below, so this lib needs no DOM typings. */
-interface DomAttributes {
-  setAttribute: (name: string, value: string) => void;
-  removeAttribute: (name: string) => void;
-}
-
-/**
- * react-native-web's Pressable drops `aria-disabled` and only supports a real `disabled`, which
- * removes the button from the tab order. For an unavailable-but-focusable button the attribute is
- * set on the DOM node in the ref callback, so it is applied every time the node attaches (first
- * render, remount) and whenever `ariaDisabled` changes. Native uses the accessibility state.
- */
-function applyAriaDisabled(node: ButtonNode | null, ariaDisabled: boolean) {
-  if (Platform.OS !== 'web' || !node) {
-    return;
-  }
-  const element = node as unknown as DomAttributes;
-  if (ariaDisabled) {
-    element.setAttribute('aria-disabled', 'true');
-  } else {
-    element.removeAttribute('aria-disabled');
-  }
 }
 
 export function Button({
@@ -95,10 +74,17 @@ export function Button({
       accessibilityState={{ disabled: ariaDisabled }}
       accessibilityHint={hint}
       onPress={onPress}
-      style={[styles.base, styles[variant], unavailableFill && styles.unavailableFill]}
+      style={({ pressed }) => [
+        styles.base,
+        styles[variant],
+        unavailableFill && styles.unavailableFill,
+        pressed && styles.pressed,
+      ]}
       {...extra}
     >
-      <Text style={[styles.label, labelStyle(variant, ariaDisabled)]}>{label}</Text>
+      <Text style={[styles.label, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled)]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -119,20 +105,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
-    borderRadius: radius.md,
+    borderRadius: BUTTON_RADIUS,
   },
   // Fills behind text use accent-700 (5.72:1 with the page colour); the base accent is decorative.
-  primary: { backgroundColor: colors['accent-700'] },
-  secondary: { borderColor: colors['neutral-600'] },
+  primary: { backgroundColor: colors['accent-700'], paddingVertical: 14 },
+  // Outlined with the accent, as mobile's secondary button. accent-700 on the page is 5.72:1.
+  secondary: { borderColor: colors['accent-700'], paddingVertical: 14 },
+  tinted: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
   ghost: {},
+  pressed: { opacity: 0.7 },
   // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
   // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
   unavailableFill: { backgroundColor: colors['neutral-700'] },
   label: {
     fontFamily: serifFamily('semibold'),
     fontWeight: serifWeight('semibold'),
-    fontSize: 14,
   },
+  labelPrimary: { fontSize: 15 },
+  labelLink: { fontSize: 14 },
   labelOnFill: { color: colors.bg },
   labelAccent: { color: colors['accent-700'] },
   labelUnavailable: { color: colors['neutral-700'] },
