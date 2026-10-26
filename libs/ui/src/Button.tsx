@@ -50,6 +50,8 @@ export interface ButtonProps {
   announceDisabled?: boolean;
   /** A fuller name when the label alone is not enough, for example "Select all, Close family". It must start with the label. */
   accessibilityName?: string;
+  /** A toggle: on or off. Web: aria-pressed. Native: accessibilityState selected. Leave unset for a plain button. */
+  pressed?: boolean;
   buttonRef?: Ref<ButtonNode>;
 }
 
@@ -65,6 +67,7 @@ export function Button({
   outlined = false,
   accessibilityName,
   announceDisabled = false,
+  pressed,
   buttonRef,
 }: ButtonProps) {
   const setRef = useCallback(
@@ -87,6 +90,9 @@ export function Button({
     extra['aria-label'] = accessibilityName;
     extra['accessibilityLabel'] = accessibilityName;
   }
+  if (pressed !== undefined) {
+    extra['aria-pressed'] = pressed;
+  }
   if (opensDialog) {
     extra['aria-haspopup'] = 'dialog';
   }
@@ -98,7 +104,7 @@ export function Button({
       ref={setRef}
       role="button"
       accessibilityHint={hint}
-      accessibilityState={buttonState(busy, ariaDisabled && announceDisabled)}
+      accessibilityState={buttonState(busy, ariaDisabled && announceDisabled, pressed)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
@@ -119,13 +125,15 @@ export function Button({
 }
 
 /** Native only: unavailable reads as disabled. (On web aria-disabled is set on the node, see ariaDisabled.ts.) */
-function buttonState(busy: boolean | undefined, ariaDisabled: boolean) {
+function buttonState(busy: boolean | undefined, ariaDisabled: boolean, pressed: boolean | undefined) {
   // On web a disabled state would also take the button out of the tab order, so only busy goes through.
   const unavailable = ariaDisabled && Platform.OS !== 'web';
-  if (busy === undefined && !unavailable) {
+  // On web a pressed toggle is aria-pressed (set above); `selected` would render aria-selected, which a button does not take.
+  const selected = pressed !== undefined && Platform.OS !== 'web' ? pressed : undefined;
+  if (busy === undefined && !unavailable && selected === undefined) {
     return undefined;
   }
-  return { busy: busy ?? false, disabled: Boolean(busy) || unavailable };
+  return { busy: busy ?? false, disabled: Boolean(busy) || unavailable, ...(selected === undefined ? {} : { selected }) };
 }
 
 function labelStyle(variant: ButtonVariant, ariaDisabled: boolean) {

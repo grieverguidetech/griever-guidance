@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { announceRecap, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames } from './index';
+import { announceRecap, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames, sendLabel } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
@@ -149,5 +149,22 @@ describe('announceRecap', () => {
     expect(announceRecap({ personName: '', dateOfPassing: 'May 29, 2026', senderName: 'Peter' }, copy)).toBe(
       'Their name · passed May 29, 2026 · from Peter',
     );
+  });
+});
+
+describe('sendLabel', () => {
+  const copy = screenCopy('review');
+
+  it('says one person', () => {
+    expect(sendLabel(1, copy)).toBe('Text 1 person');
+  });
+
+  it('says people', () => {
+    expect(sendLabel(2, copy)).toBe('Text 2 people');
+  });
+
+  it('falls back when there is no count to show', () => {
+    expect(sendLabel(undefined, copy)).toBe('Text these people');
+    expect(sendLabel(0, copy)).toBe('Text these people');
   });
 });

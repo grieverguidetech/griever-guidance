@@ -1,80 +1,69 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { composedFieldsWithFlorist } from '@griever/hooks';
+import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import { composeMessage, SHARE_SERVICE_SAMPLE } from '@griever/shared';
-import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
-import { TopBar } from '../lib/ui';
+import { Review } from '@griever/ui';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
 type Flow = ReturnType<typeof useSendFlow>;
+
+const copy = screenCopy('review');
 
 interface Props {
   flow: Flow;
 }
 
+/** The screen is the shared Review in libs/ui; this holds what is web only: the sample and the flowers choice. */
 export function ConfirmScreen({ flow }: Props) {
-  const [editing, setEditing] = useState(false);
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Loose on purpose: the shared Button hands back a DOM node on web.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const checklistButton = useRef<any>(null);
 
-  if (!flow.selectedTemplate) return null;
+  if (!flow.selectedTemplate) {
+    return null;
+  }
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
   const recipientCount = flow.selectedContactIds.length;
-  const isBlank = (flow.messageOverride ?? '').trim() === '' && flow.messageOverride !== null;
+  const recipients = recipientsPhrase(recipientCount, copy);
 
-  const floristName = flow.customFlorist;
-
-  const fields = composedFieldsWithFlorist(flow, floristName);
+  const fields = composedFieldsWithFlorist(flow, flow.customFlorist);
   const message = flow.messageOverride ?? composeMessage(flow.selectedTemplate, fields);
 
   function handleSend() {
     // Pin the exact text reviewed here, so SendingScreen's sms: links carry precisely what the
     // griever just read and not a recomputation that could drift.
-    if (flow.messageOverride === null) flow.setMessageOverride(message);
+    if (flow.messageOverride === null) {
+      flow.setMessageOverride(message);
+    }
     // Texting each person from their own number happens one at a time on the
     // next screen — nothing to send from here (no backend call at all).
     flow.startSendJob();
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <TopBar onBack={flow.prevStep} />
-
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[22px]">
-          {isAnnouncement ? 'Read it once before it goes' : 'Review your message'}
-        </h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          {isAnnouncement
-            ? `This will go to ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'} as a text message.`
-            : `This will go to ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}.`}
-        </p>
-      </div>
-
-      <div className="gg-card">
-        {isAnnouncement && <span className="gg-tag gg-tag-accent-2">Announcement</span>}
-        {editing || isService ? (
-          <div className="gg-field">
-            <label htmlFor="message-text">Your message</label>
-            <textarea
-              id="message-text"
-              className="gg-input"
-              rows={6}
-              autoFocus={!isService}
-              value={message}
-              onChange={(e) => flow.setMessageOverride(e.target.value)}
-            />
-          </div>
-        ) : (
-          <p
-            className="gg-card-body m-0 whitespace-pre-wrap"
-            style={{ opacity: 1, fontSize: 14, lineHeight: 1.7 }}
-          >
-            {message}
-          </p>
-        )}
-      </div>
-
+    <>
+    <Review
+      copy={copy}
+      kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}
+      intro={fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
+      message={message}
+      onMessageChange={flow.setMessageOverride}
+      edited={flow.messageOverride !== null}
+      onUseSuggested={() => flow.setMessageOverride(null)}
+      tone={flow.tone}
+      onToneChange={flow.setTone}
+      sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
+      hasRecipients={recipientCount > 0}
+      onBack={flow.prevStep}
+      onSend={handleSend}
+      onWhatYoullNeed={() => setSheetOpen(true)}
+      checklistRef={checklistButton}
+    >
       {isService && (
         <div className="flex flex-col gap-2">
           <button
@@ -85,7 +74,7 @@ export function ConfirmScreen({ flow }: Props) {
             className="gg-btn gg-btn-ghost"
             style={{ minHeight: 44, minWidth: 44 }}
           >
-            Sample message
+            {copy.sample}
           </button>
           <p
             id="message-sample"
@@ -97,73 +86,32 @@ export function ConfirmScreen({ flow }: Props) {
           </p>
         </div>
       )}
-
-      {isService && (
-        <FlowersSection flow={flow} />
-      )}
-
-      {isAnnouncement && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            className="gg-btn gg-btn-secondary flex-1"
-          >
-            <PencilSimple size={16} weight="regular" />
-            {editing ? 'Done editing' : 'Edit wording'}
-          </button>
-          <button
-            type="button"
-            onClick={() => flow.setTone(flow.tone === 'softer' ? 'plain' : 'softer')}
-            className="gg-btn gg-btn-ghost flex-1"
-          >
-            {flow.tone === 'softer' ? 'Plainer tone' : 'Softer tone'}
-          </button>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={handleSend}
-        disabled={recipientCount === 0 || isBlank}
-        className="gg-btn gg-btn-primary gg-btn-block"
-      >
-        {isAnnouncement
-          ? `Text ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'}`
-          : 'Text these people'}
-      </button>
-
-      {isBlank && (
-        <p role="status" className="text-[13px] text-center m-0" style={{ color: 'var(--text-muted)' }}>
-          Add a message before you send it.
-        </p>
-      )}
-
-      <p className="text-[12px] text-center m-0" style={{ color: 'var(--text-hint)' }}>
-        You'll text each person from your own number, one at a time.
-      </p>
-    </div>
+      {isService && <FlowersSection flow={flow} />}
+    </Review>
+    {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
+    </>
   );
 }
 
 function FlowersSection({ flow }: { flow: Flow }) {
-  const floristLabel = flow.customFlorist.trim() || 'the florist';
-  const target = flow.flowerDeliveryTarget === 'home' ? "the family's home" : 'the service';
+  const f = copy.flowers;
+  const floristLabel = flow.customFlorist.trim() || f.floristFallback;
+  const target = flow.flowerDeliveryTarget === 'home' ? f.targetHome : f.targetService;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[14px] font-semibold">Include a way to send flowers</div>
+          <div className="text-[14px] font-semibold">{f.heading}</div>
           <p className="m-0 mt-[2px] text-[12px] leading-[1.5]" style={{ color: 'var(--text-hint)' }}>
-            For people who can't be there in person.
+            {f.note}
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={flow.includeFlowers}
-          aria-label="Include a way to send flowers"
+          aria-label={f.heading}
           onClick={() => flow.setIncludeFlowers(!flow.includeFlowers)}
           className={`gg-switch ${flow.includeFlowers ? 'gg-switch-on' : ''}`}
         >
@@ -175,46 +123,48 @@ function FlowersSection({ flow }: { flow: Flow }) {
         <div className="flex flex-col gap-2">
           <div className="gg-field">
             <label htmlFor="custom-florist">
-              A florist you'd like to name
-              <span style={{ color: 'var(--text-eyebrow)' }}> (optional)</span>
+              {f.floristLabel}
+              <span style={{ color: 'var(--text-eyebrow)' }}> {f.optional}</span>
             </label>
             <input
               id="custom-florist"
               className="gg-input"
               type="text"
-              placeholder="Name, phone or website"
+              placeholder={f.floristPlaceholder}
               value={flow.customFlorist}
               onChange={(e) => flow.setCustomFlorist(e.target.value)}
             />
           </div>
 
           <div className="gg-field">
-            <label>Deliver flowers to</label>
-            <div className="gg-seg">
+            <span id="florist-target-label" className="gg-label">{f.deliverTo}</span>
+            <div className="gg-seg" role="group" aria-labelledby="florist-target-label">
               <button
                 type="button"
+                aria-pressed={flow.flowerDeliveryTarget === 'service'}
                 onClick={() => flow.setFlowerDeliveryTarget('service')}
                 className={`gg-seg-opt ${flow.flowerDeliveryTarget === 'service' ? 'gg-seg-opt-active' : ''}`}
               >
-                The service
+                {f.toService}
               </button>
               <button
                 type="button"
+                aria-pressed={flow.flowerDeliveryTarget === 'home'}
                 onClick={() => flow.setFlowerDeliveryTarget('home')}
                 className={`gg-seg-opt ${flow.flowerDeliveryTarget === 'home' ? 'gg-seg-opt-active' : ''}`}
               >
-                The family's home
+                {f.toHome}
               </button>
             </div>
           </div>
 
           {flow.messageOverride !== null ? (
             <p className="gg-reassure m-0 text-[12px] leading-[1.5]">
-              Your edited message is sent as you wrote it. Add the flowers line yourself if you want it.
+              {f.editedNote}
             </p>
           ) : (
           <p className="gg-reassure m-0 text-[12px] leading-[1.5]">
-            We'll add one line: “If you'd like to send flowers, {floristLabel} can deliver to {target}.”
+            {fill(f.addedLine, { florist: floristLabel, target })}
           </p>
           )}
         </div>

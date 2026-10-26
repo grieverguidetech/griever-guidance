@@ -1,108 +1,90 @@
-import { useState } from 'react';
-import { View, Text, TextInput, AccessibilityInfo, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
+import { Review } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
+import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';
-import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
+import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
+import { ACCENT, MUTED } from '../components/colors';
 
+const copy = screenCopy('review');
+
+/** The screen is the shared Review in libs/ui; this holds what is mobile only: scrolling and the sample. */
 export function ConfirmScreen({ flow }: FlowProps) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [sampleOpen, setSampleOpen] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const checklistButton = useRef<ButtonNode>(null);
 
-  if (!selectedTemplate) return null;
+  if (!selectedTemplate) {
+    return null;
+  }
 
-  const recipientCount = selectedContactIds.length;
+  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  const focusChecklistButton = () => {
+    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+
+  const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
-  const isBlank = isService && composedMessage.trim() === '';
+  const recipientCount = selectedContactIds.length;
+  const recipients = recipientsPhrase(recipientCount, copy);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity onPress={prevStep} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Review your message</Text>
-      <Text style={styles.subtitle}>
-        You'll text each of {recipientCount} {recipientCount === 1 ? 'person' : 'people'} from
-        your own number, one at a time.
-      </Text>
-      <View style={styles.messageBox}>
-        {isService ? (
-          <>
-            <Text style={styles.fieldLabel}>Your message</Text>
-            <TextInput
-              style={[styles.messageInput, focused && styles.messageInputFocused]}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              value={composedMessage}
-              onChangeText={setMessageOverride}
-              multiline
-              accessibilityLabel="Your message"
-            />
-          </>
-        ) : (
-          <Text style={styles.messageText}>{composedMessage}</Text>
-        )}
-      </View>
-      {isService && (
-        <View style={styles.sample}>
-          <TouchableOpacity
-            style={styles.sampleToggle}
-            onPress={() => {
-              if (!sampleOpen) AccessibilityInfo.announceForAccessibility(SHARE_SERVICE_SAMPLE);
-              setSampleOpen((v) => !v);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Sample message"
-            accessibilityState={{ expanded: sampleOpen }}
-          >
-            <Text style={styles.sampleToggleText}>Sample message</Text>
-          </TouchableOpacity>
-          {sampleOpen && <Text style={styles.messageText}>{SHARE_SERVICE_SAMPLE}</Text>}
-        </View>
-      )}
-      <TouchableOpacity
-        style={styles.button}
-        onPress={startSendJob}
-        disabled={recipientCount === 0 || isBlank}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: recipientCount === 0 || isBlank }}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.buttonText}>Text these people</Text>
-      </TouchableOpacity>
-      {isBlank && <Text style={styles.blankNote}>Add a message before you send it.</Text>}
-    </ScrollView>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Review
+          copy={copy}
+          kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}
+          intro={fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
+          message={composedMessage}
+          onMessageChange={setMessageOverride}
+          edited={flow.messageOverride !== null}
+          onUseSuggested={() => setMessageOverride(null)}
+          tone={flow.tone}
+          onToneChange={flow.setTone}
+          sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
+          hasRecipients={recipientCount > 0}
+          onBack={prevStep}
+          onSend={startSendJob}
+          onWhatYoullNeed={() => setChecklistOpen(true)}
+          checklistRef={checklistButton}
+        >
+          {isService && (
+            <>
+              <TouchableOpacity
+                style={styles.sampleToggle}
+                onPress={() => {
+                  if (!sampleOpen) {
+                    AccessibilityInfo.announceForAccessibility(SHARE_SERVICE_SAMPLE);
+                  }
+                  setSampleOpen((v) => !v);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={copy.sample}
+                accessibilityState={{ expanded: sampleOpen }}
+              >
+                <Text style={styles.sampleToggleText}>{copy.sample}</Text>
+              </TouchableOpacity>
+              {sampleOpen && <Text style={styles.sample}>{SHARE_SERVICE_SAMPLE}</Text>}
+            </>
+          )}
+        </Review>
+      </ScrollView>
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  backButton: { marginBottom: 24 },
-  backText: { fontSize: 14, color: MUTED },
-  title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: MUTED, marginBottom: 24 },
-  messageBox: {
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 32,
-  },
-  messageText: { fontSize: 14, color: '#374151', lineHeight: 22 },
-  fieldLabel: { fontSize: 13, color: MUTED, marginBottom: 6 },
-  messageInput: { borderWidth: 1, borderColor: FIELD_BORDER, borderRadius: 8, padding: 8, fontSize: 14, color: '#374151', lineHeight: 22, minHeight: 120, textAlignVertical: 'top' },
-  messageInputFocused: { borderColor: ACCENT, borderWidth: 2 },
-  blankNote: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 12 },
-  sample: { marginBottom: 24 },
+  flex: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing[3], paddingTop: spacing[4] },
   sampleToggle: { minHeight: 44, minWidth: 44, justifyContent: 'center' },
   sampleToggleText: { fontSize: 14, color: ACCENT },
-  button: {
-    backgroundColor: ACCENT,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
+  sample: { fontSize: 14, color: MUTED, lineHeight: 22 },
 });
