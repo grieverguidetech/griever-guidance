@@ -28,10 +28,12 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // A Google or Facebook flow is open in the browser; the form's own buttons wait for it.
+  const [socialPending, setSocialPending] = useState(false);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   async function run(busyText: string, action: () => Promise<void>) {
-    if (pending) {
+    if (pending || socialPending) {
       return;
     }
     setPending(true);
@@ -108,6 +110,9 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
     });
 
   async function startOver() {
+    if (socialPending) {
+      return;
+    }
     await signIn.reset();
     setCode('');
     setError(null);
@@ -173,7 +178,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
       <ErrorText message={error} />
       <PrimaryButton label={pending ? copy.submitBusy : copy.submit} pending={pending} onPress={signInWithPassword} />
       <LinkButton label={copy.emailCode} pending={pending} onPress={() => void sendCode()} />
-      <SocialButtons onStart={() => setError(null)} onError={setError} />
+      <SocialButtons onStart={() => setError(null)} onError={setError} onPendingChange={setSocialPending} blocked={pending} />
       <LinkButton label={copy.createAccount} onPress={onSwitchToSignUp} />
     </View>
   );

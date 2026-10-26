@@ -56,6 +56,8 @@ type InputProps = Pick<
   | 'onSubmitEditing'
   | 'editable'
   | 'maxLength'
+  | 'onFocus'
+  | 'onBlur'
 >;
 
 export function Field({
@@ -64,6 +66,8 @@ export function Field({
   onChangeText,
   hint,
   inputRef,
+  onFocus,
+  onBlur,
   ...input
 }: {
   label: string;
@@ -92,10 +96,17 @@ export function Field({
         accessibilityHint={hint}
         value={value}
         onChangeText={onChangeText}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
         placeholderTextColor={colors['neutral-700']}
         {...input}
+        // After the spread, so nothing a caller passes can drop the focus ring.
+        onFocus={(event) => {
+          setFocused(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          onBlur?.(event);
+        }}
       />
       {hint ? (
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.hint}>
@@ -181,7 +192,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: 8 },
   intro: { marginBottom: 24 },
   fieldGroup: { marginBottom: 20 },
-  label: { fontSize: 14, color: colors['neutral-800'], marginBottom: 6 },
+  label: { fontSize: 14, fontWeight: '500', color: colors['neutral-800'], marginBottom: 6 },
   hint: { marginTop: 6 },
   input: {
     minHeight: minTouchTarget,

@@ -13,15 +13,28 @@ type Strategy = 'oauth_google' | 'oauth_facebook';
 export const SSO_REDIRECT_PATH = 'sso-callback';
 
 /** The Google and Facebook buttons. Errors go up so the screen can show them in one place. */
-export function SocialButtons({ onError, onStart }: { onError: (message: string | null) => void; onStart: () => void }) {
+export function SocialButtons({
+  onError,
+  onStart,
+  onPendingChange,
+  blocked = false,
+}: {
+  onError: (message: string | null) => void;
+  onStart: () => void;
+  /** Tells the screen a browser flow is running, so it can ignore its own buttons meanwhile. */
+  onPendingChange?: (pending: boolean) => void;
+  /** The screen has a request running; presses here are ignored. */
+  blocked?: boolean;
+}) {
   const { startSSOFlow } = useSSO();
   const [pending, setPending] = useState(false);
 
   async function start(strategy: Strategy) {
-    if (pending) {
+    if (pending || blocked) {
       return;
     }
     setPending(true);
+    onPendingChange?.(true);
     onStart();
     announce(copy.browserAnnounce);
     try {
@@ -43,6 +56,7 @@ export function SocialButtons({ onError, onStart }: { onError: (message: string 
       onError(clerkMessage(error));
     } finally {
       setPending(false);
+      onPendingChange?.(false);
     }
   }
 

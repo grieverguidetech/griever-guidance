@@ -271,6 +271,17 @@ describe('sign in', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: 'Continue with Google' }).props.accessibilityState).toMatchObject({ disabled: true, busy: true }));
     });
 
+    it('ignores the password and email-code buttons while a browser flow is open', async () => {
+      mockStartSSO.mockImplementation(() => new Promise(() => undefined));
+      renderSignIn();
+      press('Continue with Google');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Continue with Google' }).props.accessibilityState).toMatchObject({ busy: true }));
+      press('Sign in');
+      press('Email me a code instead');
+      expect(mockSignIn.password).not.toHaveBeenCalled();
+      expect(mockSignIn.create).not.toHaveBeenCalled();
+    });
+
     it('says nothing when the person closes the browser', async () => {
       mockStartSSO.mockResolvedValue({ createdSessionId: null, authSessionResult: { type: 'cancel' } });
       renderSignIn();
