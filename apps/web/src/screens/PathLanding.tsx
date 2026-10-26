@@ -3,15 +3,15 @@ import type { Session } from '@griever/hooks';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { doneRowMeta, fill, screenCopy } from '@griever/copy';
-import { Hub } from '@griever/ui';
+import { Hub, PaywallSheet } from '@griever/ui';
 import type { HubRow } from '@griever/ui';
 import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 import { formatDate } from '../lib/format';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { ShareDetailsButton } from './ShareDetailsButton';
-import { PaywallPlaceholder } from './PaywallPlaceholder';
 
 const copy = screenCopy('pathLanding');
+const paywallCopy = screenCopy('paywall');
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -144,7 +144,7 @@ export function PathLanding({
         <FinishNoteCard note={note} onClose={closeNote} />
       </Hub>
       {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
-      {paywallOpen && <PaywallPlaceholder onClose={closePaywall} returnFocusRef={opener} />}
+      {paywallOpen && <PaywallSheet copy={paywallCopy} onClose={closePaywall} returnFocusRef={opener} />}
     </div>
   );
 }

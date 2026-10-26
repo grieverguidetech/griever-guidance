@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "out-tsc/web",
+    "tsBuildInfoFile": "out-tsc/web/tsconfig.web.tsbuildinfo",
+    "emitDeclarationOnly": true,
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "es2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  },
+  // Everything except specs, with the DOM lib: the .web files need it, and the rest must still compile beside them.
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["out-tsc", "dist", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test-setup.ts"],
+  "references": [
+    {
+      "path": "../tokens/tsconfig.lib.json"
+    }
+  ]
+}

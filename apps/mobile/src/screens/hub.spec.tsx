@@ -1,8 +1,9 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, BackHandler, Modal, Platform } from 'react-native';
+import { AccessibilityInfo, BackHandler, Modal, Platform, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
+import { SerifReadyContext } from '@griever/ui';
 import { HubScreen } from './HubScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
@@ -174,6 +175,67 @@ describe('HubScreen', () => {
       Platform.OS = original;
       jest.useRealTimers();
     }
+  });
+
+  it('shows a lock icon on locked rows only, hidden from screen readers', () => {
+    setup(anna, true);
+    const service = screen.getByRole('button', { name: /Share the service/ });
+    const icons = screen.getAllByTestId('lock-icon', { includeHiddenElements: true });
+    // Only the two locked rows carry an icon, and each is hidden from screen readers.
+    expect(icons).toHaveLength(2);
+    for (const icon of icons) {
+      expect(icon.props.importantForAccessibility).toBe('no-hide-descendants');
+      expect(icon.props.accessibilityElementsHidden).toBe(true);
+    }
+    // The reason stays the hint.
+    expect(service.props.accessibilityHint).toBe('Included with the full plan');
+  });
+
+  it('opens the shared paywall sheet: a modal with the heading, one line and a Close button', () => {
+    setup(anna, true);
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    expect(screen.getByRole('heading', { name: 'The full plan' })).toBeTruthy();
+    expect(screen.getByText('Payment details will go here.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    expect(screen.UNSAFE_getByProps({ accessibilityViewIsModal: true })).toBeTruthy();
+  });
+
+  it('closes the paywall sheet on the Android Back gesture (onRequestClose)', () => {
+    setup(anna, true);
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    const paywall = screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible);
+    act(() => paywall?.props.onRequestClose());
+    expect(screen.UNSAFE_getAllByType(Modal).every((m) => !m.props.visible)).toBe(true);
+  });
+
+  it('after the checklist sheet is dismissed, screen-reader focus goes back to What you will need', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    setup();
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
+    expect(focus).toHaveBeenCalledWith(1);
+  });
+
+  it('draws the heading in Source Serif once the app has loaded the font (the provider App.tsx supplies)', () => {
+    render(
+      <SerifReadyContext.Provider value>
+        <HubScreen session={anna} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
+      </SerifReadyContext.Provider>,
+    );
+    const heading = screen.getByRole('heading', { name: 'One thing at a time.' });
+    expect(StyleSheet.flatten(heading.props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
+    expect(StyleSheet.flatten(screen.getByText("Here's what usually comes next.").props.style).fontFamily).toBe('SourceSerif4_400Regular');
+  });
+
+  it('keeps the system font until the serif is ready', () => {
+    render(
+      <SerifReadyContext.Provider value={false}>
+        <HubScreen session={anna} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
+      </SerifReadyContext.Provider>,
+    );
+    const heading = screen.getByRole('heading', { name: 'One thing at a time.' });
+    expect(StyleSheet.flatten(heading.props.style).fontFamily).toBeUndefined();
   });
 
   it('with payments off, locks nothing', () => {

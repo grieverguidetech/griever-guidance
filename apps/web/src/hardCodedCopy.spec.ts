@@ -9,6 +9,7 @@ import type { ScreenName } from '@griever/copy';
  */
 const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'pathLanding', file: 'screens/PathLanding.tsx' },
+  { copy: 'paywall', file: 'screens/PathLanding.tsx' },
 ];
 
 describe('migrated screens do not hard-code copy', () => {

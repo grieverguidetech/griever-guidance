@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the paywall placeholder sheet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["heading", "line", "close"],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "line": { "$ref": "#/$defs/text" },
+    "close": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}

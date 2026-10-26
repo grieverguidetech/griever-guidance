@@ -18,6 +18,8 @@
     }
   ],
   "exclude": [
+    "src/**/*.web.ts",
+    "src/**/*.web.tsx",
     "out-tsc",
     "dist",
     "src/**/*.spec.ts",
