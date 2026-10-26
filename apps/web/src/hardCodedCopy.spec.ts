@@ -7,10 +7,11 @@ import type { ScreenName } from '@griever/copy';
  * A screen listed here takes its words from libs/copy, so its source must not hold any of them as a
  * literal. Add a screen in the same PR that migrates it. `file` is relative to apps/web/src.
  */
-const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [];
+const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
+  { copy: 'pathLanding', file: 'screens/PathLanding.tsx' },
+];
 
 describe('migrated screens do not hard-code copy', () => {
-  // A loop, not it.each: the list is empty until the first screen is migrated.
   for (const entry of MIGRATED_SCREENS) {
     it(entry.file, () => {
       const source = readFileSync(join(import.meta.dirname, entry.file), 'utf8');

@@ -28,23 +28,31 @@ const openAnna = async () => {
   fireEvent.press(await screen.findByLabelText('Anna'));
 };
 
+// The hub comes first: Start is the announcement; the other steps are rows named for the step.
+const startMoment = async (title: string) =>
+  fireEvent.press(
+    await screen.findByRole('button', { name: title === 'Announce the passing' ? 'Start' : new RegExp(title) }),
+  );
+
 describe('picking an announcement', () => {
   it('shows a real screen, not a blank one or the checklist', async () => {
     await openAnna();
-    fireEvent.press(await screen.findByText('Announce the passing'));
+    await startMoment('Announce the passing');
     expect(await screen.findByText("Anything you'd like to add (optional)")).toBeTruthy();
     expect(screen.queryByText('Gather when you can')).toBeNull();
   });
 
   it('steps over the service-known step in both directions', async () => {
     await openAnna();
-    fireEvent.press(await screen.findByText('Announce the passing'));
+    await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Continue'));
     expect(await screen.findByText('Select recipients')).toBeTruthy();
     fireEvent.press(screen.getByText('← Back'));
     expect(await screen.findByText("Anything you'd like to add (optional)")).toBeTruthy();
     fireEvent.press(screen.getByText('← Back'));
-    expect(await screen.findByText('Choose the type of message you would like to send.')).toBeTruthy();
+    // The first form's Back returns to the hub, not a picker.
+    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
   });
 });
 
@@ -52,7 +60,7 @@ describe('the end of a send', () => {
   const toSending = async (pick: string[], template = 'Announce the passing') => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
-    fireEvent.press(await screen.findByText(template));
+    await startMoment(template);
     if (template !== 'Share the obituary') fireEvent.press(await screen.findByText('Continue'));
     for (const name of pick) fireEvent.press(await screen.findByText(name));
     fireEvent.press(screen.getByText('Continue'));

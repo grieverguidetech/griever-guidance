@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { fill, findHardCodedCopy, screenCopy, screenNames } from './index';
+import { doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
@@ -113,5 +113,19 @@ describe('findHardCodedCopy', () => {
 
   it('still finds a capitalised single word', () => {
     expect(found("const label = 'Back';")).toEqual(['Back']);
+  });
+});
+
+describe('doneRowMeta', () => {
+  const copy = screenCopy('pathLanding');
+
+  it('says one person, with the date and Send again', () => {
+    expect(doneRowMeta(copy, { recipientCount: 1, dateLabel: 'May 30, 2026', started: false })).toBe(
+      '1 person · May 30, 2026 · Send again',
+    );
+  });
+
+  it('says people, leaves out a missing date, and shows Started', () => {
+    expect(doneRowMeta(copy, { recipientCount: 3, started: true })).toBe('3 people · Started');
   });
 });

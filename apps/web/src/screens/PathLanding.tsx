@@ -1,42 +1,20 @@
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Session } from '@griever/hooks';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
-import type { Moment, MomentKey, TemplateCategory } from '@griever/shared';
-import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
-import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
-import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
-import { Lock } from '@phosphor-icons/react/Lock';
-import { Eyebrow, TopBar } from '../lib/ui';
+import type { MomentKey, TemplateCategory } from '@griever/shared';
+import { doneRowMeta, fill, screenCopy } from '@griever/copy';
+import { Hub } from '@griever/ui';
+import type { HubRow } from '@griever/ui';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 import { formatDate } from '../lib/format';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { ShareDetailsButton } from './ShareDetailsButton';
-import { LOCKED_REASON, PaywallPlaceholder } from './PaywallPlaceholder';
+import { PaywallPlaceholder } from './PaywallPlaceholder';
+
+const copy = screenCopy('pathLanding');
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
-
-const MOMENT_COPY: Record<MomentKey, { title: string; body: string; doneLabel: string }> = {
-  announce: {
-    title: 'Announce the passing',
-    body: 'A gentle note letting people know.',
-    doneLabel: 'Told close family',
-  },
-  service: {
-    title: 'Share the service',
-    body: "Once you've set the date with the funeral home.",
-    doneLabel: 'Shared the service',
-  },
-  obituary: {
-    title: 'Share the obituary',
-    body: 'Most papers want it 1–3 days before the service.',
-    doneLabel: 'Shared the obituary',
-  },
-  thanks: {
-    title: 'Send thank-yous',
-    body: 'Afterwards, for flowers and the people who came.',
-    doneLabel: 'Sent thank-yous',
-  },
-};
 
 const CATEGORY_BY_KEY: Record<MomentKey, TemplateCategory> = {
   announce: 'announcement',
@@ -54,22 +32,14 @@ export interface FinishNote {
   total: number;
 }
 
-const ALL_TOLD: Record<MomentKey, string> = {
-  announce: 'Everyone has been told.',
-  service: 'The service details have been shared.',
-  obituary: 'The obituary has been shared.',
-  thanks: 'Your thank-yous have been sent.',
-};
-
-const NO_COPY_LINE =
-  "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.";
-
 export function finishNoteText({ moment, told, total }: FinishNote): string {
-  if (told === 0) return 'No one was texted this time. You can come back to this any time.';
-  if (told < total) {
-    return `You told ${told} of ${total}. You can text the others from your own Messages app any time.`;
+  if (told === 0) {
+    return copy.finishNote.none;
   }
-  return ALL_TOLD[moment];
+  if (told < total) {
+    return fill(copy.finishNote.partial, { told, total });
+  }
+  return copy.finishNote.allTold[moment];
 }
 
 /** The C2 line applies only when something was sent. */
@@ -79,7 +49,7 @@ function showsNoCopyLine(note: FinishNote): boolean {
 
 /** What the screen-reader region says: the same words as the visible note. */
 export function finishNoteSpoken(note: FinishNote): string {
-  return showsNoCopyLine(note) ? `${finishNoteText(note)} ${NO_COPY_LINE}` : finishNoteText(note);
+  return showsNoCopyLine(note) ? `${finishNoteText(note)} ${copy.finishNote.noCopy}` : finishNoteText(note);
 }
 
 interface Props {
@@ -93,6 +63,7 @@ interface Props {
   paymentsEnabled?: boolean;
 }
 
+/** The hub is the shared screen in libs/ui; this holds what is web only: the sheets, focus and sharing. */
 export function PathLanding({
   session,
   onBack,
@@ -103,7 +74,12 @@ export function PathLanding({
   paymentsEnabled = PAYMENTS_ENABLED,
 }: Props) {
   const moments = usePathMoments(session);
-  const heading = useRef<HTMLHeadingElement>(null);
+  // Refs are loose on purpose: the shared components hand back a DOM node on web.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const heading = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const checklistButton = useRef<any>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   // The Close button leaves the page, so focus goes to the heading rather than being lost.
   function closeNote() {
@@ -124,47 +100,50 @@ export function PathLanding({
     setTimeout(() => opener.current?.focus(), 0);
   }
 
+  const rows: HubRow[] = moments.map((moment) => {
+    const started = isDraftStarted(session.drafts[CATEGORY_BY_KEY[moment.key]]);
+    return {
+      key: moment.key,
+      status: moment.status,
+      started,
+      locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
+      meta:
+        moment.status === 'done'
+          ? doneRowMeta(copy, {
+              recipientCount: moment.recipientCount,
+              dateLabel: moment.completedAt ? formatDate(moment.completedAt) : undefined,
+              started,
+            })
+          : undefined,
+    };
+  });
+
   return (
     <div className="flex flex-col gap-4 pt-[52px] min-h-full">
-      <TopBar onBack={onBack} />
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-3">
-          <Eyebrow name={session.personName} />
-          <button type="button" onClick={onEditPerson} className="gg-btn gg-btn-ghost text-[12px]">
-            <PencilSimple size={13} weight="regular" aria-hidden="true" />
-            Edit person
-          </button>
-        </div>
-        <h1 ref={heading} className="text-[22px]">
-          One thing at a time.
-        </h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          Here's what usually comes next.
-        </p>
-      </div>
-
-      <FinishNoteCard note={note} onClose={closeNote} />
-
-      <div className="flex flex-col gap-2">
-        {moments.map((moment) => (
-          <MomentRow
-            key={moment.key}
-            moment={moment}
-            started={isDraftStarted(session.drafts[CATEGORY_BY_KEY[moment.key]])}
-            onStart={() => onStartMoment(moment.key)}
-            locked={paymentsEnabled && PAID_MOMENTS.includes(moment.key)}
-            onLockedPress={openPaywall}
+      <Hub
+        copy={copy}
+        eyebrow={fill(copy.forName, { name: session.personName })}
+        rows={rows}
+        onBack={onBack}
+        onWhatYoullNeed={() => setSheetOpen(true)}
+        onEdit={onEditPerson}
+        onStart={onStartMoment}
+        onLocked={(row) => openPaywall(row as HTMLElement)}
+        headingRef={heading}
+        checklistRef={checklistButton}
+        footer={
+          <ShareDetailsButton
+            session={session}
+            checklist={moments.map((m) => ({
+              label: copy.moments[m.key].title,
+              done: m.status === 'done',
+            }))}
           />
-        ))}
-      </div>
-
-      <ShareDetailsButton
-        session={session}
-        checklist={moments.map((m) => ({
-          label: MOMENT_COPY[m.key].title,
-          done: m.status === 'done',
-        }))}
-      />
+        }
+      >
+        <FinishNoteCard note={note} onClose={closeNote} />
+      </Hub>
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
       {paywallOpen && <PaywallPlaceholder onClose={closePaywall} returnFocusRef={opener} />}
     </div>
   );
@@ -175,136 +154,21 @@ export function PathLanding({
  * and is filled after the heading takes focus, so this card is plain content. No motion.
  */
 function FinishNoteCard({ note, onClose }: { note: FinishNote | null; onClose: () => void }) {
-  if (!note) return null;
+  if (!note) {
+    return null;
+  }
   return (
     <div className="gg-card">
       <p className="m-0 text-[14px]">{finishNoteText(note)}</p>
-      {showsNoCopyLine(note) && <p className="gg-reassure m-0 text-[12px]">{NO_COPY_LINE}</p>}
+      {showsNoCopyLine(note) && <p className="gg-reassure m-0 text-[12px]">{copy.finishNote.noCopy}</p>}
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close note"
+        aria-label={copy.finishNote.closeLabel}
         className="gg-btn gg-btn-secondary gg-btn-bar self-start"
       >
-        Close
+        {copy.finishNote.close}
       </button>
     </div>
-  );
-}
-
-function MomentRow({
-  moment,
-  started,
-  onStart,
-  locked,
-  onLockedPress,
-}: {
-  moment: Moment;
-  started: boolean;
-  onStart: () => void;
-  locked: boolean;
-  onLockedPress: (row: HTMLElement) => void;
-}) {
-  const copy = MOMENT_COPY[moment.key];
-
-  if (locked) {
-    return <LockedRow title={copy.title} body={copy.body} onPress={onLockedPress} />;
-  }
-
-  if (moment.status === 'done') {
-    // Tapping opens a new, empty message for this moment (C2: no old wording is kept).
-    return (
-      <button
-        type="button"
-        onClick={onStart}
-        className="flex gap-3 items-start text-left"
-        style={{ padding: 'var(--space-2) 0' }}
-      >
-        <CheckCircle
-          size={22}
-          weight="duotone"
-          aria-hidden="true"
-          style={{ color: 'var(--color-accent-700)', marginTop: 1 }}
-        />
-        <div>
-          <div className="text-[15px]" style={{ color: 'var(--color-neutral-700)' }}>
-            {copy.doneLabel}
-          </div>
-          <div className="gg-card-meta">
-            {moment.recipientCount ?? 0} {moment.recipientCount === 1 ? 'person' : 'people'}
-            {moment.completedAt ? ` · ${formatDate(moment.completedAt)}` : ''}
-            {started ? ' · Started' : ' · Send again'}
-          </div>
-        </div>
-      </button>
-    );
-  }
-
-  if (moment.status === 'next') {
-    return (
-      <div className="gg-card elev-md gg-card-selected">
-        <span className="gg-tag gg-tag-accent self-start">{started ? 'Started' : 'Next'}</span>
-        <span className="gg-card-title">{copy.title}</span>
-        <p className="gg-card-body m-0">{copy.body}</p>
-        <button type="button" onClick={onStart} className="gg-btn gg-btn-primary gg-btn-block mt-2">
-          {started ? 'Continue' : 'Start'}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onStart}
-      className="flex gap-3 items-start text-left"
-      style={{ padding: 'var(--space-2) 0' }}
-    >
-      <CircleDashed
-        size={22}
-        weight="duotone"
-        style={{ color: 'var(--color-neutral-500)', marginTop: 1 }}
-      />
-      <div>
-        <div className="text-[15px]" style={{ color: 'var(--color-neutral-700)' }}>
-          {copy.title}
-          {started && <span className="gg-card-meta"> · Started</span>}
-        </div>
-        <p className="m-0 mt-[2px] text-[13px] leading-[1.5]" style={{ color: 'var(--color-neutral-800)' }}>
-          {copy.body}
-        </p>
-      </div>
-    </button>
-  );
-}
-
-/**
- * A task in the full plan (#292). aria-disabled rather than disabled: it stays focusable and a screen
- * reader still reads it, with the reason. The text keeps full contrast; a tap opens the placeholder.
- */
-function LockedRow({ title, body, onPress }: { title: string; body: string; onPress: (row: HTMLElement) => void }) {
-  const reasonId = useId();
-  return (
-    <button
-      type="button"
-      aria-disabled="true"
-      aria-describedby={reasonId}
-      onClick={(e) => onPress(e.currentTarget)}
-      className="flex gap-3 items-start text-left min-h-[44px]"
-      style={{ padding: 'var(--space-2) 0' }}
-    >
-      <Lock size={22} weight="duotone" aria-hidden="true" style={{ color: 'var(--color-neutral-700)', marginTop: 1 }} />
-      <div>
-        <div className="text-[15px]" style={{ color: 'var(--color-neutral-800)' }}>
-          {title}
-        </div>
-        <p className="m-0 mt-[2px] text-[13px] leading-[1.5]" style={{ color: 'var(--color-neutral-800)' }}>
-          {body}
-        </p>
-        <span id={reasonId} aria-hidden="true" className="text-[12px]" style={{ color: 'var(--color-neutral-800)' }}>
-          {LOCKED_REASON}
-        </span>
-      </div>
-    </button>
   );
 }
