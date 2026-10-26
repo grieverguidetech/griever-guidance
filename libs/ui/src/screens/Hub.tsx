@@ -1,8 +1,9 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { spacing } from '@griever/tokens';
+import { colors, spacing } from '@griever/tokens';
 import { Button } from '../Button';
+import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
 import { Heading } from '../Heading';
@@ -73,10 +74,10 @@ export function Hub(props: HubProps) {
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="tinted" onPress={props.onBack} />
+        <Button label={copy.back} variant="tertiary" onPress={props.onBack} />
         <Button
           label={copy.checklist}
-          variant="tinted"
+          variant="tertiary"
           opensDialog
           onPress={props.onWhatYoullNeed}
           buttonRef={props.checklistRef}
@@ -185,6 +186,8 @@ function LockedStep(props: { title: string; body: string; reason: string; onLock
       describedBy={reasonId}
       hint={props.reason}
       onPress={() => props.onLocked(row.current)}
+      // Decorative: the reason text and hint are what assistive tech reads.
+      trailing={<Icon name="lock" color={colors['neutral-700']} trailing />}
     >
       <Body tone="strong">{props.title}</Body>
       <Body>{props.body}</Body>

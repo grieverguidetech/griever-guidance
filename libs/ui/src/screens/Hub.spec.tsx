@@ -102,6 +102,33 @@ describe('Hub', () => {
     expect(h.onStart).toHaveBeenCalledWith('obituary');
   });
 
+  it('puts a decorative lock icon at the end of a locked row, outside its name and description', () => {
+    setup();
+    const locked = screen.getByRole('button', { name: /Send thank-yous/ });
+    const icon = locked.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    expect(icon).toHaveAttribute('focusable', 'false');
+    // The name and reason are the words only.
+    expect(locked).toHaveAccessibleName(/^Send thank-yous\s*Afterwards\.$/);
+    expect(locked).toHaveAccessibleDescription('Included with the full plan');
+  });
+
+  it('shows no lock on rows that are not locked', () => {
+    setup();
+    expect(screen.getByRole('button', { name: /Share the obituary/ }).querySelector('svg')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start' }).querySelector('svg')).toBeNull();
+  });
+
+  it('Back and What you will need are 44px tertiary buttons with no fill or border', () => {
+    setup();
+    for (const name of ['Back', "What you'll need"]) {
+      const style = getComputedStyle(screen.getByRole('button', { name }));
+      expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
+      expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
+    }
+  });
+
   it('keeps a locked step focusable, aria-disabled and explained, and it asks for the paywall', async () => {
     const user = userEvent.setup();
     const h = setup();

@@ -176,6 +176,37 @@ describe('HubScreen', () => {
     }
   });
 
+  it('shows a lock icon on locked rows only, hidden from screen readers', () => {
+    setup(anna, true);
+    const service = screen.getByRole('button', { name: /Share the service/ });
+    const hidden = service.findAll((node: { props: Record<string, unknown> }) => node.props.importantForAccessibility === 'no-hide-descendants');
+    expect(hidden.length).toBeGreaterThan(0);
+    // The icon adds nothing to the spoken name; the reason stays the hint.
+    expect(service.props.accessibilityHint).toBe('Included with the full plan');
+    // Only the two locked rows carry an icon.
+    const withIcon = screen
+      .getAllByRole('button')
+      .filter((b) => b.findAll((node: { props: Record<string, unknown> }) => node.props.importantForAccessibility === 'no-hide-descendants').length > 0);
+    expect(withIcon).toHaveLength(2);
+  });
+
+  it('opens the shared paywall sheet: a modal with the heading, one line and a Close button', () => {
+    setup(anna, true);
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    expect(screen.getByRole('heading', { name: 'The full plan' })).toBeTruthy();
+    expect(screen.getByText('Payment details will go here.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    expect(screen.UNSAFE_getByProps({ accessibilityViewIsModal: true })).toBeTruthy();
+  });
+
+  it('closes the paywall sheet on the Android Back gesture (onRequestClose)', () => {
+    setup(anna, true);
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    const paywall = screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible);
+    act(() => paywall?.props.onRequestClose());
+    expect(screen.UNSAFE_getAllByType(Modal).every((m) => !m.props.visible)).toBe(true);
+  });
+
   it('with payments off, locks nothing', () => {
     setup(anna, false);
     expect(screen.getByRole('button', { name: /Share the service/ }).props.accessibilityHint).toBeUndefined();

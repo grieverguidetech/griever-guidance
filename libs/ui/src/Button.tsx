@@ -13,9 +13,10 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
 /**
  * Looks follow the mobile app's buttons (decision by Peter, 2026-10-25): rounded 10px corners,
  * a solid accent-700 primary, an accent outline for secondary, and a tinted outlined "link" button
- * (HomeScreen's What you'll need) as `tinted`. No icons. Palette and serif still follow web.
+ * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Back: an
+ * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed. No icons. Palette and serif still follow web.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary';
 
 const BUTTON_RADIUS = 10;
 
@@ -86,12 +87,12 @@ export function Button({
         styles.base,
         styles[variant],
         unavailableFill && styles.unavailableFill,
-        pressed && styles.pressed,
+        pressed && (variant === 'tertiary' ? styles.pressedTertiary : styles.pressed),
       ]}
       {...extra}
     >
       <Phrasing>
-        <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled)]}>
+        <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), variant === 'tertiary' && styles.labelTertiary]}>
           {label}
         </Text>
       </Phrasing>
@@ -123,7 +124,11 @@ const styles = StyleSheet.create({
   secondary: { borderColor: colors['accent-700'], paddingVertical: 14 },
   tinted: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
   ghost: {},
+  // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
+  tertiary: {},
   pressed: { opacity: 0.7 },
+  // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
+  pressedTertiary: { backgroundColor: colors['accent-100'] },
   // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
   // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
   unavailableFill: { backgroundColor: colors['neutral-700'] },
@@ -132,6 +137,7 @@ const styles = StyleSheet.create({
   labelPrimary: { fontSize: 15 },
   labelLink: { fontSize: 14 },
   labelOnFill: { color: colors.bg },
+  labelTertiary: { textDecorationLine: 'underline' },
   labelAccent: { color: colors['accent-700'] },
   labelUnavailable: { color: colors['neutral-700'] },
 });

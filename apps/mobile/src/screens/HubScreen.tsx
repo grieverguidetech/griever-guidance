@@ -5,14 +5,14 @@ import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { doneRowMeta, fill, screenCopy } from '@griever/copy';
-import { Hub } from '@griever/ui';
+import { Hub, PaywallSheet } from '@griever/ui';
 import type { HubRow } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
-import { PaywallPlaceholder } from './PaywallPlaceholder';
 
 const copy = screenCopy('pathLanding');
+const paywallCopy = screenCopy('paywall');
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -129,7 +129,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
         headingRef={heading}
       />
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} />
-      {paymentsEnabled && <PaywallPlaceholder visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
+      {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
     </ScrollView>
   );
 }

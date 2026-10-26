@@ -133,6 +133,32 @@ function contrast(a: string, b: string): number {
   return (light + 0.05) / (dark + 0.05);
 }
 
+describe('tertiary Button', () => {
+  it('is a real button with its label as the name', async () => {
+    const onPress = vi.fn();
+    render(<Button label="Back" variant="tertiary" onPress={onPress} />);
+    const button = screen.getByRole('button', { name: 'Back' });
+    expect(button.tagName).toBe('BUTTON');
+    await userEvent.click(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no fill and no border, and a 44px target', () => {
+    render(<Button label="Back" variant="tertiary" onPress={vi.fn()} />);
+    const style = getComputedStyle(screen.getByRole('button', { name: 'Back' }));
+    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
+    expect(style.borderTopColor).toBe('rgba(0, 0, 0, 0.00)');
+    expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
+    expect(parseInt(style.minWidth, 10)).toBeGreaterThanOrEqual(44);
+  });
+
+  it('is not only colour: the label is underlined', () => {
+    render(<Button label="Back" variant="tertiary" onPress={vi.fn()} />);
+    const label = screen.getByText('Back');
+    expect(getComputedStyle(label).textDecoration).toContain('underline');
+  });
+});
+
 describe('Button colours', () => {
   it.each([
     ['unavailable primary: page colour on neutral-700', colors.bg, colors['neutral-700']],
@@ -140,6 +166,9 @@ describe('Button colours', () => {
     ['unavailable secondary or ghost: neutral-700 on a surface', colors['neutral-700'], colors.surface],
     ['available primary: page colour on accent-700', colors.bg, colors['accent-700']],
     ['available secondary or ghost: accent-700 on the page', colors['accent-700'], colors.bg],
+    ['tertiary: accent-700 on the page', colors['accent-700'], colors.bg],
+    ['tertiary pressed: accent-700 on accent-100', colors['accent-700'], colors['accent-100']],
+    ['tertiary unavailable: neutral-700 on the page', colors['neutral-700'], colors.bg],
   ])('%s is at least 4.5:1', (_name, foreground, background) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
   });
