@@ -1,4 +1,4 @@
-import { Fields, getContactsAsync, getPermissionsAsync, requestPermissionsAsync } from 'expo-contacts';
+import { Fields, getContactsAsync, getPermissionsAsync, requestPermissionsAsync } from 'expo-contacts/legacy';
 import { Cancelled } from '@griever/contacts';
 import type { ContactSource, FetchedContact } from '@griever/contacts';
 
@@ -10,9 +10,10 @@ import type { ContactSource, FetchedContact } from '@griever/contacts';
  * in-app review/select step (the same one every non-preselected source uses)
  * is still required.
  *
- * Uses expo-contacts' module-level API (`getContactsAsync` / `Fields`), which is what the pinned
- * Expo SDK 54 version (15.x) ships. The class-based `Contact.getAllDetails` API only exists in
- * later SDKs; move to it when the SDK is upgraded.
+ * Imports from `expo-contacts/legacy`. Since SDK 58 the module-level functions on the package root
+ * (`getContactsAsync` etc.) are stubs that log a deprecation and throw, which surfaced as "We could
+ * not read your contacts" (#340). Under iOS 18 limited access, `granted` is true and the read
+ * returns only the contacts the user shared, so the same path works.
  */
 export const expoContactsSource: ContactSource = {
   id: 'native',

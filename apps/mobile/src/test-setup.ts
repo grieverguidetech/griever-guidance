@@ -24,8 +24,20 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   return { __esModule: true, default: asyncStorage, ...asyncStorage };
 });
 
-// Native-only module: its real entry fails to load outside a device.
-jest.mock('expo-contacts', () => ({
+// Native-only module: its real entry fails to load outside a device. Mirrors expo-contacts 58:
+// the package root keeps only stubs that throw (build/legacyWarnings.js); the working
+// module-level API is under `expo-contacts/legacy`. Keep these shapes in step with the package.
+jest.mock('expo-contacts', () => {
+  const deprecated = () => jest.fn(async () => {
+    throw new Error('Method imported from "expo-contacts" is deprecated.');
+  });
+  return {
+    getContactsAsync: deprecated(),
+    getPermissionsAsync: deprecated(),
+    requestPermissionsAsync: deprecated(),
+  };
+});
+jest.mock('expo-contacts/legacy', () => ({
   Fields: { Name: 'name', PhoneNumbers: 'phoneNumbers', Emails: 'emails' },
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import * as Contacts from 'expo-contacts';
+import * as Contacts from 'expo-contacts/legacy';
+import * as Root from 'expo-contacts';
 import { Cancelled } from '@griever/contacts';
 import { expoContactsSource } from './expoContactsSource.native';
 
@@ -16,6 +17,18 @@ beforeEach(() => {
 });
 
 describe('expoContactsSource.fetch', () => {
+  it('uses the legacy entry, because the package root functions throw in SDK 58 (#340)', async () => {
+    mocked.getContactsAsync.mockResolvedValue({ data: [] });
+    await expect(expoContactsSource.fetch()).resolves.toEqual([]);
+    expect((Root as unknown as { getContactsAsync: jest.Mock }).getContactsAsync).not.toHaveBeenCalled();
+  });
+
+  it('reads the shared contacts when iOS access is limited', async () => {
+    mocked.requestPermissionsAsync.mockResolvedValue({ granted: true, accessPrivileges: 'limited' });
+    mocked.getContactsAsync.mockResolvedValue({ data: [{ id: 'l1', name: 'Sam', phoneNumbers: [{ number: '555-0100' }] }] });
+    await expect(expoContactsSource.fetch()).resolves.toHaveLength(1);
+  });
+
   it('maps contacts, falls back for name and id, and drops empty numbers and emails', async () => {
     mocked.getContactsAsync.mockResolvedValue({
       data: [
