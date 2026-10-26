@@ -428,6 +428,7 @@ describe('isValidObituaryLink', () => {
     ['HTTP://example.com/a', true],
     ['has space', false],
     ['ftp://x', false],
+    ['legacy.com/x?u=https://y', true],
     ['', false],
     ['   ', false],
     ['a'.repeat(2048 - 'https://'.length), true],

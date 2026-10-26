@@ -199,13 +199,15 @@ const HTTP_URL = /^https?:\/\/\S+$/i;
 const isHttpUrl = (value: string): boolean => HTTP_URL.test(value);
 
 /**
- * The one rule for an obituary link, used by the screens and by the save step. A bare
+ * The one rule for an obituary link, used by the screens and by `optionalUrl` (the save step). The
+ * gateway's `validField` is looser: it only checks http(s), no whitespace and the length of the
+ * stored value, with no bare-link or other-scheme step. A bare
  * "example.com/obit" is fine (https:// is added). Another scheme such as ftp://, a space, an empty
  * value, or more than 2048 characters is not.
  */
 export function isValidObituaryLink(raw: string | undefined): boolean {
   const value = raw?.trim() ?? '';
-  if (value.includes('://') && !/^https?:\/\//i.test(value)) {
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(value) && !/^https?:\/\//i.test(value)) {
     return false;
   }
   const url = normalizeUrl(value);

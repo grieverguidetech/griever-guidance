@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { announceRecap, doneRowMeta, fill, findHardCodedCopy, obituaryPreview, screenCopy, screenNames, sendLabel } from './index';
+import { announceRecap, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames, sendLabel } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
@@ -166,27 +166,5 @@ describe('sendLabel', () => {
   it('falls back when there is no count to show', () => {
     expect(sendLabel(undefined, copy)).toBe('Text these people');
     expect(sendLabel(0, copy)).toBe('Text these people');
-  });
-});
-
-describe('obituaryPreview', () => {
-  const copy = screenCopy('shareObituary');
-
-  it('names the person and gives the link', () => {
-    expect(obituaryPreview({ personName: 'Margaret' }, 'https://legacy.com/margaret', copy)).toBe(
-      "Margaret's obituary has been published. You can read it here: https://legacy.com/margaret",
-    );
-  });
-
-  it("drops the extra s after a name that ends in s", () => {
-    expect(obituaryPreview({ personName: 'James' }, 'https://x.com/a', copy)).toBe(
-      "James' obituary has been published. You can read it here: https://x.com/a",
-    );
-  });
-
-  it('says "Their" when there is no name', () => {
-    expect(obituaryPreview({ personName: ' ' }, 'https://x.com/a', copy)).toBe(
-      'Their obituary has been published. You can read it here: https://x.com/a',
-    );
   });
 });

@@ -3,6 +3,7 @@ import {
   composeMessage,
   historyTagLabel,
   normalizeUrl,
+  obituaryLink,
   SHARE_SERVICE_SAMPLE,
   shareService,
   templates,
@@ -108,6 +109,14 @@ describe('composeMessage', () => {
   it('delegates to the template, so preview and send cannot drift', () => {
     const fields = { deceasedName: 'Ann' };
     expect(composeMessage(announcePassing, fields)).toBe(announcePassing.renderMessage(fields));
+  });
+});
+
+describe('obituaryLink', () => {
+  it('gives a bare link https://, as the other messages do', () => {
+    expect(obituaryLink.renderMessage({ deceasedName: 'Anna', obituaryUrl: 'legacy.com/anna' })).toBe(
+      'We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.',
+    );
   });
 });
 

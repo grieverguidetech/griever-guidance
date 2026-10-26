@@ -1,12 +1,14 @@
-import { useEffect, useId, useState } from 'react';
-import type { Ref } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useId, useRef, useState } from 'react';
+import type { ComponentRef, Ref } from 'react';
+import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
+import { applyUrlInputMode } from '../inputMode';
+import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
 import { useSerifStyle } from '../typography';
 
@@ -64,7 +66,8 @@ export interface ShareObituaryProps {
  * screen. The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
 export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, draftUnavailable, headingRef, checklistRef }: ShareObituaryProps) {
-  const [touched, setTouched] = useState(false);
+  // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
+  const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
   const errorId = useId();
   const reasonId = useId();
   const draftReasonId = useId();
@@ -95,9 +98,11 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         onBlur={() => setTouched(true)}
         invalid={showError}
         describedBy={showError ? errorId : undefined}
+        hint={showError ? copy.invalidLink : undefined}
         url
+        returnKeyType="next"
       />
-      <Status id={errorId} message={showError ? copy.invalidLink : undefined} />
+      <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
       <Field
         label={copy.publisherLabel}
         optional={copy.optional}
@@ -105,6 +110,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         placeholder={copy.publisherPlaceholder}
         value={publisher}
         onChangeText={onPublisherChange}
+        returnKeyType="done"
       />
       {preview ? (
         <Card>
@@ -170,20 +176,30 @@ interface FieldProps {
   onBlur?: () => void;
   invalid?: boolean;
   describedBy?: string;
+  /** Native: read after the label (accessibilityHint). */
+  hint?: string;
   url?: boolean;
+  returnKeyType: 'next' | 'done';
 }
 
-function Field({ label, optional, accessibleName, placeholder, value, onChangeText, onBlur, invalid, describedBy, url }: FieldProps) {
+function Field({ label, optional, accessibleName, placeholder, value, onChangeText, onBlur, invalid, describedBy, hint, url, returnKeyType }: FieldProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
   const [focused, setFocused] = useState(false);
+  const input = useRef<ComponentRef<typeof TextInput> | null>(null);
   return (
     <View style={styles.field}>
-      <Body tone="strong" id={labelId}>
+      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
         {label} {optional ? <Text style={styles.optional}>{optional}</Text> : null}
       </Body>
       <TextInput
-        style={[styles.input, font, invalid && styles.inputInvalid, focused && Platform.OS !== 'web' && styles.inputFocused]}
+        ref={(node) => {
+          input.current = node;
+          if (url) {
+            applyUrlInputMode(node);
+          }
+        }}
+        style={[styles.input, font, focused && Platform.OS !== 'web' && styles.inputFocused, invalid && styles.inputInvalid]}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
@@ -195,6 +211,8 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
         accessibilityLabel={accessibleName}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}
+        accessibilityHint={hint}
+        returnKeyType={returnKeyType}
         autoCapitalize="none"
         autoCorrect={false}
         // Not on web: a url input there adds the browser's own invalid state on top of ours.
@@ -208,26 +226,9 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
   );
 }
 
-/**
- * A reason or error. The polite status node is always rendered and only its text changes, so screen
- * readers announce the change. Also announced on iOS (it ignores live regions).
- */
-function Status({ id, message }: { id: string; message?: string }) {
-  useEffect(() => {
-    if (message && Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibility(message);
-    }
-  }, [message]);
-  return (
-    <Body id={id} tone="muted" live>
-      {message ?? ''}
-    </Body>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
   optional: { color: colors['neutral-700'], fontWeight: '400' },
@@ -241,7 +242,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 14,
   },
-  inputInvalid: { borderColor: colors['accent-2-700'] },
+  // Last, so an invalid field keeps its error border while it has focus.
+  inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).
   inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
 });

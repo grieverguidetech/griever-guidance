@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ShareObituary } from './ShareObituary';
@@ -84,27 +85,57 @@ describe('ShareObituary', () => {
     expect(screen.getByRole('textbox', { name: 'Link to the obituary' })).not.toBeInvalid();
   });
 
-  it('a bad link shows the error once the field is left, and Continue stays blocked with that reason', async () => {
+  // A person typing: the field holds what they type, and only https:// links count as good.
+  function Typing({ start = '' }: { start?: string }) {
+    const [link, setLink] = useState(start);
+    return (
+      <ShareObituary copy={copy} eyebrow="x" link={link} onLinkChange={setLink} linkValid={/^https:\/\/\S+$/.test(link)} publisher="" onPublisherChange={vi.fn()} onBack={vi.fn()} onWhatYoullNeed={vi.fn()} onContinue={vi.fn()} />
+    );
+  }
+
+  it('a bad link shows the error only once the field is left, and Continue stays blocked with that reason', async () => {
     const user = userEvent.setup();
-    const h = setup({ link: 'has space', linkValid: false });
+    render(<Typing />);
     const field = screen.getByRole('textbox', { name: 'Link to the obituary' });
+    await user.type(field, 'has space');
     expect(field).not.toBeInvalid();
-    await user.click(field);
+    expect(screen.queryByText(copy.invalidLink)).not.toBeInTheDocument();
     await user.tab();
     expect(field).toBeInvalid();
     expect(field).toHaveAccessibleDescription(copy.invalidLink);
     expect(continueButton()).toHaveAttribute('aria-disabled', 'true');
     expect(continueButton()).toHaveAccessibleDescription(copy.invalidLink);
-    await user.click(continueButton());
-    expect(h.onContinue).not.toHaveBeenCalled();
   });
 
   it('pressing Continue with a bad link shows the error without leaving the field', async () => {
     const user = userEvent.setup();
-    setup({ link: 'has space', linkValid: false });
+    const h = setup({ link: 'has space', linkValid: false });
     await user.click(continueButton());
     expect(screen.getByRole('textbox', { name: 'Link to the obituary' })).toBeInvalid();
     expect(screen.getByText(copy.invalidLink)).toBeInTheDocument();
+    expect(h.onContinue).not.toHaveBeenCalled();
+  });
+
+  it('a bad link that was already saved shows the error as soon as the screen opens', () => {
+    setup({ link: 'has space', linkValid: false });
+    expect(screen.getByRole('textbox', { name: 'Link to the obituary' })).toHaveAccessibleDescription(copy.invalidLink);
+    expect(continueButton()).toHaveAccessibleDescription(copy.invalidLink);
+  });
+
+  it('asks phones for a URL keyboard without making the field a url input', () => {
+    setup();
+    const field = screen.getByRole('textbox', { name: 'Link to the obituary' });
+    expect(field).toHaveAttribute('inputmode', 'url');
+    expect(field).not.toHaveAttribute('type', 'url');
+  });
+
+  it('tapping a label focuses its field', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByText('Link to the obituary'));
+    expect(screen.getByRole('textbox', { name: 'Link to the obituary' })).toHaveFocus();
+    await user.click(screen.getByText('Where it was published'));
+    expect(screen.getByRole('textbox', { name: /Where it was published/ })).toHaveFocus();
   });
 
   it('a good link enables Continue, shows the preview, and Continue fires', async () => {

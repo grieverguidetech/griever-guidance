@@ -213,7 +213,7 @@ export const obituaryLink: Template = {
     const note = fields['personalNote'] ? `\n${fields['personalNote']}` : '';
     return (
       `We wanted to share the obituary for ${fields['deceasedName']}:\n\n` +
-      fields['obituaryUrl'] +
+      normalizeUrl(fields['obituaryUrl']) +
       note +
       `\n\nThank you for your love and support.`
     );

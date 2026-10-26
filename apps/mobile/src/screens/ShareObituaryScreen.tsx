@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
-import { fill, obituaryPreview, screenCopy } from '@griever/copy';
-import { isValidObituaryLink, normalizeUrl } from '@griever/shared';
+import { fill, screenCopy } from '@griever/copy';
+import { isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { Session } from '@griever/hooks';
 import { ShareObituary } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
@@ -58,19 +58,21 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
   };
 
   const linkValid = isValidObituaryLink(session.obituaryUrl);
+  const name = session.personName.trim() || copy.nameFallback;
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <ShareObituary
           copy={copy}
-          eyebrow={fill(copy.forName, { name: session.personName.trim() || copy.nameFallback })}
+          eyebrow={fill(copy.forName, { name })}
           eyebrowTone="accent2"
           link={session.obituaryUrl}
           onLinkChange={(obituaryUrl) => onChange({ obituaryUrl })}
           linkValid={linkValid}
           publisher={session.obituaryPublisher ?? ''}
           onPublisherChange={(obituaryPublisher) => onChange({ obituaryPublisher })}
-          preview={linkValid ? obituaryPreview(session, normalizeUrl(session.obituaryUrl), copy) : undefined}
+          // The card is the message itself, so what is read here is what is sent.
+          preview={linkValid ? obituaryLink.renderMessage({ deceasedName: name, obituaryUrl: session.obituaryUrl }) : undefined}
           onBack={onBack}
           onWhatYoullNeed={() => setChecklistOpen(true)}
           onContinue={onContinue}

@@ -79,17 +79,6 @@ export function announceRecap(
     .join(' · ');
 }
 
-/** The "We'll send" card on Share the obituary: "Margaret's obituary has been published. You can read it here: <link>". `url` is already https://. */
-export function obituaryPreview(
-  session: { personName?: string } | null | undefined,
-  url: string,
-  copy: ScreenCopy<'shareObituary'>,
-): string {
-  const name = session?.personName?.trim();
-  const possessive = name ? (/s$/i.test(name) ? `${name}'` : `${name}'s`) : copy.possessiveFallback;
-  return fill(copy.preview, { possessive, url });
-}
-
 /** "1 person" or "3 people". */
 export function recipientsPhrase(count: number, copy: ScreenCopy<'review'>): string {
   return `${count} ${count === 1 ? copy.person : copy.people}`;

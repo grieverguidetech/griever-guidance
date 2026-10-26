@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { AccessibilityInfo, Platform } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
@@ -45,7 +46,34 @@ describe('sharing the obituary on mobile', () => {
     expect(await screen.findByText("That link doesn't look right. Copy it again from the paper or funeral home.")).toBeTruthy();
     expect(screen.queryByText('Who should know?')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(await screen.findByText('For Anna')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Share the obituary/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Has the obituary been published?' })).toBeNull();
+  });
+
+  it('gives the link field the error as its hint, and announces the error but not the starting reason (iOS)', async () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    await openObituary();
+    const reason = 'Paste the link to the obituary to continue.';
+    const error = "That link doesn't look right. Copy it again from the paper or funeral home.";
+    expect(announce).not.toHaveBeenCalledWith(reason);
+    fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'has space');
+    fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    await screen.findByText(error);
+    expect(announce).toHaveBeenCalledWith(error);
+    expect(screen.getByLabelText('Link to the obituary').props.accessibilityHint).toBe(error);
+  });
+
+  it('shows exactly the message that will be sent, with https:// added to a bare link', async () => {
+    await openObituary();
+    fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'legacy.com/anna');
+    const sent = 'We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.';
+    expect(screen.getByText(sent)).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    await screen.findByRole('heading', { name: 'Review your message' });
+    expect(screen.getByText(sent)).toBeTruthy();
   });
 
   it('takes the link through Who should know? to Review, with the link in the message', async () => {

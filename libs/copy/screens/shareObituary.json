@@ -11,8 +11,6 @@
   "optional": "(optional)",
   "publisherPlaceholder": "e.g. The Waltham Register",
   "previewKicker": "We'll send",
-  "preview": "{possessive} obituary has been published. You can read it here: {url}",
-  "possessiveFallback": "Their",
   "continue": "Choose who to send it to",
   "needLink": "Paste the link to the obituary to continue.",
   "invalidLink": "That link doesn't look right. Copy it again from the paper or funeral home.",

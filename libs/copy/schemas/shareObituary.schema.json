@@ -16,8 +16,6 @@
     "optional",
     "publisherPlaceholder",
     "previewKicker",
-    "preview",
-    "possessiveFallback",
     "continue",
     "needLink",
     "invalidLink",
@@ -63,20 +61,6 @@
       "$ref": "#/$defs/text"
     },
     "previewKicker": {
-      "$ref": "#/$defs/text"
-    },
-    "preview": {
-      "type": "string",
-      "allOf": [
-        {
-          "pattern": "\\{possessive\\}"
-        },
-        {
-          "pattern": "\\{url\\}"
-        }
-      ]
-    },
-    "possessiveFallback": {
       "$ref": "#/$defs/text"
     },
     "continue": {
