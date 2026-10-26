@@ -1,5 +1,10 @@
 import { AwsClient } from 'aws4fetch';
-import { DATA_USER_TOKEN_HEADER, isDataErrorCode } from '@griever/shared';
+import {
+  DATA_SERVICE_DELETE_USER_PATH,
+  DATA_SERVICE_SECRET_HEADER,
+  DATA_USER_TOKEN_HEADER,
+  isDataErrorCode,
+} from '@griever/shared';
 import type { DataAction, DataResult } from '@griever/shared';
 
 export interface DataFunctionConfig {
@@ -33,6 +38,63 @@ function isLoopback(url: URL): boolean {
   return LOOPBACK_HOSTS.has(url.hostname);
 }
 
+/** Checks the config, signs the call (SigV4, unless loopback) and sends it. Never leaks headers in errors. */
+async function send(
+  config: DataFunctionConfig,
+  path: string,
+  headers: Record<string, string>,
+  payload: unknown,
+): Promise<Response> {
+  let base: URL;
+  try {
+    base = new URL(config.url);
+  } catch {
+    throw new DataFunctionError(null, 'data function url is invalid');
+  }
+  if (base.pathname !== '/' || base.search !== '' || base.hash !== '') {
+    throw new DataFunctionError(
+      null,
+      'data function url must be an origin with no path, query or hash',
+    );
+  }
+  const loopback = isLoopback(base);
+  if (!loopback && base.protocol !== 'https:') {
+    throw new DataFunctionError(null, 'data function url must use https');
+  }
+  if (!loopback && (!config.accessKeyId || !config.secretAccessKey)) {
+    throw new DataFunctionError(
+      null,
+      'data function needs an AWS key pair for a non-loopback url',
+    );
+  }
+  // A wrong region signs fine and fails at AWS with a 403, so there is no default.
+  if (!loopback && !config.region) {
+    throw new DataFunctionError(null, 'data function needs a region');
+  }
+
+  const url = new URL(path, base).toString();
+  const init = {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(payload),
+  };
+
+  try {
+    if (loopback) {
+      return await fetch(url, init);
+    }
+    const aws = new AwsClient({
+      accessKeyId: config.accessKeyId as string,
+      secretAccessKey: config.secretAccessKey as string,
+      service: 'lambda',
+      region: config.region as string,
+    });
+    return await fetch(await aws.sign(url, init));
+  } catch {
+    throw new DataFunctionError(null, 'data function request failed');
+  }
+}
+
 /**
  * Calls one data action as the user. The user's token travels only in
  * `x-gg-user-token`; the SigV4 signature proves the call came from the gateway.
@@ -44,71 +106,67 @@ export async function callData<T = unknown>(
   action: DataAction,
   args: Record<string, unknown> = {},
 ): Promise<DataResult<T>> {
-  let base: URL;
-  try {
-    base = new URL(config.url);
-  } catch {
-    throw new DataFunctionError(null, 'data function url is invalid');
-  }
-  if (base.pathname !== '/' || base.search !== '' || base.hash !== '') {
-    throw new DataFunctionError(null, 'data function url must be an origin with no path, query or hash');
-  }
-  const loopback = isLoopback(base);
-  if (!loopback && base.protocol !== 'https:') {
-    throw new DataFunctionError(null, 'data function url must use https');
-  }
-  if (!loopback && (!config.accessKeyId || !config.secretAccessKey)) {
-    throw new DataFunctionError(null, 'data function needs an AWS key pair for a non-loopback url');
-  }
-  // A wrong region signs fine and fails at AWS with a 403, so there is no default.
-  if (!loopback && !config.region) {
-    throw new DataFunctionError(null, 'data function needs a region');
-  }
-
-  const url = new URL('/v1', base).toString();
-  const init = {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', [DATA_USER_TOKEN_HEADER]: userToken },
-    body: JSON.stringify({ action, args }),
-  };
-
-  let res: Response;
-  try {
-    if (loopback) {
-      res = await fetch(url, init);
-    } else {
-      const aws = new AwsClient({
-        accessKeyId: config.accessKeyId as string,
-        secretAccessKey: config.secretAccessKey as string,
-        service: 'lambda',
-        region: config.region as string,
-      });
-      res = await fetch(await aws.sign(url, init));
-    }
-  } catch {
-    throw new DataFunctionError(null, 'data function request failed');
-  }
-
+  const res = await send(
+    config,
+    '/v1',
+    { [DATA_USER_TOKEN_HEADER]: userToken },
+    { action, args },
+  );
   if (res.status === 401) {
     await res.body?.cancel();
     return { ok: false, code: 'unauthorized' };
   }
   if (res.status !== 200) {
     await res.body?.cancel();
-    throw new DataFunctionError(res.status, `data function answered ${res.status}`);
+    throw new DataFunctionError(
+      res.status,
+      `data function answered ${res.status}`,
+    );
   }
 
   let body: unknown;
   try {
     body = await res.json();
   } catch {
-    throw new DataFunctionError(res.status, 'data function returned a non-JSON body');
+    throw new DataFunctionError(
+      res.status,
+      'data function returned a non-JSON body',
+    );
   }
   return parseResult<T>(body, res.status);
 }
 
+/**
+ * Deletes all of one user's data. Server-to-server only (the Clerk user.deleted webhook): no user
+ * token, but the SigV4 signature plus the shared service secret. Resolves on success, throws otherwise.
+ */
+export async function callDeleteUser(
+  config: DataFunctionConfig,
+  serviceSecret: string,
+  userId: string,
+): Promise<void> {
+  const res = await send(
+    config,
+    DATA_SERVICE_DELETE_USER_PATH,
+    { [DATA_SERVICE_SECRET_HEADER]: serviceSecret },
+    { userId },
+  );
+  await res.body?.cancel();
+  if (res.status !== 200) {
+    throw new DataFunctionError(
+      res.status,
+      `data function answered ${res.status}`,
+    );
+  }
+}
+
 function parseResult<T>(body: unknown, status: number): DataResult<T> {
-  const value = body as { ok?: unknown; data?: unknown; code?: unknown; message?: unknown } | null;
+  const value = body as {
+    ok?: unknown;
+    data?: unknown;
+    code?: unknown;
+    message?: unknown;
+  } | null;
   if (value && value.ok === true) {
     return { ok: true, data: value.data as T };
   }
@@ -117,5 +175,8 @@ function parseResult<T>(body: unknown, status: number): DataResult<T> {
       ? { ok: false, code: value.code, message: value.message }
       : { ok: false, code: value.code };
   }
-  throw new DataFunctionError(status, 'data function returned an unexpected body');
+  throw new DataFunctionError(
+    status,
+    'data function returned an unexpected body',
+  );
 }

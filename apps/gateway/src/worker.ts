@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { profileRouter } from '@griever/identity';
+import { clerkWebhookRouter, profileRouter } from '@griever/identity';
 import { messagesRouter } from '@griever/gateway-messages';
 import { membersRouter } from '@griever/gateway-flows';
 
@@ -35,6 +35,7 @@ app.use(
 
 app.get('/health', (c) => c.json({ ok: true }));
 app.route('/', profileRouter);
+app.route('/', clerkWebhookRouter);
 app.route('/', messagesRouter);
 app.route('/', membersRouter);
 

@@ -54,7 +54,10 @@ export const MEMBER_PREFIX = 'MEMBER#';
 export const INVITE_PREFIX = 'INVITE#';
 export type SkPrefix = typeof FLOW_PREFIX | typeof MEMBER_PREFIX | typeof INVITE_PREFIX;
 
+/** The gsi1 partition that holds everything pointing at one user. */
+export const refPk = (id: string): string => `REF#${userId(id)}`;
+
 /** gsi1 keys: items that point at a user. Used only by account deletion. */
 export function refGsi(id: string, kind: 'FLOW' | 'INVITE', itemId: string): { gsi1pk: string; gsi1sk: string } {
-  return { gsi1pk: `REF#${userId(id)}`, gsi1sk: `${kind}#${uuid(kind.toLowerCase(), itemId)}` };
+  return { gsi1pk: refPk(id), gsi1sk: `${kind}#${uuid(kind.toLowerCase(), itemId)}` };
 }

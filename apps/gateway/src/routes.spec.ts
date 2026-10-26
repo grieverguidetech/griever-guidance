@@ -8,6 +8,7 @@ const EXPECTED_ROUTES = [
   'GET /me/profile',
   'PUT /me/profile',
   'POST /obituary',
+  'POST /webhooks/clerk',
   'GET /members',
   'DELETE /members/:memberId',
   'POST /invites',
@@ -56,6 +57,13 @@ describe('gateway route inventory (C8)', () => {
   ])('%s %s refuses a request with no token', async (method, path) => {
     const app = await loadApp();
     const res = await app.request(path, { method, body: method === 'PUT' || method === 'POST' ? '{}' : undefined });
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /webhooks/clerk refuses an unsigned request with 401', async () => {
+    const app = await loadApp();
+    vi.stubEnv('CLERK_WEBHOOK_SECRET', 'whsec_dGVzdA==');
+    const res = await app.request('/webhooks/clerk', { method: 'POST', body: '{"type":"user.deleted"}' });
     expect(res.status).toBe(401);
   });
 });

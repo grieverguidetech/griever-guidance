@@ -7,6 +7,7 @@ import { acceptInvite } from './rules/acceptInvite.js';
 import { createFlow, listFlows, updateFlow } from './rules/flows.js';
 import { createInvite, revokeInvite } from './rules/invites.js';
 import { listMembers, removeMember } from './rules/members.js';
+import { deleteUser } from './rules/deleteUser.js';
 import { getProfile, putProfile } from './rules/profiles.js';
 
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -61,6 +62,8 @@ export function createHandler(env: Env = process.env, overrides: Partial<DataApp
     doc: createDocClient(createDynamoClient(config)),
     table: config.dataTable,
     verify: loadVerifier(env),
+    serviceSecret: env['DATA_SERVICE_SECRET']?.trim() || undefined,
+    deleteUser,
     ...overrides,
   });
   const run = handle(app);
