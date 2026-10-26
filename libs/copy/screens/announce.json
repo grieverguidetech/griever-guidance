@@ -1,0 +1,20 @@
+{
+  "heading": "Announce the passing",
+  "intro": "We have everything we need. This is only if you'd like to say more.",
+  "back": "Back",
+  "checklist": "What you'll need",
+  "forName": "For {name}",
+  "nameFallback": "your loved one",
+  "kicker": "From your details",
+  "edit": "Edit",
+  "noteLabel": "Anything you'd like to add",
+  "optional": "(optional)",
+  "placeholder": "She was peaceful, and we were with her.",
+  "continue": "Continue",
+  "recap": {
+    "nameFallback": "Their name",
+    "passed": "passed {date}",
+    "dateNotSet": "date not set",
+    "from": "from {sender}"
+  }
+}

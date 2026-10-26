@@ -38,8 +38,18 @@ describe('picking an announcement', () => {
   it('shows a real screen, not a blank one or the checklist', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    expect(await screen.findByText("Anything you'd like to add (optional)")).toBeTruthy();
+    expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
     expect(screen.queryByText('Gather when you can')).toBeNull();
+  });
+
+  it('keeps the note typed on the announce screen, and Continue goes to Select recipients', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Select recipients')).toBeTruthy();
+    fireEvent.press(screen.getByText('← Back'));
+    expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
   });
 
   it('steps over the service-known step in both directions', async () => {
@@ -48,8 +58,8 @@ describe('picking an announcement', () => {
     fireEvent.press(await screen.findByText('Continue'));
     expect(await screen.findByText('Select recipients')).toBeTruthy();
     fireEvent.press(screen.getByText('← Back'));
-    expect(await screen.findByText("Anything you'd like to add (optional)")).toBeTruthy();
-    fireEvent.press(screen.getByText('← Back'));
+    expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     // The first form's Back returns to the hub, not a picker.
     expect(await screen.findByText('One thing at a time.')).toBeTruthy();
     expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();

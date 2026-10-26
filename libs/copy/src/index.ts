@@ -61,3 +61,20 @@ export function doneRowMeta(
   const date = row.dateLabel ? ` · ${row.dateLabel}` : '';
   return `${people}${date} · ${row.started ? copy.metaStarted : copy.metaSendAgain}`;
 }
+
+/** The "From your details" line on Announce the passing: "Name · passed date · from sender". */
+export function announceRecap(
+  session: { personName?: string; dateOfPassing?: string | null; senderName?: string } | null | undefined,
+  copy: ScreenCopy<'announce'>,
+): string {
+  const name = session?.personName?.trim();
+  const date = session?.dateOfPassing?.trim();
+  const sender = session?.senderName?.trim();
+  return [
+    name || copy.recap.nameFallback,
+    date ? fill(copy.recap.passed, { date }) : copy.recap.dateNotSet,
+    sender ? fill(copy.recap.from, { sender }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}

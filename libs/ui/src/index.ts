@@ -14,6 +14,8 @@ export { Sheet } from './Sheet';
 export type { SheetProps } from './Sheet';
 export { PaywallSheet } from './PaywallSheet';
 export type { PaywallCopy, PaywallSheetProps } from './PaywallSheet';
+export { Announce } from './screens/Announce';
+export type { AnnounceCopy, AnnounceProps } from './screens/Announce';
 export { Hub } from './screens/Hub';
 export type { HubCopy, HubMomentKey, HubProps, HubRow } from './screens/Hub';
 export { SerifReadyContext, useSerifStyle } from './typography';

@@ -8,6 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
+import { AnnounceScreen } from '../screens/AnnounceScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
@@ -71,6 +72,7 @@ export type RootStackParamList = {
   Home: undefined;
   Starting: undefined;
   DetailsForm: undefined;
+  Announce: undefined;
   ContactSelector: undefined;
   Confirm: undefined;
   Sending: undefined;
@@ -93,6 +95,8 @@ type SessionProps = {
   startCategory: TemplateCategory | null;
   /** Back from a moment's first form: return to the hub (the picker is gone). */
   onHub: () => void;
+  /** Edit person on the announce step: back to the person's setup. */
+  onEditPerson: () => void;
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
@@ -102,7 +106,7 @@ type SessionProps = {
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, startCategory, onHub, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, startCategory, onHub, onEditPerson, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
@@ -214,7 +218,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onDraft
       }
     },
   };
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} />;
 };
 
 // The announcement path has a "do you know the service details" step that mobile has no screen
@@ -383,6 +387,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       arrived={arrived}
       startCategory={startCategory}
       onHub={() => setAtHub(true)}
+      onEditPerson={() => setStage('setup')}
       onDraftChange={updateDraft}
       onDetails={updateSession}
       onHome={goHome}
@@ -455,10 +460,12 @@ const Navigation = ({
   flow,
   contacts,
   bar,
+  onEditPerson,
 }: {
   flow: ReturnType<typeof useSendFlow>;
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
+  onEditPerson: () => void;
 }) => {
   return (
     <NavigationContainer>
@@ -467,7 +474,12 @@ const Navigation = ({
           // Only for the moment between choosing a step on the hub and its first form opening.
           <Stack.Screen name="Starting">{() => <View style={{ flex: 1, backgroundColor: '#ffffff' }} />}</Stack.Screen>
         )}
-        {(flow.step === 'details' || flow.step === 'announce' || flow.step === 'serviceKnown') && (
+        {flow.step === 'announce' && (
+          <Stack.Screen name="Announce">
+            {() => withBar(bar, <AnnounceScreen flow={flow} onEditPerson={onEditPerson} />)}
+          </Stack.Screen>
+        )}
+        {(flow.step === 'details' || flow.step === 'serviceKnown') && (
           <Stack.Screen name="DetailsForm">{() => withBar(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'contacts' && (
