@@ -1,80 +1,51 @@
+import { useRef, useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
-import { PencilSimple } from '@phosphor-icons/react/PencilSimple';
-import { TopBar, Eyebrow, SavedNote } from '../lib/ui';
+import { announceRecap, fill, screenCopy } from '@griever/copy';
+import { Announce } from '@griever/ui';
+import { SavedNote } from '../lib/ui';
 import { StartAgain } from '../lib/StartAgain';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
 type Flow = ReturnType<typeof useSendFlow>;
+
+const copy = screenCopy('announce');
 
 interface Props {
   flow: Flow;
   onEditSession: () => void;
 }
 
+/** The screen is the shared Announce in libs/ui; this holds what is web only: the sheet and Start again. */
 export function AnnounceForm({ flow, onEditSession }: Props) {
-  const { fields, setField, nextStep, prevStep } = flow;
-  const session = flow.session;
-  const name = session?.personName?.trim() || 'your loved one';
-
-  const recap = [
-    session?.personName?.trim() || 'Their name',
-    session?.dateOfPassing?.trim()
-      ? `passed ${session.dateOfPassing.trim()}`
-      : 'date not set',
-    session?.senderName?.trim() ? `from ${session.senderName.trim()}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const { fields, setField, nextStep, prevStep, session } = flow;
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Loose on purpose: the shared Button hands back a DOM node on web.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const checklistButton = useRef<any>(null);
+  const name = session?.personName?.trim() || copy.nameFallback;
 
   return (
     <div className="flex flex-col gap-4">
-      <TopBar onBack={prevStep} />
-      <div className="flex flex-col gap-1">
-        <Eyebrow name={name} accent2 />
-        <h1 className="text-[22px]">Announce the passing</h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          We have everything we need. This is only if you'd like to say more.
-        </p>
-      </div>
-
-      <div className="gg-card">
-        <span className="gg-card-kicker">From your details</span>
-        <p className="gg-card-body m-0" style={{ opacity: 1, fontSize: 14 }}>
-          {recap}
-        </p>
-        <button
-          type="button"
-          onClick={onEditSession}
-          className="gg-btn gg-btn-ghost self-start !min-h-0 !px-0"
-        >
-          <PencilSimple size={16} weight="regular" />
-          Edit
-        </button>
-      </div>
-
-      <div className="gg-field">
-        <label htmlFor="b-note">
-          Anything you'd like to add
-          <span style={{ color: 'var(--text-eyebrow)' }}> (optional)</span>
-        </label>
-        <textarea
-          id="b-note"
-          className="gg-input"
-          rows={3}
-          placeholder="She was peaceful, and we were with her."
-          value={fields['personalNote'] ?? ''}
-          onChange={(e) => setField('personalNote', e.target.value)}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={nextStep}
-        className="gg-btn gg-btn-primary gg-btn-block"
-      >
-        Continue
-      </button>
-      <SavedNote />
-      <StartAgain flow={flow} />
+      <Announce
+        copy={copy}
+        eyebrow={fill(copy.forName, { name })}
+        eyebrowTone="accent2"
+        recap={announceRecap(session, copy)}
+        note={fields['personalNote'] ?? ''}
+        onNoteChange={(note) => setField('personalNote', note)}
+        onBack={prevStep}
+        onWhatYoullNeed={() => setSheetOpen(true)}
+        onEdit={onEditSession}
+        onContinue={nextStep}
+        checklistRef={checklistButton}
+        footer={
+          <>
+            <SavedNote />
+            <StartAgain flow={flow} />
+          </>
+        }
+      />
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
     </div>
   );
 }

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Announce the passing screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "intro",
+    "back",
+    "checklist",
+    "forName",
+    "nameFallback",
+    "kicker",
+    "edit",
+    "noteLabel",
+    "optional",
+    "placeholder",
+    "continue",
+    "recap"
+  ],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "intro": { "$ref": "#/$defs/text" },
+    "back": { "$ref": "#/$defs/text" },
+    "checklist": { "$ref": "#/$defs/text" },
+    "forName": { "type": "string", "pattern": "\\{name\\}" },
+    "nameFallback": { "$ref": "#/$defs/text" },
+    "kicker": { "$ref": "#/$defs/text" },
+    "edit": { "$ref": "#/$defs/text" },
+    "noteLabel": { "$ref": "#/$defs/text" },
+    "optional": { "$ref": "#/$defs/text" },
+    "placeholder": { "$ref": "#/$defs/text" },
+    "continue": { "$ref": "#/$defs/text" },
+    "recap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nameFallback", "passed", "dateNotSet", "from"],
+      "properties": {
+        "nameFallback": { "$ref": "#/$defs/text" },
+        "passed": { "type": "string", "pattern": "\\{date\\}" },
+        "dateNotSet": { "$ref": "#/$defs/text" },
+        "from": { "type": "string", "pattern": "\\{sender\\}" }
+      }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 }
+  }
+}

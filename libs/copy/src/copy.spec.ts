@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames } from './index';
+import { announceRecap, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
@@ -127,5 +127,27 @@ describe('doneRowMeta', () => {
 
   it('says people, leaves out a missing date, and shows Started', () => {
     expect(doneRowMeta(copy, { recipientCount: 3, started: true })).toBe('3 people · Started');
+  });
+});
+
+describe('announceRecap', () => {
+  const copy = screenCopy('announce');
+
+  it('joins name, date and sender', () => {
+    expect(announceRecap({ personName: 'Margaret Hayes', dateOfPassing: 'May 29, 2026', senderName: 'Peter' }, copy)).toBe(
+      'Margaret Hayes · passed May 29, 2026 · from Peter',
+    );
+  });
+
+  it('says the date is not set, and leaves out a missing sender', () => {
+    expect(announceRecap({ personName: 'Margaret Hayes', dateOfPassing: ' ', senderName: '' }, copy)).toBe(
+      'Margaret Hayes · date not set',
+    );
+  });
+
+  it('falls back when there is no name', () => {
+    expect(announceRecap({ personName: '', dateOfPassing: 'May 29, 2026', senderName: 'Peter' }, copy)).toBe(
+      'Their name · passed May 29, 2026 · from Peter',
+    );
   });
 });

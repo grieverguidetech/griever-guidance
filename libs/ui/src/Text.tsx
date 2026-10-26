@@ -5,12 +5,14 @@ import { useSerifStyle } from './typography';
 
 export interface EyebrowProps {
   children: ReactNode;
+  /** `accent2` is the second accent (a magenta), for the Announce screen. */
+  tone?: 'accent' | 'accent2';
 }
 
 /** The small accent line above a heading, for example "For Margaret". */
-export function Eyebrow({ children }: EyebrowProps) {
+export function Eyebrow({ children, tone = 'accent' }: EyebrowProps) {
   const font = useSerifStyle('regular');
-  return <Text style={[styles.eyebrow, font]}>{children}</Text>;
+  return <Text style={[styles.eyebrow, tone === 'accent2' && styles.accent2, font]}>{children}</Text>;
 }
 
 export type BodyTone = 'default' | 'strong' | 'muted';
@@ -46,6 +48,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors['accent-700'],
   },
+  accent2: { color: colors['accent-2-700'] },
   body: {
     fontSize: 13,
     lineHeight: 20,

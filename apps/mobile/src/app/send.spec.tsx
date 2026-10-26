@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Linking } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, Linking, Modal } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App, withoutServiceKnown } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
+
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+// This path is specific to this react-native version. Re-check it when react-native is upgraded.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
 
 const anna = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
@@ -38,8 +45,59 @@ describe('picking an announcement', () => {
   it('shows a real screen, not a blank one or the checklist', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    expect(await screen.findByText("Anything you'd like to add (optional)")).toBeTruthy();
+    expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
     expect(screen.queryByText('Gather when you can')).toBeNull();
+  });
+
+  it('keeps the note typed on the announce screen, and Continue goes to Select recipients', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Select recipients')).toBeTruthy();
+    fireEvent.press(screen.getByText('← Back'));
+    expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
+  });
+
+  it('puts the typed note in the message on the confirm screen', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
+  });
+
+  it('Edit opens setup, and Back there returns to Announce with the note kept', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
+    fireEvent.press(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.press(await screen.findByLabelText('Back to home'));
+    expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
+  });
+
+  it('moves screen-reader focus to the heading when Announce opens', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna();
+    await screen.findByText('One thing at a time.');
+    focus.mockClear();
+    await startMoment('Announce the passing');
+    await screen.findByLabelText(/Anything you'd like to add/);
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it('opens What you will need in a sheet on Announce, and focus returns to the button when it closes', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna();
+    await startMoment('Announce the passing');
+    await screen.findByLabelText(/Anything you'd like to add/);
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
+    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
+    expect(focus).toHaveBeenCalled();
   });
 
   it('steps over the service-known step in both directions', async () => {
@@ -48,8 +106,8 @@ describe('picking an announcement', () => {
     fireEvent.press(await screen.findByText('Continue'));
     expect(await screen.findByText('Select recipients')).toBeTruthy();
     fireEvent.press(screen.getByText('← Back'));
-    expect(await screen.findByText("Anything you'd like to add (optional)")).toBeTruthy();
-    fireEvent.press(screen.getByText('← Back'));
+    expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     // The first form's Back returns to the hub, not a picker.
     expect(await screen.findByText('One thing at a time.')).toBeTruthy();
     expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();

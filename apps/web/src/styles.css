@@ -116,6 +116,12 @@ h1, h2, h3, h4, h5, h6 {
   outline: 1px solid var(--color-accent-700);
   outline-offset: 0;
 }
+/* The shared Announce note field (libs/ui) carries data-gg-field instead of .gg-input; same ring. */
+[data-gg-field]:focus-visible {
+  border-color: var(--color-accent-700);
+  outline: 1px solid var(--color-accent-700);
+  outline-offset: 0;
+}
 /* .gg-card-selected lives in @layer components, so its outline can never win
    against the unlayered `:focus { outline: none }` reset above — the selection
    ring would vanish the instant a card is clicked (clicking focuses it). Keep
