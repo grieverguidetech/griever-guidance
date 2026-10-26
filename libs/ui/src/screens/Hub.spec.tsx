@@ -140,6 +140,8 @@ describe('Hub', () => {
     expect(screen.getByText('Not in the app yet.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Share the obituary/ })).not.toBeInTheDocument();
     expect(h.onStart).not.toHaveBeenCalled();
+    // Plain text on web: not a tab stop.
+    expect(screen.getByText('Not in the app yet.').closest('[tabindex]')).toBeNull();
   });
 
   it('keeps the HTML valid: no div inside any button', () => {

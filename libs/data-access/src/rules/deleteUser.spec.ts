@@ -260,7 +260,7 @@ describe.runIf(up)('deleteUser with many items', () => {
     expect((await scan()).filter((i) => i['ownerId'] === BIG || i['pk'] === `USER#${BIG}`)).toEqual([]);
     expect(ms).toBeLessThan(8000);
     await dropTables();
-  });
+  }, 30_000); // seeding 1000 items; the 5 s default is too tight when CI or a full check runs in parallel
 });
 
 function flowGuard(flowId: string, ownerId: string) {

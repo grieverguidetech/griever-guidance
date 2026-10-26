@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, BackHandler, findNodeHandle, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
@@ -77,6 +77,15 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
     return () => sub.remove();
   }, [onBack]);
 
+  // The placeholder's onDismiss runs on iOS only, so on Android focus goes back when it is closed
+  // (the Close button, or the Back gesture).
+  const closePaywall = () => {
+    setPaywallOpen(false);
+    if (Platform.OS !== 'ios') {
+      setTimeout(focusOpener, 0);
+    }
+  };
+
   const focusOpener = () => {
     const handle = opener.current ? findNodeHandle(opener.current as ComponentRef<typeof Text>) : null;
     if (handle) {
@@ -120,7 +129,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
         headingRef={heading}
       />
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} />
-      {paymentsEnabled && <PaywallPlaceholder visible={paywallOpen} onClose={() => setPaywallOpen(false)} onDismiss={focusOpener} />}
+      {paymentsEnabled && <PaywallPlaceholder visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
     </ScrollView>
   );
 }

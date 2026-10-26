@@ -1,6 +1,6 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -113,7 +113,9 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
   if (row.unavailable) {
     // Text only, not a button: nothing to press, so nothing that sends (see the host's reason).
     return (
-      <View accessible style={styles.plain}>
+      // `accessible` groups the lines into one screen-reader stop on native. On web it would make a
+      // focusable div with no action, so web gets plain text.
+      <View accessible={Platform.OS !== 'web'} style={styles.plain}>
         <Body tone="muted">{text.title}</Body>
         <Body>{text.body}</Body>
         <Body tone="muted" small>

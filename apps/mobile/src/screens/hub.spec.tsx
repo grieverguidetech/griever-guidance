@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, BackHandler, Modal } from 'react-native';
+import { AccessibilityInfo, BackHandler, Modal, Platform } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
@@ -154,6 +154,26 @@ describe('HubScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
     act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
     expect(focus).toHaveBeenCalledWith(1);
+  });
+
+  it('on Android, closing the placeholder sends focus back to the locked row (onDismiss is iOS only)', () => {
+    jest.useFakeTimers();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      setup(anna, true);
+      focus.mockClear();
+      fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+      fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).toHaveBeenCalledWith(1);
+    } finally {
+      Platform.OS = original;
+      jest.useRealTimers();
+    }
   });
 
   it('with payments off, locks nothing', () => {
