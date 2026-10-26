@@ -25,8 +25,8 @@ describe('SentNote', () => {
     const { container } = render(<SentNote lead={LEAD} rest={REST} />);
     for (const el of [container.firstElementChild, screen.getByText(LEAD), screen.getByText(REST)]) {
       const style = getComputedStyle(el as Element);
-      expect(['', '0px']).toContain(style.borderTopWidth);
-      expect(['', 'rgba(0, 0, 0, 0)', 'transparent']).toContain(style.backgroundColor);
+      expect(style.borderTopWidth).toBe('0px');
+      expect(style.backgroundColor).toBe('rgba(0, 0, 0, 0)');
     }
   });
 

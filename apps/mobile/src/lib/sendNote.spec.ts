@@ -9,7 +9,7 @@ describe('sendNote', () => {
     expect(sendNote('announcement', r('delivered'))).toEqual({
       lead: 'Everyone has been told.',
       rest: NO_COPY,
-      spoken: 'Everyone has been told.',
+      spoken: `Everyone has been told. ${NO_COPY}`,
     });
     expect(sendNote('service', r('delivered')).lead).toBe('The service details have been shared.');
     expect(sendNote('obituary', r('delivered')).lead).toBe('The obituary has been shared.');
@@ -21,7 +21,7 @@ describe('sendNote', () => {
     expect(sendNote('announcement', r('delivered', 'skipped', 'delivered'))).toEqual({
       lead: 'You told 2 of 3.',
       rest: `You can text the others from your own Messages app any time. ${NO_COPY}`,
-      spoken: 'You told 2 of 3. You can text the others from your own Messages app any time.',
+      spoken: `You told 2 of 3. You can text the others from your own Messages app any time. ${NO_COPY}`,
     });
   });
 

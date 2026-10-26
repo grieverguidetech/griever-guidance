@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, SentNote, SerifText as Text } from '@griever/ui';
+import { Body, Button, SentNote, SerifText as Text } from '@griever/ui';
+import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
-import { PrimaryButton, ScreenHeader, authStyles } from '../components/authForm';
+import { PrimaryButton, ScreenHeader } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';
-import { ACCENT, ACCENT_TINT, MUTED } from '../components/colors';
 import { isBlank } from '../lib/useDeviceSessions';
 import type { SentNoteText } from '../lib/sendNote';
 
@@ -41,7 +41,9 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
   // The header takes screen-reader focus as Home opens. On iOS the note is queued behind it, so it
   // is read rather than dropped. Android reads the live region below.
   useEffect(() => {
-    if (note && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
+    if (note && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
+    }
   }, [note]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -61,22 +63,28 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
           <Button label={copy.checklist} variant="header" onPress={onWhatYoullNeed} />
         </View>
       ) : null}
-      {onAccount ? (
-        <Pressable style={styles.link} onPress={onAccount} accessibilityRole="button">
-          <Text style={styles.linkText}>Your account</Text>
-        </Pressable>
+      {people.length > 0 ? (
+        <View style={styles.intro}>
+          <Body tone="muted">Each person is kept separately on this phone.</Body>
+        </View>
       ) : null}
-      {people.length > 0 ? <Text style={authStyles.body}>Each person is kept separately on this phone.</Text> : null}
+      {people.length === 0 ? (
+        <View style={styles.intro}>
+          <Body tone="muted">
+            {canCreate ? 'No one here yet.' : 'When someone adds you to help, the people you\'re helping will show here.'}
+          </Body>
+        </View>
+      ) : null}
       {people.map((s) => (
         <Pressable
           key={s.id}
-          style={styles.row}
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => onOpen(s.id)}
           accessibilityRole="button"
           accessibilityLabel={`${personLabel(s)}${s.dateOfPassing ? `, passed ${s.dateOfPassing}` : ''}`}
         >
           <Text style={styles.rowName}>{personLabel(s)}</Text>
-          {s.dateOfPassing ? <Text style={styles.rowMeta}>{s.dateOfPassing}</Text> : null}
+          {s.dateOfPassing ? <Body tone="muted" small>{s.dateOfPassing}</Body> : null}
         </Pressable>
       ))}
       {canCreate ? (
@@ -84,40 +92,35 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
           <PrimaryButton label={people.length > 0 ? ADD_PERSON : START_FIRST} pending={false} onPress={onCreate} />
         </View>
       ) : null}
+      {onAccount ? (
+        // Outline, page showing through: the shared `header` variant (web's top bar look).
+        <View style={styles.account}>
+          <Button label="Your account" variant="header" onPress={onAccount} />
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#ffffff' },
+  screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 24, paddingTop: 60 },
   headerRow: { alignSelf: 'flex-start', marginBottom: 8 },
-  link: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    minWidth: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderRadius: 10,
-    backgroundColor: ACCENT_TINT,
-    marginBottom: 8,
-  },
   note: { marginBottom: 16 },
-  pressed: { opacity: 0.7 },
-  linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
+  intro: { marginBottom: 16 },
   row: {
     minHeight: 44,
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: MUTED,
+    borderColor: colors['neutral-600'],
     borderRadius: 10,
+    backgroundColor: colors.surface,
     marginBottom: 12,
   },
-  rowName: { fontSize: 16, color: ACCENT, fontWeight: '500' },
-  rowMeta: { fontSize: 13, color: MUTED, marginTop: 2 },
+  rowPressed: { backgroundColor: colors['accent-100'] },
+  rowName: { fontSize: 17, color: colors.ink, fontWeight: '600' },
   create: { marginTop: 8 },
+  account: { alignSelf: 'flex-start', marginTop: 8 },
 });

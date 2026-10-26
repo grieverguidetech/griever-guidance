@@ -86,7 +86,6 @@ describe('PathLanding finish note (#176)', () => {
     expect(finishNoteText({ moment, told: 3, total: 3 })).toBe(words);
     renderPath({}, { note: { moment, told: 3, total: 3 } });
     expect(screen.getByText(words)).toBeInTheDocument();
-    expect(finishNoteSpoken({ moment, told: 3, total: 3 })).toContain(words);
   });
 
   it('counts, and says how to reach the others, when anyone was skipped', () => {
@@ -97,6 +96,15 @@ describe('PathLanding finish note (#176)', () => {
     expect(screen.getByText('You told 2 of 5.')).toBeInTheDocument();
     expect(screen.getByText(/You can text the others from your own Messages app any time\./)).toBeInTheDocument();
     expect(screen.queryByText('Everyone has been told.')).not.toBeInTheDocument();
+  });
+
+  const NO_COPY = "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.";
+
+  it('speaks the same words as the note, privacy line included', () => {
+    expect(finishNoteSpoken({ moment: 'announce', told: 2, total: 5 })).toBe(
+      `You told 2 of 5. You can text the others from your own Messages app any time. ${NO_COPY}`,
+    );
+    expect(finishNoteSpoken({ moment: 'obituary', told: 3, total: 3 })).toBe(`The obituary has been shared. ${NO_COPY}`);
   });
 
   it('keeps the C2 line in the note, and calm copy (C7)', () => {
@@ -116,17 +124,6 @@ describe('PathLanding finish note (#176)', () => {
     expect(getComputedStyle(lead).fontStyle).toBe('italic');
     expect(getComputedStyle(rest).fontStyle).toBe('italic');
     expect(lead.closest('.gg-card')).toBeNull();
-  });
-
-  it('shows the first sentence in bold italic and the rest in italic, with no card around the note', () => {
-    renderPath({}, { note: { moment: 'announce', told: 1, total: 1 } });
-    const lead = getComputedStyle(screen.getByText('Everyone has been told.'));
-    const rest = getComputedStyle(screen.getByText(/We don't keep a copy of what was sent/));
-    expect(lead.fontStyle).toBe('italic');
-    expect(lead.fontWeight).toBe('600');
-    expect(rest.fontStyle).toBe('italic');
-    expect(rest.fontWeight).not.toBe('600');
-    expect(screen.getByText('Everyone has been told.').closest('.gg-card')).toBeNull();
   });
 
   it('when no one was texted, says so and leaves out the no-copy line', () => {

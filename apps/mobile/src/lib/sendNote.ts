@@ -17,7 +17,7 @@ const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
 export interface SentNoteText {
   lead: string;
   rest: string;
-  /** `lead` and what follows it, without the privacy line, as the iOS announcement says it. */
+  /** The same words as the visible note (lead and rest), for the iOS announcement. */
   spoken: string;
 }
 
@@ -34,9 +34,9 @@ export function sendNote(category: Category, recipients: RecipientProgress[]): S
     return {
       lead,
       rest: `${finishNote.partial.rest} ${finishNote.noCopy}`,
-      spoken: `${lead} ${finishNote.partial.rest}`,
+      spoken: `${lead} ${finishNote.partial.rest} ${finishNote.noCopy}`,
     };
   }
   const lead = category ? finishNote.allTold[MOMENT_BY_CATEGORY[category]] : finishNote.sentGeneric;
-  return { lead, rest: finishNote.noCopy, spoken: lead };
+  return { lead, rest: finishNote.noCopy, spoken: `${lead} ${finishNote.noCopy}` };
 }
