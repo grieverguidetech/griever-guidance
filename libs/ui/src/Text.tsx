@@ -15,7 +15,8 @@ export function Eyebrow({ children, tone = 'accent' }: EyebrowProps) {
   return <Text style={[styles.eyebrow, tone === 'accent2' && styles.accent2, font]}>{children}</Text>;
 }
 
-export type BodyTone = 'default' | 'strong' | 'muted';
+/** `danger` is for a calm error line (the same red as the error under the contact form). */
+export type BodyTone = 'default' | 'strong' | 'muted' | 'danger';
 
 export interface BodyProps {
   children: ReactNode;
@@ -28,10 +29,12 @@ export interface BodyProps {
   hidden?: boolean;
   /** Read out politely when the text changes (a count, a status). */
   live?: boolean;
+  /** Makes the text tappable, for example a field label that focuses its field. */
+  onPress?: () => void;
 }
 
 /** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
-export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false }: BodyProps) {
+export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false, onPress }: BodyProps) {
   const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};
   if (id) {
@@ -44,7 +47,7 @@ export function Body({ children, tone = 'default', small = false, id, hidden = f
     extra['role'] = 'status';
     extra['accessibilityLiveRegion'] = 'polite';
   }
-  return <Text style={[styles.body, font, styles[tone], small && styles.small]} {...extra}>{children}</Text>;
+  return <Text style={[styles.body, font, styles[tone], small && styles.small]} onPress={onPress} {...extra}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({
@@ -62,5 +65,6 @@ const styles = StyleSheet.create({
   default: { color: colors['neutral-800'] },
   strong: { color: colors.ink },
   muted: { color: colors['neutral-700'] },
+  danger: { color: '#b91c1c' },
   small: { fontSize: 12, lineHeight: 18 },
 });

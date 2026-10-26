@@ -47,23 +47,11 @@ describe('HubScreen', () => {
     expect(screen.getByRole('button', { name: /Send thank-yous/ })).toBeTruthy();
   });
 
-  it('lists the obituary with a calm reason and no way to start it (no link step on mobile, C10)', () => {
+  it('starts the obituary from its row, with no "Not in the app yet"', () => {
     const { onStart } = setup();
-    expect(screen.getByText('Share the obituary')).toBeTruthy();
-    expect(screen.getByText('Not in the app yet. You can do this one on the web.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Share the obituary/ })).toBeNull();
-    expect(onStart).not.toHaveBeenCalled();
-  });
-
-  it('keeps the obituary unavailable when it is the next step', () => {
-    const done = {
-      ...anna,
-      recipientsNotified: { announcement: ['c1'], service: ['c1'] },
-      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z', service: '2026-10-03T12:00:00.000Z' },
-    } as unknown as Session;
-    setup(done);
-    expect(screen.queryByRole('button', { name: 'Start' })).toBeNull();
-    expect(screen.getByText('Not in the app yet. You can do this one on the web.')).toBeTruthy();
+    expect(screen.queryByText(/Not in the app yet/)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: /Share the obituary/ }));
+    expect(onStart).toHaveBeenLastCalledWith('obituary');
   });
 
   it('moves screen-reader focus to the heading when it opens', () => {

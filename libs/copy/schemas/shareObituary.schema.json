@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Share the obituary screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "intro",
+    "back",
+    "checklist",
+    "forName",
+    "nameFallback",
+    "linkLabel",
+    "linkPlaceholder",
+    "publisherLabel",
+    "optional",
+    "publisherPlaceholder",
+    "previewKicker",
+    "continue",
+    "needLink",
+    "invalidLink",
+    "waiting",
+    "draftTitle",
+    "draftBody",
+    "draftButton",
+    "draftBeta"
+  ],
+  "properties": {
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "back": {
+      "$ref": "#/$defs/text"
+    },
+    "checklist": {
+      "$ref": "#/$defs/text"
+    },
+    "forName": {
+      "type": "string",
+      "pattern": "\\{name\\}"
+    },
+    "nameFallback": {
+      "$ref": "#/$defs/text"
+    },
+    "linkLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "linkPlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "optional": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherPlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "previewKicker": {
+      "$ref": "#/$defs/text"
+    },
+    "continue": {
+      "$ref": "#/$defs/text"
+    },
+    "needLink": {
+      "$ref": "#/$defs/text"
+    },
+    "invalidLink": {
+      "$ref": "#/$defs/text"
+    },
+    "waiting": {
+      "$ref": "#/$defs/text"
+    },
+    "draftTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "draftBody": {
+      "$ref": "#/$defs/text"
+    },
+    "draftButton": {
+      "$ref": "#/$defs/text"
+    },
+    "draftBeta": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

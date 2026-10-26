@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
+import { obituaryLink } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { AnnounceScreen } from '../screens/AnnounceScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
@@ -21,6 +22,7 @@ import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
+import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
@@ -95,6 +97,8 @@ type SessionProps = {
   startCategory: TemplateCategory | null;
   /** Back from a moment's first form: return to the hub (the picker is gone). */
   onHub: () => void;
+  /** Back from the obituary's first form: return to the link screen. */
+  onShareObituary: () => void;
   /** Edit person on the announce step: back to the person's setup. */
   onEditPerson: () => void;
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
@@ -106,7 +110,7 @@ type SessionProps = {
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, startCategory, onHub, onEditPerson, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShareObituary, onEditPerson, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
@@ -119,13 +123,18 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onEditP
     onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
   });
   // The hub chose a moment: pick its category, then step past the picker once the flow has it.
-  const { setTemplateCategory, nextStep } = flow;
+  const { setTemplateCategory, setTemplate, nextStep } = flow;
   const [pendingStart, setPendingStart] = useState(startCategory);
   useEffect(() => {
     if (pendingStart && flow.templateCategory !== pendingStart) {
-      setTemplateCategory(pendingStart);
+      // The obituary is the share-a-link template, as on web (its draft is kept under that template).
+      if (pendingStart === 'obituary') {
+        setTemplate(obituaryLink);
+      } else {
+        setTemplateCategory(pendingStart);
+      }
     }
-  }, [pendingStart, flow.templateCategory, setTemplateCategory]);
+  }, [pendingStart, flow.templateCategory, setTemplateCategory, setTemplate]);
   useEffect(() => {
     if (pendingStart && flow.templateCategory === pendingStart) {
       setPendingStart(null);
@@ -141,6 +150,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onEditP
       onHub();
     }
   }, [stuckOnPicker, onHub]);
+  // The obituary's first form is Who should know?; its Back returns to the link screen, not the hub.
+  const backToStart = flow.templateCategory === 'obituary' ? onShareObituary : onHub;
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
@@ -191,7 +202,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onEditP
     <PersonBar
       active={session}
       onOpen={onHome}
-      onHardwareBack={onFirstForm ? onHub : undefined}
+      onHardwareBack={onFirstForm ? backToStart : undefined}
       arrived={pendingArrival}
       onArrived={clearArrival}
     />
@@ -212,7 +223,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onEditP
     prevStep: () => {
       // The step before this one is the picker: go to the hub instead.
       if (onFirstForm) {
-        onHub();
+        backToStart();
       } else {
         stepped.prevStep();
       }
@@ -241,6 +252,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [stage, setStage] = useState<SetupStage | null>(null);
   const [arrived, setArrived] = useState(false);
   const [atHub, setAtHub] = useState(false);
+  const [atShareObituary, setAtShareObituary] = useState(false);
   // Setup was opened from the announce step (Edit): Back there returns to that step, as on web.
   const [editingFromFlow, setEditingFromFlow] = useState(false);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
@@ -253,6 +265,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setEditingFromFlow(false);
     setArrived(false);
     setAtHub(false);
+    setAtShareObituary(false);
     setStartCategory(null);
     setNote(null);
     setAtHome(true);
@@ -366,6 +379,23 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       />
     );
   }
+  if (atShareObituary) {
+    return (
+      <ShareObituaryScreen
+        key={active.id}
+        session={active}
+        onChange={(patch) => updateSession(active.id, patch)}
+        onBack={() => {
+          setAtShareObituary(false);
+          setAtHub(true);
+        }}
+        onContinue={() => {
+          setStartCategory('obituary');
+          setAtShareObituary(false);
+        }}
+      />
+    );
+  }
   if (atHub) {
     return (
       <HubScreen
@@ -373,8 +403,13 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
         session={active}
         onBack={goHome}
         onStart={(key: MomentKey) => {
-          setStartCategory(CATEGORY_BY_MOMENT[key]);
           setAtHub(false);
+          if (key === 'obituary') {
+            // The link comes first (C10 allows it here, never at setup); then Who should know?.
+            setAtShareObituary(true);
+          } else {
+            setStartCategory(CATEGORY_BY_MOMENT[key]);
+          }
         }}
         onEditPerson={() => {
           setAtHub(false);
@@ -391,6 +426,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       arrived={arrived}
       startCategory={startCategory}
       onHub={() => setAtHub(true)}
+      onShareObituary={() => setAtShareObituary(true)}
       onEditPerson={() => {
         setEditingFromFlow(true);
         setStage('setup');

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -9,6 +9,7 @@ import { focusNode } from '../focusNode';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
 import { Body } from '../Text';
+import { Status } from '../Status';
 import { useSerifStyle } from '../typography';
 
 type TextInputNode = ComponentRef<typeof TextInput>;
@@ -198,23 +199,6 @@ function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProp
         onChangeText={onChangeText}
       />
     </View>
-  );
-}
-
-/**
- * A reason a button is unavailable. The polite status node is always rendered and only its text
- * changes, so screen readers announce the change. Also announced on iOS (it ignores live regions).
- */
-function Status({ id, message }: { id: string; message?: string }) {
-  useEffect(() => {
-    if (message && Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibility(message);
-    }
-  }, [message]);
-  return (
-    <Body id={id} tone="muted" live>
-      {message ?? ''}
-    </Body>
   );
 }
 

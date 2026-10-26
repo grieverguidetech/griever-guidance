@@ -1,6 +1,7 @@
 import {
   FLOW_FACT_KEYS,
   FLOW_FACT_MAX_LENGTH,
+  isValidObituaryLink,
   coalesceFlowPatches,
   diffFlowFacts,
   flowFactsToSessionFields,
@@ -417,5 +418,22 @@ describe('response and text edge cases', () => {
         { personName: 'A' },
       ]),
     ).toEqual({ personName: 'A' });
+  });
+});
+
+describe('isValidObituaryLink', () => {
+  it.each([
+    ['example.com/obit', true],
+    ['  https://legacy.com/x  ', true],
+    ['HTTP://example.com/a', true],
+    ['has space', false],
+    ['ftp://x', false],
+    ['legacy.com/x?u=https://y', true],
+    ['', false],
+    ['   ', false],
+    ['a'.repeat(2048 - 'https://'.length), true],
+    ['a'.repeat(2049 - 'https://'.length), false],
+  ])('%j -> %s', (raw, expected) => {
+    expect(isValidObituaryLink(raw)).toBe(expected);
   });
 });
