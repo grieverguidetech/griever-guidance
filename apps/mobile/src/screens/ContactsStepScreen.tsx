@@ -1,17 +1,6 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import {
-  ActivityIndicator,
-  BackHandler,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, BackHandler, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { SerifText as Text, Button } from '@griever/ui';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164 } from '@griever/contacts';
 import type { NormalizedContact } from '@griever/contacts';
@@ -116,9 +105,9 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
   }
 
   const back = (
-    <Pressable style={styles.back} onPress={() => (mode.kind === 'start' ? onBack() : setMode({ kind: 'start' }))} accessibilityRole="button" accessibilityLabel="Back">
-      <Text style={styles.backText}>← Back</Text>
-    </Pressable>
+    <View style={styles.backRow}>
+      <Button label="Back" variant="header" onPress={() => (mode.kind === 'start' ? onBack() : setMode({ kind: 'start' }))} />
+    </View>
   );
 
   if (mode.kind === 'reviewing') {
@@ -282,8 +271,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   header: { paddingHorizontal: 24, paddingTop: 60 },
-  back: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 16 },
-  backText: { fontSize: 16, color: MUTED },
+  backRow: { alignSelf: 'flex-start', marginBottom: 16 },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
   empty: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 },
   row: {

@@ -118,19 +118,22 @@ describe('Hub', () => {
     expect(screen.getAllByTestId('lock-icon')).toHaveLength(1);
   });
 
-  it('What you will need has an outline and Back does not', () => {
-    setup();
-    expect(getComputedStyle(screen.getByRole('button', { name: "What you'll need" })).borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
-    expect(getComputedStyle(screen.getByRole('button', { name: 'Back' })).borderTopColor).toBe('rgba(0, 0, 0, 0.00)');
-  });
-
-  it('Back and What you will need are 44px tertiary buttons with no fill or border', () => {
+  it('Back and What you will need share the outline look: 44px, outline, no fill, no underline', () => {
     setup();
     for (const name of ['Back', "What you'll need"]) {
       const style = getComputedStyle(screen.getByRole('button', { name }));
       expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
+      expect(style.borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
       expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
+      expect(getComputedStyle(screen.getByText(name)).textDecoration).not.toContain('underline');
     }
+  });
+
+  it('Edit person is the primary look: accent-700 fill, page-colour text', () => {
+    setup();
+    const style = getComputedStyle(screen.getByRole('button', { name: 'Edit person' }));
+    expect(style.backgroundColor).toBe('rgb(0, 103, 134)');
+    expect(getComputedStyle(screen.getByText('Edit person')).color).toBe('rgb(243, 242, 242)');
   });
 
   it('keeps a locked step focusable, aria-disabled and explained, and it asks for the paywall', async () => {

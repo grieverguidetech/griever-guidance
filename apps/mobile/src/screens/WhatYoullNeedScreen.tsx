@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { AccessibilityInfo, View, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { SerifText as Text, Button } from '@griever/ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -116,14 +117,9 @@ export function WhatYoullNeedScreen() {
       // A touch anywhere outside the info button closes the tip.
       onTouchStart={() => setTipOpen(null)}
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-      >
-        <Text style={styles.backText}>← Back</Text>
-      </Pressable>
+      <View style={styles.backRow}>
+        <Button label="Back" variant="header" onPress={() => navigation.goBack()} />
+      </View>
 
       <Text style={styles.title}>What you'll need</Text>
       <Text style={styles.subtitle}>Not today. Just so none of it surprises you.</Text>
@@ -146,20 +142,7 @@ export function WhatYoullNeedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 24, paddingTop: 60 },
-  backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    minWidth: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderRadius: 10,
-    backgroundColor: ACCENT_TINT,
-    marginBottom: 24,
-  },
-  backText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
+  backRow: { alignSelf: 'flex-start', marginBottom: 24 },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
   subtitle: { fontSize: 13, color: MUTED, marginBottom: 24 },
   card: {

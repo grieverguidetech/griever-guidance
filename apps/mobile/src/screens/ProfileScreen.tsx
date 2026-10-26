@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { ErrorText, Field, LinkButton, PrimaryButton, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { NAME_REQUIRED } from './SignUpScreen';

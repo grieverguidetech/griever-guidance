@@ -127,7 +127,7 @@ describe('top buttons', () => {
     return style;
   };
 
-  it('Back is a labelled button, at least 44x44, with a visible border and fill', async () => {
+  it('Back is a labelled button, at least 44x44, with a visible outline', async () => {
     render(<WhatYoullNeedScreen />);
     await screen.findAllByRole('checkbox');
     const back = screen.getByRole('button', { name: 'Back' });
@@ -135,12 +135,12 @@ describe('top buttons', () => {
     expect(style.minHeight).toBeGreaterThanOrEqual(44);
     expect(style.minWidth).toBeGreaterThanOrEqual(44);
     expect(style.borderWidth).toBeGreaterThan(0);
-    expect(style.backgroundColor).toBeTruthy();
+    expect(style.borderColor).toBeTruthy();
     fireEvent.press(back);
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('the Home link (accounts off) is a labelled button, at least 44x44, with a visible border and fill', () => {
+  it('the Home link (accounts off) is a labelled button, at least 44x44, with a visible outline', () => {
     const onWhatYoullNeed = jest.fn();
     render(<HomeScreen sessions={[]} canCreate onOpen={jest.fn()} onCreate={jest.fn()} onWhatYoullNeed={onWhatYoullNeed} />);
     const link = screen.getByRole('button', { name: "What you'll need" });
@@ -148,9 +148,19 @@ describe('top buttons', () => {
     expect(style.minHeight).toBeGreaterThanOrEqual(44);
     expect(style.minWidth).toBeGreaterThanOrEqual(44);
     expect(style.borderWidth).toBeGreaterThan(0);
-    expect(style.backgroundColor).toBeTruthy();
+    expect(style.borderColor).toBeTruthy();
     fireEvent.press(link);
     expect(onWhatYoullNeed).toHaveBeenCalled();
+  });
+});
+
+describe('old screens use the serif through SerifText', () => {
+  it('a person row on Home is in the semibold serif (its 500 weight maps to semibold)', () => {
+    const anna = { id: 'a', flowId: 'f', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: '2026-01-01', lastOpenedAt: '2026-01-01', drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] };
+    render(<HomeScreen sessions={[anna as never]} canCreate onOpen={jest.fn()} onCreate={jest.fn()} />);
+    const style = StyleSheet.flatten(screen.getByText('Anna').props.style) as Record<string, unknown>;
+    expect(style.fontFamily).toBe('SourceSerif4_600SemiBold');
+    expect(style.fontWeight).toBeUndefined();
   });
 });
 

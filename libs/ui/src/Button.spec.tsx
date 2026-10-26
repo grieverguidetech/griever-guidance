@@ -159,20 +159,15 @@ describe('tertiary Button', () => {
   });
 });
 
-describe('outlined tertiary Button', () => {
-  it('has a thin accent outline and the underlined label; plain tertiary has none', () => {
-    render(
-      <>
-        <Button label="What you'll need" variant="tertiary" outlined onPress={vi.fn()} />
-        <Button label="Back" variant="tertiary" onPress={vi.fn()} />
-      </>,
-    );
-    const outlined = getComputedStyle(screen.getByRole('button', { name: "What you'll need" }));
-    expect(outlined.borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
-    expect(outlined.borderTopWidth).toBe('1px');
-    expect(getComputedStyle(screen.getByText("What you'll need")).textDecoration).toContain('underline');
-    expect(parseInt(outlined.minHeight, 10)).toBeGreaterThanOrEqual(44);
-    expect(getComputedStyle(screen.getByRole('button', { name: 'Back' })).borderTopColor).toBe('rgba(0, 0, 0, 0.00)');
+describe('header Button (Back, What you\'ll need)', () => {
+  it('has a page-coloured (transparent) fill, a thin accent outline, a 44px target and no underline', () => {
+    render(<Button label="What you'll need" variant="header" onPress={vi.fn()} />);
+    const style = getComputedStyle(screen.getByRole('button', { name: "What you'll need" }));
+    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
+    expect(style.borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
+    expect(style.borderTopWidth).toBe('1px');
+    expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
+    expect(getComputedStyle(screen.getByText("What you'll need")).textDecoration).not.toContain('underline');
   });
 });
 
@@ -183,7 +178,7 @@ describe('Button colours', () => {
     ['unavailable secondary or ghost: neutral-700 on a surface', colors['neutral-700'], colors.surface],
     ['available primary: page colour on accent-700', colors.bg, colors['accent-700']],
     ['available secondary or ghost: accent-700 on the page', colors['accent-700'], colors.bg],
-    ['outlined tertiary: the accent-600 outline on the page (non-text, 3:1)', colors['accent-600'], colors.bg, 3],
+    ['header: the accent-600 outline on the page (non-text, 3:1)', colors['accent-600'], colors.bg, 3],
     ['tertiary: accent-700 on the page', colors['accent-700'], colors.bg],
     ['tertiary pressed: accent-700 on accent-100', colors['accent-700'], colors['accent-100']],
     ['tertiary unavailable: neutral-700 on the page', colors['neutral-700'], colors.bg],

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type ComponentRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { AccessibilityInfo, BackHandler, findNodeHandle, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, Pressable, StyleSheet, View } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Session } from '@griever/hooks';
 import { announce } from './authForm';

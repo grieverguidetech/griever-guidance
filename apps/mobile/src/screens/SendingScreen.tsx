@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import type { FlowProps } from '../app/App';

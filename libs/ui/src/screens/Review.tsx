@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
+import { SerifText } from '../SerifText';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
 import { focusNode } from '../focusNode';
@@ -100,9 +101,9 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="tertiary" onPress={onBack} />
+        <Button label={copy.back} variant="header" onPress={onBack} />
         {onWhatYoullNeed ? (
-          <Button label={copy.checklist} variant="tertiary" outlined opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         ) : null}
       </View>
       <View style={styles.head}>
@@ -114,7 +115,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
       <Card>
         {announcement ? (
           <View style={styles.tag}>
-            <Text style={styles.tagText}>{copy.announcementTag}</Text>
+            <SerifText style={styles.tagText}>{copy.announcementTag}</SerifText>
           </View>
         ) : null}
         {editing || kind === 'service' ? (
