@@ -5,7 +5,7 @@ import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { PrimaryButton, ScreenHeader } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';
-import { ACCENT, MUTED } from '../components/colors';
+import { MUTED } from '../components/colors';
 import { isBlank } from '../lib/useDeviceSessions';
 import { NO_COPY_LINE } from '../lib/sendNote';
 
@@ -39,7 +39,9 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
   // The header takes screen-reader focus as Home opens. On iOS the note is queued behind it, so it
   // is read rather than dropped. Android reads the live region below.
   useEffect(() => {
-    if (note && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(note, { queue: true });
+    if (note && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(note, { queue: true });
+    }
   }, [note]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -65,10 +67,17 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
           <Body tone="muted">Each person is kept separately on this phone.</Body>
         </View>
       ) : null}
+      {people.length === 0 ? (
+        <View style={styles.intro}>
+          <Body tone="muted">
+            {canCreate ? 'No one here yet.' : 'When someone adds you to help, the people you\'re helping will show here.'}
+          </Body>
+        </View>
+      ) : null}
       {people.map((s) => (
         <Pressable
           key={s.id}
-          style={styles.row}
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => onOpen(s.id)}
           accessibilityRole="button"
           accessibilityLabel={`${personLabel(s)}${s.dateOfPassing ? `, passed ${s.dateOfPassing}` : ''}`}
@@ -111,7 +120,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginBottom: 12,
   },
-  rowName: { fontSize: 16, color: ACCENT, fontWeight: '500' },
+  rowPressed: { backgroundColor: colors['accent-100'] },
+  rowName: { fontSize: 17, color: colors.ink, fontWeight: '600' },
   create: { marginTop: 8 },
   account: { alignSelf: 'flex-start', marginTop: 8 },
 });
