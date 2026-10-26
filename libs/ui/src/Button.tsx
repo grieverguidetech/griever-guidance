@@ -33,6 +33,8 @@ export interface ButtonProps {
   describedBy?: string;
   /** Native: the reason, read after the label (accessibilityHint), for example "Included with the full plan". */
   hint?: string;
+  /** `tertiary` only: adds a thin accent-600 outline (3.74:1 on the page), for a quiet button that still needs to read as a button. */
+  outlined?: boolean;
   /** Web only: tells assistive tech the button opens a dialog. */
   opensDialog?: boolean;
   /**
@@ -52,6 +54,7 @@ export function Button({
   hint,
   opensDialog = false,
   busy,
+  outlined = false,
   buttonRef,
 }: ButtonProps) {
   const setRef = useCallback(
@@ -87,6 +90,7 @@ export function Button({
         styles.base,
         styles[variant],
         unavailableFill && styles.unavailableFill,
+        variant === 'tertiary' && outlined && styles.outline,
         pressed && (variant === 'tertiary' ? styles.pressedTertiary : styles.pressed),
       ]}
       {...extra}
@@ -126,6 +130,7 @@ const styles = StyleSheet.create({
   ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
   tertiary: {},
+  outline: { borderColor: colors['accent-600'] },
   pressed: { opacity: 0.7 },
   // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedTertiary: { backgroundColor: colors['accent-100'] },

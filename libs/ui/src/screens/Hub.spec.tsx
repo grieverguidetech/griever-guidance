@@ -118,6 +118,12 @@ describe('Hub', () => {
     expect(screen.getAllByTestId('lock-icon')).toHaveLength(1);
   });
 
+  it('What you will need has an outline and Back does not', () => {
+    setup();
+    expect(getComputedStyle(screen.getByRole('button', { name: "What you'll need" })).borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
+    expect(getComputedStyle(screen.getByRole('button', { name: 'Back' })).borderTopColor).toBe('rgba(0, 0, 0, 0.00)');
+  });
+
   it('Back and What you will need are 44px tertiary buttons with no fill or border', () => {
     setup();
     for (const name of ['Back', "What you'll need"]) {

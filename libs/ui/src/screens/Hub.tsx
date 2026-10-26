@@ -78,6 +78,7 @@ export function Hub(props: HubProps) {
         <Button
           label={copy.checklist}
           variant="tertiary"
+          outlined
           opensDialog
           onPress={props.onWhatYoullNeed}
           buttonRef={props.checklistRef}
