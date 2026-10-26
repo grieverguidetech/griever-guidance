@@ -1,13 +1,11 @@
-import pathLanding from '../screens/pathLanding.json';
+import { screens } from './screens';
+import type { ScreenName } from './screens';
 
 /**
  * Screen copy, one JSON file per screen in libs/copy/screens/. Each file has a JSON Schema of the
- * same name in libs/copy/schemas/; copy.spec.ts checks the two agree. To add a screen: add the
- * JSON, add the schema, and add one line here.
+ * same name in libs/copy/schemas/; copy.spec.ts checks the two agree.
  */
-const screens = { pathLanding } as const;
-
-export type ScreenName = keyof typeof screens;
+export type { ScreenName } from './screens';
 
 /** The shape of one screen's copy, read from its JSON file. */
 export type ScreenCopy<Name extends ScreenName> = (typeof screens)[Name];
@@ -18,7 +16,22 @@ export function screenCopy<Name extends ScreenName>(name: Name): ScreenCopy<Name
   return screens[name];
 }
 
+export { findHardCodedCopy } from './hardCodedCopy';
+
 const PLACEHOLDER = /\{(\w+)\}/g;
+
+/**
+ * Bundlers replace `process.env.NODE_ENV` with a literal at build time (Vite and Metro both do).
+ * If one does not, `process` may not exist in a browser, so the read is guarded and the answer
+ * is "not production", which is the strict choice.
+ */
+function isProductionBuild(): boolean {
+  try {
+    return process.env.NODE_ENV === 'production';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Fill `{name}`-style placeholders. A placeholder with no value throws, so a typo shows up in dev
@@ -31,7 +44,7 @@ export function fill(template: string, values: Record<string, string | number>):
     if (value !== undefined) {
       return String(value);
     }
-    if (process.env.NODE_ENV === 'production') {
+    if (isProductionBuild()) {
       return whole;
     }
     throw new Error(`Missing value for {${key}} in "${template}"`);

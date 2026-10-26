@@ -33,6 +33,12 @@
       "path": "../../libs/ui/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/tokens/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/copy/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/shared/tsconfig.lib.json"
     },
     {

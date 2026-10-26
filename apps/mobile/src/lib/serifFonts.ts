@@ -7,7 +7,7 @@ import { fonts } from '@griever/tokens';
  * Source Serif 4, the face the web app uses. The family names come from @griever/tokens, so shared
  * components (libs/ui) ask for the same names this registers. Only the two weights the web uses.
  * The font files ship inside the app binary (no network at launch, C5), under the SIL Open Font
- * License 1.1; the licence text is in @expo-google-fonts/source-serif-4/LICENSE_FONT.
+ * License 1.1; the licence text is committed at apps/mobile/assets/fonts/SourceSerif4-OFL.txt.
  */
 export const serifFontFiles = {
   [fonts.serifRegular]: SourceSerif4_400Regular,

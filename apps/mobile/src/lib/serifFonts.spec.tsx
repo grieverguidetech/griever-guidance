@@ -1,16 +1,13 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { render } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import { fonts } from '@griever/tokens';
+import { App } from '../app/App';
 
+// Fonts never finish loading in these tests: the app must not wait for them.
 const mockUseFonts = jest.fn<(map: Record<string, unknown>) => [boolean, Error | null]>(() => [false, null]);
 jest.mock('expo-font', () => ({ useFonts: (map: Record<string, unknown>) => mockUseFonts(map) }));
 
-import { serifFontFiles, useSerifFonts } from './serifFonts';
-
-const Probe = () => {
-  useSerifFonts();
-  return null;
-};
+import { serifFontFiles } from './serifFonts';
 
 describe('serif fonts', () => {
   it('registers regular and semibold under the names in @griever/tokens', () => {
@@ -23,9 +20,9 @@ describe('serif fonts', () => {
     }
   });
 
-  it('asks expo-font to load them without blocking the screen', () => {
-    const screen = render(<Probe />);
+  it('shows the first screen while the fonts are still loading', async () => {
+    render(<App />);
     expect(mockUseFonts).toHaveBeenCalledWith(serifFontFiles);
-    expect(screen.toJSON()).toBeNull();
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
@@ -19,9 +19,11 @@ export interface ButtonProps {
    * so the caller can explain why, for example with the paywall placeholder on a locked step.
    */
   ariaDisabled?: boolean;
-  /** Names an element that explains the unavailable state. */
+  /** Web: the id of an element that explains the unavailable state (aria-describedby). */
   describedBy?: string;
-  /** Tells assistive tech the button opens a dialog. */
+  /** Native: the reason, read after the label (accessibilityHint), for example "Included with the full plan". */
+  hint?: string;
+  /** Web only: tells assistive tech the button opens a dialog. */
   opensDialog?: boolean;
   buttonRef?: Ref<ButtonNode>;
 }
@@ -37,18 +39,22 @@ interface DomAttributes {
   removeAttribute: (name: string) => void;
 }
 
-function useAriaDisabledOnWeb(nodeRef: { current: ButtonNode | null }, ariaDisabled: boolean) {
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !nodeRef.current) {
-      return;
-    }
-    const element = nodeRef.current as unknown as DomAttributes;
-    if (ariaDisabled) {
-      element.setAttribute('aria-disabled', 'true');
-    } else {
-      element.removeAttribute('aria-disabled');
-    }
-  }, [nodeRef, ariaDisabled]);
+/**
+ * react-native-web's Pressable drops `aria-disabled` and only supports a real `disabled`, which
+ * removes the button from the tab order. For an unavailable-but-focusable button the attribute is
+ * set on the DOM node in the ref callback, so it is applied every time the node attaches (first
+ * render, remount) and whenever `ariaDisabled` changes. Native uses the accessibility state.
+ */
+function applyAriaDisabled(node: ButtonNode | null, ariaDisabled: boolean) {
+  if (Platform.OS !== 'web' || !node) {
+    return;
+  }
+  const element = node as unknown as DomAttributes;
+  if (ariaDisabled) {
+    element.setAttribute('aria-disabled', 'true');
+  } else {
+    element.removeAttribute('aria-disabled');
+  }
 }
 
 export function Button({
@@ -57,20 +63,21 @@ export function Button({
   variant = 'primary',
   ariaDisabled = false,
   describedBy,
+  hint,
   opensDialog = false,
   buttonRef,
 }: ButtonProps) {
-  const ownRef = useRef<ButtonNode | null>(null);
-  useAriaDisabledOnWeb(ownRef, ariaDisabled);
-
-  const setRef = (node: ButtonNode | null) => {
-    ownRef.current = node;
-    if (typeof buttonRef === 'function') {
-      buttonRef(node);
-    } else if (buttonRef) {
-      (buttonRef as { current: ButtonNode | null }).current = node;
-    }
-  };
+  const setRef = useCallback(
+    (node: ButtonNode | null) => {
+      applyAriaDisabled(node, ariaDisabled);
+      if (typeof buttonRef === 'function') {
+        buttonRef(node);
+      } else if (buttonRef) {
+        (buttonRef as { current: ButtonNode | null }).current = node;
+      }
+    },
+    [ariaDisabled, buttonRef],
+  );
 
   const extra: Record<string, unknown> = {};
   if (describedBy) {
@@ -80,18 +87,27 @@ export function Button({
     extra['aria-haspopup'] = 'dialog';
   }
 
+  const unavailableFill = ariaDisabled && variant === 'primary';
   return (
     <Pressable
       ref={setRef}
       role="button"
       accessibilityState={{ disabled: ariaDisabled }}
+      accessibilityHint={hint}
       onPress={onPress}
-      style={[styles.base, styles[variant], ariaDisabled && styles.unavailable]}
+      style={[styles.base, styles[variant], unavailableFill && styles.unavailableFill]}
       {...extra}
     >
-      <Text style={[styles.label, variant === 'primary' ? styles.labelOnFill : styles.labelAccent]}>{label}</Text>
+      <Text style={[styles.label, labelStyle(variant, ariaDisabled)]}>{label}</Text>
     </Pressable>
   );
+}
+
+function labelStyle(variant: ButtonVariant, ariaDisabled: boolean) {
+  if (ariaDisabled) {
+    return variant === 'primary' ? styles.labelOnFill : styles.labelUnavailable;
+  }
+  return variant === 'primary' ? styles.labelOnFill : styles.labelAccent;
 }
 
 const styles = StyleSheet.create({
@@ -109,7 +125,9 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: colors['accent-700'] },
   secondary: { borderColor: colors['neutral-600'] },
   ghost: {},
-  unavailable: { opacity: 0.45 },
+  // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
+  // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
+  unavailableFill: { backgroundColor: colors['neutral-700'] },
   label: {
     fontFamily: serifFamily('semibold'),
     fontWeight: serifWeight('semibold'),
@@ -117,4 +135,5 @@ const styles = StyleSheet.create({
   },
   labelOnFill: { color: colors.bg },
   labelAccent: { color: colors['accent-700'] },
+  labelUnavailable: { color: colors['neutral-700'] },
 });

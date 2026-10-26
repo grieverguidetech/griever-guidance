@@ -3,8 +3,8 @@ import { fonts } from '@griever/tokens';
 
 /**
  * The serif family for a weight. Web uses the CSS stack (the font loads from index.html). Native
- * uses the face apps/mobile registers with expo-font, and falls back to the system serif until it
- * has loaded, because a custom family name that is not registered renders in the default font.
+ * uses the face apps/mobile registers with expo-font. Until it has loaded (or if it fails) React
+ * Native shows the system font, because a family name that is not registered is ignored.
  */
 export function serifFamily(weight: 'regular' | 'semibold'): string {
   if (Platform.OS === 'web') {

@@ -49,13 +49,12 @@ export const fontSerifStack = "'Source Serif 4', Georgia, 'Times New Roman', ser
 
 /**
  * Font family names as React Native knows them. On web the CSS stack above is used. On native the
- * names are the ones apps/mobile registers with expo-font; until they load, the system serif shows.
+ * names are the ones apps/mobile registers with expo-font.
  */
 export const fonts = {
   serifWeb: fontSerifStack,
   serifRegular: 'SourceSerif4_400Regular',
   serifSemiBold: 'SourceSerif4_600SemiBold',
-  serifFallback: 'Georgia',
 } as const;
 
 /** Pixels. Keys match the `--space-*` custom properties. */

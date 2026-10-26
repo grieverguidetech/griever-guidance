@@ -1,11 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { fill, screenCopy, screenNames } from './index';
+import { fill, findHardCodedCopy, screenCopy, screenNames } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
-const ROOT = join(import.meta.dirname, '..', '..', '..');
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 const screenFiles = readdirSync(SCREENS_DIR).filter((name) => name.endsWith('.json'));
@@ -78,31 +77,41 @@ describe('fill', () => {
   });
 });
 
-/**
- * The migration guard. A screen on this list now takes its words from libs/copy, so its source must
- * not hold any of them as a literal. Add a screen here in the same PR that migrates it.
- */
-const MIGRATED_SCREENS: { copy: (typeof screenNames)[number]; sources: string[] }[] = [];
+describe('findHardCodedCopy', () => {
+  const found = (source: string) => findHardCodedCopy(source, 'pathLanding');
 
-/** True when `source` holds `text` as a string literal or as JSX text. */
-function hardCodes(source: string, text: string): boolean {
-  const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`['"\`]${escaped}['"\`]|>\\s*${escaped}\\s*<`).test(source);
-}
-
-describe('migrated screens do not hard-code copy', () => {
-  it('detects a literal and JSX text, and ignores unrelated code', () => {
-    expect(hardCodes("const t = 'One thing at a time.';", 'One thing at a time.')).toBe(true);
-    expect(hardCodes('<h1>One thing at a time.</h1>', 'One thing at a time.')).toBe(true);
-    expect(hardCodes('<h1>{copy.heading}</h1>', 'One thing at a time.')).toBe(false);
+  it('finds a string literal in any quote style', () => {
+    expect(found("const t = 'One thing at a time.';")).toEqual(['One thing at a time.']);
+    expect(found('const t = "One thing at a time.";')).toEqual(['One thing at a time.']);
+    expect(found('const t = `One thing at a time.`;')).toEqual(['One thing at a time.']);
   });
 
-  it.each(MIGRATED_SCREENS.flatMap((entry) => entry.sources.map((source) => [entry.copy, source] as const)))(
-    '%s: %s',
-    (name, source) => {
-      const text = readFileSync(join(ROOT, source), 'utf8');
-      const hardCoded = allStrings(screenCopy(name)).filter((value) => hardCodes(text, value));
-      expect(hardCoded).toEqual([]);
-    },
-  );
+  it('finds JSX text, including across lines', () => {
+    expect(found('<h1>One thing at a time.</h1>')).toEqual(['One thing at a time.']);
+    expect(found('<h1>\n  One thing at a time.\n</h1>')).toEqual(['One thing at a time.']);
+  });
+
+  it('finds a template with a placeholder written as ${name} or {name}', () => {
+    expect(found('const t = `For ${person.name}`;')).toEqual(['For {name}']);
+    expect(found('<p>For {name}</p>')).toEqual(['For {name}']);
+  });
+
+  it('treats straight, curly and HTML-escaped apostrophes the same', () => {
+    expect(found("<h2>What you\u2019ll need</h2>")).toEqual(["What you'll need"]);
+    expect(found('<h2>What you&apos;ll need</h2>')).toEqual(["What you'll need"]);
+    expect(found('<h2>What you&#39;ll need</h2>')).toEqual(["What you'll need"]);
+  });
+
+  it('ignores copy read from the JSON and unrelated code', () => {
+    expect(found('<h1>{copy.heading}</h1>')).toEqual([]);
+    expect(found("const heading = copy.heading; if (a === 'x') {}")).toEqual([]);
+  });
+
+  it('ignores single lowercase words, which are usually code (status keys, roles)', () => {
+    expect(found("if (kind === 'start') { return 'person'; }")).toEqual([]);
+  });
+
+  it('still finds a capitalised single word', () => {
+    expect(found("const label = 'Back';")).toEqual(['Back']);
+  });
 });
