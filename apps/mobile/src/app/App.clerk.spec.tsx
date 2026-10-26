@@ -32,7 +32,7 @@ beforeEach(async () => {
 describe('App with the account feature and a Clerk key on', () => {
   it('no marker and Clerk still loading (offline): opens on the account screen, and Back reaches Home', async () => {
     render(<App />);
-    expect(await screen.findByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeTruthy();
     expect(screen.getByText('One moment.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
@@ -42,7 +42,7 @@ describe('App with the account feature and a Clerk key on', () => {
     await AsyncStorage.setItem('gg.signedIn.v1', 'user_1');
     render(<App />);
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
-    expect(screen.queryByRole('header', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
   });
 
   it('mounts Clerk with the publishable key, the secure token cache and the resource cache', async () => {

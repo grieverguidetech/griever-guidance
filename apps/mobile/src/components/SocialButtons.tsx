@@ -1,26 +1,42 @@
 import { useState } from 'react';
 import { useSSO } from '@clerk/expo';
+import { screenCopy } from '@griever/copy';
 import * as AuthSession from 'expo-auth-session';
 import { clerkMessage, FACEBOOK_NO_EMAIL } from '../lib/clerkMessages';
 import { SecondaryButton, announce } from './authForm';
+
+const copy = screenCopy('signIn');
 
 type Strategy = 'oauth_google' | 'oauth_facebook';
 
 /** Where the browser sends the person back to the app. This exact URL must be allowed in Clerk. */
 export const SSO_REDIRECT_PATH = 'sso-callback';
 
-/** "Continue with Google" and "Continue with Facebook". Errors go up so the screen can show them in one place. */
-export function SocialButtons({ onError, onStart }: { onError: (message: string | null) => void; onStart: () => void }) {
+/** The Google and Facebook buttons. Errors go up so the screen can show them in one place. */
+export function SocialButtons({
+  onError,
+  onStart,
+  onPendingChange,
+  blocked = false,
+}: {
+  onError: (message: string | null) => void;
+  onStart: () => void;
+  /** Tells the screen a browser flow is running, so it can ignore its own buttons meanwhile. */
+  onPendingChange?: (pending: boolean) => void;
+  /** The screen has a request running; presses here are ignored. */
+  blocked?: boolean;
+}) {
   const { startSSOFlow } = useSSO();
   const [pending, setPending] = useState(false);
 
   async function start(strategy: Strategy) {
-    if (pending) {
+    if (pending || blocked) {
       return;
     }
     setPending(true);
+    onPendingChange?.(true);
     onStart();
-    announce('Opening your browser');
+    announce(copy.browserAnnounce);
     try {
       const redirectUrl = AuthSession.makeRedirectUri({ scheme: 'mobile', path: SSO_REDIRECT_PATH });
       const result = await startSSOFlow({ strategy, redirectUrl });
@@ -40,13 +56,14 @@ export function SocialButtons({ onError, onStart }: { onError: (message: string 
       onError(clerkMessage(error));
     } finally {
       setPending(false);
+      onPendingChange?.(false);
     }
   }
 
   return (
     <>
-      <SecondaryButton label="Continue with Google" pending={pending} onPress={() => void start('oauth_google')} />
-      <SecondaryButton label="Continue with Facebook" pending={pending} onPress={() => void start('oauth_facebook')} />
+      <SecondaryButton label={copy.google} pending={pending} onPress={() => void start('oauth_google')} />
+      <SecondaryButton label={copy.facebook} pending={pending} onPress={() => void start('oauth_facebook')} />
     </>
   );
 }

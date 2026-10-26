@@ -101,7 +101,7 @@ describe('missing configuration', () => {
         <AccountScreen onBack={() => undefined} />
       </AccountProvider>,
     );
-    expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
     expect(screen.getByText("Accounts aren't available right now.")).toBeTruthy();
   });
 });
@@ -115,7 +115,7 @@ describe('sign in', () => {
     type('Password', 'secret-pass');
     press('Sign in');
     await screen.findByDisplayValue('Sam');
-    expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
   });
 
   it('asks for a name when the account has none', async () => {
@@ -123,7 +123,7 @@ describe('sign in', () => {
     renderAccount();
     await screen.findByLabelText('Email');
     press('Sign in');
-    await screen.findByRole('header', { name: 'What should we call you?' });
+    await screen.findByRole('heading', { name: 'What should we call you?' });
     expect(screen.getByText('This is the name on your account.')).toBeTruthy();
   });
 
@@ -192,7 +192,7 @@ describe('sign up', () => {
     type('Email', 'b@x.co');
     type('Password', 'another-password');
     press('Sign in');
-    await screen.findByRole('header', { name: 'What should we call you?' });
+    await screen.findByRole('heading', { name: 'What should we call you?' });
     expect(mockUpdateProfile).not.toHaveBeenCalled();
     expect(value('Your name')).toBe('');
   });
@@ -216,7 +216,7 @@ describe('sign up', () => {
     mockUpdateProfile.mockResolvedValue(profileWith(''));
     await openSignUp();
     await createAccount();
-    await screen.findByRole('header', { name: 'What should we call you?' });
+    await screen.findByRole('heading', { name: 'What should we call you?' });
   });
 
   it('keeps the typed name in the field when saving it fails', async () => {
@@ -225,7 +225,7 @@ describe('sign up', () => {
     await createAccount();
     await screen.findByText(OFFLINE);
     expect(value('Your name')).toBe('Sam');
-    expect(screen.getByRole('header', { name: 'Your account' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
   });
 });
 
@@ -263,7 +263,7 @@ describe('profile', () => {
   it('shows "Saved." on the first save, when the account had no profile yet', async () => {
     mockGetProfile.mockResolvedValue(noProfile);
     renderAccount(true);
-    await screen.findByRole('header', { name: 'What should we call you?' });
+    await screen.findByRole('heading', { name: 'What should we call you?' });
     type('Your name', 'Sam');
     press('Save');
     await screen.findByText('Saved.');
@@ -301,7 +301,7 @@ describe('profile', () => {
     expect(value('Your name')).toBe('Samantha');
     press('Sign in');
     await screen.findByLabelText('Email');
-    expect(screen.getByRole('header', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy();
   });
 
   it('goes to sign in without the note after an explicit sign out', async () => {
@@ -354,7 +354,7 @@ describe('profile', () => {
     it('leaves the list out while the account asks for a name', async () => {
       mockGetProfile.mockResolvedValue(profileWith(null));
       renderAccount(true);
-      await screen.findByRole('header', { name: 'What should we call you?' });
+      await screen.findByRole('heading', { name: 'What should we call you?' });
       expect(screen.queryByRole('checkbox')).toBeNull();
     });
   });

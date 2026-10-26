@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the mobile sign-up screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "intro",
+    "nameLabel",
+    "emailLabel",
+    "passwordLabel",
+    "nameRequired",
+    "submit",
+    "submitBusy",
+    "busyAnnounce",
+    "haveAccount",
+    "passwordHint",
+    "passwordTooShort",
+    "code"
+  ],
+  "properties": {
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "nameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "emailLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "passwordLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "nameRequired": {
+      "$ref": "#/$defs/text"
+    },
+    "submit": {
+      "$ref": "#/$defs/text"
+    },
+    "submitBusy": {
+      "$ref": "#/$defs/text"
+    },
+    "busyAnnounce": {
+      "$ref": "#/$defs/text"
+    },
+    "haveAccount": {
+      "$ref": "#/$defs/text"
+    },
+    "passwordHint": {
+      "type": "string",
+      "pattern": "\\{min\\}"
+    },
+    "passwordTooShort": {
+      "type": "string",
+      "pattern": "\\{min\\}"
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heading",
+        "intro",
+        "label",
+        "submit",
+        "submitBusy",
+        "busyAnnounce",
+        "resend",
+        "resendBusy",
+        "newCodeSent",
+        "differentEmail"
+      ],
+      "properties": {
+        "heading": {
+          "$ref": "#/$defs/text"
+        },
+        "intro": {
+          "type": "string",
+          "pattern": "\\{email\\}"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "submit": {
+          "$ref": "#/$defs/text"
+        },
+        "submitBusy": {
+          "$ref": "#/$defs/text"
+        },
+        "busyAnnounce": {
+          "$ref": "#/$defs/text"
+        },
+        "resend": {
+          "$ref": "#/$defs/text"
+        },
+        "resendBusy": {
+          "$ref": "#/$defs/text"
+        },
+        "newCodeSent": {
+          "$ref": "#/$defs/text"
+        },
+        "differentEmail": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

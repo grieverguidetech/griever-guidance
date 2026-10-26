@@ -1,21 +1,20 @@
-import { useEffect, useRef } from 'react';
-import type { ComponentProps, ComponentRef, Ref } from 'react';
-import {
-  AccessibilityInfo,
-  findNodeHandle,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import type { ReactNode } from 'react';
-import { ACCENT, MUTED, MUTED_STRONG } from './colors';
+import { useEffect, useRef, useState } from 'react';
+import type { ComponentProps, ComponentRef, ReactNode, Ref } from 'react';
+import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { colors, minTouchTarget } from '@griever/tokens';
+import { Body, Button, Heading, useSerifStyle } from '@griever/ui';
+
+/** Errors use the same pink as web's Clerk appearance (colorDanger); 7:1 on white. */
+const DANGER = colors['accent-2-700'];
+/** Focus ring, as web's Clerk colorRing. */
+const RING = colors['accent-700'];
+const FIELD_BORDER = colors['neutral-600'];
 
 /** iOS only: Android reads the live region / alert role, so announcing there would say it twice. */
 export function announce(message: string) {
-  if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+  if (Platform.OS === 'ios') {
+    AccessibilityInfo.announceForAccessibility(message);
+  }
 }
 
 /** A screen heading that takes screen-reader focus when it appears (after a screen swap). */
@@ -23,12 +22,25 @@ export function ScreenHeader({ children }: { children: ReactNode }) {
   const ref = useRef<ComponentRef<typeof Text>>(null);
   useEffect(() => {
     const handle = ref.current ? findNodeHandle(ref.current) : null;
-    if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
   }, []);
   return (
-    <Text ref={ref} accessibilityRole="header" style={authStyles.title}>
-      {children}
-    </Text>
+    <View style={styles.header}>
+      <Heading level={1} headingRef={ref}>
+        {children}
+      </Heading>
+    </View>
+  );
+}
+
+/** The calm line under the heading. */
+export function Intro({ children }: { children: ReactNode }) {
+  return (
+    <View style={styles.intro}>
+      <Body tone="muted">{children}</Body>
+    </View>
   );
 }
 
@@ -44,6 +56,8 @@ type InputProps = Pick<
   | 'onSubmitEditing'
   | 'editable'
   | 'maxLength'
+  | 'onFocus'
+  | 'onBlur'
 >;
 
 export function Field({
@@ -52,6 +66,8 @@ export function Field({
   onChangeText,
   hint,
   inputRef,
+  onFocus,
+  onBlur,
   ...input
 }: {
   label: string;
@@ -60,26 +76,44 @@ export function Field({
   hint?: string;
   inputRef?: Ref<ComponentRef<typeof TextInput>>;
 } & InputProps) {
+  const [focused, setFocused] = useState(false);
+  const labelFont = useSerifStyle('semibold');
+  const inputFont = useSerifStyle('regular');
   return (
     <View style={styles.fieldGroup}>
       {/* The input carries the label for screen readers; this copy is only for sighted users. */}
-      <Text style={styles.label} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Text
+        style={[styles.label, labelFont]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         {label}
       </Text>
       <TextInput
         ref={inputRef}
-        style={styles.input}
+        style={[styles.input, inputFont, focused && styles.inputFocused]}
         accessibilityLabel={label}
         accessibilityHint={hint}
         value={value}
         onChangeText={onChangeText}
-        placeholderTextColor={MUTED}
+        placeholderTextColor={colors['neutral-700']}
         {...input}
+        // After the spread, so nothing a caller passes can drop the focus ring.
+        onFocus={(event) => {
+          setFocused(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          onBlur?.(event);
+        }}
       />
       {hint ? (
-        <Text style={styles.hint} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          {hint}
-        </Text>
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.hint}>
+          <Body tone="muted" small>
+            {hint}
+          </Body>
+        </View>
       ) : null}
     </View>
   );
@@ -87,13 +121,16 @@ export function Field({
 
 /** Shows the message in a polite live region and announces it on iOS. */
 export function ErrorText({ message }: { message: string | null }) {
+  const font = useSerifStyle('regular');
   useEffect(() => {
-    if (message) announce(message);
+    if (message) {
+      announce(message);
+    }
   }, [message]);
   return (
     <View accessibilityLiveRegion="polite" style={styles.errorBox}>
       {message ? (
-        <Text accessibilityRole="alert" style={styles.error}>
+        <Text accessibilityRole="alert" style={[styles.error, font]}>
           {message}
         </Text>
       ) : null}
@@ -101,90 +138,78 @@ export function ErrorText({ message }: { message: string | null }) {
   );
 }
 
-export function PrimaryButton({ label, pending, onPress }: { label: string; pending: boolean; onPress: () => void }) {
+/** A calm confirmation line in a polite live region (for example "We sent a new code."). */
+export function Notice({ message }: { message: string | null }) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.button, pending && styles.buttonPending, pressed && styles.pressed]}
-      onPress={onPress}
-      disabled={pending}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: pending, busy: pending }}
-    >
-      <Text style={styles.buttonText}>{label}</Text>
-    </Pressable>
+    <View accessibilityLiveRegion="polite">
+      {message ? (
+        <View style={styles.notice}>
+          <Body tone="muted">{message}</Body>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+type ActionProps = { label: string; onPress: () => void; pending?: boolean };
+
+/** The main action. While `pending` it reads as busy and a second press is ignored by the screen. */
+export function PrimaryButton({ label, pending = false, onPress }: ActionProps) {
+  return (
+    <View style={styles.action}>
+      <Button label={label} onPress={onPress} busy={pending} ariaDisabled={pending} />
+    </View>
   );
 }
 
 /** An outlined button for a choice that sits beside the primary action. */
-export function SecondaryButton({ label, pending, onPress }: { label: string; pending: boolean; onPress: () => void }) {
+export function SecondaryButton({ label, pending = false, onPress }: ActionProps) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.secondary, pending && styles.secondaryPending, pressed && styles.pressed]}
-      onPress={onPress}
-      disabled={pending}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: pending, busy: pending }}
-    >
-      <Text style={[styles.secondaryText, pending && styles.secondaryTextPending]}>{label}</Text>
-    </Pressable>
+    <View style={styles.action}>
+      <Button label={label} onPress={onPress} variant="secondary" busy={pending} ariaDisabled={pending} />
+    </View>
   );
 }
 
-export function LinkButton({ label, onPress, pending = false }: { label: string; onPress: () => void; pending?: boolean }) {
+/**
+ * A text-style action ("Create an account"). TODO: use the `tertiary` Button variant once #341
+ * lands; until then the existing `ghost` variant is the closest look.
+ */
+export function LinkButton({ label, onPress, pending = false }: ActionProps) {
   return (
-    <Pressable style={styles.link} onPress={onPress} accessibilityRole="button" accessibilityState={{ busy: pending }}>
-      <Text style={[styles.linkText, pending && styles.secondaryTextPending]}>{label}</Text>
-    </Pressable>
+    <View style={styles.link}>
+      <Button label={label} onPress={onPress} variant="ghost" busy={pending} ariaDisabled={pending} />
+    </View>
   );
 }
 
+/** Plain body text for the other screens that share this form kit. */
 export const authStyles = StyleSheet.create({
-  title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 8 },
-  body: { fontSize: 14, color: MUTED, marginBottom: 24 },
+  body: { fontSize: 14, color: colors['neutral-700'], marginBottom: 24 },
 });
 
 const styles = StyleSheet.create({
+  header: { marginBottom: 8 },
+  intro: { marginBottom: 24 },
   fieldGroup: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 },
-  hint: { fontSize: 13, color: MUTED, marginTop: 6 },
+  label: { fontSize: 14, fontWeight: '500', color: colors['neutral-800'], marginBottom: 6 },
+  hint: { marginTop: 6 },
   input: {
-    minHeight: 44,
+    minHeight: minTouchTarget,
     borderWidth: 1,
-    borderColor: MUTED,
+    borderColor: FIELD_BORDER,
     borderRadius: 10,
+    backgroundColor: colors['neutral-100'],
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
+    color: colors.ink,
   },
+  // The ring is a thicker border in the same box, so the field does not shift when focused.
+  inputFocused: { borderColor: RING, borderWidth: 2, paddingHorizontal: 15, paddingVertical: 11 },
   errorBox: { minHeight: 0, marginBottom: 8 },
-  error: { fontSize: 14, color: '#b91c1c' },
-  button: {
-    minHeight: 44,
-    backgroundColor: ACCENT,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  // A busy button gets a solid dark fill instead of fading: white on MUTED_STRONG is 7.57:1.
-  buttonPending: { backgroundColor: MUTED_STRONG },
-  pressed: { opacity: 0.7 },
-  buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '500' },
-  secondary: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  secondaryPending: { borderColor: MUTED_STRONG },
-  secondaryText: { color: ACCENT, fontSize: 15, fontWeight: '500' },
-  secondaryTextPending: { color: MUTED_STRONG },
-  link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 12 },
-  linkText: { fontSize: 14, color: ACCENT, fontWeight: '500' },
+  error: { fontSize: 14, lineHeight: 20, color: DANGER },
+  notice: { marginBottom: 4 },
+  action: { marginTop: 12 },
+  link: { marginTop: 4, alignSelf: 'flex-start' },
 });

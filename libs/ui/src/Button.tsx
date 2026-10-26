@@ -34,6 +34,11 @@ export interface ButtonProps {
   hint?: string;
   /** Web only: tells assistive tech the button opens a dialog. */
   opensDialog?: boolean;
+  /**
+   * Native: a request from this button is running. Reads as busy and unavailable
+   * (`accessibilityState`); the caller ignores presses meanwhile. Leave unset for a plain button.
+   */
+  busy?: boolean;
   buttonRef?: Ref<ButtonNode>;
 }
 
@@ -45,6 +50,7 @@ export function Button({
   describedBy,
   hint,
   opensDialog = false,
+  busy,
   buttonRef,
 }: ButtonProps) {
   const setRef = useCallback(
@@ -74,6 +80,7 @@ export function Button({
       ref={setRef}
       role="button"
       accessibilityHint={hint}
+      accessibilityState={busy === undefined ? undefined : { busy, disabled: busy }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
