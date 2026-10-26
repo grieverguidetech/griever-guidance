@@ -20,7 +20,7 @@ export { Hub } from './screens/Hub';
 export type { HubCopy, HubMomentKey, HubProps, HubRow } from './screens/Hub';
 export { SerifText, SerifTextInput } from './SerifText';
 export { SerifReadyContext, useSerifStyle } from './typography';
-export { WhoShouldKnow } from './screens/WhoShouldKnow';
+export { WhoShouldKnow, PersonRow } from './screens/WhoShouldKnow';
 export type { WhoPerson, WhoShouldKnowCopy, WhoShouldKnowProps } from './screens/WhoShouldKnow';
 export { Review } from './screens/Review';
 export type { ReviewCopy, ReviewProps } from './screens/Review';

@@ -155,6 +155,11 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
         </View>
       ) : null}
       <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} />
+      {noneChosen ? (
+        <Body id={reasonId} hidden small tone="muted">
+          {copy.chooseOne}
+        </Body>
+      ) : null}
       <View style={styles.footerRow}>
         <SelectedCount label={selectedLabel} />
         <Button
@@ -169,11 +174,6 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
             }
           }}
         />
-        {noneChosen ? (
-          <Body id={reasonId} hidden small>
-            {copy.chooseOne}
-          </Body>
-        ) : null}
       </View>
       {footer}
     </View>
@@ -344,7 +344,7 @@ function Field({ label, placeholder, value, onChangeText, phone = false, inputRe
 }
 
 /** One person: a whole-line checkbox. The tick is drawn, and hidden from screen readers (the state is read once). */
-function PersonRow({ person, selected, onToggle }: { person: WhoPerson; selected: boolean; onToggle: () => void }) {
+export function PersonRow({ person, selected, onToggle }: { person: WhoPerson; selected: boolean; onToggle: () => void }) {
   // react-native-web only presses a role=button on Space; a checkbox needs Space too.
   const spaceKey: Record<string, unknown> = {
     onKeyDown: (event: { key: string; preventDefault: () => void }) => {
@@ -389,7 +389,7 @@ function PersonRow({ person, selected, onToggle }: { person: WhoPerson; selected
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   bringAcross: { gap: spacing[1] },
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing[2] },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing[1] },
   field: { gap: spacing[1] },
   input: {
     minHeight: minTouchTarget,

@@ -1,14 +1,15 @@
-import { useState } from 'react';
-import { View, TouchableOpacity, FlatList, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Button, WhoShouldKnow, SerifText as Text } from '@griever/ui';
+import { Body, Button, Heading, PersonRow, WhoShouldKnow } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
 import { SavedNote } from '../components/SavedNote';
-import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
+import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -27,6 +28,15 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const checklistButton = useRef<ButtonNode>(null);
+  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  const focusChecklistButton = () => {
+    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
 
   // Same rule as web: group only for announcements, and only when both groups have people.
@@ -64,71 +74,54 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
   }
 
   if (mode.kind === 'reviewing') {
+    const none = reviewSelected.size === 0;
+    const toggleReview = (key: string) =>
+      setReviewSelected((current) => {
+        const next = new Set(current);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        return next;
+      });
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Button label={copy.back} variant="header" onPress={() => setMode({ kind: 'list' })} />
-          <Text accessibilityRole="header" style={styles.title}>
-            {copy.bringAcross}
-          </Text>
-          <Text style={styles.subtitle}>{copy.importIntro}</Text>
-        </View>
-        <FlatList
-          data={mode.fresh}
-          keyExtractor={(item) => item.key}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.empty}>{copy.importEmpty}</Text>}
-          renderItem={({ item }) => {
-            const selected = reviewSelected.has(item.key);
-            return (
-              <TouchableOpacity
-                style={[styles.row, selected && styles.rowSelected]}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected }}
-                onPress={() =>
-                  setReviewSelected((current) => {
-                    const next = new Set(current);
-                    if (next.has(item.key)) {
-                      next.delete(item.key);
-                    } else {
-                      next.add(item.key);
-                    }
-                    return next;
-                  })
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+        <View style={styles.review}>
+          <View style={styles.topBar}>
+            <Button label={copy.back} variant="header" onPress={() => setMode({ kind: 'list' })} />
+          </View>
+          <View style={styles.head}>
+            <Heading level={1}>{copy.bringAcross}</Heading>
+            <Body tone="muted">{copy.importIntro}</Body>
+          </View>
+          {mode.fresh.length === 0 ? <Body tone="muted">{copy.importEmpty}</Body> : null}
+          {mode.fresh.map((item) => (
+            <PersonRow
+              key={item.key}
+              person={{ id: item.key, name: item.displayName, phone: item.phone }}
+              selected={reviewSelected.has(item.key)}
+              onToggle={() => toggleReview(item.key)}
+            />
+          ))}
+          <View style={styles.footerRow}>
+            <Body tone="muted" live>
+              {fill(copy.chosen, { count: reviewSelected.size })}
+            </Body>
+            <Button
+              label={copy.add}
+              ariaDisabled={none}
+              announceDisabled
+              hint={none ? copy.chooseOne : undefined}
+              onPress={() => {
+                if (!none) {
+                  void commitReview();
                 }
-                activeOpacity={0.7}
-              >
-                <View style={styles.rowInfo}>
-                  <Text style={styles.name}>{item.displayName}</Text>
-                  <Text style={styles.phone}>{item.phone}</Text>
-                </View>
-                <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-                  {selected && (
-                    <Text
-                      style={styles.checkmark}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no-hide-descendants"
-                    >
-                      ✓
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-        />
-        <View style={styles.footer}>
-          <Text style={styles.count}>{fill(copy.chosen, { count: reviewSelected.size })}</Text>
-          <TouchableOpacity
-            style={[styles.button, reviewSelected.size === 0 && styles.buttonDisabled]}
-            onPress={commitReview}
-            disabled={reviewSelected.size === 0}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>{copy.add}</Text>
-          </TouchableOpacity>
+              }}
+            />
+          </View>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -150,11 +143,14 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
             toggleContact(created.contactId);
           }}
           onBack={prevStep}
+          onWhatYoullNeed={() => setChecklistOpen(true)}
+          checklistRef={checklistButton}
           onContinue={nextStep}
           bringAcross={{ onPress: handleImport, busy: importing, notice: importError ?? undefined }}
           footer={<SavedNote />}
         />
       </ScrollView>
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </KeyboardAvoidingView>
   );
 }
@@ -162,52 +158,8 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing[3], paddingTop: spacing[4] },
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
-  title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: MUTED },
-  list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
-  empty: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-    marginBottom: 8,
-  },
-  rowSelected: { borderColor: ACCENT, backgroundColor: ACCENT_TINT },
-  rowInfo: { flex: 1 },
-  name: { fontSize: 14, fontWeight: '500', color: '#111827' },
-  phone: { fontSize: 12, color: MUTED_STRONG, marginTop: 2 },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: FIELD_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxSelected: { backgroundColor: ACCENT, borderColor: ACCENT },
-  checkmark: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  count: { fontSize: 14, color: MUTED },
-  button: {
-    backgroundColor: ACCENT,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: { color: '#ffffff', fontSize: 14, fontWeight: '500' },
+  review: { gap: spacing[3] },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  head: { gap: spacing[1] },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing[1] },
 });

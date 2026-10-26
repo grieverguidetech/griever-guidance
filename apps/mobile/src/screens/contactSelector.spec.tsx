@@ -117,9 +117,9 @@ describe('ContactSelectorScreen grouping', () => {
     expect(tick.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
-  it('gives the Bring people across rows the checkbox role and checked state', async () => {
+  it('gives the Add from your contacts rows the checkbox role and checked state', async () => {
     renderScreen();
-    fireEvent.press(screen.getByRole('button', { name: 'Bring people across' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     expect(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
     expect(screen.getByText('Choose only the ones you want — the rest stay where they are.')).toBeTruthy();
     const plain = screen.getByRole('checkbox', { name: /Plain Pat/, checked: false });
@@ -128,6 +128,15 @@ describe('ContactSelectorScreen grouping', () => {
     const ticks = screen.getAllByText('✓', { includeHiddenElements: true });
     expect(ticks).toHaveLength(2);
     ticks.forEach((t) => expect(t.props.accessibilityElementsHidden).toBe(true));
+  });
+
+  it('titles the import review "Add from your contacts" and Back returns to the list', async () => {
+    renderScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    expect(await screen.findByRole('heading', { name: 'Add from your contacts' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    expect(screen.queryByText('Starred Sam')).toBeNull();
   });
 
   it('reads Continue as disabled until someone is chosen, and says why', () => {

@@ -102,6 +102,23 @@ describe('picking an announcement', () => {
     expect(focus).toHaveBeenCalled();
   });
 
+  it('has no "Writing about" / Home bar on Announce', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    await screen.findByLabelText(/Anything you'd like to add/);
+    expect(screen.queryByText(/Writing about/)).toBeNull();
+    expect(screen.queryByLabelText('Back to home')).toBeNull();
+  });
+
+  it('opens What you will need in a sheet on Who should know?', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
+    await screen.findByText('Who should know?');
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
+  });
+
   it('opens What you will need in a sheet on Announce, and focus returns to the button when it closes', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await openAnna();

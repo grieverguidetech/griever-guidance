@@ -182,7 +182,11 @@ describe('Home from every step', () => {
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
     await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
-    fireEvent.press(screen.getByLabelText('Back to home'));
+    // No Home bar (#364): Back from the first form goes to the hub, and Back there goes Home.
+    expect(screen.queryByLabelText('Back to home')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByText('One thing at a time.');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 

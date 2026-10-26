@@ -60,7 +60,7 @@ router. The browser Back button does not move between views (not verified in a b
 | "The people you're writing about" | `Home.tsx` | App start (flag off). After sign-in. Back from the hub. Fallback for any view with no person open. | "Who are we writing about?" (button "Start with someone I've lost" or "Someone else I've lost"). The hub of a listed person. Settings. "Your account" (AUTH). "What you'll need". | None |
 | "Who are we writing about?" (new) or "Edit their details" (edit) | `SessionSetup.tsx` | Home create button. "Edit person" on the hub or on a form. | "Who should we be able to reach?" when this device has no contacts. "Who should hear first?" when it has contacts. The hub when editing. | None |
 | "Who should we be able to reach?" | `AddContactsManual.tsx` | "Who are we writing about?" (first person on a device) | "Who should hear first?" | None |
-| "Bring people across" or "Add people by hand" | `ImportContacts.tsx` | No button in the current code opens this view (checked with grep in `app.tsx` and the screens). Not reachable. | "Who should hear first?" | None |
+| "Add from your contacts" or "Add people by hand" | `ImportContacts.tsx` | No button in the current code opens this view (checked with grep in `app.tsx` and the screens). Not reachable. | "Who should hear first?" | None |
 | "Who should hear first?" | `WhoHearsFirst.tsx` | Contacts step, or setup when contacts exist | The hub | None |
 | "One thing at a time." (the hub, also called the path) | `PathLanding.tsx` | End of the add-person walk. Tapping a person on Home. End of every send, with a note such as "Everyone has been told." | The four tasks: Announce the passing, Share the service, Share the obituary, Send thank-yous. "What you'll need". "Edit person". Back to Home. | None |
 | "Announce the passing" | `AnnounceForm.tsx` | Hub, task "Announce the passing" | "Who should know?" | None |
@@ -96,7 +96,7 @@ is no hub screen, no gate and no obituary screen.
 | "The people you're writing about" | `HomeScreen.tsx` | App start. "Home" in the person bar. End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
 | "One thing at a time." (hub, shared with web from libs/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | Details form for the chosen step. "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
 | Template name, for example "Announce the passing" or "Share the service" | `DetailsFormScreen.tsx` | Hub. Used for the `announce` and `details` steps. | Contact selector | None |
-| "Who should know?", "Bring people across" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |
+| "Who should know?", "Add from your contacts" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |
 | "Review your message" | `ConfirmScreen.tsx` | Contact selector | Sending | None |
 | "Texting people, one at a time" | `SendingScreen.tsx` | Confirm | Home with a note | None |
 | "What you'll need" | `WhatYoullNeedScreen.tsx` | Home and picker | Back | None |
