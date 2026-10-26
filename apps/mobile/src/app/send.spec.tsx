@@ -142,8 +142,39 @@ describe('Review your message (announcement)', () => {
     await toReview();
     const plain = screen.getByText(/passed away/).props.children;
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
-    expect(screen.getByRole('button', { name: 'Plainer tone' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
     expect(screen.queryByText(plain)).toBeNull();
+  });
+
+  it('keeps edited words: tone is unavailable until the suggested wording is back', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
+    expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('My own words.')).toBeTruthy();
+    expect(screen.getByText('Your own words are kept. Undo your edit to change the tone.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
+    expect(screen.queryByText('My own words.')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
+    expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
+  });
+
+  it('sends the edited words to the sending step', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=My own words.');
+  });
+
+  it('opens What you will need in a sheet', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
   });
 
   it('sends on to the sending step', async () => {
@@ -158,8 +189,12 @@ describe('the end of a send', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
     await startMoment(template);
-    if (template !== 'Share the obituary') fireEvent.press(await screen.findByText('Continue'));
-    for (const name of pick) fireEvent.press(await screen.findByText(name));
+    if (template !== 'Share the obituary') {
+      fireEvent.press(await screen.findByText('Continue'));
+    }
+    for (const name of pick) {
+      fireEvent.press(await screen.findByText(name));
+    }
     fireEvent.press(screen.getByText('Continue'));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
   };

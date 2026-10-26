@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
@@ -122,5 +122,26 @@ describe('Review your message (Share the service)', () => {
     expect(screen.getByLabelText('Your message')).toHaveValue(
       "Margaret Hayes' service will be held June 14 at 2:00 PM, Oak Chapel. If you'd like to send flowers, Rose Shop, 617-555-0100 can deliver to the service.",
     );
+  });
+
+  it('opens What you will need in the shared sheet and returns focus to its button on Close', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: "What you'll need" });
+    await user.click(trigger);
+    expect(screen.getByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(trigger).toHaveFocus();
+  });
+
+  it('names the flower delivery options as a group with a pressed state', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('switch', { name: 'Include a way to send flowers' }));
+    const group = screen.getByRole('group', { name: 'Deliver flowers to' });
+    expect(within(group).getByRole('button', { name: 'The service' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(group).getByRole('button', { name: "The family's home" }));
+    expect(within(group).getByRole('button', { name: "The family's home" })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: 'The service' })).toHaveAttribute('aria-pressed', 'false');
   });
 });

@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { AccessibilityInfo, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import { Review } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';
+import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { ACCENT, MUTED } from '../components/colors';
 
 const copy = screenCopy('review');
@@ -13,10 +15,20 @@ const copy = screenCopy('review');
 export function ConfirmScreen({ flow }: FlowProps) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const checklistButton = useRef<ButtonNode>(null);
 
   if (!selectedTemplate) {
     return null;
   }
+
+  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  const focusChecklistButton = () => {
+    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
@@ -32,12 +44,16 @@ export function ConfirmScreen({ flow }: FlowProps) {
           intro={fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
           message={composedMessage}
           onMessageChange={setMessageOverride}
+          edited={flow.messageOverride !== null}
+          onUseSuggested={() => setMessageOverride(null)}
           tone={flow.tone}
           onToneChange={flow.setTone}
           sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
           hasRecipients={recipientCount > 0}
           onBack={prevStep}
           onSend={startSendJob}
+          onWhatYoullNeed={() => setChecklistOpen(true)}
+          checklistRef={checklistButton}
         >
           {isService && (
             <>
@@ -60,6 +76,7 @@ export function ConfirmScreen({ flow }: FlowProps) {
           )}
         </Review>
       </ScrollView>
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </KeyboardAvoidingView>
   );
 }

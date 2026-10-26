@@ -224,7 +224,8 @@ h1, h2, h3, h4, h5, h6 {
   .elev-md { box-shadow: var(--shadow-md); }
 
   /* — forms — */
-  .gg-field > label {
+  .gg-field > label,
+  .gg-field > .gg-label {
     display: block;
     font-size: 12px;
     margin-bottom: 5px;

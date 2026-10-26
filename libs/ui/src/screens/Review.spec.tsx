@@ -13,7 +13,9 @@ const copy: ReviewCopy = {
   edit: 'Edit wording',
   doneEditing: 'Done editing',
   softer: 'Softer tone',
-  plainer: 'Plainer tone',
+  toneKept: 'Your own words are kept. Undo your edit to change the tone.',
+  useSuggested: 'Use the suggested wording',
+  checklist: "What you'll need",
   blank: 'Add a message before you send it.',
   noRecipients: 'Choose who should get this message first.',
   privacy: "You'll text each person from your own number, one at a time.",
@@ -28,15 +30,25 @@ const base = {
   hasRecipients: true,
 };
 
-/** Holds the message and tone the way the app does, so typing and switching change what is shown. */
-function Harness({ onToneChange, ...over }: Partial<ReviewProps> = {}) {
+/** Holds the message, tone and edited flag the way the app does, so typing and switching change what is shown. */
+function Harness({ onToneChange, onUseSuggested, ...over }: Partial<ReviewProps> = {}) {
   const [message, setMessage] = useState('Margaret Hayes has passed away.');
+  const [edited, setEdited] = useState(false);
   const [tone, setTone] = useState('plain');
   return (
     <Review
       {...base}
       message={message}
-      onMessageChange={setMessage}
+      edited={edited}
+      onMessageChange={(next) => {
+        setMessage(next);
+        setEdited(true);
+      }}
+      onUseSuggested={() => {
+        onUseSuggested?.();
+        setMessage('Margaret Hayes has passed away.');
+        setEdited(false);
+      }}
       tone={tone}
       onToneChange={(next) => {
         onToneChange?.(next);
@@ -91,15 +103,51 @@ describe('Review', () => {
     expect(screen.getByRole('textbox', { name: 'Your message' })).toHaveAttribute('aria-labelledby', label.closest('[id]')?.id);
   });
 
-  it('switches tone and flips the button label', async () => {
+  it('switches tone with a constant label and a pressed state', async () => {
     const user = userEvent.setup();
     const onToneChange = vi.fn();
     render(<Harness onToneChange={onToneChange} />);
+    const softer = screen.getByRole('button', { name: 'Softer tone' });
+    expect(softer).toHaveAttribute('aria-pressed', 'false');
+    await user.click(softer);
+    expect(onToneChange).toHaveBeenCalledWith('softer');
+    expect(screen.getByRole('button', { name: 'Softer tone' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Softer tone' }));
+    expect(onToneChange).toHaveBeenLastCalledWith('plain');
+  });
+
+  it('keeps edited words: the tone button is unavailable and says why, until the suggested wording is back', async () => {
+    const user = userEvent.setup();
+    const onToneChange = vi.fn();
+    render(<Harness onToneChange={onToneChange} />);
+    expect(screen.queryByRole('button', { name: 'Use the suggested wording' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit wording' }));
+    await user.type(screen.getByLabelText('Your message'), ' Thank you.');
+    await user.click(screen.getByRole('button', { name: 'Done editing' }));
+    const softer = screen.getByRole('button', { name: 'Softer tone' });
+    expect(softer).toHaveAttribute('aria-disabled', 'true');
+    expect(softer).toHaveAccessibleDescription('Your own words are kept. Undo your edit to change the tone.');
+    await user.click(softer);
+    expect(onToneChange).not.toHaveBeenCalled();
+    expect(screen.getByText('Margaret Hayes has passed away. Thank you.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Use the suggested wording' }));
+    expect(screen.getByText('Margaret Hayes has passed away.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use the suggested wording' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Softer tone' })).not.toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('button', { name: 'Softer tone' }));
     expect(onToneChange).toHaveBeenCalledWith('softer');
-    await user.click(screen.getByRole('button', { name: 'Plainer tone' }));
-    expect(onToneChange).toHaveBeenLastCalledWith('plain');
-    expect(screen.getByRole('button', { name: 'Softer tone' })).toBeInTheDocument();
+  });
+
+  it('opens What you will need only when the app offers it', async () => {
+    const user = userEvent.setup();
+    const onWhatYoullNeed = vi.fn();
+    const { unmount } = render(<Harness onWhatYoullNeed={onWhatYoullNeed} />);
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    expect(onWhatYoullNeed).toHaveBeenCalledOnce();
+    unmount();
+    render(<Harness />);
+    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
   });
 
   it('shows the send label and sends', async () => {
@@ -114,16 +162,19 @@ describe('Review', () => {
     const user = userEvent.setup();
     const onSend = vi.fn();
     render(<Harness onSend={onSend} />);
+    // The status nodes are there before there is anything to say, so a change is announced.
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: 'Edit wording' }));
     await user.clear(screen.getByLabelText('Your message'));
     const send = screen.getByRole('button', { name: 'Text 2 people' });
     expect(send).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('status')).toHaveTextContent('Add a message before you send it.');
+    expect(screen.getByText('Add a message before you send it.')).toBeInTheDocument();
     expect(send).toHaveAccessibleDescription('Add a message before you send it.');
     await user.click(send);
     expect(onSend).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText('Your message'), 'Hello');
     expect(send).not.toHaveAttribute('aria-disabled', 'true');
+    expect(send).not.toHaveAttribute('aria-describedby');
   });
 
   it('blocks sending to no one and says why', async () => {
@@ -131,7 +182,7 @@ describe('Review', () => {
     const onSend = vi.fn();
     render(<Harness hasRecipients={false} onSend={onSend} />);
     const send = screen.getByRole('button', { name: 'Text 2 people' });
-    expect(screen.getByRole('status')).toHaveTextContent('Choose who should get this message first.');
+    expect(screen.getByText('Choose who should get this message first.')).toBeInTheDocument();
     await user.click(send);
     expect(onSend).not.toHaveBeenCalled();
   });

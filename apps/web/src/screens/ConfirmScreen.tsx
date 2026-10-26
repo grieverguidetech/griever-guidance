@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { composedFieldsWithFlorist } from '@griever/hooks';
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import { composeMessage, SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import { Review } from '@griever/ui';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -16,8 +17,14 @@ interface Props {
 /** The screen is the shared Review in libs/ui; this holds what is web only: the sample and the flowers choice. */
 export function ConfirmScreen({ flow }: Props) {
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Loose on purpose: the shared Button hands back a DOM node on web.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const checklistButton = useRef<any>(null);
 
-  if (!flow.selectedTemplate) return null;
+  if (!flow.selectedTemplate) {
+    return null;
+  }
 
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
@@ -39,18 +46,23 @@ export function ConfirmScreen({ flow }: Props) {
   }
 
   return (
+    <>
     <Review
       copy={copy}
       kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}
       intro={fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
       message={message}
       onMessageChange={flow.setMessageOverride}
+      edited={flow.messageOverride !== null}
+      onUseSuggested={() => flow.setMessageOverride(null)}
       tone={flow.tone}
       onToneChange={flow.setTone}
       sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
       hasRecipients={recipientCount > 0}
       onBack={flow.prevStep}
       onSend={handleSend}
+      onWhatYoullNeed={() => setSheetOpen(true)}
+      checklistRef={checklistButton}
     >
       {isService && (
         <div className="flex flex-col gap-2">
@@ -76,6 +88,8 @@ export function ConfirmScreen({ flow }: Props) {
       )}
       {isService && <FlowersSection flow={flow} />}
     </Review>
+    {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
+    </>
   );
 }
 
@@ -123,10 +137,11 @@ function FlowersSection({ flow }: { flow: Flow }) {
           </div>
 
           <div className="gg-field">
-            <label>{f.deliverTo}</label>
-            <div className="gg-seg">
+            <span id="florist-target-label" className="gg-label">{f.deliverTo}</span>
+            <div className="gg-seg" role="group" aria-labelledby="florist-target-label">
               <button
                 type="button"
+                aria-pressed={flow.flowerDeliveryTarget === 'service'}
                 onClick={() => flow.setFlowerDeliveryTarget('service')}
                 className={`gg-seg-opt ${flow.flowerDeliveryTarget === 'service' ? 'gg-seg-opt-active' : ''}`}
               >
@@ -134,6 +149,7 @@ function FlowersSection({ flow }: { flow: Flow }) {
               </button>
               <button
                 type="button"
+                aria-pressed={flow.flowerDeliveryTarget === 'home'}
                 onClick={() => flow.setFlowerDeliveryTarget('home')}
                 className={`gg-seg-opt ${flow.flowerDeliveryTarget === 'home' ? 'gg-seg-opt-active' : ''}`}
               >

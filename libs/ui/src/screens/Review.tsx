@@ -23,10 +23,13 @@ export interface ReviewCopy {
   edit: string;
   doneEditing: string;
   softer: string;
-  plainer: string;
+  /** Why the tone button is unavailable once the words are edited. */
+  toneKept: string;
+  useSuggested: string;
+  checklist: string;
   /** Why Send is unavailable when the message is empty. */
   blank: string;
-  /** Why Send is unavailable when no one is chosen. */
+  /** Why Send is unavailable when no one is chosen. Both apps only reach this screen with someone chosen, so it guards a state that should not happen. */
   noRecipients: string;
   privacy: string;
 }
@@ -39,6 +42,10 @@ export interface ReviewProps {
   intro: string;
   message: string;
   onMessageChange: (message: string) => void;
+  /** The person's own words are in use (the app holds an override). */
+  edited: boolean;
+  /** Drops the edit and returns to the suggested wording. */
+  onUseSuggested: () => void;
   /** `softer` or `plain`. */
   tone: string;
   onToneChange: (tone: 'softer' | 'plain') => void;
@@ -47,6 +54,10 @@ export interface ReviewProps {
   hasRecipients: boolean;
   onBack: () => void;
   onSend: () => void;
+  /** Opens "What you'll need". Leave unset to hide the button. */
+  onWhatYoullNeed?: () => void;
+  /** For the sheet that "What you'll need" opens to return focus to. */
+  checklistRef?: Ref<ButtonNode>;
   /** Between the message and the buttons, for example the sample and the flowers choice. */
   children?: ReactNode;
   headingRef?: HeadingProps['headingRef'];
@@ -57,13 +68,14 @@ export interface ReviewProps {
  * libs/ui so web (through react-native-web) and mobile show the same screen. The message and tone
  * live in the app; only whether the field is open lives here.
  */
-export function Review({ copy, kind, intro, message, onMessageChange, tone, onToneChange, sendLabel, hasRecipients, onBack, onSend, children, headingRef }: ReviewProps) {
+export function Review({ copy, kind, intro, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, sendLabel, hasRecipients, onBack, onSend, onWhatYoullNeed, checklistRef, children, headingRef }: ReviewProps) {
   const announcement = kind === 'announcement';
   const [editing, setEditing] = useState(false);
   const [returnFocus, setReturnFocus] = useState(false);
   const fieldRef = useRef<TextInputNode>(null);
   const editRef = useRef<ButtonNode>(null);
   const reasonId = useId();
+  const toneReasonId = useId();
   const blank = message.trim() === '';
   const reason = blank ? copy.blank : hasRecipients ? undefined : copy.noRecipients;
 
@@ -88,6 +100,9 @@ export function Review({ copy, kind, intro, message, onMessageChange, tone, onTo
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="tertiary" onPress={onBack} />
+        {onWhatYoullNeed ? (
+          <Button label={copy.checklist} variant="tertiary" outlined opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+        ) : null}
       </View>
       <View style={styles.head}>
         <Heading level={1} headingRef={headingRef}>
@@ -112,12 +127,23 @@ export function Review({ copy, kind, intro, message, onMessageChange, tone, onTo
         <View style={styles.actions}>
           <Button label={editing ? copy.doneEditing : copy.edit} variant="secondary" buttonRef={editRef} onPress={toggleEditing} />
           <Button
-            label={tone === 'softer' ? copy.plainer : copy.softer}
+            label={copy.softer}
             variant="ghost"
-            onPress={() => onToneChange(tone === 'softer' ? 'plain' : 'softer')}
+            pressed={tone === 'softer'}
+            ariaDisabled={edited}
+            announceDisabled
+            describedBy={edited ? toneReasonId : undefined}
+            hint={edited ? copy.toneKept : undefined}
+            onPress={() => {
+              if (!edited) {
+                onToneChange(tone === 'softer' ? 'plain' : 'softer');
+              }
+            }}
           />
+          <Status id={toneReasonId} message={edited ? copy.toneKept : undefined} />
         </View>
       ) : null}
+      {edited ? <Button label={copy.useSuggested} variant="ghost" onPress={onUseSuggested} /> : null}
       <Button
         label={sendLabel}
         ariaDisabled={reason !== undefined}
@@ -130,7 +156,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, tone, onTo
           }
         }}
       />
-      <Reason id={reasonId} message={reason} />
+      <Status id={reasonId} message={reason} />
       <Body tone="muted" small>
         {copy.privacy}
       </Body>
@@ -151,6 +177,7 @@ interface MessageFieldProps {
 function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
+  const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
       <Body tone="strong" id={labelId}>
@@ -158,7 +185,9 @@ function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProp
       </Body>
       <TextInput
         ref={inputRef}
-        style={[styles.input, font]}
+        style={[styles.input, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         {...webFieldHook}
         // Web names the field from the visible label; native reads the label text directly.
         aria-labelledby={labelId}
@@ -172,19 +201,19 @@ function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProp
   );
 }
 
-/** Why Send is unavailable: a polite status, and announced on iOS when it appears (iOS ignores live regions). */
-function Reason({ id, message }: { id: string; message?: string }) {
+/**
+ * A reason a button is unavailable. The polite status node is always rendered and only its text
+ * changes, so screen readers announce the change. Also announced on iOS (it ignores live regions).
+ */
+function Status({ id, message }: { id: string; message?: string }) {
   useEffect(() => {
     if (message && Platform.OS === 'ios') {
       AccessibilityInfo.announceForAccessibility(message);
     }
   }, [message]);
-  if (!message) {
-    return null;
-  }
   return (
     <Body id={id} tone="muted" live>
-      {message}
+      {message ?? ''}
     </Body>
   );
 }
@@ -208,4 +237,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlignVertical: 'top',
   },
+  // Native focus cue (web draws its own ring through data-gg-field).
+  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
 });
