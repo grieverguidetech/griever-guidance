@@ -79,8 +79,8 @@ describe('picking an announcement', () => {
     expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
     expect(screen.getByText('2 selected')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Text these people')).toBeTruthy();
-    expect(screen.getByText(/each of 2 people/)).toBeTruthy();
+    expect(await screen.findByText('Text 2 people')).toBeTruthy();
+    expect(screen.getByText('This will go to 2 people as a text message.')).toBeTruthy();
   });
 
   it('Edit opens setup, and Back there returns to Announce with the note kept', async () => {
@@ -128,6 +128,31 @@ describe('picking an announcement', () => {
   });
 });
 
+describe('Review your message (announcement)', () => {
+  const toReview = async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.press(await screen.findByText('Continue'));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    await screen.findByRole('heading', { name: 'Read it once before it goes' });
+  };
+
+  it('changes the message when the tone changes', async () => {
+    await toReview();
+    const plain = screen.getByText(/passed away/).props.children;
+    fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
+    expect(screen.getByRole('button', { name: 'Plainer tone' })).toBeTruthy();
+    expect(screen.queryByText(plain)).toBeNull();
+  });
+
+  it('sends on to the sending step', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
+    expect(await screen.findByText('Open Messages')).toBeTruthy();
+  });
+});
+
 describe('the end of a send', () => {
   const toSending = async (pick: string[], template = 'Announce the passing') => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
@@ -136,7 +161,7 @@ describe('the end of a send', () => {
     if (template !== 'Share the obituary') fireEvent.press(await screen.findByText('Continue'));
     for (const name of pick) fireEvent.press(await screen.findByText(name));
     fireEvent.press(screen.getByText('Continue'));
-    fireEvent.press(await screen.findByText('Text these people'));
+    fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
   };
 
   it('returns Home with a calm note, announced, once the last person is done', async () => {

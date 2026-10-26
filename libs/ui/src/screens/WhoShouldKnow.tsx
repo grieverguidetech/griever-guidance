@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -9,6 +9,7 @@ import type { HeadingProps } from '../Heading';
 import { Phrasing } from '../phrasing';
 import { Card } from '../Card';
 import { Body } from '../Text';
+import { focusNode } from '../focusNode';
 import { useSerifStyle } from '../typography';
 
 type TextInputNode = ComponentRef<typeof TextInput>;
@@ -274,21 +275,6 @@ interface FieldProps {
 
 /** Web: lets apps/web/src/styles.css draw its field focus ring (data-gg-field). Ignored on native. */
 const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
-
-/** Moves focus to a button: the DOM on web, the screen reader's cursor on native. */
-function focusNode(node: ButtonNode | null) {
-  if (!node) {
-    return;
-  }
-  if (Platform.OS === 'web') {
-    (node as unknown as { focus: () => void }).focus();
-    return;
-  }
-  const handle = findNodeHandle(node);
-  if (handle) {
-    AccessibilityInfo.setAccessibilityFocus(handle);
-  }
-}
 
 /** A calm error line. Web: an alert. Native: role=alert is silent there, so it is also announced. */
 function Alert({ message, id }: { message?: string; id?: string }) {

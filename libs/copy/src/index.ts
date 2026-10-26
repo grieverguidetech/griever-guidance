@@ -78,3 +78,16 @@ export function announceRecap(
     .filter(Boolean)
     .join(' · ');
 }
+
+/** "1 person" or "3 people". */
+export function recipientsPhrase(count: number, copy: ScreenCopy<'review'>): string {
+  return `${count} ${count === 1 ? copy.person : copy.people}`;
+}
+
+/** The send button on Review: "Text 1 person", "Text 2 people", or "Text these people" when there is no count. */
+export function sendLabel(count: number | undefined, copy: ScreenCopy<'review'>): string {
+  if (!count) {
+    return copy.sendFallback;
+  }
+  return fill(copy.send, { recipients: recipientsPhrase(count, copy) });
+}

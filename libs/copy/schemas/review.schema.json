@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Review your message screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "headingAnnouncement",
+    "introAnnouncement",
+    "intro",
+    "back",
+    "announcementTag",
+    "messageLabel",
+    "edit",
+    "doneEditing",
+    "softer",
+    "plainer",
+    "person",
+    "people",
+    "send",
+    "sendFallback",
+    "blank",
+    "noRecipients",
+    "privacy",
+    "sample",
+    "flowers"
+  ],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "headingAnnouncement": { "$ref": "#/$defs/text" },
+    "introAnnouncement": { "type": "string", "pattern": "\\{recipients\\}" },
+    "intro": { "type": "string", "pattern": "\\{recipients\\}" },
+    "back": { "$ref": "#/$defs/text" },
+    "announcementTag": { "$ref": "#/$defs/text" },
+    "messageLabel": { "$ref": "#/$defs/text" },
+    "edit": { "$ref": "#/$defs/text" },
+    "doneEditing": { "$ref": "#/$defs/text" },
+    "softer": { "$ref": "#/$defs/text" },
+    "plainer": { "$ref": "#/$defs/text" },
+    "person": { "$ref": "#/$defs/text" },
+    "people": { "$ref": "#/$defs/text" },
+    "send": { "type": "string", "pattern": "\\{recipients\\}" },
+    "sendFallback": { "$ref": "#/$defs/text" },
+    "blank": { "$ref": "#/$defs/text" },
+    "noRecipients": { "$ref": "#/$defs/text" },
+    "privacy": { "$ref": "#/$defs/text" },
+    "sample": { "$ref": "#/$defs/text" },
+    "flowers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heading", "note", "floristLabel", "optional", "floristPlaceholder", "deliverTo",
+        "toService", "toHome", "floristFallback", "targetService", "targetHome", "editedNote", "addedLine"
+      ],
+      "properties": {
+        "heading": { "$ref": "#/$defs/text" },
+        "note": { "$ref": "#/$defs/text" },
+        "floristLabel": { "$ref": "#/$defs/text" },
+        "optional": { "$ref": "#/$defs/text" },
+        "floristPlaceholder": { "$ref": "#/$defs/text" },
+        "deliverTo": { "$ref": "#/$defs/text" },
+        "toService": { "$ref": "#/$defs/text" },
+        "toHome": { "$ref": "#/$defs/text" },
+        "floristFallback": { "$ref": "#/$defs/text" },
+        "targetService": { "$ref": "#/$defs/text" },
+        "targetHome": { "$ref": "#/$defs/text" },
+        "editedNote": { "$ref": "#/$defs/text" },
+        "addedLine": { "type": "string", "pattern": "\\{florist\\}.*\\{target\\}" }
+      }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 }
+  }
+}

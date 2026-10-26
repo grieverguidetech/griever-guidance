@@ -95,12 +95,12 @@ describe('Review your message (Share the service)', () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.clear(screen.getByLabelText('Your message'));
-    expect(screen.getByRole('button', { name: 'Text these people' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Text these people' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Add a message before you send it.')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Your message'), '  ');
-    expect(screen.getByRole('button', { name: 'Text these people' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Text these people' })).toHaveAttribute('aria-disabled', 'true');
     await user.type(screen.getByLabelText('Your message'), 'Hello');
-    expect(screen.getByRole('button', { name: 'Text these people' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Text these people' })).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('keeps an edit when flowers are switched on', async () => {
