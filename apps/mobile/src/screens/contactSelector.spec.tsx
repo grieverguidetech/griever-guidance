@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
 import { ContactSelectorScreen } from './ContactSelectorScreen';
@@ -55,7 +56,12 @@ function renderScreen(
   return { toggleContact, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
-const headers = () => screen.queryAllByRole('header').map((h) => h.props.children);
+// The screen's own title is a heading too; the tier headings are the rest.
+const headers = () =>
+  screen
+    .queryAllByRole('heading')
+    .map((h) => h.props.children)
+    .filter((text) => text !== 'Who should know?');
 
 describe('ContactSelectorScreen grouping', () => {
   it('for an announcement, lists Close family before Friends & family, with headings as headers', () => {
@@ -82,7 +88,7 @@ describe('ContactSelectorScreen grouping', () => {
 
   it('preselects no one and sends nothing until the user picks', () => {
     const { toggleContact } = renderScreen();
-    expect(screen.getByText('No recipients selected')).toBeTruthy();
+    expect(screen.getByText('0 selected')).toBeTruthy();
     expect(toggleContact).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText('Mum'));
     expect(toggleContact).toHaveBeenCalledTimes(1);
@@ -113,14 +119,29 @@ describe('ContactSelectorScreen grouping', () => {
 
   it('gives the Bring people across rows the checkbox role and checked state', async () => {
     renderScreen();
-    fireEvent.press(screen.getByText('Import from contacts'));
-    await waitFor(() => expect(screen.getByText('Bring people across')).toBeTruthy());
-    expect(screen.getByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring people across' }));
+    expect(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
+    expect(screen.getByText('Choose only the ones you want — the rest stay where they are.')).toBeTruthy();
     const plain = screen.getByRole('checkbox', { name: /Plain Pat/, checked: false });
     fireEvent.press(plain);
     expect(screen.getByRole('checkbox', { name: /Plain Pat/, checked: true })).toBeTruthy();
     const ticks = screen.getAllByText('✓', { includeHiddenElements: true });
     expect(ticks).toHaveLength(2);
     ticks.forEach((t) => expect(t.props.accessibilityElementsHidden).toBe(true));
+  });
+
+  it('reads Continue as disabled until someone is chosen, and says why', () => {
+    renderScreen();
+    const cont = screen.getByRole('button', { name: 'Continue' });
+    expect(cont.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(cont.props.accessibilityHint).toBe('Choose at least one person');
+  });
+
+  it('announces the new count when the selection changes', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const { rerender } = renderScreen();
+    announce.mockClear();
+    rerender(['2']);
+    expect(announce).toHaveBeenCalledWith('1 selected');
   });
 });

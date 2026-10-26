@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, minTouchTarget, spacing } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
@@ -42,6 +42,14 @@ export interface ButtonProps {
    * (`accessibilityState`); the caller ignores presses meanwhile. Leave unset for a plain button.
    */
   busy?: boolean;
+  /**
+   * With `ariaDisabled`, native also reads the button as disabled. Only for a button whose press does
+   * nothing: native swallows the tap of a disabled button (#292), so a button that explains itself
+   * on press (the paywall) must leave this off.
+   */
+  announceDisabled?: boolean;
+  /** A fuller name when the label alone is not enough, for example "Select all, Close family". It must start with the label. */
+  accessibilityName?: string;
   buttonRef?: Ref<ButtonNode>;
 }
 
@@ -55,6 +63,8 @@ export function Button({
   opensDialog = false,
   busy,
   outlined = false,
+  accessibilityName,
+  announceDisabled = false,
   buttonRef,
 }: ButtonProps) {
   const setRef = useCallback(
@@ -73,6 +83,10 @@ export function Button({
   if (describedBy) {
     extra['aria-describedby'] = describedBy;
   }
+  if (accessibilityName) {
+    extra['aria-label'] = accessibilityName;
+    extra['accessibilityLabel'] = accessibilityName;
+  }
   if (opensDialog) {
     extra['aria-haspopup'] = 'dialog';
   }
@@ -84,7 +98,7 @@ export function Button({
       ref={setRef}
       role="button"
       accessibilityHint={hint}
-      accessibilityState={busy === undefined ? undefined : { busy, disabled: busy }}
+      accessibilityState={buttonState(busy, ariaDisabled && announceDisabled)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
@@ -102,6 +116,16 @@ export function Button({
       </Phrasing>
     </Pressable>
   );
+}
+
+/** Native only: unavailable reads as disabled. (On web aria-disabled is set on the node, see ariaDisabled.ts.) */
+function buttonState(busy: boolean | undefined, ariaDisabled: boolean) {
+  // On web a disabled state would also take the button out of the tab order, so only busy goes through.
+  const unavailable = ariaDisabled && Platform.OS !== 'web';
+  if (busy === undefined && !unavailable) {
+    return undefined;
+  }
+  return { busy: busy ?? false, disabled: Boolean(busy) || unavailable };
 }
 
 function labelStyle(variant: ButtonVariant, ariaDisabled: boolean) {

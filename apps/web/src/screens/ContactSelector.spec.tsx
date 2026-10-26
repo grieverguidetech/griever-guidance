@@ -41,17 +41,17 @@ describe('ContactSelector', () => {
     expect(screen.queryByText(/neighbours/i)).not.toBeInTheDocument();
   });
 
-  it("exposes each row's selected state, and preselects no one", () => {
+  it("exposes each row's checked state, and preselects no one", () => {
     setup();
-    expect(screen.getByRole('button', { name: /Aunt Carol/ })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: /Bob Smith/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('checkbox', { name: /Aunt Carol/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Bob Smith/ })).not.toBeChecked();
   });
 
-  it('marks a chosen row as pressed and toggles on click', async () => {
+  it('marks a chosen row as checked and toggles on click', async () => {
     const { toggleContact, user } = setup(['b']);
-    expect(screen.getByRole('button', { name: /Bob Smith/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /Aunt Carol/ })).toHaveAttribute('aria-pressed', 'false');
-    await user.click(screen.getByRole('button', { name: /Aunt Carol/ }));
+    expect(screen.getByRole('checkbox', { name: /Bob Smith/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Aunt Carol/ })).not.toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: /Aunt Carol/ }));
     expect(toggleContact).toHaveBeenCalledWith('a');
   });
 });

@@ -86,7 +86,7 @@ describe('saved as you go', () => {
     const user = userEvent.setup();
     await startAnnouncement(user);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByRole('button', { name: /Aunt Carol/ })).toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: /Aunt Carol/ })).toBeInTheDocument();
     expect(screen.queryByText('Do you know the service details?')).not.toBeInTheDocument();
   });
 
@@ -95,11 +95,11 @@ describe('saved as you go', () => {
     let view = await startAnnouncement(user);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
-    await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+    await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
     view = reload(view);
     await openFromHome(user);
     await resume(user);
-    expect(await screen.findByRole('button', { name: /Aunt Carol/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('checkbox', { name: /Aunt Carol/ })).toBeChecked();
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: 'Edit wording' }));
@@ -120,7 +120,7 @@ describe('saved as you go', () => {
     vi.stubGlobal('fetch', fetchSpy);
     try {
       await user.click(screen.getByRole('button', { name: 'Continue' }));
-      await waitFor(() => expect(screen.getByRole('button', { name: /Aunt Carol/ })).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole('checkbox', { name: /Aunt Carol/ })).toBeInTheDocument());
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     } finally {
@@ -141,7 +141,7 @@ describe('saved as you go', () => {
     const user = userEvent.setup();
     const view = await startAnnouncement(user);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(await screen.findByRole('button', { name: /Aunt Carol/ }));
+    await user.click(await screen.findByRole('checkbox', { name: /Aunt Carol/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: /^Text 1 person/ }));
 

@@ -26,10 +26,12 @@ export interface BodyProps {
   id?: string;
   /** Hidden from assistive tech, for text that is read another way (a hint, a description). */
   hidden?: boolean;
+  /** Read out politely when the text changes (a count, a status). */
+  live?: boolean;
 }
 
 /** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
-export function Body({ children, tone = 'default', small = false, id, hidden = false }: BodyProps) {
+export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false }: BodyProps) {
   const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};
   if (id) {
@@ -37,6 +39,10 @@ export function Body({ children, tone = 'default', small = false, id, hidden = f
   }
   if (hidden) {
     extra['aria-hidden'] = true;
+  }
+  if (live) {
+    extra['role'] = 'status';
+    extra['accessibilityLiveRegion'] = 'polite';
   }
   return <Text style={[styles.body, font, styles[tone], small && styles.small]} {...extra}>{children}</Text>;
 }

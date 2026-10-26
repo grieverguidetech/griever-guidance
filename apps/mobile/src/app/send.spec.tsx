@@ -49,13 +49,13 @@ describe('picking an announcement', () => {
     expect(screen.queryByText('Gather when you can')).toBeNull();
   });
 
-  it('keeps the note typed on the announce screen, and Continue goes to Select recipients', async () => {
+  it('keeps the note typed on the announce screen, and Continue goes to Who should know?', async () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Select recipients')).toBeTruthy();
-    fireEvent.press(screen.getByText('← Back'));
+    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
   });
 
@@ -67,6 +67,20 @@ describe('picking an announcement', () => {
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
+  });
+
+  it('lets people be picked on Who should know?, and the picked people reach Review', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('0 selected')).toBeTruthy();
+    fireEvent.press(await screen.findByRole('checkbox', { name: /Dee/ }));
+    fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
+    expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
+    expect(screen.getByText('2 selected')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Text these people')).toBeTruthy();
+    expect(screen.getByText(/each of 2 people/)).toBeTruthy();
   });
 
   it('Edit opens setup, and Back there returns to Announce with the note kept', async () => {
@@ -104,8 +118,8 @@ describe('picking an announcement', () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Continue'));
-    expect(await screen.findByText('Select recipients')).toBeTruthy();
-    fireEvent.press(screen.getByText('← Back'));
+    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     // The first form's Back returns to the hub, not a picker.

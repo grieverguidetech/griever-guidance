@@ -15,6 +15,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'signUp', file: 'screens/SignUpScreen.tsx' },
   { copy: 'paywall', file: 'screens/HubScreen.tsx' },
   { copy: 'announce', file: 'screens/AnnounceScreen.tsx' },
+  { copy: 'whoShouldKnow', file: 'screens/ContactSelectorScreen.tsx' },
 ];
 
 describe('migrated screens do not hard-code copy', () => {
