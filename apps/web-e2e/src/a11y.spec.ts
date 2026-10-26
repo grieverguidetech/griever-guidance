@@ -49,6 +49,12 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await onboard(page);
     await page.getByRole('button', { name: 'Start' }).click();
   },
+  'who should know': async (page) => {
+    await onboard(page);
+    await page.getByRole('button', { name: 'Start' }).click();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('heading', { name: 'Who should know?' }).waitFor();
+  },
 };
 
 for (const [name, open] of Object.entries(screens)) {

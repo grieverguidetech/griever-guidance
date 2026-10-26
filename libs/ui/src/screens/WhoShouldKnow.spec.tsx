@@ -12,6 +12,9 @@ const copy: WhoShouldKnowCopy = {
   tierFirst: 'Close family',
   tierFamily: 'Friends & family',
   selectAll: 'Select all',
+  selectAllFor: 'Select all, {group}',
+  chooseOne: 'Choose at least one person',
+  fillBoth: 'Enter a name and a mobile number',
   addAnother: 'Add another person',
   nameLabel: 'Name',
   namePlaceholder: 'e.g. Aunt Carol',
@@ -20,7 +23,6 @@ const copy: WhoShouldKnowCopy = {
   add: 'Add',
   cancel: 'Cancel',
   badNumber: "That number doesn't look right — check the area code and digits.",
-  selected: '{count} selected',
   continue: 'Continue',
   empty: 'No one saved yet. Add someone below.',
   bringAcross: 'Bring people across',
@@ -41,7 +43,10 @@ function setup(over: Partial<WhoShouldKnowProps> = {}) {
     onAddPerson: vi.fn(async () => undefined),
     toE164: vi.fn((raw: string) => (raw.replace(/\D/g, '').length >= 10 ? '+16175550148' : null)),
   };
-  render(<WhoShouldKnow copy={copy} people={people} grouped selectedIds={[]} {...handlers} {...over} />);
+  const count = (over.selectedIds ?? []).length;
+  render(
+    <WhoShouldKnow copy={copy} people={people} grouped selectedIds={[]} selectedLabel={`${count} selected`} {...handlers} {...over} />,
+  );
   return handlers;
 }
 
@@ -68,7 +73,8 @@ describe('WhoShouldKnow', () => {
   it('selects the whole group with its Select all, and offers none when not grouped', async () => {
     const user = userEvent.setup();
     const h = setup();
-    const [closeFamily, friends] = screen.getAllByRole('button', { name: 'Select all' });
+    const closeFamily = screen.getByRole('button', { name: 'Select all, Close family' });
+    const friends = screen.getByRole('button', { name: 'Select all, Friends & family' });
     await user.click(friends);
     expect(h.onSelectAll).toHaveBeenLastCalledWith(['b', 'c']);
     await user.click(closeFamily);
@@ -154,5 +160,58 @@ describe('WhoShouldKnow', () => {
     setup({ onWhatYoullNeed });
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
     expect(onWhatYoullNeed).toHaveBeenCalledOnce();
+  });
+
+  it('toggles a row with Space', async () => {
+    const user = userEvent.setup();
+    const h = setup();
+    screen.getByRole('checkbox', { name: /Aunt Carol/ }).focus();
+    await user.keyboard(' ');
+    expect(h.onToggle).toHaveBeenCalledWith('a');
+  });
+
+  it('moves focus to Name when the form opens, and back to Add another person on Cancel', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Add another person' }));
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Add another person' })).toHaveFocus();
+  });
+
+  it('puts focus back on Add another person after a successful add', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Add another person' }));
+    await user.type(screen.getByLabelText('Name'), 'Aunt Dee');
+    await user.type(screen.getByLabelText('Mobile number'), '617 555 0148');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('button', { name: 'Add another person' })).toHaveFocus();
+  });
+
+  it('announces the count politely', () => {
+    setup({ selectedIds: ['a'] });
+    expect(screen.getByRole('status')).toHaveTextContent('1 selected');
+  });
+
+  it('ties the bad-number error to the phone field', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Add another person' }));
+    await user.type(screen.getByLabelText('Name'), 'Aunt Dee');
+    await user.type(screen.getByLabelText('Mobile number'), '123');
+    expect(screen.getByLabelText('Mobile number')).not.toHaveAttribute('aria-invalid', 'true');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    const phone = screen.getByLabelText('Mobile number');
+    expect(phone).toHaveAttribute('aria-invalid', 'true');
+    expect(phone).toHaveAccessibleDescription(copy.badNumber);
+  });
+
+  it('explains why Continue and Add are unavailable', async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.getByRole('button', { name: 'Continue' })).toHaveAccessibleDescription('Choose at least one person');
+    await user.click(screen.getByRole('button', { name: 'Add another person' }));
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveAccessibleDescription('Enter a name and a mobile number');
   });
 });

@@ -7,6 +7,7 @@
   "tierFirst": "Close family",
   "tierFamily": "Friends & family",
   "selectAll": "Select all",
+  "selectAllFor": "Select all, {group}",
   "addAnother": "Add another person",
   "nameLabel": "Name",
   "namePlaceholder": "e.g. Aunt Carol",
@@ -18,5 +19,11 @@
   "selected": "{count} selected",
   "continue": "Continue",
   "empty": "No one saved yet. Add someone below.",
-  "bringAcross": "Bring people across"
+  "bringAcross": "Bring people across",
+  "chooseOne": "Choose at least one person",
+  "fillBoth": "Enter a name and a mobile number",
+  "importError": "We could not read your contacts. You can add people by hand instead.",
+  "importIntro": "Choose only the ones you want — the rest stay where they are.",
+  "importEmpty": "No new contacts with a mobile number found.",
+  "chosen": "{count} chosen"
 }

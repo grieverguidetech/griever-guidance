@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
 import { detectDeviceRegion, toE164 } from '@griever/contacts';
-import { screenCopy } from '@griever/copy';
+import { fill, screenCopy } from '@griever/copy';
 import { WhoShouldKnow } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
 import { SavedNote } from '../lib/ui';
 import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 import { formatPhone } from '../lib/format';
@@ -25,9 +27,8 @@ interface Props {
 export function ContactSelector({ flow, contacts, grouped, onAddContact }: Props) {
   const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep } = flow;
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Loose on purpose: the shared Button hands back a DOM node on web.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const checklistButton = useRef<any>(null);
+  // The shared Button hands back a DOM node on web; its type says native node.
+  const checklistButton = useRef<ButtonNode>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -36,6 +37,7 @@ export function ContactSelector({ flow, contacts, grouped, onAddContact }: Props
         people={contacts.map((c) => ({ id: c.contactId, name: c.name, phone: formatPhone(c.phone), tier: c.tier }))}
         grouped={grouped}
         selectedIds={selectedContactIds}
+        selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
         onToggle={toggleContact}
         onSelectAll={selectContacts}
         toE164={(raw) => toE164(raw, detectDeviceRegion())}
@@ -49,7 +51,7 @@ export function ContactSelector({ flow, contacts, grouped, onAddContact }: Props
         checklistRef={checklistButton}
         footer={<SavedNote />}
       />
-      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton} />}
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />}
     </div>
   );
 }

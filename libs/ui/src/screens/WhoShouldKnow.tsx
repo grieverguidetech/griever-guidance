@@ -1,6 +1,6 @@
-import { useId, useState } from 'react';
-import type { ReactNode, Ref } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { ComponentRef, ReactNode, Ref } from 'react';
+import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -10,6 +10,8 @@ import { Phrasing } from '../phrasing';
 import { Card } from '../Card';
 import { Body } from '../Text';
 import { useSerifStyle } from '../typography';
+
+type TextInputNode = ComponentRef<typeof TextInput>;
 
 /** The words the screen needs. libs/copy/screens/whoShouldKnow.json has these keys. */
 export interface WhoShouldKnowCopy {
@@ -21,6 +23,12 @@ export interface WhoShouldKnowCopy {
   tierFirst: string;
   tierFamily: string;
   selectAll: string;
+  /** Has a {group} placeholder: the full name of a Select all button. Starts with `selectAll`. */
+  selectAllFor: string;
+  /** Why Continue is unavailable. */
+  chooseOne: string;
+  /** Why Add is unavailable. */
+  fillBoth: string;
   addAnother: string;
   nameLabel: string;
   namePlaceholder: string;
@@ -29,8 +37,6 @@ export interface WhoShouldKnowCopy {
   add: string;
   cancel: string;
   badNumber: string;
-  /** Has a {count} placeholder. */
-  selected: string;
   continue: string;
   empty: string;
   bringAcross: string;
@@ -50,6 +56,8 @@ export interface WhoShouldKnowProps {
   /** Show Close family and Friends & family headings. */
   grouped: boolean;
   selectedIds: string[];
+  /** The count line, already built (for example "2 selected"). It is read out when it changes. */
+  selectedLabel: string;
   onToggle: (id: string) => void;
   /** Select all of one group's people. */
   onSelectAll: (ids: string[]) => void;
@@ -83,13 +91,15 @@ export interface WhoShouldKnowProps {
  * "Who should know?": pick the people who get the message. Built from libs/ui so web (through
  * react-native-web) and mobile show the same screen.
  */
-export function WhoShouldKnow({ copy, people, grouped, selectedIds, onToggle, onSelectAll, toE164, onAddPerson, onBack, onContinue, onWhatYoullNeed, checklistRef, bringAcross, loading, footer, headingRef }: WhoShouldKnowProps) {
+export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabel, onToggle, onSelectAll, toE164, onAddPerson, onBack, onContinue, onWhatYoullNeed, checklistRef, bringAcross, loading, footer, headingRef }: WhoShouldKnowProps) {
   const sections = grouped
     ? [
         { key: 'first', label: copy.tierFirst, items: people.filter((p) => (p.tier ?? 'family') === 'first') },
         { key: 'family', label: copy.tierFamily, items: people.filter((p) => (p.tier ?? 'family') === 'family') },
       ].filter((s) => s.items.length > 0)
     : [{ key: 'all', label: null, items: people }];
+  const noneChosen = selectedIds.length === 0;
+  const reasonId = useId();
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
@@ -107,7 +117,12 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, onToggle, on
           {section.label ? (
             <View style={styles.sectionHead}>
               <Heading level={2}>{section.label}</Heading>
-              <Button label={copy.selectAll} variant="tertiary" onPress={() => onSelectAll(section.items.map((p) => p.id))} />
+              <Button
+                label={copy.selectAll}
+                accessibilityName={copy.selectAllFor.replace('{group}', section.label)}
+                variant="tertiary"
+                onPress={() => onSelectAll(section.items.map((p) => p.id))}
+              />
             </View>
           ) : null}
           {section.items.map((person) => (
@@ -134,13 +149,29 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, onToggle, on
               }
             }}
           />
-          {bringAcross.notice ? <Text role="alert" style={styles.error}>{bringAcross.notice}</Text> : null}
+          <Alert message={bringAcross.notice} />
         </View>
       ) : null}
       <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} />
       <View style={styles.footerRow}>
-        <Body tone="muted">{copy.selected.replace('{count}', String(selectedIds.length))}</Body>
-        <Button label={copy.continue} ariaDisabled={selectedIds.length === 0} onPress={() => selectedIds.length > 0 && onContinue()} />
+        <SelectedCount label={selectedLabel} />
+        <Button
+          label={copy.continue}
+          ariaDisabled={noneChosen}
+          announceDisabled
+          describedBy={noneChosen ? reasonId : undefined}
+          hint={noneChosen ? copy.chooseOne : undefined}
+          onPress={() => {
+            if (!noneChosen) {
+              onContinue();
+            }
+          }}
+        />
+        {noneChosen ? (
+          <Body id={reasonId} hidden small>
+            {copy.chooseOne}
+          </Body>
+        ) : null}
       </View>
       {footer}
     </View>
@@ -155,12 +186,28 @@ function AddByHand({ copy, toE164, onAddPerson }: Pick<WhoShouldKnowProps, 'copy
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [returnFocus, setReturnFocus] = useState(false);
+  const nameRef = useRef<TextInputNode>(null);
+  const addAnotherRef = useRef<ButtonNode>(null);
+  const reasonId = useId();
+  const errorId = useId();
+
+  // Focus follows the form: into Name when it opens, back to the opener when it closes.
+  useEffect(() => {
+    if (open) {
+      nameRef.current?.focus();
+    } else if (returnFocus) {
+      focusNode(addAnotherRef.current);
+      setReturnFocus(false);
+    }
+  }, [open, returnFocus]);
 
   const close = () => {
     setOpen(false);
     setName('');
     setPhone('');
     setError(null);
+    setReturnFocus(true);
   };
   const empty = !name.trim() || !phone.trim();
   const submit = async () => {
@@ -177,11 +224,11 @@ function AddByHand({ copy, toE164, onAddPerson }: Pick<WhoShouldKnowProps, 'copy
   };
 
   if (!open) {
-    return <Button label={copy.addAnother} variant="tertiary" onPress={() => setOpen(true)} />;
+    return <Button label={copy.addAnother} variant="tertiary" buttonRef={addAnotherRef} onPress={() => setOpen(true)} />;
   }
   return (
     <Card>
-      <Field label={copy.nameLabel} placeholder={copy.namePlaceholder} value={name} onChangeText={setName} />
+      <Field label={copy.nameLabel} placeholder={copy.namePlaceholder} value={name} onChangeText={setName} inputRef={nameRef} />
       <Field
         label={copy.phoneLabel}
         placeholder={copy.phonePlaceholder}
@@ -191,12 +238,25 @@ function AddByHand({ copy, toE164, onAddPerson }: Pick<WhoShouldKnowProps, 'copy
           setError(null);
         }}
         phone
+        errorId={error ? errorId : undefined}
       />
-      {error ? <Text role="alert" style={styles.error}>{error}</Text> : null}
+      <Alert message={error ?? undefined} id={errorId} />
       <View style={styles.formButtons}>
-        <Button label={copy.add} ariaDisabled={empty} onPress={submit} />
+        <Button
+          label={copy.add}
+          ariaDisabled={empty}
+          announceDisabled
+          describedBy={empty ? reasonId : undefined}
+          hint={empty ? copy.fillBoth : undefined}
+          onPress={submit}
+        />
         <Button label={copy.cancel} variant="tertiary" onPress={close} />
       </View>
+      {empty ? (
+        <Body id={reasonId} hidden small>
+          {copy.fillBoth}
+        </Body>
+      ) : null}
     </Card>
   );
 }
@@ -207,9 +267,67 @@ interface FieldProps {
   value: string;
   onChangeText: (v: string) => void;
   phone?: boolean;
+  inputRef?: Ref<TextInputNode>;
+  /** Id of the error line when the value is not accepted. */
+  errorId?: string;
 }
 
-function Field({ label, placeholder, value, onChangeText, phone = false }: FieldProps) {
+/** Web: lets apps/web/src/styles.css draw its field focus ring (data-gg-field). Ignored on native. */
+const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
+
+/** Moves focus to a button: the DOM on web, the screen reader's cursor on native. */
+function focusNode(node: ButtonNode | null) {
+  if (!node) {
+    return;
+  }
+  if (Platform.OS === 'web') {
+    (node as unknown as { focus: () => void }).focus();
+    return;
+  }
+  const handle = findNodeHandle(node);
+  if (handle) {
+    AccessibilityInfo.setAccessibilityFocus(handle);
+  }
+}
+
+/** A calm error line. Web: an alert. Native: role=alert is silent there, so it is also announced. */
+function Alert({ message, id }: { message?: string; id?: string }) {
+  useEffect(() => {
+    if (message && Platform.OS !== 'web') {
+      AccessibilityInfo.announceForAccessibility(message);
+    }
+  }, [message]);
+  if (!message) {
+    return null;
+  }
+  const extra: Record<string, unknown> = id ? { id } : {};
+  return (
+    <Text role="alert" style={styles.error} {...extra}>
+      {message}
+    </Text>
+  );
+}
+
+/** The "2 selected" line: a polite live region, and announced on iOS when it changes (iOS ignores live regions). */
+function SelectedCount({ label }: { label: string }) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibility(label);
+    }
+  }, [label]);
+  return (
+    <Body tone="muted" live>
+      {label}
+    </Body>
+  );
+}
+
+function Field({ label, placeholder, value, onChangeText, phone = false, inputRef, errorId }: FieldProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
   return (
@@ -218,7 +336,11 @@ function Field({ label, placeholder, value, onChangeText, phone = false }: Field
         {label}
       </Body>
       <TextInput
+        ref={inputRef}
         style={[styles.input, font]}
+        {...webFieldHook}
+        aria-invalid={errorId ? true : undefined}
+        aria-describedby={errorId}
         // Web names the field from the visible label; native reads the label text directly.
         aria-labelledby={labelId}
         accessibilityLabel={label}
@@ -236,6 +358,15 @@ function Field({ label, placeholder, value, onChangeText, phone = false }: Field
 
 /** One person: a whole-line checkbox. The tick is drawn, and hidden from screen readers (the state is read once). */
 function PersonRow({ person, selected, onToggle }: { person: WhoPerson; selected: boolean; onToggle: () => void }) {
+  // react-native-web only presses a role=button on Space; a checkbox needs Space too.
+  const spaceKey: Record<string, unknown> = {
+    onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+      if (event.key === ' ') {
+        event.preventDefault();
+        onToggle();
+      }
+    },
+  };
   return (
     <Pressable
       role="checkbox"
@@ -243,6 +374,7 @@ function PersonRow({ person, selected, onToggle }: { person: WhoPerson; selected
       accessibilityState={{ checked: selected }}
       onPress={onToggle}
       style={[styles.row, selected && styles.rowSelected]}
+      {...(Platform.OS === 'web' ? spaceKey : {})}
     >
       <Phrasing>
         <Body tone="strong">{person.name}</Body>
@@ -293,10 +425,10 @@ const styles = StyleSheet.create({
     paddingRight: spacing[8],
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors['neutral-300'],
   },
-  rowSelected: { borderWidth: 2, borderColor: colors.accent },
+  rowSelected: { borderColor: colors.accent },
   box: {
     position: 'absolute',
     right: spacing[3],

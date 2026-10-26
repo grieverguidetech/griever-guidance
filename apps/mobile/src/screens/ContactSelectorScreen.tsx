@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
-import { screenCopy } from '@griever/copy';
+import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { WhoShouldKnow } from '@griever/ui';
+import { Button, WhoShouldKnow } from '@griever/ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
 import { SavedNote } from '../components/SavedNote';
@@ -43,7 +43,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
       setMode({ kind: 'reviewing', fresh: result.fresh });
     } catch (err) {
       if (!(err instanceof Cancelled)) {
-        setImportError('We could not read your contacts. You can add people by hand instead.');
+        setImportError(copy.importError);
       }
     } finally {
       setImporting(false);
@@ -67,17 +67,17 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setMode({ kind: 'list' })}>
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>{copy.bringAcross}</Text>
-          <Text style={styles.subtitle}>Choose only the ones you want — the rest stay where they are.</Text>
+          <Button label={copy.back} variant="tertiary" onPress={() => setMode({ kind: 'list' })} />
+          <Text accessibilityRole="header" style={styles.title}>
+            {copy.bringAcross}
+          </Text>
+          <Text style={styles.subtitle}>{copy.importIntro}</Text>
         </View>
         <FlatList
           data={mode.fresh}
           keyExtractor={(item) => item.key}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.empty}>No new contacts with a mobile number found.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{copy.importEmpty}</Text>}
           renderItem={({ item }) => {
             const selected = reviewSelected.has(item.key);
             return (
@@ -118,7 +118,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           }}
         />
         <View style={styles.footer}>
-          <Text style={styles.count}>{reviewSelected.size} chosen</Text>
+          <Text style={styles.count}>{fill(copy.chosen, { count: reviewSelected.size })}</Text>
           <TouchableOpacity
             style={[styles.button, reviewSelected.size === 0 && styles.buttonDisabled]}
             onPress={commitReview}
@@ -140,6 +140,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           people={contacts.contacts.map((c) => ({ id: c.contactId, name: c.name, phone: c.phone, tier: c.tier }))}
           grouped={grouped}
           selectedIds={selectedContactIds}
+          selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
           loading={contacts.loading}
           onToggle={toggleContact}
           onSelectAll={selectContacts}
@@ -163,7 +164,6 @@ const styles = StyleSheet.create({
   content: { padding: spacing[3], paddingTop: spacing[4] },
   container: { flex: 1, backgroundColor: '#ffffff' },
   header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
-  backText: { fontSize: 14, color: MUTED, marginBottom: 24 },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
   subtitle: { fontSize: 14, color: MUTED },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },

@@ -23,7 +23,14 @@
     "selected",
     "continue",
     "empty",
-    "bringAcross"
+    "bringAcross",
+    "selectAllFor",
+    "chooseOne",
+    "fillBoth",
+    "importError",
+    "importIntro",
+    "importEmpty",
+    "chosen"
   ],
   "properties": {
     "heading": {
@@ -86,6 +93,29 @@
     },
     "checklist": {
       "$ref": "#/$defs/text"
+    },
+    "selectAllFor": {
+      "type": "string",
+      "pattern": "\\{group\\}"
+    },
+    "chooseOne": {
+      "$ref": "#/$defs/text"
+    },
+    "fillBoth": {
+      "$ref": "#/$defs/text"
+    },
+    "importError": {
+      "$ref": "#/$defs/text"
+    },
+    "importIntro": {
+      "$ref": "#/$defs/text"
+    },
+    "importEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "chosen": {
+      "type": "string",
+      "pattern": "\\{count\\}"
     }
   },
   "$defs": {
