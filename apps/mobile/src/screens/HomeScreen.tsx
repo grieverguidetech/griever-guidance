@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import type { Session } from '@griever/hooks';
 import { PrimaryButton, ScreenHeader, authStyles } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';

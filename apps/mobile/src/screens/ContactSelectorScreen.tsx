@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TouchableOpacity, FlatList, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Button, WhoShouldKnow } from '@griever/ui';
+import { Button, WhoShouldKnow, SerifText as Text } from '@griever/ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
 import { SavedNote } from '../components/SavedNote';
@@ -67,7 +67,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Button label={copy.back} variant="tertiary" onPress={() => setMode({ kind: 'list' })} />
+          <Button label={copy.back} variant="header" onPress={() => setMode({ kind: 'list' })} />
           <Text accessibilityRole="header" style={styles.title}>
             {copy.bringAcross}
           </Text>

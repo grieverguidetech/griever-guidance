@@ -1,4 +1,5 @@
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import { MUTED } from './colors';
 
 /** The one reassurance line (DS-3). Same words as web's SavedNote in apps/web/src/lib/ui.tsx. */

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { AccessibilityInfo, View, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';

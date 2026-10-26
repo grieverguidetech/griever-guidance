@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
 import { ScreenHeader, authStyles } from '../components/authForm';

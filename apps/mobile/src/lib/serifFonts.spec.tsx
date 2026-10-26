@@ -10,8 +10,8 @@ jest.mock('expo-font', () => ({ useFonts: (map: Record<string, unknown>) => mock
 import { serifFontFiles } from './serifFonts';
 
 describe('serif fonts', () => {
-  it('registers regular and semibold under the names in @griever/tokens', () => {
-    expect(Object.keys(serifFontFiles).sort()).toEqual([fonts.serifRegular, fonts.serifSemiBold].sort());
+  it('registers regular and semibold, with italics, under the names in @griever/tokens', () => {
+    expect(Object.keys(serifFontFiles).sort()).toEqual([fonts.serifRegular, fonts.serifSemiBold, fonts.serifItalic, fonts.serifSemiBoldItalic].sort());
   });
 
   it('bundles a font file for each name', () => {

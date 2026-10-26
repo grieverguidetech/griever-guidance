@@ -104,9 +104,9 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="tertiary" onPress={onBack} />
+        <Button label={copy.back} variant="header" onPress={onBack} />
         {onWhatYoullNeed ? (
-          <Button label={copy.checklist} variant="tertiary" outlined opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         ) : null}
       </View>
       <View style={styles.head}>

@@ -56,8 +56,8 @@ export function Announce({ copy, eyebrow, eyebrowTone, recap, onBack, onWhatYoul
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="tertiary" onPress={onBack} />
-        <Button label={copy.checklist} variant="tertiary" outlined opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+        <Button label={copy.back} variant="header" onPress={onBack} />
+        <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
       </View>
       <View style={styles.head}>
         <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>

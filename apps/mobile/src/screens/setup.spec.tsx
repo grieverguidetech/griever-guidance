@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, TextInput } from 'react-native';
+import { AccessibilityInfo, StyleSheet, TextInput } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 // Jest has no native view tree, so findNodeHandle returns null; the focus test needs a handle.
 // This path is specific to react-native 0.81 (Expo SDK 54). Re-check it when react-native is upgraded.
@@ -69,7 +69,7 @@ describe('SetupScreen', () => {
   it('has a name placeholder and a 16pt back link', () => {
     setup();
     expect(screen.getByPlaceholderText('e.g. Margaret Hayes')).toBeTruthy();
-    expect(screen.getByText('← Back').props.style).toEqual(expect.objectContaining({ fontSize: 16 }));
+    expect(StyleSheet.flatten(screen.getByText('← Back').props.style)).toEqual(expect.objectContaining({ fontSize: 16 }));
   });
 
   it('explains the disabled Continue, and drops the hint once a name is typed', () => {

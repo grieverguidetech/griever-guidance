@@ -1,17 +1,6 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import {
-  ActivityIndicator,
-  BackHandler,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, BackHandler, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { SerifText as Text } from '@griever/ui';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164 } from '@griever/contacts';
 import type { NormalizedContact } from '@griever/contacts';

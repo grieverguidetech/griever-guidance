@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ComponentRef, ReactNode, Ref } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View } from 'react-native';
 import { colors, minTouchTarget } from '@griever/tokens';
-import { Body, Button, Heading, useSerifStyle } from '@griever/ui';
+import { Body, Button, Heading, useSerifStyle, SerifText as Text, SerifTextInput as TextInput } from '@griever/ui';
 
 /** Errors use the same pink as web's Clerk appearance (colorDanger); 7:1 on white. */
 const DANGER = colors['accent-2-700'];

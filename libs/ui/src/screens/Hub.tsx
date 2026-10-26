@@ -74,11 +74,10 @@ export function Hub(props: HubProps) {
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="tertiary" onPress={props.onBack} />
+        <Button label={copy.back} variant="header" onPress={props.onBack} />
         <Button
           label={copy.checklist}
-          variant="tertiary"
-          outlined
+          variant="header"
           opensDialog
           onPress={props.onWhatYoullNeed}
           buttonRef={props.checklistRef}
@@ -90,7 +89,7 @@ export function Hub(props: HubProps) {
             <Eyebrow>{props.eyebrow}</Eyebrow>
           </View>
           <View style={styles.noShrink}>
-            <Button label={copy.editPerson} variant="ghost" onPress={props.onEdit} />
+            <Button label={copy.editPerson} variant="primary" onPress={props.onEdit} />
           </View>
         </View>
         <Heading level={1} headingRef={props.headingRef}>

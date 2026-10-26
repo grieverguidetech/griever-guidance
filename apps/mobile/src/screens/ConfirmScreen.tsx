@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
-import { Review } from '@griever/ui';
+import { Review, SerifText as Text } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';

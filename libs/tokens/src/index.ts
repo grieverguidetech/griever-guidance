@@ -56,6 +56,8 @@ export const fonts = {
   serifWeb: fontSerifStack,
   serifRegular: 'SourceSerif4_400Regular',
   serifSemiBold: 'SourceSerif4_600SemiBold',
+  serifItalic: 'SourceSerif4_400Regular_Italic',
+  serifSemiBoldItalic: 'SourceSerif4_600SemiBold_Italic',
 } as const;
 
 /** Pixels. Keys match the `--space-*` custom properties. */

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,7 +28,7 @@ import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
-import { SerifReadyContext } from '@griever/ui';
+import { SerifReadyContext, SerifText as Text } from '@griever/ui';
 import { useSerifFonts } from '../lib/serifFonts';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */

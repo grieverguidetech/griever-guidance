@@ -1,17 +1,6 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import {
-  AccessibilityInfo,
-  BackHandler,
-  findNodeHandle,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SerifText as Text, SerifTextInput as TextInput } from '@griever/ui';
 import { ScreenHeader, authStyles } from '../components/authForm';
 import { SavedNote } from '../components/SavedNote';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
