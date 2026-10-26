@@ -10,6 +10,7 @@ import type { ScreenName } from '@griever/copy';
  */
 const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'pathLanding', file: 'screens/HubScreen.tsx' },
+  { copy: 'pathLanding', file: 'screens/HomeScreen.tsx' },
   { copy: 'signIn', file: 'screens/SignInScreen.tsx' },
   { copy: 'signIn', file: 'components/SocialButtons.tsx' },
   { copy: 'signUp', file: 'screens/SignUpScreen.tsx' },

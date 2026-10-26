@@ -31,6 +31,7 @@
       "lead": "No one was texted this time.",
       "rest": "You can come back to this any time."
     },
+    "sentGeneric": "Your messages have been sent.",
     "noCopy": "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
     "close": "Close",
     "closeLabel": "Close note"

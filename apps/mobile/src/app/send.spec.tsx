@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Linking, Modal } from 'react-native';
+import { AccessibilityInfo, Linking, Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
@@ -211,6 +211,12 @@ describe('the end of a send', () => {
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith('Everyone has been told.', { queue: true });
     expect(screen.getByLabelText(/Everyone has been told\. We don't keep a copy/)).toBeTruthy();
+    // Lead in bold italic, rest in italic, and no border (#365).
+    const lead = StyleSheet.flatten(screen.getByText('Everyone has been told.').props.style);
+    const rest = StyleSheet.flatten(screen.getByText(/We don't keep a copy of what was sent/).props.style);
+    expect(lead.fontFamily).toBe('SourceSerif4_600SemiBold_Italic');
+    expect(rest.fontFamily).toBe('SourceSerif4_400Regular_Italic');
+    expect(StyleSheet.flatten(screen.getByLabelText(/Everyone has been told\./).props.style)?.borderWidth ?? 0).toBe(0);
   });
 
   it('says how many were told when someone was skipped', async () => {
@@ -219,9 +225,12 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
-    const line = 'You told 1 of 2. You can text the others from your own Messages app any time.';
-    expect(await screen.findByText(line)).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith(line, { queue: true });
+    expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
+    expect(screen.getByText(/You can text the others from your own Messages app any time\./)).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith(
+      'You told 1 of 2. You can text the others from your own Messages app any time.',
+      { queue: true },
+    );
   });
 
   it('stays on Home with no timer, and the note goes when a person is opened', async () => {

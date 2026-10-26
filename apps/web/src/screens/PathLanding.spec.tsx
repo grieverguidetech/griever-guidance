@@ -105,6 +105,19 @@ describe('PathLanding finish note (#176)', () => {
     expect(document.body.textContent).not.toContain('!');
   });
 
+  it.each<[MomentKey, string]>([
+    ['announce', 'Everyone has been told.'],
+    ['obituary', 'The obituary has been shared.'],
+  ])('%s: the lead is bold italic and the privacy line follows in italic, no card', (moment, words) => {
+    renderPath({}, { note: { moment, told: 2, total: 2 } });
+    const lead = screen.getByText(words);
+    const rest = screen.getByText(/^We don't keep a copy of what was sent/);
+    expect(getComputedStyle(lead).fontWeight).toBe('600');
+    expect(getComputedStyle(lead).fontStyle).toBe('italic');
+    expect(getComputedStyle(rest).fontStyle).toBe('italic');
+    expect(lead.closest('.gg-card')).toBeNull();
+  });
+
   it('shows the first sentence in bold italic and the rest in italic, with no card around the note', () => {
     renderPath({}, { note: { moment: 'announce', told: 1, total: 1 } });
     const lead = getComputedStyle(screen.getByText('Everyone has been told.'));
