@@ -3,7 +3,7 @@ import type { Session } from '@griever/hooks';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { doneRowMeta, fill, screenCopy } from '@griever/copy';
-import { Hub, PaywallSheet } from '@griever/ui';
+import { Hub, PaywallSheet, SentNote } from '@griever/ui';
 import type { HubRow } from '@griever/ui';
 import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 import { formatDate } from '../lib/format';
@@ -32,14 +32,20 @@ export interface FinishNote {
   total: number;
 }
 
-export function finishNoteText({ moment, told, total }: FinishNote): string {
+/** The note's first sentence, and the rest of what it says before the no-copy line (if any). */
+export function finishNoteParts({ moment, told, total }: FinishNote): { lead: string; rest?: string } {
   if (told === 0) {
     return copy.finishNote.none;
   }
   if (told < total) {
-    return fill(copy.finishNote.partial, { told, total });
+    return { lead: fill(copy.finishNote.partial.lead, { told, total }), rest: copy.finishNote.partial.rest };
   }
-  return copy.finishNote.allTold[moment];
+  return { lead: copy.finishNote.allTold[moment] };
+}
+
+export function finishNoteText(note: FinishNote): string {
+  const { lead, rest } = finishNoteParts(note);
+  return rest ? `${lead} ${rest}` : lead;
 }
 
 /** The C2 line applies only when something was sent. */
@@ -157,10 +163,11 @@ function FinishNoteCard({ note, onClose }: { note: FinishNote | null; onClose: (
   if (!note) {
     return null;
   }
+  const { lead, rest } = finishNoteParts(note);
+  const afterLead = showsNoCopyLine(note) ? [rest, copy.finishNote.noCopy].filter(Boolean).join(' ') : rest;
   return (
-    <div className="gg-card">
-      <p className="m-0 text-[14px]">{finishNoteText(note)}</p>
-      {showsNoCopyLine(note) && <p className="gg-reassure m-0 text-[12px]">{copy.finishNote.noCopy}</p>}
+    <div className="flex flex-col gap-3">
+      <SentNote lead={lead} rest={afterLead} />
       <button
         type="button"
         onClick={onClose}
