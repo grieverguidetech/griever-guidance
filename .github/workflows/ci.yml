@@ -133,7 +133,9 @@ jobs:
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium webkit
 
+      # apt mirrors sometimes hang; fail in minutes instead of holding the job (2026-10-27, 24 min hang).
       - if: steps.pw-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 8
         run: pnpm exec playwright install-deps chromium webkit
 
       # Always runs (not `affected`): it is the only check that the whole
