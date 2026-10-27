@@ -85,4 +85,12 @@ describe('Announce', () => {
     setup({ eyebrowTone: 'accent2' });
     expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(170, 11, 86)');
   });
+
+  it('draws Edit as an outline with no fill', () => {
+    setup();
+    const style = getComputedStyle(screen.getByRole('button', { name: 'Edit' }));
+    expect(style.borderTopWidth).toBe('1px');
+    expect(style.borderTopColor).not.toBe('rgba(0, 0, 0, 0)');
+    expect(['rgba(0, 0, 0, 0)', 'transparent', '']).toContain(style.backgroundColor);
+  });
 });

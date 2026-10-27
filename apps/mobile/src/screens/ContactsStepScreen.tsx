@@ -4,6 +4,7 @@ import { SerifText as Text, Button } from '@griever/ui';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164 } from '@griever/contacts';
 import type { NormalizedContact } from '@griever/contacts';
+import { screenCopy } from '@griever/copy';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import { ErrorText, Field, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
@@ -18,6 +19,7 @@ type Props = {
 
 type Mode = { kind: 'start' } | { kind: 'adding' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
 
+const copy = screenCopy('whoShouldKnow');
 const BAD_NUMBER = "That number doesn't look right — check the area code and digits.";
 const ADD_FAILED = 'We could not save that. Please try again.';
 const IMPORT_FAILED = 'We could not read your contacts. You can add people by hand instead.';
@@ -116,14 +118,14 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
       <View style={styles.screen}>
         <View style={styles.header}>
           {back}
-          <ScreenHeader>Bring people across</ScreenHeader>
-          <Text style={authStyles.body}>Choose only the ones you want. The rest stay where they are.</Text>
+          <ScreenHeader>{copy.bringAcross}</ScreenHeader>
+          <Text style={authStyles.body}>{copy.importIntro}</Text>
         </View>
         <FlatList
           data={fresh}
           keyExtractor={(item) => item.key}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.empty}>No new contacts with a mobile number found.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>{copy.importEmpty}</Text>}
           renderItem={({ item }) => {
             const selected = chosen.has(item.key);
             return (
