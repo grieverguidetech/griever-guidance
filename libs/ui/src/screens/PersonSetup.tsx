@@ -82,7 +82,7 @@ export function PersonSetup({ copy, editing, backName, name, onNameChange, rende
       </View>
       <Field label={copy.nameLabel} accessibleName={copy.nameAccessible} placeholder={copy.namePlaceholder} value={name} onChangeText={onNameChange} capitalize />
       <View style={styles.field}>
-        <Body tone="strong" id={dateLabelId}>
+        <Body tone="strong" id={dateLabelId} hidden>
           {copy.dateLabel} <Text style={styles.optional}>{copy.optional}</Text>
         </Body>
         {renderDate({ labelId: dateLabelId, accessibleName: optionalName(copy.dateLabel) })}
@@ -137,7 +137,7 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
   const input = useRef<ComponentRef<typeof TextInput> | null>(null);
   return (
     <View style={styles.field}>
-      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
+      <Body tone="strong" id={labelId} hidden onPress={() => input.current?.focus()}>
         {label} {optional ? <Text style={styles.optional}>{optional}</Text> : null}
       </Body>
       <TextInput

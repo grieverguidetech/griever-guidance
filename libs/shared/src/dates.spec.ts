@@ -117,7 +117,19 @@ describe('mergeSessionScreens', () => {
   });
 });
 
-describe('formatPassingDate / passingDateFromText', () => {
+describe.each(['UTC', 'America/Chicago', 'Pacific/Kiritimati'])('formatPassingDate / passingDateFromText in %s', (zone) => {
+  const original = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = zone;
+  });
+  afterAll(() => {
+    if (original === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = original;
+    }
+  });
+
   it('writes a picked date the way the session stores it', () => {
     expect(formatPassingDate(new Date(2025, 5, 7))).toBe('June 7, 2025');
     expect(formatPassingDate(new Date(2026, 0, 1))).toBe('January 1, 2026');

@@ -109,6 +109,16 @@ describe('PersonSetup', () => {
     expect(h.onContinue).toHaveBeenCalledOnce();
   });
 
+  it('hides the visible labels from assistive tech, and they are not tab stops', () => {
+    setup({ sender: '', onSenderChange: vi.fn() });
+    const label = screen.getByText('Their name');
+    expect(label).toHaveAttribute('aria-hidden', 'true');
+    expect(label).not.toHaveAttribute('tabindex');
+    expect(label).not.toHaveAttribute('role');
+    // The fields are still named through aria-labelledby.
+    expect(screen.getByRole('textbox', { name: 'Their name' })).toBeInTheDocument();
+  });
+
   it('reports typing in the sender field', async () => {
     const user = userEvent.setup();
     const onSenderChange = vi.fn();

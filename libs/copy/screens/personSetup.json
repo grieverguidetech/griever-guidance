@@ -16,5 +16,6 @@
   "needName": "Type their name to continue.",
   "datePlaceholder": "Choose a date",
   "dateDone": "Done",
-  "dateClear": "Clear the date"
+  "dateClear": "Clear the date",
+  "dateHint": "Opens a calendar"
 }

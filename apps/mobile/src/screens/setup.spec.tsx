@@ -18,6 +18,10 @@ const setup = (initial = { personName: '', dateOfPassing: '' }) => {
   return { onContinue, onBack };
 };
 
+const todayText = () => {
+  const today = new Date();
+  return `${today.toLocaleString('en-US', { month: 'long' })} ${today.getDate()}, ${today.getFullYear()}`;
+};
 const dateButton = () => screen.getByRole('button', { name: 'Date they passed (optional)' });
 /** What the OS does when a day is chosen in the picker. */
 const choose = (date: Date) => fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, date);
@@ -87,7 +91,45 @@ describe('SetupScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByTestId('date-picker')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: '' });
+    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: todayText() });
+  });
+
+  it('Done saves the day the calendar shows, even if nothing was touched', () => {
+    const { onContinue } = setup({ personName: 'Anna', dateOfPassing: '' });
+    fireEvent.press(dateButton());
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    const expected = todayText();
+    expect(screen.getByText(expected)).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: expected });
+  });
+
+  it('keeps the calendar on the day chosen, and offers no day before 2000', () => {
+    setup();
+    fireEvent.press(dateButton());
+    choose(new Date(2025, 5, 7));
+    const picker = screen.getByTestId('date-picker');
+    expect((picker.props.value as Date).getDate()).toBe(7);
+    expect((picker.props.minimumDate as Date).getFullYear()).toBe(2000);
+  });
+
+  it('describes the date control and returns screen-reader focus to it after Done and Clear', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
+    setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026' });
+    expect(dateButton().props.accessibilityHint).toBe('Opens a calendar');
+    focus.mockClear();
+    fireEvent.press(dateButton());
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(focus).toHaveBeenCalledTimes(1);
+    fireEvent.press(dateButton());
+    fireEvent.press(screen.getByRole('button', { name: 'Clear the date' }));
+    expect(focus).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides the visible labels from screen readers; the controls carry the names', () => {
+    setup();
+    expect(screen.getByText('Their name', { includeHiddenElements: true }).props.accessibilityElementsHidden).toBe(true);
+    expect(screen.getByText('Their name', { includeHiddenElements: true }).props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('on Android opens the system dialog with no future dates', () => {
@@ -98,12 +140,18 @@ describe('SetupScreen', () => {
     expect(open).toHaveBeenCalledTimes(1);
     const options = open.mock.calls[0][0];
     expect(options.mode).toBe('date');
+    expect(options.neutralButton).toEqual({ label: 'Clear the date' });
+    expect((options.minimumDate as Date).getFullYear()).toBe(2000);
     expect(Math.abs((options.maximumDate as Date).getTime() - Date.now())).toBeLessThan(60_000);
     act(() => options.onChange?.({ type: 'set', nativeEvent: {} } as never, new Date(2024, 11, 31)));
     expect(screen.getByText('December 31, 2024')).toBeTruthy();
     // Cancelling the dialog changes nothing.
     act(() => open.mock.calls[0][0].onChange?.({ type: 'dismissed', nativeEvent: {} } as never, new Date(2020, 0, 1)));
     expect(screen.getByText('December 31, 2024')).toBeTruthy();
+    // The neutral button clears the date.
+    act(() => open.mock.calls[0][0].onChange?.({ type: 'neutralButtonPressed', nativeEvent: {} } as never, new Date(2020, 0, 1)));
+    expect(screen.getByText('Choose a date')).toBeTruthy();
+    act(() => options.onChange?.({ type: 'set', nativeEvent: {} } as never, new Date(2024, 11, 31)));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: 'December 31, 2024' });
     platform.restore();
