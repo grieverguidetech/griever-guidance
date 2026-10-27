@@ -1,4 +1,5 @@
-import { View, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useRef, type ComponentRef } from 'react';
+import { AccessibilityInfo, findNodeHandle, View, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SerifText as Text, SerifTextInput as TextInput, Button } from '@griever/ui';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +10,16 @@ import { ACCENT, FIELD_BORDER, MUTED } from '../components/colors';
 export function DetailsFormScreen({ flow }: FlowProps) {
   const { selectedTemplate, fields, setField, nextStep, prevStep } = flow;
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const title = useRef<ComponentRef<typeof Text>>(null);
+  const hasTemplate = Boolean(selectedTemplate);
+
+  // The title takes screen-reader focus when the screen opens, as on Announce.
+  useEffect(() => {
+    const handle = title.current ? findNodeHandle(title.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  }, [hasTemplate]);
 
   if (!selectedTemplate) return null;
 
@@ -26,7 +37,7 @@ export function DetailsFormScreen({ flow }: FlowProps) {
           <Button label="Back" variant="header" onPress={prevStep} />
           <Button label="What you'll need" variant="header" onPress={() => navigation.navigate('WhatYoullNeed')} />
         </View>
-        <Text style={styles.title}>{selectedTemplate.name}</Text>
+        <Text ref={title} accessibilityRole="header" style={styles.title}>{selectedTemplate.name}</Text>
         {selectedTemplate.fields.map((field) => (
           <View key={field.key} style={styles.fieldGroup}>
             <Text style={styles.label}>
@@ -61,7 +72,7 @@ export function DetailsFormScreen({ flow }: FlowProps) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  content: { padding: 24, paddingTop: 24, paddingBottom: 40 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 24 },
   fieldGroup: { marginBottom: 20 },

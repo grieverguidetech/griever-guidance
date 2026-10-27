@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { buildSmsLink, isIOSUserAgent } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
-import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
-import { CircleDashed } from '@phosphor-icons/react/CircleDashed';
-import { MinusCircle } from '@phosphor-icons/react/MinusCircle';
-import { ShareNetwork } from '@phosphor-icons/react/ShareNetwork';
+import { fill, screenCopy } from '@griever/copy';
+import { Sending } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
 type Flow = ReturnType<typeof useSendFlow>;
+
+const copy = screenCopy('sending');
 
 interface Props {
   flow: Flow;
@@ -18,69 +21,69 @@ interface Props {
 type HandOff = 'sms' | 'shared' | 'copied';
 
 /**
- * One contact at a time, from the griever's own accounts — not a bulk send.
- * "Open Messages" hands off to the device's own Messages app (an sms: link)
- * with the contact and message pre-filled; "Share" opens the OS share sheet
- * (Messenger, Instagram, WhatsApp, email — whatever's installed) with the
- * message text, and the griever picks both the app and the specific person
- * there themselves. Neither Facebook nor Instagram exposes an API to send a
- * message to a personal contact — there's no way to open either one already
- * addressed to a specific person the way sms: addresses a phone number, so
- * this is the one generic action rather than separate per-platform buttons.
- * Once a message has been handed off, "Next" moves on to the next person.
- * It's one tap, not a "did that send?" question, and the griever moves on when
- * they're ready. The app never infers a send from the tab being hidden and
- * shown again, which doesn't happen reliably (e.g. on a desktop, where
- * Messages opens beside the browser).
+ * The screen is the shared Sending in libs/ui; this holds what is web only: the sms: link, the
+ * share sheet and the clipboard.
+ *
+ * One contact at a time, from the griever's own accounts, not a bulk send. The first button hands
+ * off to the device's own Messages app (an sms: link) with the contact and message pre-filled.
+ * The share button opens the OS share sheet with the message text and the griever picks the app and the
+ * person there. Neither Facebook nor Instagram has an API to open a chat with a specific personal
+ * contact, so the share sheet is the one generic action. Once handed off, Next moves on. It is
+ * one tap, not a "did that send?" question. The app never infers a send from the tab being hidden
+ * and shown again, which does not happen reliably (for example on a desktop).
  */
 export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
   const [handOff, setHandOff] = useState<HandOff | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // The shared Button hands back a DOM node on web; its type says native node.
+  const checklistButton = useRef<ButtonNode>(null);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
   const activeContact = active ? contacts.find((c) => c.contactId === active.contactId) : null;
 
-  // A fresh recipient became active — the hand-off state and any error
-  // belonged to the last person, not this one.
+  // A fresh recipient became active: the hand-off state and any error belonged to the last person.
   useEffect(() => {
     setHandOff(null);
     setShareError(null);
   }, [active?.contactId]);
 
-  if (!sendJob) return null;
+  if (!sendJob) {
+    return null;
+  }
 
   const total = sendJob.recipients.length;
   const done = sendJob.recipients.filter((r) => r.status === 'delivered' || r.status === 'skipped').length;
   const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
   const isLast = activeIndex === total - 1;
-  const nameFor = (id: string) => contacts.find((c) => c.contactId === id)?.name ?? 'Recipient';
+  const nameFor = (id: string) => contacts.find((c) => c.contactId === id)?.name ?? copy.recipientFallback;
   const canShare = typeof navigator.share === 'function';
 
   function openMessages() {
-    if (!active || !activeContact) return;
+    if (!active || !activeContact) {
+      return;
+    }
     const link = buildSmsLink(activeContact.phone, flow.composedMessage, isIOSUserAgent(navigator.userAgent));
     setHandOff('sms');
     window.location.href = link;
   }
 
-  // "Share" — for Facebook, Instagram, WhatsApp, or anything else the OS
-  // offers. Neither Facebook nor Instagram has an API to open a chat with a
-  // specific personal contact pre-addressed (Facebook's m.me links need a
-  // username we don't have; Instagram's DM links can't carry the message
-  // text at all) — the share sheet is the only real mechanism, and the user
-  // picks who to send it to once inside whichever app they choose.
+  // For Facebook, Instagram, WhatsApp, or anything else the OS offers.
   function shareMessage() {
-    if (!active) return;
+    if (!active) {
+      return;
+    }
     setShareError(null);
     if (canShare) {
-      // No await before this call — navigator.share() must fire directly
-      // from the click's own gesture, not after any async work.
+      // No await before this call: navigator.share() must fire directly from the click's own gesture.
       navigator.share({ text: flow.composedMessage }).then(
         () => setHandOff('shared'),
         (err: unknown) => {
-          if (err instanceof DOMException && err.name === 'AbortError') return; // dismissed, not a failure
-          setShareError("That didn't go through. You can try again.");
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            return; // dismissed, not a failure
+          }
+          setShareError(copy.shareError);
         },
       );
       return;
@@ -88,117 +91,60 @@ export function SendingScreen({ flow, contacts }: Props) {
     navigator.clipboard
       .writeText(flow.composedMessage)
       .then(() => setHandOff('copied'))
-      .catch(() => setShareError('Could not copy the message. You can select and copy it yourself.'));
+      .catch(() => setShareError(copy.copyError));
   }
 
-  const handOffNote =
+  const nextWord = isLast ? copy.done : copy.next;
+  const note =
     handOff === 'sms'
-      ? `Send it in Messages, then come back and tap ${isLast ? 'Done' : 'Next'}.`
+      ? fill(copy.messagesNote, { action: nextWord })
       : handOff === 'shared'
-        ? `Shared for ${activeContact?.name ?? 'them'}.`
-        : 'Copied. Paste it wherever you reach them.';
+        ? activeContact
+          ? fill(copy.sharedNote, { name: activeContact.name })
+          : copy.sharedNoteFallback
+        : copy.copiedNote;
 
   return (
-    <div className="flex flex-col gap-4 pt-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[22px]">Reaching people, one at a time</h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          Text them, or share the message to Messenger, Instagram, or wherever else you'd reach
-          them. You send it — we just line people up.
-        </p>
-      </div>
-
-      <div
-        className="h-[6px] overflow-hidden"
-        style={{ background: 'var(--color-neutral-200)', borderRadius: 'var(--radius-sm)' }}
-      >
-        <div
-          style={{
-            width: `${total === 0 ? 0 : (done / total) * 100}%`,
-            height: '100%',
-            background: 'var(--color-accent)',
-            transition: 'width 300ms ease',
-          }}
-        />
-      </div>
-
-      {active && activeContact && (
-        <div className="gg-card flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="gg-eyebrow m-0">
-              {activeIndex + 1} of {total}
-            </span>
-            <span className="gg-card-title text-[16px]">{activeContact.name}</span>
-          </div>
-          <p className="gg-card-body m-0 whitespace-pre-wrap" style={{ opacity: 1, fontSize: 13, lineHeight: 1.6 }}>
-            {flow.composedMessage}
-          </p>
-
-          {shareError && (
-            <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
-              {shareError}
-            </p>
-          )}
-
-          {handOff ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-700)' }}>
-                {handOffNote}
-              </p>
-              <button type="button" onClick={markActiveSent} className="gg-btn gg-btn-primary gg-btn-block">
-                {isLast ? 'Done' : 'Next'}
-              </button>
-              <button
-                type="button"
-                onClick={handOff === 'sms' ? openMessages : shareMessage}
-                className="gg-btn gg-btn-ghost self-center !min-h-0"
-              >
-                {handOff === 'sms' ? 'Open Messages again' : canShare ? 'Share again' : 'Copy again'}
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <button type="button" onClick={openMessages} className="gg-btn gg-btn-primary flex-1">
-                Open Messages
-              </button>
-              <button type="button" onClick={shareMessage} className="gg-btn gg-btn-secondary flex-1">
-                <ShareNetwork size={16} weight="regular" />
-                {canShare ? 'Share' : 'Copy message'}
-              </button>
-              <button type="button" onClick={markActiveSkipped} className="gg-btn gg-btn-ghost">
-                Skip
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        {sendJob.recipients.map((r) => {
-          if (r.contactId === active?.contactId) return null;
-          return (
-            <div key={r.contactId} className="flex items-center justify-between text-[14px]">
-              <span>{nameFor(r.contactId)}</span>
-              {r.status === 'delivered' ? (
-                <span className="flex items-center gap-[6px]" style={{ color: 'var(--color-accent-700)' }}>
-                  <CheckCircle size={16} weight="duotone" />
-                  Sent
-                </span>
-              ) : r.status === 'skipped' ? (
-                <span className="flex items-center gap-[6px]" style={{ color: 'var(--text-hint)' }}>
-                  <MinusCircle size={16} weight="duotone" />
-                  Skipped
-                </span>
-              ) : (
-                <span className="flex items-center gap-[6px]" style={{ color: 'var(--text-hint)' }}>
-                  <CircleDashed size={16} weight="duotone" />
-                  Waiting
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <div className="pt-8">
+      <Sending
+        copy={copy}
+        intro={copy.intro}
+        progress={total === 0 ? 0 : done / total}
+        current={
+          active && activeContact
+            ? {
+                position: fill(copy.position, { n: activeIndex + 1, total }),
+                name: activeContact.name,
+                message: flow.composedMessage,
+                isLast,
+              }
+            : undefined
+        }
+        others={sendJob.recipients
+          .filter((r) => r.contactId !== active?.contactId)
+          .map((r) => ({
+            id: r.contactId,
+            name: nameFor(r.contactId),
+            status: r.status === 'delivered' ? 'sent' : r.status === 'skipped' ? 'skipped' : 'waiting',
+          }))}
+        handOff={
+          handOff
+            ? {
+                note,
+                again: handOff === 'sms' ? copy.openMessagesAgain : canShare ? copy.shareAgain : copy.copyAgain,
+                onAgain: handOff === 'sms' ? openMessages : shareMessage,
+              }
+            : null
+        }
+        error={shareError ?? undefined}
+        onOpenMessages={openMessages}
+        share={{ label: canShare ? copy.share : copy.copyMessage, onPress: shareMessage }}
+        onNext={markActiveSent}
+        onSkip={markActiveSkipped}
+        onWhatYoullNeed={() => setSheetOpen(true)}
+        checklistRef={checklistButton}
+      />
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />}
     </div>
   );
 }

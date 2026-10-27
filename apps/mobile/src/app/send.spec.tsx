@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Linking, Modal } from 'react-native';
+import { AccessibilityInfo, Linking, Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
@@ -100,6 +100,49 @@ describe('picking an announcement', () => {
     await startMoment('Announce the passing');
     await screen.findByLabelText(/Anything you'd like to add/);
     expect(focus).toHaveBeenCalled();
+  });
+
+  it('has no "Writing about" / Home bar on Announce', async () => {
+    await openAnna();
+    await startMoment('Announce the passing');
+    await screen.findByLabelText(/Anything you'd like to add/);
+    expect(screen.queryByText(/Writing about/)).toBeNull();
+    expect(screen.queryByLabelText('Back to home')).toBeNull();
+  });
+
+  it('opens What you will need in a sheet on Who should know?, and focus returns when it closes', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
+    await screen.findByText('Who should know?');
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
+    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it('moves screen-reader focus to the title when a details form opens', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna();
+    await screen.findByText('One thing at a time.');
+    focus.mockClear();
+    await startMoment('Send thank-yous');
+    await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it('says who is open when the person arrives from Home', async () => {
+    const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByText('One thing at a time.');
+    await startMoment('Announce the passing');
+    await screen.findByLabelText(/Anything you'd like to add/);
+    expect(say).toHaveBeenCalledWith('Now writing about Anna');
   });
 
   it('opens What you will need in a sheet on Announce, and focus returns to the button when it closes', async () => {
@@ -209,8 +252,30 @@ describe('the end of a send', () => {
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByText("Who you're writing about")).toBeTruthy();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith('Everyone has been told.', { queue: true });
+    expect(announce).toHaveBeenCalledWith(
+      "Everyone has been told. We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
+      { queue: true },
+    );
     expect(screen.getByLabelText(/Everyone has been told\. We don't keep a copy/)).toBeTruthy();
+    // Lead in bold italic, rest in italic, and no border (#365).
+    const lead = StyleSheet.flatten(screen.getByText('Everyone has been told.').props.style);
+    const rest = StyleSheet.flatten(screen.getByText(/We don't keep a copy of what was sent/).props.style);
+    expect(lead.fontFamily).toBe('SourceSerif4_600SemiBold_Italic');
+    expect(rest.fontFamily).toBe('SourceSerif4_400Regular_Italic');
+    expect(StyleSheet.flatten(screen.getByLabelText(/Everyone has been told\./).props.style)?.borderWidth ?? 0).toBe(0);
+  });
+
+  it('shows the shared sending screen: heading, who is next, and the hand-off note', async () => {
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    await toSending(['Dee', 'Eli']);
+    expect(await screen.findByRole('heading', { name: 'Reaching people, one at a time' })).toBeTruthy();
+    expect(screen.getByText('1 of 2')).toBeTruthy();
+    expect(screen.getByText('Dee')).toBeTruthy();
+    fireEvent.press(screen.getByText('Open Messages'));
+    expect(await screen.findByText('Send it in Messages, then come back and tap Next.')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    expect(await screen.findByText('2 of 2')).toBeTruthy();
+    expect(screen.getByText('Sent')).toBeTruthy();
   });
 
   it('says how many were told when someone was skipped', async () => {
@@ -219,9 +284,23 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
-    const line = 'You told 1 of 2. You can text the others from your own Messages app any time.';
-    expect(await screen.findByText(line)).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith(line, { queue: true });
+    expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
+    expect(screen.getByText(/You can text the others from your own Messages app any time\./)).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith(
+      "You told 1 of 2. You can text the others from your own Messages app any time. We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
+      { queue: true },
+    );
+  });
+
+  it('says no one was texted, with no privacy line, when everyone is skipped', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    await toSending(['Dee', 'Eli']);
+    fireEvent.press(await screen.findByText('Skip'));
+    fireEvent.press(await screen.findByText('Skip'));
+    expect(await screen.findByText('No one was texted this time.')).toBeTruthy();
+    expect(screen.getByLabelText(/^No one was texted this time\./).props.accessibilityLabel).not.toContain("We don't keep a copy");
+    expect(screen.queryByText(/We don't keep a copy/)).toBeNull();
+    expect(announce).toHaveBeenCalledWith('No one was texted this time. You can come back to this any time.', { queue: true });
   });
 
   it('stays on Home with no timer, and the note goes when a person is opened', async () => {

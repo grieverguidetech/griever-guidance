@@ -19,7 +19,7 @@
   "selected": "{count} selected",
   "continue": "Continue",
   "empty": "No one saved yet. Add someone below.",
-  "bringAcross": "Bring people across",
+  "bringAcross": "Add from your contacts",
   "chooseOne": "Choose at least one person",
   "fillBoth": "Enter a name and a mobile number",
   "importError": "We could not read your contacts. You can add people by hand instead.",

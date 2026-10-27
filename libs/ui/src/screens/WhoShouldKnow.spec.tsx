@@ -25,7 +25,7 @@ const copy: WhoShouldKnowCopy = {
   badNumber: "That number doesn't look right — check the area code and digits.",
   continue: 'Continue',
   empty: 'No one saved yet. Add someone below.',
-  bringAcross: 'Bring people across',
+  bringAcross: 'Add from your contacts',
 };
 
 const people = [
@@ -135,21 +135,31 @@ describe('WhoShouldKnow', () => {
     expect(h.onContinue).not.toHaveBeenCalled();
   });
 
+  it('puts the reason on its own row, before the count and Continue', () => {
+    setup();
+    const reason = screen.getByText('Choose at least one person');
+    const count = screen.getByText('0 selected');
+    expect(reason.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Not in the row that holds the count and Continue.
+    expect(count.parentElement?.contains(reason)).toBe(false);
+    expect(screen.getByRole('button', { name: 'Continue' }).parentElement?.contains(reason)).toBe(false);
+  });
+
   it('says so when no one is saved yet', () => {
     setup({ people: [] });
     expect(screen.getByText('No one saved yet. Add someone below.')).toBeInTheDocument();
   });
 
-  it('has no Bring people across unless the app passes it', () => {
+  it('has no Add from your contacts unless the app passes it', () => {
     setup();
-    expect(screen.queryByRole('button', { name: 'Bring people across' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add from your contacts' })).not.toBeInTheDocument();
   });
 
-  it('shows Bring people across when the app passes it, and its notice', async () => {
+  it('shows Add from your contacts when the app passes it, and its notice', async () => {
     const user = userEvent.setup();
     const onPress = vi.fn();
     setup({ bringAcross: { onPress, notice: 'We could not read your contacts.' } });
-    await user.click(screen.getByRole('button', { name: 'Bring people across' }));
+    await user.click(screen.getByRole('button', { name: 'Add from your contacts' }));
     expect(onPress).toHaveBeenCalledOnce();
     expect(screen.getByText('We could not read your contacts.')).toBeInTheDocument();
   });
