@@ -34,3 +34,4 @@ export { PersonSetup } from './screens/PersonSetup';
 export type { PersonSetupCopy, PersonSetupProps } from './screens/PersonSetup';
 export { Sending } from './screens/Sending';
 export type { SendingCopy, SendingPerson, SendingProps } from './screens/Sending';
+export { focusNode } from './focusNode';
