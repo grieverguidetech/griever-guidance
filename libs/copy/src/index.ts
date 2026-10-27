@@ -103,6 +103,11 @@ export interface ObituaryDraftFields {
   personalNote?: string;
 }
 
+/** Trim, and drop one trailing full stop, for a value that sits before a full stop the template adds. */
+function cleanEnd(value: string | undefined): string {
+  return (value ?? '').trim().replace(/\.$/, '').trim();
+}
+
 /** Full stop at the end of a sentence, unless the person already ended it. */
 function endSentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
@@ -114,11 +119,11 @@ function endSentence(text: string): string {
  */
 export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy<'obituaryDraft'>): string {
   const fullName = fields.fullName.trim();
-  const dateOfBirth = (fields.dateOfBirth ?? '').trim();
-  const dateOfPassing = (fields.dateOfPassing ?? '').trim();
-  const cityOfResidence = (fields.cityOfResidence ?? '').trim();
-  const career = (fields.career ?? '').trim();
-  const survivors = (fields.survivors ?? '').trim();
+  const dateOfBirth = cleanEnd(fields.dateOfBirth);
+  const dateOfPassing = cleanEnd(fields.dateOfPassing);
+  const cityOfResidence = cleanEnd(fields.cityOfResidence);
+  const career = cleanEnd(fields.career);
+  const survivors = cleanEnd(fields.survivors);
   const personalNote = (fields.personalNote ?? '').trim();
 
   const paragraphs = [

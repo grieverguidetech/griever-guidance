@@ -250,4 +250,26 @@ describe('buildObituaryDraft', () => {
       'She loved to garden.',
     );
   });
+
+  it('does not double a full stop the person typed at the end of a field', () => {
+    expect(
+      buildObituaryDraft(
+        {
+          fullName: 'Margaret Ellen Hayes',
+          dateOfBirth: 'March 2, 1941.',
+          dateOfPassing: 'June 7, 2025.',
+          cityOfResidence: 'Boston, MA.',
+          career: 'retired schoolteacher.',
+          survivors: 'husband John.',
+        },
+        copy,
+      ),
+    ).toBe(
+      [
+        'Margaret Ellen Hayes died on June 7, 2025. They were born on March 2, 1941.',
+        'Margaret Ellen Hayes lived in Boston, MA. Their work: retired schoolteacher.',
+        'Survived by husband John. Margaret Ellen Hayes will be remembered with love.',
+      ].join('\n\n'),
+    );
+  });
 });
