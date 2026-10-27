@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import type { Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
@@ -13,6 +14,7 @@ import { Body, Eyebrow } from '../Text';
 /** The words the screen needs. libs/copy/screens/sending.json has these keys, plus more. */
 export interface SendingCopy {
   heading: string;
+  checklist: string;
   openMessages: string;
   skip: string;
   next: string;
@@ -53,11 +55,14 @@ export interface SendingProps {
   error?: string;
   onOpenMessages: () => void;
   /** Leave unset when the app has no share or copy action. */
-  onShare?: () => void;
-  shareLabel?: string;
+  share?: { label: string; onPress: () => void };
   onNext: () => void;
   onSkip: () => void;
   headingRef?: HeadingProps['headingRef'];
+  /** Opens "What you'll need". Leave unset to hide the button. There is no Back: going back to Review could start the send again. */
+  onWhatYoullNeed?: () => void;
+  /** For the sheet that "What you'll need" opens to return focus to. */
+  checklistRef?: Ref<ButtonNode>;
 }
 
 /**
@@ -65,10 +70,13 @@ export interface SendingProps {
  * share sheet) and then Next. Built from libs/ui so web (through react-native-web) and mobile show
  * the same screen. It owns no state; the app holds the hand-off and does the platform work.
  */
-export function Sending({ copy, intro, progress, current, others, handOff, error, onOpenMessages, onShare, shareLabel, onNext, onSkip, headingRef }: SendingProps) {
+export function Sending({ copy, intro, progress, current, others, handOff, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();
   const nextRef = useRef<ButtonNode>(null);
+  const openRef = useRef<ButtonNode>(null);
   const handedOff = handOff !== null;
+  const personKey = current?.position;
+  const lastPerson = useRef(personKey);
 
   // The hand-off swaps the buttons, so the one that was pressed is gone. Focus goes to Next.
   useEffect(() => {
@@ -77,14 +85,31 @@ export function Sending({ copy, intro, progress, current, others, handOff, error
     }
   }, [handedOff]);
 
+  // After Next or Skip the pressed button is gone, so focus goes to the new person's first action.
+  // The first person is skipped: the heading has the focus on arrival.
+  useEffect(() => {
+    if (personKey !== lastPerson.current) {
+      lastPerson.current = personKey;
+      if (personKey !== undefined) {
+        focusNode(openRef.current);
+      }
+    }
+  }, [personKey]);
+
   return (
     <View style={styles.screen}>
+      {onWhatYoullNeed ? (
+        <View style={styles.topBar}>
+          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+        </View>
+      ) : null}
       <View style={styles.head}>
         <Heading level={1} headingRef={headingRef}>
           {copy.heading}
         </Heading>
         <Body tone="muted">{intro}</Body>
       </View>
+      {/* Hidden from assistive tech: "N of M" above the name already says how far along it is. */}
       <View style={styles.track} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <View style={[styles.fill, { width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }]} />
       </View>
@@ -97,13 +122,13 @@ export function Sending({ copy, intro, progress, current, others, handOff, error
           <Body>{current.message}</Body>
           {handOff ? (
             <View style={styles.actions}>
-              <Button label={current.isLast ? copy.done : copy.next} buttonRef={nextRef} onPress={onNext} />
+              <Button label={current.isLast ? copy.done : copy.next} buttonRef={nextRef} hint={handOff.note} onPress={onNext} />
               <Button label={handOff.again} variant="ghost" onPress={handOff.onAgain} />
             </View>
           ) : (
             <View style={styles.actions}>
-              <Button label={copy.openMessages} onPress={onOpenMessages} />
-              {onShare ? <Button label={shareLabel ?? ''} variant="secondary" onPress={onShare} /> : null}
+              <Button label={copy.openMessages} buttonRef={openRef} onPress={onOpenMessages} />
+              {share ? <Button label={share.label} variant="secondary" onPress={share.onPress} /> : null}
               <Button label={copy.skip} variant="ghost" onPress={onSkip} />
             </View>
           )}
@@ -124,6 +149,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, error
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
+  topBar: { flexDirection: 'row', justifyContent: 'flex-end' },
   head: { gap: spacing[1] },
   track: { height: 6, borderRadius: radius.sm, backgroundColor: colors['neutral-200'], overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: colors['accent-700'] },

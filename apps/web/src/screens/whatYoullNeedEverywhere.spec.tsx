@@ -9,6 +9,7 @@ import { Home } from './Home';
 import { PathLanding } from './PathLanding';
 import { SessionSetup } from './SessionSetup';
 import { Settings } from './Settings';
+import { SendingScreen } from './SendingScreen';
 
 const session = {
   id: 's1',
@@ -20,6 +21,14 @@ const session = {
   remindersScheduled: [],
 } as unknown as Session;
 
+const sendingFlow = {
+  sendJob: { recipients: [{ contactId: 'c1', status: 'sending' }] },
+  composedMessage: 'A message.',
+  markActiveSent: vi.fn(),
+  markActiveSkipped: vi.fn(),
+} as never;
+const sendingContacts = [{ contactId: 'c1', name: 'Dee', phone: '+15555550100' }] as never;
+
 const option = { label: 'x', description: 'y' } as never;
 
 const screens: [string, () => ReactElement, string][] = [
@@ -27,6 +36,7 @@ const screens: [string, () => ReactElement, string][] = [
   ['SessionSetup', () => <SessionSetup session={session} editing={false} onChange={vi.fn()} onContinue={vi.fn()} onBack={vi.fn()} />, 'Who are we writing about?'],
   ['PathLanding', () => <PathLanding session={session} onBack={vi.fn()} onStartMoment={vi.fn()} onEditPerson={vi.fn()} />, 'One thing at a time.'],
   ['Settings', () => <Settings onBack={vi.fn()} onRemoveEverything={vi.fn()} />, 'Settings'],
+  ['SendingScreen', () => <SendingScreen flow={sendingFlow} contacts={sendingContacts} />, 'Reaching people, one at a time'],
   ['Gate', () => <Gate title="Gate title" subtitle="s" notYet={option} ready={option} reassurance="r" onBack={vi.fn()} onChoose={vi.fn()} />, 'Gate title'],
 ];
 

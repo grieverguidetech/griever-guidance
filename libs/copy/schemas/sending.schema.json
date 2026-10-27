@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": [
     "heading",
+    "checklist",
     "intro",
     "introTextOnly",
     "position",
@@ -30,6 +31,9 @@
   ],
   "properties": {
     "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "checklist": {
       "$ref": "#/$defs/text"
     },
     "intro": {

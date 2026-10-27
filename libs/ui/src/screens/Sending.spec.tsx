@@ -5,6 +5,7 @@ import type { SendingCopy, SendingProps } from './Sending';
 
 const copy: SendingCopy = {
   heading: 'Reaching people, one at a time',
+  checklist: "What you'll need",
   openMessages: 'Open Messages',
   skip: 'Skip',
   next: 'Next',
@@ -15,7 +16,8 @@ const copy: SendingCopy = {
 };
 
 function setup(over: Partial<SendingProps> = {}) {
-  const handlers = { onOpenMessages: vi.fn(), onShare: vi.fn(), onNext: vi.fn(), onSkip: vi.fn() };
+  const shareFn = vi.fn();
+  const handlers = { shareFn, onOpenMessages: vi.fn(), onNext: vi.fn(), onSkip: vi.fn() };
   const props: SendingProps = {
     copy,
     intro: 'Each message opens in your own Messages app.',
@@ -26,8 +28,10 @@ function setup(over: Partial<SendingProps> = {}) {
       { id: 'd', name: 'Dana Lee', status: 'waiting' },
     ],
     handOff: null,
-    shareLabel: 'Share',
-    ...handlers,
+    share: { label: 'Share', onPress: shareFn },
+    onOpenMessages: handlers.onOpenMessages,
+    onNext: handlers.onNext,
+    onSkip: handlers.onSkip,
     ...over,
   };
   render(<Sending {...props} />);
@@ -35,6 +39,33 @@ function setup(over: Partial<SendingProps> = {}) {
 }
 
 describe('Sending', () => {
+  it('moves focus to Next after a hand-off', () => {
+    const view = render(<Sending {...base()} />);
+    view.rerender(<Sending {...base()} handOff={{ note: 'n', again: 'Open Messages again', onAgain: vi.fn() }} />);
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus();
+  });
+
+  it('moves focus to Open Messages when the next person arrives, not on first render', () => {
+    const view = render(<Sending {...base()} />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).not.toHaveFocus();
+    view.rerender(<Sending {...base()} current={{ position: '2 of 2', name: 'B', message: 'm', isLast: true }} />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveFocus();
+  });
+
+  it('opens What you will need from the top bar, and has no Back', async () => {
+    const user = userEvent.setup();
+    const onWhatYoullNeed = vi.fn();
+    setup({ onWhatYoullNeed });
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    expect(onWhatYoullNeed).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+  });
+
+  it('hides What you will need when the app gives no handler', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
+  });
+
   it('has one h1, the progress, the person it is on and their message', () => {
     setup();
     expect(screen.getByRole('heading', { level: 1, name: 'Reaching people, one at a time' })).toBeInTheDocument();
@@ -57,12 +88,12 @@ describe('Sending', () => {
     await user.click(screen.getByRole('button', { name: 'Share' }));
     await user.click(screen.getByRole('button', { name: 'Skip' }));
     expect(h.onOpenMessages).toHaveBeenCalledTimes(1);
-    expect(h.onShare).toHaveBeenCalledTimes(1);
+    expect(h.shareFn).toHaveBeenCalledTimes(1);
     expect(h.onSkip).toHaveBeenCalledTimes(1);
   });
 
   it('has no Share button when the app offers none', () => {
-    setup({ onShare: undefined });
+    setup({ share: undefined });
     expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
   });
 
@@ -95,8 +126,8 @@ describe('Sending', () => {
   });
 });
 
-function renderStatus() {
-  const base: SendingProps = {
+function base(): SendingProps {
+  return {
     copy,
     intro: 'x',
     progress: 0,
@@ -107,6 +138,10 @@ function renderStatus() {
     onNext: vi.fn(),
     onSkip: vi.fn(),
   };
-  const view = render(<Sending {...base} />);
-  return { rerender: (error: string) => view.rerender(<Sending {...base} error={error} />) };
+}
+
+function renderStatus() {
+  const props = base();
+  const view = render(<Sending {...props} />);
+  return { rerender: (error: string) => view.rerender(<Sending {...props} error={error} />) };
 }

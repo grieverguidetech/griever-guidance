@@ -6,6 +6,8 @@ import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import { colors, spacing } from '@griever/tokens';
 import { Sending } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
+import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 
 const copy = screenCopy('sending');
@@ -26,6 +28,8 @@ interface Props extends FlowProps {
 export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
   const [handedOff, setHandedOff] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const checklistButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof Text>>(null);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
@@ -43,6 +47,14 @@ export function SendingScreen({ flow, contacts }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   }, []);
+
+  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  const focusChecklistButton = () => {
+    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
 
   if (!sendJob) {
     return null;
@@ -95,7 +107,10 @@ export function SendingScreen({ flow, contacts }: Props) {
         onNext={markActiveSent}
         onSkip={markActiveSkipped}
         headingRef={heading}
+        onWhatYoullNeed={() => setChecklistOpen(true)}
+        checklistRef={checklistButton}
       />
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </ScrollView>
   );
 }

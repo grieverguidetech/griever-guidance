@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { useSendFlow } from '@griever/hooks';
 import { buildSmsLink, isIOSUserAgent } from '@griever/hooks';
 import type { Contact } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
 import { Sending } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
 type Flow = ReturnType<typeof useSendFlow>;
 
@@ -33,9 +36,9 @@ export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
   const [handOff, setHandOff] = useState<HandOff | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  // Loose on purpose: the shared Heading hands back a DOM node on web.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const heading = useRef<any>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // The shared Button hands back a DOM node on web; its type says native node.
+  const checklistButton = useRef<ButtonNode>(null);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
   const activeContact = active ? contacts.find((c) => c.contactId === active.contactId) : null;
@@ -45,11 +48,6 @@ export function SendingScreen({ flow, contacts }: Props) {
     setHandOff(null);
     setShareError(null);
   }, [active?.contactId]);
-
-  // The heading takes focus when the screen opens.
-  useEffect(() => {
-    heading.current?.focus();
-  }, []);
 
   if (!sendJob) {
     return null;
@@ -140,12 +138,13 @@ export function SendingScreen({ flow, contacts }: Props) {
         }
         error={shareError ?? undefined}
         onOpenMessages={openMessages}
-        onShare={shareMessage}
-        shareLabel={canShare ? copy.share : copy.copyMessage}
+        share={{ label: canShare ? copy.share : copy.copyMessage, onPress: shareMessage }}
         onNext={markActiveSent}
         onSkip={markActiveSkipped}
-        headingRef={heading}
+        onWhatYoullNeed={() => setSheetOpen(true)}
+        checklistRef={checklistButton}
       />
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />}
     </div>
   );
 }
