@@ -43,9 +43,8 @@ export function ShareObituary({ session, onBack, onChange, onContinue, onDraft }
         onBack={onBack}
         onWhatYoullNeed={() => setSheetOpen(true)}
         onContinue={onContinue}
-        onDraft={onDraft}
-        // Disabled here rather than on the form, so nobody fills in a whole form only to find the last button doesn't work.
-        draftUnavailable={OBITUARY_DRAFTING_ENABLED ? undefined : copy.draftBeta}
+        // Hidden while drafting is off, as on mobile, until the template draft ships (#358).
+        onDraft={OBITUARY_DRAFTING_ENABLED ? onDraft : undefined}
         checklistRef={checklistButton}
       />
       {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />}
