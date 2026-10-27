@@ -27,7 +27,7 @@ test.describe('Home and creating a person', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Home' }).click();
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
     await expect(home(page)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Margaret Hayes' })).toBeVisible();
   });
@@ -37,7 +37,7 @@ test.describe('Home and creating a person', () => {
     await addContacts(page, [CAROL]);
     await page.getByRole('button', { name: 'Done for now' }).click();
     await page.getByRole('button', { name: 'Save and continue' }).click();
-    await page.getByRole('button', { name: 'Home' }).click();
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
 
     await page.getByRole('button', { name: "Someone else I've lost" }).click();
     await page.getByLabel('Their name').fill('Harold Price');
