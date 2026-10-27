@@ -260,6 +260,9 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [editFrom, setEditFrom] = useState<'flow' | 'hub' | null>(null);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
   const [note, setNote] = useState<SentNoteText | null>(null);
+  // Importing device contacts from Home; on return Home puts focus back on the import button.
+  const [importing, setImporting] = useState(false);
+  const [backFromImport, setBackFromImport] = useState(false);
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
@@ -271,6 +274,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtShareObituary(false);
     setStartCategory(null);
     setNote(null);
+    setBackFromImport(false);
     setAtHome(true);
   }, []);
   const finish = useCallback((text: SentNoteText) => {
@@ -278,6 +282,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtHub(true);
     setStartCategory(null);
     setNote(text);
+    setBackFromImport(false);
     setAtHome(false);
   }, []);
 
@@ -324,11 +329,20 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   }
   const open = () => {
     setNote(null);
+    setBackFromImport(false);
     setArrived(true);
     setStartCategory(null);
     setAtHub(true);
     setAtHome(false);
   };
+  if (atHome && importing) {
+    const leaveImport = () => {
+      leaveFirst();
+      setBackFromImport(true);
+      setImporting(false);
+    };
+    return <ContactsStepScreen contacts={contacts} onBack={leaveImport} onContinue={leaveImport} startWithImport />;
+  }
   if (atHome) {
     return (
       <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
@@ -347,6 +361,13 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
               setAtHome(false);
             }}
             onWhatYoullNeed={AUTH_ENABLED ? undefined : () => navigation.navigate('WhatYoullNeed')}
+            onImportContacts={() => {
+              // Leaving Home for the import ends the note, so it is not read again on return.
+              setNote(null);
+              setBackFromImport(false);
+              setImporting(true);
+            }}
+            focusImport={backFromImport}
             onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
           />
         )}

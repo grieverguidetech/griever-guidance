@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
@@ -192,5 +193,85 @@ describe('the contacts step in the app', () => {
     expect(await screen.findByText('Opening…')).toBeTruthy();
     expect(screen.queryByText(CONTACTS_TITLE)).toBeNull();
     expect(await screen.findByText(CONTACTS_TITLE, {}, { timeout: CONTACTS_CHECK_FALLBACK_MS + 2000 })).toBeTruthy();
+  });
+});
+
+describe('ContactsStepScreen opened from Home (#379)', () => {
+  const sam = { key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [] };
+  const mount = (list: Contact[] = [], loading = false) => {
+    const contacts = {
+      contacts: list,
+      loading,
+      addContact: jest.fn(async (c: unknown) => c),
+      importContacts: jest.fn(async () => []),
+    } as unknown as UseContactsResult;
+    const onContinue = jest.fn();
+    const onBack = jest.fn();
+    const ui = (c: UseContactsResult) => <ContactsStepScreen contacts={c} onContinue={onContinue} onBack={onBack} startWithImport />;
+    const view = render(ui(contacts));
+    return { contacts, onContinue, onBack, view, ui };
+  };
+
+  it('Add leaves for Home (onContinue) after saving the chosen contact', async () => {
+    mockFetch.mockResolvedValue([sam]);
+    const { contacts, onContinue } = mount();
+    fireEvent.press(await screen.findByRole('checkbox', { name: 'Sam, +16175550111' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(onContinue).toHaveBeenCalledTimes(1));
+    expect(contacts.importContacts).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back from the review returns Home (onBack)', async () => {
+    mockFetch.mockResolvedValue([sam]);
+    const { onBack } = mount();
+    await screen.findByText('Sam');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refused permission shows the start screen, and Back returns Home', async () => {
+    const { Cancelled } = jest.requireActual<typeof import('@griever/contacts')>('@griever/contacts');
+    mockFetch.mockRejectedValue(new Cancelled());
+    const { onBack } = mount();
+    expect(await screen.findByText(CONTACTS_TITLE)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed read shows the calm error, and Back returns Home', async () => {
+    mockFetch.mockRejectedValue(new Error('boom'));
+    const { onBack } = mount();
+    expect((await screen.findByRole('alert')).props.children).toBe(
+      'We could not read your contacts. You can add people by hand instead.',
+    );
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('hardware back from the review returns Home', async () => {
+    mockFetch.mockResolvedValue([sam]);
+    let handler: (() => unknown) | undefined;
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handler = h as () => unknown;
+      return { remove: () => undefined };
+    });
+    const { onBack } = mount();
+    await screen.findByText('Sam');
+    act(() => {
+      handler?.();
+    });
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the saved list, so numbers already kept are not offered again', async () => {
+    mockFetch.mockResolvedValue([sam, { key: 'y', displayName: 'Pat', phones: ['+16175550112'], emails: [] }]);
+    const kept = [{ contactId: 'k', name: 'Sam', phone: '+16175550111', tier: 'family' }] as unknown as Contact[];
+    const { contacts, view, ui } = mount([], true);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(mockFetch).not.toHaveBeenCalled();
+    view.rerender(ui({ ...contacts, contacts: kept, loading: false } as UseContactsResult));
+    expect(await screen.findByText('Pat')).toBeTruthy();
+    expect(screen.queryByText('Sam')).toBeNull();
   });
 });

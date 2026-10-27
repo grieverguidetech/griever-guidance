@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Body, Button, SerifText as Text } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
+import { Body, Button, focusNode, SerifText as Text } from '@griever/ui';
 import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
@@ -8,6 +10,7 @@ import { personLabel } from '../components/PersonSwitcher';
 import { isBlank } from '../lib/useDeviceSessions';
 
 const copy = screenCopy('pathLanding');
+const IMPORT_LABEL = screenCopy('whoShouldKnow').bringAcross;
 
 export const START_FIRST = "Start with someone I've lost";
 export const ADD_PERSON = "Someone else I've lost";
@@ -26,14 +29,25 @@ export type HomeScreenProps = {
   onWhatYoullNeed?: () => void;
   /** Only given when accounts are on. */
   onAccount?: () => void;
+  /** Opens the device contacts import. Shown whether accounts are on or off. */
+  onImportContacts?: () => void;
+  /** Coming back from the import: screen-reader focus goes to its button. */
+  focusImport?: boolean;
 };
 
 /**
  * Where every launch lands. The people kept on this phone, newest first, and one way to add
  * another. Nothing here removes anyone (C9).
  */
-export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount }: HomeScreenProps) {
+export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount, onImportContacts, focusImport }: HomeScreenProps) {
+  const importRef = useRef<ButtonNode>(null);
   const people = listed(sessions);
+  useEffect(() => {
+    if (!focusImport) {
+      return;
+    }
+    focusNode(importRef.current);
+  }, [focusImport]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader>Who you're writing about</ScreenHeader>
@@ -73,8 +87,13 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
       ) : null}
       {onAccount ? (
         // Outline, page showing through: the shared `header` variant (web's top bar look).
-        <View style={styles.account}>
+        <View style={styles.account} testID="home-account-row">
           <Button label="Your account" variant="header" onPress={onAccount} />
+        </View>
+      ) : null}
+      {onImportContacts ? (
+        <View style={onAccount ? styles.importBelow : styles.account} testID="home-import-row">
+          <Button label={IMPORT_LABEL} variant="header" onPress={onImportContacts} buttonRef={importRef} />
         </View>
       ) : null}
     </ScrollView>
@@ -100,5 +119,6 @@ const styles = StyleSheet.create({
   rowPressed: { backgroundColor: colors['accent-100'] },
   rowName: { fontSize: 17, color: colors.ink, fontWeight: '600' },
   create: { marginTop: 8 },
-  account: { alignSelf: 'flex-start', marginTop: 8 },
+  account: { width: '100%', marginTop: 32 },
+  importBelow: { width: '100%', marginTop: 12 },
 });
