@@ -83,7 +83,8 @@ describe('Import contacts from Home (#379)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Anna' }));
     await screen.findByText('One thing at a time.');
     focus.mockClear();
-    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
+    // The hub's way back reads "Home" (#380).
+    fireEvent.press(await screen.findByRole('button', { name: 'Home' }));
     await screen.findByText("Who you're writing about");
     await new Promise((resolve) => setTimeout(resolve, 50));
     const calls = focus.mock.calls.map((c) => textUnder(mockNodes[(c[0] as number) - 1]));
