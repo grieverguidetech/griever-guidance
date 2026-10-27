@@ -1,0 +1,10 @@
+{
+  "opening": "{fullName} has died.",
+  "openingWithDate": "{fullName} died on {dateOfPassing}.",
+  "born": "They were born on {dateOfBirth}.",
+  "city": "{fullName} lived in {cityOfResidence}.",
+  "career": "Their work: {career}.",
+  "memory": "{personalNote}",
+  "survivors": "Survived by {survivors}.",
+  "closing": "{fullName} will be remembered with love."
+}

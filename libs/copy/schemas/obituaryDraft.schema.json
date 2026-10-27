@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the obituary draft template, one sentence per field",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["opening", "openingWithDate", "born", "city", "career", "memory", "survivors", "closing"],
+  "properties": {
+    "opening": { "type": "string", "pattern": "\\{fullName\\}" },
+    "openingWithDate": { "type": "string", "pattern": "^(?=.*\\{fullName\\})(?=.*\\{dateOfPassing\\})" },
+    "born": { "type": "string", "pattern": "\\{dateOfBirth\\}" },
+    "city": { "type": "string", "pattern": "\\{cityOfResidence\\}" },
+    "career": { "type": "string", "pattern": "\\{career\\}" },
+    "memory": { "type": "string", "pattern": "\\{personalNote\\}" },
+    "survivors": { "type": "string", "pattern": "\\{survivors\\}" },
+    "closing": { "type": "string", "pattern": "\\{fullName\\}" }
+  }
+}
