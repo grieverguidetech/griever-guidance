@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { ButtonNode } from '@griever/ui';
-import { Body, Button, SentNote, SerifText as Text } from '@griever/ui';
+import { Body, Button, SentNote, focusNode, SerifText as Text } from '@griever/ui';
 import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
@@ -56,10 +56,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
     if (!focusImport) {
       return;
     }
-    const handle = importRef.current ? findNodeHandle(importRef.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
+    focusNode(importRef.current);
   }, [focusImport]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>

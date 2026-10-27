@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, BackHandler, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SerifText as Text, Button } from '@griever/ui';
 import type { UseContactsResult } from '@griever/hooks';
@@ -13,9 +13,9 @@ type Props = {
   contacts: UseContactsResult;
   /** At least one contact is saved. */
   onContinue: () => void;
-  /** Back to setup. */
+  /** Back to where this opened: setup, or Home. */
   onBack: () => void;
-  /** Opened from Home: read the phone's contacts at once. Back from the review, or Add, leaves this screen. */
+  /** Opened from Home: read the phone's contacts once the saved list has loaded. Back from the review calls onBack; Add calls onContinue. */
   startWithImport?: boolean;
 };
 
@@ -45,13 +45,13 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
   };
 
   // Back goes up one level; from the review it leaves the screen when it was opened from Home.
-  const leaveStep = () => {
+  const leaveStep = useCallback(() => {
     if (mode.kind === 'start' || (startWithImport && mode.kind === 'reviewing')) {
       onBack();
     } else {
       setMode({ kind: 'start' });
     }
-  };
+  }, [mode.kind, startWithImport, onBack]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -59,7 +59,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
       return true;
     });
     return () => sub.remove();
-  });
+  }, [leaveStep]);
 
   async function importFromPhone() {
     setImporting(true);
@@ -122,7 +122,8 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
 
   const started = useRef(false);
   useEffect(() => {
-    if (startWithImport && !started.current) {
+    // Wait for the saved list, so numbers already kept are not offered again.
+    if (startWithImport && !contacts.loading && !started.current) {
       started.current = true;
       void importFromPhone();
     }

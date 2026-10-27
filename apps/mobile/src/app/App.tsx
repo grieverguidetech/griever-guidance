@@ -274,6 +274,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtShareObituary(false);
     setStartCategory(null);
     setNote(null);
+    setBackFromImport(false);
     setAtHome(true);
   }, []);
   const finish = useCallback((text: SentNoteText) => {
@@ -281,6 +282,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtHub(false);
     setStartCategory(null);
     setNote(text);
+    setBackFromImport(false);
     setAtHome(true);
   }, []);
 
@@ -327,6 +329,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   }
   const open = () => {
     setNote(null);
+    setBackFromImport(false);
     setArrived(true);
     setStartCategory(null);
     setAtHub(true);
@@ -334,6 +337,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   };
   if (atHome && importing) {
     const leaveImport = () => {
+      leaveFirst();
       setBackFromImport(true);
       setImporting(false);
     };
@@ -358,7 +362,12 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
               setAtHome(false);
             }}
             onWhatYoullNeed={AUTH_ENABLED ? undefined : () => navigation.navigate('WhatYoullNeed')}
-            onImportContacts={() => setImporting(true)}
+            onImportContacts={() => {
+              // Leaving Home for the import ends the note, so it is not read again on return.
+              setNote(null);
+              setBackFromImport(false);
+              setImporting(true);
+            }}
             focusImport={backFromImport}
             onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
           />

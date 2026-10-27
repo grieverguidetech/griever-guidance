@@ -1,9 +1,15 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { colors } from '@griever/tokens';
 import { HomeScreen } from './HomeScreen';
+
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
 
 const anna = {
   id: 'a', flowId: 'f', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
@@ -100,5 +106,17 @@ describe('HomeScreen import button (#379)', () => {
     render(<HomeScreen {...props} onAccount={undefined} />);
     expect(screen.getByRole('button', { name: 'Add from your contacts' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
+  });
+
+  it('moves focus to the import button when focusImport is true, and not otherwise', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    // The header takes focus as Home opens, so look only at what a change of focusImport adds.
+    const view = render(<HomeScreen {...props} focusImport={false} />);
+    focus.mockClear();
+    view.rerender(<HomeScreen {...props} focusImport={false} />);
+    expect(focus).not.toHaveBeenCalled();
+    view.rerender(<HomeScreen {...props} focusImport />);
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
   });
 });
