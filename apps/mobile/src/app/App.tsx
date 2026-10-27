@@ -20,6 +20,7 @@ import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
+import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
@@ -105,7 +106,7 @@ type SessionProps = {
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
   /** The last person has been dealt with: go Home and show this calm line. */
-  onFinished: (note: string) => void;
+  onFinished: (note: SentNoteText) => void;
 };
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
@@ -256,7 +257,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   // Setup was opened from the announce step (Edit): Back there returns to that step, as on web.
   const [editingFromFlow, setEditingFromFlow] = useState(false);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<SentNoteText | null>(null);
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
@@ -270,7 +271,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setNote(null);
     setAtHome(true);
   }, []);
-  const finish = useCallback((text: string) => {
+  const finish = useCallback((text: SentNoteText) => {
     setArrived(false);
     setAtHub(false);
     setStartCategory(null);

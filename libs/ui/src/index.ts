@@ -4,6 +4,8 @@ export { Button } from './Button';
 export type { ButtonNode, ButtonProps, ButtonVariant } from './Button';
 export { Eyebrow, Body } from './Text';
 export type { EyebrowProps, BodyProps, BodyTone } from './Text';
+export { SentNote } from './SentNote';
+export type { SentNoteProps } from './SentNote';
 export { Card } from './Card';
 export type { CardProps } from './Card';
 export { Row } from './Row';

@@ -27,7 +27,7 @@
     "finishNote": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["allTold", "partial", "none", "noCopy", "close", "closeLabel"],
+      "required": ["allTold", "partial", "none", "sentGeneric", "noCopy", "close", "closeLabel"],
       "properties": {
         "allTold": {
           "type": "object",
@@ -40,8 +40,25 @@
             "thanks": { "$ref": "#/$defs/text" }
           }
         },
-        "partial": { "type": "string", "pattern": "\\{told\\}.*\\{total\\}" },
-        "none": { "$ref": "#/$defs/text" },
+        "partial": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lead", "rest"],
+          "properties": {
+            "lead": { "type": "string", "pattern": "\\{told\\}.*\\{total\\}" },
+            "rest": { "$ref": "#/$defs/text" }
+          }
+        },
+        "none": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lead", "rest"],
+          "properties": {
+            "lead": { "$ref": "#/$defs/text" },
+            "rest": { "$ref": "#/$defs/text" }
+          }
+        },
+        "sentGeneric": { "$ref": "#/$defs/text" },
         "noCopy": { "$ref": "#/$defs/text" },
         "close": { "$ref": "#/$defs/text" },
         "closeLabel": { "$ref": "#/$defs/text" }
