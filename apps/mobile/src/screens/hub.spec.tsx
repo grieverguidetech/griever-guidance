@@ -89,6 +89,23 @@ describe('HubScreen', () => {
     expect(announce).toHaveBeenCalledTimes(1);
   });
 
+  it('announces the note on Android after a short wait, once', () => {
+    jest.useFakeTimers();
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.' };
+    render(<HubScreen session={anna} paymentsEnabled={false} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
+    Platform.OS = original;
+    expect(announce).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(150);
+    });
+    expect(announce).toHaveBeenCalledWith(note.spoken);
+    expect(announce).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
   it('Android Back goes Home', () => {
     let handler: (() => boolean) | undefined;
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, h) => {

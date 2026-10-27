@@ -1,13 +1,11 @@
-import { useEffect } from 'react';
-import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Body, Button, SentNote, SerifText as Text } from '@griever/ui';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Body, Button, SerifText as Text } from '@griever/ui';
 import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { PrimaryButton, ScreenHeader } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';
 import { isBlank } from '../lib/useDeviceSessions';
-import type { SentNoteText } from '../lib/sendNote';
 
 const copy = screenCopy('pathLanding');
 
@@ -26,8 +24,6 @@ export type HomeScreenProps = {
   onCreate: () => void;
   /** Only given while accounts are off. With accounts on, "Your account" holds the list. */
   onWhatYoullNeed?: () => void;
-  /** A calm line after the last person of a send was dealt with. Stays until the person leaves Home. */
-  note?: SentNoteText | null;
   /** Only given when accounts are on. */
   onAccount?: () => void;
 };
@@ -36,28 +32,11 @@ export type HomeScreenProps = {
  * Where every launch lands. The people kept on this phone, newest first, and one way to add
  * another. Nothing here removes anyone (C9).
  */
-export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount, note }: HomeScreenProps) {
+export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullNeed, onAccount }: HomeScreenProps) {
   const people = listed(sessions);
-  // The header takes screen-reader focus as Home opens. On iOS the note is queued behind it, so it
-  // is read rather than dropped. Android reads the live region below.
-  useEffect(() => {
-    if (note && Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
-    }
-  }, [note]);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader>Who you're writing about</ScreenHeader>
-      {note ? (
-        <View
-          style={styles.note}
-          accessible
-          accessibilityLiveRegion="polite"
-          accessibilityLabel={`${note.lead} ${note.rest}`}
-        >
-          <SentNote lead={note.lead} rest={note.rest} />
-        </View>
-      ) : null}
       {onWhatYoullNeed ? (
         <View style={styles.headerRow}>
           <Button label={copy.checklist} variant="header" onPress={onWhatYoullNeed} />
@@ -106,7 +85,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 24, paddingTop: 60 },
   headerRow: { alignSelf: 'flex-start', marginBottom: 8 },
-  note: { marginBottom: 16 },
   intro: { marginBottom: 16 },
   row: {
     minHeight: 44,

@@ -211,7 +211,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     />
   );
 
-  // Done on the last person ends the send. Home keeps no wording of it (C2) and sets no timer.
+  // Done on the last person ends the send. The hub keeps no wording of it (C2) and sets no timer.
   const { step, templateCategory, sendJob } = flow;
   const finished = useRef(false);
   useEffect(() => {
@@ -371,6 +371,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       <SetupScreen
         key={active.id}
         initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
+        returnsToPlace={editFrom !== null}
         onBack={
           editFrom
             ? () => {

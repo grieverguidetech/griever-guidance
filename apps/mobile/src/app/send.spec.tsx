@@ -8,9 +8,17 @@ import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 // This path is specific to this react-native version. Re-check it when react-native is upgraded.
+// Each node gets its own handle, so a test can tell which node focus was sent to.
+const mockHandles = new Map<unknown, number>();
+const mockHandleFor = (node: unknown) => {
+  if (!mockHandles.has(node)) {
+    mockHandles.set(node, mockHandles.size + 1);
+  }
+  return mockHandles.get(node);
+};
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  findNodeHandle: (node: unknown) => (node ? mockHandleFor(node) : null),
 }));
 
 const anna = {
@@ -88,7 +96,7 @@ describe('picking an announcement', () => {
     await startMoment('Announce the passing');
     fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
     fireEvent.press(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.press(await screen.findByLabelText('Back to home'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
   });
 
@@ -328,7 +336,9 @@ describe('the end of a send', () => {
     await screen.findByText('Everyone has been told.');
     const spoken = announce.mock.calls.filter(([text]) => String(text).startsWith('Everyone has been told.'));
     expect(spoken).toHaveLength(1);
-    expect(focus).toHaveBeenCalled();
+    // The handle belongs to the hub's heading node, not some other node.
+    const focusedNodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
+    expect(focusedNodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'One thing at a time.')).toBe(true);
     expect(screen.getByLabelText(/Everyone has been told\./).props.accessibilityLiveRegion).toBe('polite');
   });
 
@@ -367,9 +377,29 @@ describe('Edit person from the hub', () => {
     await openAnna();
     await screen.findByText('One thing at a time.');
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
-    fireEvent.press(await screen.findByLabelText('Back to home'));
+    // Back returns to the hub, so it is named plain "Back", not "Back to home".
+    expect(screen.queryByLabelText('Back to home')).toBeNull();
+    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
+  });
+
+  it('drops the sent note: finish a send, Edit person, Back shows the hub without it', async () => {
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.press(await screen.findByText('Continue'));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Done'));
+    await screen.findByText('Everyone has been told.');
+    fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.queryByText('Everyone has been told.')).toBeNull();
   });
 });
 

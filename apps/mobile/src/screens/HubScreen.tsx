@@ -64,11 +64,19 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   }, []);
 
   // On iOS the note is queued behind the heading focus, so it is read rather than dropped.
-  // Android reads the live region below.
+  // Android announces after a short wait (below).
   useEffect(() => {
-    if (note && Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
+    if (!note) {
+      return;
     }
+    if (Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
+      return;
+    }
+    // Android has no queue, and a live region that mounts with its text may not be spoken while
+    // focus moves to the heading. Announce a moment after the focus, as web does.
+    const timer = setTimeout(() => AccessibilityInfo.announceForAccessibility(note.spoken), 100);
+    return () => clearTimeout(timer);
   }, [note]);
 
   // Android Back goes Home, as the Back button does. A sheet that is open takes Back first.
@@ -143,7 +151,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
         checklistRef={checklistButton}
       >
         {note ? (
-          <View accessible accessibilityLiveRegion="polite" accessibilityLabel={`${note.lead} ${note.rest}`}>
+          <View style={styles.note} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${note.lead} ${note.rest}`}>
             <SentNote lead={note.lead} rest={note.rest} />
           </View>
         ) : null}
@@ -156,5 +164,6 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  note: { marginBottom: 16 },
   content: { padding: spacing[3], paddingTop: 64 },
 });
