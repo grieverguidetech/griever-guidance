@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Reaching people, one at a time screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "checklist",
+    "intro",
+    "introTextOnly",
+    "position",
+    "recipientFallback",
+    "openMessages",
+    "openMessagesAgain",
+    "share",
+    "shareAgain",
+    "copyMessage",
+    "copyAgain",
+    "skip",
+    "next",
+    "done",
+    "sent",
+    "skipped",
+    "waiting",
+    "messagesNote",
+    "sharedNote",
+    "sharedNoteFallback",
+    "copiedNote",
+    "shareError",
+    "copyError"
+  ],
+  "properties": {
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "checklist": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "introTextOnly": {
+      "$ref": "#/$defs/text"
+    },
+    "position": {
+      "type": "string",
+      "pattern": "\\{n\\}"
+    },
+    "recipientFallback": {
+      "$ref": "#/$defs/text"
+    },
+    "openMessages": {
+      "$ref": "#/$defs/text"
+    },
+    "openMessagesAgain": {
+      "$ref": "#/$defs/text"
+    },
+    "share": {
+      "$ref": "#/$defs/text"
+    },
+    "shareAgain": {
+      "$ref": "#/$defs/text"
+    },
+    "copyMessage": {
+      "$ref": "#/$defs/text"
+    },
+    "copyAgain": {
+      "$ref": "#/$defs/text"
+    },
+    "skip": {
+      "$ref": "#/$defs/text"
+    },
+    "next": {
+      "$ref": "#/$defs/text"
+    },
+    "done": {
+      "$ref": "#/$defs/text"
+    },
+    "sent": {
+      "$ref": "#/$defs/text"
+    },
+    "skipped": {
+      "$ref": "#/$defs/text"
+    },
+    "waiting": {
+      "$ref": "#/$defs/text"
+    },
+    "messagesNote": {
+      "type": "string",
+      "pattern": "\\{action\\}"
+    },
+    "sharedNote": {
+      "type": "string",
+      "pattern": "\\{name\\}"
+    },
+    "sharedNoteFallback": {
+      "$ref": "#/$defs/text"
+    },
+    "copiedNote": {
+      "$ref": "#/$defs/text"
+    },
+    "shareError": {
+      "$ref": "#/$defs/text"
+    },
+    "copyError": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -265,6 +265,19 @@ describe('the end of a send', () => {
     expect(StyleSheet.flatten(screen.getByLabelText(/Everyone has been told\./).props.style)?.borderWidth ?? 0).toBe(0);
   });
 
+  it('shows the shared sending screen: heading, who is next, and the hand-off note', async () => {
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    await toSending(['Dee', 'Eli']);
+    expect(await screen.findByRole('heading', { name: 'Reaching people, one at a time' })).toBeTruthy();
+    expect(screen.getByText('1 of 2')).toBeTruthy();
+    expect(screen.getByText('Dee')).toBeTruthy();
+    fireEvent.press(screen.getByText('Open Messages'));
+    expect(await screen.findByText('Send it in Messages, then come back and tap Next.')).toBeTruthy();
+    fireEvent.press(screen.getByText('Next'));
+    expect(await screen.findByText('2 of 2')).toBeTruthy();
+    expect(screen.getByText('Sent')).toBeTruthy();
+  });
+
   it('says how many were told when someone was skipped', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);

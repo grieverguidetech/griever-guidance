@@ -98,7 +98,7 @@ is no hub screen, no gate and no obituary screen.
 | Template name, for example "Announce the passing" or "Share the service" | `DetailsFormScreen.tsx` | Hub. Used for the `announce` and `details` steps. | Contact selector | None |
 | "Who should know?", "Add from your contacts" | `ContactSelectorScreen.tsx` | Details form | Confirm | None |
 | "Review your message" | `ConfirmScreen.tsx` | Contact selector | Sending | None |
-| "Texting people, one at a time" | `SendingScreen.tsx` | Confirm | Home with a note | None |
+| "Reaching people, one at a time" | `SendingScreen.tsx` | Confirm | Home with a note | None |
 | "What you'll need" | `WhatYoullNeedScreen.tsx` | Home and picker | Back | None |
 | "Your account", "Create an account", "Sign in", "Check your email", "What should we call you?" | `AccountScreen.tsx`, `SignUpScreen.tsx`, `SignInScreen.tsx`, `ProfileScreen.tsx` | "Your account" on Home | Back | `AUTH` |
 
