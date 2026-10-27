@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { isDraftStarted, usePathMoments } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { doneRowMeta, fill, screenCopy } from '@griever/copy';
-import { Hub, PaywallSheet } from '@griever/ui';
+import { Hub, PaywallSheet, SentNote } from '@griever/ui';
 import type { ButtonNode, HubRow } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
+import type { SentNoteText } from '../lib/sendNote';
 
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
@@ -33,6 +34,8 @@ export type HubScreenProps = {
   onBack: () => void;
   onStart: (key: MomentKey) => void;
   onEditPerson: () => void;
+  /** A calm line after the last person of a send was dealt with. Stays until the person leaves the hub. */
+  note?: SentNoteText | null;
   /** Defaults to the build flag; a prop so tests can set it. */
   paymentsEnabled?: boolean;
 };
@@ -41,7 +44,7 @@ export type HubScreenProps = {
  * The person's plan. The screen itself is the shared Hub in libs/ui, as on
  * web; this holds what is mobile only: the sheets, and reading the person's moments.
  */
-export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
+export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
   const moments = usePathMoments(session);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -59,6 +62,14 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   }, []);
+
+  // On iOS the note is queued behind the heading focus, so it is read rather than dropped.
+  // Android reads the live region below.
+  useEffect(() => {
+    if (note && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
+    }
+  }, [note]);
 
   // Android Back goes Home, as the Back button does. A sheet that is open takes Back first.
   useEffect(() => {
@@ -130,7 +141,13 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, paymentsEnab
         }}
         headingRef={heading}
         checklistRef={checklistButton}
-      />
+      >
+        {note ? (
+          <View accessible accessibilityLiveRegion="polite" accessibilityLabel={`${note.lead} ${note.rest}`}>
+            <SentNote lead={note.lead} rest={note.rest} />
+          </View>
+        ) : null}
+      </Hub>
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
       {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
     </ScrollView>

@@ -68,12 +68,25 @@ describe('HubScreen', () => {
     expect(onStart).toHaveBeenLastCalledWith('thanks');
   });
 
-  it('answers Back and Edit person', () => {
+  it('answers Home and Edit person', () => {
     const { onBack, onEditPerson } = setup();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onEditPerson).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the sent note as a polite live region, and announces it on iOS', () => {
+    const original = Platform.OS;
+    Platform.OS = 'ios';
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.' };
+    render(<HubScreen session={anna} paymentsEnabled={false} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
+    Platform.OS = original;
+    expect(screen.getByText('Everyone has been told.')).toBeTruthy();
+    expect(screen.getByLabelText('Everyone has been told. Kept private.').props.accessibilityLiveRegion).toBe('polite');
+    expect(announce).toHaveBeenCalledWith(note.spoken, { queue: true });
+    expect(announce).toHaveBeenCalledTimes(1);
   });
 
   it('Android Back goes Home', () => {

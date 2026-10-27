@@ -145,7 +145,7 @@ describe('the order in the app', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('One thing at a time.');
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
     expect(screen.getByText("Someone else I've lost")).toBeTruthy();
   });
@@ -188,7 +188,7 @@ describe('Home from every step', () => {
     expect(screen.queryByLabelText('Back to home')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     await screen.findByText('One thing at a time.');
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 

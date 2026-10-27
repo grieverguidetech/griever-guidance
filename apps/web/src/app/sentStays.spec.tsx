@@ -160,7 +160,7 @@ describe('after Done on the last person (#167)', () => {
 
     await sendAnAnnouncement(user);
     await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' });
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Home' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Margaret Hayes/ })).toBeInTheDocument();

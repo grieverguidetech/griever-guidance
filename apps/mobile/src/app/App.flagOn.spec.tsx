@@ -41,7 +41,7 @@ describe('App with the account feature on', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('One thing at a time.');
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByText('Your account')).toBeTruthy();
   });
 });

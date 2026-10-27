@@ -138,7 +138,7 @@ describe('the note after the last person', () => {
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
     await user.click(await screen.findByRole('button', { name: 'Close' }));
     expect(screen.getByText('Everyone has been told.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Home' }));
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { name: 'One thing at a time.' });
     expect(screen.queryByText('Everyone has been told.')).not.toBeInTheDocument();

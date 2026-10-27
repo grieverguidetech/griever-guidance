@@ -107,7 +107,7 @@ type SessionProps = {
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
-  /** The last person has been dealt with: go Home and show this calm line. */
+  /** The last person has been dealt with: go to the hub and show this calm line. */
   onFinished: (note: SentNoteText) => void;
 };
 
@@ -256,8 +256,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [arrived, setArrived] = useState(false);
   const [atHub, setAtHub] = useState(false);
   const [atShareObituary, setAtShareObituary] = useState(false);
-  // Setup was opened from the announce step (Edit): Back there returns to that step, as on web.
-  const [editingFromFlow, setEditingFromFlow] = useState(false);
+  // Setup was opened with Edit, from a step or from the hub: Back there returns to where it was opened, as on web.
+  const [editFrom, setEditFrom] = useState<'flow' | 'hub' | null>(null);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
   const [note, setNote] = useState<SentNoteText | null>(null);
   const contacts = useContacts(mobileContactStore);
@@ -265,7 +265,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const purgedOnBoot = useRef(false);
   const goHome = useCallback(() => {
     setStage(null);
-    setEditingFromFlow(false);
+    setEditFrom(null);
     setArrived(false);
     setAtHub(false);
     setAtShareObituary(false);
@@ -275,10 +275,10 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   }, []);
   const finish = useCallback((text: SentNoteText) => {
     setArrived(false);
-    setAtHub(false);
+    setAtHub(true);
     setStartCategory(null);
     setNote(text);
-    setAtHome(true);
+    setAtHome(false);
   }, []);
 
   // Setup is over: open the path. The one place the last setup step hands over (#227 changes this).
@@ -336,7 +336,6 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           <HomeScreen
             sessions={sessions}
             canCreate
-            note={note}
             onOpen={(id) => {
               switchTo(id);
               open();
@@ -372,9 +371,17 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       <SetupScreen
         key={active.id}
         initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
-        onBack={editingFromFlow ? () => { setEditingFromFlow(false); setStage(null); } : goHome}
+        onBack={
+          editFrom
+            ? () => {
+                setAtHub(editFrom === 'hub');
+                setEditFrom(null);
+                setStage(null);
+              }
+            : goHome
+        }
         onContinue={(details) => {
-          setEditingFromFlow(false);
+          setEditFrom(null);
           updateSession(active.id, details);
           if (contactsLoading) setStage('checkContacts');
           else afterSetup();
@@ -404,8 +411,10 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       <HubScreen
         key={active.id}
         session={active}
+        note={note}
         onBack={goHome}
         onStart={(key: MomentKey) => {
+          setNote(null);
           setAtHub(false);
           if (key === 'obituary') {
             // The link comes first (C10 allows it here, never at setup); then Who should know?.
@@ -415,7 +424,9 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           }
         }}
         onEditPerson={() => {
+          setNote(null);
           setAtHub(false);
+          setEditFrom('hub');
           setStage('setup');
         }}
       />
@@ -431,7 +442,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       onHub={() => setAtHub(true)}
       onShareObituary={() => setAtShareObituary(true)}
       onEditPerson={() => {
-        setEditingFromFlow(true);
+        setEditFrom('flow');
         setStage('setup');
       }}
       onDraftChange={updateDraft}

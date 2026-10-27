@@ -6,7 +6,7 @@ import type { HubCopy, HubProps, HubRow } from './Hub';
 const copy: HubCopy = {
   heading: 'One thing at a time.',
   intro: "Here's what usually comes next.",
-  back: 'Back',
+  back: 'Home',
   checklist: "What you'll need",
   editPerson: 'Edit person',
   start: 'Start',
@@ -51,10 +51,10 @@ describe('Hub', () => {
     expect(screen.getByText("Here's what usually comes next.")).toBeInTheDocument();
   });
 
-  it('answers Back, What you will need and Edit person', async () => {
+  it('answers Home, What you will need and Edit person', async () => {
     const user = userEvent.setup();
     const h = setup();
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Home' }));
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
     await user.click(screen.getByRole('button', { name: 'Edit person' }));
     expect(h.onBack).toHaveBeenCalledOnce();
@@ -118,9 +118,9 @@ describe('Hub', () => {
     expect(screen.getAllByTestId('lock-icon')).toHaveLength(1);
   });
 
-  it('Back and What you will need share the outline look: 44px, outline, no fill, no underline', () => {
+  it('Home and What you will need share the outline look: 44px, outline, no fill, no underline', () => {
     setup();
-    for (const name of ['Back', "What you'll need"]) {
+    for (const name of ['Home', "What you'll need"]) {
       const style = getComputedStyle(screen.getByRole('button', { name }));
       expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
       expect(style.borderTopColor).toBe('rgba(17, 134, 172, 1.00)');

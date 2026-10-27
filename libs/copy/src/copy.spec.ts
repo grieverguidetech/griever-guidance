@@ -54,6 +54,12 @@ describe('screen copy is calm (C7)', () => {
   });
 });
 
+describe('the hub back button', () => {
+  it('reads Home, because it leaves the person for Home (#380)', () => {
+    expect(screenCopy('pathLanding').back).toBe('Home');
+  });
+});
+
 describe('fill', () => {
   it('fills {name} placeholders', () => {
     expect(fill(screenCopy('pathLanding').forName, { name: 'Margaret' })).toBe('For Margaret');
@@ -112,7 +118,7 @@ describe('findHardCodedCopy', () => {
   });
 
   it('still finds a capitalised single word', () => {
-    expect(found("const label = 'Back';")).toEqual(['Back']);
+    expect(found("const label = 'Start';")).toEqual(['Start']);
   });
 });
 

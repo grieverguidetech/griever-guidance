@@ -84,7 +84,7 @@ test.describe('coming back', () => {
     await page.getByRole('button', { name: /Margaret Hayes/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeVisible();
     await expect(page.getByText('For Margaret Hayes')).toBeVisible();
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Home' }).click();
     await expect(page.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeFocused();
   });
 
