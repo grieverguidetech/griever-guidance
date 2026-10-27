@@ -18,6 +18,8 @@ type Props = {
   initial: SetupDetails;
   onContinue: (details: SetupDetails) => void;
   onBack: () => void;
+  /** Opened with Edit from the hub or a step: Back returns there, so it keeps its short name. */
+  returnsToPlace?: boolean;
 };
 
 /**
@@ -26,7 +28,7 @@ type Props = {
  * picker, focus, Android Back and the sheet. Only the name is required. There is deliberately no
  * obituary field here (C10).
  */
-export function SetupScreen({ initial, onContinue, onBack }: Props) {
+export function SetupScreen({ initial, onContinue, onBack, returnsToPlace = false }: Props) {
   const [name, setName] = useState(initial.personName);
   const [date, setDate] = useState(initial.dateOfPassing);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -66,7 +68,7 @@ export function SetupScreen({ initial, onContinue, onBack }: Props) {
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <PersonSetup
           copy={copy}
-          backName={copy.backName}
+          backName={returnsToPlace ? undefined : copy.backName}
           name={name}
           onNameChange={setName}
           renderDate={({ accessibleName }) => <PassingDateField copy={copy} value={date} onChange={setDate} accessibleName={accessibleName} />}

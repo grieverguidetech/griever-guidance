@@ -8,9 +8,17 @@ import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 // This path is specific to this react-native version. Re-check it when react-native is upgraded.
+// Each node gets its own handle, so a test can tell which node focus was sent to.
+const mockHandles = new Map<unknown, number>();
+const mockHandleFor = (node: unknown) => {
+  if (!mockHandles.has(node)) {
+    mockHandles.set(node, mockHandles.size + 1);
+  }
+  return mockHandles.get(node);
+};
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  findNodeHandle: (node: unknown) => (node ? mockHandleFor(node) : null),
 }));
 
 const anna = {
@@ -32,7 +40,8 @@ const openAnna = async () => {
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
-  fireEvent.press(await screen.findByLabelText('Anna'));
+  // The first App render in this file is slow on a loaded CI runner; give Home time to read storage.
+  fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
 };
 
 // The hub comes first: Start is the announcement; the other steps are rows named for the step.
@@ -88,7 +97,7 @@ describe('picking an announcement', () => {
     await startMoment('Announce the passing');
     fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
     fireEvent.press(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.press(await screen.findByLabelText('Back to home'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
   });
 
@@ -242,7 +251,7 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
   };
 
-  it('returns Home with a calm note, announced, once the last person is done', async () => {
+  it('returns to the hub with a calm note, announced, once the last person is done', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
     fireEvent.press(await screen.findByText('Open Messages'));
@@ -250,7 +259,8 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
-    expect(screen.getByText("Who you're writing about")).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith(
       "Everyone has been told. We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
@@ -303,7 +313,7 @@ describe('the end of a send', () => {
     expect(announce).toHaveBeenCalledWith('No one was texted this time. You can come back to this any time.', { queue: true });
   });
 
-  it('stays on Home with no timer, and the note goes when a person is opened', async () => {
+  it('stays on the hub with no timer, and the note goes when a step is started', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Open Messages'));
@@ -311,8 +321,86 @@ describe('the end of a send', () => {
     await screen.findByText('Everyone has been told.');
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Anna'));
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
+  });
+
+  it('announces the note once, and focuses the hub heading as it opens', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await toSending(['Dee']);
+    fireEvent.press(await screen.findByText('Open Messages'));
+    // Clear what earlier steps (or a slow earlier test) announced; only the hub's note is counted.
+    announce.mockClear();
+    focus.mockClear();
+    fireEvent.press(await screen.findByText('Done'));
+    await screen.findByText('Everyone has been told.');
+    const spoken = announce.mock.calls.filter(([text]) => String(text).startsWith('Everyone has been told.'));
+    expect(spoken).toHaveLength(1);
+    // The handle belongs to the hub's heading node, not some other node.
+    const focusedNodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
+    expect(focusedNodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'One thing at a time.')).toBe(true);
+    expect(screen.getByLabelText(/Everyone has been told\./).props.accessibilityLiveRegion).toBe('polite');
+  });
+
+  it('the hub Back button reads Home and returns to Home, with no note there', async () => {
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    await toSending(['Dee']);
+    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Done'));
+    await screen.findByText('Everyone has been told.');
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    expect(screen.queryByText('Everyone has been told.')).toBeNull();
+  });
+
+  it('finishing the obituary lands on the hub with the note', async () => {
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await openAnna();
+    await startMoment('Share the obituary');
+    fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
+    fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    await screen.findByRole('heading', { name: 'Review your message' });
+    fireEvent.press(screen.getByText('Text these people'));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Done'));
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
+  });
+});
+
+describe('Edit person from the hub', () => {
+  it('Back from setup returns to the hub, not Home', async () => {
+    await openAnna();
+    await screen.findByText('One thing at a time.');
+    fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
+    // Back returns to the hub, so it is named plain "Back", not "Back to home".
+    expect(screen.queryByLabelText('Back to home')).toBeNull();
+    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
+  });
+
+  it('drops the sent note: finish a send, Edit person, Back shows the hub without it', async () => {
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await openAnna();
+    await startMoment('Announce the passing');
+    fireEvent.press(await screen.findByText('Continue'));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Done'));
+    await screen.findByText('Everyone has been told.');
+    fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.queryByText('Everyone has been told.')).toBeNull();
   });
 });
 

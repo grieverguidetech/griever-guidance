@@ -55,13 +55,13 @@ describe('PathLanding share', () => {
 });
 
 describe('PathLanding Home link (#112)', () => {
-  it('has a Back control, and no other-people list or "Someone else I\'ve lost"', async () => {
+  it('has a Home control, and no other-people list or "Someone else I\'ve lost"', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
     render(<PathLanding session={session} onBack={onBack} onStartMoment={vi.fn()} onEditPerson={vi.fn()} />);
     expect(screen.queryByText("Other people you're writing about")).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "Someone else I've lost" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Home' }));
     expect(onBack).toHaveBeenCalledOnce();
   });
 });
@@ -287,19 +287,19 @@ describe('PathLanding "What you\'ll need" in the header (#194)', () => {
     document.body.style.overflow = '';
   });
 
-  it('is a top-bar button next to Back, and the body has no second one', () => {
+  it('is a top-bar button next to Home, and the body has no second one', () => {
     renderPath();
     const buttons = screen.getAllByRole('button', { name: "What you'll need" });
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(buttons[0].parentElement).toBe(screen.getByRole('button', { name: 'Back' }).parentElement);
+    expect(buttons[0].parentElement).toBe(screen.getByRole('button', { name: 'Home' }).parentElement);
   });
 
-  it('tabs from Back to "What you\'ll need" to the page content', async () => {
+  it('tabs from Home to "What you\'ll need" to the page content', async () => {
     const user = userEvent.setup();
     renderPath();
     await user.tab();
-    expect(screen.getByRole('button', { name: 'Back' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole('button', { name: "What you'll need" })).toHaveFocus();
     await user.tab();

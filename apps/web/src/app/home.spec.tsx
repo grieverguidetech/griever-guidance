@@ -92,7 +92,7 @@ describe('Home as the landing (#112)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Home' }));
     const heading = await screen.findByRole('heading', { level: 1, name: HOME });
     expect(heading).toHaveFocus();
   });
@@ -134,7 +134,7 @@ describe('Home as the landing (#112)', () => {
       seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
       render(<App />);
       await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
-      await user.click(screen.getByRole('button', { name: 'Back' }));
+      await user.click(screen.getByRole('button', { name: 'Home' }));
       await expectHome();
       expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
@@ -214,7 +214,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     expect(await heading('One thing at a time.')).toBeInTheDocument();
     expect(screen.getByText('For Margaret Hayes')).toBeInTheDocument();
     // Back from the path lists the person just created.
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Home' }));
     await expectHome();
     expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
   });
@@ -228,7 +228,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     await addOneContact(user);
     await user.click(screen.getByRole('button', { name: 'Done for now' }));
     await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Home' }));
     await user.click(await screen.findByRole('button', { name: "Someone else I've lost" }));
     await fillSetup(user, 'Harold Price');
     expect(await heading('Who should hear first?')).toBeInTheDocument();
@@ -264,7 +264,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     await addOneContact(user);
     await user.click(screen.getByRole('button', { name: 'Done for now' }));
     await user.click(await screen.findByRole('button', { name: 'Save and continue' }));
-    await user.click(await screen.findByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByRole('button', { name: 'Home' }));
     await user.click(await screen.findByRole('button', { name: "Someone else I've lost" }));
     await fillSetup(user, 'Harold Price');
     await heading('Who should hear first?');

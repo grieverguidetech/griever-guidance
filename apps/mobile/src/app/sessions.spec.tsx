@@ -19,7 +19,7 @@ async function startWith(name: string) {
   await screen.findByText(`For ${name}`); // the hub: the person's plan
 }
 
-const backFromHub = () => fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+const backFromHub = () => fireEvent.press(screen.getByRole('button', { name: 'Home' }));
 const openThankYous = async () => fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
 
 // Home is where every launch lands; the first person is begun from there.
