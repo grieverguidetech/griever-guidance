@@ -15,6 +15,8 @@ type Props = {
   onContinue: () => void;
   /** Back to setup. */
   onBack: () => void;
+  /** Opened from Home: read the phone's contacts at once. Back from the review, or Add, leaves this screen. */
+  startWithImport?: boolean;
 };
 
 type Mode = { kind: 'start' } | { kind: 'adding' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
@@ -28,7 +30,7 @@ const IMPORT_FAILED = 'We could not read your contacts. You can add people by ha
  * Shown once after setup, only when this phone has no saved contacts (the same rule as web).
  * Contacts stay on the device (C3); only the seven Contact fields are kept (C4).
  */
-export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
+export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImport = false }: Props) {
   const [mode, setMode] = useState<Mode>({ kind: 'start' });
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,14 +44,22 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
     announce(message);
   };
 
+  // Back goes up one level; from the review it leaves the screen when it was opened from Home.
+  const leaveStep = () => {
+    if (mode.kind === 'start' || (startWithImport && mode.kind === 'reviewing')) {
+      onBack();
+    } else {
+      setMode({ kind: 'start' });
+    }
+  };
+
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (mode.kind === 'start') onBack();
-      else setMode({ kind: 'start' });
+      leaveStep();
       return true;
     });
     return () => sub.remove();
-  }, [mode.kind, onBack]);
+  });
 
   async function importFromPhone() {
     setImporting(true);
@@ -79,6 +89,10 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
       return;
     }
     say(`${picked.length} added`);
+    if (startWithImport) {
+      onContinue();
+      return;
+    }
     setMode({ kind: 'start' });
   }
 
@@ -106,9 +120,17 @@ export function ContactsStepScreen({ contacts, onContinue, onBack }: Props) {
     setMode({ kind: 'start' });
   }
 
+  const started = useRef(false);
+  useEffect(() => {
+    if (startWithImport && !started.current) {
+      started.current = true;
+      void importFromPhone();
+    }
+  });
+
   const back = (
     <View style={styles.backRow}>
-      <Button label="Back" variant="header" onPress={() => (mode.kind === 'start' ? onBack() : setMode({ kind: 'start' }))} />
+      <Button label="Back" variant="header" onPress={leaveStep} />
     </View>
   );
 

@@ -260,6 +260,9 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [editingFromFlow, setEditingFromFlow] = useState(false);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
   const [note, setNote] = useState<SentNoteText | null>(null);
+  // Importing device contacts from Home; on return Home puts focus back on the import button.
+  const [importing, setImporting] = useState(false);
+  const [backFromImport, setBackFromImport] = useState(false);
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
@@ -329,6 +332,13 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtHub(true);
     setAtHome(false);
   };
+  if (atHome && importing) {
+    const leaveImport = () => {
+      setBackFromImport(true);
+      setImporting(false);
+    };
+    return <ContactsStepScreen contacts={contacts} onBack={leaveImport} onContinue={leaveImport} startWithImport />;
+  }
   if (atHome) {
     return (
       <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
@@ -348,6 +358,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
               setAtHome(false);
             }}
             onWhatYoullNeed={AUTH_ENABLED ? undefined : () => navigation.navigate('WhatYoullNeed')}
+            onImportContacts={() => setImporting(true)}
+            focusImport={backFromImport}
             onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
           />
         )}

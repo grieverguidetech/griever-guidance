@@ -10,7 +10,7 @@ const anna = {
   createdAt: '2026-01-01', lastOpenedAt: '2026-01-01', drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
 
-const props = { sessions: [anna], canCreate: true, onOpen: jest.fn(), onCreate: jest.fn(), onAccount: jest.fn() };
+const props = { sessions: [anna], canCreate: true, onOpen: jest.fn(), onCreate: jest.fn(), onAccount: jest.fn(), onImportContacts: jest.fn() };
 
 const flat = (el: { props: { style?: unknown } }) => StyleSheet.flatten(el.props.style as never) as Record<string, unknown>;
 
@@ -27,7 +27,7 @@ describe('HomeScreen layout (#363)', () => {
 
   it('with no people, the buttons are Start with someone, then Your account', () => {
     render(<HomeScreen {...props} sessions={[]} />);
-    expect(buttonNames()).toEqual(["Start with someone I've lost", 'Your account']);
+    expect(buttonNames()).toEqual(["Start with someone I've lost", 'Your account', 'Add from your contacts']);
     expect(screen.getByText('No one here yet.')).toBeTruthy();
   });
 
@@ -64,5 +64,41 @@ describe('HomeScreen layout (#363)', () => {
     const { toJSON } = render(<HomeScreen {...props} />);
     const root = toJSON() as { props: { style?: unknown } };
     expect(flat(root).backgroundColor).toBe(colors.bg);
+  });
+});
+
+describe('HomeScreen import button (#379)', () => {
+  it('orders the buttons: create, Your account, Add from your contacts', () => {
+    render(<HomeScreen {...props} />);
+    expect(buttonNames().slice(-3)).toEqual(["Someone else I've lost", 'Your account', 'Add from your contacts']);
+  });
+
+  it('draws both as full-width header outlines', () => {
+    render(<HomeScreen {...props} />);
+    for (const [name, row] of [['Your account', 'home-account-row'], ['Add from your contacts', 'home-import-row']]) {
+      const button = screen.getByRole('button', { name });
+      expect(flat(button).borderColor).toBe(colors['accent-600']);
+      expect(flat(button).backgroundColor ?? 'transparent').toBe('transparent');
+      expect(flat(screen.getByTestId(row)).width).toBe('100%');
+    }
+  });
+
+  it('gives the create button room above Your account', () => {
+    render(<HomeScreen {...props} />);
+    const gap = flat(screen.getByTestId('home-account-row')).marginTop as number;
+    expect(gap).toBeGreaterThanOrEqual(24);
+  });
+
+  it('calls the import handler when pressed', () => {
+    const onImportContacts = jest.fn();
+    render(<HomeScreen {...props} onImportContacts={onImportContacts} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    expect(onImportContacts).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the import button with accounts off too', () => {
+    render(<HomeScreen {...props} onAccount={undefined} />);
+    expect(screen.getByRole('button', { name: 'Add from your contacts' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
   });
 });
