@@ -13,6 +13,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'announce', file: 'screens/AnnounceForm.tsx' },
   { copy: 'whoShouldKnow', file: 'screens/ContactSelector.tsx' },
   { copy: 'review', file: 'screens/ConfirmScreen.tsx' },
+  { copy: 'sending', file: 'screens/SendingScreen.tsx' },
   { copy: 'shareObituary', file: 'screens/ShareObituary.tsx' },
   { copy: 'personSetup', file: 'screens/SessionSetup.tsx' },
 ];

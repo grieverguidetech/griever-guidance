@@ -10,6 +10,7 @@ import type { ScreenName } from '@griever/copy';
  */
 const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'pathLanding', file: 'screens/HubScreen.tsx' },
+  { copy: 'pathLanding', file: 'screens/HomeScreen.tsx' },
   { copy: 'signIn', file: 'screens/SignInScreen.tsx' },
   { copy: 'signIn', file: 'components/SocialButtons.tsx' },
   { copy: 'signUp', file: 'screens/SignUpScreen.tsx' },
@@ -17,6 +18,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'announce', file: 'screens/AnnounceScreen.tsx' },
   { copy: 'whoShouldKnow', file: 'screens/ContactSelectorScreen.tsx' },
   { copy: 'review', file: 'screens/ConfirmScreen.tsx' },
+  { copy: 'sending', file: 'screens/SendingScreen.tsx' },
   { copy: 'shareObituary', file: 'screens/ShareObituaryScreen.tsx' },
   { copy: 'personSetup', file: 'screens/SetupScreen.tsx' },
   { copy: 'personSetup', file: 'components/PassingDateField.tsx' },

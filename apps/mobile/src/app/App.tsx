@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '@griever/tokens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,6 +22,7 @@ import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
+import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
@@ -105,7 +108,7 @@ type SessionProps = {
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
   /** The last person has been dealt with: go Home and show this calm line. */
-  onFinished: (note: string) => void;
+  onFinished: (note: SentNoteText) => void;
 };
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
@@ -256,7 +259,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   // Setup was opened from the announce step (Edit): Back there returns to that step, as on web.
   const [editingFromFlow, setEditingFromFlow] = useState(false);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<SentNoteText | null>(null);
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
@@ -270,7 +273,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setNote(null);
     setAtHome(true);
   }, []);
-  const finish = useCallback((text: string) => {
+  const finish = useCallback((text: SentNoteText) => {
     setArrived(false);
     setAtHub(false);
     setStartCategory(null);
@@ -491,13 +494,18 @@ const HomeNavigation = ({
   </NavigationContainer>
 );
 
-// The Home link, the arrival announcement and Android back live on every step.
-const withBar = (bar: ReactNode, screen: ReactNode) => (
-  <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
-    {bar}
-    {screen}
-  </View>
-);
+// The person bar draws nothing now; it still carries Android back and the arrival announcement on
+// every step. This wrapper gives the step the top safe-area inset the old bar used to supply.
+const PersonContext = ({ bar, children }: { bar: ReactNode; children: ReactNode }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.bg }}>
+      {bar}
+      {children}
+    </View>
+  );
+};
+const withPersonContext = (bar: ReactNode, screen: ReactNode) => <PersonContext bar={bar}>{screen}</PersonContext>;
 
 const Navigation = ({
   flow,
@@ -519,19 +527,19 @@ const Navigation = ({
         )}
         {flow.step === 'announce' && (
           <Stack.Screen name="Announce">
-            {() => withBar(bar, <AnnounceScreen flow={flow} onEditPerson={onEditPerson} />)}
+            {() => withPersonContext(bar, <AnnounceScreen flow={flow} onEditPerson={onEditPerson} />)}
           </Stack.Screen>
         )}
         {(flow.step === 'details' || flow.step === 'serviceKnown') && (
-          <Stack.Screen name="DetailsForm">{() => withBar(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>
+          <Stack.Screen name="DetailsForm">{() => withPersonContext(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
-            {() => withBar(bar, <ContactSelectorScreen flow={flow} contacts={contacts} />)}
+            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} />)}
           </Stack.Screen>
         )}
         {flow.step === 'review' && (
-          <Stack.Screen name="Confirm">{() => withBar(bar, <ConfirmScreen flow={flow} />)}</Stack.Screen>
+          <Stack.Screen name="Confirm">{() => withPersonContext(bar, <ConfirmScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'sending' && (
           <Stack.Screen name="Sending">{() => <SendingScreen flow={flow} contacts={contacts} />}</Stack.Screen>

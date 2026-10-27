@@ -72,7 +72,7 @@ export function Announce({ copy, eyebrow, eyebrowTone, recap, onBack, onWhatYoul
         </Body>
         <Body>{recap}</Body>
         <View style={styles.start}>
-          <Button label={copy.edit} variant="ghost" onPress={onEdit} />
+          <Button label={copy.edit} variant="header" onPress={onEdit} />
         </View>
       </Card>
       <View style={styles.field}>

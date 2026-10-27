@@ -177,14 +177,18 @@ describe('Home from every step', () => {
     jest.restoreAllMocks();
   });
 
-  it('goes Home from a resumed details step', async () => {
+  it('Back from a resumed details step chains through the hub to Home', async () => {
     const anna = { ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({ deceasedName: 'Anna' }) } };
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
     await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
-    fireEvent.press(screen.getByLabelText('Back to home'));
+    // No Home bar (#364): Back from the first form goes to the hub, and Back there goes Home.
+    expect(screen.queryByLabelText('Back to home')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByText('One thing at a time.');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 

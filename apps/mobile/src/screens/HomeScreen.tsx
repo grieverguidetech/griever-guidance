@@ -1,13 +1,15 @@
 import { useEffect } from 'react';
 import { AccessibilityInfo, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Body, Button, SerifText as Text } from '@griever/ui';
+import { Body, Button, SentNote, SerifText as Text } from '@griever/ui';
 import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
+import { screenCopy } from '@griever/copy';
 import { PrimaryButton, ScreenHeader } from '../components/authForm';
 import { personLabel } from '../components/PersonSwitcher';
-import { MUTED } from '../components/colors';
 import { isBlank } from '../lib/useDeviceSessions';
-import { NO_COPY_LINE } from '../lib/sendNote';
+import type { SentNoteText } from '../lib/sendNote';
+
+const copy = screenCopy('pathLanding');
 
 export const START_FIRST = "Start with someone I've lost";
 export const ADD_PERSON = "Someone else I've lost";
@@ -25,7 +27,7 @@ export type HomeScreenProps = {
   /** Only given while accounts are off. With accounts on, "Your account" holds the list. */
   onWhatYoullNeed?: () => void;
   /** A calm line after the last person of a send was dealt with. Stays until the person leaves Home. */
-  note?: string | null;
+  note?: SentNoteText | null;
   /** Only given when accounts are on. */
   onAccount?: () => void;
 };
@@ -40,7 +42,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
   // is read rather than dropped. Android reads the live region below.
   useEffect(() => {
     if (note && Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibilityWithOptions(note, { queue: true });
+      AccessibilityInfo.announceForAccessibilityWithOptions(note.spoken, { queue: true });
     }
   }, [note]);
   return (
@@ -51,15 +53,14 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
           style={styles.note}
           accessible
           accessibilityLiveRegion="polite"
-          accessibilityLabel={`${note} ${NO_COPY_LINE}`}
+          accessibilityLabel={`${note.lead} ${note.rest}`}
         >
-          <Text style={styles.noteText}>{note}</Text>
-          <Text style={styles.noteSmall}>{NO_COPY_LINE}</Text>
+          <SentNote lead={note.lead} rest={note.rest} />
         </View>
       ) : null}
       {onWhatYoullNeed ? (
         <View style={styles.headerRow}>
-          <Button label="What you'll need" variant="header" onPress={onWhatYoullNeed} />
+          <Button label={copy.checklist} variant="header" onPress={onWhatYoullNeed} />
         </View>
       ) : null}
       {people.length > 0 ? (
@@ -105,10 +106,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 24, paddingTop: 60 },
   headerRow: { alignSelf: 'flex-start', marginBottom: 8 },
-  note: { borderWidth: 1, borderColor: MUTED, borderRadius: 10, padding: 16, marginBottom: 16 },
+  note: { marginBottom: 16 },
   intro: { marginBottom: 16 },
-  noteText: { fontSize: 16, color: colors.ink, marginBottom: 4 },
-  noteSmall: { fontSize: 12, color: MUTED },
   row: {
     minHeight: 44,
     justifyContent: 'center',

@@ -5,6 +5,12 @@ import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
 import { ContactSelectorScreen } from './ContactSelectorScreen';
 
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
+
 jest.mock('../lib/expoContactsSource', () => ({
   expoContactsSource: {
     id: 'native',
@@ -117,9 +123,9 @@ describe('ContactSelectorScreen grouping', () => {
     expect(tick.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
-  it('gives the Bring people across rows the checkbox role and checked state', async () => {
+  it('gives the Add from your contacts rows the checkbox role and checked state', async () => {
     renderScreen();
-    fireEvent.press(screen.getByRole('button', { name: 'Bring people across' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     expect(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
     expect(screen.getByText('Choose only the ones you want — the rest stay where they are.')).toBeTruthy();
     const plain = screen.getByRole('checkbox', { name: /Plain Pat/, checked: false });
@@ -128,6 +134,37 @@ describe('ContactSelectorScreen grouping', () => {
     const ticks = screen.getAllByText('✓', { includeHiddenElements: true });
     expect(ticks).toHaveLength(2);
     ticks.forEach((t) => expect(t.props.accessibilityElementsHidden).toBe(true));
+  });
+
+  it('titles the import review "Add from your contacts" and Back returns to the list', async () => {
+    renderScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    expect(await screen.findByRole('heading', { name: 'Add from your contacts' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    expect(screen.queryByText('Starred Sam')).toBeNull();
+  });
+
+  it('moves focus to the review heading on the way in, and back to the import button on Back', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    renderScreen();
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    await screen.findByRole('heading', { name: 'Add from your contacts' });
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByText('Who should know?');
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows why Add is unavailable in the review until someone is chosen', async () => {
+    renderScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    await screen.findByRole('heading', { name: 'Add from your contacts' });
+    fireEvent.press(screen.getByRole('checkbox', { name: /Starred Sam/, checked: true }));
+    expect(screen.getByText('Choose at least one person', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add' }).props.accessibilityHint).toBe('Choose at least one person');
   });
 
   it('reads Continue as disabled until someone is chosen, and says why', () => {

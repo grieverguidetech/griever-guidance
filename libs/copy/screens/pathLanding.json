@@ -23,8 +23,15 @@
   },
   "finishNote": {
     "allTold": { "announce": "Everyone has been told.", "service": "The service details have been shared.", "obituary": "The obituary has been shared.", "thanks": "Your thank-yous have been sent." },
-    "partial": "You told {told} of {total}. You can text the others from your own Messages app any time.",
-    "none": "No one was texted this time. You can come back to this any time.",
+    "partial": {
+      "lead": "You told {told} of {total}.",
+      "rest": "You can text the others from your own Messages app any time."
+    },
+    "none": {
+      "lead": "No one was texted this time.",
+      "rest": "You can come back to this any time."
+    },
+    "sentGeneric": "Your messages have been sent.",
     "noCopy": "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
     "close": "Close",
     "closeLabel": "Close note"
