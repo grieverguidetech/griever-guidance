@@ -26,3 +26,5 @@ export { Review } from './screens/Review';
 export type { ReviewCopy, ReviewProps } from './screens/Review';
 export { ShareObituary } from './screens/ShareObituary';
 export type { ShareObituaryCopy, ShareObituaryProps } from './screens/ShareObituary';
+export { PersonSetup } from './screens/PersonSetup';
+export type { PersonSetupCopy, PersonSetupProps } from './screens/PersonSetup';

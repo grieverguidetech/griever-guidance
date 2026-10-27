@@ -83,7 +83,8 @@ describe('the order in the app', () => {
     expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
     expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
     fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
-    fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
+    fireEvent.press(screen.getByRole('button', { name: 'Date they passed (optional)' }));
+    fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2025, 5, 7));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('One thing at a time.')).toBeTruthy();
     expect(screen.getByText('For Ben')).toBeTruthy();
@@ -126,7 +127,8 @@ describe('the order in the app', () => {
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');
     fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben Cole');
-    fireEvent.changeText(screen.getByLabelText('Date of passing'), 'June 7, 2025');
+    fireEvent.press(screen.getByRole('button', { name: 'Date they passed (optional)' }));
+    fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2025, 5, 7));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('One thing at a time.');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));

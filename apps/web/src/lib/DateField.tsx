@@ -41,6 +41,8 @@ interface DateInputProps {
   min?: string;
   max?: string;
   describedBy?: string;
+  /** The id of a visible label elsewhere on the page, when there is no `<label htmlFor>`. */
+  labelledBy?: string;
   required?: boolean;
 }
 
@@ -52,6 +54,7 @@ export function DateInput({
   min,
   max,
   describedBy,
+  labelledBy,
   required,
 }: DateInputProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -82,6 +85,7 @@ export function DateInput({
         className="gg-input gg-datebox-text"
         placeholder="e.g. May 29, 2026"
         value={value}
+        aria-labelledby={labelledBy}
         aria-required={required || undefined}
         aria-describedby={[describedBy, helpId].filter(Boolean).join(' ')}
         onChange={(e) => onChange(e.target.value)}

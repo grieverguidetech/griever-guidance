@@ -1,4 +1,4 @@
-import { addDays, mergeSessionScreens, parseCompleteDate, parseLooseDate, type SessionDocument } from './index.js';
+import { addDays, formatPassingDate, passingDateFromText, mergeSessionScreens, parseCompleteDate, parseLooseDate, type SessionDocument } from './index.js';
 
 describe('parseLooseDate', () => {
   it('parses what a family types and ISO dates', () => {
@@ -114,5 +114,31 @@ describe('mergeSessionScreens', () => {
     const local = doc({ screens: { a: { status: 'seen', updatedAt: 1 } } });
     const remote = doc({ screens: { b: { status: 'seen', updatedAt: 1 } } });
     expect(Object.keys(mergeSessionScreens(local, remote).screens).sort()).toEqual(['a', 'b']);
+  });
+});
+
+describe('formatPassingDate / passingDateFromText', () => {
+  it('writes a picked date the way the session stores it', () => {
+    expect(formatPassingDate(new Date(2025, 5, 7))).toBe('June 7, 2025');
+    expect(formatPassingDate(new Date(2026, 0, 1))).toBe('January 1, 2026');
+    expect(formatPassingDate(new Date(2024, 11, 31, 23, 59))).toBe('December 31, 2024');
+  });
+
+  it('reads a stored date back into the date the picker opens on', () => {
+    const back = passingDateFromText('June 7, 2025');
+    expect([back?.getFullYear(), back?.getMonth(), back?.getDate()]).toEqual([2025, 5, 7]);
+    const iso = passingDateFromText('2026-05-29');
+    expect([iso?.getFullYear(), iso?.getMonth(), iso?.getDate()]).toEqual([2026, 4, 29]);
+  });
+
+  it('gives null for empty or free text, so the picker opens on today', () => {
+    expect(passingDateFromText('')).toBeNull();
+    expect(passingDateFromText('last Tuesday')).toBeNull();
+    expect(passingDateFromText(undefined)).toBeNull();
+  });
+
+  it('round-trips', () => {
+    const date = new Date(2023, 8, 15);
+    expect(formatPassingDate(passingDateFromText(formatPassingDate(date)) as Date)).toBe('September 15, 2023');
   });
 });
