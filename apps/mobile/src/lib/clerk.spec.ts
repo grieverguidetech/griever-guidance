@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { renderHook, act } from '@testing-library/react-native';
-import { toAccountAuth, useClerkAccountAuth } from './clerk';
+import { SETTLE_AFTER_MS, toAccountAuth, useClerkAccountAuth } from './clerk';
 import type { AdapterInputs, ClerkAuthLike } from './clerk';
 import { clerkMessage } from './clerkMessages';
 
@@ -86,6 +86,32 @@ describe('toAccountAuth getToken', () => {
     expect(await auth.getToken()).toEqual({ ok: false, reason: 'offline' });
   });
 
+  it('maps any other getToken failure to failed, not offline (#343)', async () => {
+    const auth = adapt({
+      clerk: {
+        getToken: async () => {
+          throw new Error('Something broke');
+        },
+      },
+    });
+    expect(await auth.getToken()).toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('is settled once Clerk has loaded, even degraded or without a session; not before (#343)', () => {
+    expect(adapt({ clerk: notLoaded, marker: 'u' }).settled).toBe(false);
+    expect(adapt({ ready: false, marker: 'u', clerk: { isSignedIn: false, userId: null } }).settled).toBe(true);
+    expect(adapt().settled).toBe(true);
+  });
+
+  it('a loaded, degraded Clerk with no session reads offline (#343)', async () => {
+    const auth = adapt({ ready: false, marker: 'u', clerk: { isSignedIn: false, userId: null } });
+    expect(await auth.getToken()).toEqual({ ok: false, reason: 'offline' });
+  });
+
+  it('settles a Clerk that never loads once the wait is over (#343)', () => {
+    expect(adapt({ clerk: notLoaded, marker: 'u', waitedLong: true }).settled).toBe(true);
+  });
+
   it('does not ask Clerk for a token when signed out, and reads an unconfirmed Clerk as offline', async () => {
     const getToken = jest.fn(async () => 'tok');
     expect(await adapt({ clerk: { isSignedIn: false, getToken } }).getToken()).toEqual({ ok: false, reason: 'signed_out' });
@@ -164,5 +190,25 @@ describe('clerkMessage on the email-code path', () => {
     const text = clerkMessage({ code: 'form_identifier_not_found' }, 'code');
     expect(text).toBe("We couldn't send a code to that email. Please check it and try again.");
     expect(text).not.toMatch(/password/i);
+  });
+});
+
+describe('useClerkAccountAuth settling (#343)', () => {
+  it('stays unsettled while Clerk loads, then settles after the wait if it never does', () => {
+    jest.useFakeTimers();
+    try {
+      mockUseAuth.mockReturnValue({ isLoaded: false, isSignedIn: undefined, userId: undefined, getToken: async () => null, signOut: async () => undefined });
+      mockUseClerk.mockReturnValue({ status: 'loading' });
+      const data: Record<string, string> = { 'gg.signedIn.v1': 'u1' };
+      const storage = { getItem: (k: string) => data[k] ?? null, setItem: () => undefined, removeItem: () => undefined };
+      const { result } = renderHook(() => useClerkAccountAuth(storage, true));
+      expect(result.current.settled).toBe(false);
+      act(() => {
+        jest.advanceTimersByTime(SETTLE_AFTER_MS + 1);
+      });
+      expect(result.current.settled).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

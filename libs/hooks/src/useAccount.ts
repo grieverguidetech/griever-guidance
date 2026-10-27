@@ -174,6 +174,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
 
   const authStatus = auth.status;
   const authUserId = auth.userId;
+  const authSettled = auth.settled !== false;
 
   useEffect(() => {
     mounted.current = true;
@@ -199,6 +200,10 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       writeKey(storageRef.current, PROFILE_STORAGE_KEY, null);
     }
     setProfile((current) => (current && current.id !== authUserId ? null : current));
+    // The provider cannot give a token yet; asking now would read as offline. This runs again when it settles.
+    if (!authSettled) {
+      return;
+    }
     void (async () => {
       const result = await callWithToken(g, (token) => getProfile(token));
       if (!mounted.current || g !== gen.current) {
@@ -218,7 +223,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       // unavailable / invalid / failed: keep what we have, stay signed in.
     })();
-  }, [authStatus, authUserId, callWithToken, clearLocal, keepProfile, fail]);
+  }, [authStatus, authUserId, authSettled, callWithToken, clearLocal, keepProfile, fail]);
 
   /**
    * Local state is cleared first and stays cleared even if `auth.signOut()` rejects: on a shared

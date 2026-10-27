@@ -1,0 +1,22 @@
+{
+  "heading": "Your account",
+  "askHeading": "What should we call you?",
+  "askIntro": "This is the name on your account.",
+  "firstTimeIntro": "This is the name on your account. You can change it later.",
+  "back": "Back",
+  "checklist": "What you'll need",
+  "nameLabel": "Your name",
+  "save": "Save",
+  "saving": "Saving…",
+  "continue": "Continue",
+  "signOut": "Sign out",
+  "signIn": "Sign in",
+  "offline": "You are offline. You can change your name when you are connected.",
+  "saved": "Your name is saved.",
+  "nameRequired": "Please enter your name.",
+  "saveFailed": "We couldn't save your name. You can try again.",
+  "sessionEnded": "You've been signed out. Your work on this device is safe. Sign in again when you're ready.",
+  "unavailable": "Accounts aren't available right now.",
+  "loading": "One moment.",
+  "checklistNote": "Not today. Just so none of it surprises you."
+}

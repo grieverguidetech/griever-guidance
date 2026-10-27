@@ -204,7 +204,7 @@ describe('sign up', () => {
     await screen.findByText(OFFLINE);
     type('Your name', 'Samantha');
     press('Save');
-    await screen.findByText('Saved.');
+    await screen.findByText('Your name is saved.');
     screen.unmount();
     renderAccount(true);
     await screen.findByLabelText('Your name');
@@ -255,18 +255,19 @@ describe('profile', () => {
     renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
-    await screen.findByText('Saved.');
+    await screen.findByText('Your name is saved.');
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Samantha' });
-    expect(announce).toHaveBeenCalledWith('Saved.');
+    // Only the shared status line announces it, once.
+    expect(announce.mock.calls.filter(([m]) => m === 'Your name is saved.')).toHaveLength(1);
   });
 
-  it('shows "Saved." on the first save, when the account had no profile yet', async () => {
+  it('shows "Your name is saved." on the first save, when the account had no profile yet', async () => {
     mockGetProfile.mockResolvedValue(noProfile);
     renderAccount(true);
     await screen.findByRole('heading', { name: 'What should we call you?' });
     type('Your name', 'Sam');
     press('Save');
-    await screen.findByText('Saved.');
+    await screen.findByText('Your name is saved.');
     expect(value('Your name')).toBe('Sam');
   });
 
@@ -291,6 +292,27 @@ describe('profile', () => {
     mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
     renderAccount(true);
     await screen.findByText('You are offline. You can change your name when you are connected.');
+  });
+
+  it('saves a new name and shows no offline line when online (#343)', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByText(/You are offline/)).toBeNull();
+    type('Your name', 'Samantha');
+    press('Save');
+    await screen.findByText('Your name is saved.');
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Samantha' });
+    expect(screen.queryByText(/You are offline/)).toBeNull();
+  });
+
+  it('draws Sign out as an outline with no fill, unlike Save (#343)', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    const fill = (name: string) => StyleSheet.flatten(screen.getByRole('button', { name }).props.style).backgroundColor;
+    expect(fill('Sign out')).toBeUndefined();
+    expect(fill('Save')).toBeTruthy();
   });
 
   it('keeps the view, the note and the typed name when the session ends', async () => {

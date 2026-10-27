@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Your account / What should we call you? screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "askHeading",
+    "askIntro",
+    "firstTimeIntro",
+    "back",
+    "checklist",
+    "nameLabel",
+    "save",
+    "saving",
+    "continue",
+    "signOut",
+    "signIn",
+    "offline",
+    "saved",
+    "nameRequired",
+    "saveFailed",
+    "sessionEnded",
+    "unavailable",
+    "loading",
+    "checklistNote"
+  ],
+  "properties": {
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "askHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "askIntro": {
+      "$ref": "#/$defs/text"
+    },
+    "firstTimeIntro": {
+      "$ref": "#/$defs/text"
+    },
+    "back": {
+      "$ref": "#/$defs/text"
+    },
+    "checklist": {
+      "$ref": "#/$defs/text"
+    },
+    "nameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "save": {
+      "$ref": "#/$defs/text"
+    },
+    "saving": {
+      "$ref": "#/$defs/text"
+    },
+    "continue": {
+      "$ref": "#/$defs/text"
+    },
+    "signOut": {
+      "$ref": "#/$defs/text"
+    },
+    "signIn": {
+      "$ref": "#/$defs/text"
+    },
+    "offline": {
+      "$ref": "#/$defs/text"
+    },
+    "saved": {
+      "$ref": "#/$defs/text"
+    },
+    "nameRequired": {
+      "$ref": "#/$defs/text"
+    },
+    "saveFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "sessionEnded": {
+      "$ref": "#/$defs/text"
+    },
+    "unavailable": {
+      "$ref": "#/$defs/text"
+    },
+    "loading": {
+      "$ref": "#/$defs/text"
+    },
+    "checklistNote": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
