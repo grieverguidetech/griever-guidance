@@ -57,3 +57,13 @@ if (NativeBroadcastChannel) {
   }
   (globalThis as { BroadcastChannel?: typeof BroadcastChannel }).BroadcastChannel = UnrefedBroadcastChannel;
 }
+
+// Native-only module: Jest has no native view for it. The stand-in renders a plain view that keeps
+// its props, so a spec can call the picker's onChange the way the OS would. The Android dialog is a
+// jest.fn() that records what it was opened with.
+jest.mock('@react-native-community/datetimepicker', () => {
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const React = jest.requireActual<typeof import('react')>('react');
+  const DateTimePicker = (props: Record<string, unknown>) => React.createElement(View, { testID: 'date-picker', ...props });
+  return { __esModule: true, default: DateTimePicker, DateTimePickerAndroid: { open: jest.fn(), dismiss: jest.fn() } };
+});

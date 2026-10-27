@@ -42,6 +42,8 @@ export function Body({ children, tone = 'default', small = false, id, hidden = f
   }
   if (hidden) {
     extra['aria-hidden'] = true;
+    extra['accessibilityElementsHidden'] = true;
+    extra['importantForAccessibility'] = 'no-hide-descendants';
   }
   if (live) {
     extra['role'] = 'status';

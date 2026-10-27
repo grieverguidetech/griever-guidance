@@ -60,10 +60,12 @@ describe('App onboarding', () => {
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     expect(screen.getByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
     const cont = screen.getByRole('button', { name: 'Continue' });
-    expect(cont).toBeDisabled();
+    // Unavailable but still focusable, with the reason beside it (aria-disabled, not disabled).
+    expect(cont).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Type their name to continue.')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
     // Date of death is optional (#21): a name alone is enough to continue.
-    expect(cont).toBeEnabled();
+    expect(cont).not.toHaveAttribute('aria-disabled', 'true');
     await user.type(screen.getByLabelText('Date they passed (optional)'), 'May 29, 2026');
     await user.click(cont);
 

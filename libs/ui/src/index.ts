@@ -30,5 +30,7 @@ export { ShareObituary } from './screens/ShareObituary';
 export type { ShareObituaryCopy, ShareObituaryProps } from './screens/ShareObituary';
 export { Account } from './screens/Account';
 export type { AccountCopy, AccountProps } from './screens/Account';
+export { PersonSetup } from './screens/PersonSetup';
+export type { PersonSetupCopy, PersonSetupProps } from './screens/PersonSetup';
 export { Sending } from './screens/Sending';
 export type { SendingCopy, SendingPerson, SendingProps } from './screens/Sending';
