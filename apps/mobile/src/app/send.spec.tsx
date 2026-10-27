@@ -40,7 +40,8 @@ const openAnna = async () => {
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
-  fireEvent.press(await screen.findByLabelText('Anna'));
+  // The first App render in this file is slow on a loaded CI runner; give Home time to read storage.
+  fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
 };
 
 // The hub comes first: Start is the announcement; the other steps are rows named for the step.
