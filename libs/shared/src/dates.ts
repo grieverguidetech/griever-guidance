@@ -69,3 +69,22 @@ export function addDays(date: Date, days: number): Date {
   result.setDate(result.getDate() + days);
   return result;
 }
+
+const MONTH_TITLES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/**
+ * A date from a date picker, written the way the session stores `dateOfPassing`
+ * ("June 7, 2025"; the same text web's `DateField` writes), so messages and sync are unchanged.
+ * Uses the local day, and does not depend on Intl.
+ */
+export function formatPassingDate(date: Date): string {
+  return `${MONTH_TITLES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+/** A stored `dateOfPassing` as the date a picker should open on; null when it is empty or not a complete date. */
+export function passingDateFromText(value: string | undefined | null): Date | null {
+  return parseCompleteDate(value);
+}

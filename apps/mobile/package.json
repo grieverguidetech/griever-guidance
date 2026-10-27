@@ -54,6 +54,7 @@
     "@griever/ui": "workspace:*",
     "@expo-google-fonts/source-serif-4": "0.4.1",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "9.2.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
     "@testing-library/react-native": "13.3.3",

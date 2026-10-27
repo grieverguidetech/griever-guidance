@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Who are we writing about screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "heading",
+    "headingEdit",
+    "intro",
+    "back",
+    "backName",
+    "checklist",
+    "nameLabel",
+    "nameAccessible",
+    "namePlaceholder",
+    "dateLabel",
+    "optional",
+    "senderLabel",
+    "senderPlaceholder",
+    "continue",
+    "needName",
+    "datePlaceholder",
+    "dateDone",
+    "dateClear",
+    "dateHint"
+  ],
+  "properties": {
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "headingEdit": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "back": {
+      "$ref": "#/$defs/text"
+    },
+    "checklist": {
+      "$ref": "#/$defs/text"
+    },
+    "nameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "nameAccessible": {
+      "$ref": "#/$defs/text"
+    },
+    "namePlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "dateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "optional": {
+      "$ref": "#/$defs/text"
+    },
+    "senderLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "senderPlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "continue": {
+      "$ref": "#/$defs/text"
+    },
+    "needName": {
+      "$ref": "#/$defs/text"
+    },
+    "datePlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "dateDone": {
+      "$ref": "#/$defs/text"
+    },
+    "dateClear": {
+      "$ref": "#/$defs/text"
+    },
+    "backName": {
+      "$ref": "#/$defs/text"
+    },
+    "dateHint": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

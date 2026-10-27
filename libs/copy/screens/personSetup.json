@@ -1,0 +1,21 @@
+{
+  "heading": "Who are we writing about?",
+  "headingEdit": "Edit their details",
+  "intro": "We'll carry this into every message, so you only type it once.",
+  "back": "Back",
+  "backName": "Back to home",
+  "checklist": "What you'll need",
+  "nameLabel": "Their name",
+  "nameAccessible": "Their name, required",
+  "namePlaceholder": "e.g. Margaret Hayes",
+  "dateLabel": "Date they passed",
+  "optional": "(optional)",
+  "senderLabel": "Your name",
+  "senderPlaceholder": "So people know who wrote",
+  "continue": "Continue",
+  "needName": "Type their name to continue.",
+  "datePlaceholder": "Choose a date",
+  "dateDone": "Done",
+  "dateClear": "Clear the date",
+  "dateHint": "Opens a calendar"
+}

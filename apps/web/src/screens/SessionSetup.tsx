@@ -1,6 +1,14 @@
+import { useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { Session } from '@griever/hooks';
-import { TopBar, SavedNote } from '../lib/ui';
-import { DateField, todayISO } from '../lib/DateField';
+import { screenCopy } from '@griever/copy';
+import { PersonSetup } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
+import { SavedNote } from '../lib/ui';
+import { DateInput, todayISO } from '../lib/DateField';
+import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
+
+const copy = screenCopy('personSetup');
 
 interface Props {
   session: Session;
@@ -10,65 +18,35 @@ interface Props {
   onBack: () => void;
 }
 
+/**
+ * The screen is the shared PersonSetup in libs/ui; this holds what is web only: the sheet and the
+ * typed date field with its calendar button. Date of death is optional, so pre-planning and recent
+ * losses both proceed; only the name is required.
+ */
 export function SessionSetup({ session, editing, onChange, onContinue, onBack }: Props) {
-  // Date of death is optional — pre-planning and recent losses both need to proceed.
-  const canContinue = Boolean(session.personName.trim());
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // The shared Button hands back a DOM node on web; the sheet wants it typed as one.
+  const checklistButton = useRef<ButtonNode>(null);
 
   return (
     <div className="flex flex-col gap-4">
-      <TopBar onBack={onBack} />
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[22px]">
-          {editing ? 'Edit their details' : 'Who are we writing about?'}
-        </h1>
-        <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-          We'll carry this into every message, so you only type it once.
-        </p>
-      </div>
-
-      <div className="gg-field">
-        <label htmlFor="s-name">Their name</label>
-        <input
-          id="s-name"
-          className="gg-input"
-          type="text"
-          placeholder="e.g. Margaret Hayes"
-          value={session.personName}
-          onChange={(e) => onChange({ personName: e.target.value })}
-        />
-      </div>
-
-      <DateField
-        id="s-date"
-        label="Date they passed (optional)"
-        value={session.dateOfPassing ?? ''}
-        max={todayISO()}
-        onChange={(dateOfPassing) => onChange({ dateOfPassing })}
+      <PersonSetup
+        copy={copy}
+        editing={editing}
+        name={session.personName}
+        onNameChange={(personName) => onChange({ personName })}
+        renderDate={({ labelId }) => (
+          <DateInput id="s-date" labelledBy={labelId} value={session.dateOfPassing ?? ''} max={todayISO()} onChange={(dateOfPassing) => onChange({ dateOfPassing })} />
+        )}
+        sender={session.senderName}
+        onSenderChange={(senderName) => onChange({ senderName })}
+        onBack={onBack}
+        onWhatYoullNeed={() => setSheetOpen(true)}
+        onContinue={onContinue}
+        footer={<SavedNote />}
+        checklistRef={checklistButton}
       />
-
-      <div className="gg-field">
-        <label htmlFor="s-sender">
-          Your name<span style={{ color: 'var(--text-eyebrow)' }}> (optional)</span>
-        </label>
-        <input
-          id="s-sender"
-          className="gg-input"
-          type="text"
-          placeholder="So people know who wrote"
-          value={session.senderName}
-          onChange={(e) => onChange({ senderName: e.target.value })}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={onContinue}
-        disabled={!canContinue}
-        className="gg-btn gg-btn-primary gg-btn-block"
-      >
-        Continue
-      </button>
-      <SavedNote />
+      {sheetOpen && <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />}
     </div>
   );
 }

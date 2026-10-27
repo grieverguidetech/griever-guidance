@@ -15,6 +15,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'review', file: 'screens/ConfirmScreen.tsx' },
   { copy: 'sending', file: 'screens/SendingScreen.tsx' },
   { copy: 'shareObituary', file: 'screens/ShareObituary.tsx' },
+  { copy: 'personSetup', file: 'screens/SessionSetup.tsx' },
 ];
 
 describe('migrated screens do not hard-code copy', () => {
