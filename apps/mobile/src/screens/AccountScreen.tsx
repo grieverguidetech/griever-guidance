@@ -30,7 +30,7 @@ function AccountChecklist({ tipOpen, onTipChange }: { tipOpen: string | null; on
   return (
     <View style={styles.checklist}>
       <Text accessibilityRole="header" style={styles.checklistTitle}>What you'll need</Text>
-      <Text style={styles.checklistNote}>Not today. Just so none of it surprises you.</Text>
+      <Text style={styles.checklistNote}>{copy.checklistNote}</Text>
       <ChecklistRows tipOpen={tipOpen} onTipChange={onTipChange} />
     </View>
   );
@@ -85,14 +85,18 @@ function AccountBody({
     if (!pendingName || !isSignedIn || attempted.current === pendingName) return;
     attempted.current = pendingName;
     void updateSenderName(pendingName.name).then((ok) => {
-      if (ok) clearPending();
+      if (ok) {
+        clearPending();
+      }
     });
   }, [pendingName, isSignedIn, updateSenderName]);
 
   // Once the account holds the name, the in-memory copy has done its job.
   const savedName = identity.profile?.senderName;
   useEffect(() => {
-    if (pendingName && savedName === pendingName.name) clearPending();
+    if (pendingName && savedName === pendingName.name) {
+      clearPending();
+    }
   }, [pendingName, savedName]);
 
   function clearPending() {
@@ -151,7 +155,9 @@ function AccountBody({
         onSwitchToSignUp={() => switchMode('signUp')}
         onAttempt={(email) => {
           // Signing in as someone else: the sign-up name is not theirs.
-          if (pendingName && !sameEmail(pendingName.email, email)) clearPending();
+          if (pendingName && !sameEmail(pendingName.email, email)) {
+            clearPending();
+          }
         }}
       />
     </>

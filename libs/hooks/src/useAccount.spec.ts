@@ -171,7 +171,7 @@ describe('useAccount offline (C5)', () => {
     expect(result.current.offline).toBe(false);
   });
 
-  it('a token that failed for a non-network reason is an error, not offline (#343)', async () => {
+  it('a token that failed for a non-network reason is not offline (#343)', async () => {
     const auth = fakeAuth({ getToken: async () => ({ ok: false, reason: 'failed' }) });
     const { result } = renderHook(() => useAccount({ auth }));
     await act(async () => undefined);

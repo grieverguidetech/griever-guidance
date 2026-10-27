@@ -5,7 +5,6 @@ import { screenCopy } from '@griever/copy';
 import { Account } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
 import type { UseAccountResult } from '@griever/hooks';
-import { announce } from '../components/authForm';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
 const copy = screenCopy('account');
@@ -70,7 +69,6 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       const ok = await identity.updateSenderName(name.trim());
       setSaved(ok);
       if (ok) {
-        announce(copy.saved);
         onSaved();
       }
     } finally {

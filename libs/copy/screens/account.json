@@ -17,5 +17,6 @@
   "saveFailed": "We couldn't save your name. You can try again.",
   "sessionEnded": "You've been signed out. Your work on this device is safe. Sign in again when you're ready.",
   "unavailable": "Accounts aren't available right now.",
-  "loading": "One moment."
+  "loading": "One moment.",
+  "checklistNote": "Not today. Just so none of it surprises you."
 }

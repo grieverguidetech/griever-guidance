@@ -22,7 +22,8 @@
     "saveFailed",
     "sessionEnded",
     "unavailable",
-    "loading"
+    "loading",
+    "checklistNote"
   ],
   "properties": {
     "heading": {
@@ -80,6 +81,9 @@
       "$ref": "#/$defs/text"
     },
     "loading": {
+      "$ref": "#/$defs/text"
+    },
+    "checklistNote": {
       "$ref": "#/$defs/text"
     }
   },

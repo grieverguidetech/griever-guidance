@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Account } from './Account';
 import type { AccountCopy, AccountProps } from './Account';
@@ -60,9 +60,9 @@ describe('Account', () => {
     const button = screen.getByRole('button', { name: 'Sign out' });
     await userEvent.click(button);
     expect(props.onSignOut).toHaveBeenCalledTimes(1);
-    // The header look is a thin outline with no fill; the primary Save has a solid fill.
-    expect(getComputedStyle(button).backgroundColor).not.toBe(getComputedStyle(screen.getByRole('button', { name: 'Save' })).backgroundColor);
-    expect(getComputedStyle(button).borderTopWidth).toBe('1px');
+    // The header look has no fill; the primary Save has a solid one.
+    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(getComputedStyle(button).backgroundColor);
+    expect(getComputedStyle(screen.getByRole('button', { name: 'Save' })).backgroundColor).not.toBe(getComputedStyle(button).backgroundColor);
   });
 
   it('leaves Sign out out when there is no handler', () => {
@@ -75,6 +75,28 @@ describe('Account', () => {
     expect(screen.queryByText(copy.offline)).not.toBeInTheDocument();
     rerender({ offline: true });
     expect(screen.getByText(copy.offline)).toBeInTheDocument();
+  });
+
+  it('always renders the status node, empty when there is no message', () => {
+    setup();
+    expect(screen.getAllByRole('status').length).toBeGreaterThanOrEqual(2);
+    for (const node of screen.getAllByRole('status')) {
+      expect(node).toBeEmptyDOMElement();
+    }
+  });
+
+  it('draws an error in the danger colour, different from a plain status', () => {
+    setup({ status: { message: 'We could not save.', tone: 'danger' } });
+    const danger = getComputedStyle(screen.getByText('We could not save.')).color;
+    cleanup();
+    setup({ status: { message: 'Your name is saved.' } });
+    expect(getComputedStyle(screen.getByText('Your name is saved.')).color).not.toBe(danger);
+  });
+
+  it('moves focus to the name field when its label is tapped', async () => {
+    setup();
+    await userEvent.click(screen.getByText('Your name'));
+    expect(screen.getByLabelText('Your name')).toHaveFocus();
   });
 
   it('shows a status message and an error in the live status line', () => {

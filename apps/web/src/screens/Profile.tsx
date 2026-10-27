@@ -119,7 +119,8 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
     />
   );
   const sheet = sheetOpen ? (
-    <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />
+    <WhatYoullNeedSheet onClose={() => setSheetOpen(false)} // The shared Button's ref is typed for web and native; on web it holds the DOM button, which is what the sheet needs.
+      returnFocusRef={checklistButton as unknown as RefObject<HTMLElement | null>} />
   ) : null;
   if (!peopleHelping && !showList) {
     return (
@@ -138,7 +139,7 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
             {copy.checklist}
           </h2>
           <p className="text-[13px] m-0" style={{ color: 'var(--text-muted)' }}>
-            Not today. Just so none of it surprises you.
+            {copy.checklistNote}
           </p>
           <ChecklistRows />
         </section>

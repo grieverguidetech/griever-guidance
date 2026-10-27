@@ -257,7 +257,8 @@ describe('profile', () => {
     press('Save');
     await screen.findByText('Your name is saved.');
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Samantha' });
-    expect(announce).toHaveBeenCalledWith('Your name is saved.');
+    // Only the shared status line announces it, once.
+    expect(announce.mock.calls.filter(([m]) => m === 'Your name is saved.')).toHaveLength(1);
   });
 
   it('shows "Your name is saved." on the first save, when the account had no profile yet', async () => {
@@ -293,7 +294,7 @@ describe('profile', () => {
     await screen.findByText('You are offline. You can change your name when you are connected.');
   });
 
-  it('shows no offline line when the profile loads, and saves a new name (#343)', async () => {
+  it('saves a new name and shows no offline line when online (#343)', async () => {
     mockGetProfile.mockResolvedValue(profileWith('Sam'));
     renderAccount(true);
     await screen.findByDisplayValue('Sam');

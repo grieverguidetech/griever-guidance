@@ -1,5 +1,5 @@
-import { useId, useState } from 'react';
-import type { ReactNode, Ref } from 'react';
+import { useId, useRef, useState } from 'react';
+import type { ComponentRef, ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
@@ -81,6 +81,7 @@ export function Account({
   const offlineId = useId();
   const statusId = useId();
   const [focused, setFocused] = useState(false);
+  const fieldRef = useRef<ComponentRef<typeof TextInput>>(null);
   const submit = () => {
     if (!primaryBusy) {
       onPrimary();
@@ -106,10 +107,11 @@ export function Account({
       </View>
       <Status id={offlineId} message={offline ? copy.offline : undefined} />
       <View style={styles.field}>
-        <Body tone="strong" id={labelId}>
+        <Body tone="strong" id={labelId} onPress={() => fieldRef.current?.focus()}>
           {copy.nameLabel}
         </Body>
         <TextInput
+          ref={fieldRef}
           style={[styles.input, inputFont, focused && Platform.OS !== 'web' && styles.inputFocused]}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
