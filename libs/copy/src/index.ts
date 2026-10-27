@@ -91,3 +91,51 @@ export function sendLabel(count: number | undefined, copy: ScreenCopy<'review'>)
   }
   return fill(copy.send, { recipients: recipientsPhrase(count, copy) });
 }
+
+/** The obituary form's fields (same names as `ObituaryRequest`). Dates are display text. */
+export interface ObituaryDraftFields {
+  fullName: string;
+  dateOfBirth?: string;
+  dateOfPassing?: string;
+  cityOfResidence?: string;
+  career?: string;
+  survivors?: string;
+  personalNote?: string;
+}
+
+/** Full stop at the end of a sentence, unless the person already ended it. */
+function endSentence(text: string): string {
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+
+/**
+ * Fill the obituary template. A sentence is left out when its field is empty or only spaces.
+ * Sentences are grouped into three short paragraphs, separated by a blank line.
+ */
+export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy<'obituaryDraft'>): string {
+  const fullName = fields.fullName.trim();
+  const dateOfBirth = (fields.dateOfBirth ?? '').trim();
+  const dateOfPassing = (fields.dateOfPassing ?? '').trim();
+  const cityOfResidence = (fields.cityOfResidence ?? '').trim();
+  const career = (fields.career ?? '').trim();
+  const survivors = (fields.survivors ?? '').trim();
+  const personalNote = (fields.personalNote ?? '').trim();
+
+  const paragraphs = [
+    [
+      dateOfPassing ? fill(copy.openingWithDate, { fullName, dateOfPassing }) : fill(copy.opening, { fullName }),
+      dateOfBirth ? fill(copy.born, { dateOfBirth }) : '',
+    ],
+    [
+      cityOfResidence ? fill(copy.city, { fullName, cityOfResidence }) : '',
+      career ? fill(copy.career, { career }) : '',
+      personalNote ? fill(copy.memory, { personalNote }) : '',
+    ],
+    [survivors ? fill(copy.survivors, { survivors }) : '', fill(copy.closing, { fullName })],
+  ];
+
+  return paragraphs
+    .map((sentences) => sentences.filter(Boolean).map(endSentence).join(' '))
+    .filter(Boolean)
+    .join('\n\n');
+}

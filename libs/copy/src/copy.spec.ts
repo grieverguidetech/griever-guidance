@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { announceRecap, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames, sendLabel } from './index';
+import { announceRecap, buildObituaryDraft, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames, sendLabel } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
@@ -166,5 +166,88 @@ describe('sendLabel', () => {
   it('falls back when there is no count to show', () => {
     expect(sendLabel(undefined, copy)).toBe('Text these people');
     expect(sendLabel(0, copy)).toBe('Text these people');
+  });
+});
+
+describe('buildObituaryDraft', () => {
+  const copy = screenCopy('obituaryDraft');
+
+  it('writes every sentence when every field is filled', () => {
+    const draft = buildObituaryDraft(
+      {
+        fullName: 'Margaret Ellen Hayes',
+        dateOfBirth: 'March 2, 1941',
+        dateOfPassing: 'June 7, 2025',
+        cityOfResidence: 'Boston, MA',
+        career: 'retired schoolteacher',
+        survivors: 'husband John, two daughters',
+        personalNote: 'She made everyone feel at home.',
+      },
+      copy,
+    );
+    expect(draft).toBe(
+      [
+        'Margaret Ellen Hayes died on June 7, 2025. They were born on March 2, 1941.',
+        'Margaret Ellen Hayes lived in Boston, MA. Their work: retired schoolteacher. She made everyone feel at home.',
+        'Survived by husband John, two daughters. Margaret Ellen Hayes will be remembered with love.',
+      ].join('\n\n'),
+    );
+  });
+
+  it('writes only the name, the opening and the closing line', () => {
+    expect(buildObituaryDraft({ fullName: 'Margaret Ellen Hayes' }, copy)).toBe(
+      'Margaret Ellen Hayes has died.\n\nMargaret Ellen Hayes will be remembered with love.',
+    );
+  });
+
+  it('adds both dates when the name and both dates are given', () => {
+    expect(
+      buildObituaryDraft(
+        { fullName: 'Margaret Ellen Hayes', dateOfBirth: 'March 2, 1941', dateOfPassing: 'June 7, 2025' },
+        copy,
+      ),
+    ).toBe(
+      'Margaret Ellen Hayes died on June 7, 2025. They were born on March 2, 1941.\n\nMargaret Ellen Hayes will be remembered with love.',
+    );
+  });
+
+  it('keeps the birth date when the date of passing is missing', () => {
+    expect(buildObituaryDraft({ fullName: 'Margaret Ellen Hayes', dateOfBirth: 'March 2, 1941' }, copy)).toBe(
+      'Margaret Ellen Hayes has died. They were born on March 2, 1941.\n\nMargaret Ellen Hayes will be remembered with love.',
+    );
+  });
+
+  it('writes survivors when there is no career', () => {
+    expect(
+      buildObituaryDraft(
+        { fullName: 'Margaret Ellen Hayes', cityOfResidence: 'Boston, MA', survivors: 'husband John, two daughters' },
+        copy,
+      ),
+    ).toBe(
+      'Margaret Ellen Hayes has died.\n\nMargaret Ellen Hayes lived in Boston, MA.\n\nSurvived by husband John, two daughters. Margaret Ellen Hayes will be remembered with love.',
+    );
+  });
+
+  it('treats fields with only spaces as empty', () => {
+    expect(
+      buildObituaryDraft(
+        {
+          fullName: 'Margaret Ellen Hayes',
+          dateOfBirth: '  ',
+          dateOfPassing: '\t',
+          cityOfResidence: ' ',
+          career: '\n',
+          survivors: '   ',
+          personalNote: ' ',
+        },
+        copy,
+      ),
+    ).toBe('Margaret Ellen Hayes has died.\n\nMargaret Ellen Hayes will be remembered with love.');
+  });
+
+  it('adds a full stop to a memory the person did not end', () => {
+    expect(buildObituaryDraft({ fullName: 'Margaret Ellen Hayes', personalNote: 'She loved to garden' }, copy)).toContain(
+      'She loved to garden.',
+    );
   });
 });
