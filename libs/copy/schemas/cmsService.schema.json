@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the planning editor, Service section",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "typeLabel",
+    "typePlaceholder",
+    "dateLabel",
+    "timeLabel",
+    "placeLabel",
+    "addressLabel",
+    "notesLabel",
+    "messageLabel",
+    "messageHint",
+    "useDetails"
+  ],
+  "properties": {
+    "typeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "typePlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "dateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "timeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "placeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "addressLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "notesLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "messageLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "messageHint": {
+      "$ref": "#/$defs/text"
+    },
+    "useDetails": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
