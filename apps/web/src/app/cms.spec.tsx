@@ -203,20 +203,19 @@ describe('editor on (#395)', () => {
     expect(stored()).toHaveLength(1);
   });
 
-  it('shows the coming-later note for Announcement, Obituary and Thank-yous', async () => {
-    const user = userEvent.setup();
+  it('lists Announcement, Obituary and Thank-yous in the nav as plain text, not buttons', async () => {
     await openMargaret();
+    const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
-      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
-      await screen.findByRole('heading', { level: 1, name });
-      expect(screen.getByText('This part comes later. Nothing is needed here yet.')).toBeInTheDocument();
+      expect(nav.queryByRole('button', { name })).toBeNull();
+      expect(nav.getByText(name)).toBeInTheDocument();
     }
   });
 
   it('reaches no path, wizard, sms: link or "Open Messages" from any section', async () => {
     const user = userEvent.setup();
     await openMargaret();
-    for (const name of ['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
+    for (const name of ['Overview', 'The person', 'Service']) {
       await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
       expect(document.querySelector('a[href^="sms:"]')).toBeNull();

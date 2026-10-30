@@ -17,15 +17,25 @@ describe('SideNav', () => {
   it('lists the 7 items in order inside the Sections nav', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    const names = within(nav).getAllByRole('button').map((b) => b.textContent);
+    const names = within(nav).getAllByRole('listitem').map((li) => li.textContent);
     expect(names).toEqual(['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
   });
 
+  it('makes only the open sections and the two ends buttons; later sections are plain text', () => {
+    setup();
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Overview', 'The person', 'Service', 'Your account']);
+    for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
+      expect(within(nav).queryByRole('button', { name })).toBeNull();
+      expect(within(nav).getByText(name)).toBeInTheDocument();
+    }
+  });
+
   it('marks only the current item with aria-current=page', () => {
-    setup({ section: 'obituary' });
+    setup({ section: 'person' });
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     const current = within(nav).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page');
-    expect(current.map((b) => b.textContent)).toEqual(['Obituary']);
+    expect(current.map((b) => b.textContent)).toEqual(['The person']);
   });
 
   it('shows the person name', () => {
@@ -48,8 +58,8 @@ describe('SideNav', () => {
 
   it('keeps the menu button outside the nav landmark and hides it from md up', () => {
     setup();
-    const menu = screen.getByRole('button', { name: 'Sections' });
-    expect(within(screen.getByRole('navigation')).queryByRole('button', { name: 'Sections' })).toBeNull();
+    const menu = screen.getByRole('button', { name: 'Sections · Service' });
+    expect(within(screen.getByRole('navigation')).queryByRole('button', { name: /^Sections/ })).toBeNull();
     expect(menu).toHaveClass('md:hidden');
     expect(menu).toHaveAttribute('aria-expanded', 'false');
     expect(document.getElementById(menu.getAttribute('aria-controls') ?? '')).toHaveClass('hidden', 'md:flex');
@@ -57,7 +67,7 @@ describe('SideNav', () => {
 
   it('opens and closes with the menu button', async () => {
     setup();
-    const menu = screen.getByRole('button', { name: 'Sections' });
+    const menu = screen.getByRole('button', { name: 'Sections · Service' });
     await userEvent.click(menu);
     expect(menu).toHaveAttribute('aria-expanded', 'true');
     await userEvent.click(menu);
@@ -66,16 +76,16 @@ describe('SideNav', () => {
 
   it('choosing an item calls onSelect and closes the menu', async () => {
     const { onSelect } = setup();
-    const menu = screen.getByRole('button', { name: 'Sections' });
+    const menu = screen.getByRole('button', { name: 'Sections · Service' });
     await userEvent.click(menu);
-    await userEvent.click(screen.getByRole('button', { name: 'Announcement' }));
-    expect(onSelect).toHaveBeenCalledWith<[CmsNavKey]>('announcement');
+    await userEvent.click(screen.getByRole('button', { name: 'The person' }));
+    expect(onSelect).toHaveBeenCalledWith<[CmsNavKey]>('person');
     expect(menu).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('Escape closes the menu and returns focus to the menu button', async () => {
     setup();
-    const menu = screen.getByRole('button', { name: 'Sections' });
+    const menu = screen.getByRole('button', { name: 'Sections · Service' });
     await userEvent.click(menu);
     screen.getByRole('button', { name: 'Overview' }).focus();
     await userEvent.keyboard('{Escape}');
@@ -90,21 +100,36 @@ describe('SideNav', () => {
     expect(within(nav).getByText('In progress')).toBeInTheDocument();
     expect(within(nav).queryAllByText('Not started')).toHaveLength(0);
     expect(within(nav).getAllByText('Later')).toHaveLength(3);
-    expect(within(nav).getAllByText('Later')[0]).toHaveClass('text-[color:var(--text-muted)]');
-    expect(within(nav).getAllByText('Later')[0]).toHaveClass('text-[14px]');
+    expect(within(nav).getAllByText('Later')[0]).toHaveClass('gg-meta');
+    expect(within(nav).getByText('Ready').closest('button')?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(within(nav).getByText('In progress').closest('button')?.querySelector('svg')).toBeNull();
   });
 
   it('gives an item its label and status as one name, with a space between', () => {
     setup({ statuses: { service: 'in_progress' } });
     expect(screen.getByRole('button', { name: 'Service In progress' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Obituary Later' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Obituary/ })).toBeNull();
+    expect(screen.getByText('Obituary').closest('li')).toHaveTextContent('Obituary Later');
     expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument();
   });
 
   it('styles the current item beyond aria-current', () => {
     setup({ section: 'service' });
-    expect(screen.getByRole('button', { name: 'Service' })).toHaveClass('font-semibold', 'bg-accent-100', 'border-l-4');
-    expect(screen.getByRole('button', { name: 'Obituary' })).not.toHaveClass('font-semibold');
+    const current = screen.getByRole('button', { name: 'Service' });
+    expect(current).toHaveClass('bg-accent-100', 'shadow-[inset_3px_0_0_var(--color-accent-700)]');
+    expect(current).not.toHaveClass('font-semibold');
+    expect(screen.getByRole('button', { name: 'The person' })).not.toHaveClass('bg-accent-100');
+  });
+
+  it('puts the current section in the phone menu button', () => {
+    setup({ section: 'overview' });
+    expect(screen.getByRole('button', { name: 'Sections · Overview' })).toBeInTheDocument();
+  });
+
+  it('is sticky from md up at the shell offset', () => {
+    setup();
+    const menu = screen.getByRole('button', { name: 'Sections · Service' });
+    expect(menu.parentElement).toHaveClass('md:sticky', 'md:top-[52px]');
   });
 
   it('with accountOnly offers just "Your account": no sections, no name, no Change, no menu button', async () => {
