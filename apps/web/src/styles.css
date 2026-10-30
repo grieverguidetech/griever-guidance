@@ -80,6 +80,11 @@
   --text-muted: color-mix(in srgb, var(--color-text) 72%, transparent);
   --text-hint: color-mix(in srgb, var(--color-text) 68%, transparent);
   --text-eyebrow: color-mix(in srgb, var(--color-text) 68%, transparent);
+
+  /* Motion: short and calm. Used by .gg-row, .gg-chip and .gg-enter. */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --ease-calm: cubic-bezier(.2, 0, 0, 1);
 }
 
 body {
@@ -381,5 +386,72 @@ h1, h2, h3, h4, h5, h6 {
     font-style: italic;
     font-size: 13px;
     color: var(--text-hint);
+  }
+
+  /* — calm primitives (#479): panel, row, chip, hint, meta, enter — */
+  .gg-panel {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+  }
+  .gg-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    text-align: left;
+    color: var(--color-text);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--dur-1) ease;
+  }
+  .gg-row:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+  .gg-row:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+  .gg-row-trail { margin-left: auto; flex: 0 0 auto; }
+  .gg-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    font-size: 14px;
+    color: var(--color-text);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--dur-1) ease, box-shadow var(--dur-1) ease;
+  }
+  .gg-chip:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+  .gg-chip:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+  .gg-chip[aria-pressed='true'] {
+    background: var(--color-accent-100);
+    box-shadow: inset 0 0 0 2px var(--color-accent-700);
+  }
+  .gg-hint { font-size: 13px; color: var(--text-hint); }
+  .gg-meta { font-size: 13px; color: var(--text-muted); }
+  @keyframes gg-enter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .gg-enter { animation: gg-enter var(--dur-2) var(--ease-calm) both; }
+  }
+}
+
+/* Reduced motion: gg-* transitions and animations become near-instant. Unlayered so it beats
+   the component layer; it only matches gg-* classes, so nothing else changes. */
+@media (prefers-reduced-motion: reduce) {
+  [class*='gg-'], [class*='gg-']::before, [class*='gg-']::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
