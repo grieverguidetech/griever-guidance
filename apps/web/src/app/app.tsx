@@ -67,6 +67,8 @@ type AppView =
 /** The editor's sections; the account is a separate view, so it is never a section. */
 type CmsSection = Exclude<CmsNavKey, 'account'>;
 
+/** How long a landing waits for the profile (to tell a member from an owner) before giving up. */
+const LANDING_PROFILE_WAIT_MS = 3000;
 const cmsShellCopy = screenCopy('cmsShell');
 const cmsItemLabels = screenCopy('cmsChecklist').items;
 
@@ -791,15 +793,34 @@ function AppBody({
     }
   }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, profileKnown, canCreate]);
 
+  // No profile after a while (the call failed or is slow): give up landing for this sign-in rather
+  // than jump someone later who has already started using Home.
   useEffect(() => {
-    if (!focusAfterLanding.current || view !== 'cms') {
+    const waiting = CMS_ENABLED && !landed.current && isSignedIn && !auth?.isLoading && view === 'home' && !profileKnown;
+    if (!waiting) {
       return;
     }
-    const heading = document.querySelector('h1');
-    if (heading) {
+    const timer = setTimeout(() => {
+      landed.current = true;
+    }, LANDING_PROFILE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [isSignedIn, auth?.isLoading, view, profileKnown]);
+
+  // Armed by the landing. Fires once on the first editor render, then disarms (even with no h1). If the
+  // landing is interrupted (another screen shows first), it disarms so it can't fire on a later visit.
+  useEffect(() => {
+    if (!focusAfterLanding.current) {
+      return;
+    }
+    if (view === 'cms') {
       focusAfterLanding.current = false;
-      heading.setAttribute('tabindex', '-1');
-      heading.focus();
+      const heading = document.querySelector('h1');
+      if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus();
+      }
+    } else if (view !== 'home') {
+      focusAfterLanding.current = false;
     }
   });
 

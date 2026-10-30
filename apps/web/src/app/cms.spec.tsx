@@ -42,8 +42,6 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-type User = ReturnType<typeof userEvent.setup>;
-
 const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 
@@ -78,7 +76,7 @@ async function expectHome() {
 }
 
 /** Loading with one saved person lands on their Overview (#448). */
-async function openMargaret(_user?: User) {
+async function openMargaret() {
   seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
   render(<App />);
   return screen.findByRole('heading', { level: 1, name: 'Overview' });
@@ -96,8 +94,7 @@ beforeEach(() => {
 
 describe('editor on (#395)', () => {
   it('opens a person on their Overview and records the visit', async () => {
-    const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     expect(screen.queryByRole('heading', { name: 'One thing at a time.' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /^Now:/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Next on the list/ })).toBeInTheDocument();
@@ -122,7 +119,7 @@ describe('editor on (#395)', () => {
 
   it('marking Service ready shows Ready on the Overview', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
@@ -158,7 +155,7 @@ describe('editor on (#395)', () => {
 
   it('taking "Mark as ready" back on Service sets In progress and clears serviceReady', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
@@ -170,7 +167,7 @@ describe('editor on (#395)', () => {
 
   it('"Change" keeps a named person', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     await user.click(screen.getByRole('button', { name: /Change/ }));
     await expectHome();
     expect(stored()).toHaveLength(1);
@@ -178,7 +175,7 @@ describe('editor on (#395)', () => {
 
   it('shows the coming-later note for Announcement, Obituary and Thank-yous', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
       await user.click(screen.getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
@@ -188,7 +185,7 @@ describe('editor on (#395)', () => {
 
   it('reaches no path, wizard, sms: link or "Open Messages" from any section', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     for (const name of ['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
       await user.click(screen.getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
@@ -200,7 +197,7 @@ describe('editor on (#395)', () => {
 
   it('moves focus to the h1 when an Overview row or Next opens a section', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: /^Overview/ }));
@@ -211,7 +208,7 @@ describe('editor on (#395)', () => {
 
   it('"Your account" opens Settings when nobody is signed in, and Back returns to Home', async () => {
     const user = userEvent.setup();
-    await openMargaret(user);
+    await openMargaret();
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Back' }));
