@@ -18,6 +18,22 @@ function setup(section: CmsNavKey = 'service') {
   return { onSelect, onAccount, onChangePerson };
 }
 
+describe('CmsShell people view', () => {
+  it('has one h1, no section buttons, and "Your account" calls onAccount after focusing the h1', async () => {
+    const onAccount = vi.fn();
+    render(
+      <CmsShell title="Your people" peopleView personName="" section="overview" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={onAccount}>
+        <p>List</p>
+      </CmsShell>,
+    );
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Your account']);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
+    expect(onAccount).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+  });
+});
+
 describe('CmsShell', () => {
   it.each<[CmsNavKey, string]>([
     ['overview', 'Overview'],

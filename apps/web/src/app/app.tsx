@@ -22,6 +22,7 @@ import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { CmsShell } from '../cms/CmsShell';
 import { Overview } from '../cms/Overview';
+import { PeopleList } from '../cms/PeopleList';
 import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
 import { ChecklistItemDetail } from '../cms/checklist/ChecklistItemDetail';
 import { PersonSection } from '../cms/sections/PersonSection';
@@ -62,7 +63,8 @@ type AppView =
   | 'shareObituary'
   | 'flow'
   | 'obituary'
-  | 'cms';
+  | 'cms'
+  | 'people';
 
 /** The editor's sections; the account is a separate view, so it is never a section. */
 type CmsSection = Exclude<CmsNavKey, 'account'>;
@@ -531,7 +533,7 @@ function AppBody({
 
   // With no one open these views have nothing to show, and Home stands in; keep the state honest.
   useEffect(() => {
-    if (!active && NEEDS_PERSON.includes(view)) setView('home');
+    if (!active && NEEDS_PERSON.includes(view)) setView(CMS_ENABLED ? 'people' : 'home');
   }, [active, view]);
 
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
@@ -597,8 +599,21 @@ function AppBody({
     setView(active ? 'pathLanding' : 'home');
   }, [active]);
 
+  /**
+   * Flag off: Home. Flag on there is no Home: the open person's Overview, or "Your people" with
+   * nobody open. Used by Back from the account screens and the setup exit.
+   */
   function goHome() {
-    setView('home');
+    if (!CMS_ENABLED) {
+      setView('home');
+      return;
+    }
+    if (active) {
+      setCmsSection('overview');
+      setView('cms');
+      return;
+    }
+    setView('people');
   }
 
   /** Makes this person the active one and opens their path. A half-written message shows "Started" there (#25). */
@@ -787,9 +802,11 @@ function AppBody({
       return;
     }
     landed.current = true;
+    focusAfterLanding.current = true;
     if (canCreate) {
-      focusAfterLanding.current = true;
       opens.current.startNewSession();
+    } else {
+      setView('people');
     }
   }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, profileKnown, canCreate]);
 
@@ -812,7 +829,7 @@ function AppBody({
     if (!focusAfterLanding.current) {
       return;
     }
-    if (view === 'cms') {
+    if (view === 'cms' || view === 'people') {
       focusAfterLanding.current = false;
       const heading = document.querySelector('h1');
       if (heading) {
@@ -824,12 +841,12 @@ function AppBody({
     }
   });
 
-  /** "Change" in the editor: an unnamed person is dropped, then Home. */
+  /** "Change" in the editor: an unnamed person is dropped, then "Your people". */
   function leaveCms() {
     sessions.pruneEmpty();
     setCmsItem(null);
     setActiveId(null);
-    goHome();
+    setView('people');
   }
 
   // While Clerk is loading or a stored session is being checked, show nothing but the quiet status.
@@ -873,7 +890,11 @@ function AppBody({
           onBack={() => {
             auth.clearError();
             setAskingName(false);
-            setView(askingName ? returnTo : 'home');
+            if (askingName) {
+              setView(returnTo);
+            } else {
+              goHome();
+            }
           }}
           onSave={async (name) => {
             const saved = await auth.updateSenderName(name);
@@ -960,6 +981,35 @@ function AppBody({
           ) : (
             <p>{cmsShellCopy.comingLater}</p>
           )}
+        </CmsShell>
+      </Shell>
+    );
+  }
+
+  // Flag on: "Your people" is the only list. The view 'home' is the same screen, so a moment before
+  // the landing (or a sign-in that has not settled) never shows the old Home.
+  if (CMS_ENABLED && (view === 'people' || view === 'home')) {
+    return (
+      <Shell wide>
+        <CmsShell
+          title={cmsShellCopy.peopleTitle}
+          peopleView
+          personName={active?.personName ?? ''}
+          section={cmsSection}
+          // Only the account item is offered here, and it goes to onAccount.
+          onSelect={() => undefined}
+          onChangePerson={() => undefined}
+          onAccount={() => {
+            sessions.pruneEmpty();
+            if (auth?.isSignedIn) {
+              openProfile(false, 'people');
+            } else {
+              setView('settings');
+            }
+          }}
+          notice={endedNote}
+        >
+          <PeopleList sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate={canCreate} />
         </CmsShell>
       </Shell>
     );

@@ -17,5 +17,12 @@
   "next": "Next: {section}",
   "overviewIntro": "Everything is saved as you go. You can stop and come back.",
   "comingLater": "This part comes later. Nothing is needed here yet.",
-  "markReady": "Mark as ready"
+  "markReady": "Mark as ready",
+  "peopleTitle": "Your people",
+  "peopleListLabel": "People",
+  "peopleEmptyOwner": "No one here yet.",
+  "peopleEmptyMember": "When someone adds you to help, the people you're helping will show here.",
+  "peopleCreateFirst": "Start with someone I've lost",
+  "peopleCreateAnother": "Someone else I've lost",
+  "peoplePassed": "{name}, passed {date}"
 }

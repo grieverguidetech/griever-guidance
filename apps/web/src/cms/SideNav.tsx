@@ -46,13 +46,15 @@ interface Props {
   onChangePerson: () => void;
   /** When given, each section shows its status; a missing key reads as not started. */
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
+  /** The people list: no person is the subject, so only the account item is offered. */
+  accountOnly?: boolean;
 }
 
 /**
  * Wide screens: always shown. Narrow screens: behind a menu button. The button sits outside the
  * nav landmark so a screen reader does not hear the landmark name twice.
  */
-export function SideNav({ personName, section, onSelect, onChangePerson, statuses }: Props) {
+export function SideNav({ personName, section, onSelect, onChangePerson, statuses, accountOnly = false }: Props) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -68,6 +70,22 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
   function choose(key: CmsNavKey) {
     setOpen(false);
     onSelect(key);
+  }
+
+  if (accountOnly) {
+    return (
+      <div className="flex flex-col gap-2 md:w-64 md:shrink-0">
+        <nav aria-label={copy.navLandmark}>
+          <ul className="flex flex-col gap-1 list-none p-0 m-0">
+            <li>
+              <button type="button" className="gg-btn gg-btn-ghost w-full !justify-between text-left" onClick={() => onSelect('account')}>
+                <span>{navTitle('account')}</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    );
   }
 
   return (

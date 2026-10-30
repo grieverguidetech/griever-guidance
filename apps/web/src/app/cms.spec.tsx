@@ -42,7 +42,8 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const HOME = "Who you're writing about";
+const HOME = 'Your people';
+const OLD_HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 
 function person(id: string, name: string, openedAt: string) {
@@ -73,6 +74,7 @@ function stored(): { id: string; personName: string; lastOpenedAt: string; secti
 
 async function expectHome() {
   expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: OLD_HOME })).not.toBeInTheDocument();
 }
 
 /** Loading with one saved person lands on their Overview (#448). */
@@ -206,14 +208,13 @@ describe('editor on (#395)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toHaveFocus();
   });
 
-  it('"Your account" opens Settings when nobody is signed in, and Back returns to Home', async () => {
+  it('"Your account" opens Settings when nobody is signed in, and Back returns to the Overview', async () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    await expectHome();
-    expect(screen.getByRole('heading', { level: 1, name: HOME })).toHaveFocus();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
   });
 });
 
@@ -234,7 +235,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: 'u1' }).load);
   }
 
-  it('"Your account" opens the profile, and Back returns to Home', async () => {
+  it('"Your account" opens the profile, and Back returns to the Overview', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
@@ -244,8 +245,7 @@ describe('editor on, signed in (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    await expectHome();
-    expect(screen.getByRole('heading', { level: 1, name: HOME })).toHaveFocus();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
   });
 
   it('a member has no "Create a new one"', async () => {
@@ -272,7 +272,7 @@ describe('editor off (#395)', () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
-    await expectHome();
+    expect(await screen.findByRole('heading', { level: 1, name: OLD_HOME })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
