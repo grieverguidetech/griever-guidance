@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
+import { CHECKLIST_PHASES } from '@griever/shared';
 import { ChecklistPanel } from './ChecklistPanel';
 
 const copy = screenCopy('cmsChecklist');
@@ -49,6 +50,17 @@ describe('ChecklistPanel', () => {
     expect(onSetItem).toHaveBeenCalledWith('pronouncement', 'done');
     await user.click(screen.getByRole('button', { name: copy.items.custody }));
     expect(onOpenItem).toHaveBeenCalledWith('custody');
+  });
+
+  it('has h3 headings: the card, Gather, and the six phases', () => {
+    render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
+    const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(names).toEqual([
+      'Certified death certificates',
+      'Gather when you can',
+      ...CHECKLIST_PHASES.map((p) => copy.phases[p.key]),
+    ]);
+    expect(CHECKLIST_PHASES).toHaveLength(6);
   });
 
   it('has no h1, no heading above h3, and no counts', () => {
