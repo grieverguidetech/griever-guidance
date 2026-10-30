@@ -22,19 +22,30 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext }: Props
   const hintId = useId();
   return (
     <div className="flex flex-col gap-3 items-start">
-      <p id={hintId}>{copy.readyHint}</p>
-      <button
-        type="button"
-        className="gg-btn gg-btn-secondary min-h-[44px]"
-        aria-pressed={ready}
-        aria-describedby={hintId}
-        onClick={() => onChange(!ready)}
-      >
-        {ready && <Check size={18} weight="bold" aria-hidden="true" />}
-        {copy.markReady}
-      </button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button
+          type="button"
+          className="gg-chip"
+          aria-pressed={ready}
+          aria-describedby={hintId}
+          onClick={() => onChange(!ready)}
+        >
+          {ready && (
+            <Check
+              size={18}
+              weight="bold"
+              aria-hidden="true"
+              className="motion-safe:transition-transform motion-safe:duration-[var(--dur-2)] motion-safe:ease-[var(--ease-calm)] motion-safe:starting:scale-[0.8]"
+            />
+          )}
+          {copy.markReady}
+        </button>
+        <p id={hintId} className="gg-hint">
+          {copy.readyHint}
+        </p>
+      </div>
       {ready && onNext ? (
-        <button type="button" className="gg-btn gg-btn-primary min-h-[44px]" onClick={onNext}>
+        <button type="button" className="gg-btn gg-btn-primary gg-enter min-h-[44px]" onClick={onNext}>
           {nextSection ? fill(copy.next, { section: navTitle(nextSection) }) : copy.backToOverview}
         </button>
       ) : null}
