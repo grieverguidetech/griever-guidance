@@ -215,6 +215,10 @@ older list loads with its values unchanged.
   `in_progress`.
 - `personName`, `dateOfPassing`, `serviceDate`, `obituaryUrl` and `obituaryPublisher` are written in
   place, never copied. `toFlowFacts` and the sync diff are unchanged: none of these fields sync.
+- Editors clear a field to `''`, never to `undefined`. An `undefined` field would let the one-time
+  draft copy run again on the next load.
+- At load, a session with `serviceReady: true` and no `sectionStatus.service` gets `ready`, so the
+  Overview agrees with the synced flag. Stored keys that are not a section key are dropped.
 - No delete method is added (C9).
 
 ### 2.1 The screen C3 checklist lives on the account

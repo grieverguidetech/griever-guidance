@@ -154,7 +154,30 @@ describe('useSessions section fields', () => {
     });
   });
 
+  it('keeps a stored ready status when the service draft is copied', () => {
+    const { get } = setup([
+      { ...OLD, sectionStatus: { service: 'ready' }, drafts: { service: serviceDraft({ serviceTime: '2 pm' }) } },
+    ]);
+    expect(get().serviceTime).toBe('2 pm');
+    expect(get().sectionStatus?.service).toBe('ready');
+  });
+
+  it('loads serviceReady: true with no stored status as ready', () => {
+    const { get } = setup([{ ...OLD, serviceReady: true }]);
+    expect(get().sectionStatus).toEqual({ service: 'ready' });
+  });
+
+  it('does not override a stored service status from serviceReady', () => {
+    const { get } = setup([{ ...OLD, serviceReady: true, sectionStatus: { service: 'in_progress' } }]);
+    expect(get().sectionStatus?.service).toBe('in_progress');
+  });
+
   describe('corrupt stored sectionStatus', () => {
+    it('drops keys that are not a section key', () => {
+      const { get } = setup([{ ...OLD, sectionStatus: { foo: 'ready', thanks: 'ready' } }]);
+      expect(get().sectionStatus).toEqual({ thanks: 'ready' });
+    });
+
     it('drops values that are not in_progress or ready', () => {
       const { get } = setup([
         { ...OLD, sectionStatus: { person: 'ready', service: 'done', obituary: 5, thanks: null, announcement: 'in_progress' } },

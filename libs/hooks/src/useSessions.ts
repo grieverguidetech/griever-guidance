@@ -17,6 +17,7 @@ import {
   FLOW_FACT_KEYS,
   mergeFlowFacts,
   parseCompleteDate,
+  SECTION_ORDER,
   toFlowFacts,
 } from '@griever/shared';
 import { freshDraft, hasDraftInProgress } from './useSendFlow.js';
@@ -223,14 +224,15 @@ export function stripSentWording(draft: SendFlowDraft | null): SendFlowDraft | n
 
 const SECTION_STATUSES: readonly string[] = ['in_progress', 'ready'];
 
-/** Keeps only statuses that are 'in_progress' or 'ready'. Anything else in storage is dropped. */
+/** Keeps only known section keys with an 'in_progress' or 'ready' status. Anything else is dropped. */
 function cleanSectionStatus(stored: unknown): SectionFields['sectionStatus'] {
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
     return undefined;
   }
   const clean: Partial<Record<SectionKey, SectionStatus>> = {};
   for (const [key, value] of Object.entries(stored)) {
-    if (typeof value === 'string' && SECTION_STATUSES.includes(value)) {
+    const knownKey = (SECTION_ORDER as readonly string[]).includes(key);
+    if (knownKey && typeof value === 'string' && SECTION_STATUSES.includes(value)) {
       clean[key as SectionKey] = value as SectionStatus;
     }
   }
@@ -305,6 +307,10 @@ function migrateSession(stored: StoredSession): Session {
     } else {
       delete migrated.sectionStatus;
     }
+  }
+  // An old session with the synced "service ready" flag but no stored status shows as ready.
+  if (migrated.serviceReady === true && migrated.sectionStatus?.service === undefined) {
+    migrated.sectionStatus = { ...migrated.sectionStatus, service: 'ready' };
   }
   return copyServiceDraftFields(migrated);
 }
