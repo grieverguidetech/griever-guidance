@@ -91,6 +91,8 @@ export interface Session extends SessionDetails, SectionFields, ServiceEventFiel
 export type SessionPatch = Partial<SessionDetails & SectionFields & ServiceEventFields>;
 
 export interface UseSessionsResult {
+  /** True after a failed storage write; false again after the next successful write. */
+  saveFailed: boolean;
   sessions: Session[];
   inProgressSessions: Session[];
   createSession: (details?: Partial<SessionDetails>) => Session;
@@ -359,12 +361,14 @@ function load(storage: SendFlowStorage | undefined): Session[] {
   }
 }
 
-function save(storage: SendFlowStorage | undefined, sessions: Session[]): void {
-  if (!storage) return;
+/** Returns false when the write failed (sessions still work for this tab's lifetime). */
+function save(storage: SendFlowStorage | undefined, sessions: Session[]): boolean {
+  if (!storage) return true;
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    return true;
   } catch {
-    // storage unavailable — sessions still work for this tab's lifetime
+    return false;
   }
 }
 
@@ -478,8 +482,10 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
 
+  const [saveFailed, setSaveFailed] = useState(false);
+
   useEffect(() => {
-    save(storage, sessions);
+    setSaveFailed(!save(storage, sessions));
   }, [storage, sessions]);
 
   const createSession = useCallback((details?: Partial<SessionDetails>) => {
@@ -713,6 +719,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   );
 
   return {
+    saveFailed,
     sessions,
     inProgressSessions,
     createSession,

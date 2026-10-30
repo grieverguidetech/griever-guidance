@@ -501,10 +501,16 @@ function AppBody({
       {showRemoved && <p className="m-0 mb-4">{REMOVED_MESSAGE}</p>}
     </div>
   );
+  const saveFailedNote = CMS_ENABLED && sessions.saveFailed && (
+    <p role="status" className="m-0 mb-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+      {cmsShellCopy.saveFailed}
+    </p>
+  );
   const endedNote = (
     <>
       {removedNote}
       {signedOutNote}
+      {saveFailedNote}
       <div role="status" aria-live="polite" className="sr-only">
         {finishAnnouncement}
       </div>
