@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { Plus } from '@phosphor-icons/react/Plus';
 import { screenCopy } from '@griever/copy';
 import {
   defaultServiceEventsMessage,
@@ -185,7 +186,8 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
           <p className="gg-hint">{copy.alsoHaving}</p>
           <div className="flex flex-wrap gap-2">
             {closed.map((c) => (
-              <button key={c.key} type="button" className="gg-chip min-h-[44px]" onClick={() => openGroup(c.key)}>
+              <button key={c.key} type="button" className="gg-chip min-h-[44px] text-accent-700" onClick={() => openGroup(c.key)}>
+                <Plus aria-hidden="true" weight="bold" size={16} data-testid="add-icon" />
                 {c.label}
               </button>
             ))}
