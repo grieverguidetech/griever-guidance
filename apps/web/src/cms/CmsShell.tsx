@@ -7,6 +7,7 @@ import { SideNav, navTitle } from './SideNav';
 import type { CmsNavKey } from './SideNav';
 
 const copy = screenCopy('cmsChecklist');
+const shellCopy = screenCopy('cmsShell');
 // cmsChecklist has no Close word and copy files are outside this ticket; the shared one lives in paywall.
 const closeLabel = screenCopy('paywall').close;
 
@@ -130,6 +131,9 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
           </div>
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
+        )}
+        {peopleView ? null : (
+          <p className="text-[14px]" style={{ color: 'var(--text-hint)' }}>{shellCopy.saveLine}</p>
         )}
         {notice}
         {children}
