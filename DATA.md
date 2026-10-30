@@ -184,18 +184,18 @@ additive: an older list loads, and the file keeps its key and shape.
 - The `flowId` given to an old session is stable only once the save succeeds. If storage is full
   or unavailable, the next load makes a new one.
 
-### 2.1 The C3 checklist lives on the account
+### 2.1 The screen C3 checklist lives on the account
 
 The ticks persist — silently, as decided — but they belong to the **account**, not the session.
 
 **Settled Oct 2026 (#176, product owner): ticks are kept on this device only.** They live in the
 local `account` store as `checklistTicks: string[]` (keys: `will-or-wishes`, `pre-arranged-plans`,
 `ssn-and-id`, `life-insurance`, `military-papers`; never rename one). All items start unticked.
-**Split (2026-10-30, #385, #406):** this rule covers the five "Gather when you can" ticks only. The new phase ticks and "Doesn't apply" marks (WEB-10) are saved on the person and will sync in a later round; they are not synced in round 1. Only the phase checks and the Overview's next item (WEB-12) read them. Still no notifications, nagging, badges or counts.
+**Split (2026-10-30, #385, #406):** this rule covers the five "Gather when you can" ticks only. The new phase ticks and "Doesn't apply" marks (WEB-10) are saved on the person and will sync in a later round; they are not synced in round 1. Only the phase checks and the Overview's next item (WEB-12) read them. Still no notifications, nagging, badges or counts. The phase check is not a badge or a count. The phase ticks live on the person, in the local sessions store (`gg.sessions.v1`, field `checklist`, #414).
 
-Ticks are per device, not per account: a second phone starts unticked. They are read and written only by the "What you'll need" screen, are never sent to the network, and
+These five ticks are per device, not per account: a second phone starts unticked. They are read and written only by the five-item list (checklist screen, Your account), are never sent to the network, and
 are emptied with everything else by "Remove everything from this device". This resolves the design
-handoff's C3 open question as "persist". The server copy below (`users.checklistTicks`) is **not
+handoff's screen C3 open question as "persist". The server copy below (`users.checklistTicks`) is **not
 built and not planned**; if it is ever wanted it needs a fresh decision, because syncing would
 make the list something the app holds about a person.
 
@@ -203,9 +203,9 @@ Someone returning a year later for a second loss, on the same device, sees the p
 already gathered still ticked; nobody re-ticks a military discharge record they found in 2026.
 
 The copy's promise is absolute and is a build requirement, not a preference: **never notify, never
-nag, never badge, never count.** A persisted tick may only ever be read back onto C3 itself. If any
+nag, never badge, never count.** A persisted tick may only ever be read back onto screen C3 itself. If any
 future surface (C1's path, a reminder, a settings summary) wants to read `checklistTicks`, the
-answer is no.
+answer is no (the five ticks only; phase ticks: see Split above).
 
 ### Session lifecycle
 
@@ -475,7 +475,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
-- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10): not synced in round 1 (round 1 assumption, #385 B9)
+- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10): not synced in round 1 (B9); planned later
 - the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it (WEB-4).
 
 Rules:
