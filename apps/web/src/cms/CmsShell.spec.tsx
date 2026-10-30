@@ -34,6 +34,32 @@ describe('CmsShell people view', () => {
   });
 });
 
+describe('CmsShell save line', () => {
+  const line = 'Saved in this browser as you type. Nothing is sent from here.';
+
+  it('shows the static line in editor views, not as a live region, with one h1', () => {
+    setup('service');
+    const el = screen.getByText(line);
+    expect(el.closest('[aria-live], [role="status"], [role="alert"]')).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
+  it('is absent on the overview, which has its own saved-as-you-go line', () => {
+    setup('overview');
+    expect(screen.queryByText(line)).toBeNull();
+  });
+
+  it('is absent in the people view', () => {
+    render(
+      <CmsShell title="Your people" peopleView personName="" section="overview" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
+        <p>List</p>
+      </CmsShell>,
+    );
+    expect(screen.queryByText(line)).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+});
+
 describe('CmsShell', () => {
   it.each<[CmsNavKey, string]>([
     ['overview', 'Overview'],
