@@ -68,7 +68,8 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
 
   await page.getByLabel('Their name').fill('Margaret Hayes');
   await openSection(page, 'Overview', 'Overview');
-  await expect(nav(page).getByText('Margaret Hayes')).toBeVisible();
+  // The name sits in a paragraph above the nav landmark, not inside it.
+  await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
 
   await openSection(page, 'The person', 'The person');
   await expect(page.getByLabel('Their name')).toHaveValue('Margaret Hayes');
