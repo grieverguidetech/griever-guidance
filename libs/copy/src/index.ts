@@ -144,3 +144,6 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy
     .filter(Boolean)
     .join('\n\n');
 }
+
+export { checklistDetail } from './checklistDetails';
+export type { ChecklistDetail } from './checklistDetails';

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Guidance for checklist items, keyed by item id",
+  "type": "object",
+  "additionalProperties": { "$ref": "#/$defs/detail" },
+  "$defs": {
+    "detail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["whatItIs", "whyItMatters"],
+      "properties": {
+        "whatItIs": { "type": "string", "minLength": 1 },
+        "whyItMatters": { "type": "string", "minLength": 1 },
+        "whoToCall": { "type": "string", "minLength": 1 },
+        "whatToBring": { "type": "string", "minLength": 1 },
+        "doesNotApplyWhen": { "type": "string", "minLength": 1 },
+        "sources": { "type": "array", "items": { "type": "string", "format": "uri" } }
+      }
+    }
+  }
+}

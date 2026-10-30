@@ -11,7 +11,7 @@
     "moduleResolution": "bundler",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "screens/*.json"],
+  "include": ["src/**/*.ts", "screens/*.json", "checklist/*.json"],
   "references": [],
   "exclude": [
     "out-tsc",
