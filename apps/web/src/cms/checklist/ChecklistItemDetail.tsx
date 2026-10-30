@@ -1,3 +1,4 @@
+import { CaretLeft } from '@phosphor-icons/react/CaretLeft';
 import { checklistDetail, screenCopy } from '@griever/copy';
 import { CHECKLIST_ITEM_SECTIONS } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
@@ -36,22 +37,31 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
     section === 'service' && AVAILABLE_SECTIONS.includes(section) && Boolean(onOpenService);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
-        <button type="button" className="gg-btn gg-btn-secondary" onClick={onBack}>
+        <button type="button" className="gg-btn gg-btn-ghost" onClick={onBack}>
+          <CaretLeft aria-hidden="true" />
           {copy.back}
         </button>
       </div>
-      {detail ? (
-        parts.map((part) => (
-          <section key={part.heading} className="flex flex-col gap-2">
-            <h2 className="text-lg font-semibold">{part.heading}</h2>
-            <p>{part.text}</p>
-          </section>
-        ))
-      ) : (
-        <p>{copy.comingSoon}</p>
-      )}
+      <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />
+      <div className="gg-panel flex flex-col">
+        {detail ? (
+          parts.map((part, index) => (
+            <section
+              key={part.heading}
+              className={`flex flex-col gap-2 py-4 first:pt-0 last:pb-0${
+                index > 0 ? ' border-t border-[var(--color-divider)]' : ''
+              }`}
+            >
+              <h2 className="text-lg font-semibold">{part.heading}</h2>
+              <p>{part.text}</p>
+            </section>
+          ))
+        ) : (
+          <p>{copy.comingSoon}</p>
+        )}
+      </div>
       {canOpenService ? (
         <div>
           <button type="button" className="gg-btn gg-btn-primary" onClick={onOpenService}>
@@ -59,7 +69,6 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
           </button>
         </div>
       ) : null}
-      <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />
     </div>
   );
 }
