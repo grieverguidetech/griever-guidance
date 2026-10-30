@@ -39,6 +39,8 @@ interface TimeInputProps {
   value: string;
   onChange: (pretty: string) => void;
   describedBy?: string;
+  /** The id(s) of visible label elements, when the name should join more than one. */
+  labelledBy?: string;
   required?: boolean;
 }
 
@@ -48,6 +50,7 @@ export function TimeInput({
   value,
   onChange,
   describedBy,
+  labelledBy,
   required,
 }: TimeInputProps) {
   return (
@@ -58,6 +61,7 @@ export function TimeInput({
       value={timeToISO(value)}
       required={required}
       aria-describedby={describedBy}
+      aria-labelledby={labelledBy}
       onChange={(e) => onChange(isoToTime(e.target.value))}
       onClick={(e) => {
         const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
