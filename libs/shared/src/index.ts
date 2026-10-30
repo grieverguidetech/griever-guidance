@@ -12,3 +12,4 @@ export * from './introSamples.js';
 export * from './account.js';
 export * from './sections.js';
 export * from './serviceEvents.js';
+export * from './checklist.js';
