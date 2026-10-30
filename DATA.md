@@ -221,6 +221,24 @@ older list loads with its values unchanged.
   Overview agrees with the synced flag. Stored keys that are not a section key are dropped.
 - No delete method is added (C9).
 
+### 2.0c Checklist on the local session
+
+The ticks and "Doesn't apply" belong to the person. Same list (`gg.sessions.v1`); the field is
+additive and optional.
+
+```js
+{ …,                          // everything in 2.0b
+  // ChecklistFields
+  checklist: { "pronouncement": "done", "custody": "not_applicable" } }  // item id -> 'done' | 'not_applicable'
+```
+
+- A missing key means the item is open. No `checklist` at all (an older list) means every item is
+  open. Item ids are those in `CHECKLIST_PHASES` (`libs/shared/src/checklist.ts`).
+- `setChecklistItem(id, itemId, state | null)` sets the state, or removes the key for `null`. Other
+  sessions are unchanged. Clearing an item is not deletion (C9).
+- Local only this round: `toFlowFacts`, `useFlowSync` and the device checklist
+  (`account.checklistTicks`, section 2.1) are unchanged.
+
 ### 2.1 The screen C3 checklist lives on the account
 
 The ticks persist — silently, as decided — but they belong to the **account**, not the session.

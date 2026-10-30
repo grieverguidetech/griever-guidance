@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  ChecklistFields,
+  ChecklistItemId,
+  ChecklistItemState,
   FlowFactKey,
   FlowRecord,
   FlowRole,
@@ -53,7 +56,7 @@ export interface ReminderEntry {
  * captured once and every message flow reads from here. Sessions are durable
  * (restored on reload) and there can be more than one.
  */
-export interface Session extends SessionDetails, SectionFields, ServiceEventFields {
+export interface Session extends SessionDetails, SectionFields, ServiceEventFields, ChecklistFields {
   /** The local key. It never changes and is not what the server knows the person by. */
   id: string;
   /** UUID v4 made on this device; the person's id on the server. Stable once set. */
@@ -95,6 +98,8 @@ export interface UseSessionsResult {
   updateSection: (id: string, key: SectionKey, patch: SessionPatch) => void;
   /** `null` removes the status (Not started). For 'service', `ready` also sets `serviceReady`, any other value clears it. */
   setSectionStatus: (id: string, key: SectionKey, status: SectionStatus | null) => void;
+  /** Sets one checklist item on one person. `null` removes the key (the item is open again). Other people are unchanged. */
+  setChecklistItem: (id: string, itemId: ChecklistItemId, state: ChecklistItemState | null) => void;
   updateDraft: (id: string, draft: SendFlowDraft) => void;
   /** Empties one moment's draft. Other moments, people, contacts and who was notified stay as they are. */
   clearDraft: (id: string, category: TemplateCategory) => void;
@@ -495,6 +500,26 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     [],
   );
 
+  const setChecklistItem = useCallback(
+    (id: string, itemId: ChecklistItemId, state: ChecklistItemState | null) => {
+      setSessions((list) =>
+        list.map((s) => {
+          if (s.id !== id) {
+            return s;
+          }
+          const checklist = { ...s.checklist };
+          if (state === null) {
+            delete checklist[itemId];
+          } else {
+            checklist[itemId] = state;
+          }
+          return { ...s, checklist };
+        }),
+      );
+    },
+    [],
+  );
+
   const updateDraft = useCallback((id: string, incoming: SendFlowDraft) => {
     const draft = stripSentWording(incoming);
     const category = draft.templateCategory;
@@ -646,6 +671,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     updateSession,
     updateSection,
     setSectionStatus,
+    setChecklistItem,
     updateDraft,
     clearDraft,
     touchSession,
