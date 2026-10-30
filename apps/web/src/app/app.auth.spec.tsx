@@ -260,7 +260,8 @@ describe('Clerk cannot be reached (C5)', () => {
   it('focuses the heading so the message is announced', async () => {
     render(<App />);
     const heading = await screen.findByRole('heading', { name: "Accounts aren't available right now" });
-    expect(document.activeElement).toBe(heading);
+    // The focus runs in an effect after the heading is in the DOM, so wait for it.
+    await waitFor(() => expect(document.activeElement).toBe(heading));
   });
 
   it('opens the local work with a calm note and no account actions when the signed-in marker exists', async () => {

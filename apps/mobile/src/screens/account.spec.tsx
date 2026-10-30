@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ProfileResult } from '@griever/api-client';
 import type { AccountAuth } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { CHECKLIST_KEY, SSN_TIP } from './WhatYoullNeedScreen';
 import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
+
+// On a cold Babel cache (a fresh worktree) the first sign-in render compiles modules lazily and
+// takes longer than the 1s default for findBy*. 10s is still a clear hang signal (#404).
+configure({ asyncUtilTimeout: 10_000 });
 
 // Jest has no native view tree, so the real findNodeHandle returns null for every component. The
 // heading focus test needs a handle to exist; only this one function is replaced.
