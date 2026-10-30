@@ -399,8 +399,7 @@ the web build in `.github/workflows/deploy.yml`.
 7. **No deletion in a flow (C9).** Removal is only in Settings, as a button with a confirm step.
 8. **One recipient per `sms:` link (C1).** The user sends each text from their own Messages app.
 9. **E2E checks.** `apps/web-e2e/src/a11y.spec.ts` runs axe for WCAG A and AA, checks contrast, and
-   checks for one `<h1>` and a page language. It runs on desktop Chrome, Pixel 7 and iPhone 15
-   (WebKit), in CI only.
+   checks for one `<h1>` and a page language. It runs on desktop Chrome, in CI only.
 
 ## 7. How to run, build and test
 
