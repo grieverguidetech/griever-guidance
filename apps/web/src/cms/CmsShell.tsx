@@ -45,7 +45,7 @@ interface Props {
   onAccount: () => void;
   notice?: ReactNode;
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
-  /** The checklist panel: a third column from `lg`, a sheet below. */
+  /** The checklist panel: a third column from `lg`, a sheet below. Use the function form to get `closeSheet`. */
   aside?: ReactNode | ((context: AsideContext) => ReactNode);
   /** Replaces the h1 text, for item details. */
   title?: string;
@@ -113,6 +113,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
             <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
             <button
               ref={sheetButton}
+              data-checklist-opener=""
               type="button"
               className="gg-btn gg-btn-secondary lg:hidden"
               aria-haspopup="dialog"

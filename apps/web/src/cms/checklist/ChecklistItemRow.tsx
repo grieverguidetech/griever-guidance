@@ -9,11 +9,12 @@ interface Props {
   id: ChecklistItemId;
   state: ChecklistItemState | 'open';
   onOpen: (id: ChecklistItemId) => void;
+  current?: boolean;
   onChange: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
 }
 
 /** One item: the label opens its guidance, then the two state toggles. The check is decoration; aria-pressed carries the state. */
-export function ChecklistItemRow({ id, state, onOpen, onChange }: Props) {
+export function ChecklistItemRow({ id, state, onOpen, onChange, current }: Props) {
   const label = copy.items[id];
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -25,6 +26,7 @@ export function ChecklistItemRow({ id, state, onOpen, onChange }: Props) {
           <button
             type="button"
             data-checklist-item={id}
+            aria-current={current ? 'true' : undefined}
             className="gg-btn gg-btn-ghost min-w-0 text-left"
             onClick={() => onOpen(id)}
           >

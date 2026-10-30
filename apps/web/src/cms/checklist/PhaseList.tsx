@@ -9,11 +9,12 @@ const copy = screenCopy('cmsChecklist');
 interface Props {
   checklist: ChecklistFields['checklist'];
   onOpen: (id: ChecklistItemId) => void;
+  current?: ChecklistItemId | null;
   onChange: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
 }
 
 /** Every phase in order, with its items. No counts, no percentages, no delete. */
-export function PhaseList({ checklist, onOpen, onChange }: Props) {
+export function PhaseList({ checklist, onOpen, onChange, current }: Props) {
   const { phases } = computeChecklist({ checklist });
   return (
     <div className="flex flex-col gap-6">
@@ -37,6 +38,7 @@ export function PhaseList({ checklist, onOpen, onChange }: Props) {
                 id={item.id}
                 state={item.state}
                 onOpen={onOpen}
+                current={item.id === current}
                 onChange={onChange}
               />
             ))}

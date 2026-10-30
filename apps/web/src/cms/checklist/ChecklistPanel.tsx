@@ -10,13 +10,15 @@ interface Props {
   checklist: ChecklistFields['checklist'];
   onSetItem: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
   onOpenItem: (id: ChecklistItemId) => void;
+  /** The item whose guidance is open; its label button gets aria-current. */
+  currentItem?: ChecklistItemId | null;
 }
 
 /**
  * The body of the CMS checklist panel. The shell supplies the h2 title, so nothing here is
  * above h3. The device-only ticks stay as they were; the phases are saved on the record.
  */
-export function ChecklistPanel({ checklist, onSetItem, onOpenItem }: Props) {
+export function ChecklistPanel({ checklist, onSetItem, onOpenItem, currentItem }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <p className="m-0">{copy.intro}</p>
@@ -25,7 +27,7 @@ export function ChecklistPanel({ checklist, onSetItem, onOpenItem }: Props) {
         <h3 className="gg-eyebrow m-0">{GATHER_HEADING}</h3>
         <ChecklistRows />
       </div>
-      <PhaseList checklist={checklist} onOpen={onOpenItem} onChange={onSetItem} />
+      <PhaseList checklist={checklist} onOpen={onOpenItem} current={currentItem} onChange={onSetItem} />
       <p className="gg-reassure m-0 text-center">{NO_REMINDER_LINE}</p>
     </div>
   );

@@ -380,11 +380,6 @@ function AppBody({
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
   // The editor's sections share one view, so the section is part of the key: a change moves focus to the h1.
   useFocusHeadingOnChange(view === 'cms' ? `cms:${cmsSection}:${cmsItem ?? ''}` : view);
-  useEffect(() => {
-    if (view !== 'cms') {
-      setCmsItem(null);
-    }
-  }, [view]);
   // Must stay declared after the heading hook above: effects run in order, so this one lands
   // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
   useEffect(() => {
@@ -394,11 +389,22 @@ function AppBody({
     restoreOpener.current = false;
     const opener = itemOpener.current;
     itemOpener.current = null;
-    if (!opener || opener.region === 'sheet') {
+    if (!opener) {
       return;
     }
-    const scope = opener.region === 'panel' ? 'aside' : 'main';
-    const target = document.querySelector<HTMLElement>(`${scope} [data-checklist-item="${opener.id}"]`);
+    let target: HTMLElement | null = null;
+    if (opener.region === 'sheet') {
+      // The sheet's own button is gone; its phone button opened it. Hidden from `lg`, where focus stays on the h1.
+      target = document.querySelector<HTMLElement>('[data-checklist-opener]');
+    } else if (opener.region === 'panel') {
+      // CmsShell renders exactly one <main> and one <aside>, so these selectors find one region each.
+      target = document.querySelector<HTMLElement>(`aside [data-checklist-item="${opener.id}"]`);
+    } else {
+      // The item may have moved on (marked done), so the Next button can now name another item.
+      target =
+        document.querySelector<HTMLElement>(`main [data-checklist-item="${opener.id}"]`) ??
+        document.querySelector<HTMLElement>('main [data-checklist-item]');
+    }
     target?.focus();
   });
   const clearError = auth?.clearError;
@@ -754,6 +760,7 @@ function AppBody({
   /** "Change" in the editor: an unnamed person is dropped, then Home. */
   function leaveCms() {
     sessions.pruneEmpty();
+    setCmsItem(null);
     setActiveId(null);
     goHome();
   }
@@ -831,6 +838,7 @@ function AppBody({
             <ChecklistPanel
               checklist={active.checklist ?? {}}
               onSetItem={(id, state) => sessions.setChecklistItem(active.id, id, state)}
+              currentItem={cmsItem}
               onOpenItem={(id) => openCmsItem(id, inSheet ? 'sheet' : 'panel', closeSheet)}
             />
           )}
@@ -847,6 +855,7 @@ function AppBody({
           onChangePerson={leaveCms}
           onAccount={() => {
             sessions.pruneEmpty();
+            setCmsItem(null);
             if (auth?.isSignedIn) {
               openProfile(false);
             } else {
