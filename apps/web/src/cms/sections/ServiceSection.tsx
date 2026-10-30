@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { screenCopy } from '@griever/copy';
 import {
   defaultServiceEventsMessage,
@@ -68,52 +68,6 @@ function GroupText({
   );
 }
 
-/**
- * A group behind an "Add ..." button. Once opened it stays open (one way, no collapse), so nothing
- * the family typed can be hidden or lost. It is an action button, not a toggle, so it has no
- * aria-expanded. The button goes away on open, so focus moves to the group's fieldset (named by its
- * legend), not an input, so the phone keyboard does not open.
- */
-function Disclosure({
-  open,
-  onOpen,
-  buttonLabel,
-  children,
-}: {
-  open: boolean;
-  onOpen: () => void;
-  buttonLabel: string;
-  children: ReactNode;
-}) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const moveFocus = useRef(false);
-  useEffect(() => {
-    if (open && moveFocus.current) {
-      moveFocus.current = false;
-      panelRef.current?.querySelector<HTMLElement>('fieldset')?.focus();
-    }
-  }, [open]);
-  return (
-    <div>
-      {!open && (
-        <button
-          type="button"
-          className="gg-btn gg-btn-secondary min-h-[44px]"
-          onClick={() => {
-            moveFocus.current = true;
-            onOpen();
-          }}
-        >
-          {buttonLabel}
-        </button>
-      )}
-      <div ref={panelRef}>
-        {open && children}
-      </div>
-    </div>
-  );
-}
-
 /** Offers the funeral service's value for an empty group field, when the service has one. */
 const sameAs = (serviceValue: string | undefined, label: string, use: (v: string) => void) =>
   serviceValue ? { label, onUse: () => use(serviceValue) } : undefined;
@@ -164,90 +118,133 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
   ) {
     setOpened(open);
   }
-  const openGroup = (g: keyof typeof opened) => setOpened((o) => ({ ...o, [g]: true }));
+  // Focus goes to the fieldset of the group just opened (named by its legend), not an input, so the
+  // phone keyboard does not open. The Add chip is gone by then.
+  const focusGroup = useRef<keyof typeof opened | null>(null);
+  const panelsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusGroup.current) {
+      panelsRef.current?.querySelector<HTMLElement>(`[data-group="${focusGroup.current}"] fieldset`)?.focus();
+      focusGroup.current = null;
+    }
+  }, [opened]);
+  // One way: a chip opens its group and never closes it, so nothing the family typed is hidden.
+  const openGroup = (g: keyof typeof opened) => {
+    focusGroup.current = g;
+    setOpened((o) => ({ ...o, [g]: true }));
+  };
+  const chips = [
+    { key: 'visitation', label: copy.addVisitation },
+    { key: 'burial', label: copy.addBurial },
+    { key: 'reception', label: copy.addReception },
+  ] as const;
+  const closed = chips.filter((c) => !open[c.key]);
+  const panel = 'gg-panel gg-enter';
 
   return (
     <div className="flex flex-col gap-6">
       <p>{copy.intro}</p>
-      <Disclosure open={open.visitation} onOpen={() => openGroup('visitation')} buttonLabel={copy.addVisitation}>
-      <EventFields
-        legend={copy.eventVisitation}
-        keys={{ date: 'visitationDate', time: 'visitationTime', place: 'visitationPlace' }}
-        values={values}
-        onChange={onChange}
-        dateOfPassing={values.dateOfPassing}
-        dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (visitationDate) => onChange({ visitationDate }))}
-        placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (visitationPlace) => onChange({ visitationPlace }))}
-      />
-      </Disclosure>
-      <EventFields
-        legend={copy.eventFuneral}
-        keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
-        values={values}
-        onChange={onChange}
-        dateOfPassing={values.dateOfPassing}
-        extra={(legendId) => (
-          <>
-            <GroupText
-              id={`${id}-type`}
-              legendId={legendId}
-              label={copy.typeLabel}
-              placeholder={copy.typePlaceholder}
-              value={values.serviceType}
-              onChange={(serviceType) => onChange({ serviceType })}
+      <div className="gg-panel">
+        <EventFields
+          legend={copy.eventFuneral}
+          keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
+          values={values}
+          onChange={onChange}
+          dateOfPassing={values.dateOfPassing}
+          extra={(legendId) => (
+            <>
+              <GroupText
+                id={`${id}-type`}
+                legendId={legendId}
+                label={copy.typeLabel}
+                placeholder={copy.typePlaceholder}
+                value={values.serviceType}
+                onChange={(serviceType) => onChange({ serviceType })}
+              />
+              <GroupText
+                id={`${id}-address`}
+                legendId={legendId}
+                label={copy.addressLabel}
+                autoComplete="street-address"
+                value={values.serviceAddress}
+                onChange={(serviceAddress) => onChange({ serviceAddress })}
+              />
+              <GroupText
+                id={`${id}-officiant`}
+                legendId={legendId}
+                label={copy.eventOfficiant}
+                value={values.serviceOfficiant}
+                onChange={(serviceOfficiant) => onChange({ serviceOfficiant })}
+              />
+            </>
+          )}
+        />
+      </div>
+      {closed.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <p className="gg-hint">{copy.alsoHaving}</p>
+          <div className="flex flex-wrap gap-2">
+            {closed.map((c) => (
+              <button key={c.key} type="button" className="gg-chip min-h-[44px]" onClick={() => openGroup(c.key)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div ref={panelsRef} className="flex flex-col gap-6">
+        {open.visitation && (
+          <div className={panel} data-group="visitation">
+            <EventFields
+              legend={copy.eventVisitation}
+              keys={{ date: 'visitationDate', time: 'visitationTime', place: 'visitationPlace' }}
+              values={values}
+              onChange={onChange}
+              dateOfPassing={values.dateOfPassing}
+              dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (visitationDate) => onChange({ visitationDate }))}
+              placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (visitationPlace) => onChange({ visitationPlace }))}
             />
-            <GroupText
-              id={`${id}-address`}
-              legendId={legendId}
-              label={copy.addressLabel}
-              autoComplete="street-address"
-              value={values.serviceAddress}
-              onChange={(serviceAddress) => onChange({ serviceAddress })}
-            />
-            <GroupText
-              id={`${id}-officiant`}
-              legendId={legendId}
-              label={copy.eventOfficiant}
-              value={values.serviceOfficiant}
-              onChange={(serviceOfficiant) => onChange({ serviceOfficiant })}
-            />
-          </>
+          </div>
         )}
-      />
-      <Disclosure open={open.burial} onOpen={() => openGroup('burial')} buttonLabel={copy.addBurial}>
-      <EventFields
-        legend={copy.eventBurial}
-        keys={{ date: 'burialDate', time: 'burialTime', place: 'burialPlace' }}
-        values={values}
-        onChange={onChange}
-        dateOfPassing={values.dateOfPassing}
-        placeLabel={copy.eventCemetery}
-        dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (burialDate) => onChange({ burialDate }))}
-        hideFields={values.burialPrivate === true}
-        lead={
-          <label className="flex items-center gap-3 min-h-[44px] cursor-pointer">
-            <input
-              type="checkbox"
-              className="h-5 w-5 m-0"
-              checked={values.burialPrivate === true}
-              onChange={(e) => onChange({ burialPrivate: e.target.checked })}
+        {open.burial && (
+          <div className={panel} data-group="burial">
+            <EventFields
+              legend={copy.eventBurial}
+              keys={{ date: 'burialDate', time: 'burialTime', place: 'burialPlace' }}
+              values={values}
+              onChange={onChange}
+              dateOfPassing={values.dateOfPassing}
+              placeLabel={copy.eventCemetery}
+              dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (burialDate) => onChange({ burialDate }))}
+              hideFields={values.burialPrivate === true}
+              lead={
+                <label className="flex items-center gap-3 min-h-[44px] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 m-0"
+                    checked={values.burialPrivate === true}
+                    onChange={(e) => onChange({ burialPrivate: e.target.checked })}
+                  />
+                  {copy.eventPrivateFamily}
+                </label>
+              }
             />
-            {copy.eventPrivateFamily}
-          </label>
-        }
-      />
-      </Disclosure>
-      <Disclosure open={open.reception} onOpen={() => openGroup('reception')} buttonLabel={copy.addReception}>
-      <EventFields
-        legend={copy.eventReception}
-        keys={{ date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' }}
-        values={values}
-        onChange={onChange}
-        dateOfPassing={values.dateOfPassing}
-        dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (receptionDate) => onChange({ receptionDate }))}
-        placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (receptionPlace) => onChange({ receptionPlace }))}
-      />
-      </Disclosure>
+          </div>
+        )}
+        {open.reception && (
+          <div className={panel} data-group="reception">
+            <EventFields
+              legend={copy.eventReception}
+              keys={{ date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' }}
+              values={values}
+              onChange={onChange}
+              dateOfPassing={values.dateOfPassing}
+              dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (receptionDate) => onChange({ receptionDate }))}
+              placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (receptionPlace) => onChange({ receptionPlace }))}
+            />
+          </div>
+        )}
+      </div>
       <div className="gg-field">
         <label htmlFor={`${id}-notes`}>{copy.notesLabel}</label>
         <textarea

@@ -63,12 +63,14 @@ describe('ServiceSection', () => {
       const b = screen.getByRole('button', { name });
       expect(b).not.toHaveAttribute('aria-expanded');
       expect(b).not.toHaveAttribute('aria-controls');
-      expect(b).toHaveClass('min-h-[44px]');
+      expect(b).toHaveClass('gg-chip', 'min-h-[44px]');
     }
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.getByText('Also having')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Funeral or memorial service' }).closest('.gg-panel')).not.toBeNull();
   });
 
-  it('groups stay in date order when opened (C10) and focus moves to the new group', async () => {
+  it('opened groups follow the funeral card in real-world order, each its own panel, and focus moves to the new group', async () => {
     setup();
     await add('Add reception');
     await add('Add visitation or calling hours');
@@ -76,8 +78,10 @@ describe('ServiceSection', () => {
     await add('Add burial');
     expect(screen.getByRole('group', { name: 'Burial' })).toHaveFocus();
     const names = screen.getAllByRole('group').map((g) => g.querySelector('legend')?.textContent);
-    expect(names).toEqual(['Visitation or calling hours', 'Funeral or memorial service', 'Burial', 'Reception']);
+    expect(names).toEqual(['Funeral or memorial service', 'Visitation or calling hours', 'Burial', 'Reception']);
+    expect(screen.getByRole('group', { name: 'Burial' }).closest('.gg-panel')).toHaveClass('gg-enter');
     expect(screen.queryByRole('button', { name: /^Add / })).toBeNull();
+    expect(screen.queryByText('Also having')).toBeNull();
   });
 
   it('a group with data opens on its own, and stays open when the data is cleared', async () => {
