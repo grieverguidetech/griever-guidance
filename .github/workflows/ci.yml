@@ -142,6 +142,11 @@ jobs:
       # journey works in a real browser, and it takes about a minute.
       - run: pnpm nx e2e web-e2e
 
+      # The editor (#396) is behind VITE_FEATURE_CMS, a build-time flag, so it needs its own flag-on
+      # build and server. Nx does not infer a target from this config, so call Playwright directly.
+      - name: Playwright e2e (web editor, flag on)
+        run: pnpm exec playwright test -c apps/web-e2e/playwright.cms.config.ts
+
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

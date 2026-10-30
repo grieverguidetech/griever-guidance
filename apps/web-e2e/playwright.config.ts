@@ -24,6 +24,8 @@ export default defineConfig({
   reporter: process.env['CI']
     ? [['list'], ...(preset.reporter as ReporterDescription[])]
     : preset.reporter,
+  // The editor specs need a flag-on build; they run through playwright.cms.config.ts.
+  testIgnore: '**/cms/**',
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   use: {

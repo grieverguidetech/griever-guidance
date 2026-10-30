@@ -82,3 +82,6 @@ design_specs
 *.tsbuildinfo
 apps/marketing/.astro/
 .specstory/
+
+# the flag-on web build used by the CMS e2e (apps/web-e2e/playwright.cms.config.ts)
+apps/web/dist-cms/
