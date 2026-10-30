@@ -48,6 +48,8 @@
   --color-accent-2-700: #aa0b56;
   --color-accent-2-800: #790e3d;
   --color-accent-2-900: #4b1528;
+
+  --color-success-700: #2a7048;
 }
 
 /* Non-colour tokens + aliases for the component layer below. Plain custom
