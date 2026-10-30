@@ -1,0 +1,7 @@
+{
+  "nameLabel": "Their name",
+  "dateOfBirthLabel": "Date of birth",
+  "dateOfPassingLabel": "Date they passed",
+  "optional": "(optional)",
+  "namePlaceholder": "e.g. Margaret Hayes"
+}
