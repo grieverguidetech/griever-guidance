@@ -3,6 +3,7 @@ import { screenCopy } from '@griever/copy';
 import {
   defaultServiceEventsMessage,
   type SectionFields,
+  type SectionKey,
   type ServiceEventFields,
   type SessionDetails,
 } from '@griever/shared';
@@ -25,6 +26,9 @@ interface Props {
   /** Gets only the field that changed. There is no Save button; the editor saves as you go. */
   onChange: (patch: ServicePatch) => void;
   onReadyChange: (ready: boolean) => void;
+  /** The next section still to do, or null when none is left. */
+  nextSection?: SectionKey | null;
+  onNext?: () => void;
 }
 
 /** A text field named "legend label" like the base fields of an event group. */
@@ -113,7 +117,7 @@ function Disclosure({
 const hasText = (...vs: (string | boolean | undefined)[]) => vs.some((v) => v === true || (typeof v === 'string' && v !== ''));
 
 /** Service events, notes and the message. The message follows the details until the family edits it. */
-export function ServiceSection({ values, onChange, onReadyChange }: Props) {
+export function ServiceSection({ values, onChange, onReadyChange, nextSection, onNext }: Props) {
   const id = useId();
   const prefill = defaultServiceEventsMessage({
     personName: values.personName ?? '',
@@ -267,7 +271,12 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
           </button>
         )}
       </div>
-      <MarkReady ready={values.sectionStatus?.service === 'ready'} onChange={onReadyChange} />
+      <MarkReady
+        ready={values.sectionStatus?.service === 'ready'}
+        onChange={onReadyChange}
+        nextSection={nextSection}
+        onNext={onNext}
+      />
     </div>
   );
 }

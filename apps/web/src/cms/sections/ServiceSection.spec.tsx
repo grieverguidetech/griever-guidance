@@ -32,6 +32,26 @@ function setup(initial: Values = {}) {
 const message = () => screen.getByLabelText('Message') as HTMLTextAreaElement;
 
 describe('ServiceSection', () => {
+  it('shows the ready hint, and "Back to Overview" only once ready with nothing left', async () => {
+    const onNext = vi.fn();
+    const { rerender } = render(
+      <ServiceSection values={{}} onChange={vi.fn()} onReadyChange={vi.fn()} nextSection={null} onNext={onNext} />,
+    );
+    expect(screen.getByText(/Mark as ready when these details are settled/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to Overview' })).toBeNull();
+    rerender(
+      <ServiceSection
+        values={{ sectionStatus: { service: 'ready' } }}
+        onChange={vi.fn()}
+        onReadyChange={vi.fn()}
+        nextSection={null}
+        onNext={onNext}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Overview' }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
   const add = (name: string) => userEvent.click(screen.getByRole('button', { name }));
 
   it('opens Funeral only, with the intro, and plain Add buttons for the rest; no h1', () => {

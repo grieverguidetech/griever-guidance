@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
-import type { SectionFields, SessionDetails } from '@griever/shared';
+import type { SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { DateField, todayISO } from '../../lib/DateField';
 import { MarkReady } from './MarkReady';
 
@@ -16,13 +16,17 @@ interface Props {
   /** Gets only the field that changed. There is no Save button; the editor saves as you go. */
   onChange: (patch: PersonPatch) => void;
   onReadyChange: (ready: boolean) => void;
+  /** The next section still to do, or null when none is left. */
+  nextSection?: SectionKey | null;
+  onNext?: () => void;
 }
 
 /** The person's details, typed once; every message reads them. */
-export function PersonSection({ values, onChange, onReadyChange }: Props) {
+export function PersonSection({ values, onChange, onReadyChange, nextSection, onNext }: Props) {
   const id = useId();
   return (
     <div className="flex flex-col gap-4">
+      <p>{copy.intro}</p>
       <div className="gg-field">
         <label htmlFor={`${id}-name`}>{copy.nameLabel}</label>
         <input
@@ -49,7 +53,12 @@ export function PersonSection({ values, onChange, onReadyChange }: Props) {
         max={todayISO()}
         onChange={(dateOfPassing) => onChange({ dateOfPassing })}
       />
-      <MarkReady ready={values.sectionStatus?.person === 'ready'} onChange={onReadyChange} />
+      <MarkReady
+        ready={values.sectionStatus?.person === 'ready'}
+        onChange={onReadyChange}
+        nextSection={nextSection}
+        onNext={onNext}
+      />
     </div>
   );
 }
