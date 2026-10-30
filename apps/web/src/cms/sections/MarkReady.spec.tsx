@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
@@ -65,6 +66,26 @@ describe('MarkReady', () => {
     render(<MarkReady ready onChange={() => undefined} nextSection={null} onNext={onNext} />);
     await userEvent.click(screen.getByRole('button', { name: 'Back to Overview' }));
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the chip and hint styles, and the next button enters calmly', () => {
+    render(<MarkReady ready onChange={() => undefined} nextSection="service" onNext={() => undefined} />);
+    const toggle = screen.getByRole('button', { name: 'Mark as ready' });
+    expect(toggle).toHaveClass('gg-chip');
+    expect(screen.getByText(/Mark as ready when/)).toHaveClass('gg-hint');
+    expect(screen.getByRole('button', { name: 'Next: Service' })).toHaveClass('gg-enter');
+  });
+
+  it('keeps focus on the toggle after it is pressed', async () => {
+    const Harness = () => {
+      const [ready, setReady] = useState(false);
+      return <MarkReady ready={ready} onChange={setReady} nextSection="service" onNext={() => undefined} />;
+    };
+    render(<Harness />);
+    const toggle = screen.getByRole('button', { name: 'Mark as ready' });
+    await userEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'Next: Service' })).toBeInTheDocument();
+    expect(toggle).toHaveFocus();
   });
 
   it('holds no hard-coded copy', () => {
