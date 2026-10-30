@@ -59,11 +59,11 @@ describe('PhaseList', () => {
     render(
       <PhaseList checklist={{ pronouncement: 'done', custody: 'not_applicable' }} onOpen={noop} onChange={noop} />,
     );
-    const done = screen.getByRole('button', { name: copy.items.pronouncement }).closest('li');
-    const na = screen.getByRole('button', { name: copy.items.custody }).closest('li');
     // The label column only; the pressed toggle has its own check.
-    expect(done?.querySelector(':scope > div:first-child svg[aria-hidden="true"]')).not.toBeNull();
-    expect(na?.querySelector(':scope > div:first-child svg')).toBeNull();
+    const doneColumn = screen.getByRole('button', { name: copy.items.pronouncement }).parentElement?.parentElement;
+    const naColumn = screen.getByRole('button', { name: copy.items.custody }).parentElement?.parentElement;
+    expect(doneColumn?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(naColumn?.querySelector('svg')).toBeNull();
   });
 
   it('opens an item from its label', async () => {
