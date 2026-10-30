@@ -103,7 +103,7 @@ describe('editor on (#395)', () => {
     await openMargaret();
     expect(screen.queryByRole('heading', { name: 'One thing at a time.' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /^Now:/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Next on the list/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^On the checklist/ })).toBeInTheDocument();
     expect(Date.parse(stored()[0].lastOpenedAt)).toBeGreaterThan(Date.parse('2026-10-10T00:00:00.000Z'));
   });
 

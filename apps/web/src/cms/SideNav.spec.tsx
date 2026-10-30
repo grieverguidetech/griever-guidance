@@ -83,18 +83,21 @@ describe('SideNav', () => {
     expect(menu).toHaveFocus();
   });
 
-  it('shows statuses when given, with a missing key as Not started', () => {
+  it('shows statuses when given, with a missing open key as Not started and later sections as Later', () => {
     setup({ statuses: { person: 'ready', service: 'in_progress' } });
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getByText('Ready')).toBeInTheDocument();
     expect(within(nav).getByText('In progress')).toBeInTheDocument();
-    expect(within(nav).getAllByText('Not started')).toHaveLength(3);
+    expect(within(nav).queryAllByText('Not started')).toHaveLength(0);
+    expect(within(nav).getAllByText('Later')).toHaveLength(3);
+    expect(within(nav).getAllByText('Later')[0]).toHaveClass('text-[color:var(--text-muted)]');
+    expect(within(nav).getAllByText('Later')[0]).toHaveClass('text-[14px]');
   });
 
   it('gives an item its label and status as one name, with a space between', () => {
     setup({ statuses: { service: 'in_progress' } });
     expect(screen.getByRole('button', { name: 'Service In progress' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Obituary Not started' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Obituary Later' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument();
   });
 

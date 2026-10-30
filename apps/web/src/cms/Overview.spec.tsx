@@ -57,11 +57,13 @@ describe('Overview', () => {
     expect(screen.getAllByText('Not started')).toHaveLength(2);
   });
 
-  it('later sections show the coming-later note and still open', async () => {
-    const { onOpen } = setup();
+  it('later sections show the coming-later note as plain text, not buttons', () => {
+    setup();
     expect(screen.getAllByText('This part comes later. Nothing is needed here yet.')).toHaveLength(3);
-    await userEvent.click(screen.getByRole('button', { name: /Obituary/ }));
-    expect(onOpen).toHaveBeenCalledWith('obituary');
+    for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
+      expect(screen.queryByRole('button', { name: new RegExp(`^${name}`) })).toBeNull();
+    }
+    expect(screen.getAllByRole('button', { name: /^(The person|Service)/ })).toHaveLength(2);
   });
 
   it('a row calls onOpen with its key', async () => {
@@ -73,20 +75,20 @@ describe('Overview', () => {
   it('shows the current phase and the next item, and the item calls onOpenItem', async () => {
     const { onOpenItem } = setup();
     expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: `Next on the list: ${CHECKLIST_ITEM_LABEL}` }));
+    await userEvent.click(screen.getByRole('button', { name: `On the checklist: ${CHECKLIST_ITEM_LABEL}` }));
     expect(onOpenItem).toHaveBeenCalledWith(CHECKLIST_PHASES[0].itemIds[0]);
   });
 
   it('without onOpenItem the phase shows and the next-item button does not', () => {
     render(<Overview session={{}} checklist={{}} onOpen={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Next on the list:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^On the checklist:/ })).toBeNull();
   });
 
   it('shows nothing from the checklist when every phase is done', () => {
     setup({}, allDone);
     expect(screen.queryByText(/^Now:/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Next on the list:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^On the checklist:/ })).toBeNull();
   });
 
   it('a Ready section shows an aria-hidden check beside its status text', () => {
