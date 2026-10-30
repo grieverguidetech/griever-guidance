@@ -77,6 +77,12 @@ describe('Overview', () => {
     expect(onOpenItem).toHaveBeenCalledWith(CHECKLIST_PHASES[0].itemIds[0]);
   });
 
+  it('without onOpenItem the phase shows and the next-item button does not', () => {
+    render(<Overview session={{}} checklist={{}} onOpen={vi.fn()} />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Next on the list:/ })).toBeNull();
+  });
+
   it('shows nothing from the checklist when every phase is done', () => {
     setup({}, allDone);
     expect(screen.queryByText(/^Now:/)).toBeNull();

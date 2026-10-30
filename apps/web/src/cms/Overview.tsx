@@ -24,7 +24,8 @@ interface Props {
   session: Pick<SectionFields, 'sectionStatus'>;
   checklist: ChecklistFields;
   onOpen: (key: SectionKey) => void;
-  onOpenItem: (itemId: ChecklistItemId) => void;
+  /** Without it the next item is not shown (no button that does nothing); the phase still is. */
+  onOpenItem?: (itemId: ChecklistItemId) => void;
 }
 
 /** Decorative; the status text beside it carries the meaning. */
@@ -92,7 +93,7 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
       {phase ? (
         <div className="flex flex-col gap-2">
           <h2 className="font-semibold">{fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}</h2>
-          {item ? (
+          {item && onOpenItem ? (
             <button
               type="button"
               className="gg-btn gg-btn-secondary self-start text-left"

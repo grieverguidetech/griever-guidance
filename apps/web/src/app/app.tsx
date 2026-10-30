@@ -806,7 +806,6 @@ function AppBody({
               session={active}
               checklist={active}
               onOpen={setCmsSection}
-              onOpenItem={() => undefined}
             />
           ) : cmsSection === 'person' ? (
             <PersonSection
