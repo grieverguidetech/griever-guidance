@@ -11,6 +11,7 @@ import {
   resumeDraft,
   namedSessionsByRecent,
   latestInProgressDraft,
+  computeSections,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { getProfile } from '@griever/api-client';
@@ -21,7 +22,7 @@ import { screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { CmsShell } from '../cms/CmsShell';
-import { Overview } from '../cms/Overview';
+import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
 import { PeopleList } from '../cms/PeopleList';
 import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
 import { ChecklistItemDetail } from '../cms/checklist/ChecklistItemDetail';
@@ -958,6 +959,12 @@ function AppBody({
   if (view === 'cms' && active) {
     const readyChange = (key: 'person' | 'service') => (ready: boolean) =>
       sessions.setSectionStatus(active.id, key, ready ? 'ready' : 'in_progress');
+    const nextSection = computeSections(active, AVAILABLE_SECTIONS).next;
+    // Ready leads on: the next section, or the Overview when nothing is left. The key hook moves focus to the h1.
+    const goNext = () => {
+      setCmsItem(null);
+      setCmsSection(nextSection ?? 'overview');
+    };
     return (
       <Shell wide>
         <CmsShell
@@ -1012,12 +1019,16 @@ function AppBody({
               values={active}
               onChange={(patch) => sessions.updateSection(active.id, 'person', patch)}
               onReadyChange={readyChange('person')}
+              nextSection={nextSection}
+              onNext={goNext}
             />
           ) : cmsSection === 'service' ? (
             <ServiceSection
               values={active}
               onChange={(patch) => sessions.updateSection(active.id, 'service', patch)}
               onReadyChange={readyChange('service')}
+              nextSection={nextSection}
+              onNext={goNext}
             />
           ) : (
             <p>{cmsShellCopy.comingLater}</p>

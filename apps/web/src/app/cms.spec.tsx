@@ -135,6 +135,20 @@ describe('editor on (#395)', () => {
     expect(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ })).toHaveTextContent('Ready');
   });
 
+  it('Ready leads on: Next opens Service with focus on its h1, then Back to Overview', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^The person/ }));
+    await screen.findByRole('heading', { level: 1, name: 'The person' });
+    expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    await user.click(screen.getByRole('button', { name: 'Next: Service' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    await user.click(screen.getByRole('button', { name: 'Back to Overview' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
+  });
+
   it('"Change" returns to Home and drops an unnamed person', async () => {
     const user = userEvent.setup();
     render(<App />);

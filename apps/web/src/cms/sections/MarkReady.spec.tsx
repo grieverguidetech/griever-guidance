@@ -42,6 +42,31 @@ describe('MarkReady', () => {
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toBeInTheDocument();
   });
 
+  it('shows the hint and ties it to the toggle', () => {
+    render(<MarkReady ready={false} onChange={() => undefined} />);
+    const hint = screen.getByText('Mark as ready when these details are settled. You can still change them.');
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAccessibleDescription(hint.textContent ?? '');
+  });
+
+  it('shows no continue button when not ready', () => {
+    render(<MarkReady ready={false} onChange={() => undefined} nextSection="service" onNext={() => undefined} />);
+    expect(screen.queryByRole('button', { name: /^Next:|Back to Overview/ })).toBeNull();
+  });
+
+  it('shows "Next: section" when ready and calls onNext', async () => {
+    const onNext = vi.fn();
+    render(<MarkReady ready onChange={() => undefined} nextSection="service" onNext={onNext} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Next: Service' }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows "Back to Overview" when ready and nothing is left', async () => {
+    const onNext = vi.fn();
+    render(<MarkReady ready onChange={() => undefined} nextSection={null} onNext={onNext} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Overview' }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'MarkReady.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsShell')).toEqual([]);

@@ -22,6 +22,30 @@ describe('PersonSection', () => {
     expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
   });
 
+  it('shows the intro at the top', () => {
+    setup();
+    expect(screen.getByText('Start with their name. The rest can wait.')).toBeInTheDocument();
+  });
+
+  it('shows Next only when ready, and calls onNext', async () => {
+    const onNext = vi.fn();
+    const { rerender } = render(
+      <PersonSection values={{}} onChange={vi.fn()} onReadyChange={vi.fn()} nextSection="service" onNext={onNext} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Next: Service' })).toBeNull();
+    rerender(
+      <PersonSection
+        values={{ sectionStatus: { person: 'ready' } }}
+        onChange={vi.fn()}
+        onReadyChange={vi.fn()}
+        nextSection="service"
+        onNext={onNext}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Next: Service' }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
   it('typing calls onChange with only the name', async () => {
     const { onChange } = setup();
     await userEvent.type(screen.getByLabelText('Their name'), 'M');
