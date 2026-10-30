@@ -9,6 +9,8 @@
   "notApplicable": "Doesn't apply",
   "nowPhase": "Now: {phase}",
   "nextItem": "Next on the list: {item}",
+  "onTheChecklist": "On the checklist: {item}",
+  "openService": "Open Service",
   "back": "Back",
   "whatItIs": "What it is",
   "whyItMatters": "Why it matters",

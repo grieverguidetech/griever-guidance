@@ -8,7 +8,8 @@
     "dateOfBirthLabel",
     "dateOfPassingLabel",
     "optional",
-    "namePlaceholder"
+    "namePlaceholder",
+    "intro"
   ],
   "properties": {
     "nameLabel": {
@@ -24,6 +25,9 @@
       "$ref": "#/$defs/text"
     },
     "namePlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
       "$ref": "#/$defs/text"
     }
   },
