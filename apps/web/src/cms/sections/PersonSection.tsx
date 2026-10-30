@@ -55,24 +55,26 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
           onChange={(e) => onChange({ personName: e.target.value })}
         />
       </div>
-      <DateField
-        id={`${id}-birth`}
-        label={`${copy.dateOfBirthLabel} ${copy.optional}`}
-        value={values.birthDate ?? ''}
-        max={todayISO()}
-        visibleHelp
-        {...noteProps(birthNote)}
-        onChange={(birthDate) => onChange({ birthDate })}
-      />
-      <DateField
-        id={`${id}-passing`}
-        label={`${copy.dateOfPassingLabel} ${copy.optional}`}
-        value={values.dateOfPassing ?? ''}
-        max={todayISO()}
-        visibleHelp
-        {...noteProps(passingNote)}
-        onChange={(dateOfPassing) => onChange({ dateOfPassing })}
-      />
+      <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 'var(--space-4)' }}>
+        <DateField
+          id={`${id}-birth`}
+          label={`${copy.dateOfBirthLabel} ${copy.optional}`}
+          value={values.birthDate ?? ''}
+          max={todayISO()}
+          visibleHelp
+          {...noteProps(birthNote)}
+          onChange={(birthDate) => onChange({ birthDate })}
+        />
+        <DateField
+          id={`${id}-passing`}
+          label={`${copy.dateOfPassingLabel} ${copy.optional}`}
+          value={values.dateOfPassing ?? ''}
+          max={todayISO()}
+          visibleHelp
+          {...noteProps(passingNote)}
+          onChange={(dateOfPassing) => onChange({ dateOfPassing })}
+        />
+      </div>
       <MarkReady
         ready={values.sectionStatus?.person === 'ready'}
         onChange={onReadyChange}

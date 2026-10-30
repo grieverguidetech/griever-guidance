@@ -20,8 +20,31 @@ describe('DateInput notes', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('shows the format help as visible text when asked', () => {
+  it('keeps the visible help screen-reader-only until the field has focus', async () => {
     render(<DateField id="d" label="Date" value="" visibleHelp onChange={() => undefined} />);
+    const help = screen.getByText(/Type a date such as/);
+    const input = screen.getByLabelText('Date');
+    expect(help).toHaveClass('sr-only');
+    expect(input).toHaveAttribute('aria-describedby', 'd-help');
+    await userEvent.click(input);
+    expect(help).toHaveClass('gg-hint');
+    expect(help).not.toHaveClass('sr-only');
+    expect(input).toHaveAttribute('aria-describedby', 'd-help');
+  });
+
+  it('keeps the help visible when focus moves to the calendar button, and hides it on leaving', async () => {
+    render(<DateField id="d" label="Date" value="" visibleHelp onChange={() => undefined} />);
+    const help = screen.getByText(/Type a date such as/);
+    await userEvent.click(screen.getByLabelText('Date'));
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'Choose date from calendar' })).toHaveFocus();
+    expect(help).not.toHaveClass('sr-only');
+    await userEvent.tab();
+    expect(help).toHaveClass('sr-only');
+  });
+
+  it('shows the help while a note is showing, even without focus', () => {
+    render(<DateField id="d" label="Date" value="x" visibleHelp note="A note" onChange={() => undefined} />);
     expect(screen.getByText(/Type a date such as/)).not.toHaveClass('sr-only');
   });
 });

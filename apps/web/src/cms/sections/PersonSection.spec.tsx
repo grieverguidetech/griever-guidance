@@ -52,9 +52,23 @@ describe('PersonSection', () => {
     expect(onChange).toHaveBeenCalledWith({ dateOfPassing: 'December 25, 20991' });
   });
 
-  it('shows the date format help as visible text', () => {
+  it('shows the date format help only while a date field has focus, and always describes it', async () => {
     setup();
-    expect(screen.getAllByText('Type a date such as May 29, 2026, or use the calendar button.')[0]).toBeVisible();
+    const helps = screen.getAllByText('Type a date such as May 29, 2026, or use the calendar button.');
+    const birth = screen.getByLabelText(/Date of birth/);
+    expect(helps[0]).toHaveClass('sr-only');
+    expect(birth.getAttribute('aria-describedby')).toContain(helps[0].id);
+    await userEvent.click(birth);
+    expect(helps[0]).not.toHaveClass('sr-only');
+    expect(helps[1]).toHaveClass('sr-only');
+  });
+
+  it('puts the two dates in a grid: one column on a phone, two from sm up', () => {
+    setup();
+    const grid = screen.getByLabelText(/Date of birth/).closest('.grid');
+    expect(grid).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
+    expect(grid).toContainElement(screen.getByLabelText(/Date they passed/));
+    expect(grid).not.toContainElement(screen.getByLabelText('Their name'));
   });
 
   it('shows the intro at the top', () => {

@@ -69,6 +69,7 @@ export function DateInput({
   const [blurredValue, setBlurredValue] = useState<string | null>(null);
   const note = liveNote ?? (blurredValue !== null && blurredValue === value ? noteOnBlur : undefined);
   const pickerRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
   const helpId = `${id}-help`;
   const noteId = `${id}-note`;
 
@@ -86,18 +87,29 @@ export function DateInput({
     }
   }
 
+  // Visible only while the field or its calendar button has focus, or a note shows.
+  // Otherwise it stays for screen readers (aria-describedby always points at it).
+  const showHelp = Boolean(visibleHelp) && (focused || Boolean(note));
+
   const help = (
     <span
       id={helpId}
-      className={visibleHelp ? 'block mt-1 text-[13px] leading-[1.5]' : 'sr-only'}
-      style={visibleHelp ? { color: 'var(--text-hint)' } : undefined}
+      className={showHelp ? 'gg-hint block mt-1 leading-[1.5]' : 'sr-only'}
     >
       Type a date such as May 29, 2026, or use the calendar button.
     </span>
   );
 
   const box = (
-    <div className="gg-datebox">
+    <div
+      className="gg-datebox"
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setFocused(false);
+        }
+      }}
+    >
       <input
         id={id}
         type="text"
