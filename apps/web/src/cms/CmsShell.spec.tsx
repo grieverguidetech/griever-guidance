@@ -80,15 +80,15 @@ describe('CmsShell', () => {
   });
 
   it('aria-current follows the section', () => {
-    setup('thanks');
-    expect(screen.getByRole('button', { name: 'Thank-yous' })).toHaveAttribute('aria-current', 'page');
+    setup('person');
+    expect(screen.getByRole('button', { name: 'The person' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Service' })).not.toHaveAttribute('aria-current');
   });
 
   it('routes section items to onSelect and the account item to onAccount', async () => {
     const { onSelect, onAccount } = setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Obituary' }));
-    expect(onSelect).toHaveBeenCalledWith('obituary');
+    await userEvent.click(screen.getByRole('button', { name: 'The person' }));
+    expect(onSelect).toHaveBeenCalledWith('person');
     await userEvent.click(screen.getByRole('button', { name: 'Your account' }));
     expect(onAccount).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -96,14 +96,14 @@ describe('CmsShell', () => {
 
   it('moves focus to the h1 after a menu choice on a phone', async () => {
     setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Sections' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Obituary' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sections · Service' }));
+    await userEvent.click(screen.getByRole('button', { name: 'The person' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 
   it('moves focus off the nav when Change is pressed', async () => {
     setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Sections' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sections · Service' }));
     await userEvent.click(screen.getByRole('button', { name: "Change who you're writing about" }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });

@@ -7,7 +7,7 @@
   "navThankYous": "Thank-yous",
   "navAccount": "Your account",
   "navLandmark": "Sections",
-  "menuButton": "Sections",
+  "menuButton": "Sections · {section}",
   "change": "Change",
   "changeLabel": "Change who you're writing about",
   "unnamedPerson": "Not named yet",
