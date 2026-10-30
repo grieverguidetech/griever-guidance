@@ -4,18 +4,18 @@ import type { ReactNode } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
-import { EventFields } from './EventFields';
+import { EventFields, type Suggestion } from './EventFields';
 
 const keys = { date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' } as const;
 
 type Slot = ReactNode | ((legendId: string) => ReactNode);
 
 function setup(
-  props: { values?: Record<string, string>; placeLabel?: string; extra?: Slot; lead?: Slot; hideFields?: boolean } = {},
+  props: { values?: Record<string, string>; placeLabel?: string; extra?: Slot; lead?: Slot; hideFields?: boolean; dateSuggestion?: Suggestion; placeSuggestion?: Suggestion } = {},
 ) {
   const onChange = vi.fn();
   render(
-    <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} lead={props.lead} hideFields={props.hideFields} />,
+    <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} lead={props.lead} hideFields={props.hideFields} dateSuggestion={props.dateSuggestion} placeSuggestion={props.placeSuggestion} />,
   );
   return { onChange };
 }
@@ -107,6 +107,30 @@ describe('EventFields', () => {
       ),
     });
     expect(screen.getByRole('textbox', { name: 'Reception Address' })).toBeInTheDocument();
+  });
+
+  it('shows suggestion buttons only while the field is empty, named with the legend', async () => {
+    const onUse = vi.fn();
+    setup({ dateSuggestion: { label: 'Same day', onUse }, placeSuggestion: { label: 'Same place', onUse } });
+    const day = screen.getByRole('button', { name: 'Reception Same day' });
+    expect(day).toHaveClass('min-h-[44px]');
+    await userEvent.click(day);
+    expect(onUse).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Date')).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Reception Same place' })).toBeInTheDocument();
+  });
+
+  it('shows no suggestion without one, or once the field has a value', () => {
+    const s = { label: 'Same day', onUse: vi.fn() };
+    setup({ values: { receptionDate: 'May 29, 2026', receptionPlace: 'Hall' }, dateSuggestion: s, placeSuggestion: s });
+    expect(screen.queryByRole('button', { name: /Same day/ })).toBeNull();
+  });
+
+  it('never fills by itself', () => {
+    const onUse = vi.fn();
+    const { onChange } = setup({ dateSuggestion: { label: 'Same day', onUse } });
+    expect(onUse).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('has no delete or remove control (C9)', () => {

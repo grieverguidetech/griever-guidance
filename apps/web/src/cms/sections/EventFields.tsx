@@ -38,10 +38,48 @@ interface Props<K extends EventKey> {
   extra?: Slot;
   /** Hides date, time and place. The lead and extra slots stay. */
   hideFields?: boolean;
+  /** A one-tap fill for an empty date. Shown only while the date is empty; never fills by itself. */
+  dateSuggestion?: Suggestion;
+  /** The same for an empty place. */
+  placeSuggestion?: Suggestion;
+}
+
+/** A button label and what to do on tap. The parent writes the value. */
+export interface Suggestion {
+  label: string;
+  onUse: () => void;
 }
 
 /** A slot can take the legend id, so its fields are named "legend label" like the base fields. */
 type Slot = ReactNode | ((legendId: string) => ReactNode);
+
+/** A small button named "legend label", like the fields. It goes away once the field has a value, so focus moves to the field. */
+function SuggestionButton({
+  suggestion,
+  legendId,
+  buttonId,
+  fieldId,
+}: {
+  suggestion: Suggestion;
+  legendId: string;
+  buttonId: string;
+  fieldId: string;
+}) {
+  return (
+    <button
+      type="button"
+      id={buttonId}
+      aria-labelledby={`${legendId} ${buttonId}`}
+      className="gg-btn gg-btn-secondary min-h-[44px] self-start"
+      onClick={() => {
+        suggestion.onUse();
+        document.getElementById(fieldId)?.focus();
+      }}
+    >
+      {suggestion.label}
+    </button>
+  );
+}
 
 /** Date, time and where, for one event. There is no delete control. */
 export function EventFields<K extends EventKey>({
@@ -53,6 +91,8 @@ export function EventFields<K extends EventKey>({
   lead,
   extra,
   hideFields = false,
+  dateSuggestion,
+  placeSuggestion,
 }: Props<K>) {
   const id = useId();
   const legendId = `${id}-legend`;
@@ -72,6 +112,14 @@ export function EventFields<K extends EventKey>({
           value={values[keys.date] ?? ''}
           onChange={(v) => onChange({ [keys.date]: v } as Partial<Record<K, string>>)}
         />
+        {dateSuggestion && !values[keys.date] && (
+          <SuggestionButton
+            suggestion={dateSuggestion}
+            legendId={legendId}
+            buttonId={`${id}-date-suggest`}
+            fieldId={`${id}-date`}
+          />
+        )}
       </div>
       <div className="gg-field">
         <label id={`${id}-time-label`} htmlFor={`${id}-time`}>
@@ -97,6 +145,14 @@ export function EventFields<K extends EventKey>({
           value={values[keys.place] ?? ''}
           onChange={(e) => onChange({ [keys.place]: e.target.value } as Partial<Record<K, string>>)}
         />
+        {placeSuggestion && !values[keys.place] && (
+          <SuggestionButton
+            suggestion={placeSuggestion}
+            legendId={legendId}
+            buttonId={`${id}-place-suggest`}
+            fieldId={`${id}-place`}
+          />
+        )}
       </div>
         </>
       )}

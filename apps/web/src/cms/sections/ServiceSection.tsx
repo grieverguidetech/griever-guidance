@@ -114,6 +114,10 @@ function Disclosure({
   );
 }
 
+/** Offers the funeral service's value for an empty group field, when the service has one. */
+const sameAs = (serviceValue: string | undefined, label: string, use: (v: string) => void) =>
+  serviceValue ? { label, onUse: () => use(serviceValue) } : undefined;
+
 const hasText = (...vs: (string | boolean | undefined)[]) => vs.some((v) => v === true || (typeof v === 'string' && v !== ''));
 
 /** Service events, notes and the message. The message follows the details until the family edits it. */
@@ -171,6 +175,8 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         keys={{ date: 'visitationDate', time: 'visitationTime', place: 'visitationPlace' }}
         values={values}
         onChange={onChange}
+        dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (visitationDate) => onChange({ visitationDate }))}
+        placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (visitationPlace) => onChange({ visitationPlace }))}
       />
       </Disclosure>
       <EventFields
@@ -213,6 +219,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         values={values}
         onChange={onChange}
         placeLabel={copy.eventCemetery}
+        dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (burialDate) => onChange({ burialDate }))}
         hideFields={values.burialPrivate === true}
         lead={
           <label className="flex items-center gap-3 min-h-[44px] cursor-pointer">
@@ -233,6 +240,8 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         keys={{ date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' }}
         values={values}
         onChange={onChange}
+        dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (receptionDate) => onChange({ receptionDate }))}
+        placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (receptionPlace) => onChange({ receptionPlace }))}
       />
       </Disclosure>
       <div className="gg-field">
