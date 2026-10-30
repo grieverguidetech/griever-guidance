@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   e2e-stress:
-    name: Playwright e2e x${{ inputs.repeat_each }} (desktop, Android, iPhone)
+    name: Playwright e2e x${{ inputs.repeat_each }} (desktop)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -40,10 +40,10 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: pnpm exec playwright install --with-deps chromium
 
       - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium webkit
+        run: pnpm exec playwright install-deps chromium
 
       - run: pnpm nx e2e web-e2e --skip-nx-cache -- --repeat-each="$REPEAT_EACH" --retries=0 --trace=retain-on-failure
         env:

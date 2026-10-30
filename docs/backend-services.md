@@ -352,7 +352,7 @@ probably answers 500 in production. A key set by hand on the Worker: not verifie
 
 | Workflow | Trigger | Jobs |
 |---|---|---|
-| `ci.yml` | Push to `main`, every PR | `Typecheck, unit + integration tests, build` (Nx affected; forbids `.only`, `.skip`, `.todo`); `Supabase RLS tests` (pgTAP); `e2e` (Playwright, desktop, Android, iPhone) |
+| `ci.yml` | Push to `main`, every PR | `Typecheck, unit + integration tests, build` (Nx affected; forbids `.only`, `.skip`, `.todo`); `Supabase RLS tests` (pgTAP); `e2e` (Playwright, desktop) |
 | `deploy.yml` | CI success on a push to `main`, or manual | `gate` → `check-accounts-config` → `deploy-gateway`, `deploy-web`, `deploy-marketing` (parallel) → `smoke` |
 | `e2e-stress.yml` | Not read in detail | Repeat e2e runs (AGENTS.md) |
 | `mobile-bundle.yml` | Not read in detail | Mobile bundle check (not verified) |
