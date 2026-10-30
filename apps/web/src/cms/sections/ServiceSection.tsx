@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import {
   defaultServiceEventsMessage,
@@ -64,6 +64,56 @@ function GroupText({
   );
 }
 
+/**
+ * A group behind an "Add ..." button. Once opened it stays open (one way, no collapse), so nothing
+ * the family typed can be hidden or lost. The button goes away on open, so focus moves to the
+ * first control of the group.
+ */
+function Disclosure({
+  open,
+  onOpen,
+  buttonLabel,
+  children,
+}: {
+  open: boolean;
+  onOpen: () => void;
+  buttonLabel: string;
+  children: ReactNode;
+}) {
+  const panelId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const moveFocus = useRef(false);
+  useEffect(() => {
+    if (open && moveFocus.current) {
+      moveFocus.current = false;
+      panelRef.current?.querySelector<HTMLElement>('input, textarea, button')?.focus();
+    }
+  }, [open]);
+  return (
+    <div>
+      {!open && (
+        <button
+          type="button"
+          className="gg-btn gg-btn-secondary min-h-[44px]"
+          aria-expanded={false}
+          aria-controls={panelId}
+          onClick={() => {
+            moveFocus.current = true;
+            onOpen();
+          }}
+        >
+          {buttonLabel}
+        </button>
+      )}
+      <div id={panelId} ref={panelRef}>
+        {open && children}
+      </div>
+    </div>
+  );
+}
+
+const hasText = (...vs: (string | boolean | undefined)[]) => vs.some((v) => v === true || (typeof v === 'string' && v !== ''));
+
 /** Service events, notes and the message. The message follows the details until the family edits it. */
 export function ServiceSection({ values, onChange, onReadyChange }: Props) {
   const id = useId();
@@ -88,32 +138,54 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
   });
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const edited = values.serviceMessage !== undefined;
+  // A group with data opens on its own; one the family opened stays open.
+  const [opened, setOpened] = useState({ visitation: false, burial: false, reception: false });
+  const withData = {
+    visitation: hasText(values.visitationDate, values.visitationTime, values.visitationPlace),
+    burial: hasText(values.burialDate, values.burialTime, values.burialPlace, values.burialPrivate),
+    reception: hasText(values.receptionDate, values.receptionTime, values.receptionPlace),
+  };
+  // Remember data-opened groups too, so clearing a field never closes the group under the cursor.
+  const open = {
+    visitation: opened.visitation || withData.visitation,
+    burial: opened.burial || withData.burial,
+    reception: opened.reception || withData.reception,
+  };
+  if (
+    (withData.visitation && !opened.visitation) ||
+    (withData.burial && !opened.burial) ||
+    (withData.reception && !opened.reception)
+  ) {
+    setOpened(open);
+  }
+  const openGroup = (g: keyof typeof opened) => setOpened((o) => ({ ...o, [g]: true }));
 
   return (
     <div className="flex flex-col gap-6">
+      <p>{copy.intro}</p>
+      <Disclosure open={open.visitation} onOpen={() => openGroup('visitation')} buttonLabel={copy.addVisitation}>
       <EventFields
         legend={copy.eventVisitation}
         keys={{ date: 'visitationDate', time: 'visitationTime', place: 'visitationPlace' }}
         values={values}
         onChange={onChange}
       />
+      </Disclosure>
       <EventFields
         legend={copy.eventFuneral}
         keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
         values={values}
         onChange={onChange}
-        lead={(legendId) => (
-          <GroupText
-            id={`${id}-type`}
-            legendId={legendId}
-            label={copy.typeLabel}
-            placeholder={copy.typePlaceholder}
-            value={values.serviceType}
-            onChange={(serviceType) => onChange({ serviceType })}
-          />
-        )}
         extra={(legendId) => (
           <>
+            <GroupText
+              id={`${id}-type`}
+              legendId={legendId}
+              label={copy.typeLabel}
+              placeholder={copy.typePlaceholder}
+              value={values.serviceType}
+              onChange={(serviceType) => onChange({ serviceType })}
+            />
             <GroupText
               id={`${id}-address`}
               legendId={legendId}
@@ -132,6 +204,7 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
           </>
         )}
       />
+      <Disclosure open={open.burial} onOpen={() => openGroup('burial')} buttonLabel={copy.addBurial}>
       <EventFields
         legend={copy.eventBurial}
         keys={{ date: 'burialDate', time: 'burialTime', place: 'burialPlace' }}
@@ -151,12 +224,15 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
           </label>
         }
       />
+      </Disclosure>
+      <Disclosure open={open.reception} onOpen={() => openGroup('reception')} buttonLabel={copy.addReception}>
       <EventFields
         legend={copy.eventReception}
         keys={{ date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' }}
         values={values}
         onChange={onChange}
       />
+      </Disclosure>
       <div className="gg-field">
         <label htmlFor={`${id}-notes`}>{copy.notesLabel}</label>
         <textarea
