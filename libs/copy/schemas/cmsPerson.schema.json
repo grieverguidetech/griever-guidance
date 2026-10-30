@@ -9,7 +9,10 @@
     "dateOfPassingLabel",
     "optional",
     "namePlaceholder",
-    "intro"
+    "intro",
+    "dateUnreadable",
+    "birthAfterPassing",
+    "futurePassing"
   ],
   "properties": {
     "nameLabel": {
@@ -28,6 +31,15 @@
       "$ref": "#/$defs/text"
     },
     "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "dateUnreadable": {
+      "$ref": "#/$defs/text"
+    },
+    "birthAfterPassing": {
+      "$ref": "#/$defs/text"
+    },
+    "futurePassing": {
       "$ref": "#/$defs/text"
     }
   },

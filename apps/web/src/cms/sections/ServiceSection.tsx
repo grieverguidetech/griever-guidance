@@ -13,13 +13,13 @@ import { MarkReady } from './MarkReady';
 const copy = screenCopy('cmsService');
 
 type ServiceValues = Partial<
-  Pick<SessionDetails, 'personName' | 'serviceDate' | 'obituaryUrl'> &
+  Pick<SessionDetails, 'personName' | 'serviceDate' | 'obituaryUrl' | 'dateOfPassing'> &
     Omit<SectionFields, 'sectionStatus'> &
     ServiceEventFields
 > &
   Pick<SectionFields, 'sectionStatus'>;
 
-export type ServicePatch = Partial<Omit<ServiceValues, 'sectionStatus' | 'personName' | 'obituaryUrl'>>;
+export type ServicePatch = Partial<Omit<ServiceValues, 'sectionStatus' | 'personName' | 'obituaryUrl' | 'dateOfPassing'>>;
 
 interface Props {
   values: ServiceValues;
@@ -175,6 +175,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         keys={{ date: 'visitationDate', time: 'visitationTime', place: 'visitationPlace' }}
         values={values}
         onChange={onChange}
+        dateOfPassing={values.dateOfPassing}
         dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (visitationDate) => onChange({ visitationDate }))}
         placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (visitationPlace) => onChange({ visitationPlace }))}
       />
@@ -184,6 +185,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
         values={values}
         onChange={onChange}
+        dateOfPassing={values.dateOfPassing}
         extra={(legendId) => (
           <>
             <GroupText
@@ -218,6 +220,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         keys={{ date: 'burialDate', time: 'burialTime', place: 'burialPlace' }}
         values={values}
         onChange={onChange}
+        dateOfPassing={values.dateOfPassing}
         placeLabel={copy.eventCemetery}
         dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (burialDate) => onChange({ burialDate }))}
         hideFields={values.burialPrivate === true}
@@ -240,6 +243,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         keys={{ date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' }}
         values={values}
         onChange={onChange}
+        dateOfPassing={values.dateOfPassing}
         dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (receptionDate) => onChange({ receptionDate }))}
         placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (receptionPlace) => onChange({ receptionPlace }))}
       />

@@ -11,11 +11,11 @@ const keys = { date: 'receptionDate', time: 'receptionTime', place: 'receptionPl
 type Slot = ReactNode | ((legendId: string) => ReactNode);
 
 function setup(
-  props: { values?: Record<string, string>; placeLabel?: string; extra?: Slot; lead?: Slot; hideFields?: boolean; dateSuggestion?: Suggestion; placeSuggestion?: Suggestion } = {},
+  props: { values?: Record<string, string>; placeLabel?: string; extra?: Slot; lead?: Slot; hideFields?: boolean; dateOfPassing?: string; dateSuggestion?: Suggestion; placeSuggestion?: Suggestion } = {},
 ) {
   const onChange = vi.fn();
   render(
-    <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} lead={props.lead} hideFields={props.hideFields} dateSuggestion={props.dateSuggestion} placeSuggestion={props.placeSuggestion} />,
+    <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} lead={props.lead} hideFields={props.hideFields} dateOfPassing={props.dateOfPassing} dateSuggestion={props.dateSuggestion} placeSuggestion={props.placeSuggestion} />,
   );
   return { onChange };
 }
@@ -27,6 +27,27 @@ describe('EventFields', () => {
     expect(within(group).getByLabelText('Date')).toBeInTheDocument();
     expect(within(group).getByLabelText('Time')).toBeInTheDocument();
     expect(within(group).getByLabelText('Place')).toBeInTheDocument();
+  });
+
+  it('notes an event date before the date they passed, linked to the input and not an alert', () => {
+    setup({ values: { receptionDate: 'May 20, 2026' }, dateOfPassing: 'May 29, 2026' });
+    const note = screen.getByText('This is before the date they passed. You can keep it.');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Reception Date' }).getAttribute('aria-describedby')).toContain(note.id);
+  });
+
+  it('notes an unreadable event date only after the field loses focus', async () => {
+    setup({ values: { receptionDate: 'next week' } });
+    expect(screen.queryByText(/couldn't read/)).toBeNull();
+    await userEvent.click(screen.getByRole('textbox', { name: 'Reception Date' }));
+    expect(screen.queryByText(/couldn't read/)).toBeNull();
+    await userEvent.tab();
+    expect(screen.getByText("We couldn't read this as a date. It will show as typed.")).toBeInTheDocument();
+  });
+
+  it('adds no note for a date on or after the date they passed, or without one', () => {
+    setup({ values: { receptionDate: 'May 29, 2026' }, dateOfPassing: 'May 29, 2026' });
+    expect(screen.queryByText(/before the date they passed/)).toBeNull();
   });
 
   it('names each field with the legend and its label', () => {

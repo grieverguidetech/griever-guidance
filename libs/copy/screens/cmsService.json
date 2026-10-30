@@ -22,5 +22,7 @@
   "addBurial": "Add burial",
   "addReception": "Add reception",
   "sameDay": "Same day as the service",
-  "samePlace": "Same place as the service"
+  "samePlace": "Same place as the service",
+  "dateUnreadable": "We couldn't read this as a date. It will show as typed.",
+  "beforePassing": "This is before the date they passed. You can keep it."
 }
