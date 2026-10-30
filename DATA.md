@@ -3,9 +3,9 @@
 Companion to `README.md`. The README describes what the twenty screens *are*; this document
 describes where their data lives, what shape it has, and how it gets to a server and back.
 
-**Posture: offline-first, local-authoritative.** The device is the source of truth for the session
+**Posture: local-authoritative today, but offline is no longer a requirement.** Since 2026-10-30 (#385) C5 (offline-first) is dropped for the whole product: offline is tech debt, and last saved wins. Existing offline behaviour (mobile, the flag-off web send flow) stays as built until a ticket changes it; nothing new needs to work offline. The device is the source of truth for the session
 the user is working in. The server is a backup and a hand-off mechanism between that user's own
-devices and, for person details, the owner's members — never a gatekeeper. Nothing in the flow may block on a network round-trip. This follows
+devices and, for person details, the owner's members — never a gatekeeper. Existing flows do not block on a network round-trip, and nothing new has to meet that bar (C5 dropped). This follows
 directly from the product's central promise, printed on three screens: *"Everything is saved as you
 go. You can stop and come back."*
 
@@ -144,7 +144,7 @@ draftsUpdatedAt: { announcement: "2026-10-11T10:00:00.000Z", … }   // which on
   on the picker resumes at the moment's first form), otherwise starts that moment fresh. Writing a
   draft touches only its own key.
 - The app reopens the in-progress draft with the latest `draftsUpdatedAt`.
-- C2: a draft at `sent` keeps only its moment and who was messaged; the typed fields, the edited
+- C2 (dropped 2026-10-30 for the web editor; still the rule in the flag-off send flow): a draft at `sent` keeps only its moment and who was messaged; the typed fields, the edited
   wording and the place are dropped, per moment.
 - A draft with no moment chosen yet is not kept (there is nothing in it to lose).
 - Migration at load: the older single `draft` moves to `drafts[draft.templateCategory]` (dropped
@@ -427,7 +427,7 @@ A failed background flush retries with backoff (1s → 2s → 4s → … capped 
 
 This section covers the original Convex session sync, which was removed (#203).
 The family-sharing design below ("Shared people") overrides it where they differ:
-shared person sync never carries contact ids or edited wording (C2, C3).
+shared person sync never carries contact ids or edited wording (C2 until it was dropped 2026-10-30, C3).
 
 - **Contacts. Settled: they never leave the device.** Names and mobile numbers of a grieving
   family's circle are the most sensitive data in the app, and they are already on the phone
@@ -436,8 +436,8 @@ shared person sync never carries contact ids or edited wording (C2, C3).
   number. In shared person sync the server sees not even the ids (C3). The cost is accepted, not worked
   around: a new device starts fresh (§2). Do not add a "just this once" path that ships a name to
   the server for a preview or a receipt.
-- **Message bodies.** Derived, not stored (§2 rule 2). `messageOverride` (edited wording) is the
-  user's own message text. It is kept only in the on-device draft until sent and never syncs (C2).
+- **Message bodies.** Planning messages (`serviceMessage` and the other section messages the web editor writes) are stored on the device (C2 dropped 2026-10-30); nothing is sent from web. In the send flow, the body is derived, not stored (§2 rule 2). `messageOverride` (edited wording) is the
+  user's own message text. It is kept only in the on-device draft until sent and never syncs (C2, dropped 2026-10-30 for the web editor; still true in the flag-off send flow).
   The removed Convex design would have synced it as `screens.B4.values.messageOverride`, but nothing
   wrote it there.
 - **Send jobs / delivery receipts.** Server-owned already (README B5); they are read down by their
@@ -473,6 +473,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
+- the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it (WEB-4).
 
 Rules:
 
@@ -499,11 +500,11 @@ Rules:
   on the next edit, wake or pull. After a send, only keys unchanged since sending are cleared.
   `GET /flows` runs on start, on wake and every 10 minutes, one request at a time with sends, and
   goes to `applyRemoteFlows` with the pending keys so a pull never overwrites an unsent edit. A
-  pull with unreadable records (`dropped > 0`) removes nothing. Nothing is shown to the user (C5).
+  pull with unreadable records (`dropped > 0`) removes nothing. Nothing is shown to the user (C5, dropped 2026-10-30; the sync still stays quiet).
   Nothing is sent until the first pull has worked (a failed pull holds back every send, not only
   creates), so a person the server already has is not created again.
 - Account actions (invite, join, remove) need a connection; the sync itself stays invisible and
-  never blocks the app or a flow (C5, §4.6).
+  never blocks the app or a flow (C5 dropped 2026-10-30; §4.6).
 
 ## 6. Auth seam
 
