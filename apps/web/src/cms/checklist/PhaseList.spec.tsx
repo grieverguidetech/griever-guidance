@@ -18,13 +18,13 @@ function allHandled(): NonNullable<ChecklistFields['checklist']> {
 }
 
 function phaseHeading(key: keyof typeof copy.phases) {
-  return screen.getByRole('heading', { level: 2, name: new RegExp(copy.phases[key].replace(/[()]/g, '\\$&')) });
+  return screen.getByRole('heading', { level: 3, name: new RegExp(copy.phases[key].replace(/[()]/g, '\\$&')) });
 }
 
 describe('PhaseList', () => {
-  it('renders an h2 per phase in order, and no h1', () => {
+  it('renders an h3 per phase in order, and no h1', () => {
     render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
-    const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(names).toEqual(CHECKLIST_PHASES.map((p) => copy.phases[p.key]));
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
@@ -53,6 +53,17 @@ describe('PhaseList', () => {
     render(<PhaseList checklist={checklist} onOpen={noop} onChange={noop} />);
     expect(phaseHeading('right-away').querySelector('svg')).not.toBeNull();
     expect(screen.getByText(copy.notApplicable, { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('marks a done row with a hidden check and a not applicable row without one', () => {
+    render(
+      <PhaseList checklist={{ pronouncement: 'done', custody: 'not_applicable' }} onOpen={noop} onChange={noop} />,
+    );
+    const done = screen.getByRole('button', { name: copy.items.pronouncement }).closest('li');
+    const na = screen.getByRole('button', { name: copy.items.custody }).closest('li');
+    // The label column only; the pressed toggle has its own check.
+    expect(done?.querySelector(':scope > div svg[aria-hidden="true"]')).not.toBeNull();
+    expect(na?.querySelector(':scope > div svg')).toBeNull();
   });
 
   it('opens an item from its label', async () => {

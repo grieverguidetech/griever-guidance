@@ -1,7 +1,12 @@
+import { Check } from '@phosphor-icons/react/Check';
 import { screenCopy } from '@griever/copy';
 import type { ChecklistItemState } from '@griever/shared';
 
 const copy = screenCopy('cmsChecklist');
+
+// Pressed = tinted fill, darker double border and a check, so colour is never the only cue.
+const PRESSED =
+  'gg-btn gg-btn-secondary aria-pressed:border-accent-700 aria-pressed:bg-accent-100 aria-pressed:shadow-[inset_0_0_0_1px_var(--color-accent-700)]';
 
 interface Props {
   state: ChecklistItemState | null;
@@ -24,18 +29,20 @@ export function ItemStateToggles({ state, onChange, groupLabel }: Props) {
     <div role="group" aria-label={groupLabel} className="flex flex-wrap gap-2">
       <button
         type="button"
-        className="gg-btn gg-btn-secondary"
+        className={PRESSED}
         aria-pressed={state === 'done'}
         onClick={() => toggle('done')}
       >
+        {state === 'done' && <Check size={18} weight="bold" aria-hidden="true" />}
         {copy.done}
       </button>
       <button
         type="button"
-        className="gg-btn gg-btn-secondary"
+        className={PRESSED}
         aria-pressed={state === 'not_applicable'}
         onClick={() => toggle('not_applicable')}
       >
+        {state === 'not_applicable' && <Check size={18} weight="bold" aria-hidden="true" />}
         {copy.notApplicable}
       </button>
     </div>

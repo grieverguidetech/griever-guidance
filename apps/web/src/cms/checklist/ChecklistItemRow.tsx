@@ -17,21 +17,25 @@ export function ChecklistItemRow({ id, state, onOpen, onChange }: Props) {
   const label = copy.items[id];
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex min-w-0 flex-1 basis-56 items-center gap-2">
-        {state === 'done' && (
-          <Check size={18} weight="bold" aria-hidden="true" className="shrink-0 text-success-700" />
+      <div className="flex min-w-0 flex-1 basis-56 flex-col">
+        <div className="flex items-center gap-2">
+          {state === 'done' && (
+            <Check size={18} weight="bold" aria-hidden="true" className="shrink-0 text-success-700" />
+          )}
+          <button
+            type="button"
+            className="gg-btn gg-btn-ghost min-w-0 text-left"
+            onClick={() => onOpen(id)}
+          >
+            {label}
+          </button>
+        </div>
+        {state === 'not_applicable' && (
+          <span aria-hidden="true" className="text-[color:var(--text-muted)]">
+            {copy.notApplicable}
+          </span>
         )}
-        <button
-          type="button"
-          className="gg-btn gg-btn-ghost min-w-0 text-left"
-          onClick={() => onOpen(id)}
-        >
-          {label}
-        </button>
       </div>
-      {state === 'not_applicable' && (
-        <span className="text-[color:var(--text-muted)]">{copy.notApplicable}</span>
-      )}
       <ItemStateToggles
         groupLabel={label}
         state={state === 'open' ? null : state}

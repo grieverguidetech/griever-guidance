@@ -19,15 +19,16 @@ export function PhaseList({ checklist, onOpen, onChange }: Props) {
     <div className="flex flex-col gap-6">
       {phases.map((phase) => (
         <section key={phase.key} className="flex flex-col gap-3">
-          <h2 className="flex items-center gap-2">
+          <h3 className="flex items-center gap-2">
             {copy.phases[phase.key]}
             {phase.done && (
               <>
+                {' '}
                 <Check size={20} weight="bold" aria-hidden="true" className="shrink-0 text-success-700" />
                 <span className="sr-only">{copy.done}</span>
               </>
             )}
-          </h2>
+          </h3>
           {phase.key === 'obituary' && <p>{copy.obituaryNote}</p>}
           <ul className="flex list-none flex-col gap-3 p-0">
             {phase.items.map((item) => (

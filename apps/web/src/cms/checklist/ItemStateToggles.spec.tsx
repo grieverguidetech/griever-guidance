@@ -27,12 +27,18 @@ describe('ItemStateToggles', () => {
     expect(onChange).toHaveBeenLastCalledWith('not_applicable');
   });
 
-  it('switches from done to not applicable, and only one is pressed', async () => {
+  it('switches from done to not applicable when the other is pressed', async () => {
     const onChange = setup('done');
     expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: "Doesn't apply" })).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(screen.getByRole('button', { name: "Doesn't apply" }));
     expect(onChange).toHaveBeenCalledWith('not_applicable');
+  });
+
+  it('shows a hidden check inside the pressed button only', () => {
+    setup('done');
+    expect(screen.getByRole('button', { name: 'Done' }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('button', { name: "Doesn't apply" }).querySelector('svg')).toBeNull();
   });
 
   it('clears when the pressed one is pressed again', async () => {
