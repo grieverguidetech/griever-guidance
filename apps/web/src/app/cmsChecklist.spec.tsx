@@ -17,7 +17,7 @@ vi.mock('../lib/cmsFlag', () => ({
 import { App } from './app';
 
 const ITEM = 'Get a legal pronouncement of death';
-const NEXT = `Next on the list: ${ITEM}`;
+const NEXT = `On the checklist: ${ITEM}`;
 
 function person(
   id: string,
@@ -144,7 +144,7 @@ describe('checklist in the editor (#421)', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     const next = within(screen.getByRole('main')).getByRole('button', {
-      name: /^Next on the list/,
+      name: /^On the checklist/,
     });
     expect(next).not.toHaveAccessibleName(NEXT);
     expect(next).toHaveFocus();

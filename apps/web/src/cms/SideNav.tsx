@@ -4,6 +4,7 @@ import { screenCopy } from '@griever/copy';
 import { SECTION_ORDER } from '@griever/shared';
 import type { SectionKey, SectionStatus } from '@griever/shared';
 import { Button } from '@griever/ui';
+import { AVAILABLE_SECTIONS } from './Overview';
 
 const copy = screenCopy('cmsShell');
 
@@ -131,7 +132,13 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                   {statuses && isSectionKey(key) ? (
                     <>
                       {' '}
-                      <span className="text-[12px] font-normal">{copy[STATUS_COPY[statuses[key] ?? 'not_started']]}</span>
+                      {AVAILABLE_SECTIONS.includes(key) ? (
+                        <span className="text-[14px] font-normal">{copy[STATUS_COPY[statuses[key] ?? 'not_started']]}</span>
+                      ) : (
+                        <span className="text-[14px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                          {copy.statusLater}
+                        </span>
+                      )}
                     </>
                   ) : null}
                 </button>

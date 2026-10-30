@@ -73,18 +73,28 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
           const later = !AVAILABLE_SECTIONS.includes(key);
           return (
             <li key={key}>
-              <button
-                type="button"
-                className="gg-btn gg-btn-secondary w-full !justify-between text-left"
-                onClick={() => onOpen(key)}
-              >
-                <span>{navTitle(key)}</span>
-                {' '}
-                <span className="flex items-center gap-2 text-[14px] font-normal">
-                  {!later && status === 'ready' ? <CheckIcon /> : null}
-                  <span>{later ? shell.comingLater : STATUS_COPY[status]}</span>
-                </span>
-              </button>
+              {later ? (
+                <p className="m-0 flex items-center justify-between gap-2 px-[var(--space-3)] py-[var(--space-2)]">
+                  <span>{navTitle(key)}</span>
+                  {' '}
+                  <span className="text-[14px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                    {shell.comingLater}
+                  </span>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="gg-btn gg-btn-secondary w-full !justify-between text-left"
+                  onClick={() => onOpen(key)}
+                >
+                  <span>{navTitle(key)}</span>
+                  {' '}
+                  <span className="flex items-center gap-2 text-[14px] font-normal">
+                    {status === 'ready' ? <CheckIcon /> : null}
+                    <span>{STATUS_COPY[status]}</span>
+                  </span>
+                </button>
+              )}
             </li>
           );
         })}
@@ -100,7 +110,7 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
               className="gg-btn gg-btn-secondary self-start text-left"
               onClick={() => onOpenItem(item)}
             >
-              {fill(checklist.nextItem, { item: ITEM_COPY[item] })}
+              {fill(checklist.onTheChecklist, { item: ITEM_COPY[item] })}
             </button>
           ) : null}
         </div>
