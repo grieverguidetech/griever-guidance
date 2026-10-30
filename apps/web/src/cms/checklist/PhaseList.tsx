@@ -81,7 +81,11 @@ export function PhaseList({ checklist, onOpen, onChange, current }: Props) {
               )}
             </button>
           </h3>
-          <div id={`${panelId}-${phase.key}`} hidden={!open.has(phase.key)}>
+          <div
+            id={`${panelId}-${phase.key}`}
+            hidden={!open.has(phase.key)}
+            className={open.has(phase.key) ? 'gg-enter' : undefined}
+          >
             <div className="flex flex-col gap-3">
               {phase.key === 'obituary' && <p>{copy.obituaryNote}</p>}
               <ul className="flex list-none flex-col gap-3 p-0">

@@ -1,4 +1,4 @@
-import { Check } from '@phosphor-icons/react/Check';
+import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import { ItemStateToggles } from './ItemStateToggles';
@@ -13,37 +13,35 @@ interface Props {
   onChange: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
 }
 
-/** One item: the label opens its guidance, then the two state toggles. The check is decoration; aria-pressed carries the state. */
+/**
+ * One line: a check-circle for Done, the label (opens its guidance), then a small
+ * not-applicable chip. A handled row (done or not applicable) shows its label muted.
+ * aria-pressed carries the state; the muted colour is only a quiet extra cue.
+ */
 export function ChecklistItemRow({ id, state, onOpen, onChange, current }: Props) {
   const label = copy.items[id];
+  const labelId = useId();
+  const handled = state !== 'open';
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex min-w-0 flex-1 basis-56 flex-col">
-        <div className="flex items-center gap-2">
-          {state === 'done' && (
-            <Check size={18} weight="bold" aria-hidden="true" className="shrink-0 text-success-700" />
-          )}
-          <button
-            type="button"
-            data-checklist-item={id}
-            aria-current={current ? 'true' : undefined}
-            className="gg-btn gg-btn-ghost min-w-0 text-left"
-            onClick={() => onOpen(id)}
-          >
-            {label}
-          </button>
-        </div>
-        {state === 'not_applicable' && (
-          <span aria-hidden="true" className="text-[color:var(--text-muted)]">
-            {copy.notApplicable}
-          </span>
-        )}
-      </div>
+    <li className="m-0">
       <ItemStateToggles
+        variant="row"
         groupLabel={label}
+        labelId={labelId}
         state={state === 'open' ? null : state}
         onChange={(next) => onChange(id, next)}
-      />
+      >
+        <button
+          type="button"
+          id={labelId}
+          data-checklist-item={id}
+          aria-current={current ? 'true' : undefined}
+          className={`gg-btn gg-btn-ghost min-w-0 flex-1 justify-start text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
+          onClick={() => onOpen(id)}
+        >
+          {label}
+        </button>
+      </ItemStateToggles>
     </li>
   );
 }

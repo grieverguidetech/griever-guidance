@@ -21,8 +21,10 @@ interface Props {
 export function ChecklistPanel({ checklist, onSetItem, onOpenItem, currentItem }: Props) {
   return (
     <div className="flex flex-col gap-6">
-      <p className="m-0">{copy.intro}</p>
-      <DeathCertificateCard asHeading />
+      <div className="gg-panel flex flex-col gap-4 [&_.gg-card]:bg-transparent [&_.gg-card]:p-0">
+        <p className="m-0">{copy.intro}</p>
+        <DeathCertificateCard asHeading />
+      </div>
       <div className="flex flex-col gap-3">
         <h3 className="gg-eyebrow m-0">{GATHER_HEADING}</h3>
         <ChecklistRows />

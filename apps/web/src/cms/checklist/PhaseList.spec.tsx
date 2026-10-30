@@ -145,7 +145,7 @@ describe('PhaseList', () => {
     const { container } = render(
       <PhaseList checklist={{}} onOpen={noop} onChange={noop} />,
     );
-    expect(container.querySelector('svg:not([data-chevron])')).toBeNull();
+    expect(container.querySelector('h3 svg:not([data-chevron])')).toBeNull();
   });
 
   it('shows a hidden-text check on a done phase only', () => {
@@ -170,12 +170,17 @@ describe('PhaseList', () => {
     expect(
       phaseHeading('right-away').querySelector('svg:not([data-chevron])'),
     ).not.toBeNull();
+    // The finished phase is closed, so its group is hidden from the accessibility tree.
+    const group = screen.getByRole('group', { name: copy.items.pronouncement, hidden: true });
     expect(
-      screen.getByText(copy.notApplicable, { selector: 'span' }),
-    ).toBeInTheDocument();
+      within(group).getByRole('button', { name: copy.notApplicable, hidden: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(group).getByRole('button', { name: copy.done, hidden: true }),
+    ).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('marks a done row with a hidden check and a not applicable row without one', () => {
+  it('shows handled rows with a muted label and an open row with the normal one', () => {
     render(
       <PhaseList
         checklist={{ pronouncement: 'done', custody: 'not_applicable' }}
@@ -183,14 +188,36 @@ describe('PhaseList', () => {
         onChange={noop}
       />,
     );
-    // The label column only; the pressed toggle has its own check.
-    const doneColumn = screen.getByRole('button', {
-      name: copy.items.pronouncement,
-    }).parentElement?.parentElement;
-    const naColumn = screen.getByRole('button', { name: copy.items.custody })
-      .parentElement?.parentElement;
-    expect(doneColumn?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
-    expect(naColumn?.querySelector('svg')).toBeNull();
+    const muted = 'text-[color:var(--text-muted)]';
+    expect(screen.getByRole('button', { name: copy.items.pronouncement })).toHaveClass(muted);
+    expect(screen.getByRole('button', { name: copy.items.custody })).toHaveClass(muted);
+    expect(screen.getByRole('button', { name: copy.items['find-wishes'] })).not.toHaveClass(muted);
+  });
+
+  it('left-aligns the label and wires its id to the group name and the Done description', () => {
+    render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
+    const label = screen.getByRole('button', { name: copy.items.pronouncement });
+    expect(label).toHaveClass('justify-start');
+    const group = screen.getByRole('group', { name: copy.items.pronouncement });
+    expect(group).toHaveAttribute('aria-labelledby', label.id);
+    expect(within(group).getByRole('button', { name: copy.done })).toHaveAccessibleDescription(
+      copy.items.pronouncement,
+    );
+  });
+
+  it('fades in an open phase panel and keeps a closed one hidden', async () => {
+    render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
+    const open = document.getElementById(
+      within(phaseHeading('right-away')).getByRole('button').getAttribute('aria-controls') ?? '',
+    );
+    const closedButton = within(phaseHeading('first-days')).getByRole('button');
+    const closed = document.getElementById(closedButton.getAttribute('aria-controls') ?? '');
+    expect(open).toHaveClass('gg-enter');
+    expect(closed).toHaveAttribute('hidden');
+    expect(closed).not.toHaveClass('gg-enter');
+    await userEvent.click(closedButton);
+    expect(closed).toHaveClass('gg-enter');
+    expect(closed).not.toHaveAttribute('hidden');
   });
 
   it('opens an item from its label', async () => {
@@ -212,18 +239,22 @@ describe('PhaseList', () => {
     expect(onChange).toHaveBeenCalledWith('pronouncement', 'done');
   });
 
-  it("tabs through label, Done, Doesn't apply", async () => {
+  it("tabs through Done, label, Doesn't apply", async () => {
     render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
     await userEvent.tab();
     expect(
       screen.getByRole('button', { name: copy.phases['right-away'] }),
     ).toHaveFocus();
     await userEvent.tab();
+    expect(document.activeElement).toBe(
+      within(screen.getByRole('group', { name: copy.items.pronouncement })).getByRole('button', {
+        name: copy.done,
+      }),
+    );
+    await userEvent.tab();
     expect(
       screen.getByRole('button', { name: copy.items.pronouncement }),
     ).toHaveFocus();
-    await userEvent.tab();
-    expect(document.activeElement).toHaveTextContent(copy.done);
     await userEvent.tab();
     expect(document.activeElement).toHaveTextContent(copy.notApplicable);
   });
