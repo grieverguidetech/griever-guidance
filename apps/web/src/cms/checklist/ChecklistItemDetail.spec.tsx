@@ -80,4 +80,36 @@ describe('ChecklistItemDetail', () => {
     render(<ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} />);
     expect(screen.queryByRole('button', { name: copy.openService })).toBeNull();
   });
+
+  it('styles Back as a ghost button with a hidden icon, keeping its name', () => {
+    render(<ChecklistItemDetail itemId="custody" state={null} onSetState={noop} onBack={noop} />);
+    const back = screen.getByRole('button', { name: copy.back });
+    expect(back.className).toContain('gg-btn-ghost');
+    expect(back.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('orders Back, then the toggles, then the guidance panel, then Open Service', () => {
+    render(
+      <ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} onOpenService={noop} />,
+    );
+    const back = screen.getByRole('button', { name: copy.back });
+    const done = screen.getByRole('button', { name: copy.done });
+    const heading = screen.getAllByRole('heading', { level: 2 })[0];
+    const open = screen.getByRole('button', { name: copy.openService });
+    const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(back, done)).toBe(true);
+    expect(before(done, heading)).toBe(true);
+    expect(before(heading, open)).toBe(true);
+  });
+
+  it('puts all guidance parts in one panel, with a divider between parts only', () => {
+    render(<ChecklistItemDetail itemId="pronouncement" state={null} onSetState={noop} onBack={noop} />);
+    const headings = screen.getAllByRole('heading', { level: 2 });
+    const panel = headings[0].closest('.gg-panel');
+    expect(panel).not.toBeNull();
+    headings.forEach((h) => expect(h.closest('.gg-panel')).toBe(panel));
+    const sections = headings.map((h) => h.closest('section') as HTMLElement);
+    expect(sections[0].className).not.toContain('border-t');
+    sections.slice(1).forEach((s) => expect(s.className).toContain('border-[var(--color-divider)]'));
+  });
 });
