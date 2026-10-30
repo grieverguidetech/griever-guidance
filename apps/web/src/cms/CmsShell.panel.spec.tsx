@@ -110,6 +110,24 @@ describe('CmsShell checklist panel', () => {
     expect(h1[0]).toHaveTextContent('Pronouncement');
   });
 
+  it('gives a function aside the sheet flag and a close that shuts the sheet', async () => {
+    const user = userEvent.setup();
+    render(
+      <CmsShell personName="Margaret Hale" section="service" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}
+        aside={({ inSheet, closeSheet }) => (
+          <button type="button" onClick={closeSheet}>{inSheet ? 'In sheet' : 'In panel'}</button>
+        )}
+      >
+        <h2>Details</h2>
+      </CmsShell>,
+    );
+    expect(screen.getByRole('button', { name: 'In panel' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'In sheet' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('with no aside, renders no panel, toggle or phone button', () => {
     render(shell({ aside: false }));
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();

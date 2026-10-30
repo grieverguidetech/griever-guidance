@@ -333,12 +333,9 @@ function AppBody({
   const [cmsSection, setCmsSection] = useState<CmsSection>('overview');
   // The checklist item whose guidance fills the editor's main column (flag on only).
   const [cmsItem, setCmsItem] = useState<ChecklistItemId | null>(null);
-  // The button last clicked, so Back can return to the one that opened the item.
-  const lastButton = useRef<HTMLButtonElement | null>(null);
-  const itemOpener = useRef<{ node: HTMLButtonElement; text: string } | null>(null);
+  // Where the open item was opened from, so Back can return to that button.
+  const itemOpener = useRef<{ id: ChecklistItemId; region: 'main' | 'panel' | 'sheet' } | null>(null);
   const restoreOpener = useRef(false);
-  // Changing it remounts the shell, which closes its phone sheet in the same update as the item opens.
-  const [cmsShellKey, setCmsShellKey] = useState(0);
   // Where Back from "Edit person" returns: the form it was opened from, or the path.
   const setupReturn = useRef<AppView>('flow');
   // The quiet note on the path after the last person was handed a message. It lasts until the
@@ -386,16 +383,10 @@ function AppBody({
   useEffect(() => {
     if (view !== 'cms') {
       setCmsItem(null);
-      return;
     }
-    const remember = (event: Event) => {
-      const target = event.target instanceof Element ? event.target : null;
-      lastButton.current = target?.closest('button') ?? null;
-    };
-    document.addEventListener('click', remember, true);
-    return () => document.removeEventListener('click', remember, true);
   }, [view]);
-  // Declared after the heading hook so it runs second: Back lands on the opener, not the h1.
+  // Must stay declared after the heading hook above: effects run in order, so this one lands
+  // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
   useEffect(() => {
     if (!restoreOpener.current || cmsItem !== null) {
       return;
@@ -403,15 +394,11 @@ function AppBody({
     restoreOpener.current = false;
     const opener = itemOpener.current;
     itemOpener.current = null;
-    if (!opener) {
+    if (!opener || opener.region === 'sheet') {
       return;
     }
-    let target: HTMLElement | null = opener.node.isConnected ? opener.node : null;
-    if (!target) {
-      // The opener was rebuilt (the Overview button): find its twin in the main column.
-      const twins = Array.from(document.querySelectorAll<HTMLButtonElement>('main button'));
-      target = twins.find((button) => button.textContent === opener.text) ?? null;
-    }
+    const scope = opener.region === 'panel' ? 'aside' : 'main';
+    const target = document.querySelector<HTMLElement>(`${scope} [data-checklist-item="${opener.id}"]`);
     target?.focus();
   });
   const clearError = auth?.clearError;
@@ -752,13 +739,10 @@ function AppBody({
     setView('setup');
   }
 
-  function openCmsItem(id: ChecklistItemId) {
-    const button = lastButton.current;
-    const fromSheet = Boolean(button?.closest('[role="dialog"]'));
-    itemOpener.current = button && !fromSheet ? { node: button, text: button.textContent ?? '' } : null;
-    if (fromSheet) {
-      setCmsShellKey((key) => key + 1);
-    }
+  function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', closeSheet?: () => void) {
+    itemOpener.current = { id, region };
+    // Same update as the item opening, so the sheet does not return focus after the heading took it.
+    closeSheet?.();
     setCmsItem(id);
   }
 
@@ -842,15 +826,14 @@ function AppBody({
     return (
       <Shell wide>
         <CmsShell
-          key={cmsShellKey}
           title={cmsItem ? cmsItemLabels[cmsItem] : undefined}
-          aside={
+          aside={({ inSheet, closeSheet }) => (
             <ChecklistPanel
               checklist={active.checklist ?? {}}
               onSetItem={(id, state) => sessions.setChecklistItem(active.id, id, state)}
-              onOpenItem={openCmsItem}
+              onOpenItem={(id) => openCmsItem(id, inSheet ? 'sheet' : 'panel', closeSheet)}
             />
-          }
+          )}
           personName={active.personName}
           section={cmsSection}
           statuses={active.sectionStatus}
@@ -884,7 +867,7 @@ function AppBody({
               session={active}
               checklist={active}
               onOpen={setCmsSection}
-              onOpenItem={openCmsItem}
+              onOpenItem={(id) => openCmsItem(id, 'main')}
             />
           ) : cmsSection === 'person' ? (
             <PersonSection

@@ -24,6 +24,7 @@ export function ChecklistItemRow({ id, state, onOpen, onChange }: Props) {
           )}
           <button
             type="button"
+            data-checklist-item={id}
             className="gg-btn gg-btn-ghost min-w-0 text-left"
             onClick={() => onOpen(id)}
           >
