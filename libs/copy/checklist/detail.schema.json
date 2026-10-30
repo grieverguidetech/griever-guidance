@@ -14,7 +14,7 @@
         "whoToCall": { "type": "string", "minLength": 1 },
         "whatToBring": { "type": "string", "minLength": 1 },
         "doesNotApplyWhen": { "type": "string", "minLength": 1 },
-        "sources": { "type": "array", "items": { "type": "string", "format": "uri" } }
+        "sources": { "type": "array", "items": { "type": "string", "pattern": "^https://" } }
       }
     }
   }
