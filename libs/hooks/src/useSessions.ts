@@ -17,6 +17,7 @@ import type {
 import {
   addDays,
   flowFactsToSessionFields,
+  CHECKLIST_PHASES,
   FLOW_FACT_KEYS,
   mergeFlowFacts,
   parseCompleteDate,
@@ -244,6 +245,23 @@ function cleanSectionStatus(stored: unknown): SectionFields['sectionStatus'] {
   return clean;
 }
 
+const CHECKLIST_ITEM_IDS: readonly string[] = CHECKLIST_PHASES.flatMap((phase) => phase.itemIds);
+const CHECKLIST_STATES: readonly string[] = ['done', 'not_applicable'];
+
+/** Keeps only known item ids with a 'done' or 'not_applicable' state. Returns undefined when nothing is left. */
+function cleanChecklist(stored: unknown): ChecklistFields['checklist'] {
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+    return undefined;
+  }
+  const clean: NonNullable<ChecklistFields['checklist']> = {};
+  for (const [key, value] of Object.entries(stored)) {
+    if (CHECKLIST_ITEM_IDS.includes(key) && typeof value === 'string' && CHECKLIST_STATES.includes(value)) {
+      clean[key as ChecklistItemId] = value as ChecklistItemState;
+    }
+  }
+  return Object.keys(clean).length > 0 ? clean : undefined;
+}
+
 /** Service draft field -> session field. Other fields are written in place, never copied. */
 const SERVICE_DRAFT_COPIES = [
   ['serviceTime', 'serviceTime'],
@@ -311,6 +329,14 @@ function migrateSession(stored: StoredSession): Session {
       migrated.sectionStatus = sectionStatus;
     } else {
       delete migrated.sectionStatus;
+    }
+  }
+  if (stored.checklist !== undefined) {
+    const checklist = cleanChecklist(stored.checklist);
+    if (checklist) {
+      migrated.checklist = checklist;
+    } else {
+      delete migrated.checklist;
     }
   }
   // An old session with the synced "service ready" flag but no stored status shows as ready.

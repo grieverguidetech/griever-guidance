@@ -236,6 +236,8 @@ additive and optional.
   open. Item ids are those in `CHECKLIST_PHASES` (`libs/shared/src/checklist.ts`).
 - `setChecklistItem(id, itemId, state | null)` sets the state, or removes the key for `null`. Other
   sessions are unchanged. Clearing an item is not deletion (C9).
+- At load, ids that are not in `CHECKLIST_PHASES` and states other than `done` or `not_applicable`
+  are dropped. If nothing is left, the field is removed.
 - Local only this round: `toFlowFacts`, `useFlowSync` and the device checklist
   (`account.checklistTicks`, section 2.1) are unchanged.
 

@@ -45,9 +45,19 @@ function setup(list: unknown[] = [stored('s1'), stored('s2')]) {
 }
 
 describe('useSessions checklist', () => {
-  it('loads an old list with no checklist as all open', () => {
+  it('loads an old list with no checklist field unchanged', () => {
     const { find } = setup();
     expect(find('s1').checklist).toBeUndefined();
+  });
+
+  it('drops unknown ids and states at load', () => {
+    const { find } = setup([stored('s1', { checklist: { custody: 'yes', bogus: 'done', pronouncement: 'done' } })]);
+    expect(find('s1').checklist).toEqual({ pronouncement: 'done' });
+  });
+
+  it('removes a checklist with nothing valid left', () => {
+    const { find } = setup([stored('s1', { checklist: { bogus: 'done' } })]);
+    expect('checklist' in find('s1')).toBe(false);
   });
 
   it('sets, changes and clears an item', () => {
