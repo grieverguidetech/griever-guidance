@@ -1,0 +1,53 @@
+import { screenCopy } from '@griever/copy';
+import type { SectionFields, SessionDetails } from '@griever/shared';
+import { DateField, todayISO } from '../../lib/DateField';
+import { MarkReady } from './MarkReady';
+
+const copy = screenCopy('cmsPerson');
+
+type PersonValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
+  Pick<SectionFields, 'birthDate' | 'sectionStatus'>;
+
+export type PersonPatch = Partial<Pick<PersonValues, 'personName' | 'birthDate' | 'dateOfPassing'>>;
+
+interface Props {
+  values: PersonValues;
+  /** Gets only the field that changed. There is no Save button; the editor saves as you go. */
+  onChange: (patch: PersonPatch) => void;
+  onReadyChange: (ready: boolean) => void;
+}
+
+/** The person's details, typed once; every message reads them. */
+export function PersonSection({ values, onChange, onReadyChange }: Props) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="gg-field">
+        <label htmlFor="cms-person-name">{copy.nameLabel}</label>
+        <input
+          id="cms-person-name"
+          type="text"
+          className="gg-input"
+          autoComplete="off"
+          placeholder={copy.namePlaceholder}
+          value={values.personName ?? ''}
+          onChange={(e) => onChange({ personName: e.target.value })}
+        />
+      </div>
+      <DateField
+        id="cms-person-birth"
+        label={`${copy.dateOfBirthLabel} ${copy.optional}`}
+        value={values.birthDate ?? ''}
+        max={todayISO()}
+        onChange={(birthDate) => onChange({ birthDate })}
+      />
+      <DateField
+        id="cms-person-passing"
+        label={`${copy.dateOfPassingLabel} ${copy.optional}`}
+        value={values.dateOfPassing ?? ''}
+        max={todayISO()}
+        onChange={(dateOfPassing) => onChange({ dateOfPassing })}
+      />
+      <MarkReady ready={values.sectionStatus?.person === 'ready'} onChange={onReadyChange} />
+    </div>
+  );
+}
