@@ -135,7 +135,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                       {AVAILABLE_SECTIONS.includes(key) ? (
                         <span className="text-[14px] font-normal">{copy[STATUS_COPY[statuses[key] ?? 'not_started']]}</span>
                       ) : (
-                        <span className="text-[14px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                        <span className="text-[14px] font-normal text-[color:var(--text-muted)]">
                           {copy.statusLater}
                         </span>
                       )}

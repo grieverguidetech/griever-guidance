@@ -90,7 +90,7 @@ describe('SideNav', () => {
     expect(within(nav).getByText('In progress')).toBeInTheDocument();
     expect(within(nav).queryAllByText('Not started')).toHaveLength(0);
     expect(within(nav).getAllByText('Later')).toHaveLength(3);
-    expect(within(nav).getAllByText('Later')[0]).toHaveAttribute('style', expect.stringContaining('var(--text-muted)'));
+    expect(within(nav).getAllByText('Later')[0]).toHaveClass('text-[color:var(--text-muted)]');
     expect(within(nav).getAllByText('Later')[0]).toHaveClass('text-[14px]');
   });
 
