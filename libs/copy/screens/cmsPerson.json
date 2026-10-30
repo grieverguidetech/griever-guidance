@@ -3,5 +3,6 @@
   "dateOfBirthLabel": "Date of birth",
   "dateOfPassingLabel": "Date they passed",
   "optional": "(optional)",
-  "namePlaceholder": "e.g. Margaret Hayes"
+  "namePlaceholder": "e.g. Margaret Hayes",
+  "intro": "Start with their name. The rest can wait."
 }

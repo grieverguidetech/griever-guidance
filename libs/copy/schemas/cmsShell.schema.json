@@ -19,10 +19,15 @@
     "statusNotStarted",
     "statusInProgress",
     "statusReady",
+    "statusLater",
     "next",
     "overviewIntro",
+    "saveLine",
+    "saveFailed",
+    "backToOverview",
     "comingLater",
     "markReady",
+    "readyHint",
     "peopleTitle",
     "peopleListLabel",
     "peopleEmptyOwner",
@@ -77,16 +82,31 @@
     "statusReady": {
       "$ref": "#/$defs/text"
     },
+    "statusLater": {
+      "$ref": "#/$defs/text"
+    },
     "next": {
       "$ref": "#/$defs/text"
     },
     "overviewIntro": {
       "$ref": "#/$defs/text"
     },
+    "saveLine": {
+      "$ref": "#/$defs/text"
+    },
+    "saveFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "backToOverview": {
+      "$ref": "#/$defs/text"
+    },
     "comingLater": {
       "$ref": "#/$defs/text"
     },
     "markReady": {
+      "$ref": "#/$defs/text"
+    },
+    "readyHint": {
       "$ref": "#/$defs/text"
     },
     "peopleTitle": {

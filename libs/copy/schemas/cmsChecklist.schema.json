@@ -14,6 +14,8 @@
     "notApplicable",
     "nowPhase",
     "nextItem",
+    "onTheChecklist",
+    "openService",
     "back",
     "whatItIs",
     "whyItMatters",
@@ -53,6 +55,12 @@
       "$ref": "#/$defs/text"
     },
     "nextItem": {
+      "$ref": "#/$defs/text"
+    },
+    "onTheChecklist": {
+      "$ref": "#/$defs/text"
+    },
+    "openService": {
       "$ref": "#/$defs/text"
     },
     "back": {
