@@ -5,8 +5,11 @@ import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { CHECKLIST_PHASES } from '@griever/shared';
 import type { ChecklistFields, SectionFields } from '@griever/shared';
+import { screenCopy } from '@griever/copy';
 import { Overview } from './Overview';
 
+const shell = screenCopy('cmsShell');
+const CHECKLIST_ITEM_LABEL = 'Get a legal pronouncement of death';
 const allIds = CHECKLIST_PHASES.flatMap((phase) => [...phase.itemIds]);
 const allDone: ChecklistFields = { checklist: Object.fromEntries(allIds.map((id) => [id, 'done'])) };
 
@@ -40,13 +43,13 @@ describe('Overview', () => {
     setup({ sectionStatus: { person: 'ready', service: 'in_progress' } });
     const rows = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(rows).toHaveLength(5);
-    expect(rows[0]).toContain('The person');
-    expect(rows[0]).toContain('Ready');
-    expect(rows[1]).toContain('Announcement');
-    expect(rows[2]).toContain('Service');
-    expect(rows[2]).toContain('In progress');
-    expect(rows[3]).toContain('Obituary');
-    expect(rows[4]).toContain('Thank-yous');
+    expect(rows).toEqual([
+      'The person Ready',
+      `Announcement ${shell.comingLater}`,
+      'Service In progress',
+      `Obituary ${shell.comingLater}`,
+      `Thank-yous ${shell.comingLater}`,
+    ]);
   });
 
   it('shows Not started for an untouched open section', () => {
@@ -69,8 +72,8 @@ describe('Overview', () => {
 
   it('shows the current phase and the next item, and the item calls onOpenItem', async () => {
     const { onOpenItem } = setup();
-    expect(screen.getByText('Now: Right away (first 24 to 48 hours)')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Next on the list: / }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: `Next on the list: ${CHECKLIST_ITEM_LABEL}` }));
     expect(onOpenItem).toHaveBeenCalledWith(CHECKLIST_PHASES[0].itemIds[0]);
   });
 
