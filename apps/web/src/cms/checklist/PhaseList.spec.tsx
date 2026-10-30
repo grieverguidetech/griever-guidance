@@ -194,6 +194,17 @@ describe('PhaseList', () => {
     expect(screen.getByRole('button', { name: copy.items['find-wishes'] })).not.toHaveClass(muted);
   });
 
+  it('left-aligns the label and wires its id to the group name and the Done description', () => {
+    render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
+    const label = screen.getByRole('button', { name: copy.items.pronouncement });
+    expect(label).toHaveClass('justify-start');
+    const group = screen.getByRole('group', { name: copy.items.pronouncement });
+    expect(group).toHaveAttribute('aria-labelledby', label.id);
+    expect(within(group).getByRole('button', { name: copy.done })).toHaveAccessibleDescription(
+      copy.items.pronouncement,
+    );
+  });
+
   it('fades in an open phase panel and keeps a closed one hidden', async () => {
     render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
     const open = document.getElementById(

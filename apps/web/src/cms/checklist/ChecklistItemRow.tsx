@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import { ItemStateToggles } from './ItemStateToggles';
@@ -19,20 +20,23 @@ interface Props {
  */
 export function ChecklistItemRow({ id, state, onOpen, onChange, current }: Props) {
   const label = copy.items[id];
+  const labelId = useId();
   const handled = state !== 'open';
   return (
     <li className="m-0">
       <ItemStateToggles
         variant="row"
         groupLabel={label}
+        labelId={labelId}
         state={state === 'open' ? null : state}
         onChange={(next) => onChange(id, next)}
       >
         <button
           type="button"
+          id={labelId}
           data-checklist-item={id}
           aria-current={current ? 'true' : undefined}
-          className={`gg-btn gg-btn-ghost min-w-0 flex-1 text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
+          className={`gg-btn gg-btn-ghost min-w-0 flex-1 justify-start text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
           onClick={() => onOpen(id)}
         >
           {label}

@@ -103,6 +103,20 @@ describe('ItemStateToggles', () => {
       expect(screen.getByRole('button', { name: 'Done' }).innerHTML).not.toBe(open);
     });
 
+    it('names the group from the label button and describes Done with it', () => {
+      render(
+        <ItemStateToggles variant="row" state={null} onChange={vi.fn()} groupLabel="ignored" labelId="lbl">
+          <button type="button" id="lbl">
+            Row label
+          </button>
+        </ItemStateToggles>,
+      );
+      const group = screen.getByRole('group', { name: 'Row label' });
+      expect(group).not.toHaveAttribute('aria-label');
+      const done = within(group).getByRole('button', { name: 'Done' });
+      expect(done).toHaveAccessibleDescription('Row label');
+    });
+
     it('is a 44px circle and a chip', () => {
       setupRow(null);
       expect(screen.getByRole('button', { name: 'Done' })).toHaveClass('size-11', 'rounded-full');

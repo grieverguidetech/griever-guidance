@@ -21,11 +21,13 @@ interface Props {
    * `row`: a leading check-circle for Done, `children` (the row label), then a trailing chip.
    */
   variant?: 'detail' | 'row';
+  /** Row variant: id of the label button. It names the group and describes the Done circle. */
+  labelId?: string;
   children?: ReactNode;
 }
 
 /** Two toggles that exclude each other. Pressing the pressed one clears it. */
-export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detail', children }: Props) {
+export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detail', labelId, children }: Props) {
   const toggle = (next: ChecklistItemState) => {
     if (state === next) {
       onChange(null);
@@ -36,12 +38,18 @@ export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detai
 
   if (variant === 'row') {
     return (
-      <div role="group" aria-label={groupLabel} className="flex items-center gap-1">
+      <div
+        role="group"
+        aria-label={labelId ? undefined : groupLabel}
+        aria-labelledby={labelId}
+        className="flex items-center gap-1"
+      >
         <button
           type="button"
           className="gg-chip size-11 shrink-0 rounded-full p-0 aria-pressed:shadow-none"
           aria-pressed={state === 'done'}
           aria-label={copy.done}
+          aria-describedby={labelId}
           onClick={() => toggle('done')}
         >
           {state === 'done' ? (
