@@ -22,7 +22,7 @@ Three stores, each with one job. Do not spread the same data across two of them.
 
 | Store | Holds | Why |
 | --- | --- | --- |
-| `localStorage` | Pointers and tiny scalars only: `gg.userId`, `gg.activeSessionId`, `gg.syncCursor`, `gg.authProvider`, `gg.lastSyncAt` | Synchronous read at boot. The app must know *which* session to hydrate before the first paint, without awaiting IndexedDB. |
+| `localStorage` | Pointers and tiny scalars only: `gg.userId`, `gg.activeSessionId`, `gg.syncCursor`, `gg.authProvider`, `gg.lastSyncAt`, `gg.cmsChecklistPanel.v1` (`'shown'` \| `'hidden'`: the checklist panel, WEB-9) | Synchronous read at boot. The app must know *which* session to hydrate before the first paint, without awaiting IndexedDB. |
 | **IndexedDB** (`gg` database) | `sessions` (the active session document), `contacts`, `outbox`, `sendJobs`, `attachments` | Structured, large, transactional. The session document is a nested object; localStorage would mean re-serializing the whole thing on every keystroke. |
 | IndexedDB, account-scoped | `account` store: `checklistTicks` (C3), contact tiers | Outlives any one session — see §2 and §3 |
 | **Device capabilities** | Contacts picker, notification scheduling (reminders), share sheet, SMS handoff | Native/OS-owned. Never mirrored to the server. See §6. |
@@ -191,6 +191,8 @@ The ticks persist — silently, as decided — but they belong to the **account*
 **Settled Oct 2026 (#176, product owner): ticks are kept on this device only.** They live in the
 local `account` store as `checklistTicks: string[]` (keys: `will-or-wishes`, `pre-arranged-plans`,
 `ssn-and-id`, `life-insurance`, `military-papers`; never rename one). All items start unticked.
+**Split (2026-10-30, #385, #406):** this rule covers the five "Gather when you can" ticks only. The new phase ticks and "Doesn't apply" marks (WEB-10) are saved on the person and will sync in a later round; they are not synced in round 1. Only the phase checks and the Overview's next item (WEB-12) read them. Still no notifications, nagging, badges or counts.
+
 Ticks are per device, not per account: a second phone starts unticked. They are read and written only by the "What you'll need" screen, are never sent to the network, and
 are emptied with everything else by "Remove everything from this device". This resolves the design
 handoff's C3 open question as "persist". The server copy below (`users.checklistTicks`) is **not
@@ -473,6 +475,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
+- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10): not synced in round 1
 - the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it (WEB-4).
 
 Rules:
