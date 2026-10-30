@@ -36,6 +36,41 @@ describe('CmsShell checklist panel', () => {
     expect(screen.getByRole('button', { name: 'Hide checklist' })).not.toHaveAttribute('aria-expanded');
   });
 
+  it('puts Hide in the aside header as a ghost button, and Show at the top of main when hidden', async () => {
+    render(shell());
+    const aside = screen.getByRole('complementary');
+    const hide = within(aside).getByRole('button', { name: 'Hide checklist' });
+    expect(hide).toHaveClass('gg-btn-ghost');
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toContainElement(hide);
+    await userEvent.click(hide);
+    const show = screen.getByRole('button', { name: 'Show checklist' });
+    expect(show).toHaveClass('gg-btn-ghost');
+    expect(screen.getByRole('main')).toContainElement(show);
+  });
+
+  it('makes the aside sticky, scrollable and keyboard reachable', () => {
+    render(shell());
+    const aside = screen.getByRole('complementary', { name: "What you'll need" });
+    expect(aside).toHaveAttribute('tabindex', '0');
+    expect(aside.className).toContain('lg:sticky');
+    expect(aside.className).toContain('lg:overflow-y-auto');
+    expect(aside.className).toContain('lg:max-h-[calc(100dvh-52px)]');
+  });
+
+  it('wraps the section content in a keyed gg-enter div that remounts on section change', () => {
+    const props = { personName: 'Margaret Hale', onSelect: vi.fn(), onChangePerson: vi.fn(), onAccount: vi.fn() };
+    const { rerender } = render(
+      <CmsShell {...props} section="service"><h2>Details</h2></CmsShell>,
+    );
+    const first = screen.getByRole('heading', { name: 'Details' }).parentElement as HTMLElement;
+    expect(first).toHaveClass('gg-enter');
+    rerender(<CmsShell {...props} section="service" title="Other"><h2>Details</h2></CmsShell>);
+    const second = screen.getByRole('heading', { name: 'Details' }).parentElement as HTMLElement;
+    expect(second).toHaveClass('gg-enter');
+    expect(second).not.toBe(first);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
   it('hides, saves the choice, and is still hidden after a remount', async () => {
     const { unmount } = render(shell());
     await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
