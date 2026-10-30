@@ -243,7 +243,7 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
       </div>
       <div className="gg-field">
         <label htmlFor={`${id}-message`}>{copy.messageLabel}</label>
-        <p id={`${id}-message-hint`}>{copy.messageHint}</p>
+        <p id={`${id}-message-hint`}>{edited ? copy.messageHintEdited : copy.messageHint}</p>
         <textarea
           id={`${id}-message`}
           ref={messageRef}
