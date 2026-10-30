@@ -28,3 +28,9 @@ export const SHARING_ENABLED = import.meta.env['VITE_FEATURE_SHARING'] === 'true
  * with it off, every task stays free and nothing asks for payment.
  */
 export const PAYMENTS_ENABLED = import.meta.env['VITE_FEATURE_PAYMENTS'] === 'true';
+
+/**
+ * The web editor (Overview, The person, Service) in place of the path and the send flow. Off by
+ * default: with it off the app is unchanged. Production turns it on.
+ */
+export const CMS_ENABLED = import.meta.env['VITE_FEATURE_CMS'] === 'true';

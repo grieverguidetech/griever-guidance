@@ -17,7 +17,13 @@ import { getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
-import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
+import { screenCopy } from '@griever/copy';
+import { AUTH_ENABLED, CMS_ENABLED, SHARING_ENABLED } from '../lib/features';
+import { CmsShell } from '../cms/CmsShell';
+import { Overview } from '../cms/Overview';
+import { PersonSection } from '../cms/sections/PersonSection';
+import { ServiceSection } from '../cms/sections/ServiceSection';
+import type { CmsNavKey } from '../cms/SideNav';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { Profile } from '../screens/Profile';
@@ -52,7 +58,25 @@ type AppView =
   | 'gate'
   | 'shareObituary'
   | 'flow'
-  | 'obituary';
+  | 'obituary'
+  | 'cms';
+
+/**
+ * The CMS flag, read when used. Specs that mock '../lib/features' without CMS_ENABLED throw on
+ * that read; for them (and for any build without the flag) the editor is off.
+ */
+function cmsOn(): boolean {
+  try {
+    return CMS_ENABLED;
+  } catch {
+    return false;
+  }
+}
+
+/** The editor's sections; the account is a separate view, so it is never a section. */
+type CmsSection = Exclude<CmsNavKey, 'account'>;
+
+const cmsShellCopy = screenCopy('cmsShell');
 
 const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
   announcement: 'announce',
@@ -252,7 +276,7 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
 }
 
 /** Views that need a person to be open; with nobody open Home is shown instead. */
-const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary'];
+const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary', 'cms'];
 
 function isAccountView(view: AppView): boolean {
   return view === 'signIn';
@@ -310,6 +334,8 @@ function AppBody({
   // changed most recently.
   const [flowCategory, setFlowCategory] = useState<TemplateCategory | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
+  // Which section the editor shows (flag on only).
+  const [cmsSection, setCmsSection] = useState<CmsSection>('overview');
   // Where Back from "Edit person" returns: the form it was opened from, or the path.
   const setupReturn = useRef<AppView>('flow');
   // The quiet note on the path after the last person was handed a message. It lasts until the
@@ -352,7 +378,8 @@ function AppBody({
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
-  useFocusHeadingOnChange(view);
+  // The editor's sections share one view, so the section is part of the key: a change moves focus to the h1.
+  useFocusHeadingOnChange(view === 'cms' ? `cms:${cmsSection}` : view);
   const clearError = auth?.clearError;
 
   const openProfile = useCallback(
@@ -552,6 +579,11 @@ function AppBody({
     sessions.touchSession(id);
     setActiveId(id);
     setFlowCategory(undefined);
+    if (cmsOn()) {
+      setCmsSection('overview');
+      setView('cms');
+      return;
+    }
     setView('pathLanding');
   }
 
@@ -564,6 +596,14 @@ function AppBody({
 
   /** "Create a new one" on Home: setup first, then the rest of the walk. */
   function startNewSession() {
+    if (cmsOn()) {
+      // The editor has no contacts step or who-hears-first: make the person and open The person.
+      const created = sessions.createSession();
+      setActiveId(created.id);
+      setCmsSection('person');
+      setView('cms');
+      return;
+    }
     setCreating(true);
     setContactDraft({ name: '', phone: '', hearsFirst: false });
     setFirstTicks(null);
@@ -678,6 +718,13 @@ function AppBody({
     setView('setup');
   }
 
+  /** "Change" in the editor: an unnamed person is dropped, then Home. */
+  function leaveCms() {
+    sessions.pruneEmpty();
+    setActiveId(null);
+    goHome();
+  }
+
   // While Clerk is loading or a stored session is being checked, show nothing but the quiet status.
   if (auth?.isLoading) {
     return (
@@ -736,6 +783,47 @@ function AppBody({
             void auth.signOut();
           }}
         />
+      </Shell>
+    );
+  }
+
+  if (view === 'cms' && active) {
+    const readyChange = (key: 'person' | 'service') => (ready: boolean) =>
+      sessions.setSectionStatus(active.id, key, ready ? 'ready' : 'in_progress');
+    return (
+      <Shell>
+        <CmsShell
+          personName={active.personName}
+          section={cmsSection}
+          statuses={active.sectionStatus}
+          onSelect={(key) => setCmsSection(key === 'account' ? 'overview' : key)}
+          onChangePerson={leaveCms}
+          onAccount={() => (auth?.isSignedIn ? openProfile(false) : setView('settings'))}
+          notice={endedNote}
+        >
+          {cmsSection === 'overview' ? (
+            <Overview
+              session={active}
+              checklist={active}
+              onOpen={setCmsSection}
+              onOpenItem={() => undefined}
+            />
+          ) : cmsSection === 'person' ? (
+            <PersonSection
+              values={active}
+              onChange={(patch) => sessions.updateSection(active.id, 'person', patch)}
+              onReadyChange={readyChange('person')}
+            />
+          ) : cmsSection === 'service' ? (
+            <ServiceSection
+              values={active}
+              onChange={(patch) => sessions.updateSection(active.id, 'service', patch)}
+              onReadyChange={readyChange('service')}
+            />
+          ) : (
+            <p>{cmsShellCopy.comingLater}</p>
+          )}
+        </CmsShell>
       </Shell>
     );
   }
