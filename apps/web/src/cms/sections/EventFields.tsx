@@ -99,7 +99,8 @@ export function EventFields<K extends EventKey>({
 }: Props<K>) {
   const id = useId();
   const kind = dateNote(values[keys.date], { field: 'event', dateOfPassing });
-  const note = kind === 'unreadable' ? copy.dateUnreadable : kind === 'beforePassing' ? copy.beforePassing : undefined;
+  const note = kind === 'beforePassing' ? copy.beforePassing : undefined;
+  const noteOnBlur = kind === 'unreadable' ? copy.dateUnreadable : undefined;
   const legendId = `${id}-legend`;
   return (
     <fieldset tabIndex={-1} className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
@@ -116,6 +117,7 @@ export function EventFields<K extends EventKey>({
           labelledBy={`${legendId} ${id}-date-label`}
           visibleHelp
           note={note}
+          noteOnBlur={noteOnBlur}
           value={values[keys.date] ?? ''}
           onChange={(v) => onChange({ [keys.date]: v } as Partial<Record<K, string>>)}
         />

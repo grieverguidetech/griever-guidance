@@ -36,8 +36,12 @@ describe('EventFields', () => {
     expect(screen.getByRole('textbox', { name: 'Reception Date' }).getAttribute('aria-describedby')).toContain(note.id);
   });
 
-  it('notes an unreadable event date', () => {
+  it('notes an unreadable event date only after the field loses focus', async () => {
     setup({ values: { receptionDate: 'next week' } });
+    expect(screen.queryByText(/couldn't read/)).toBeNull();
+    await userEvent.click(screen.getByRole('textbox', { name: 'Reception Date' }));
+    expect(screen.queryByText(/couldn't read/)).toBeNull();
+    await userEvent.tab();
     expect(screen.getByText("We couldn't read this as a date. It will show as typed.")).toBeInTheDocument();
   });
 

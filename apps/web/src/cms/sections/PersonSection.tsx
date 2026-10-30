@@ -6,12 +6,19 @@ import { MarkReady } from './MarkReady';
 
 const copy = screenCopy('cmsPerson');
 
-const noteCopy = {
-  unreadable: copy.dateUnreadable,
-  birthAfterPassing: copy.birthAfterPassing,
-  futurePassing: copy.futurePassing,
-  beforePassing: undefined,
-};
+/** The unreadable note waits for the field to lose focus; the others show at once. */
+function noteProps(kind: ReturnType<typeof dateNote>) {
+  if (kind === 'unreadable') {
+    return { noteOnBlur: copy.dateUnreadable };
+  }
+  if (kind === 'birthAfterPassing') {
+    return { note: copy.birthAfterPassing };
+  }
+  if (kind === 'futurePassing') {
+    return { note: copy.futurePassing };
+  }
+  return {};
+}
 
 type PersonValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
   Pick<SectionFields, 'birthDate' | 'sectionStatus'>;
@@ -54,7 +61,7 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
         value={values.birthDate ?? ''}
         max={todayISO()}
         visibleHelp
-        note={birthNote ? noteCopy[birthNote] : undefined}
+        {...noteProps(birthNote)}
         onChange={(birthDate) => onChange({ birthDate })}
       />
       <DateField
@@ -63,7 +70,7 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
         value={values.dateOfPassing ?? ''}
         max={todayISO()}
         visibleHelp
-        note={passingNote ? noteCopy[passingNote] : undefined}
+        {...noteProps(passingNote)}
         onChange={(dateOfPassing) => onChange({ dateOfPassing })}
       />
       <MarkReady

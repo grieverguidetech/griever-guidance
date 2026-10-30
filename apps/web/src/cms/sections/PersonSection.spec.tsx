@@ -29,11 +29,15 @@ describe('PersonSection', () => {
     expect(screen.queryByText(/still ahead/)).toBeNull();
   });
 
-  it('adds a quiet note, linked to the input and not an alert, for an unreadable birth date', () => {
+  it('adds a quiet note, linked to the input and not an alert, for an unreadable birth date after blur', async () => {
     setup({ birthDate: 'long ago' });
+    const input = screen.getByLabelText(/Date of birth/);
+    expect(screen.queryByText(/couldn't read/)).toBeNull();
+    await userEvent.click(input);
+    await userEvent.tab();
     const note = screen.getByText("We couldn't read this as a date. It will show as typed.");
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByLabelText(/Date of birth/).getAttribute('aria-describedby')).toContain(note.id);
+    expect(input.getAttribute('aria-describedby')).toContain(note.id);
   });
 
   it('notes a birth date after the date they passed', () => {

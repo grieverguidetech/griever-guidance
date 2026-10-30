@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { DateField, DateInput } from './DateField';
 
@@ -21,5 +23,31 @@ describe('DateInput notes', () => {
   it('shows the format help as visible text when asked', () => {
     render(<DateField id="d" label="Date" value="" visibleHelp onChange={() => undefined} />);
     expect(screen.getByText(/Type a date such as/)).not.toHaveClass('sr-only');
+  });
+});
+
+describe('DateInput noteOnBlur', () => {
+  function Harness() {
+    const [value, setValue] = useState('');
+    return <DateField id="d" label="Date" value={value} noteOnBlur="Blur note" onChange={setValue} />;
+  }
+
+  it('stays hidden while typing, shows after blur, and hides again when the text changes', async () => {
+    render(<Harness />);
+    const input = screen.getByLabelText('Date');
+    await userEvent.type(input, 'Ma');
+    expect(screen.queryByText('Blur note')).toBeNull();
+    await userEvent.tab();
+    expect(screen.getByText('Blur note')).toBeInTheDocument();
+    expect(input.getAttribute('aria-describedby')).toContain('d-note');
+    await userEvent.type(input, 'y');
+    expect(screen.queryByText('Blur note')).toBeNull();
+  });
+
+  it('shows nothing after blur from an empty field', async () => {
+    render(<Harness />);
+    await userEvent.click(screen.getByLabelText('Date'));
+    await userEvent.tab();
+    expect(screen.queryByText('Blur note')).toBeNull();
   });
 });
