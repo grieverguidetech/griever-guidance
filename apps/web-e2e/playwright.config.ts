@@ -39,11 +39,7 @@ export default defineConfig({
         timeout: 180_000,
         cwd: workspaceRoot,
       },
-  // The person this is for is on a phone (REQUIREMENTS §1): phone projects
-  // are first-class, with WebKit standing in for iPhone Safari.
-  projects: [
-    { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
-    { name: 'phone-chrome', use: { ...devices['Pixel 7'] } },
-    { name: 'phone-safari', use: { ...devices['iPhone 15'] } },
-  ],
+  // Desktop only. Web is the desk planning editor (#385); the phone surface is
+  // the mobile app, so the web suite does not cover phone viewports or WebKit.
+  projects: [{ name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } }],
 });
