@@ -102,8 +102,7 @@ describe('editor on (#395)', () => {
   it('opens a person on their Overview and records the visit', async () => {
     await openMargaret();
     expect(screen.queryByRole('heading', { name: 'One thing at a time.' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: /^Now:/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^On the checklist/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Now: .*On the checklist:/ })).toBeInTheDocument();
     expect(Date.parse(stored()[0].lastOpenedAt)).toBeGreaterThan(Date.parse('2026-10-10T00:00:00.000Z'));
   });
 
@@ -225,14 +224,16 @@ describe('editor on (#395)', () => {
     }
   });
 
-  it('moves focus to the h1 when an Overview row or Next opens a section', async () => {
+  it('moves focus to the h1 when an Overview card opens a section', async () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: /^Overview/ }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Next: The person' }));
+    await user.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /^The person Not started .*Continue$/ }),
+    );
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toHaveFocus();
   });
 

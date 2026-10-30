@@ -34,7 +34,15 @@
     "peopleEmptyMember",
     "peopleCreateFirst",
     "peopleCreateAnother",
-    "peoplePassed"
+    "peoplePassed",
+    "continue",
+    "summaryPassed",
+    "summaryPersonJoin",
+    "summaryPersonEmpty",
+    "summaryServiceDefaultType",
+    "summaryServiceDate",
+    "summaryServicePlace",
+    "summaryServiceEmpty"
   ],
   "properties": {
     "navOverview": {
@@ -128,6 +136,30 @@
       "$ref": "#/$defs/text"
     },
     "peoplePassed": {
+      "$ref": "#/$defs/text"
+    },
+    "continue": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryPassed": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryPersonJoin": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryPersonEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryServiceDefaultType": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryServiceDate": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryServicePlace": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryServiceEmpty": {
       "$ref": "#/$defs/text"
     }
   },

@@ -137,7 +137,8 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     const heading = await h1('Overview');
     await waitFor(() => expect(heading).toHaveFocus());
-    expect(screen.getByText('Harold Price', { exact: true })).toBeInTheDocument();
+    // The name shows in the shell header and in The person card summary.
+    expect(screen.getAllByText('Harold Price', { exact: true })).toHaveLength(2);
     const harold = stored().find((s) => s.id === 's2');
     expect(Date.parse(harold?.lastOpenedAt ?? '')).toBeGreaterThan(Date.parse('2026-10-12T00:00:00.000Z'));
   });
