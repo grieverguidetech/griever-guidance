@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ReactNode } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
@@ -7,7 +8,7 @@ import { EventFields } from './EventFields';
 
 const keys = { date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' } as const;
 
-function setup(props: { values?: Record<string, string>; placeLabel?: string; extra?: React.ReactNode } = {}) {
+function setup(props: { values?: Record<string, string>; placeLabel?: string; extra?: ReactNode } = {}) {
   const onChange = vi.fn();
   render(
     <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} />,
@@ -22,6 +23,13 @@ describe('EventFields', () => {
     expect(within(group).getByLabelText('Date')).toBeInTheDocument();
     expect(within(group).getByLabelText('Time')).toBeInTheDocument();
     expect(within(group).getByLabelText('Place')).toBeInTheDocument();
+  });
+
+  it('names each field with the legend and its label', () => {
+    setup({ placeLabel: 'Cemetery' });
+    expect(screen.getByRole('textbox', { name: 'Reception Date' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Reception Time')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Reception Cemetery' })).toBeInTheDocument();
   });
 
   it('uses a custom place label', () => {
