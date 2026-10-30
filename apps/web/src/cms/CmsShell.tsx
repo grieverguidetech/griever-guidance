@@ -124,24 +124,32 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
             >
               {copy.phoneButton}
             </button>
-            {/* The name flips Hide/Show; no aria-expanded, so there is one signal. */}
-            <button type="button" className="gg-btn gg-btn-secondary hidden lg:inline-flex" onClick={togglePanel}>
-              {panelShown ? copy.hide : copy.show}
-            </button>
+            {/* After the h1 in DOM order so Tab from the heading moves forward; justify-between keeps it top right. */}
+            {panelShown ? null : (
+              <button type="button" className="gg-btn gg-btn-ghost hidden lg:inline-flex" onClick={togglePanel}>{copy.show}</button>
+            )}
           </div>
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
         )}
-        {peopleView || section === 'overview' ? null : (
-          <p className="text-[14px]" style={{ color: 'var(--text-hint)' }}>{shellCopy.saveLine}</p>
-        )}
+        {peopleView || section === 'overview' ? null : <p className="gg-hint">{shellCopy.saveLine}</p>}
         {notice}
-        {children}
+        <div key={`${section}:${title ?? ''}`} className="gg-enter flex flex-col gap-4">
+          {children}
+        </div>
       </main>
       {/* Mounted once: checklist state must live above the shell (props or a hook), not inside `aside`. */}
       {aside && panelShown && !sheetOpen ? (
-        <aside aria-labelledby={asideTitleId} className="hidden lg:block lg:w-80 lg:shrink-0">
-          <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
+        // Scrolling is keyboard reachable because the Hide button inside is focusable.
+        <aside
+          aria-labelledby={asideTitleId}
+          className="hidden lg:sticky lg:top-[52px] lg:block lg:w-80 lg:shrink-0 lg:max-h-[calc(100dvh-52px)] lg:overflow-y-auto"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
+            {/* The name flips Hide/Show; no aria-expanded, so there is one signal. */}
+            <button type="button" className="gg-btn gg-btn-ghost" onClick={togglePanel}>{copy.hide}</button>
+          </div>
           {renderAside(false)}
         </aside>
       ) : null}
