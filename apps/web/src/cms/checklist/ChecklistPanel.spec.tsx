@@ -31,6 +31,16 @@ describe('ChecklistPanel', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
+  it('holds the intro and the certificate card in one panel', () => {
+    const { container } = render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
+    const panels = container.querySelectorAll('.gg-panel');
+    expect(panels).toHaveLength(1);
+    expect(panels[0]).toHaveTextContent(copy.intro);
+    expect(
+      within(panels[0] as HTMLElement).getByRole('heading', { level: 3, name: 'Certified death certificates' }),
+    ).toBeInTheDocument();
+  });
+
   it('keeps device ticks in the account store', async () => {
     const user = userEvent.setup();
     render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
