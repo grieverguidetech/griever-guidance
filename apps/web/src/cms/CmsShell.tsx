@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { SectionKey, SectionStatus } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
@@ -57,6 +57,22 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
   const [panelShown, setPanelShown] = useState(readPanelShown);
   const [sheetOpen, setSheetOpen] = useState(false);
   const sheetButton = useRef<HTMLButtonElement>(null);
+  const asideTitleId = useId();
+
+  // From `lg` the phone button is hidden, so close the sheet rather than return focus to it.
+  useEffect(() => {
+    if (!sheetOpen || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const query = window.matchMedia('(min-width: 1024px)');
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setSheetOpen(false);
+      }
+    };
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, [sheetOpen]);
 
   function togglePanel() {
     const next = !panelShown;
@@ -81,35 +97,33 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
           onChangePerson();
         }} statuses={statuses} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {aside ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
+            <button
+              ref={sheetButton}
+              type="button"
+              className="gg-btn gg-btn-secondary lg:hidden"
+              aria-haspopup="dialog"
+              onClick={() => setSheetOpen(true)}
+            >
+              {copy.phoneButton}
+            </button>
+            {/* The name flips Hide/Show; no aria-expanded, so there is one signal. */}
+            <button type="button" className="gg-btn gg-btn-secondary hidden lg:inline-flex" onClick={togglePanel}>
+              {panelShown ? copy.hide : copy.show}
+            </button>
+          </div>
+        ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
-          {aside ? (
-            <>
-              <button
-                ref={sheetButton}
-                type="button"
-                className="gg-btn gg-btn-secondary lg:hidden"
-                aria-haspopup="dialog"
-                onClick={() => setSheetOpen(true)}
-              >
-                {copy.phoneButton}
-              </button>
-              <button
-                type="button"
-                className="gg-btn gg-btn-secondary hidden lg:inline-flex"
-                aria-expanded={panelShown}
-                onClick={togglePanel}
-              >
-                {panelShown ? copy.hide : copy.show}
-              </button>
-            </>
-          ) : null}
-        </div>
+        )}
         {notice}
         {children}
       </main>
-      {aside && panelShown ? (
-        <aside aria-label={copy.panelTitle} className="hidden lg:block lg:w-80 lg:shrink-0">
+      {/* Mounted once: checklist state must live above the shell (props or a hook), not inside `aside`. */}
+      {aside && panelShown && !sheetOpen ? (
+        <aside aria-labelledby={asideTitleId} className="hidden lg:block lg:w-80 lg:shrink-0">
+          <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
           {aside}
         </aside>
       ) : null}
