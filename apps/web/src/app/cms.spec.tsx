@@ -177,7 +177,7 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
-      await user.click(screen.getByRole('button', { name }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
       expect(screen.getByText('This part comes later. Nothing is needed here yet.')).toBeInTheDocument();
     }
@@ -187,7 +187,7 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     for (const name of ['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
-      await user.click(screen.getByRole('button', { name }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
       expect(document.querySelector('a[href^="sms:"]')).toBeNull();
       expect(screen.queryByText(/Open Messages/i)).not.toBeInTheDocument();

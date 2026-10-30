@@ -29,6 +29,50 @@ describe('PhaseList', () => {
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
+  it('puts a disclosure button in each h3, open for the current phase only', () => {
+    render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
+    for (const phase of CHECKLIST_PHASES) {
+      const button = within(phaseHeading(phase.key)).getByRole('button');
+      const open = phase.key === 'right-away';
+      expect(button).toHaveAttribute('aria-expanded', String(open));
+      expect(document.getElementById(button.getAttribute('aria-controls') ?? '')).not.toBeNull();
+    }
+    expect(screen.getByRole('button', { name: copy.items.pronouncement })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: copy.items['burial-or-cremation'] })).toBeNull();
+  });
+
+  it('opens the first phase that is not done', () => {
+    render(<PhaseList checklist={allHandled()} onOpen={noop} onChange={noop} />);
+    expect(within(phaseHeading('right-away')).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    expect(within(phaseHeading('first-days')).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('closes every phase when everything is handled', () => {
+    const all: NonNullable<ChecklistFields['checklist']> = {};
+    for (const phase of CHECKLIST_PHASES) {
+      for (const id of phase.itemIds) {
+        all[id] = 'done';
+      }
+    }
+    render(<PhaseList checklist={all} onOpen={noop} onChange={noop} />);
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
+  it('toggles a phase from its heading button', async () => {
+    render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
+    const button = within(phaseHeading('first-days')).getByRole('button');
+    const items = document.getElementById(button.getAttribute('aria-controls') ?? '');
+    expect(items).toHaveAttribute('hidden');
+    await userEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(items).not.toHaveAttribute('hidden');
+    await userEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(items).toHaveAttribute('hidden');
+  });
+
   it('shows the obituary note once', () => {
     render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
     expect(screen.getAllByText(copy.obituaryNote)).toHaveLength(1);
@@ -83,6 +127,8 @@ describe('PhaseList', () => {
 
   it('tabs through label, Done, Doesn\'t apply', async () => {
     render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: copy.phases['right-away'] })).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByRole('button', { name: copy.items.pronouncement })).toHaveFocus();
     await userEvent.tab();
