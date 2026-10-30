@@ -11,3 +11,4 @@ export * from './useFlowSync.js';
 export * from './useFirstVisitIntro.js';
 export * from './useAccount.js';
 export * from './sectionOverview.js';
+export * from './checklistProgress.js';
