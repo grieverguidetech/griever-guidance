@@ -32,9 +32,16 @@ interface Props<K extends EventKey> {
   onChange: (patch: Partial<Record<K, string>>) => void;
   /** Label for the place field when the default does not fit. */
   placeLabel?: string;
-  /** Extra controls after the place field: address, officiant, a checkbox. */
-  extra?: ReactNode;
+  /** Controls right after the legend, before date: a checkbox, a type. */
+  lead?: Slot;
+  /** Extra controls after the place field: address, officiant. */
+  extra?: Slot;
+  /** Hides date, time and place. The lead and extra slots stay. */
+  hideFields?: boolean;
 }
+
+/** A slot can take the legend id, so its fields are named "legend label" like the base fields. */
+type Slot = ReactNode | ((legendId: string) => ReactNode);
 
 /** Date, time and where, for one event. There is no delete control. */
 export function EventFields<K extends EventKey>({
@@ -43,13 +50,18 @@ export function EventFields<K extends EventKey>({
   values,
   onChange,
   placeLabel = copy.placeLabel,
+  lead,
   extra,
+  hideFields = false,
 }: Props<K>) {
   const id = useId();
   const legendId = `${id}-legend`;
   return (
     <fieldset className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
       <legend id={legendId} className="mb-2 p-0 font-semibold">{legend}</legend>
+      {typeof lead === 'function' ? lead(legendId) : lead}
+      {!hideFields && (
+        <>
       <div className="gg-field">
         <label id={`${id}-date-label`} htmlFor={`${id}-date`}>
           {copy.dateLabel}
@@ -86,7 +98,9 @@ export function EventFields<K extends EventKey>({
           onChange={(e) => onChange({ [keys.place]: e.target.value } as Partial<Record<K, string>>)}
         />
       </div>
-      {extra}
+        </>
+      )}
+      {typeof extra === 'function' ? extra(legendId) : extra}
     </fieldset>
   );
 }

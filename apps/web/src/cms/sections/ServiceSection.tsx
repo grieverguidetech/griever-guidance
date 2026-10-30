@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { screenCopy } from '@griever/copy';
 import {
   defaultServiceEventsMessage,
@@ -27,6 +27,43 @@ interface Props {
   onReadyChange: (ready: boolean) => void;
 }
 
+/** A text field named "legend label" like the base fields of an event group. */
+function GroupText({
+  id,
+  legendId,
+  label,
+  placeholder,
+  autoComplete = 'off',
+  value,
+  onChange,
+}: {
+  id: string;
+  legendId: string;
+  label: string;
+  placeholder?: string;
+  autoComplete?: string;
+  value: string | undefined;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="gg-field">
+      <label id={`${id}-label`} htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        aria-labelledby={`${legendId} ${id}-label`}
+        type="text"
+        className="gg-input"
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
 /** Service events, notes and the message. The message follows the details until the family edits it. */
 export function ServiceSection({ values, onChange, onReadyChange }: Props) {
   const id = useId();
@@ -49,6 +86,7 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
     receptionTime: values.receptionTime,
     receptionPlace: values.receptionPlace,
   });
+  const messageRef = useRef<HTMLTextAreaElement>(null);
   const edited = values.serviceMessage !== undefined;
 
   return (
@@ -64,65 +102,55 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
         keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
         values={values}
         onChange={onChange}
-        extra={
-          <>
-            <div className="gg-field">
-              <label htmlFor={`${id}-type`}>{copy.typeLabel}</label>
-              <input
-                id={`${id}-type`}
-                type="text"
-                className="gg-input"
-                autoComplete="off"
-                placeholder={copy.typePlaceholder}
-                value={values.serviceType ?? ''}
-                onChange={(e) => onChange({ serviceType: e.target.value })}
-              />
-            </div>
-            <div className="gg-field">
-              <label htmlFor={`${id}-address`}>{copy.addressLabel}</label>
-              <input
-                id={`${id}-address`}
-                type="text"
-                className="gg-input"
-                autoComplete="street-address"
-                value={values.serviceAddress ?? ''}
-                onChange={(e) => onChange({ serviceAddress: e.target.value })}
-              />
-            </div>
-            <div className="gg-field">
-              <label htmlFor={`${id}-officiant`}>{copy.eventOfficiant}</label>
-              <input
-                id={`${id}-officiant`}
-                type="text"
-                className="gg-input"
-                autoComplete="off"
-                value={values.serviceOfficiant ?? ''}
-                onChange={(e) => onChange({ serviceOfficiant: e.target.value })}
-              />
-            </div>
-          </>
-        }
-      />
-      {/* The checkbox sits outside the fields so it keeps focus when they hide. */}
-      <div className="flex flex-col gap-4">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={values.burialPrivate === true}
-            onChange={(e) => onChange({ burialPrivate: e.target.checked })}
-          />
-          {copy.eventPrivateFamily}
-        </label>
-        {values.burialPrivate !== true && (
-          <EventFields
-            legend={copy.eventBurial}
-            keys={{ date: 'burialDate', time: 'burialTime', place: 'burialPlace' }}
-            values={values}
-            onChange={onChange}
-            placeLabel={copy.eventCemetery}
+        lead={(legendId) => (
+          <GroupText
+            id={`${id}-type`}
+            legendId={legendId}
+            label={copy.typeLabel}
+            placeholder={copy.typePlaceholder}
+            value={values.serviceType}
+            onChange={(serviceType) => onChange({ serviceType })}
           />
         )}
-      </div>
+        extra={(legendId) => (
+          <>
+            <GroupText
+              id={`${id}-address`}
+              legendId={legendId}
+              label={copy.addressLabel}
+              autoComplete="street-address"
+              value={values.serviceAddress}
+              onChange={(serviceAddress) => onChange({ serviceAddress })}
+            />
+            <GroupText
+              id={`${id}-officiant`}
+              legendId={legendId}
+              label={copy.eventOfficiant}
+              value={values.serviceOfficiant}
+              onChange={(serviceOfficiant) => onChange({ serviceOfficiant })}
+            />
+          </>
+        )}
+      />
+      <EventFields
+        legend={copy.eventBurial}
+        keys={{ date: 'burialDate', time: 'burialTime', place: 'burialPlace' }}
+        values={values}
+        onChange={onChange}
+        placeLabel={copy.eventCemetery}
+        hideFields={values.burialPrivate === true}
+        lead={
+          <label className="flex items-center gap-3 min-h-[44px] cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-5 w-5 m-0"
+              checked={values.burialPrivate === true}
+              onChange={(e) => onChange({ burialPrivate: e.target.checked })}
+            />
+            {copy.eventPrivateFamily}
+          </label>
+        }
+      />
       <EventFields
         legend={copy.eventReception}
         keys={{ date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' }}
@@ -144,6 +172,7 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
         <p id={`${id}-message-hint`}>{copy.messageHint}</p>
         <textarea
           id={`${id}-message`}
+          ref={messageRef}
           aria-describedby={`${id}-message-hint`}
           className="gg-input"
           rows={8}
@@ -154,7 +183,11 @@ export function ServiceSection({ values, onChange, onReadyChange }: Props) {
           <button
             type="button"
             className="gg-btn gg-btn-secondary"
-            onClick={() => onChange({ serviceMessage: undefined })}
+            onClick={() => {
+              onChange({ serviceMessage: undefined });
+              // The button goes away on reset, so keep focus on the message.
+              messageRef.current?.focus();
+            }}
           >
             {copy.useDetails}
           </button>

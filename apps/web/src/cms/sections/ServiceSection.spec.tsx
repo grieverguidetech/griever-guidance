@@ -58,11 +58,11 @@ describe('ServiceSection', () => {
 
   it('the funeral group also writes type, address and officiant', async () => {
     const { patches } = setup();
-    await userEvent.type(screen.getByLabelText('Type of service'), 'F');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Type of service' }), 'F');
     expect(patches.at(-1)).toEqual({ serviceType: 'F' });
-    await userEvent.type(screen.getByLabelText('Address'), 'A');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Address' }), 'A');
     expect(patches.at(-1)).toEqual({ serviceAddress: 'A' });
-    await userEvent.type(screen.getByLabelText('Officiant'), 'O');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Officiant' }), 'O');
     expect(patches.at(-1)).toEqual({ serviceOfficiant: 'O' });
   });
 
@@ -81,12 +81,29 @@ describe('ServiceSection', () => {
     const box = screen.getByRole('checkbox', { name: 'Private burial, family only' });
     await userEvent.click(box);
     expect(patches.at(-1)).toEqual({ burialPrivate: true });
-    expect(screen.queryByRole('group', { name: 'Burial or interment' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Burial or interment' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Cemetery')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Burial or interment Date' })).toBeNull();
     expect(box).toHaveFocus();
     expect(message().value).toContain('The burial will be private.');
     await userEvent.click(box);
-    expect(screen.getByRole('group', { name: 'Burial or interment' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Burial or interment Cemetery' })).toHaveValue('Rest Haven');
+  });
+
+  it('the checkbox is first in the burial group and its label is at least 44px tall', () => {
+    setup();
+    const group = screen.getByRole('group', { name: 'Burial or interment' });
+    const box = within(group).getByRole('checkbox');
+    expect(box.closest('label')).toHaveClass('min-h-[44px]');
+    expect(group.querySelector('legend')?.nextElementSibling).toBe(box.closest('label'));
+  });
+
+  it('type of service comes before the date in the funeral group', () => {
+    setup();
+    const group = screen.getByRole('group', { name: 'Funeral or memorial service' });
+    const fields = within(group).getAllByRole('textbox');
+    expect(fields[0]).toHaveAccessibleName('Funeral or memorial service Type of service');
+    expect(fields[1]).toHaveAccessibleName('Funeral or memorial service Date');
   });
 
   it('the message follows the details until it is edited', async () => {
@@ -108,6 +125,7 @@ describe('ServiceSection', () => {
     expect(patches.at(-1)).toEqual({ serviceMessage: undefined });
     expect(message().value).toContain('A reception will be held at Hall.');
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
+    expect(message()).toHaveFocus();
   });
 
   it('notes write serviceNotes', async () => {
