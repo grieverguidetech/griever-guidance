@@ -18,7 +18,8 @@ import type { ProfileResult } from '@griever/api-client';
 import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
-import { AUTH_ENABLED, CMS_ENABLED, SHARING_ENABLED } from '../lib/features';
+import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
+import { CMS_ENABLED } from '../lib/cmsFlag';
 import { CmsShell } from '../cms/CmsShell';
 import { Overview } from '../cms/Overview';
 import { PersonSection } from '../cms/sections/PersonSection';
@@ -61,18 +62,6 @@ type AppView =
   | 'obituary'
   | 'cms';
 
-/**
- * The CMS flag, read when used. Specs that mock '../lib/features' without CMS_ENABLED throw on
- * that read; for them (and for any build without the flag) the editor is off.
- */
-function cmsOn(): boolean {
-  try {
-    return CMS_ENABLED;
-  } catch {
-    return false;
-  }
-}
-
 /** The editor's sections; the account is a separate view, so it is never a section. */
 type CmsSection = Exclude<CmsNavKey, 'account'>;
 
@@ -93,13 +82,16 @@ const browserStorage =
 function Shell({
   children,
   notice,
+  wide = false,
 }: {
   children: React.ReactNode;
   notice?: ReactNode;
+  /** The editor lays out nav, editor and panel side by side; its own top space replaces the padding. */
+  wide?: boolean;
 }) {
   return (
     <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
-      <div className="w-full max-w-[420px] px-5 py-8">
+      <div className={wide ? 'w-full max-w-6xl px-5 pb-8' : 'w-full max-w-[420px] px-5 py-8'}>
         {notice}
         {children}
       </div>
@@ -579,7 +571,7 @@ function AppBody({
     sessions.touchSession(id);
     setActiveId(id);
     setFlowCategory(undefined);
-    if (cmsOn()) {
+    if (CMS_ENABLED) {
       setCmsSection('overview');
       setView('cms');
       return;
@@ -596,7 +588,7 @@ function AppBody({
 
   /** "Create a new one" on Home: setup first, then the rest of the walk. */
   function startNewSession() {
-    if (cmsOn()) {
+    if (CMS_ENABLED) {
       // The editor has no contacts step or who-hears-first: make the person and open The person.
       const created = sessions.createSession();
       setActiveId(created.id);
@@ -791,14 +783,26 @@ function AppBody({
     const readyChange = (key: 'person' | 'service') => (ready: boolean) =>
       sessions.setSectionStatus(active.id, key, ready ? 'ready' : 'in_progress');
     return (
-      <Shell>
+      <Shell wide>
         <CmsShell
           personName={active.personName}
           section={cmsSection}
           statuses={active.sectionStatus}
-          onSelect={(key) => setCmsSection(key === 'account' ? 'overview' : key)}
+          // The account item goes to onAccount, never here; the check only narrows the type.
+          onSelect={(key) => {
+            if (key !== 'account') {
+              setCmsSection(key);
+            }
+          }}
           onChangePerson={leaveCms}
-          onAccount={() => (auth?.isSignedIn ? openProfile(false) : setView('settings'))}
+          onAccount={() => {
+            sessions.pruneEmpty();
+            if (auth?.isSignedIn) {
+              openProfile(false);
+            } else {
+              setView('settings');
+            }
+          }}
           notice={endedNote}
         >
           {cmsSection === 'overview' ? (

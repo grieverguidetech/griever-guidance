@@ -31,6 +31,6 @@ export const PAYMENTS_ENABLED = import.meta.env['VITE_FEATURE_PAYMENTS'] === 'tr
 
 /**
  * The web editor (Overview, The person, Service) in place of the path and the send flow. Off by
- * default: with it off the app is unchanged. Production turns it on.
+ * default: with it off the app is unchanged. Production turns it on. Defined in cmsFlag.ts.
  */
-export const CMS_ENABLED = import.meta.env['VITE_FEATURE_CMS'] === 'true';
+export { CMS_ENABLED } from './cmsFlag';

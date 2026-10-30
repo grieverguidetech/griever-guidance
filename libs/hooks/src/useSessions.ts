@@ -447,6 +447,30 @@ const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
   aftercare: 'thanks',
 };
 
+/** True when a person holds anything worth keeping: a name, a draft, a section status or any typed field. */
+function hasAnyContent(s: Session): boolean {
+  if (s.personName.trim() !== '' || Object.keys(s.drafts).length > 0) {
+    return true;
+  }
+  if (Object.keys(s.sectionStatus ?? {}).length > 0) {
+    return true;
+  }
+  return Object.entries(s).some(([key, value]) => {
+    if (!EDITOR_FIELDS.has(key)) {
+      return false;
+    }
+    return typeof value === 'string' ? value.trim() !== '' : value === true;
+  });
+}
+
+/** Typed fields that are not the name: person details and every section and service-event field. */
+const EDITOR_FIELDS: ReadonlySet<string> = new Set([
+  'dateOfPassing', 'obituaryUrl', 'serviceDate', 'birthDate', 'serviceType', 'serviceTime', 'servicePlace',
+  'serviceAddress', 'serviceNotes', 'serviceMessage', 'announcementMessage', 'obituaryText', 'thanksMessage',
+  'visitationDate', 'visitationTime', 'visitationPlace', 'serviceOfficiant', 'burialDate', 'burialTime',
+  'burialPlace', 'burialPrivate', 'receptionDate', 'receptionTime', 'receptionPlace',
+]);
+
 export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));
   // removeSession must return its boolean synchronously, but a setState updater runs later, so the
@@ -604,9 +628,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   }, [storage]);
 
   const pruneEmpty = useCallback(() => {
-    setSessions((list) =>
-      list.filter((s) => s.personName.trim() !== '' || Object.keys(s.drafts).length > 0),
-    );
+    setSessions((list) => list.filter(hasAnyContent));
   }, []);
 
   const setServiceReady = useCallback((id: string, ready: boolean) => {
