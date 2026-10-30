@@ -39,6 +39,17 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await page.getByLabel('Their name').fill('Margaret Hayes');
     await openSection(page, 'Overview', 'Overview');
   },
+  Service: async (page) => {
+    await startPerson(page);
+    await openSection(page, 'Service', 'Service');
+  },
+  'Service, all groups open': async (page) => {
+    await startPerson(page);
+    await openSection(page, 'Service', 'Service');
+    for (const add of ['Add visitation or calling hours', 'Add burial', 'Add reception']) {
+      await page.getByRole('button', { name: add }).click();
+    }
+  },
   'The person': async (page) => {
     await startPerson(page);
   },
@@ -81,7 +92,8 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   await expect(page.getByLabel('Their name')).toHaveValue('Margaret Hayes');
 
   await openSection(page, 'Service', 'Service');
-  const burial = page.getByRole('group', { name: 'Burial or interment' });
+  await page.getByRole('button', { name: 'Add burial' }).click();
+  const burial = page.getByRole('group', { name: 'Burial', exact: true });
   const privateBurial = burial.getByRole('checkbox', { name: 'Private burial, family only' });
   await expect(burial.getByLabel(/Cemetery/)).toBeVisible();
 
@@ -98,6 +110,6 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
   await openSection(page, 'Service', 'Service');
   await expect(
-    page.getByRole('group', { name: 'Burial or interment' }).getByRole('checkbox', { name: 'Private burial, family only' }),
+    page.getByRole('group', { name: 'Burial', exact: true }).getByRole('checkbox', { name: 'Private burial, family only' }),
   ).toBeChecked();
 });

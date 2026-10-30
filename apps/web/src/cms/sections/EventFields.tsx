@@ -57,7 +57,7 @@ export function EventFields<K extends EventKey>({
   const id = useId();
   const legendId = `${id}-legend`;
   return (
-    <fieldset className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
+    <fieldset tabIndex={-1} className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
       <legend id={legendId} className="mb-2 p-0 font-semibold">{legend}</legend>
       {typeof lead === 'function' ? lead(legendId) : lead}
       {!hideFields && (

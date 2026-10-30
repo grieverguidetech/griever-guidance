@@ -32,25 +32,53 @@ function setup(initial: Values = {}) {
 const message = () => screen.getByLabelText('Message') as HTMLTextAreaElement;
 
 describe('ServiceSection', () => {
-  it('has four groups in order, each named by its legend, and no h1', () => {
+  const add = (name: string) => userEvent.click(screen.getByRole('button', { name }));
+
+  it('opens Funeral only, with the intro, and plain Add buttons for the rest; no h1', () => {
     setup();
     const names = screen.getAllByRole('group').map((g) => g.querySelector('legend')?.textContent);
-    expect(names).toEqual([
-      'Visitation or calling hours',
-      'Funeral or memorial service',
-      'Burial or interment',
-      'Reception',
-    ]);
+    expect(names).toEqual(['Funeral or memorial service']);
+    expect(screen.getByText("Add only the parts you're having. You can change anything later.")).toBeInTheDocument();
+    for (const name of ['Add visitation or calling hours', 'Add burial', 'Add reception']) {
+      const b = screen.getByRole('button', { name });
+      expect(b).not.toHaveAttribute('aria-expanded');
+      expect(b).not.toHaveAttribute('aria-controls');
+      expect(b).toHaveClass('min-h-[44px]');
+    }
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+  });
+
+  it('groups stay in date order when opened (C10) and focus moves to the new group', async () => {
+    setup();
+    await add('Add reception');
+    await add('Add visitation or calling hours');
+    expect(screen.getByRole('group', { name: 'Visitation or calling hours' })).toHaveFocus();
+    await add('Add burial');
+    expect(screen.getByRole('group', { name: 'Burial' })).toHaveFocus();
+    const names = screen.getAllByRole('group').map((g) => g.querySelector('legend')?.textContent);
+    expect(names).toEqual(['Visitation or calling hours', 'Funeral or memorial service', 'Burial', 'Reception']);
+    expect(screen.queryByRole('button', { name: /^Add / })).toBeNull();
+  });
+
+  it('a group with data opens on its own, and stays open when the data is cleared', async () => {
+    setup({ visitationPlace: 'Hall', burialPrivate: true });
+    expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toHaveValue('Hall');
+    expect(screen.getByRole('group', { name: 'Burial' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add reception' })).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' }));
+    expect(screen.getByRole('group', { name: 'Visitation or calling hours' })).toBeInTheDocument();
   });
 
   it('each group writes its own fields', async () => {
     const { patches } = setup();
+    await add('Add visitation or calling hours');
+    await add('Add burial');
+    await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' }), 'H');
     expect(patches.at(-1)).toEqual({ visitationPlace: 'H' });
     await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Place' }), 'C');
     expect(patches.at(-1)).toEqual({ servicePlace: 'C' });
-    await userEvent.type(screen.getByRole('textbox', { name: 'Burial or interment Cemetery' }), 'R');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Burial Cemetery' }), 'R');
     expect(patches.at(-1)).toEqual({ burialPlace: 'R' });
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'P');
     expect(patches.at(-1)).toEqual({ receptionPlace: 'P' });
@@ -58,18 +86,24 @@ describe('ServiceSection', () => {
 
   it('the funeral group also writes type, address and officiant', async () => {
     const { patches } = setup();
-    await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Type of service' }), 'F');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Type of service (optional)' }), 'F');
     expect(patches.at(-1)).toEqual({ serviceType: 'F' });
     await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Address' }), 'A');
     expect(patches.at(-1)).toEqual({ serviceAddress: 'A' });
-    await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Officiant' }), 'O');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Funeral or memorial service Who will lead it (officiant)' }),
+      'O',
+    );
     expect(patches.at(-1)).toEqual({ serviceOfficiant: 'O' });
   });
 
   it('only the main service date writes serviceDate', async () => {
     const { patches } = setup();
+    await add('Add visitation or calling hours');
+    await add('Add burial');
+    await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Visitation or calling hours Date' }), '1');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Burial or interment Date' }), '2');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Burial Date' }), '2');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Date' }), '3');
     expect(patches.some((p) => 'serviceDate' in p)).toBe(false);
     await userEvent.type(screen.getByRole('textbox', { name: 'Funeral or memorial service Date' }), '4');
@@ -81,34 +115,37 @@ describe('ServiceSection', () => {
     const box = screen.getByRole('checkbox', { name: 'Private burial, family only' });
     await userEvent.click(box);
     expect(patches.at(-1)).toEqual({ burialPrivate: true });
-    expect(screen.getByRole('group', { name: 'Burial or interment' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Burial' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Cemetery')).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Burial or interment Date' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Burial Date' })).toBeNull();
     expect(box).toHaveFocus();
     expect(message().value).toContain('The burial will be private.');
     await userEvent.click(box);
-    expect(screen.getByRole('textbox', { name: 'Burial or interment Cemetery' })).toHaveValue('Rest Haven');
+    expect(screen.getByRole('textbox', { name: 'Burial Cemetery' })).toHaveValue('Rest Haven');
   });
 
-  it('the checkbox is first in the burial group and its label is at least 44px tall', () => {
+  it('the checkbox is first in the burial group and its label is at least 44px tall', async () => {
     setup();
-    const group = screen.getByRole('group', { name: 'Burial or interment' });
+    await add('Add burial');
+    const group = screen.getByRole('group', { name: 'Burial' });
     const box = within(group).getByRole('checkbox');
     expect(box.closest('label')).toHaveClass('min-h-[44px]');
     expect(group.querySelector('legend')?.nextElementSibling).toBe(box.closest('label'));
   });
 
-  it('type of service comes before the date in the funeral group', () => {
+  it('type of service comes after the place in the funeral group', () => {
     setup();
     const group = screen.getByRole('group', { name: 'Funeral or memorial service' });
-    const fields = within(group).getAllByRole('textbox');
-    expect(fields[0]).toHaveAccessibleName('Funeral or memorial service Type of service');
-    expect(fields[1]).toHaveAccessibleName('Funeral or memorial service Date');
+    const order = Array.from(group.querySelectorAll('label')).map((l) => l.textContent);
+    expect(order.indexOf('Place')).toBeGreaterThan(-1);
+    expect(order.indexOf('Type of service (optional)')).toBeGreaterThan(order.indexOf('Place'));
+    expect(order.indexOf('Date')).toBeLessThan(order.indexOf('Place'));
   });
 
   it('the message follows the details until it is edited', async () => {
     setup({ personName: 'Margaret Hayes' });
     expect(message().value).not.toContain('Hall');
+    await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
     expect(message().value).toContain('A reception will be held at Hall.');
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
@@ -119,6 +156,7 @@ describe('ServiceSection', () => {
     await userEvent.type(message(), 'X');
     expect(patches.at(-1)?.serviceMessage).toMatch(/X$/);
     const typed = message().value;
+    await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
     expect(message().value).toBe(typed);
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
@@ -130,7 +168,7 @@ describe('ServiceSection', () => {
 
   it('notes write serviceNotes', async () => {
     const { patches } = setup();
-    await userEvent.type(screen.getByLabelText('Notes'), 'N');
+    await userEvent.type(screen.getByLabelText('Anything else people should know'), 'N');
     expect(patches.at(-1)).toEqual({ serviceNotes: 'N' });
   });
 
@@ -150,7 +188,7 @@ describe('ServiceSection', () => {
   });
 
   it('every group is a labelled fieldset', () => {
-    setup();
+    setup({ receptionPlace: 'x' });
     const group = screen.getByRole('group', { name: 'Reception' });
     expect(within(group).getByLabelText('Reception Date')).toBeInTheDocument();
   });

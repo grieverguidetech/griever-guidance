@@ -20,7 +20,11 @@
     "eventBurial",
     "eventCemetery",
     "eventPrivateFamily",
-    "eventReception"
+    "eventReception",
+    "intro",
+    "addVisitation",
+    "addBurial",
+    "addReception"
   ],
   "properties": {
     "typeLabel": {
@@ -72,6 +76,18 @@
       "$ref": "#/$defs/text"
     },
     "eventReception": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "addVisitation": {
+      "$ref": "#/$defs/text"
+    },
+    "addBurial": {
+      "$ref": "#/$defs/text"
+    },
+    "addReception": {
       "$ref": "#/$defs/text"
     }
   },

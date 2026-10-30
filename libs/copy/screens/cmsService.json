@@ -1,19 +1,23 @@
 {
-  "typeLabel": "Type of service",
+  "typeLabel": "Type of service (optional)",
   "typePlaceholder": "e.g. Funeral, memorial, celebration of life",
   "dateLabel": "Date",
   "timeLabel": "Time",
   "placeLabel": "Place",
   "addressLabel": "Address",
-  "notesLabel": "Notes",
+  "notesLabel": "Anything else people should know",
   "messageLabel": "Message",
   "messageHint": "We start it from the details above. You can change it.",
   "useDetails": "Use the details above",
   "eventVisitation": "Visitation or calling hours",
   "eventFuneral": "Funeral or memorial service",
-  "eventOfficiant": "Officiant",
-  "eventBurial": "Burial or interment",
+  "eventOfficiant": "Who will lead it (officiant)",
+  "eventBurial": "Burial",
   "eventCemetery": "Cemetery",
   "eventPrivateFamily": "Private burial, family only",
-  "eventReception": "Reception"
+  "eventReception": "Reception",
+  "intro": "Add only the parts you're having. You can change anything later.",
+  "addVisitation": "Add visitation or calling hours",
+  "addBurial": "Add burial",
+  "addReception": "Add reception"
 }
