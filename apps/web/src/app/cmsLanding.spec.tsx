@@ -2,7 +2,7 @@
  * #448: with the editor on, the app lands on the Overview (or The person) once per load or sign-in,
  * and "Change" opens "Your people" and stays there; Back from Settings or Profile returns to the Overview (#451). Real localStorage; the flag is mocked.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -217,6 +217,21 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: ANOTHER }));
     expect(await h1('The person')).toBeInTheDocument();
+  });
+
+  it('in "Your people" the nav offers only "Your account", under the one h1', async () => {
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(HOME);
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your account']);
+    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    await user.click(within(nav).getByRole('button', { name: 'Your account' }));
+    expect(await h1('Settings')).toHaveFocus();
   });
 
   it('Back from Settings returns to the Overview of the open person', async () => {

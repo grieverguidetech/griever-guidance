@@ -104,6 +104,16 @@ describe('SideNav', () => {
     expect(screen.getByRole('button', { name: 'Obituary' })).not.toHaveClass('font-semibold');
   });
 
+  it('with accountOnly offers just "Your account": no sections, no name, no Change, no menu button', async () => {
+    const { onSelect } = setup({ accountOnly: true });
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your account']);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByText('Margaret Hale')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
+    expect(onSelect).toHaveBeenCalledWith('account');
+  });
+
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'SideNav.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsShell')).toEqual([]);

@@ -993,15 +993,11 @@ function AppBody({
       <Shell wide>
         <CmsShell
           title={cmsShellCopy.peopleTitle}
+          peopleView
           personName={active?.personName ?? ''}
           section={cmsSection}
-          // With nobody open there is no section to show; the account item goes to onAccount.
-          onSelect={(key) => {
-            if (key !== 'account' && active) {
-              setCmsSection(key);
-              setView('cms');
-            }
-          }}
+          // Only the account item is offered here, and it goes to onAccount.
+          onSelect={() => undefined}
           onChangePerson={() => undefined}
           onAccount={() => {
             sessions.pruneEmpty();

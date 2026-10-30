@@ -49,11 +49,13 @@ interface Props {
   aside?: ReactNode | ((context: AsideContext) => ReactNode);
   /** Replaces the h1 text, for item details. */
   title?: string;
+  /** The people list: the nav offers only the account item. */
+  peopleView?: boolean;
   children: ReactNode;
 }
 
 /** Nav left, editor right from `md`; stacked below. The shell owns the page's only h1. */
-export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, children }: Props) {
+export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, peopleView, children }: Props) {
   const heading = useRef<HTMLElement | null>(null);
   const setHeading = useCallback((node: unknown) => {
     heading.current = node as HTMLElement | null;
@@ -106,7 +108,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
       <SideNav personName={personName} section={section} onSelect={select} onChangePerson={() => {
           heading.current?.focus();
           onChangePerson();
-        }} statuses={statuses} />
+        }} statuses={statuses} accountOnly={peopleView} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
         {aside ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
