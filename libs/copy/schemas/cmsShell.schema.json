@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the planning editor shell and Overview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "navOverview",
+    "navPerson",
+    "navAnnouncement",
+    "navService",
+    "navObituary",
+    "navThankYous",
+    "navAccount",
+    "navLandmark",
+    "menuButton",
+    "change",
+    "changeLabel",
+    "unnamedPerson",
+    "statusNotStarted",
+    "statusInProgress",
+    "statusReady",
+    "next",
+    "overviewIntro",
+    "comingLater",
+    "markReady"
+  ],
+  "properties": {
+    "navOverview": {
+      "$ref": "#/$defs/text"
+    },
+    "navPerson": {
+      "$ref": "#/$defs/text"
+    },
+    "navAnnouncement": {
+      "$ref": "#/$defs/text"
+    },
+    "navService": {
+      "$ref": "#/$defs/text"
+    },
+    "navObituary": {
+      "$ref": "#/$defs/text"
+    },
+    "navThankYous": {
+      "$ref": "#/$defs/text"
+    },
+    "navAccount": {
+      "$ref": "#/$defs/text"
+    },
+    "navLandmark": {
+      "$ref": "#/$defs/text"
+    },
+    "menuButton": {
+      "$ref": "#/$defs/text"
+    },
+    "change": {
+      "$ref": "#/$defs/text"
+    },
+    "changeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "unnamedPerson": {
+      "$ref": "#/$defs/text"
+    },
+    "statusNotStarted": {
+      "$ref": "#/$defs/text"
+    },
+    "statusInProgress": {
+      "$ref": "#/$defs/text"
+    },
+    "statusReady": {
+      "$ref": "#/$defs/text"
+    },
+    "next": {
+      "$ref": "#/$defs/text"
+    },
+    "overviewIntro": {
+      "$ref": "#/$defs/text"
+    },
+    "comingLater": {
+      "$ref": "#/$defs/text"
+    },
+    "markReady": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
