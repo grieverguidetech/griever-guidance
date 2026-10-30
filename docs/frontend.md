@@ -367,10 +367,11 @@ variable keeps the feature off.
 | `AUTH_ENABLED` | web | `VITE_FEATURE_AUTH` | off | On: the app starts at sign-up, loads Clerk in its own chunk, and shows account screens and "Your account". Off: the app starts at Home and loads no auth code. |
 | `OBITUARY_DRAFTING_ENABLED` | web | `VITE_FEATURE_OBITUARY_DRAFTING` | off | On: "Write the obituary" calls the gateway obituary route. Off: the button shows, disabled, with an "in beta" tooltip. The deploy workflow does not set this variable, so production is off. |
 | `SHARING_ENABLED` | web | `VITE_FEATURE_SHARING` | off | Meant to turn on family sharing (invite, join, remove). No screen reads it yet. The deploy check fails if `FEATURE_SHARING` is on and `FEATURE_AUTH` is off. |
+| `CMS_ENABLED` | web | `VITE_FEATURE_CMS` | off | On: Home opens the web editor (Overview, The person, Service) instead of the path; no send flow, wizard or `sms:` link is reachable. Off: the app is unchanged. Production is on (repo variable `FEATURE_CMS`, passed by the deploy workflow). |
 | `AUTH_ENABLED` | mobile | `EXPO_PUBLIC_FEATURE_AUTH` | off | On: wraps the app in `AccountProvider` and adds "Your account" on Home and the picker. Off: no account code runs. |
 | `PAYMENTS` | web, mobile | not defined | n/a | Planned (GRI-15). Does not exist in the code. |
 
-Production values come from GitHub repo variables `FEATURE_AUTH` and `FEATURE_SHARING`, passed to
+Production values come from GitHub repo variables `FEATURE_AUTH`, `FEATURE_SHARING` and `FEATURE_CMS`, passed to
 the web build in `.github/workflows/deploy.yml`.
 
 ## 6. Accessibility and copy rules in practice

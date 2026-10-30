@@ -125,22 +125,22 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 ### 3.7 Web editor
 
 Added 2026-10-30 (#385, round 1). The web becomes a planning editor: the family plans at a desk,
-and the phone sends (C1). Everything here ships behind `VITE_FEATURE_CMS`, which is **off in
-production**. With the flag off the web app is unchanged. Round 1 considers only The person and
+and the phone sends (C1). Everything here ships behind `VITE_FEATURE_CMS`, which is **on in
+production** (product owner, 2026-10-30: no users yet). With the flag off the web app is unchanged. Round 1 considers only The person and
 Service when it picks the next section. Round 1 planning fields stay on the device that typed them;
 sending them from the phone needs sync, which comes in a later round. Notes marked "round 1
 assumption" are the assumptions accepted in #385 (A1 to A9 and B1 to B10).
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
-| WEB-1 | Shell and nav: a side nav (layout switches at the `md` breakpoint; round 1 assumption, #385 A7) that moves between the sections | Not started | #391 |
-| WEB-2 | Overview: every section with its status (Not started, In progress, Ready) and one next section | Not started | #392. Next considers only The person and Service |
-| WEB-3 | The person: edit the person's details; "Mark as ready" | Not started | #393. The first save sets In progress; "Mark as ready" sets Ready. Editing a Ready section keeps it Ready (round 1 assumption, #385 A2) |
-| WEB-4 | Service: edit the service details, with a "Use the details above" reset; "Mark as ready" | Not started | #394. Service type is free text and not in the message (round 1 assumption, #385 A4). The "Use the details above" reset is a round 1 assumption (#385 A8). Ready also sets the synced `serviceReady`; un-marking sets it false (round 1 assumption, #385 A3). Four events: visitation, funeral or memorial service (with officiant), burial or "private family service", reception (round 1 assumption, #385 B6, B7). `serviceDate` stays the main service date and anchors contact retention (round 1 assumption, #385 B8). Fields: #407, #420 |
-| WEB-5 | Announcement | Not started | Coming later in round 1 |
-| WEB-6 | Obituary | Not started | Coming later in round 1 |
-| WEB-7 | Thank-yous | Not started | Coming later in round 1 |
-| WEB-8 | Your account (Back goes to Home; round 1 assumption, #385 A9) | Not started | #391 |
+| WEB-1 | Shell and nav: a side nav (layout switches at the `md` breakpoint; round 1 assumption, #385 A7) that moves between the sections | Done (behind `VITE_FEATURE_CMS`, on in production) | #391 |
+| WEB-2 | Overview: every section with its status (Not started, In progress, Ready) and one next section | Done (behind `VITE_FEATURE_CMS`, on in production) | #392. Next considers only The person and Service |
+| WEB-3 | The person: edit the person's details; "Mark as ready" | Done (behind `VITE_FEATURE_CMS`, on in production) | #393. The first save sets In progress; "Mark as ready" sets Ready. Editing a Ready section keeps it Ready (round 1 assumption, #385 A2) |
+| WEB-4 | Service: edit the service details, with a "Use the details above" reset; "Mark as ready" | Done (behind `VITE_FEATURE_CMS`, on in production) | #394. Service type is free text and not in the message (round 1 assumption, #385 A4). The "Use the details above" reset is a round 1 assumption (#385 A8). Ready also sets the synced `serviceReady`; un-marking sets it false (round 1 assumption, #385 A3). Four events: visitation, funeral or memorial service (with officiant), burial or "private family service", reception (round 1 assumption, #385 B6, B7). `serviceDate` stays the main service date and anchors contact retention (round 1 assumption, #385 B8). Fields: #407, #420 |
+| WEB-5 | Announcement | Partial (coming-later note) | Coming later in round 1 |
+| WEB-6 | Obituary | Partial (coming-later note) | Coming later in round 1 |
+| WEB-7 | Thank-yous | Partial (coming-later note) | Coming later in round 1 |
+| WEB-8 | Your account (Back goes to Home; round 1 assumption, #385 A9) | Done (behind `VITE_FEATURE_CMS`, on in production) | #391 |
 | WEB-9 | Checklist panel ("What you'll need"): a third column on wide screens; show or hide is remembered per device; below `lg` a button opens it as a sheet. Not a nav item | Not started | #417, #419. Remembered in `gg.cmsChecklistPanel.v1` (DATA.md §1) (round 1 assumption, #385 B2, B3) |
 | WEB-10 | The 6 phases of the Funeral Arrangements Checklist. Each item can be ticked or marked "Doesn't apply"; a phase shows a green check when every item is ticked or doesn't apply. No counts | Not started | #408, #414, #415, #416. Saved on the person; not synced in round 1 (SE-5, DATA.md §2.1). The tell-close-family item reads "Tell immediate family and closest friends yourself, by phone or a personal message, before anything public" (C10) (round 1 assumption, #385 B1, B4, B5) |
 | WEB-11 | Item detail screen in the main column: what it is, why it matters, who to call, what to bring, doesn't apply when. Facts checked against official sources by a human | Not started | #410, #411, #412, #418. A person checks each fact before it ships (round 1 assumption, #385 B10) |
@@ -458,6 +458,7 @@ apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; d
               VITE_CLERK_PUBLISHABLE_KEY (read only when the flag is on)
               VITE_FEATURE_SHARING ("true" enables sharing; default off)
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
+              VITE_FEATURE_CMS ("true" enables the web editor, WEB-1 to WEB-8; default off; on in production)
 apps/mobile   EXPO_PUBLIC_API_URL
 ```
 
