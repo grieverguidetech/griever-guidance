@@ -134,7 +134,7 @@ describe('EventFields', () => {
     const onUse = vi.fn();
     setup({ dateSuggestion: { label: 'Same day', onUse }, placeSuggestion: { label: 'Same place', onUse } });
     const day = screen.getByRole('button', { name: 'Reception Same day' });
-    expect(day).toHaveClass('min-h-[44px]');
+    expect(day).toHaveClass('gg-chip', 'min-h-[44px]', 'text-accent-700');
     await userEvent.click(day);
     expect(onUse).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Date')).toHaveFocus();

@@ -72,7 +72,7 @@ function SuggestionButton({
       type="button"
       id={buttonId}
       aria-labelledby={`${legendId} ${buttonId}`}
-      className="gg-btn gg-btn-secondary min-h-[44px] self-start"
+      className="gg-chip min-h-[44px] self-start text-accent-700"
       onClick={() => {
         suggestion.onUse();
         document.getElementById(fieldId)?.focus();
@@ -108,6 +108,7 @@ export function EventFields<K extends EventKey>({
       {typeof lead === 'function' ? lead(legendId) : lead}
       {!hideFields && (
         <>
+      <div className="grid gap-4 sm:grid-cols-2">
       <div className="gg-field">
         <label id={`${id}-date-label`} htmlFor={`${id}-date`}>
           {copy.dateLabel}
@@ -140,6 +141,7 @@ export function EventFields<K extends EventKey>({
           value={values[keys.time] ?? ''}
           onChange={(v) => onChange({ [keys.time]: v } as Partial<Record<K, string>>)}
         />
+      </div>
       </div>
       <div className="gg-field">
         <label id={`${id}-place-label`} htmlFor={`${id}-place`}>

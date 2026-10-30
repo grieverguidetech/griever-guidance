@@ -23,6 +23,7 @@
     "eventPrivateFamily",
     "eventReception",
     "intro",
+    "alsoHaving",
     "addVisitation",
     "addBurial",
     "addReception",
@@ -87,6 +88,9 @@
       "$ref": "#/$defs/text"
     },
     "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "alsoHaving": {
       "$ref": "#/$defs/text"
     },
     "addVisitation": {
