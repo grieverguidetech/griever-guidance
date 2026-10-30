@@ -52,6 +52,20 @@ describe('CmsShell', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
+  it('moves focus to the h1 after a menu choice on a phone', async () => {
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Sections' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Obituary' }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+  });
+
+  it('moves focus off the nav when Change is pressed', async () => {
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Sections' }));
+    await userEvent.click(screen.getByRole('button', { name: "Change who you're writing about" }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+  });
+
   it('Change calls onChangePerson', async () => {
     const { onChangePerson } = setup();
     await userEvent.click(screen.getByRole('button', { name: "Change who you're writing about" }));

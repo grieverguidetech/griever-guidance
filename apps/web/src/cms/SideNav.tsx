@@ -22,6 +22,10 @@ const NAV_COPY: Record<CmsNavKey, CopyKey> = {
   account: 'navAccount',
 };
 
+function isSectionKey(key: CmsNavKey): key is SectionKey {
+  return (SECTION_ORDER as readonly string[]).includes(key);
+}
+
 const STATUS_COPY: Record<SectionStatus | 'not_started', CopyKey> = {
   not_started: 'statusNotStarted',
   in_progress: 'statusInProgress',
@@ -68,6 +72,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
 
   return (
     <div className="flex flex-col gap-2 md:w-64 md:shrink-0" onKeyDown={onKeyDown}>
+      {/* A raw button, not the libs/ui Button: it needs a ref (Escape returns focus here) and aria-expanded / aria-controls, which Button does not take. */}
       <button
         ref={menuButton}
         type="button"
@@ -86,6 +91,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
             accessibilityName={copy.changeLabel}
             variant="tertiary"
             onPress={() => {
+              // Close first so focus is never left on a hidden button; the caller then moves it on.
               setOpen(false);
               onChangePerson();
             }}
@@ -97,13 +103,18 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
               <li key={key}>
                 <button
                   type="button"
-                  className="gg-btn gg-btn-ghost w-full !justify-between text-left"
+                  className={`gg-btn gg-btn-ghost w-full !justify-between text-left ${
+                    key === section ? 'font-semibold bg-accent-100 border-l-4 border-l-accent-700' : ''
+                  }`}
                   aria-current={key === section ? 'page' : undefined}
                   onClick={() => choose(key)}
                 >
                   <span>{navTitle(key)}</span>
-                  {statuses && key !== 'overview' && key !== 'account' ? (
-                    <span className="text-[12px] font-normal">{copy[STATUS_COPY[statuses[key] ?? 'not_started']]}</span>
+                  {statuses && isSectionKey(key) ? (
+                    <>
+                      {' '}
+                      <span className="text-[12px] font-normal">{copy[STATUS_COPY[statuses[key] ?? 'not_started']]}</span>
+                    </>
                   ) : null}
                 </button>
               </li>

@@ -91,6 +91,19 @@ describe('SideNav', () => {
     expect(within(nav).getAllByText('Not started')).toHaveLength(3);
   });
 
+  it('gives an item its label and status as one name, with a space between', () => {
+    setup({ statuses: { service: 'in_progress' } });
+    expect(screen.getByRole('button', { name: 'Service In progress' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Obituary Not started' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument();
+  });
+
+  it('styles the current item beyond aria-current', () => {
+    setup({ section: 'service' });
+    expect(screen.getByRole('button', { name: 'Service' })).toHaveClass('font-semibold', 'bg-accent-100', 'border-l-4');
+    expect(screen.getByRole('button', { name: 'Obituary' })).not.toHaveClass('font-semibold');
+  });
+
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'SideNav.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsShell')).toEqual([]);
