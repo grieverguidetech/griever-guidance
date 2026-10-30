@@ -4,6 +4,10 @@ import type {
   FlowRecord,
   FlowRole,
   MomentKey,
+  SectionFields,
+  SectionKey,
+  SectionStatus,
+  ServiceEventFields,
   SessionDetails,
   TemplateCategory,
 } from '@griever/shared';
@@ -48,7 +52,7 @@ export interface ReminderEntry {
  * captured once and every message flow reads from here. Sessions are durable
  * (restored on reload) and there can be more than one.
  */
-export interface Session extends SessionDetails {
+export interface Session extends SessionDetails, SectionFields, ServiceEventFields {
   /** The local key. It never changes and is not what the server knows the person by. */
   id: string;
   /** UUID v4 made on this device; the person's id on the server. Stable once set. */
@@ -78,11 +82,18 @@ export interface Session extends SessionDetails {
   remindersScheduled: ReminderEntry[];
 }
 
+/** What an edit can change on a session: the person's details and every section field. */
+export type SessionPatch = Partial<SessionDetails & SectionFields & ServiceEventFields>;
+
 export interface UseSessionsResult {
   sessions: Session[];
   inProgressSessions: Session[];
   createSession: (details?: Partial<SessionDetails>) => Session;
-  updateSession: (id: string, patch: Partial<SessionDetails>) => void;
+  updateSession: (id: string, patch: SessionPatch) => void;
+  /** Applies the patch, and marks the section `in_progress` only when it has no status yet (`ready` stays). */
+  updateSection: (id: string, key: SectionKey, patch: SessionPatch) => void;
+  /** `null` removes the status (Not started). For 'service', `ready` also sets `serviceReady`, any other value clears it. */
+  setSectionStatus: (id: string, key: SectionKey, status: SectionStatus | null) => void;
   updateDraft: (id: string, draft: SendFlowDraft) => void;
   /** Empties one moment's draft. Other moments, people, contacts and who was notified stay as they are. */
   clearDraft: (id: string, category: TemplateCategory) => void;
@@ -210,6 +221,57 @@ export function stripSentWording(draft: SendFlowDraft | null): SendFlowDraft | n
   });
 }
 
+const SECTION_STATUSES: readonly string[] = ['in_progress', 'ready'];
+
+/** Keeps only statuses that are 'in_progress' or 'ready'. Anything else in storage is dropped. */
+function cleanSectionStatus(stored: unknown): SectionFields['sectionStatus'] {
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+    return undefined;
+  }
+  const clean: Partial<Record<SectionKey, SectionStatus>> = {};
+  for (const [key, value] of Object.entries(stored)) {
+    if (typeof value === 'string' && SECTION_STATUSES.includes(value)) {
+      clean[key as SectionKey] = value as SectionStatus;
+    }
+  }
+  return clean;
+}
+
+/** Service draft field -> session field. Other fields are written in place, never copied. */
+const SERVICE_DRAFT_COPIES = [
+  ['serviceTime', 'serviceTime'],
+  ['serviceLocation', 'servicePlace'],
+  ['serviceNotes', 'serviceNotes'],
+] as const;
+
+/**
+ * Copies typed service details from the service draft into session fields that were never set
+ * (`undefined`). A field cleared to '' is not undefined, so it is never copied again. The draft
+ * is not changed. When anything is copied and the section has no status, it becomes `in_progress`.
+ */
+function copyServiceDraftFields(session: Session): Session {
+  const draftFields = session.drafts.service?.fields;
+  if (!draftFields) {
+    return session;
+  }
+  const copied: Partial<SectionFields> = {};
+  for (const [from, to] of SERVICE_DRAFT_COPIES) {
+    const value = draftFields[from]?.trim();
+    if (value && session[to] === undefined) {
+      copied[to] = value;
+    }
+  }
+  if (Object.keys(copied).length === 0) {
+    return session;
+  }
+  const sectionStatus = session.sectionStatus ?? {};
+  return {
+    ...session,
+    ...copied,
+    sectionStatus: { ...sectionStatus, service: sectionStatus.service ?? 'in_progress' },
+  };
+}
+
 /**
  * Loads a saved session. An old single `draft` moves into `drafts` under its moment (one with no
  * moment chosen holds nothing worth keeping and is dropped), and C2 is applied to every draft.
@@ -228,7 +290,7 @@ function migrateSession(stored: StoredSession): Session {
   }
   // Sessions saved before sharing have no flowId: give one now. It is saved straight after load,
   // so it is the same on every later load.
-  return {
+  const migrated: Session = {
     ...rest,
     flowId: stored.flowId ?? generateFlowId(),
     ownerId: stored.ownerId ?? null,
@@ -236,6 +298,15 @@ function migrateSession(stored: StoredSession): Session {
     drafts,
     draftsUpdatedAt,
   };
+  if (stored.sectionStatus !== undefined) {
+    const sectionStatus = cleanSectionStatus(stored.sectionStatus);
+    if (sectionStatus) {
+      migrated.sectionStatus = sectionStatus;
+    } else {
+      delete migrated.sectionStatus;
+    }
+  }
+  return copyServiceDraftFields(migrated);
 }
 
 function load(storage: SendFlowStorage | undefined): Session[] {
@@ -375,11 +446,48 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     return session;
   }, []);
 
-  const updateSession = useCallback((id: string, patch: Partial<SessionDetails>) => {
+  const updateSession = useCallback((id: string, patch: SessionPatch) => {
     setSessions((list) =>
       list.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     );
   }, []);
+
+  const updateSection = useCallback((id: string, key: SectionKey, patch: SessionPatch) => {
+    setSessions((list) =>
+      list.map((s) => {
+        if (s.id !== id) {
+          return s;
+        }
+        const sectionStatus = { ...s.sectionStatus };
+        sectionStatus[key] ??= 'in_progress';
+        return { ...s, ...patch, sectionStatus };
+      }),
+    );
+  }, []);
+
+  const setSectionStatus = useCallback(
+    (id: string, key: SectionKey, status: SectionStatus | null) => {
+      setSessions((list) =>
+        list.map((s) => {
+          if (s.id !== id) {
+            return s;
+          }
+          const sectionStatus = { ...s.sectionStatus };
+          if (status === null) {
+            delete sectionStatus[key];
+          } else {
+            sectionStatus[key] = status;
+          }
+          const next: Session = { ...s, sectionStatus };
+          if (key === 'service') {
+            next.serviceReady = status === 'ready';
+          }
+          return next;
+        }),
+      );
+    },
+    [],
+  );
 
   const updateDraft = useCallback((id: string, incoming: SendFlowDraft) => {
     const draft = stripSentWording(incoming);
@@ -530,6 +638,8 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     inProgressSessions,
     createSession,
     updateSession,
+    updateSection,
+    setSectionStatus,
     updateDraft,
     clearDraft,
     touchSession,
