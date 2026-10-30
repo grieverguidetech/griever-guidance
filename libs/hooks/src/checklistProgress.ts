@@ -1,11 +1,12 @@
 import {
   CHECKLIST_PHASES,
   type ChecklistFields,
+  type ChecklistItemState,
   type ChecklistItemId,
   type ChecklistPhaseKey,
 } from '@griever/shared';
 
-export type ChecklistProgressItemState = 'open' | 'done' | 'not_applicable';
+export type ChecklistProgressItemState = ChecklistItemState | 'open';
 
 export interface ChecklistProgressItem {
   id: ChecklistItemId;
@@ -34,7 +35,11 @@ export function computeChecklist(state: ChecklistFields): ChecklistProgress {
 
   const phases: ChecklistProgressPhase[] = CHECKLIST_PHASES.map((phase) => {
     const items = phase.itemIds.map((id): ChecklistProgressItem => {
-      return { id, state: saved[id] ?? 'open' };
+      const value = saved[id];
+      if (value === 'done' || value === 'not_applicable') {
+        return { id, state: value };
+      }
+      return { id, state: 'open' };
     });
     const done = items.every((item) => item.state !== 'open');
     return { key: phase.key, done, items };

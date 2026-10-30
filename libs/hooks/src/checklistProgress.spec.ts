@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { CHECKLIST_PHASES } from '@griever/shared';
-import type { ChecklistFields } from '@griever/shared';
+import type {
+  ChecklistFields,
+  ChecklistItemId,
+  ChecklistItemState,
+} from '@griever/shared';
 import { computeChecklist } from './checklistProgress.js';
 
-function allWith(value: 'done' | 'not_applicable'): ChecklistFields {
-  const checklist: Record<string, 'done' | 'not_applicable'> = {};
+function allWith(value: ChecklistItemState): ChecklistFields {
+  const checklist: Partial<Record<ChecklistItemId, ChecklistItemState>> = {};
   for (const phase of CHECKLIST_PHASES) {
     for (const id of phase.itemIds) {
       checklist[id] = value;
     }
   }
-  return { checklist } as ChecklistFields;
+  return { checklist };
 }
 
 describe('computeChecklist', () => {
@@ -68,6 +72,17 @@ describe('computeChecklist', () => {
     });
     expect(result.currentPhase).toBe('right-away');
     expect(result.nextItem).toBe('find-wishes');
+  });
+
+  it('treats a bad stored value as open', () => {
+    const state = allWith('done');
+    state.checklist = { ...state.checklist, headstone: true as never };
+    const result = computeChecklist(state);
+    const last = result.phases[result.phases.length - 1];
+    expect(last.items.find((i) => i.id === 'headstone')?.state).toBe('open');
+    expect(last.done).toBe(false);
+    expect(result.currentPhase).toBe('first-months');
+    expect(result.nextItem).toBe('headstone');
   });
 
   it('has no numeric fields anywhere in the result', () => {
