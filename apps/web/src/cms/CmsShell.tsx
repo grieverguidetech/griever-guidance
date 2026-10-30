@@ -132,7 +132,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
         )}
-        {peopleView ? null : (
+        {peopleView || section === 'overview' ? null : (
           <p className="text-[14px]" style={{ color: 'var(--text-hint)' }}>{shellCopy.saveLine}</p>
         )}
         {notice}

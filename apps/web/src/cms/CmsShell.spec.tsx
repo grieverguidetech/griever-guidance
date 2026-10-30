@@ -44,6 +44,11 @@ describe('CmsShell save line', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
+  it('is absent on the overview, which has its own saved-as-you-go line', () => {
+    setup('overview');
+    expect(screen.queryByText(line)).toBeNull();
+  });
+
   it('is absent in the people view', () => {
     render(
       <CmsShell title="Your people" peopleView personName="" section="overview" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
