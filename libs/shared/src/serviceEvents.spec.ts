@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  defaultServiceEventsMessage,
-  defaultServiceMessage,
-} from './index.js';
+import { defaultServiceEventsMessage, defaultServiceMessage } from './index.js';
 
 const base = {
   personName: 'Margaret Hale',
@@ -14,9 +11,7 @@ const base = {
 
 describe('defaultServiceEventsMessage', () => {
   it('equals the main service message when no events are set', () => {
-    expect(defaultServiceEventsMessage(base)).toBe(
-      defaultServiceMessage(base),
-    );
+    expect(defaultServiceEventsMessage(base)).toBe(defaultServiceMessage(base));
   });
 
   it('adds a visitation sentence after the service', () => {
@@ -102,5 +97,53 @@ describe('defaultServiceEventsMessage', () => {
       receptionPlace: 'C',
     });
     expect(text).not.toContain('!');
+  });
+
+  it('adds https to a bare-domain obituary URL', () => {
+    const text = defaultServiceEventsMessage({
+      ...base,
+      obituaryUrl: 'example.com/obit',
+    });
+    expect(text.endsWith('\n\nhttps://example.com/obit')).toBe(true);
+  });
+
+  it('closes service notes that have no final period', () => {
+    const text = defaultServiceEventsMessage({
+      ...base,
+      serviceNotes: 'Reception to follow',
+      visitationPlace: 'Hale Funeral Home',
+    });
+    expect(text).toContain(
+      'Reception to follow. Visitation will be held at Hale Funeral Home.',
+    );
+  });
+
+  it('does not double a trailing period in a place name', () => {
+    const text = defaultServiceEventsMessage({
+      ...base,
+      receptionPlace: 'St. Mary Chapel Inc.',
+    });
+    expect(text).toContain('at St. Mary Chapel Inc.');
+    expect(text).not.toContain('..');
+  });
+
+  it('handles date-only and time-only events', () => {
+    expect(
+      defaultServiceEventsMessage({ ...base, burialDate: 'June 4, 2026' }),
+    ).toContain('The burial will be held on June 4, 2026.');
+    expect(
+      defaultServiceEventsMessage({ ...base, receptionTime: '4:00 PM' }),
+    ).toContain('A reception will be held at 4:00 PM.');
+  });
+
+  it('ignores whitespace-only event fields', () => {
+    const text = defaultServiceEventsMessage({
+      ...base,
+      visitationPlace: '   ',
+      burialDate: ' ',
+      receptionTime: '  ',
+      obituaryUrl: '  ',
+    });
+    expect(text).toBe(defaultServiceMessage(base));
   });
 });

@@ -1,4 +1,5 @@
 import { defaultServiceMessage, type SectionFields } from './sections.js';
+import { normalizeUrl } from './templates.js';
 import type { SessionDetails } from './types.js';
 
 /** Fields for the other service events. The main service stays in `SectionFields`. */
@@ -28,7 +29,7 @@ type ServiceEventsInput = Pick<
   ServiceEventFields;
 
 function clean(value: string | undefined): string {
-  return value?.trim() ?? '';
+  return (value?.trim() ?? '').replace(/\.$/, '').trim();
 }
 
 /** "<lead> at <place> on <date> at <time>." with only the parts that are set, or '' if none. */
@@ -80,8 +81,9 @@ export function defaultServiceEventsMessage(
     ),
   ].filter(Boolean);
 
-  const service = defaultServiceMessage({ ...details, obituaryUrl: '' });
-  const body = [service, ...sentences].join(' ');
-  const url = clean(details.obituaryUrl);
+  const service = defaultServiceMessage({ ...details, obituaryUrl: '' }).trim();
+  const closedService = /[.?]$/.test(service) ? service : `${service}.`;
+  const body = [closedService, ...sentences].join(' ');
+  const url = normalizeUrl(details.obituaryUrl);
   return url ? `${body}\n\n${url}` : body;
 }
