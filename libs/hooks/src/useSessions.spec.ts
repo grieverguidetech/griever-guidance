@@ -564,3 +564,37 @@ describe('removeSession (#215)', () => {
     expect(result.current.sessions).toHaveLength(1);
   });
 });
+
+describe('saveFailed (#460)', () => {
+  function flakyStorage() {
+    const state = { fail: true };
+    const storage: SendFlowStorage = {
+      getItem: () => null,
+      setItem: () => {
+        if (state.fail) {
+          throw new Error('quota');
+        }
+      },
+      removeItem: () => undefined,
+    };
+    return { state, storage };
+  }
+
+  it('is true after a failed write and false after the next successful one', () => {
+    const { state, storage } = flakyStorage();
+    const { result } = renderHook(() => useSessions(storage));
+    expect(result.current.saveFailed).toBe(true);
+    state.fail = false;
+    act(() => {
+      result.current.createSession({ personName: 'Margaret' });
+    });
+    expect(result.current.saveFailed).toBe(false);
+  });
+
+  it('stays false when writes succeed or there is no storage', () => {
+    const { state, storage } = flakyStorage();
+    state.fail = false;
+    expect(renderHook(() => useSessions(storage)).result.current.saveFailed).toBe(false);
+    expect(renderHook(() => useSessions()).result.current.saveFailed).toBe(false);
+  });
+});
