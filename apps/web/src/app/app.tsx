@@ -778,6 +778,8 @@ function AppBody({
   // Editor on: the first time the app reaches Home after load or sign-in, open the most recent person's
   // Overview, or The person for a new one. The ref makes it once per sign-in, so "Change" and Back from
   // Settings or Profile stay on Home. A known member with nobody shared yet (C11) stays on Home.
+  // Where Your account was opened from (flag on): Back returns there.
+  const accountFrom = useRef<'cms' | 'people'>('cms');
   const landed = useRef(false);
   // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
   // is a real move to a new screen, so it asks for the h1 itself.
@@ -841,6 +843,44 @@ function AppBody({
     }
   });
 
+  /** The people list inside the shell. Flag on, this is also the fallback, so the old Home never renders. */
+  function renderPeople() {
+    return (
+      <Shell wide>
+        <CmsShell
+          title={cmsShellCopy.peopleTitle}
+          peopleView
+          personName=""
+          section="overview"
+          // Only the account item is offered here, and it goes to onAccount.
+          onSelect={() => undefined}
+          onChangePerson={() => undefined}
+          onAccount={() => {
+            sessions.pruneEmpty();
+            accountFrom.current = 'people';
+            if (auth?.isSignedIn) {
+              openProfile(false, 'people');
+            } else {
+              setView('settings');
+            }
+          }}
+          notice={endedNote}
+        >
+          <PeopleList sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate={canCreate} />
+        </CmsShell>
+      </Shell>
+    );
+  }
+
+  /** Back from Settings or Your account: flag on, to where the person came from. */
+  function backFromAccount() {
+    if (CMS_ENABLED && accountFrom.current === 'people') {
+      setView('people');
+      return;
+    }
+    goHome();
+  }
+
   /** "Change" in the editor: an unnamed person is dropped, then "Your people". */
   function leaveCms() {
     sessions.pruneEmpty();
@@ -893,7 +933,7 @@ function AppBody({
             if (askingName) {
               setView(returnTo);
             } else {
-              goHome();
+              backFromAccount();
             }
           }}
           onSave={async (name) => {
@@ -943,6 +983,7 @@ function AppBody({
           onChangePerson={leaveCms}
           onAccount={() => {
             sessions.pruneEmpty();
+            accountFrom.current = 'cms';
             setCmsItem(null);
             if (auth?.isSignedIn) {
               openProfile(false);
@@ -986,40 +1027,11 @@ function AppBody({
     );
   }
 
-  // Flag on: "Your people" is the only list. The view 'home' is the same screen, so a moment before
-  // the landing (or a sign-in that has not settled) never shows the old Home.
-  if (CMS_ENABLED && (view === 'people' || view === 'home')) {
-    return (
-      <Shell wide>
-        <CmsShell
-          title={cmsShellCopy.peopleTitle}
-          peopleView
-          personName={active?.personName ?? ''}
-          section={cmsSection}
-          // Only the account item is offered here, and it goes to onAccount.
-          onSelect={() => undefined}
-          onChangePerson={() => undefined}
-          onAccount={() => {
-            sessions.pruneEmpty();
-            if (auth?.isSignedIn) {
-              openProfile(false, 'people');
-            } else {
-              setView('settings');
-            }
-          }}
-          notice={endedNote}
-        >
-          <PeopleList sessions={sessionList} onOpen={openPerson} onCreate={startNewSession} canCreate={canCreate} />
-        </CmsShell>
-      </Shell>
-    );
-  }
-
   if (view === 'settings') {
     return (
       <Shell notice={endedNote}>
         <Settings
-          onBack={goHome}
+          onBack={backFromAccount}
           onRemoveEverything={removeEverything}
           signsOut={offline || (auth?.isSignedIn ?? false)}
           removeMember={
@@ -1194,6 +1206,11 @@ function AppBody({
   }
 
   // Home is also the fallback: a view with nobody open (the path, a flow) never shows a blank screen.
+  // Flag on there is no Home at all: 'people', the pre-landing 'home', and any view that lost its person
+  // for one render all show "Your people".
+  if (CMS_ENABLED) {
+    return renderPeople();
+  }
   return (
     <Shell notice={endedNote}>
       <Home

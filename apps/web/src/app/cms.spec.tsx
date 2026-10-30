@@ -42,8 +42,8 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const HOME = 'Your people';
-const OLD_HOME = "Who you're writing about";
+const PEOPLE = 'Your people';
+const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 
 function person(id: string, name: string, openedAt: string) {
@@ -74,7 +74,11 @@ function stored(): { id: string; personName: string; lastOpenedAt: string; secti
 
 async function expectHome() {
   expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: OLD_HOME })).not.toBeInTheDocument();
+}
+
+async function expectPeople() {
+  expect(await screen.findByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: HOME })).not.toBeInTheDocument();
 }
 
 /** Loading with one saved person lands on their Overview (#448). */
@@ -114,7 +118,7 @@ describe('editor on (#395)', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await expectHome();
+    await expectPeople();
     expect(screen.getByRole('button', { name: 'Harold Price' })).toBeInTheDocument();
     expect(stored()[0].sectionStatus).toEqual({ person: 'in_progress' });
   });
@@ -137,8 +141,8 @@ describe('editor on (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(stored()).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await expectHome();
-    expect(screen.getByRole('heading', { level: 1, name: HOME })).toHaveFocus();
+    await expectPeople();
+    expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toHaveFocus();
     expect(stored()).toHaveLength(0);
   });
 
@@ -150,7 +154,7 @@ describe('editor on (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.type(screen.getAllByLabelText('Date')[0], 'May 29, 2026');
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await expectHome();
+    await expectPeople();
     expect(stored()).toHaveLength(1);
     expect(stored()[0].personName).toBe('');
   });
@@ -171,7 +175,7 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await expectHome();
+    await expectPeople();
     expect(stored()).toHaveLength(1);
   });
 
@@ -272,7 +276,7 @@ describe('editor off (#395)', () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
-    expect(await screen.findByRole('heading', { level: 1, name: OLD_HOME })).toBeInTheDocument();
+    await expectHome();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
