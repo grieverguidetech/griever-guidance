@@ -22,7 +22,7 @@ Three stores, each with one job. Do not spread the same data across two of them.
 
 | Store | Holds | Why |
 | --- | --- | --- |
-| `localStorage` | Pointers and tiny scalars only: `gg.userId`, `gg.activeSessionId`, `gg.syncCursor`, `gg.authProvider`, `gg.lastSyncAt`, `gg.cmsChecklistPanel.v1` (`'shown'` \| `'hidden'`: the checklist panel, WEB-9) | Synchronous read at boot. The app must know *which* session to hydrate before the first paint, without awaiting IndexedDB. |
+| `localStorage` | Pointers and tiny scalars only: `gg.userId`, `gg.activeSessionId`, `gg.syncCursor`, `gg.authProvider`, `gg.lastSyncAt`, `gg.cmsChecklistPanel.v1` (`'shown'` \| `'hidden'`: the checklist panel, WEB-9; round 1 assumption, #385 B2) | Synchronous read at boot. The app must know *which* session to hydrate before the first paint, without awaiting IndexedDB. |
 | **IndexedDB** (`gg` database) | `sessions` (the active session document), `contacts`, `outbox`, `sendJobs`, `attachments` | Structured, large, transactional. The session document is a nested object; localStorage would mean re-serializing the whole thing on every keystroke. |
 | IndexedDB, account-scoped | `account` store: `checklistTicks` (C3), contact tiers | Outlives any one session — see §2 and §3 |
 | **Device capabilities** | Contacts picker, notification scheduling (reminders), share sheet, SMS handoff | Native/OS-owned. Never mirrored to the server. See §6. |
@@ -475,7 +475,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
-- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10): not synced in round 1
+- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10): not synced in round 1 (round 1 assumption, #385 B9)
 - the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it (WEB-4).
 
 Rules:
