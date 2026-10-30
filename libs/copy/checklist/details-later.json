@@ -1,1 +1,171 @@
-{}
+{
+  "flowers-programs-music": {
+    "whatItIs": "Choosing flowers, printed programs and music for the service.",
+    "whyItMatters": "These small choices help the service feel like the person. The funeral home has to give you a written price list, and you can buy goods and services separately.",
+    "whoToCall": "The funeral home, a florist, or the place where the service will be held.",
+    "doesNotApplyWhen": "There is no service, or the family wants to keep it plain.",
+    "sources": [
+      "https://consumer.ftc.gov/articles/shopping-funeral-services"
+    ]
+  },
+  "guest-book": {
+    "whatItIs": "A book where guests sign their names and leave a short note.",
+    "whyItMatters": "It shows you later who came. Some people find comfort in reading it in the months after.",
+    "whoToCall": "The funeral home may have one. A plain notebook also works.",
+    "doesNotApplyWhen": "There is no gathering."
+  },
+  "reception": {
+    "whatItIs": "A gathering after the service, sometimes called a repast. You choose the place, the food and who hosts.",
+    "whyItMatters": "It gives people time to talk and share memories. It can be small.",
+    "whoToCall": "A friend, family member or faith community who can host. They can also help with the food.",
+    "doesNotApplyWhen": "The family does not want a gathering after the service."
+  },
+  "eulogy": {
+    "whatItIs": "A short talk about the person's life, given at the service.",
+    "whyItMatters": "It helps people remember who the person was. Someone close to them can give it, or you can.",
+    "whoToCall": "A family member, a close friend, or the person leading the service.",
+    "doesNotApplyWhen": "There is no service, or the person leading it will speak for the family."
+  },
+  "family-transport": {
+    "whatItIs": "Getting close family to the service, the burial and the reception.",
+    "whyItMatters": "On the day, people may be too tired or upset to drive. A plan takes one worry away.",
+    "whoToCall": "The funeral home, or friends who offer to drive.",
+    "doesNotApplyWhen": "Everyone can get there on their own."
+  },
+  "notify-community": {
+    "whatItIs": "Telling the person's employer, clergy, and any clubs or groups they belonged to.",
+    "whyItMatters": "These people may want to come to the service or help the family.",
+    "whoToCall": "The employer's human resources office, the person's place of worship, and group leaders.",
+    "doesNotApplyWhen": "The person had no employer or groups to tell."
+  },
+  "notify-ssa": {
+    "whatItIs": "Letting Social Security know about the death.",
+    "whyItMatters": "Social Security benefits stop at death, and Social Security tells Medicare. A payment for the month of death goes back to Social Security.",
+    "whoToCall": "Often the funeral director reports the death for you. Give them the person's Social Security number, and ask them if they did it. If not, call Social Security at 1-800-772-1213 (TTY 1-800-325-0778) or visit a local office. They take death reports only by phone or in person.",
+    "whatToBring": "The person's Social Security number. You can start without the death certificate, but they will need it later.",
+    "sources": [
+      "https://www.usa.gov/social-security-report-a-death",
+      "https://www.usa.gov/report-a-death"
+    ]
+  },
+  "notify-banks": {
+    "whatItIs": "Telling banks, credit card companies, credit bureaus and other financial companies about the death.",
+    "whyItMatters": "If Social Security paid by direct deposit, ask the bank to send back the payment for the month of death and any later ones.",
+    "whoToCall": "Each bank and card company, and the credit bureaus.",
+    "whatToBring": "Certified copies of the death certificate.",
+    "doesNotApplyWhen": "The person had no accounts or cards.",
+    "sources": [
+      "https://www.usa.gov/report-a-death",
+      "https://www.usa.gov/social-security-report-a-death",
+      "https://www.usa.gov/death-certificate"
+    ]
+  },
+  "life-insurance-claims": {
+    "whatItIs": "Telling each life insurance company about the death and asking for a claim.",
+    "whyItMatters": "The money can help with funeral costs and bills. Someone needs to ask each company for it.",
+    "whoToCall": "Each insurance company. Look at the policy, or ask the person's employer if they had insurance through work. If the person was a veteran, the VA can tell you about veterans life insurance.",
+    "whatToBring": "A certified copy of the death certificate, and the policy number if you have it.",
+    "doesNotApplyWhen": "The person had no life insurance.",
+    "sources": [
+      "https://www.usa.gov/death-certificate",
+      "https://www.usa.gov/report-a-death"
+    ]
+  },
+  "pension-retirement": {
+    "whatItIs": "Telling the person's pension or retirement plan about the death.",
+    "whyItMatters": "Payments to the person stop. For a military retiree, DFAS stops the monthly payments and sends Survivor Benefit Plan forms if the person was enrolled.",
+    "whoToCall": "The plan's office or the former employer. For a military retiree, contact the Defense Finance and Accounting Service (DFAS). For a VA pension, contact the VA.",
+    "whatToBring": "A certified copy of the death certificate.",
+    "doesNotApplyWhen": "The person had no pension or retirement plan.",
+    "sources": [
+      "https://www.usa.gov/report-a-death",
+      "https://www.usa.gov/death-certificate"
+    ]
+  },
+  "utilities-housing": {
+    "whatItIs": "Telling the power, water, gas and phone companies, and the landlord or mortgage holder.",
+    "whyItMatters": "Bills keep coming until someone tells them. Rules for leases and mortgages vary by state.",
+    "whoToCall": "Each utility company, the landlord, and the mortgage company.",
+    "doesNotApplyWhen": "Someone else in the home already pays these bills in their own name."
+  },
+  "cancel-subscriptions": {
+    "whatItIs": "Stopping memberships, streaming services, gym plans and other things that charge every month.",
+    "whyItMatters": "These charges keep going until someone stops them.",
+    "whoToCall": "Each company. Bank and card statements show what charges each month.",
+    "doesNotApplyWhen": "The person had no recurring charges."
+  },
+  "forward-mail": {
+    "whatItIs": "Having the person's mail sent to the person who handles their affairs.",
+    "whyItMatters": "Mail shows bills, accounts and benefits you may not know about.",
+    "whoToCall": "The post office. To forward all of their mail, the executor or administrator goes to a post office in person.",
+    "whatToBring": "Proof that you are the appointed executor or administrator. A death certificate alone is not enough.",
+    "doesNotApplyWhen": "You lived with the person. You can open and manage their mail at that address.",
+    "sources": [
+      "https://www.usps.com/manage/mail-for-deceased.htm"
+    ]
+  },
+  "thank-you-notes": {
+    "whatItIs": "Short notes to people who sent flowers, gave to a cause, brought food or helped.",
+    "whyItMatters": "They let people know their kindness reached you. There is no deadline, and a few words are enough.",
+    "doesNotApplyWhen": "You do not feel ready. A friend or family member can help write them."
+  },
+  "will-and-probate": {
+    "whatItIs": "Finding out what to do with the will, and whether the estate needs to go through probate.",
+    "whyItMatters": "The executor settles the person's debts from the estate. Family members usually do not pay those debts from their own money.",
+    "whoToCall": "A probate lawyer, the county court or a tax preparer can tell you what applies.",
+    "whatToBring": "The will if there is one, a certified copy of the death certificate, and a list of what the person owned and owed.",
+    "sources": [
+      "https://consumer.ftc.gov/articles/debts-and-deceased-relatives"
+    ]
+  },
+  "retitle-property": {
+    "whatItIs": "Moving homes, vehicles and accounts into a living person's name.",
+    "whyItMatters": "Homes, vehicles and accounts stay in the person's name until someone transfers them. For a vehicle, the state motor vehicles office can transfer the title and cancel the person's license or ID.",
+    "whoToCall": "A probate lawyer, the county court or a tax preparer can tell you what applies.",
+    "whatToBring": "Certified copies of the death certificate, and the title or account papers.",
+    "doesNotApplyWhen": "The person owned nothing in their own name.",
+    "sources": [
+      "https://www.usa.gov/report-a-death"
+    ]
+  },
+  "online-accounts": {
+    "whatItIs": "Closing or saving the person's email, social media and other online accounts.",
+    "whyItMatters": "Some families keep a social media page as a place to remember. Others close the accounts.",
+    "whoToCall": "Each company. Look in its help pages for what to do when an account holder dies.",
+    "doesNotApplyWhen": "The person had no online accounts."
+  },
+  "final-tax-return": {
+    "whatItIs": "The person's last income tax return. It reports all income up to the date of death.",
+    "whyItMatters": "The usual tax deadlines apply. If a refund is due, someone has to claim it. If the person did not file for earlier years, those returns may be needed too.",
+    "whoToCall": "A probate lawyer, the county court or a tax preparer can tell you what applies. The IRS calls the person who files the personal representative: an executor, an administrator, or anyone else in charge of the person's property. A surviving spouse can file a joint return.",
+    "whatToBring": "The person's tax papers and income records. The IRS does not need a copy of the death certificate.",
+    "sources": [
+      "https://www.irs.gov/newsroom/filing-a-final-federal-tax-return-for-someone-who-has-died",
+      "https://www.irs.gov/taxtopics/tc356",
+      "https://www.irs.gov/individuals/file-the-final-income-tax-returns-of-a-deceased-person",
+      "https://www.usa.gov/report-a-death"
+    ]
+  },
+  "headstone": {
+    "whatItIs": "Ordering a headstone or grave marker for the burial place.",
+    "whyItMatters": "It marks where the person rests, so family can visit.",
+    "whoToCall": "The cemetery, or a monument maker. If the person was a veteran, the VA may provide a headstone or marker. Call the VA at 800-697-6947.",
+    "whatToBring": "For a VA headstone: VA Form 40-1330 and a copy of the veteran's discharge papers. Do not send original papers.",
+    "doesNotApplyWhen": "The person was cremated and the family is not using a grave or niche marker.",
+    "sources": [
+      "https://www.va.gov/burials-memorials/memorial-items/headstones-markers-medallions/"
+    ]
+  },
+  "follow-up-claims": {
+    "whatItIs": "Checking on insurance and benefit claims that are still open.",
+    "whyItMatters": "Some claims have time limits. A spouse and minor children may be able to get Social Security survivor benefits. For a veteran, a VA burial allowance claim is usually due within 2 years after the burial, with some exceptions.",
+    "whoToCall": "Each insurance company, Social Security at 1-800-772-1213, and the VA at 800-827-1000 if the person was a veteran.",
+    "whatToBring": "Claim numbers, letters you received, and a certified copy of the death certificate.",
+    "doesNotApplyWhen": "All claims are paid or closed.",
+    "sources": [
+      "https://www.usa.gov/social-security-report-a-death",
+      "https://www.va.gov/burials-memorials/veterans-burial-allowance/",
+      "https://www.va.gov/burials-memorials/"
+    ]
+  }
+}
