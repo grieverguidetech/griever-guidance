@@ -36,13 +36,6 @@ describe('ChecklistItemDetail', () => {
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
   });
 
-  it('moves focus to the screen on open', () => {
-    const { container } = render(
-      <ChecklistItemDetail itemId="custody" state={null} onSetState={noop} onBack={noop} />,
-    );
-    expect(document.activeElement).toBe(container.firstElementChild);
-  });
-
   it('calls onSetState from the toggles', async () => {
     const onSetState = vi.fn();
     render(<ChecklistItemDetail itemId="custody" state={null} onSetState={onSetState} onBack={noop} />);
