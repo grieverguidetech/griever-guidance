@@ -98,6 +98,25 @@ describe('checklist in the editor (#421)', () => {
     expect(opener).toHaveFocus();
   });
 
+  it('Open Service on a service item closes the item and focuses the Service h1', async () => {
+    const user = userEvent.setup();
+    // The first phase is done, so "Within the first few days" is the open one.
+    seed(
+      Object.fromEntries(
+        ['pronouncement', 'custody', 'find-wishes', 'tell-close-family', 'dependents-care', 'secure-home'].map(
+          (id) => [id, 'done'],
+        ),
+      ),
+    );
+    await openOverview();
+    const panel = within(screen.getByRole('complementary', { name: "What you'll need" }));
+    await user.click(panel.getByRole('button', { name: /^Set a date, time, and place for the service/ }));
+    await screen.findByRole('heading', { level: 1, name: /^Set a date, time, and place/ });
+    await user.click(screen.getByRole('button', { name: 'Open Service' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
+    expect(stored().checklist).not.toHaveProperty('set-service');
+  });
+
   it('opens the next item from the Overview, and Back returns to the Overview button', async () => {
     const user = userEvent.setup();
     await openOverview();

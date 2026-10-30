@@ -149,6 +149,16 @@ describe('editor on (#395)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
   });
 
+  it('Service ready leads back: Next: The person focuses The person h1', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Service' });
+    await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    await user.click(screen.getByRole('button', { name: 'Next: The person' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toHaveFocus();
+  });
+
   it('"Change" returns to Home and drops an unnamed person', async () => {
     const user = userEvent.setup();
     render(<App />);
