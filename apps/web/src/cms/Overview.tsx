@@ -96,6 +96,7 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
           {item && onOpenItem ? (
             <button
               type="button"
+              data-checklist-item={item}
               className="gg-btn gg-btn-secondary self-start text-left"
               onClick={() => onOpenItem(item)}
             >

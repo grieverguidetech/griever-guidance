@@ -15,13 +15,15 @@ import {
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
-import type { MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
+import type { ChecklistItemId, MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { CmsShell } from '../cms/CmsShell';
 import { Overview } from '../cms/Overview';
+import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
+import { ChecklistItemDetail } from '../cms/checklist/ChecklistItemDetail';
 import { PersonSection } from '../cms/sections/PersonSection';
 import { ServiceSection } from '../cms/sections/ServiceSection';
 import type { CmsNavKey } from '../cms/SideNav';
@@ -66,6 +68,7 @@ type AppView =
 type CmsSection = Exclude<CmsNavKey, 'account'>;
 
 const cmsShellCopy = screenCopy('cmsShell');
+const cmsItemLabels = screenCopy('cmsChecklist').items;
 
 const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
   announcement: 'announce',
@@ -328,6 +331,11 @@ function AppBody({
   const [setupEditing, setSetupEditing] = useState(false);
   // Which section the editor shows (flag on only).
   const [cmsSection, setCmsSection] = useState<CmsSection>('overview');
+  // The checklist item whose guidance fills the editor's main column (flag on only).
+  const [cmsItem, setCmsItem] = useState<ChecklistItemId | null>(null);
+  // Where the open item was opened from, so Back can return to that button.
+  const itemOpener = useRef<{ id: ChecklistItemId; region: 'main' | 'panel' | 'sheet' } | null>(null);
+  const restoreOpener = useRef(false);
   // Where Back from "Edit person" returns: the form it was opened from, or the path.
   const setupReturn = useRef<AppView>('flow');
   // The quiet note on the path after the last person was handed a message. It lasts until the
@@ -371,7 +379,34 @@ function AppBody({
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
   // The editor's sections share one view, so the section is part of the key: a change moves focus to the h1.
-  useFocusHeadingOnChange(view === 'cms' ? `cms:${cmsSection}` : view);
+  useFocusHeadingOnChange(view === 'cms' ? `cms:${cmsSection}:${cmsItem ?? ''}` : view);
+  // Must stay declared after the heading hook above: effects run in order, so this one lands
+  // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
+  useEffect(() => {
+    if (!restoreOpener.current || cmsItem !== null) {
+      return;
+    }
+    restoreOpener.current = false;
+    const opener = itemOpener.current;
+    itemOpener.current = null;
+    if (!opener) {
+      return;
+    }
+    let target: HTMLElement | null = null;
+    if (opener.region === 'sheet') {
+      // The sheet's own button is gone; its phone button opened it. Hidden from `lg`, where focus stays on the h1.
+      target = document.querySelector<HTMLElement>('[data-checklist-opener]');
+    } else if (opener.region === 'panel') {
+      // CmsShell renders exactly one <main> and one <aside>, so these selectors find one region each.
+      target = document.querySelector<HTMLElement>(`aside [data-checklist-item="${opener.id}"]`);
+    } else {
+      // The item may have moved on (marked done), so the Next button can now name another item.
+      target =
+        document.querySelector<HTMLElement>(`main [data-checklist-item="${opener.id}"]`) ??
+        document.querySelector<HTMLElement>('main [data-checklist-item]');
+    }
+    target?.focus();
+  });
   const clearError = auth?.clearError;
 
   const openProfile = useCallback(
@@ -710,9 +745,22 @@ function AppBody({
     setView('setup');
   }
 
+  function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', closeSheet?: () => void) {
+    itemOpener.current = { id, region };
+    // Same update as the item opening, so the sheet does not return focus after the heading took it.
+    closeSheet?.();
+    setCmsItem(id);
+  }
+
+  function closeCmsItem() {
+    restoreOpener.current = true;
+    setCmsItem(null);
+  }
+
   /** "Change" in the editor: an unnamed person is dropped, then Home. */
   function leaveCms() {
     sessions.pruneEmpty();
+    setCmsItem(null);
     setActiveId(null);
     goHome();
   }
@@ -785,18 +833,29 @@ function AppBody({
     return (
       <Shell wide>
         <CmsShell
+          title={cmsItem ? cmsItemLabels[cmsItem] : undefined}
+          aside={({ inSheet, closeSheet }) => (
+            <ChecklistPanel
+              checklist={active.checklist ?? {}}
+              onSetItem={(id, state) => sessions.setChecklistItem(active.id, id, state)}
+              currentItem={cmsItem}
+              onOpenItem={(id) => openCmsItem(id, inSheet ? 'sheet' : 'panel', closeSheet)}
+            />
+          )}
           personName={active.personName}
           section={cmsSection}
           statuses={active.sectionStatus}
           // The account item goes to onAccount, never here; the check only narrows the type.
           onSelect={(key) => {
             if (key !== 'account') {
+              setCmsItem(null);
               setCmsSection(key);
             }
           }}
           onChangePerson={leaveCms}
           onAccount={() => {
             sessions.pruneEmpty();
+            setCmsItem(null);
             if (auth?.isSignedIn) {
               openProfile(false);
             } else {
@@ -805,11 +864,19 @@ function AppBody({
           }}
           notice={endedNote}
         >
-          {cmsSection === 'overview' ? (
+          {cmsItem ? (
+            <ChecklistItemDetail
+              itemId={cmsItem}
+              state={active.checklist?.[cmsItem] ?? null}
+              onSetState={(state) => sessions.setChecklistItem(active.id, cmsItem, state)}
+              onBack={closeCmsItem}
+            />
+          ) : cmsSection === 'overview' ? (
             <Overview
               session={active}
               checklist={active}
               onOpen={setCmsSection}
+              onOpenItem={(id) => openCmsItem(id, 'main')}
             />
           ) : cmsSection === 'person' ? (
             <PersonSection

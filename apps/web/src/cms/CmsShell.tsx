@@ -29,6 +29,13 @@ function savePanelShown(shown: boolean) {
   }
 }
 
+export interface AsideContext {
+  /** True for the copy inside the phone sheet. */
+  inSheet: boolean;
+  /** Closes the sheet; call it in the same update as an action that moves focus. */
+  closeSheet: () => void;
+}
+
 interface Props {
   personName: string;
   section: CmsNavKey;
@@ -38,8 +45,8 @@ interface Props {
   onAccount: () => void;
   notice?: ReactNode;
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
-  /** The checklist panel: a third column from `lg`, a sheet below. */
-  aside?: ReactNode;
+  /** The checklist panel: a third column from `lg`, a sheet below. Use the function form to get `closeSheet`. */
+  aside?: ReactNode | ((context: AsideContext) => ReactNode);
   /** Replaces the h1 text, for item details. */
   title?: string;
   children: ReactNode;
@@ -74,6 +81,10 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
     return () => query.removeEventListener('change', onChange);
   }, [sheetOpen]);
 
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  const renderAside = (inSheet: boolean) =>
+    typeof aside === 'function' ? aside({ inSheet, closeSheet }) : aside;
+
   function togglePanel() {
     const next = !panelShown;
     setPanelShown(next);
@@ -102,6 +113,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
             <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
             <button
               ref={sheetButton}
+              data-checklist-opener=""
               type="button"
               className="gg-btn gg-btn-secondary lg:hidden"
               aria-haspopup="dialog"
@@ -124,7 +136,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
       {aside && panelShown && !sheetOpen ? (
         <aside aria-labelledby={asideTitleId} className="hidden lg:block lg:w-80 lg:shrink-0">
           <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
-          {aside}
+          {renderAside(false)}
         </aside>
       ) : null}
       {aside ? (
@@ -135,7 +147,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
           onClose={() => setSheetOpen(false)}
           returnFocusRef={sheetButton}
         >
-          {aside}
+          {renderAside(true)}
         </Sheet>
       ) : null}
     </div>
