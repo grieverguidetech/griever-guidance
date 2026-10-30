@@ -184,6 +184,43 @@ additive: an older list loads, and the file keeps its key and shape.
 - The `flowId` given to an old session is stable only once the save succeeds. If storage is full
   or unavailable, the next load makes a new one.
 
+### 2.0b Section fields on the local session
+
+The editor saves to the same list (`gg.sessions.v1`). The fields are additive and optional: an
+older list loads with its values unchanged.
+
+```js
+{ …,                          // everything in 2.0a
+  // SectionFields
+  birthDate, serviceType, serviceTime, servicePlace, serviceAddress, serviceNotes,
+  serviceMessage, announcementMessage, obituaryText, thanksMessage,
+  sectionStatus: { service: "in_progress" },   // 'in_progress' | 'ready'; a missing key = Not started
+  // ServiceEventFields
+  visitationDate, visitationTime, visitationPlace, serviceOfficiant,
+  burialDate, burialTime, burialPlace, burialPrivate,
+  receptionDate, receptionTime, receptionPlace }
+```
+
+- `serviceDate` stays the main service's date. Contact retention reads only `serviceDate`; no
+  visitation, burial or reception date affects it.
+- Status is stored, not guessed. `updateSection(id, key, patch)` applies the patch and sets
+  `in_progress` only when the key has no status (a `ready` section stays `ready`).
+  `setSectionStatus(id, key, status | null)` sets it, or removes it for `null` (Not started). For
+  `service`, `ready` also sets `serviceReady: true`; any other value sets it to `false`. A stored
+  status that is not `in_progress` or `ready` is dropped at load.
+- One-time copy at load: a non-empty trimmed value in `drafts.service.fields` is copied into an
+  empty (`undefined`) session field: `serviceTime` to `serviceTime`, `serviceLocation` to
+  `servicePlace`, `serviceNotes` to `serviceNotes`. A field cleared to `''` is never re-copied. The
+  draft is not changed. When anything is copied and `sectionStatus.service` is unset, it becomes
+  `in_progress`.
+- `personName`, `dateOfPassing`, `serviceDate`, `obituaryUrl` and `obituaryPublisher` are written in
+  place, never copied. `toFlowFacts` and the sync diff are unchanged: none of these fields sync.
+- Editors clear a field to `''`, never to `undefined`. An `undefined` field would let the one-time
+  draft copy run again on the next load.
+- At load, a session with `serviceReady: true` and no `sectionStatus.service` gets `ready`, so the
+  Overview agrees with the synced flag. Stored keys that are not a section key are dropped.
+- No delete method is added (C9).
+
 ### 2.1 The screen C3 checklist lives on the account
 
 The ticks persist — silently, as decided — but they belong to the **account**, not the session.
