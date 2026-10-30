@@ -27,10 +27,9 @@ async function openSection(page: Page, name: string, heading: string) {
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
-/** Home, then "Start with someone I've lost" opens The person directly with the editor on. */
+/** With the editor on and nobody saved, loading the app opens The person directly (#448; auth is off in this build). */
 async function startPerson(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: "Start with someone I've lost" }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
 }
 
@@ -87,7 +86,8 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
 
   // The choice is saved as you go.
   await page.reload();
-  await page.getByRole('button', { name: 'Margaret Hayes' }).click();
+  // A saved person: loading opens their Overview.
+  await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   await openSection(page, 'Service', 'Service');
   await expect(
     page.getByRole('group', { name: 'Burial or interment' }).getByRole('checkbox', { name: 'Private burial, family only' }),

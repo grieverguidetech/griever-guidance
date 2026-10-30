@@ -51,10 +51,9 @@ function seed(checklist: Record<string, string> = {}) {
 
 async function openOverview(user: ReturnType<typeof userEvent.setup>) {
   render(<App />);
-  await user.click(
-    await screen.findByRole('button', { name: 'Margaret Hayes' }),
-  );
+  // With the editor on, loading lands on the most recent person's Overview (#448).
   await screen.findByRole('heading', { level: 1, name: 'Overview' });
+  void user;
 }
 
 function stored(): { checklist?: Record<string, string> } {
@@ -226,9 +225,6 @@ describe('checklist in the editor (#421)', () => {
     );
     const user = userEvent.setup();
     const view = render(<App />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Margaret Hayes' }),
-    );
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     const group = within(screen.getByRole('complementary')).getByRole('group', {
       name: ITEM,
@@ -237,6 +233,8 @@ describe('checklist in the editor (#421)', () => {
     expect(storedChecklist('s1')).toEqual({ pronouncement: 'done' });
     view.unmount();
     render(<App />);
+    // Loading lands on Margaret (just opened); "Change" returns to Home to pick Harold.
+    await user.click(await screen.findByRole('button', { name: /Change/ }));
     await user.click(
       await screen.findByRole('button', { name: 'Harold Price' }),
     );

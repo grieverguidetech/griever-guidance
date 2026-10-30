@@ -77,11 +77,10 @@ async function expectHome() {
   expect(await screen.findByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
 }
 
-async function openMargaret(user: User) {
+/** Loading with one saved person lands on their Overview (#448). */
+async function openMargaret(_user?: User) {
   seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
   render(<App />);
-  await expectHome();
-  await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
   return screen.findByRole('heading', { level: 1, name: 'Overview' });
 }
 
@@ -108,13 +107,14 @@ describe('editor on (#395)', () => {
   it('"Create a new one" opens The person directly, and a typed name survives a remount', async () => {
     const user = userEvent.setup();
     const view = render(<App />);
-    await expectHome();
-    await user.click(screen.getByRole('button', { name: CREATE }));
+    // Nobody saved: loading opens The person directly (#448). Home's button is covered in cmsLanding.spec.tsx.
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /contacts|who hears first/i })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Their name'), 'Harold Price');
     view.unmount();
     render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: /Change/ }));
     await expectHome();
     expect(screen.getByRole('button', { name: 'Harold Price' })).toBeInTheDocument();
     expect(stored()[0].sectionStatus).toEqual({ person: 'in_progress' });
@@ -135,8 +135,6 @@ describe('editor on (#395)', () => {
   it('"Change" returns to Home and drops an unnamed person', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expectHome();
-    await user.click(screen.getByRole('button', { name: CREATE }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(stored()).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: /Change/ }));
@@ -148,8 +146,6 @@ describe('editor on (#395)', () => {
   it('"Change" keeps an unnamed person who has service data', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expectHome();
-    await user.click(screen.getByRole('button', { name: CREATE }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     await user.click(screen.getByRole('button', { name: 'Service' }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
@@ -264,13 +260,11 @@ describe('editor on, signed in (#395)', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument());
   });
 
-  it('an owner keeps "Create a new one", and it opens The person', async () => {
+  it('an owner with nobody saved lands on The person', async () => {
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     signedInAs('owner');
-    const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: CREATE }));
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toBeInTheDocument();
   });
 });

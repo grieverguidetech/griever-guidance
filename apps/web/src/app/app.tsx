@@ -512,6 +512,7 @@ function AppBody({
     onRemoved();
   }
 
+  const canCreate = !(sharingOn && auth?.profile?.accountType === 'member');
   const sortedSessions = useMemo(() => namedSessionsByRecent([...sessions.sessions]), [sessions.sessions]);
 
   // Picks the most recent person when none is open. It never creates one: Home's "Create a new
@@ -756,6 +757,51 @@ function AppBody({
     restoreOpener.current = true;
     setCmsItem(null);
   }
+
+  // Editor on: the first time the app reaches Home after load or sign-in, open the most recent person's
+  // Overview, or The person for a new one. The ref makes it once per sign-in, so "Change" and Back from
+  // Settings or Profile stay on Home. A known member with nobody shared yet (C11) stays on Home.
+  const landed = useRef(false);
+  // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
+  // is a real move to a new screen, so it asks for the h1 itself.
+  const focusAfterLanding = useRef(false);
+  // The latest openPerson and startNewSession (re-made each render), so the effect below needn't list them.
+  const opens = useRef({ openPerson, startNewSession });
+  opens.current = { openPerson, startNewSession };
+  const profileKnown = !sharingOn || !!auth?.profile;
+  useEffect(() => {
+    if (signedOut) landed.current = false;
+    if (!CMS_ENABLED || landed.current || !isSignedIn || auth?.isLoading || view !== 'home') {
+      return;
+    }
+    if (sortedSessions.length > 0) {
+      landed.current = true;
+      focusAfterLanding.current = true;
+      opens.current.openPerson(sortedSessions[0].id);
+      return;
+    }
+    // A member is only known once the profile has loaded; until then Home stays and we ask again.
+    if (!profileKnown) {
+      return;
+    }
+    landed.current = true;
+    if (canCreate) {
+      focusAfterLanding.current = true;
+      opens.current.startNewSession();
+    }
+  }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, profileKnown, canCreate]);
+
+  useEffect(() => {
+    if (!focusAfterLanding.current || view !== 'cms') {
+      return;
+    }
+    const heading = document.querySelector('h1');
+    if (heading) {
+      focusAfterLanding.current = false;
+      heading.setAttribute('tabindex', '-1');
+      heading.focus();
+    }
+  });
 
   /** "Change" in the editor: an unnamed person is dropped, then Home. */
   function leaveCms() {
@@ -1085,7 +1131,7 @@ function AppBody({
         onCreate={startNewSession}
         // Only a known member loses the button; an unknown or offline profile keeps it, and the
         // database still refuses a member's insert (C11).
-        canCreate={!(sharingOn && auth?.profile?.accountType === 'member')}
+        canCreate={canCreate}
         // "Your account" shows the list whenever its button shows; otherwise Home keeps the link.
         checklistLink={!(auth && !sessionEnded)}
       />
