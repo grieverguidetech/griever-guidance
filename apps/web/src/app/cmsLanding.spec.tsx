@@ -14,7 +14,21 @@ const mocks = vi.hoisted(() => ({
   loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
   getProfile: vi.fn(),
   getMembers: vi.fn(),
+  sessions: null as null | { removeSession: (id: string) => boolean },
 }));
+
+// Passes through, and keeps the latest sessions handle so a test can remove a person.
+vi.mock('@griever/hooks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@griever/hooks')>();
+  return {
+    ...actual,
+    useSessions: (...args: Parameters<typeof actual.useSessions>) => {
+      const result = actual.useSessions(...args);
+      mocks.sessions = result;
+      return result;
+    },
+  };
+});
 
 vi.mock('../lib/features', () => ({
   get AUTH_ENABLED() {
@@ -42,8 +56,8 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const HOME = 'Your people';
-const OLD_HOME = "Who you're writing about";
+const PEOPLE = 'Your people';
+const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
 
@@ -77,10 +91,16 @@ function h1(name: string) {
   return screen.findByRole('heading', { level: 1, name });
 }
 
-/** Lets any pending effect run, then checks "Your people" is still showing (no bounce back). */
+/** Flag off: lets any pending effect run, then checks Home is still showing (no bounce back). */
 async function expectStaysOnHome() {
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(screen.getByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+}
+
+/** Lets any pending effect run, then checks "Your people" is still showing (no bounce back). */
+async function expectStaysOnPeople() {
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
 }
 
 function signedInAs(accountType: 'owner' | 'member') {
@@ -134,8 +154,8 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1('The person');
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await h1(HOME);
-    await expectStaysOnHome();
+    await h1(PEOPLE);
+    await expectStaysOnPeople();
     await user.click(screen.getByRole('button', { name: CREATE }));
     expect(await h1('The person')).toBeInTheDocument();
   });
@@ -155,7 +175,7 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await h1(HOME);
+    await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await user.click(await screen.findByRole('button', { name: 'Sign out' }));
     await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
@@ -175,13 +195,13 @@ describe('landing with the editor on (#448)', () => {
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
     render(<App />);
-    expect(await h1(HOME)).toBeInTheDocument();
+    expect(await h1(PEOPLE)).toBeInTheDocument();
     await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
-    await expectStaysOnHome();
+    await expectStaysOnPeople();
     expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: ANOTHER })).not.toBeInTheDocument();
     expect(screen.getByText("When someone adds you to help, the people you're helping will show here.")).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 1, name: OLD_HOME })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
     expect(stored()).toHaveLength(0);
   });
 
@@ -193,12 +213,12 @@ describe('landing with the editor on (#448)', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       render(<App />);
-      expect(await h1(HOME)).toBeInTheDocument();
+      expect(await h1(PEOPLE)).toBeInTheDocument();
       await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3500);
       });
-      expect(screen.getByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
       expect(stored()).toHaveLength(0);
     } finally {
       vi.useRealTimers();
@@ -211,9 +231,9 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    const home = await h1(HOME);
+    const home = await h1(PEOPLE);
     await waitFor(() => expect(home).toHaveFocus());
-    await expectStaysOnHome();
+    await expectStaysOnPeople();
     expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: ANOTHER }));
     expect(await h1('The person')).toBeInTheDocument();
@@ -225,7 +245,7 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await h1(HOME);
+    await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your account']);
     expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
@@ -234,19 +254,77 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('Settings')).toHaveFocus();
   });
 
-  it('Back from Settings returns to the Overview of the open person', async () => {
+  it('Back from Settings opened from "Your people" returns to "Your people" and stays there', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: /Change/ }));
-    await h1(HOME);
+    await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Settings');
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    const overview = await h1('Overview');
-    await waitFor(() => expect(overview).toHaveFocus());
-    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
+    const people = await h1(PEOPLE);
+    await waitFor(() => expect(people).toHaveFocus());
+    await expectStaysOnPeople();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+  });
+
+  it('Back from Your account opened from "Your people" returns to "Your people"', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(PEOPLE);
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await h1(PEOPLE)).toBeInTheDocument();
+    await expectStaysOnPeople();
+  });
+
+  it('Back from Settings opened from an Overview returns to that Overview', async () => {
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await h1('Settings');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await h1('Overview')).toBeInTheDocument();
+  });
+
+  it('shows "Your people", never the old Home, before the profile arrives', async () => {
+    signedInAs('owner');
+    mocks.sharing = true;
+    let resolveProfile: (value: unknown) => void = () => undefined;
+    mocks.getProfile.mockReturnValue(new Promise((resolve) => { resolveProfile = resolve; }));
+    mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
+    render(<App />);
+    expect(await h1(PEOPLE)).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: HOME })).not.toBeInTheDocument();
+    await act(async () => {
+      resolveProfile({
+        ok: true,
+        profile: { id: 'u1', senderName: 'Anna', contactSource: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
+      });
+    });
+    expect(await h1('The person')).toBeInTheDocument();
+  });
+
+  it('never renders the old Home when the open person disappears', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await h1('Overview');
+    // The person is removed under the editor: the render that has no person must not be the old Home.
+    act(() => {
+      mocks.sessions?.removeSession('s1');
+    });
+    expect(screen.queryByRole('heading', { name: HOME })).not.toBeInTheDocument();
+    expect(await h1(PEOPLE)).toBeInTheDocument();
   });
 
   it('Back from Your account returns to the Overview of the open person', async () => {
@@ -259,14 +337,15 @@ describe('landing with the editor on (#448)', () => {
     await h1('Your account');
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(await h1('Overview')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: PEOPLE })).not.toBeInTheDocument();
   });
 
   it('with the editor off, loads on Home as before', async () => {
     mocks.cms = false;
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
-    expect(await h1(OLD_HOME)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
+    expect(await h1(HOME)).toBeInTheDocument();
+    await expectStaysOnHome();
+    expect(screen.queryByRole('heading', { level: 1, name: PEOPLE })).not.toBeInTheDocument();
   });
 });

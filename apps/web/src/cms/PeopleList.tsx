@@ -28,6 +28,7 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
   const people = namedSessionsByRecent(sessions);
   const createLabel = people.length > 0 ? copy.peopleCreateAnother : copy.peopleCreateFirst;
 
+  // role="list" stays on the <ul>: with list-none styling, Safari/VoiceOver drop the list semantics.
   return (
     <section aria-label={copy.peopleListLabel} className="flex flex-col gap-4">
       {people.length > 0 && (
