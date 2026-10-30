@@ -8,5 +8,12 @@
   "notesLabel": "Notes",
   "messageLabel": "Message",
   "messageHint": "We start it from the details above. You can change it.",
-  "useDetails": "Use the details above"
+  "useDetails": "Use the details above",
+  "eventVisitation": "Visitation or calling hours",
+  "eventFuneral": "Funeral or memorial service",
+  "eventOfficiant": "Officiant",
+  "eventBurial": "Burial or interment",
+  "eventCemetery": "Cemetery",
+  "eventPrivateFamily": "Private burial, family only",
+  "eventReception": "Reception"
 }

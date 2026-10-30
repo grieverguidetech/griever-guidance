@@ -13,7 +13,14 @@
     "notesLabel",
     "messageLabel",
     "messageHint",
-    "useDetails"
+    "useDetails",
+    "eventVisitation",
+    "eventFuneral",
+    "eventOfficiant",
+    "eventBurial",
+    "eventCemetery",
+    "eventPrivateFamily",
+    "eventReception"
   ],
   "properties": {
     "typeLabel": {
@@ -44,6 +51,27 @@
       "$ref": "#/$defs/text"
     },
     "useDetails": {
+      "$ref": "#/$defs/text"
+    },
+    "eventVisitation": {
+      "$ref": "#/$defs/text"
+    },
+    "eventFuneral": {
+      "$ref": "#/$defs/text"
+    },
+    "eventOfficiant": {
+      "$ref": "#/$defs/text"
+    },
+    "eventBurial": {
+      "$ref": "#/$defs/text"
+    },
+    "eventCemetery": {
+      "$ref": "#/$defs/text"
+    },
+    "eventPrivateFamily": {
+      "$ref": "#/$defs/text"
+    },
+    "eventReception": {
       "$ref": "#/$defs/text"
     }
   },

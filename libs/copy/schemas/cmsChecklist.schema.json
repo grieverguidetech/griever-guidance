@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the checklist panel, phases, items and detail screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "panelTitle",
+    "show",
+    "hide",
+    "phoneButton",
+    "intro",
+    "obituaryNote",
+    "done",
+    "notApplicable",
+    "nowPhase",
+    "nextItem",
+    "back",
+    "whatItIs",
+    "whyItMatters",
+    "whoToCall",
+    "whatToBring",
+    "notApplicableWhen",
+    "comingSoon",
+    "phases",
+    "items"
+  ],
+  "properties": {
+    "panelTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "show": {
+      "$ref": "#/$defs/text"
+    },
+    "hide": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneButton": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "obituaryNote": {
+      "$ref": "#/$defs/text"
+    },
+    "done": {
+      "$ref": "#/$defs/text"
+    },
+    "notApplicable": {
+      "$ref": "#/$defs/text"
+    },
+    "nowPhase": {
+      "$ref": "#/$defs/text"
+    },
+    "nextItem": {
+      "$ref": "#/$defs/text"
+    },
+    "back": {
+      "$ref": "#/$defs/text"
+    },
+    "whatItIs": {
+      "$ref": "#/$defs/text"
+    },
+    "whyItMatters": {
+      "$ref": "#/$defs/text"
+    },
+    "whoToCall": {
+      "$ref": "#/$defs/text"
+    },
+    "whatToBring": {
+      "$ref": "#/$defs/text"
+    },
+    "notApplicableWhen": {
+      "$ref": "#/$defs/text"
+    },
+    "comingSoon": {
+      "$ref": "#/$defs/text"
+    },
+    "phases": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "right-away",
+        "first-days",
+        "obituary",
+        "planning-service",
+        "first-weeks",
+        "first-months"
+      ],
+      "properties": {
+        "right-away": {
+          "$ref": "#/$defs/text"
+        },
+        "first-days": {
+          "$ref": "#/$defs/text"
+        },
+        "obituary": {
+          "$ref": "#/$defs/text"
+        },
+        "planning-service": {
+          "$ref": "#/$defs/text"
+        },
+        "first-weeks": {
+          "$ref": "#/$defs/text"
+        },
+        "first-months": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pronouncement",
+        "custody",
+        "find-wishes",
+        "tell-close-family",
+        "dependents-care",
+        "secure-home",
+        "burial-or-cremation",
+        "casket-or-urn",
+        "set-service",
+        "officiant",
+        "death-certificates",
+        "pallbearers",
+        "viewing-clothing-photo",
+        "confirm-service-details",
+        "write-obituary",
+        "submit-obituary",
+        "share-obituary",
+        "flowers-programs-music",
+        "guest-book",
+        "reception",
+        "eulogy",
+        "family-transport",
+        "notify-community",
+        "notify-ssa",
+        "notify-banks",
+        "life-insurance-claims",
+        "pension-retirement",
+        "utilities-housing",
+        "cancel-subscriptions",
+        "forward-mail",
+        "thank-you-notes",
+        "will-and-probate",
+        "retitle-property",
+        "online-accounts",
+        "final-tax-return",
+        "headstone",
+        "follow-up-claims"
+      ],
+      "properties": {
+        "pronouncement": {
+          "$ref": "#/$defs/text"
+        },
+        "custody": {
+          "$ref": "#/$defs/text"
+        },
+        "find-wishes": {
+          "$ref": "#/$defs/text"
+        },
+        "tell-close-family": {
+          "$ref": "#/$defs/text"
+        },
+        "dependents-care": {
+          "$ref": "#/$defs/text"
+        },
+        "secure-home": {
+          "$ref": "#/$defs/text"
+        },
+        "burial-or-cremation": {
+          "$ref": "#/$defs/text"
+        },
+        "casket-or-urn": {
+          "$ref": "#/$defs/text"
+        },
+        "set-service": {
+          "$ref": "#/$defs/text"
+        },
+        "officiant": {
+          "$ref": "#/$defs/text"
+        },
+        "death-certificates": {
+          "$ref": "#/$defs/text"
+        },
+        "pallbearers": {
+          "$ref": "#/$defs/text"
+        },
+        "viewing-clothing-photo": {
+          "$ref": "#/$defs/text"
+        },
+        "confirm-service-details": {
+          "$ref": "#/$defs/text"
+        },
+        "write-obituary": {
+          "$ref": "#/$defs/text"
+        },
+        "submit-obituary": {
+          "$ref": "#/$defs/text"
+        },
+        "share-obituary": {
+          "$ref": "#/$defs/text"
+        },
+        "flowers-programs-music": {
+          "$ref": "#/$defs/text"
+        },
+        "guest-book": {
+          "$ref": "#/$defs/text"
+        },
+        "reception": {
+          "$ref": "#/$defs/text"
+        },
+        "eulogy": {
+          "$ref": "#/$defs/text"
+        },
+        "family-transport": {
+          "$ref": "#/$defs/text"
+        },
+        "notify-community": {
+          "$ref": "#/$defs/text"
+        },
+        "notify-ssa": {
+          "$ref": "#/$defs/text"
+        },
+        "notify-banks": {
+          "$ref": "#/$defs/text"
+        },
+        "life-insurance-claims": {
+          "$ref": "#/$defs/text"
+        },
+        "pension-retirement": {
+          "$ref": "#/$defs/text"
+        },
+        "utilities-housing": {
+          "$ref": "#/$defs/text"
+        },
+        "cancel-subscriptions": {
+          "$ref": "#/$defs/text"
+        },
+        "forward-mail": {
+          "$ref": "#/$defs/text"
+        },
+        "thank-you-notes": {
+          "$ref": "#/$defs/text"
+        },
+        "will-and-probate": {
+          "$ref": "#/$defs/text"
+        },
+        "retitle-property": {
+          "$ref": "#/$defs/text"
+        },
+        "online-accounts": {
+          "$ref": "#/$defs/text"
+        },
+        "final-tax-return": {
+          "$ref": "#/$defs/text"
+        },
+        "headstone": {
+          "$ref": "#/$defs/text"
+        },
+        "follow-up-claims": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
