@@ -82,7 +82,7 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
 
   await openSection(page, 'Service', 'Service');
   await page.getByRole('button', { name: 'Add burial' }).click();
-  const burial = page.getByRole('group', { name: 'Burial' });
+  const burial = page.getByRole('group', { name: 'Burial', exact: true });
   const privateBurial = burial.getByRole('checkbox', { name: 'Private burial, family only' });
   await expect(burial.getByLabel(/Cemetery/)).toBeVisible();
 
@@ -99,6 +99,6 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
   await openSection(page, 'Service', 'Service');
   await expect(
-    page.getByRole('group', { name: 'Burial' }).getByRole('checkbox', { name: 'Private burial, family only' }),
+    page.getByRole('group', { name: 'Burial', exact: true }).getByRole('checkbox', { name: 'Private burial, family only' }),
   ).toBeChecked();
 });
