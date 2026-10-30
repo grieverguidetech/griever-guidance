@@ -39,6 +39,17 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await page.getByLabel('Their name').fill('Margaret Hayes');
     await openSection(page, 'Overview', 'Overview');
   },
+  Service: async (page) => {
+    await startPerson(page);
+    await openSection(page, 'Service', 'Service');
+  },
+  'Service, all groups open': async (page) => {
+    await startPerson(page);
+    await openSection(page, 'Service', 'Service');
+    for (const add of ['Add visitation or calling hours', 'Add burial', 'Add reception']) {
+      await page.getByRole('button', { name: add }).click();
+    }
+  },
   'The person': async (page) => {
     await startPerson(page);
   },

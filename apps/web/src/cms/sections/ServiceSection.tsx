@@ -66,8 +66,9 @@ function GroupText({
 
 /**
  * A group behind an "Add ..." button. Once opened it stays open (one way, no collapse), so nothing
- * the family typed can be hidden or lost. The button goes away on open, so focus moves to the
- * first control of the group.
+ * the family typed can be hidden or lost. It is an action button, not a toggle, so it has no
+ * aria-expanded. The button goes away on open, so focus moves to the group's fieldset (named by its
+ * legend), not an input, so the phone keyboard does not open.
  */
 function Disclosure({
   open,
@@ -80,13 +81,12 @@ function Disclosure({
   buttonLabel: string;
   children: ReactNode;
 }) {
-  const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
   useEffect(() => {
     if (open && moveFocus.current) {
       moveFocus.current = false;
-      panelRef.current?.querySelector<HTMLElement>('input, textarea, button')?.focus();
+      panelRef.current?.querySelector<HTMLElement>('fieldset')?.focus();
     }
   }, [open]);
   return (
@@ -95,8 +95,6 @@ function Disclosure({
         <button
           type="button"
           className="gg-btn gg-btn-secondary min-h-[44px]"
-          aria-expanded={false}
-          aria-controls={panelId}
           onClick={() => {
             moveFocus.current = true;
             onOpen();
@@ -105,7 +103,7 @@ function Disclosure({
           {buttonLabel}
         </button>
       )}
-      <div id={panelId} ref={panelRef}>
+      <div ref={panelRef}>
         {open && children}
       </div>
     </div>

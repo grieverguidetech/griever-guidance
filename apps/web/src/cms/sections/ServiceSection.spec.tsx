@@ -34,27 +34,27 @@ const message = () => screen.getByLabelText('Message') as HTMLTextAreaElement;
 describe('ServiceSection', () => {
   const add = (name: string) => userEvent.click(screen.getByRole('button', { name }));
 
-  it('opens Funeral only, with the intro, and Add buttons for the rest; no h1', () => {
+  it('opens Funeral only, with the intro, and plain Add buttons for the rest; no h1', () => {
     setup();
     const names = screen.getAllByRole('group').map((g) => g.querySelector('legend')?.textContent);
     expect(names).toEqual(['Funeral or memorial service']);
     expect(screen.getByText("Add only the parts you're having. You can change anything later.")).toBeInTheDocument();
     for (const name of ['Add visitation or calling hours', 'Add burial', 'Add reception']) {
       const b = screen.getByRole('button', { name });
-      expect(b).toHaveAttribute('aria-expanded', 'false');
+      expect(b).not.toHaveAttribute('aria-expanded');
+      expect(b).not.toHaveAttribute('aria-controls');
       expect(b).toHaveClass('min-h-[44px]');
-      expect(document.getElementById(b.getAttribute('aria-controls') ?? '')).not.toBeNull();
     }
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
-  it('groups stay in date order when opened (C10) and focus moves to the first field', async () => {
+  it('groups stay in date order when opened (C10) and focus moves to the new group', async () => {
     setup();
     await add('Add reception');
     await add('Add visitation or calling hours');
-    expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Date' })).toHaveFocus();
+    expect(screen.getByRole('group', { name: 'Visitation or calling hours' })).toHaveFocus();
     await add('Add burial');
-    expect(screen.getByRole('checkbox', { name: 'Private burial, family only' })).toHaveFocus();
+    expect(screen.getByRole('group', { name: 'Burial' })).toHaveFocus();
     const names = screen.getAllByRole('group').map((g) => g.querySelector('legend')?.textContent);
     expect(names).toEqual(['Visitation or calling hours', 'Funeral or memorial service', 'Burial', 'Reception']);
     expect(screen.queryByRole('button', { name: /^Add / })).toBeNull();
