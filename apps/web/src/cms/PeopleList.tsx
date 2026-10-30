@@ -41,17 +41,17 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
                   type="button"
                   onClick={() => onOpen(s.id)}
                   aria-label={passed ? fill(copy.peoplePassed, { name: s.personName, date: passed }) : s.personName}
-                  className="gg-card flex-row items-center justify-between gap-3 w-full text-left"
-                  style={{
-                    minHeight: 44,
-                    border: '1px solid color-mix(in srgb, var(--color-ink) 50%, var(--color-bg))',
-                  }}
+                  className="gg-panel group flex items-center justify-between gap-3 w-full min-h-11 text-left cursor-pointer hover:shadow-[var(--shadow-sm)] motion-safe:transition-[box-shadow,transform] motion-safe:duration-150 motion-safe:active:translate-y-px"
                 >
                   <span className="flex flex-col min-w-0 break-words">
-                    <span className="gg-card-title">{s.personName}</span>
-                    {passed && <span className="gg-card-meta">{passed}</span>}
+                    <span className="font-medium">{s.personName}</span>
+                    {passed && <span className="gg-meta">{passed}</span>}
                   </span>
-                  <CaretRight size={16} aria-hidden="true" />
+                  <CaretRight
+                    size={16}
+                    aria-hidden="true"
+                    className="shrink-0 motion-safe:transition-transform motion-safe:duration-150 motion-safe:group-hover:translate-x-0.5"
+                  />
                 </button>
               </li>
             );

@@ -60,4 +60,22 @@ describe('PeopleList', () => {
     render(<PeopleList sessions={[older]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
+
+  it('renders each person as a soft card: no inline border, caret hidden from assistive tech, 44px target', () => {
+    render(<PeopleList sessions={[older]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
+    const card = screen.getByRole('button', { name: 'Margaret Hayes, passed May 29, 2026' });
+    expect(card).toHaveClass('gg-panel', 'min-h-11');
+    expect(card.getAttribute('style') ?? '').not.toMatch(/border/);
+    expect(card.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(card.querySelector('.gg-meta')).toHaveTextContent('May 29, 2026');
+  });
+
+  it('keeps all hover and press motion behind motion-safe', () => {
+    render(<PeopleList sessions={[older]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
+    const card = screen.getByRole('button', { name: 'Margaret Hayes, passed May 29, 2026' });
+    const classes = `${card.getAttribute('class')} ${card.querySelector('svg')?.getAttribute('class')}`.split(/\s+/);
+    const motion = classes.filter((c) => /translate|transition/.test(c));
+    expect(motion.length).toBeGreaterThan(0);
+    expect(motion.every((c) => c.startsWith('motion-safe:'))).toBe(true);
+  });
 });
