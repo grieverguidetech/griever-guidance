@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SECTION_ORDER } from '@griever/shared';
-import { computeSections } from './sectionOverview';
+import { computeSections } from './sectionOverview.js';
 
 describe('computeSections', () => {
   it('marks an empty session Not started with person next', () => {
@@ -24,12 +24,18 @@ describe('computeSections', () => {
     expect(result.next).toBe('service');
   });
 
+  it('follows SECTION_ORDER whatever the order of available', () => {
+    expect(computeSections({}, ['service', 'person']).next).toBe('person');
+  });
+
   it('treats an in-progress section as next', () => {
     const result = computeSections({
       sectionStatus: { person: 'ready', announcement: 'in_progress' },
     });
     expect(result.next).toBe('announcement');
-    expect(result.sections[1].status).toBe('in_progress');
+    expect(result.sections.find((s) => s.key === 'announcement')?.status).toBe(
+      'in_progress',
+    );
   });
 
   it('returns null when all are ready', () => {
