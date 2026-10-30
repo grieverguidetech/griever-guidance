@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
 import type { SectionFields, SessionDetails } from '@griever/shared';
 import { DateField, todayISO } from '../../lib/DateField';
@@ -19,12 +20,13 @@ interface Props {
 
 /** The person's details, typed once; every message reads them. */
 export function PersonSection({ values, onChange, onReadyChange }: Props) {
+  const id = useId();
   return (
     <div className="flex flex-col gap-4">
       <div className="gg-field">
-        <label htmlFor="cms-person-name">{copy.nameLabel}</label>
+        <label htmlFor={`${id}-name`}>{copy.nameLabel}</label>
         <input
-          id="cms-person-name"
+          id={`${id}-name`}
           type="text"
           className="gg-input"
           autoComplete="off"
@@ -34,14 +36,14 @@ export function PersonSection({ values, onChange, onReadyChange }: Props) {
         />
       </div>
       <DateField
-        id="cms-person-birth"
+        id={`${id}-birth`}
         label={`${copy.dateOfBirthLabel} ${copy.optional}`}
         value={values.birthDate ?? ''}
         max={todayISO()}
         onChange={(birthDate) => onChange({ birthDate })}
       />
       <DateField
-        id="cms-person-passing"
+        id={`${id}-passing`}
         label={`${copy.dateOfPassingLabel} ${copy.optional}`}
         value={values.dateOfPassing ?? ''}
         max={todayISO()}

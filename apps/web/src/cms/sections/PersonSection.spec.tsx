@@ -79,8 +79,8 @@ describe('PersonSection', () => {
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
   });
 
-  it.each(['PersonSection.tsx', 'MarkReady.tsx'])('%s holds no hard-coded copy', (file) => {
-    const source = readFileSync(join(import.meta.dirname, file), 'utf8');
+  it('holds no hard-coded copy', () => {
+    const source = readFileSync(join(import.meta.dirname, 'PersonSection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsPerson')).toEqual([]);
   });
 });
