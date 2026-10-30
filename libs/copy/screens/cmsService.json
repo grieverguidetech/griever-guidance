@@ -8,6 +8,7 @@
   "notesLabel": "Anything else people should know",
   "messageLabel": "Message",
   "messageHint": "We start it from the details above. You can change it.",
+  "messageHintEdited": "You changed the message, so new details above won't appear in it. Use the details above to start it again.",
   "useDetails": "Use the details above",
   "eventVisitation": "Visitation or calling hours",
   "eventFuneral": "Funeral or memorial service",

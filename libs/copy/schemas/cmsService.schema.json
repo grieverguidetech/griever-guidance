@@ -13,6 +13,7 @@
     "notesLabel",
     "messageLabel",
     "messageHint",
+    "messageHintEdited",
     "useDetails",
     "eventVisitation",
     "eventFuneral",
@@ -52,6 +53,9 @@
       "$ref": "#/$defs/text"
     },
     "messageHint": {
+      "$ref": "#/$defs/text"
+    },
+    "messageHintEdited": {
       "$ref": "#/$defs/text"
     },
     "useDetails": {

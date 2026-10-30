@@ -166,6 +166,20 @@ describe('ServiceSection', () => {
     expect(message()).toHaveFocus();
   });
 
+  it('the hint changes once the message is edited, stays linked to the textarea, and reset restores it', async () => {
+    setup({ personName: 'Margaret Hayes' });
+    const original = 'We start it from the details above. You can change it.';
+    const stale =
+      "You changed the message, so new details above won't appear in it. Use the details above to start it again.";
+    const describedBy = () => document.getElementById(message().getAttribute('aria-describedby') ?? '');
+    expect(describedBy()).toHaveTextContent(original);
+    await userEvent.type(message(), 'X');
+    expect(describedBy()).toHaveTextContent(stale);
+    expect(message()).toHaveAccessibleDescription(stale);
+    await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
+    expect(describedBy()).toHaveTextContent(original);
+  });
+
   it('notes write serviceNotes', async () => {
     const { patches } = setup();
     await userEvent.type(screen.getByLabelText('Anything else people should know'), 'N');
