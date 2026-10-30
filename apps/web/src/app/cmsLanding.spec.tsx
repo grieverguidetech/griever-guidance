@@ -2,7 +2,7 @@
  * #448: with the editor on, the app lands on the Overview (or The person) once per load or sign-in,
  * and "Change" and Back from Settings or Profile stay on Home. Real localStorage; the flag is mocked.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -95,7 +95,9 @@ function signedInAs(accountType: 'owner' | 'member') {
       updatedAt: '2026-10-11T00:00:00.000Z',
     },
   });
-  mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: 'u1' }).load);
+  const clerk = fakeClerk({ userId: 'u1' });
+  mocks.loadClerk.mockResolvedValue(clerk.load);
+  return clerk;
 }
 
 beforeEach(() => {
@@ -126,10 +128,36 @@ describe('landing with the editor on (#448)', () => {
     expect(stored()).toHaveLength(1);
   });
 
+  it('an owner with nobody saved can press Change, then "Start with someone I\'ve lost" (C11)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('The person');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(HOME);
+    await expectStaysOnHome();
+    await user.click(screen.getByRole('button', { name: CREATE }));
+    expect(await h1('The person')).toBeInTheDocument();
+  });
+
   it('lands after sign-in too, on the Overview', async () => {
     signedInAs('owner');
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
+    const heading = await h1('Overview');
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it('lands again after signing out and back in', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(HOME);
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+    await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
     expect(await h1('Overview')).toBeInTheDocument();
   });
 
@@ -151,6 +179,26 @@ describe('landing with the editor on (#448)', () => {
     await expectStaysOnHome();
     expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument();
     expect(stored()).toHaveLength(0);
+  });
+
+  it('gives up landing when the profile is unavailable, and does not jump later', async () => {
+    signedInAs('owner');
+    mocks.sharing = true;
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
+    mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<App />);
+      expect(await h1(HOME)).toBeInTheDocument();
+      await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3500);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
+      expect(stored()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('"Change" returns to Home and stays there, and Home can still create a person', async () => {

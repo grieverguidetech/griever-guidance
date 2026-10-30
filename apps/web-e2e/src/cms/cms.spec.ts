@@ -88,6 +88,7 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   await page.reload();
   // A saved person: loading opens their Overview.
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+  await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
   await openSection(page, 'Service', 'Service');
   await expect(
     page.getByRole('group', { name: 'Burial or interment' }).getByRole('checkbox', { name: 'Private burial, family only' }),

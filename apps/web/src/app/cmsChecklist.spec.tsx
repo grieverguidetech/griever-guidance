@@ -49,11 +49,10 @@ function seed(checklist: Record<string, string> = {}) {
   );
 }
 
-async function openOverview(user: ReturnType<typeof userEvent.setup>) {
+async function openOverview() {
   render(<App />);
   // With the editor on, loading lands on the most recent person's Overview (#448).
   await screen.findByRole('heading', { level: 1, name: 'Overview' });
-  void user;
 }
 
 function stored(): { checklist?: Record<string, string> } {
@@ -76,7 +75,7 @@ beforeEach(() => {
 describe('checklist in the editor (#421)', () => {
   it('opens an item from the panel: the h1 takes focus, and Back returns to the panel button', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     const panel = within(
       screen.getByRole('complementary', { name: "What you'll need" }),
     );
@@ -101,7 +100,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('opens the next item from the Overview, and Back returns to the Overview button', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: NEXT }),
     );
@@ -117,7 +116,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('opens an item from the phone sheet, closes the sheet, and Back falls to the h1', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: ITEM }));
@@ -134,7 +133,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('after Done on the item, Back focuses the Next button that now names the next item', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: NEXT }),
     );
@@ -153,7 +152,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('marks the open item in the panel with aria-current', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     const panel = within(screen.getByRole('complementary'));
     expect(panel.getByRole('button', { name: ITEM })).not.toHaveAttribute(
       'aria-current',
@@ -173,7 +172,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('saves a state set on the detail, and a section choice leaves the detail', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: NEXT }),
     );
@@ -190,7 +189,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('sets a state from the panel without opening the detail', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     const group = within(screen.getByRole('complementary')).getByRole('group', {
       name: ITEM,
     });
@@ -203,7 +202,7 @@ describe('checklist in the editor (#421)', () => {
 
   it('has no sms: link with the panel and the detail open (C1)', async () => {
     const user = userEvent.setup();
-    await openOverview(user);
+    await openOverview();
     expect(document.querySelector('a[href^="sms:"]')).toBeNull();
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: NEXT }),
