@@ -29,5 +29,13 @@
   "peopleEmptyMember": "When someone adds you to help, the people you're helping will show here.",
   "peopleCreateFirst": "Start with someone I've lost",
   "peopleCreateAnother": "Someone else I've lost",
-  "peoplePassed": "{name}, passed {date}"
+  "peoplePassed": "{name}, passed {date}",
+  "continue": "Continue",
+  "summaryPassed": "passed {date}",
+  "summaryPersonJoin": "{name} · {passed}",
+  "summaryPersonEmpty": "Start with their name",
+  "summaryServiceDefaultType": "Service",
+  "summaryServiceDate": "{type}, {date}",
+  "summaryServicePlace": "{summary} at {place}",
+  "summaryServiceEmpty": "Add the date and place"
 }

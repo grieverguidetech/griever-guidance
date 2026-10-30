@@ -1,10 +1,11 @@
+import type { ComponentProps } from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { CHECKLIST_PHASES } from '@griever/shared';
-import type { ChecklistFields, SectionFields } from '@griever/shared';
+import type { ChecklistFields } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
 import { Overview } from './Overview';
 
@@ -13,7 +14,7 @@ const CHECKLIST_ITEM_LABEL = 'Get a legal pronouncement of death';
 const allIds = CHECKLIST_PHASES.flatMap((phase) => [...phase.itemIds]);
 const allDone: ChecklistFields = { checklist: Object.fromEntries(allIds.map((id) => [id, 'done'])) };
 
-function setup(session: Pick<SectionFields, 'sectionStatus'> = {}, checklist: ChecklistFields = {}) {
+function setup(session: ComponentProps<typeof Overview>['session'] = {}, checklist: ChecklistFields = {}) {
   const onOpen = vi.fn();
   const onOpenItem = vi.fn();
   const view = render(<Overview session={session} checklist={checklist} onOpen={onOpen} onOpenItem={onOpenItem} />);
@@ -21,35 +22,73 @@ function setup(session: Pick<SectionFields, 'sectionStatus'> = {}, checklist: Ch
 }
 
 describe('Overview', () => {
-  it('an empty session points Next at The person and opens it', async () => {
+  it('an empty session marks The person as the next card and opens it', async () => {
     const { onOpen } = setup();
-    const next = screen.getByRole('button', { name: 'Next: The person' });
-    await userEvent.click(next);
+    const card = screen.getByRole('button', { name: 'The person Not started Start with their name Continue' });
+    expect(card).toHaveClass('gg-panel');
+    expect(card.className).toContain('--color-accent-700');
+    await userEvent.click(card);
     expect(onOpen).toHaveBeenCalledWith('person');
   });
 
-  it('person ready moves Next to Service', async () => {
+  it('person ready moves the Continue card to Service', async () => {
     const { onOpen } = setup({ sectionStatus: { person: 'ready' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Next: Service' }));
+    expect(screen.getByRole('button', { name: /^The person Ready/ })).not.toHaveTextContent('Continue');
+    await userEvent.click(screen.getByRole('button', { name: /^Service Not started .*Continue$/ }));
     expect(onOpen).toHaveBeenCalledWith('service');
   });
 
-  it('shows no Next when both open sections are ready', () => {
+  it('shows no Continue and no separate Next button when both open sections are ready', () => {
     setup({ sectionStatus: { person: 'ready', service: 'ready' } });
+    expect(screen.queryByText('Continue')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
   });
 
-  it('lists the 5 sections in order and every status word', () => {
-    setup({ sectionStatus: { person: 'ready', service: 'in_progress' } });
+  it('never renders the old Next: primary button', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
+  });
+
+  it('lists the 5 sections in order with status and summary', () => {
+    setup({
+      sectionStatus: { person: 'ready', service: 'in_progress' },
+      personName: 'Margaret Hayes',
+      dateOfPassing: '2026-05-29',
+      serviceType: 'Funeral',
+      serviceDate: '2026-06-03',
+      servicePlace: 'St. Mark Church',
+    });
     const rows = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(rows).toHaveLength(5);
     expect(rows).toEqual([
-      'The person Ready',
+      'The person Ready Margaret Hayes · passed May 29, 2026',
       `Announcement ${shell.comingLater}`,
-      'Service In progress',
+      'Service In progress Funeral, June 3, 2026 at St. Mark Church Continue',
       `Obituary ${shell.comingLater}`,
       `Thank-yous ${shell.comingLater}`,
     ]);
+  });
+
+  it('person summary omits missing parts', () => {
+    const { unmount } = setup({ personName: 'Margaret Hayes' });
+    expect(screen.getByRole('button', { name: /^The person/ })).toHaveTextContent('Margaret Hayes');
+    expect(screen.getByRole('button', { name: /^The person/ })).not.toHaveTextContent('passed');
+    unmount();
+    setup({ dateOfPassing: '2026-05-29' });
+    expect(screen.getByRole('button', { name: /^The person/ })).toHaveTextContent('The person Not started passed May 29, 2026');
+  });
+
+  it('service summary falls back to "Service" and omits missing parts', () => {
+    const { unmount } = setup({ serviceDate: '2026-06-03' });
+    expect(screen.getByRole('button', { name: /^Service/ })).toHaveTextContent('Service, June 3, 2026');
+    unmount();
+    setup({ servicePlace: 'St. Mark Church' });
+    expect(screen.getByRole('button', { name: /^Service/ })).toHaveTextContent('Service at St. Mark Church');
+  });
+
+  it('an empty service shows a calm prompt', () => {
+    setup();
+    expect(screen.getByRole('button', { name: /^Service/ })).toHaveTextContent('Add the date and place');
   });
 
   it('shows Not started for an untouched open section', () => {
@@ -72,23 +111,26 @@ describe('Overview', () => {
     expect(onOpen).toHaveBeenCalledWith('service');
   });
 
-  it('shows the current phase and the next item, and the item calls onOpenItem', async () => {
+  it('shows the current phase and the next item in one card that calls onOpenItem', async () => {
     const { onOpenItem } = setup();
-    expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: `On the checklist: ${CHECKLIST_ITEM_LABEL}` }));
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: `Now: Right away (first 24 to 48 hours) On the checklist: ${CHECKLIST_ITEM_LABEL}`,
+      }),
+    );
     expect(onOpenItem).toHaveBeenCalledWith(CHECKLIST_PHASES[0].itemIds[0]);
   });
 
   it('without onOpenItem the phase shows and the next-item button does not', () => {
     render(<Overview session={{}} checklist={{}} onOpen={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^On the checklist:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /On the checklist:/ })).toBeNull();
   });
 
   it('shows nothing from the checklist when every phase is done', () => {
     setup({}, allDone);
     expect(screen.queryByText(/^Now:/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /^On the checklist:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /On the checklist:/ })).toBeNull();
   });
 
   it('a Ready section shows an aria-hidden check beside its status text', () => {

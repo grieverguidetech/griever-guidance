@@ -1,8 +1,8 @@
 import { fill, screenCopy } from '@griever/copy';
 import { computeChecklist, computeSections } from '@griever/hooks';
 import type { OverviewStatus } from '@griever/hooks';
-import { SECTION_ORDER } from '@griever/shared';
-import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey } from '@griever/shared';
+import { parseCompleteDate, SECTION_ORDER } from '@griever/shared';
+import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { navTitle } from './SideNav';
 
 const shell = screenCopy('cmsShell');
@@ -20,12 +20,61 @@ const STATUS_COPY: Record<OverviewStatus, string> = {
 const PHASE_COPY: Record<ChecklistPhaseKey, string> = checklist.phases;
 const ITEM_COPY: Record<ChecklistItemId, string> = checklist.items;
 
+type OverviewSession = Pick<SectionFields, 'sectionStatus' | 'serviceType' | 'servicePlace'> &
+  Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing' | 'serviceDate'>>;
+
 interface Props {
-  session: Pick<SectionFields, 'sectionStatus'>;
+  session: OverviewSession;
   checklist: ChecklistFields;
   onOpen: (key: SectionKey) => void;
   /** Without it the next item is not shown (no button that does nothing); the phase still is. */
   onOpenItem?: (itemId: ChecklistItemId) => void;
+}
+
+const CARD =
+  'gg-panel w-full min-h-[44px] flex flex-col gap-1 text-left font-[inherit] text-[color:inherit] border-0 cursor-pointer ' +
+  'hover:[background:color-mix(in_srgb,var(--color-text)_7%,var(--color-surface))] ' +
+  'active:[background:color-mix(in_srgb,var(--color-text)_14%,var(--color-surface))]';
+/** The next card: a 3px accent-700 bar down the left edge, drawn inside so nothing shifts. */
+const NEXT_BAR = ' shadow-[inset_3px_0_0_var(--color-accent-700)]';
+
+/** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
+function dateLabel(value: string): string {
+  const date = parseCompleteDate(value);
+  if (!date) {
+    return value;
+  }
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function present(value: string | null | undefined): string {
+  return value?.trim() ?? '';
+}
+
+function personSummary(session: OverviewSession): string {
+  const name = present(session.personName);
+  const passedDate = present(session.dateOfPassing);
+  const passed = passedDate ? fill(shell.summaryPassed, { date: dateLabel(passedDate) }) : '';
+  if (name && passed) {
+    return fill(shell.summaryPersonJoin, { name, passed });
+  }
+  return name || passed || shell.summaryPersonEmpty;
+}
+
+function serviceSummary(session: OverviewSession): string {
+  const type = present(session.serviceType);
+  const date = present(session.serviceDate);
+  const place = present(session.servicePlace);
+  if (!type && !date && !place) {
+    return shell.summaryServiceEmpty;
+  }
+  const head = type || shell.summaryServiceDefaultType;
+  const withDate = date ? fill(shell.summaryServiceDate, { type: head, date: dateLabel(date) }) : head;
+  return place ? fill(shell.summaryServicePlace, { summary: withDate, place }) : withDate;
+}
+
+function summaryFor(key: SectionKey, session: OverviewSession): string {
+  return key === 'person' ? personSummary(session) : serviceSummary(session);
 }
 
 /** Decorative; the status text beside it carries the meaning. */
@@ -61,13 +110,7 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
     <div className="flex flex-col gap-6">
       <p>{shell.overviewIntro}</p>
 
-      {nextSection ? (
-        <button type="button" className="gg-btn gg-btn-primary self-start" onClick={() => onOpen(nextSection)}>
-          {fill(shell.next, { section: navTitle(nextSection) })}
-        </button>
-      ) : null}
-
-      <ul role="list" className="flex flex-col gap-1 list-none p-0 m-0">
+      <ul role="list" className="flex flex-col gap-2 list-none p-0 m-0">
         {SECTION_ORDER.map((key) => {
           const status = overview.sections.find((section) => section.key === key)?.status ?? 'not_started';
           const later = !AVAILABLE_SECTIONS.includes(key);
@@ -84,15 +127,29 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
               ) : (
                 <button
                   type="button"
-                  className="gg-btn gg-btn-secondary w-full !justify-between text-left"
+                  className={CARD + (key === nextSection ? NEXT_BAR : '')}
                   onClick={() => onOpen(key)}
                 >
-                  <span>{navTitle(key)}</span>
-                  {' '}
-                  <span className="flex items-center gap-2 text-[14px] font-normal">
-                    {status === 'ready' ? <CheckIcon /> : null}
-                    <span>{STATUS_COPY[status]}</span>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">{navTitle(key)}</span>
+                    {' '}
+                    <span className="flex items-center gap-2 text-[14px] font-normal">
+                      {status === 'ready' ? <CheckIcon /> : null}
+                      <span>{STATUS_COPY[status]}</span>
+                    </span>
                   </span>
+                  {' '}
+                  <span className="text-[14px]" style={{ color: 'var(--text-muted)' }}>
+                    {summaryFor(key, session)}
+                  </span>
+                  {key === nextSection ? (
+                    <>
+                      {' '}
+                      <span className="text-[14px] font-semibold text-[color:var(--color-accent-700)]">
+                        {shell.continue}
+                      </span>
+                    </>
+                  ) : null}
                 </button>
               )}
             </li>
@@ -101,19 +158,17 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
       </ul>
 
       {phase ? (
-        <div className="flex flex-col gap-2">
+        item && onOpenItem ? (
+          <button type="button" data-checklist-item={item} className={CARD} onClick={() => onOpenItem(item)}>
+            <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+              {fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}
+            </span>
+            {' '}
+            <span>{fill(checklist.onTheChecklist, { item: ITEM_COPY[item] })}</span>
+          </button>
+        ) : (
           <h2 className="font-semibold">{fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}</h2>
-          {item && onOpenItem ? (
-            <button
-              type="button"
-              data-checklist-item={item}
-              className="gg-btn gg-btn-secondary self-start text-left"
-              onClick={() => onOpenItem(item)}
-            >
-              {fill(checklist.onTheChecklist, { item: ITEM_COPY[item] })}
-            </button>
-          ) : null}
-        </div>
+        )
       ) : null}
     </div>
   );
