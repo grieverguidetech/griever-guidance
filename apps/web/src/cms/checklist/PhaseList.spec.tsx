@@ -62,8 +62,8 @@ describe('PhaseList', () => {
     const done = screen.getByRole('button', { name: copy.items.pronouncement }).closest('li');
     const na = screen.getByRole('button', { name: copy.items.custody }).closest('li');
     // The label column only; the pressed toggle has its own check.
-    expect(done?.querySelector(':scope > div svg[aria-hidden="true"]')).not.toBeNull();
-    expect(na?.querySelector(':scope > div svg')).toBeNull();
+    expect(done?.querySelector(':scope > div:first-child svg[aria-hidden="true"]')).not.toBeNull();
+    expect(na?.querySelector(':scope > div:first-child svg')).toBeNull();
   });
 
   it('opens an item from its label', async () => {
