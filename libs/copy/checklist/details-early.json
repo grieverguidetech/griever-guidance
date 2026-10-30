@@ -1,1 +1,138 @@
-{}
+{
+  "pronouncement": {
+    "whatItIs": "Someone with authority, like a doctor or a hospice nurse, officially says that the person has died. They also fill out the forms about the cause, time and place of death.",
+    "whyItMatters": "These forms are what let an official death certificate be made later. Nearly every other step depends on that certificate.",
+    "whoToCall": "In a hospital or nursing home, the staff take care of this. If the person was in hospice, call the hospice. If the person died at home without hospice, call their doctor, the local medical examiner or coroner, or a funeral home and ask how to proceed. If the death was sudden or you are not sure what to do, call 911.",
+    "doesNotApplyWhen": "Hospital, nursing home or hospice staff have already done it. You can ask them to be sure.",
+    "sources": [
+      "https://www.nia.nih.gov/health/what-do-after-someone-dies"
+    ]
+  },
+  "custody": {
+    "whatItIs": "Choosing a funeral home or cremation provider to take your person into their care.",
+    "whyItMatters": "If the death was at home, there is no need to move the body right away. You can take a little time. When the family is ready, the body can be picked up according to local law. A hospital or nursing home may help arrange this.",
+    "whoToCall": "A funeral home or cremation provider. You can call more than one. A funeral home has to give you accurate price information over the phone if you ask, and it cannot make you come in to get prices.",
+    "whatToBring": "Nothing yet. The person's full name and where they are now is enough for the first call.",
+    "doesNotApplyWhen": "A pre-arranged plan already names a provider. Call that provider. In most states a family can also make these arrangements themselves. Rules vary by state. The funeral home or a lawyer can confirm.",
+    "sources": [
+      "https://www.nia.nih.gov/health/what-do-after-someone-dies",
+      "https://www.ftc.gov/business-guidance/resources/complying-funeral-rule"
+    ]
+  },
+  "find-wishes": {
+    "whatItIs": "Looking for anything your person left about their wishes: a prepaid funeral plan, a will, or a note about burial or cremation.",
+    "whyItMatters": "It can answer hard questions for you, and it may mean some arrangements are already made or paid for. A will can also matter later, when you settle their affairs.",
+    "whoToCall": "No one yet. Check their papers at home, and ask close family if they know of a plan. If they had a prepaid plan, tell the funeral home named in it.",
+    "doesNotApplyWhen": "You know there is no plan and no written wishes. That is common, and you can still go on. What a will means for the estate comes later. Rules vary by state. The funeral home or a lawyer can confirm.",
+    "sources": [
+      "https://www.ftc.gov/business-guidance/resources/complying-funeral-rule",
+      "https://www.va.gov/burials-memorials/schedule-a-burial/"
+    ]
+  },
+  "tell-close-family": {
+    "whatItIs": "Tell immediate family and closest friends yourself, by phone or a personal message, before anything public.",
+    "whyItMatters": "The people closest to your person should hear it from someone who loves them, not from a post or a notice. You can do this whenever you are ready, at any point. It just comes before anything public.",
+    "whoToCall": "Only the people closest to them. You do not have to call everyone yourself. You can ask one person to help you call others.",
+    "doesNotApplyWhen": "Everyone close to them already knows."
+  },
+  "dependents-care": {
+    "whatItIs": "Making sure anyone who relied on your person is looked after. That can be a child, an adult they cared for, or a pet.",
+    "whyItMatters": "In the first hours it is easy to lose track of who needs a meal, a ride or a walk. A short plan takes one worry off your mind.",
+    "whoToCall": "A family member, friend or neighbor you trust. Ask for help. People often want to be given a task.",
+    "doesNotApplyWhen": "No one depended on them for care."
+  },
+  "secure-home": {
+    "whatItIs": "Keeping your person's home and belongings safe while it is empty.",
+    "whyItMatters": "An empty home can be at risk. Lock the doors, take in the mail, and put keys, cash, jewelry and important papers somewhere safe.",
+    "whoToCall": "A family member, friend or neighbor who can check on the home. If they rented, the landlord can wait until the coming weeks.",
+    "doesNotApplyWhen": "They lived with you or with someone who is still at home."
+  },
+  "burial-or-cremation": {
+    "whatItIs": "Meeting with the funeral home to choose burial or cremation, and the kind of arrangement you want.",
+    "whyItMatters": "This choice shapes the rest of the plan. You can choose only the goods and services you want. Every funeral home also charges a basic services fee that cannot be declined.",
+    "whoToCall": "The funeral home you chose. If your person was a Veteran, they may be able to be buried in a VA national cemetery. You or the funeral director can call the National Cemetery Scheduling Office at 800-535-1117.",
+    "whatToBring": "Any written wishes or prepaid plan. If they were a Veteran, their DD214 or other discharge papers. If you cannot find them, the VA can help when you call.",
+    "doesNotApplyWhen": "A prepaid plan already sets these choices. Rules vary by state. The funeral home or a lawyer can confirm.",
+    "sources": [
+      "https://www.ftc.gov/business-guidance/resources/complying-funeral-rule",
+      "https://consumer.ftc.gov/articles/shopping-funeral-services",
+      "https://www.va.gov/burials-memorials/eligibility/",
+      "https://www.va.gov/burials-memorials/schedule-a-burial/"
+    ]
+  },
+  "casket-or-urn": {
+    "whatItIs": "Choosing a casket or an urn, and a burial plot or a niche if you need one.",
+    "whyItMatters": "This can be one of the larger costs. The funeral home has to show you a price list before it shows you caskets. You can buy a casket or urn somewhere else, and the funeral home cannot charge you a fee for that. For a direct cremation, a simple container can be used instead of a casket.",
+    "whoToCall": "The funeral home for caskets and urns. The cemetery for a plot or niche. Ask the cemetery what it requires. State or local law does not require a vault or liner around the casket, but many cemeteries do.",
+    "doesNotApplyWhen": "A prepaid plan already covers it, or a family plot is already set. Rules vary by state. The funeral home or a lawyer can confirm.",
+    "sources": [
+      "https://www.ftc.gov/business-guidance/resources/complying-funeral-rule",
+      "https://consumer.ftc.gov/articles/shopping-funeral-services"
+    ]
+  },
+  "set-service": {
+    "whatItIs": "Choosing a date, time and place for the service, or deciding there will not be one.",
+    "whyItMatters": "Once this is set, the obituary can share it, and people can plan to come. Having no service, or a small one, is also a real choice.",
+    "whoToCall": "The funeral home, and the place of worship or venue if it is somewhere else. Ask the funeral home what is possible."
+  },
+  "officiant": {
+    "whatItIs": "Choosing who will lead the service. This can be a member of the clergy, a celebrant, a friend or a family member.",
+    "whyItMatters": "The person who leads helps the service feel like your person. Ask them early so they can hold the date.",
+    "whoToCall": "Their place of worship, if they had one. The funeral home can also suggest someone.",
+    "doesNotApplyWhen": "There will be no service."
+  },
+  "death-certificates": {
+    "whatItIs": "Asking for certified copies of the death certificate. Ask the funeral home for 8 to 10 certified copies.",
+    "whyItMatters": "Banks, insurers, Social Security and other agencies ask for a certified copy, not a photocopy. Some smaller tasks, like canceling a subscription, may only need a photocopy.",
+    "whoToCall": "The funeral home. You can also order copies from the vital records office in the state where the death happened. Only certain family members, like a spouse, sibling or child, may be able to order them.",
+    "whatToBring": "The date and place of death. The state may also ask how you are related to your person. Each certified copy has a fee. Ask the funeral home or the state office for the cost.",
+    "sources": [
+      "https://www.usa.gov/death-certificate",
+      "https://www.usa.gov/report-a-death",
+      "https://www.nia.nih.gov/health/what-do-after-someone-dies"
+    ]
+  },
+  "pallbearers": {
+    "whatItIs": "Asking a few people to carry the casket during the service. Ask the funeral home how many they need.",
+    "whyItMatters": "It is a way to honor people who were close to your person. Asking early gives them time to plan.",
+    "whoToCall": "Family members or friends who would want to do it. The funeral home can help if you need more people.",
+    "doesNotApplyWhen": "There is a cremation with no casket at the service, or no service."
+  },
+  "viewing-clothing-photo": {
+    "whatItIs": "Choosing clothes for your person and a photo for the funeral home, if there will be a viewing.",
+    "whyItMatters": "The clothes and photo help them look like themselves. Embalming is not required by law in most cases, but it may be needed for some choices, such as a funeral with a viewing.",
+    "whoToCall": "The funeral home. Ask what to bring and when.",
+    "whatToBring": "A full set of clothes they liked, and a recent clear photo.",
+    "doesNotApplyWhen": "There will be no viewing.",
+    "sources": [
+      "https://www.ftc.gov/business-guidance/resources/complying-funeral-rule"
+    ]
+  },
+  "confirm-service-details": {
+    "whatItIs": "Checking the service date, time and place with the funeral home before anything is written.",
+    "whyItMatters": "The obituary is often how people learn where and when to come. A quick check keeps a wrong time from going out.",
+    "whoToCall": "The funeral home.",
+    "doesNotApplyWhen": "There will be no service. The obituary can say so, or leave it out."
+  },
+  "write-obituary": {
+    "whatItIs": "Writing a short notice about your person's life, with the service details.",
+    "whyItMatters": "It tells the wider community what happened and how to attend or honor them. It does not have to be long or perfect.",
+    "whoToCall": "No one has to. You can ask a family member or friend to help write it. The funeral home can also help.",
+    "doesNotApplyWhen": "Your family has chosen not to publish one."
+  },
+  "submit-obituary": {
+    "whatItIs": "Sending the obituary to a newspaper, the funeral home website, or both.",
+    "whyItMatters": "This is how the notice reaches people. Placing obituary notices is one of the services a funeral director usually provides, so the funeral home may do this for you.",
+    "whoToCall": "The funeral home first. If you send it to a newspaper yourself, ask the newspaper about its deadline and its cost.",
+    "doesNotApplyWhen": "Your family has chosen not to publish one.",
+    "sources": [
+      "https://www.ftc.gov/business-guidance/resources/complying-funeral-rule"
+    ]
+  },
+  "share-obituary": {
+    "whatItIs": "Sharing the published obituary more widely, by email or on social media.",
+    "whyItMatters": "It reaches people you may not think to call. It comes after close family and friends already know.",
+    "whoToCall": "No one. You can ask a family member or friend to share it for you.",
+    "doesNotApplyWhen": "Your family has chosen to keep the news private."
+  }
+}
