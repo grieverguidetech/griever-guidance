@@ -8,10 +8,14 @@ import { EventFields } from './EventFields';
 
 const keys = { date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' } as const;
 
-function setup(props: { values?: Record<string, string>; placeLabel?: string; extra?: ReactNode } = {}) {
+type Slot = ReactNode | ((legendId: string) => ReactNode);
+
+function setup(
+  props: { values?: Record<string, string>; placeLabel?: string; extra?: Slot; lead?: Slot; hideFields?: boolean } = {},
+) {
   const onChange = vi.fn();
   render(
-    <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} />,
+    <EventFields legend="Reception" keys={keys} values={props.values ?? {}} onChange={onChange} placeLabel={props.placeLabel} extra={props.extra} lead={props.lead} hideFields={props.hideFields} />,
   );
   return { onChange };
 }
@@ -73,6 +77,36 @@ describe('EventFields', () => {
     expect(screen.getByLabelText('Place')).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByLabelText('Extra')).toHaveFocus();
+  });
+
+  it('lead comes right after the legend, before date', async () => {
+    setup({ lead: <input aria-label="Lead" /> });
+    await userEvent.tab();
+    expect(screen.getByLabelText('Lead')).toHaveFocus();
+    await userEvent.tab();
+    expect(screen.getByLabelText('Date')).toHaveFocus();
+  });
+
+  it('hideFields hides date, time and place but keeps the group, lead and extra', () => {
+    setup({ hideFields: true, lead: <input aria-label="Lead" />, extra: <input aria-label="Extra" /> });
+    expect(screen.getByRole('group', { name: 'Reception' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Date')).toBeNull();
+    expect(screen.queryByLabelText('Time')).toBeNull();
+    expect(screen.queryByLabelText('Place')).toBeNull();
+    expect(screen.getByLabelText('Lead')).toBeInTheDocument();
+    expect(screen.getByLabelText('Extra')).toBeInTheDocument();
+  });
+
+  it('slots given as functions get the legend id, so they can be named with the legend', () => {
+    setup({
+      extra: (legendId) => (
+        <>
+          <span id="x-label">Address</span>
+          <input aria-labelledby={`${legendId} x-label`} />
+        </>
+      ),
+    });
+    expect(screen.getByRole('textbox', { name: 'Reception Address' })).toBeInTheDocument();
   });
 
   it('has no delete or remove control (C9)', () => {
