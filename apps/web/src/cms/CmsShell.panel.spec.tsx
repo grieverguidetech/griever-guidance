@@ -46,12 +46,15 @@ describe('CmsShell checklist panel', () => {
     const show = screen.getByRole('button', { name: 'Show checklist' });
     expect(show).toHaveClass('gg-btn-ghost');
     expect(screen.getByRole('main')).toContainElement(show);
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.compareDocumentPosition(show) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('makes the aside sticky, scrollable and keyboard reachable', () => {
+  it('makes the aside sticky and scrollable, with a focusable first child', () => {
     render(shell());
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
-    expect(aside).toHaveAttribute('tabindex', '0');
+    expect(aside).not.toHaveAttribute('tabindex');
+    expect(within(aside).getByRole('button', { name: 'Hide checklist' })).toBeInTheDocument();
     expect(aside.className).toContain('lg:sticky');
     expect(aside.className).toContain('lg:overflow-y-auto');
     expect(aside.className).toContain('lg:max-h-[calc(100dvh-52px)]');
