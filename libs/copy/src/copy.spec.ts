@@ -65,6 +65,10 @@ describe('fill', () => {
     expect(fill(screenCopy('pathLanding').forName, { name: 'Margaret' })).toBe('For Margaret');
   });
 
+  it('fills the {section} placeholder in the shell Next link', () => {
+    expect(fill(screenCopy('cmsShell').next, { section: 'The person' })).toBe('Next: The person');
+  });
+
   it('fills the same placeholder twice and accepts numbers', () => {
     expect(fill('{n} of {n}', { n: 2 })).toBe('2 of 2');
   });

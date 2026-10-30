@@ -1,0 +1,21 @@
+{
+  "navOverview": "Overview",
+  "navPerson": "The person",
+  "navAnnouncement": "Announcement",
+  "navService": "Service",
+  "navObituary": "Obituary",
+  "navThankYous": "Thank-yous",
+  "navAccount": "Your account",
+  "navLandmark": "Sections",
+  "menuButton": "Sections",
+  "change": "Change",
+  "changeLabel": "Change who you're writing about",
+  "unnamedPerson": "Not named yet",
+  "statusNotStarted": "Not started",
+  "statusInProgress": "In progress",
+  "statusReady": "Ready",
+  "next": "Next: {section}",
+  "overviewIntro": "Everything is saved as you go. You can stop and come back.",
+  "comingLater": "This part comes later. Nothing is needed here yet.",
+  "markReady": "Mark as ready"
+}
