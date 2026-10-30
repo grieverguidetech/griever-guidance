@@ -94,7 +94,6 @@ beforeEach(() => {
 
 describe('editor on (#395)', () => {
   it('opens a person on their Overview and records the visit', async () => {
-    const user = userEvent.setup();
     await openMargaret();
     expect(screen.queryByRole('heading', { name: 'One thing at a time.' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /^Now:/ })).toBeInTheDocument();
