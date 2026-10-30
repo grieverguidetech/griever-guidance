@@ -22,7 +22,14 @@
     "next",
     "overviewIntro",
     "comingLater",
-    "markReady"
+    "markReady",
+    "peopleTitle",
+    "peopleListLabel",
+    "peopleEmptyOwner",
+    "peopleEmptyMember",
+    "peopleCreateFirst",
+    "peopleCreateAnother",
+    "peoplePassed"
   ],
   "properties": {
     "navOverview": {
@@ -80,6 +87,27 @@
       "$ref": "#/$defs/text"
     },
     "markReady": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleListLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleEmptyOwner": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleEmptyMember": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleCreateFirst": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleCreateAnother": {
+      "$ref": "#/$defs/text"
+    },
+    "peoplePassed": {
       "$ref": "#/$defs/text"
     }
   },

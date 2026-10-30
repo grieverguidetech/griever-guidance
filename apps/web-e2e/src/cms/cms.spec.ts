@@ -42,6 +42,13 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
   'The person': async (page) => {
     await startPerson(page);
   },
+  'Your people': async (page) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await page.getByRole('button', { name: 'Change' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: "Who you're writing about" })).toHaveCount(0);
+  },
 };
 
 for (const [name, open] of Object.entries(screens)) {

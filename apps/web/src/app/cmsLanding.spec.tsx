@@ -1,6 +1,6 @@
 /**
  * #448: with the editor on, the app lands on the Overview (or The person) once per load or sign-in,
- * and "Change" and Back from Settings or Profile stay on Home. Real localStorage; the flag is mocked.
+ * and "Change" opens "Your people" and stays there; Back from Settings or Profile returns to the Overview (#451). Real localStorage; the flag is mocked.
  */
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -42,7 +42,8 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const HOME = "Who you're writing about";
+const HOME = 'Your people';
+const OLD_HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
 
@@ -76,7 +77,7 @@ function h1(name: string) {
   return screen.findByRole('heading', { level: 1, name });
 }
 
-/** Lets any pending effect run, then checks Home is still showing (no bounce back). */
+/** Lets any pending effect run, then checks "Your people" is still showing (no bounce back). */
 async function expectStaysOnHome() {
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(screen.getByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
@@ -169,7 +170,7 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('The person')).toBeInTheDocument();
   });
 
-  it('keeps a member with nothing shared on Home (C11)', async () => {
+  it('lands a member with nothing shared on "Your people", with the empty-state copy and no create button (C11)', async () => {
     signedInAs('member');
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
@@ -178,6 +179,9 @@ describe('landing with the editor on (#448)', () => {
     await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
     await expectStaysOnHome();
     expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: ANOTHER })).not.toBeInTheDocument();
+    expect(screen.getByText("When someone adds you to help, the people you're helping will show here.")).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: OLD_HOME })).not.toBeInTheDocument();
     expect(stored()).toHaveLength(0);
   });
 
@@ -215,21 +219,22 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('The person')).toBeInTheDocument();
   });
 
-  it('Back from Settings returns to Home and stays there', async () => {
+  it('Back from Settings returns to the Overview of the open person', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: /Change/ }));
     await h1(HOME);
-    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Settings');
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(await h1(HOME)).toBeInTheDocument();
-    await expectStaysOnHome();
+    const overview = await h1('Overview');
+    await waitFor(() => expect(overview).toHaveFocus());
+    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
   });
 
-  it('Back from Your account returns to Home and stays there', async () => {
+  it('Back from Your account returns to the Overview of the open person', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
@@ -238,15 +243,15 @@ describe('landing with the editor on (#448)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Your account');
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(await h1(HOME)).toBeInTheDocument();
-    await expectStaysOnHome();
+    expect(await h1('Overview')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
   });
 
   it('with the editor off, loads on Home as before', async () => {
     mocks.cms = false;
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
-    expect(await h1(HOME)).toBeInTheDocument();
-    await expectStaysOnHome();
+    expect(await h1(OLD_HOME)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: HOME })).not.toBeInTheDocument();
   });
 });
