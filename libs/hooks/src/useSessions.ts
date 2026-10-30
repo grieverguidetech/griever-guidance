@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  ChecklistFields,
+  ChecklistItemId,
+  ChecklistItemState,
   FlowFactKey,
   FlowRecord,
   FlowRole,
@@ -14,6 +17,7 @@ import type {
 import {
   addDays,
   flowFactsToSessionFields,
+  CHECKLIST_PHASES,
   FLOW_FACT_KEYS,
   mergeFlowFacts,
   parseCompleteDate,
@@ -53,7 +57,7 @@ export interface ReminderEntry {
  * captured once and every message flow reads from here. Sessions are durable
  * (restored on reload) and there can be more than one.
  */
-export interface Session extends SessionDetails, SectionFields, ServiceEventFields {
+export interface Session extends SessionDetails, SectionFields, ServiceEventFields, ChecklistFields {
   /** The local key. It never changes and is not what the server knows the person by. */
   id: string;
   /** UUID v4 made on this device; the person's id on the server. Stable once set. */
@@ -95,6 +99,8 @@ export interface UseSessionsResult {
   updateSection: (id: string, key: SectionKey, patch: SessionPatch) => void;
   /** `null` removes the status (Not started). For 'service', `ready` also sets `serviceReady`, any other value clears it. */
   setSectionStatus: (id: string, key: SectionKey, status: SectionStatus | null) => void;
+  /** Sets one checklist item on one person. `null` removes the key (the item is open again). Other people are unchanged. */
+  setChecklistItem: (id: string, itemId: ChecklistItemId, state: ChecklistItemState | null) => void;
   updateDraft: (id: string, draft: SendFlowDraft) => void;
   /** Empties one moment's draft. Other moments, people, contacts and who was notified stay as they are. */
   clearDraft: (id: string, category: TemplateCategory) => void;
@@ -239,6 +245,23 @@ function cleanSectionStatus(stored: unknown): SectionFields['sectionStatus'] {
   return clean;
 }
 
+const CHECKLIST_ITEM_IDS: readonly string[] = CHECKLIST_PHASES.flatMap((phase) => phase.itemIds);
+const CHECKLIST_STATES: readonly string[] = ['done', 'not_applicable'];
+
+/** Keeps only known item ids with a 'done' or 'not_applicable' state. Returns undefined when nothing is left. */
+function cleanChecklist(stored: unknown): ChecklistFields['checklist'] {
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+    return undefined;
+  }
+  const clean: NonNullable<ChecklistFields['checklist']> = {};
+  for (const [key, value] of Object.entries(stored)) {
+    if (CHECKLIST_ITEM_IDS.includes(key) && typeof value === 'string' && CHECKLIST_STATES.includes(value)) {
+      clean[key as ChecklistItemId] = value as ChecklistItemState;
+    }
+  }
+  return Object.keys(clean).length > 0 ? clean : undefined;
+}
+
 /** Service draft field -> session field. Other fields are written in place, never copied. */
 const SERVICE_DRAFT_COPIES = [
   ['serviceTime', 'serviceTime'],
@@ -306,6 +329,14 @@ function migrateSession(stored: StoredSession): Session {
       migrated.sectionStatus = sectionStatus;
     } else {
       delete migrated.sectionStatus;
+    }
+  }
+  if (stored.checklist !== undefined) {
+    const checklist = cleanChecklist(stored.checklist);
+    if (checklist) {
+      migrated.checklist = checklist;
+    } else {
+      delete migrated.checklist;
     }
   }
   // An old session with the synced "service ready" flag but no stored status shows as ready.
@@ -495,6 +526,26 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     [],
   );
 
+  const setChecklistItem = useCallback(
+    (id: string, itemId: ChecklistItemId, state: ChecklistItemState | null) => {
+      setSessions((list) =>
+        list.map((s) => {
+          if (s.id !== id) {
+            return s;
+          }
+          const checklist = { ...s.checklist };
+          if (state === null) {
+            delete checklist[itemId];
+          } else {
+            checklist[itemId] = state;
+          }
+          return { ...s, checklist };
+        }),
+      );
+    },
+    [],
+  );
+
   const updateDraft = useCallback((id: string, incoming: SendFlowDraft) => {
     const draft = stripSentWording(incoming);
     const category = draft.templateCategory;
@@ -646,6 +697,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
     updateSession,
     updateSection,
     setSectionStatus,
+    setChecklistItem,
     updateDraft,
     clearDraft,
     touchSession,
