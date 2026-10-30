@@ -143,7 +143,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
         // Scrolling is keyboard reachable because the Hide button inside is focusable.
         <aside
           aria-labelledby={asideTitleId}
-          className="hidden lg:sticky lg:top-[52px] lg:block lg:w-80 lg:shrink-0 lg:max-h-[calc(100dvh-52px)] lg:overflow-y-auto"
+          className="hidden lg:sticky lg:top-[52px] lg:block lg:w-96 lg:shrink-0 lg:max-h-[calc(100dvh-52px)] lg:overflow-y-auto"
         >
           <div className="flex items-center justify-between gap-2">
             <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
