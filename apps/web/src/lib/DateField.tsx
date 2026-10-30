@@ -44,6 +44,10 @@ interface DateInputProps {
   /** The id of a visible label elsewhere on the page, when there is no `<label htmlFor>`. */
   labelledBy?: string;
   required?: boolean;
+  /** A quiet, non-blocking note under the field (not an alert). Never stops saving. */
+  note?: string;
+  /** Shows the format help as visible text under the field, not only to a screen reader. */
+  visibleHelp?: boolean;
 }
 
 /** The bare control — pair it with your own `<label htmlFor>` / `.gg-field`. */
@@ -56,9 +60,12 @@ export function DateInput({
   describedBy,
   labelledBy,
   required,
+  note,
+  visibleHelp,
 }: DateInputProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const helpId = `${id}-help`;
+  const noteId = `${id}-note`;
 
   function openPicker() {
     const el = pickerRef.current as
@@ -74,7 +81,17 @@ export function DateInput({
     }
   }
 
-  return (
+  const help = (
+    <span
+      id={helpId}
+      className={visibleHelp ? 'block mt-1 text-[12px] leading-[1.5]' : 'sr-only'}
+      style={visibleHelp ? { color: 'var(--text-hint)' } : undefined}
+    >
+      Type a date such as May 29, 2026, or use the calendar button.
+    </span>
+  );
+
+  const box = (
     <div className="gg-datebox">
       <input
         id={id}
@@ -87,7 +104,7 @@ export function DateInput({
         value={value}
         aria-labelledby={labelledBy}
         aria-required={required || undefined}
-        aria-describedby={[describedBy, helpId].filter(Boolean).join(' ')}
+        aria-describedby={[describedBy, helpId, note ? noteId : undefined].filter(Boolean).join(' ')}
         onChange={(e) => onChange(e.target.value)}
         onBlur={(e) => {
           const iso = dateToISO(e.target.value);
@@ -113,10 +130,23 @@ export function DateInput({
         max={max}
         onChange={(e) => onChange(isoToDate(e.target.value))}
       />
-      <span id={helpId} className="sr-only">
-        Type a date such as May 29, 2026, or use the calendar button.
-      </span>
+      {!visibleHelp && help}
     </div>
+  );
+
+  if (!visibleHelp && !note) {
+    return box;
+  }
+  return (
+    <>
+      {box}
+      {visibleHelp && help}
+      {note && (
+        <p id={noteId} className="m-0 mt-1 text-[13px] leading-[1.5]" style={{ color: 'var(--color-text)' }}>
+          {note}
+        </p>
+      )}
+    </>
   );
 }
 

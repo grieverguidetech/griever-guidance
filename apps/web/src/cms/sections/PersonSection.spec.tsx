@@ -22,6 +22,37 @@ describe('PersonSection', () => {
     expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
   });
 
+  it('says nothing about a normal date', () => {
+    setup({ birthDate: 'March 3, 1950', dateOfPassing: 'May 29, 2026' });
+    expect(screen.queryByText(/couldn't read/)).toBeNull();
+    expect(screen.queryByText(/after the date they passed/)).toBeNull();
+    expect(screen.queryByText(/still ahead/)).toBeNull();
+  });
+
+  it('adds a quiet note, linked to the input and not an alert, for an unreadable birth date', () => {
+    setup({ birthDate: 'long ago' });
+    const note = screen.getByText("We couldn't read this as a date. It will show as typed.");
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByLabelText(/Date of birth/).getAttribute('aria-describedby')).toContain(note.id);
+  });
+
+  it('notes a birth date after the date they passed', () => {
+    setup({ birthDate: 'June 1, 2026', dateOfPassing: 'May 29, 2026' });
+    expect(screen.getByText('This is after the date they passed. You can keep it.')).toBeInTheDocument();
+  });
+
+  it('notes a date they passed that is still ahead, and still saves what is typed', async () => {
+    const { onChange } = setup({ dateOfPassing: 'December 25, 2099' });
+    expect(screen.getByText('This date is still ahead. You can keep it.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/Date they passed/), '1');
+    expect(onChange).toHaveBeenCalledWith({ dateOfPassing: 'December 25, 20991' });
+  });
+
+  it('shows the date format help as visible text', () => {
+    setup();
+    expect(screen.getAllByText('Type a date such as May 29, 2026, or use the calendar button.')[0]).toBeVisible();
+  });
+
   it('shows the intro at the top', () => {
     setup();
     expect(screen.getByText('Start with their name. The rest can wait.')).toBeInTheDocument();

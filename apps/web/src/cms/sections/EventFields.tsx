@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
-import type { SectionFields, ServiceEventFields, SessionDetails } from '@griever/shared';
+import { dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
 import { DateInput } from '../../lib/DateField';
 import { TimeInput } from '../../lib/TimeField';
 
@@ -42,6 +42,8 @@ interface Props<K extends EventKey> {
   dateSuggestion?: Suggestion;
   /** The same for an empty place. */
   placeSuggestion?: Suggestion;
+  /** The date of passing as typed. A date before it gets a quiet note. */
+  dateOfPassing?: string | null;
 }
 
 /** A button label and what to do on tap. The parent writes the value. */
@@ -93,8 +95,11 @@ export function EventFields<K extends EventKey>({
   hideFields = false,
   dateSuggestion,
   placeSuggestion,
+  dateOfPassing,
 }: Props<K>) {
   const id = useId();
+  const kind = dateNote(values[keys.date], { field: 'event', dateOfPassing });
+  const note = kind === 'unreadable' ? copy.dateUnreadable : kind === 'beforePassing' ? copy.beforePassing : undefined;
   const legendId = `${id}-legend`;
   return (
     <fieldset tabIndex={-1} className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
@@ -109,6 +114,8 @@ export function EventFields<K extends EventKey>({
         <DateInput
           id={`${id}-date`}
           labelledBy={`${legendId} ${id}-date-label`}
+          visibleHelp
+          note={note}
           value={values[keys.date] ?? ''}
           onChange={(v) => onChange({ [keys.date]: v } as Partial<Record<K, string>>)}
         />

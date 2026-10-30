@@ -4,5 +4,8 @@
   "dateOfPassingLabel": "Date they passed",
   "optional": "(optional)",
   "namePlaceholder": "e.g. Margaret Hayes",
-  "intro": "Start with their name. The rest can wait."
+  "intro": "Start with their name. The rest can wait.",
+  "dateUnreadable": "We couldn't read this as a date. It will show as typed.",
+  "birthAfterPassing": "This is after the date they passed. You can keep it.",
+  "futurePassing": "This date is still ahead. You can keep it."
 }

@@ -1,10 +1,17 @@
 import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
-import type { SectionFields, SectionKey, SessionDetails } from '@griever/shared';
+import { dateNote, type SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { DateField, todayISO } from '../../lib/DateField';
 import { MarkReady } from './MarkReady';
 
 const copy = screenCopy('cmsPerson');
+
+const noteCopy = {
+  unreadable: copy.dateUnreadable,
+  birthAfterPassing: copy.birthAfterPassing,
+  futurePassing: copy.futurePassing,
+  beforePassing: undefined,
+};
 
 type PersonValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
   Pick<SectionFields, 'birthDate' | 'sectionStatus'>;
@@ -24,6 +31,8 @@ interface Props {
 /** The person's details, typed once; every message reads them. */
 export function PersonSection({ values, onChange, onReadyChange, nextSection, onNext }: Props) {
   const id = useId();
+  const birthNote = dateNote(values.birthDate, { field: 'birth', dateOfPassing: values.dateOfPassing });
+  const passingNote = dateNote(values.dateOfPassing, { field: 'passing' });
   return (
     <div className="flex flex-col gap-4">
       <p>{copy.intro}</p>
@@ -44,6 +53,8 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
         label={`${copy.dateOfBirthLabel} ${copy.optional}`}
         value={values.birthDate ?? ''}
         max={todayISO()}
+        visibleHelp
+        note={birthNote ? noteCopy[birthNote] : undefined}
         onChange={(birthDate) => onChange({ birthDate })}
       />
       <DateField
@@ -51,6 +62,8 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
         label={`${copy.dateOfPassingLabel} ${copy.optional}`}
         value={values.dateOfPassing ?? ''}
         max={todayISO()}
+        visibleHelp
+        note={passingNote ? noteCopy[passingNote] : undefined}
         onChange={(dateOfPassing) => onChange({ dateOfPassing })}
       />
       <MarkReady

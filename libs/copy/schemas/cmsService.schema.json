@@ -27,7 +27,9 @@
     "addBurial",
     "addReception",
     "sameDay",
-    "samePlace"
+    "samePlace",
+    "dateUnreadable",
+    "beforePassing"
   ],
   "properties": {
     "typeLabel": {
@@ -100,6 +102,12 @@
       "$ref": "#/$defs/text"
     },
     "samePlace": {
+      "$ref": "#/$defs/text"
+    },
+    "dateUnreadable": {
+      "$ref": "#/$defs/text"
+    },
+    "beforePassing": {
       "$ref": "#/$defs/text"
     }
   },
