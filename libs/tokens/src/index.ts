@@ -41,6 +41,9 @@ export const colors = {
   'accent-2-700': '#aa0b56',
   'accent-2-800': '#790e3d',
   'accent-2-900': '#4b1528',
+
+  /** Done check marks. Calm green, at least 4.5:1 on bg and surface. */
+  'success-700': '#2a7048',
 } as const;
 
 export type ColorToken = keyof typeof colors;
