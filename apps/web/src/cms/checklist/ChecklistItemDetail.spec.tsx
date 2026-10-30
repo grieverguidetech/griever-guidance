@@ -61,4 +61,23 @@ describe('ChecklistItemDetail', () => {
     const source = readFileSync(join(import.meta.dirname, 'ChecklistItemDetail.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsChecklist')).toEqual([]);
   });
+
+  it('shows Open Service for a service item and calls onOpenService', async () => {
+    const onOpenService = vi.fn();
+    render(
+      <ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} onOpenService={onOpenService} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: copy.openService }));
+    expect(onOpenService).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no Open Service for an item without a section, or without the prop', () => {
+    const view = render(
+      <ChecklistItemDetail itemId="write-obituary" state={null} onSetState={noop} onBack={noop} onOpenService={noop} />,
+    );
+    expect(screen.queryByRole('button', { name: copy.openService })).toBeNull();
+    view.unmount();
+    render(<ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} />);
+    expect(screen.queryByRole('button', { name: copy.openService })).toBeNull();
+  });
 });

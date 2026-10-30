@@ -1006,6 +1006,11 @@ function AppBody({
               state={active.checklist?.[cmsItem] ?? null}
               onSetState={(state) => sessions.setChecklistItem(active.id, cmsItem, state)}
               onBack={closeCmsItem}
+              onOpenService={() => {
+                // The key hook moves focus to the Service h1.
+                setCmsItem(null);
+                setCmsSection('service');
+              }}
             />
           ) : cmsSection === 'overview' ? (
             <Overview
