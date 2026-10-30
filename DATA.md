@@ -3,9 +3,9 @@
 Companion to `README.md`. The README describes what the twenty screens *are*; this document
 describes where their data lives, what shape it has, and how it gets to a server and back.
 
-**Posture: offline-first, local-authoritative for the app and the send flow.** Since 2026-10-30 (#385) this does not hold for the web planning editor: C5 (offline-first) is dropped there, offline is tech debt, and last saved wins. The device is the source of truth for the session
+**Posture: local-authoritative today, but offline is no longer a requirement.** Since 2026-10-30 (#385) C5 (offline-first) is dropped for the whole product: offline is tech debt, and last saved wins. Existing offline behaviour (mobile, the flag-off web send flow) stays as built until a ticket changes it; nothing new needs to work offline. The device is the source of truth for the session
 the user is working in. The server is a backup and a hand-off mechanism between that user's own
-devices and, for person details, the owner's members — never a gatekeeper. Nothing in the flow may block on a network round-trip. This follows
+devices and, for person details, the owner's members — never a gatekeeper. Existing flows do not block on a network round-trip, and nothing new has to meet that bar (C5 dropped). This follows
 directly from the product's central promise, printed on three screens: *"Everything is saved as you
 go. You can stop and come back."*
 
@@ -473,7 +473,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
-- the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it
+- the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it (WEB-4).
 
 Rules:
 

@@ -21,6 +21,9 @@ Since 2026-10-30 the web has a second job (#385): a desk where the family plans 
 (the person, the service, later the announcement, obituary and thank-yous) so they can send from
 the phone without retyping. **Web = plan at a desk, mobile = send.**
 
+Sending the planned details from the phone needs sync, which comes in a later round. In round 1 the
+planning fields stay on the device that typed them.
+
 Every requirement below is subordinate to that. If a requirement makes the app slower or more
 confusing for that person, the requirement is wrong.
 
@@ -36,7 +39,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | C2 | Dropped 2026-10-30 (#385): web planning text is stored on the device so it can be sent from the phone later; nothing is sent from web. The old rule, kept for the record and still in force in the flag-off build: message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to the AWS data function. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
 | C3 | Contact data never reaches the gateway. Contact data **and contact ids** never reach the gateway or the data function in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
 | C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
-| C5 | Dropped 2026-10-30 (#385): offline is tech debt, last saved wins. The old rule, kept for the record: offline-first, nothing after sign-up may wait on the network, and nothing inside a flow ever does. Only account actions (sign-up, sign-in, reset, invite, revoke an invite, join, remove a member) need a connection, and they say so calmly. The device is authoritative. | DATA.md posture |
+| C5 | Dropped 2026-10-30 (#385): offline is tech debt, last saved wins. The old rule, kept for the record: offline-first, nothing after sign-up may wait on the network, and nothing inside a flow ever does. Only account actions (sign-up, sign-in, reset, invite, revoke an invite, join, remove a member) need a connection, and they say so calmly. The device is authoritative. Existing offline behaviour (mobile, the flag-off web send flow) stays as built until a ticket changes it; nothing new needs to work offline. | DATA.md posture |
 | C6 | Sign-in (email today, Facebook later) is identity only — never a friends list, never a DM path. Members are added only by an owner typing an email. They are never suggested. | §6 "Identity" |
 | C7 | All user-facing copy is calm and plain. No exclamation points, no celebratory microcopy. | §6 "Tone and copy" |
 | C8 | Every gateway route validates its request body/query. | §6 "What not to do" |
@@ -75,7 +78,7 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | CT-1 | Import from device contacts | Not offered (web import deleted 2026-10-21); removed when `VITE_FEATURE_CMS` is on | Done (`expo-contacts`) | |
 | CT-2 | Manual contact entry | Done; superseded when `VITE_FEATURE_CMS` is on | Done | Fallback everywhere. Mobile: "Add someone myself" on the contacts step after setup (#226) and "Add by hand" on the picker; phone checked with the same rule as web. Device-tested on a phone: HUMAN TODO |
 | CT-3 | Normalize, dedupe, and rank imported contacts | Done | Done | `libs/contacts` |
-| CT-4 | Contacts stored on-device only | Done (IndexedDB) | Done (AsyncStorage) | Shared `ContactStore` interface |
+| CT-4 | Contacts stored on-device only | Done (IndexedDB); superseded when `VITE_FEATURE_CMS` is on | Done (AsyncStorage) | Shared `ContactStore` interface |
 | CT-5 | Clear saved contacts 30 days after the latest known service date; keep them if no date is set | Done | Done (single-date anchor) | `CONTACT_RETENTION_DAYS` |
 | CT-6 | A device with no contacts does not restore a session | Partial | Not started | DATA.md §2 |
 
@@ -124,18 +127,20 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 Added 2026-10-30 (#385, round 1). The web becomes a planning editor: the family plans at a desk,
 and the phone sends (C1). Everything here ships behind `VITE_FEATURE_CMS`, which is **off in
 production**. With the flag off the web app is unchanged. Round 1 considers only The person and
-Service when it picks the next section.
+Service when it picks the next section. Round 1 planning fields stay on the device that typed them;
+sending them from the phone needs sync, which comes in a later round. Notes marked "round 1
+assumption" are the assumptions accepted in #385 (A1 to A9).
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
-| WEB-1 | Shell and nav: a side nav (layout switches at the `md` breakpoint) that moves between the sections | Not started | #391 |
+| WEB-1 | Shell and nav: a side nav (layout switches at the `md` breakpoint; round 1 assumption, #385 A7) that moves between the sections | Not started | #391 |
 | WEB-2 | Overview: every section with its status (Not started, In progress, Ready) and one next section | Not started | #392. Next considers only The person and Service |
-| WEB-3 | The person: edit the person's details; "Mark as ready" | Not started | #393. The first save sets In progress; "Mark as ready" sets Ready. Editing a Ready section keeps it Ready |
-| WEB-4 | Service: edit the service details, with a "Use the details above" reset; "Mark as ready" | Not started | #394. Service type is free text and not in the message. Ready also sets the synced `serviceReady`; un-marking sets it false |
+| WEB-3 | The person: edit the person's details; "Mark as ready" | Not started | #393. The first save sets In progress; "Mark as ready" sets Ready. Editing a Ready section keeps it Ready (round 1 assumption, #385 A2) |
+| WEB-4 | Service: edit the service details, with a "Use the details above" reset; "Mark as ready" | Not started | #394. Service type is free text and not in the message (round 1 assumption, #385 A4). The "Use the details above" reset is a round 1 assumption (#385 A8). Ready also sets the synced `serviceReady`; un-marking sets it false (round 1 assumption, #385 A3) |
 | WEB-5 | Announcement | Not started | Coming later in round 1 |
 | WEB-6 | Obituary | Not started | Coming later in round 1 |
 | WEB-7 | Thank-yous | Not started | Coming later in round 1 |
-| WEB-8 | Your account (Back goes to Home) | Not started | #391 |
+| WEB-8 | Your account (Back goes to Home; round 1 assumption, #385 A9) | Not started | #391 |
 
 ---
 
@@ -160,7 +165,7 @@ person details (not messages, drafts or contacts) sync through the AWS data func
 C9, C11 in §2 and DATA.md "Shared people".
 
 **Offline is tech debt (2026-10-30, #385).** The web editor needs a connection only where it already
-does. Last saved wins. C5 is dropped; making the editor work offline is not planned.
+does. Last saved wins. C5 is dropped; making the editor work offline is not planned in round 1.
 
 These need a product-owner decision before the related work can be called done. Do not resolve
 them in code by assumption — raise them.
@@ -418,7 +423,7 @@ DynamoDB, behind the AWS data function, is the only server database. Convex and 
 the shared-people design).
 
 Contact data is never sent to the gateway or the data function. Contact *ids* never appear in shared person
-sync (C3). Message content is never stored on a server and never logged, and there is no send history —
+sync (C3). Message content is never stored on a server and never logged (C2 still applies in the flag-off build), and there is no send history —
 it is composed client-side and handed to the device's own Messages app at send time (see "The send flow").
 
 **Accounts boundary.** App state tied to an account (the profile: sender name and contact source; the
