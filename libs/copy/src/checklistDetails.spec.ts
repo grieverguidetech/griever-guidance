@@ -59,3 +59,29 @@ describe('checklist detail files', () => {
     }
   });
 });
+
+describe('production behaviour and file overlap', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('keeps the early entry on a duplicate in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const early: ChecklistDetail = { whatItIs: 'early', whyItMatters: 'b' };
+    const later: ChecklistDetail = { whatItIs: 'later', whyItMatters: 'b' };
+    expect(mergeChecklistDetails({ a: early }, { a: later }).a).toBe(early);
+  });
+
+  it('has no id in both details-early.json and details-later.json', () => {
+    const earlyIds = Object.keys(readJson('details-early.json') as object);
+    const laterIds = Object.keys(readJson('details-later.json') as object);
+    expect(earlyIds.filter((id) => laterIds.includes(id))).toEqual([]);
+  });
+
+  it('requires https for sources', () => {
+    const ajv = new Ajv2020({ strict: true });
+    const validate = ajv.compile(readJson('detail.schema.json') as object);
+    expect(validate({ a: { ...entry, sources: ['http://example.com'] } })).toBe(false);
+    expect(validate({ a: { ...entry, sources: ['https://example.com'] } })).toBe(true);
+  });
+});
