@@ -25,7 +25,9 @@
     "intro",
     "addVisitation",
     "addBurial",
-    "addReception"
+    "addReception",
+    "sameDay",
+    "samePlace"
   ],
   "properties": {
     "typeLabel": {
@@ -92,6 +94,12 @@
       "$ref": "#/$defs/text"
     },
     "addReception": {
+      "$ref": "#/$defs/text"
+    },
+    "sameDay": {
+      "$ref": "#/$defs/text"
+    },
+    "samePlace": {
       "$ref": "#/$defs/text"
     }
   },

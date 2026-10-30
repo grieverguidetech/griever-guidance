@@ -200,6 +200,48 @@ describe('ServiceSection', () => {
     expect(describedBy()).toHaveTextContent(original);
   });
 
+  describe('same day and same place as the service', () => {
+    const service = { serviceDate: 'May 29, 2026', servicePlace: 'Chapel' };
+
+    it('offers neither while the service has no date or place', async () => {
+      setup();
+      await add('Add reception');
+      expect(screen.queryByRole('button', { name: /Same (day|place) as the service/ })).toBeNull();
+    });
+
+    it('fills the reception date once on tap, moves focus there, and the button goes away', async () => {
+      const { patches } = setup(service);
+      await add('Add reception');
+      expect(patches).toEqual([]);
+      await userEvent.click(screen.getByRole('button', { name: 'Reception Same day as the service' }));
+      expect(patches).toEqual([{ receptionDate: 'May 29, 2026' }]);
+      expect(screen.getByRole('textbox', { name: 'Reception Date' })).toHaveValue('May 29, 2026');
+      expect(screen.getByRole('textbox', { name: 'Reception Date' })).toHaveFocus();
+      expect(screen.queryByRole('button', { name: 'Reception Same day as the service' })).toBeNull();
+    });
+
+    it('fills the visitation place on tap', async () => {
+      const { patches } = setup(service);
+      await add('Add visitation or calling hours');
+      await userEvent.click(screen.getByRole('button', { name: 'Visitation or calling hours Same place as the service' }));
+      expect(patches).toEqual([{ visitationPlace: 'Chapel' }]);
+      expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toHaveFocus();
+    });
+
+    it('burial gets a same-day button but no same-place button', async () => {
+      const { patches } = setup(service);
+      await add('Add burial');
+      expect(screen.queryByRole('button', { name: /Burial Same place/ })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Burial Same day as the service' }));
+      expect(patches).toEqual([{ burialDate: 'May 29, 2026' }]);
+    });
+
+    it('offers nothing for a field that already has a value, and the funeral group has none', async () => {
+      setup({ ...service, receptionDate: 'June 1, 2026', receptionPlace: 'Hall' });
+      expect(screen.queryByRole('button', { name: /Same (day|place) as the service/ })).toBeNull();
+    });
+  });
+
   it('notes write serviceNotes', async () => {
     const { patches } = setup();
     await userEvent.type(screen.getByLabelText('Anything else people should know'), 'N');
