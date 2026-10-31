@@ -479,7 +479,11 @@ const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
   aftercare: 'thanks',
 };
 
-/** True when a person holds anything worth keeping: a name, a draft, a section status or any typed field. */
+/**
+ * True when a person holds anything worth keeping: a name, a draft, a checklist tick, a section
+ * marked 'ready' or any typed field. An 'in_progress' status alone is not content: it is set by the
+ * first keystroke, so typing a letter and erasing it must not keep a blank person.
+ */
 function hasAnyContent(s: Session): boolean {
   if (s.personName.trim() !== '' || Object.keys(s.drafts).length > 0) {
     return true;
@@ -487,7 +491,7 @@ function hasAnyContent(s: Session): boolean {
   if (Object.keys(s.checklist ?? {}).length > 0) {
     return true;
   }
-  if (Object.keys(s.sectionStatus ?? {}).length > 0) {
+  if (Object.values(s.sectionStatus ?? {}).some((status) => status === 'ready')) {
     return true;
   }
   return Object.entries(s).some(([key, value]) => {
@@ -500,7 +504,7 @@ function hasAnyContent(s: Session): boolean {
 
 /** Typed fields that are not the name: person details and every section and service-event field. */
 const EDITOR_FIELDS: ReadonlySet<string> = new Set([
-  'dateOfPassing', 'obituaryUrl', 'serviceDate', 'birthDate', 'serviceType', 'serviceTime', 'servicePlace',
+  'dateOfPassing', 'obituaryUrl', 'obituaryPublisher', 'serviceReady', 'serviceDate', 'birthDate', 'serviceType', 'serviceTime', 'servicePlace',
   'serviceAddress', 'serviceNotes', 'serviceMessage', 'announcementMessage', 'obituaryText', 'obituaryCity', 'obituaryCareer', 'obituarySurvivors',
   'obituaryNote', 'thanksMessage',
   'visitationDate', 'visitationTime', 'visitationPlace', 'serviceOfficiant', 'burialDate', 'burialTime',

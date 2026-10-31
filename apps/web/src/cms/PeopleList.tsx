@@ -23,6 +23,16 @@ function passingLabel(value: string | null | undefined): string {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+/** "Not named yet, started Oct 31": tells unnamed people apart. Plain "Not named yet" when the date can't be read. */
+function unnamedLabel(createdAt: string): string {
+  const time = Date.parse(createdAt);
+  if (Number.isNaN(time)) {
+    return copy.peopleUnnamed;
+  }
+  const date = new Date(time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return fill(copy.peopleUnnamedStarted, { date });
+}
+
 /** The people with a name or any work, newest first, inside the shell (which owns the h1). */
 export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
   const people = listableSessionsByRecent(sessions);
@@ -35,7 +45,8 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
         <ul role="list" className="flex flex-col gap-2 list-none m-0 p-0">
           {people.map((s) => {
             const passed = passingLabel(s.dateOfPassing);
-            const name = s.personName.trim() || copy.peopleUnnamed;
+            const named = s.personName.trim() !== '';
+            const name = named ? s.personName.trim() : unnamedLabel(s.createdAt);
             return (
               <li key={s.id}>
                 <button
@@ -45,7 +56,7 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
                   className="gg-panel group flex items-center justify-between gap-3 w-full min-h-11 text-left cursor-pointer hover:shadow-[var(--shadow-sm)] motion-safe:transition-[box-shadow,transform] motion-safe:duration-150 motion-safe:active:translate-y-px"
                 >
                   <span className="flex flex-col min-w-0 break-words">
-                    <span className="font-medium">{name}</span>
+                    <span className={named ? 'font-medium' : 'gg-meta'}>{name}</span>
                     {passed && <span className="gg-meta">{passed}</span>}
                   </span>
                   <CaretRight
