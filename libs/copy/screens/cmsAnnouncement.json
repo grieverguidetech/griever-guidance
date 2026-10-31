@@ -1,0 +1,7 @@
+{
+  "intro": "A short note to let people know. You can change any of it.",
+  "messageLabel": "Message",
+  "messageHint": "We start it from the details you entered about them. You can change it.",
+  "messageHintEdited": "You changed the message, so new details about them won't appear in it. Use the details above to start it again.",
+  "useDetails": "Use the details above"
+}
