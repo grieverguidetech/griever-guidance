@@ -18,11 +18,15 @@ const mocks = vi.hoisted(() => ({
   clerkStatus: 'ready' as 'ready' | 'degraded' | 'loading',
   providerProps: null as null | Record<string, unknown>,
   getProfile: vi.fn(),
+  clerkLoaded: true,
+  openUserProfile: vi.fn(),
+  user: null as null | { primaryEmailAddress: { emailAddress: string } },
 }));
 
 vi.mock('@clerk/react', () => ({
   useAuth: () => mocks.auth,
-  useClerk: () => ({ status: mocks.clerkStatus }),
+  useClerk: () => ({ status: mocks.clerkStatus, loaded: mocks.clerkLoaded, openUserProfile: mocks.openUserProfile }),
+  useUser: () => ({ user: mocks.user }),
   ClerkProvider: (props: Record<string, unknown> & { children: React.ReactNode }) => {
     mocks.providerProps = props;
     return <>{props.children}</>;
@@ -60,6 +64,9 @@ beforeEach(() => {
   window.localStorage.clear();
   mocks.providerProps = null;
   mocks.clerkStatus = 'ready';
+  mocks.clerkLoaded = true;
+  mocks.user = null;
+  mocks.openUserProfile.mockReset();
   mocks.getProfile.mockReset();
   setAuth();
   vi.stubGlobal('navigator', { ...navigator, onLine: true });
@@ -302,6 +309,33 @@ describe('useClerkAuth signOut', () => {
 });
 
 describe('ClerkAccount', () => {
+  it('hands the app the email and a way to open Clerk account screen, only once loaded', async () => {
+    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_abc');
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
+    mocks.user = { primaryEmailAddress: { emailAddress: 'anna@example.com' } };
+    let seen: { email?: string | null; open?: () => void } = {};
+    const view = (key: string) => (
+      <ClerkAccount key={key}>
+        {(state) => {
+          if (!state.unavailable) {
+            seen = { email: state.email, open: state.openAccountSettings };
+          }
+          return <p>{state.unavailable ? 'unavailable' : state.account.status}</p>;
+        }}
+      </ClerkAccount>
+    );
+    mocks.clerkLoaded = false;
+    const { rerender } = render(view('a'));
+    await screen.findByText('signed_in');
+    expect(seen.email).toBe('anna@example.com');
+    expect(seen.open).toBeUndefined();
+    mocks.clerkLoaded = true;
+    rerender(view('b'));
+    expect(seen.open).toBeTypeOf('function');
+    seen.open?.();
+    expect(mocks.openUserProfile).toHaveBeenCalledTimes(1);
+  });
+
   it('reports unavailable without a publishable key, and mounts no Clerk', () => {
     vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
     render(<ClerkAccount>{(state) => <p>{state.unavailable ? 'unavailable' : 'ready'}</p>}</ClerkAccount>);
