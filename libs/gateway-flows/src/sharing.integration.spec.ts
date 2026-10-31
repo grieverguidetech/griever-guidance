@@ -42,6 +42,7 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
   const emails: string[] = [];
   let ownerToken: string;
   let joinerToken: string;
+  let signFor: (caller: Caller) => Promise<string>;
   let router: ReturnType<typeof createMembersRouter>;
   let flows: ReturnType<typeof createFlowsRouter>;
 
@@ -61,6 +62,11 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
         privateJwk,
         'RS256',
       );
+    signFor = async (caller) => {
+      const t = await sign(caller);
+      tokens.set(t, caller);
+      return t;
+    };
     ownerToken = await sign(OWNER);
     joinerToken = await sign(JOINER);
     tokens.set(ownerToken, OWNER);
@@ -212,14 +218,26 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
       expect(after?.details).toMatchObject({ servicePlace: 'Chapel', serviceType: 'Funeral', burialPrivate: true });
     });
 
-    it('refuses a forbidden key before it reaches the data function', async () => {
+    it('answers 400 for a forbidden key', async () => {
       const res = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, { drafts: {} });
       expect(res.status).toBe(400);
     });
 
-    it('does not let a member create a person', async () => {
-      const res = await sendFlows(joinerToken, 'POST', '/flows', { id: '66666666-6666-4666-8666-666666666666', ...FACTS });
+    it('does not let a member create a person (C11)', async () => {
+      // Self-contained: this test makes its own owner and member, so it does not depend on the one above.
+      const ownerId = 'user_c11_owner';
+      const memberId = 'user_c11_member';
+      const owner = await signFor({ userId: ownerId, email: 'c11owner@example.test', emailVerified: true });
+      const member = await signFor({ userId: memberId, email: 'c11member@example.test', emailVerified: true });
+      expect((await send(owner, 'POST', '/invites', { email: 'c11member@example.test' })).status).toBe(201);
+      const raw = /#t=([A-Za-z0-9_-]{43})/.exec(JSON.parse(emails.at(-1)!).text)![1]!;
+      expect((await send(member, 'POST', '/invites/accept', { token: raw })).status).toBe(200);
+
+      const newId = '66666666-6666-4666-8666-666666666666';
+      const res = await sendFlows(member, 'POST', '/flows', { id: newId, ...FACTS });
       expect(res.status).toBe(403);
+      expect((await listed(member)).map((f) => f.id)).not.toContain(newId);
+      expect((await listed(owner)).map((f) => f.id)).not.toContain(newId);
     });
   });
 

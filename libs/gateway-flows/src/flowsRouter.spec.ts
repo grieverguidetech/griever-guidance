@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Jwt } from 'hono/utils/jwt';
 import { clearClerkCache } from '@griever/gateway-auth';
 import { FORBIDDEN_SYNC_KEYS, FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
-import { FLOWS_TOO_LARGE, MAX_BODY_BYTES, createFlowsRouter, flowsFailureFor } from './flowsRouter.js';
+import { FLOWS_CANNOT_ADD, FLOWS_TOO_LARGE, MAX_BODY_BYTES, createFlowsRouter, flowsFailureFor } from './flowsRouter.js';
 
 const ISSUER = 'https://clerk.example.test';
 const DATA = { url: 'http://127.0.0.1:3002' };
@@ -176,6 +176,16 @@ describe('flows router (real callData, fetch stubbed)', () => {
       expect(dataCalls).toHaveLength(0);
     });
 
+    it('is 400 for an empty patch and makes no data call', async () => {
+      expect((await send('PATCH', `/flows/${FLOW_ID}`, {})).status).toBe(400);
+      expect(dataCalls).toHaveLength(0);
+    });
+
+    // Known gap: fact text is not checked for control characters in the shared parser (#529).
+    it.fails('is 400 for a control character in a fact (#529)', async () => {
+      expect((await send('PATCH', `/flows/${FLOW_ID}`, { personName: 'a\u0001b' })).status).toBe(400);
+    });
+
     it('is 400 for an unknown key', async () => {
       expect((await send('PATCH', `/flows/${FLOW_ID}`, { nickname: 'x' })).status).toBe(400);
       expect(dataCalls).toHaveLength(0);
@@ -207,7 +217,21 @@ describe('flows router (real callData, fetch stubbed)', () => {
       expect(dataCalls).toHaveLength(0);
     });
 
-    it('accepts a normal body just under the cap', async () => {
+    it('is 413 when Content-Length is over the cap, with no data call', async () => {
+      const res = await router.request(`/flows/${FLOW_ID}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Content-Length': String(MAX_BODY_BYTES + 1),
+        },
+        body: JSON.stringify({ personName: 'A' }),
+      });
+      expect(res.status).toBe(413);
+      expect(dataCalls).toHaveLength(0);
+    });
+
+    it('accepts the longest honest body (10,000-character obituary text)', async () => {
       const res = await send('PATCH', `/flows/${FLOW_ID}`, { obituaryText: 'x'.repeat(10000) });
       expect(res.status).toBe(200);
     });
@@ -228,11 +252,11 @@ describe('flows router (real callData, fetch stubbed)', () => {
       expect(flowsFailureFor(code).status).toBe(status);
     });
 
-    it('a member creating gets the calm 403 copy', async () => {
+    it('a member creating gets the calm 403 copy about adding', async () => {
       dataAnswer = () => fail('forbidden');
       const res = await send('POST', '/flows', { id: FLOW_ID, ...FACTS });
       expect(res.status).toBe(403);
-      expect(await res.json()).toEqual({ error: "You can't change this person's details." });
+      expect(await res.json()).toEqual({ error: FLOWS_CANNOT_ADD });
     });
 
     it('is 409 when the id already exists', async () => {

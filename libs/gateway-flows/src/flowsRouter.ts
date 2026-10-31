@@ -40,6 +40,7 @@ export const FLOWS_UNAVAILABLE = 'Your people are not available right now. Pleas
 export const FLOWS_BAD_BODY = 'That request could not be understood.';
 export const FLOWS_TOO_LARGE = 'That request is too large.';
 export const FLOWS_FORBIDDEN = "You can't change this person's details.";
+export const FLOWS_CANNOT_ADD = 'Only the person who owns this account can add someone.';
 
 type Failure = { status: 400 | 401 | 403 | 404 | 409 | 503; error: string };
 
@@ -103,7 +104,7 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     maxSize: MAX_BODY_BYTES,
     onError: (c) => c.json({ error: FLOWS_TOO_LARGE }, 413),
   });
-  // Limit runs after auth, so a caller with no token gets 401 whatever the size.
+  // Each path is registered once. Limit runs after auth, so a caller with no token gets 401 whatever the size.
   for (const path of ['/flows', '/flows/*']) {
     router.use(path, clerkAuth(config.getAuthConfig), limit);
   }
@@ -112,13 +113,14 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     c: Context<Env>,
     result: DataResult<FlowRecord | FlowRecord[]> | null,
     okStatus: 200 | 201,
+    forbiddenCopy = FLOWS_FORBIDDEN,
   ) => {
     if (!result) {
       return c.json({ error: FLOWS_UNAVAILABLE }, 503);
     }
     if (!result.ok) {
       const { status, error } = flowsFailureFor(result.code);
-      return c.json({ error }, status);
+      return c.json({ error: result.code === 'forbidden' ? forbiddenCopy : error }, status);
     }
     return c.json(result.data, okStatus);
   };
@@ -136,7 +138,7 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     if (!fields) {
       return c.json({ error: FLOWS_BAD_BODY }, 400);
     }
-    return respond(c, await client.create(c.get('accessToken'), id, fields), 201);
+    return respond(c, await client.create(c.get('accessToken'), id, fields), 201, FLOWS_CANNOT_ADD);
   });
 
   router.patch('/flows/:id', async (c) => {
@@ -146,7 +148,8 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     }
     const body = await readJsonObject(c.req.raw);
     const patch = body ? parsePatchFields(body) : null;
-    if (!patch) {
+    // An empty patch changes nothing, so it is refused rather than sent.
+    if (!patch || Object.keys(patch).length === 0) {
       return c.json({ error: FLOWS_BAD_BODY }, 400);
     }
     return respond(c, await client.update(c.get('accessToken'), id, patch), 200);
