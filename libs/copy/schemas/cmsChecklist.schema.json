@@ -15,7 +15,7 @@
     "nowPhase",
     "nextItem",
     "onTheChecklist",
-    "openService",
+    "openSection",
     "back",
     "whatItIs",
     "whyItMatters",
@@ -60,7 +60,7 @@
     "onTheChecklist": {
       "$ref": "#/$defs/text"
     },
-    "openService": {
+    "openSection": {
       "$ref": "#/$defs/text"
     },
     "back": {

@@ -42,7 +42,13 @@
     "summaryServiceDefaultType",
     "summaryServiceDate",
     "summaryServicePlace",
-    "summaryServiceEmpty"
+    "summaryServiceEmpty",
+    "summaryAnnouncementEmpty",
+    "summaryObituaryEmpty",
+    "summaryObituaryDraft",
+    "summaryObituaryPublisher",
+    "summaryThanksEmpty",
+    "summaryThanksDraft"
   ],
   "properties": {
     "navOverview": {
@@ -160,6 +166,24 @@
       "$ref": "#/$defs/text"
     },
     "summaryServiceEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryAnnouncementEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryObituaryEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryObituaryDraft": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryObituaryPublisher": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryThanksEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryThanksDraft": {
       "$ref": "#/$defs/text"
     }
   },

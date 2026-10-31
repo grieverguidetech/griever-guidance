@@ -20,12 +20,17 @@ describe('checklist item sections', () => {
     }
   });
 
-  it('links the service items and leaves obituary and thank-you items out', () => {
+  it('links the service, obituary, announcement and thank-you items', () => {
     expect(CHECKLIST_ITEM_SECTIONS).toEqual({
       'set-service': 'service',
       officiant: 'service',
       'confirm-service-details': 'service',
       reception: 'service',
+      'write-obituary': 'obituary',
+      'submit-obituary': 'obituary',
+      'share-obituary': 'obituary',
+      'notify-community': 'announcement',
+      'thank-you-notes': 'thanks',
     });
   });
 });

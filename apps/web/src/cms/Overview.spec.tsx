@@ -31,15 +31,17 @@ describe('Overview', () => {
     expect(onOpen).toHaveBeenCalledWith('person');
   });
 
-  it('person ready moves the Continue card to Service', async () => {
+  it('person ready moves the Continue card to Announcement', async () => {
     const { onOpen } = setup({ sectionStatus: { person: 'ready' } });
     expect(screen.getByRole('button', { name: /^The person Ready/ })).not.toHaveTextContent('Continue');
-    await userEvent.click(screen.getByRole('button', { name: /^Service Not started .*Continue$/ }));
-    expect(onOpen).toHaveBeenCalledWith('service');
+    await userEvent.click(screen.getByRole('button', { name: /^Announcement Not started .*Continue$/ }));
+    expect(onOpen).toHaveBeenCalledWith('announcement');
   });
 
-  it('shows no Continue and no separate Next button when both open sections are ready', () => {
-    setup({ sectionStatus: { person: 'ready', service: 'ready' } });
+  it('shows no Continue and no separate Next button when every section is ready', () => {
+    setup({
+      sectionStatus: { person: 'ready', announcement: 'ready', service: 'ready', obituary: 'ready', thanks: 'ready' },
+    });
     expect(screen.queryByText('Continue')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
   });
@@ -62,10 +64,10 @@ describe('Overview', () => {
     expect(rows).toHaveLength(5);
     expect(rows).toEqual([
       'The person Ready Margaret Hayes · passed May 29, 2026',
-      `Announcement ${shell.comingLater}`,
-      'Service In progress Funeral, June 3, 2026 at St. Mark Church Continue',
-      `Obituary ${shell.comingLater}`,
-      `Thank-yous ${shell.comingLater}`,
+      `Announcement Not started ${shell.summaryAnnouncementEmpty} Continue`,
+      'Service In progress Funeral, June 3, 2026 at St. Mark Church',
+      `Obituary Not started ${shell.summaryObituaryEmpty}`,
+      `Thank-yous Not started ${shell.summaryThanksEmpty}`,
     ]);
   });
 
@@ -91,18 +93,43 @@ describe('Overview', () => {
     expect(screen.getByRole('button', { name: /^Service/ })).toHaveTextContent('Add the date and place');
   });
 
-  it('shows Not started for an untouched open section', () => {
+  it('shows Not started for every untouched section', () => {
     setup();
-    expect(screen.getAllByText('Not started')).toHaveLength(2);
+    expect(screen.getAllByText('Not started')).toHaveLength(5);
   });
 
-  it('later sections show the coming-later note as plain text, not buttons', () => {
+  it('every section is a button and none shows the coming-later note', () => {
     setup();
-    expect(screen.getAllByText('This part comes later. Nothing is needed here yet.')).toHaveLength(3);
-    for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
-      expect(screen.queryByRole('button', { name: new RegExp(`^${name}`) })).toBeNull();
-    }
-    expect(screen.getAllByRole('button', { name: /^(The person|Service)/ })).toHaveLength(2);
+    expect(screen.queryByText(shell.comingLater)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^(The person|Announcement|Service|Obituary|Thank-yous)/ })).toHaveLength(5);
+  });
+
+  it('announcement summary is the first line of the message, cut short when long', () => {
+    const { unmount } = setup({ announcementMessage: '\n  Margaret passed away peacefully.\nSecond line' });
+    expect(screen.getByRole('button', { name: /^Announcement/ })).toHaveTextContent('Margaret passed away peacefully.');
+    expect(screen.getByRole('button', { name: /^Announcement/ })).not.toHaveTextContent('Second line');
+    unmount();
+    setup({ announcementMessage: 'x'.repeat(200) });
+    expect(screen.getByRole('button', { name: /^Announcement/ })).toHaveTextContent(`${'x'.repeat(80)}…`);
+  });
+
+  it('obituary summary: template, draft started, then the publisher', () => {
+    const { unmount } = setup();
+    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Start from the template');
+    unmount();
+    const second = setup({ obituaryCity: 'Austin' });
+    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Draft started');
+    second.unmount();
+    setup({ obituaryText: 'Text', obituaryPublisher: 'The Daily News' });
+    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Published in The Daily News');
+  });
+
+  it('thank-yous summary: template, then draft started once the message is edited', () => {
+    const { unmount } = setup();
+    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Start from the template');
+    unmount();
+    setup({ thanksMessage: 'Thank you all.' });
+    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Draft started');
   });
 
   it('a row calls onOpen with its key', async () => {

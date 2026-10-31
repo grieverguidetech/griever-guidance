@@ -117,6 +117,25 @@ describe('checklist in the editor (#421)', () => {
     expect(stored().checklist).not.toHaveProperty('set-service');
   });
 
+  it('Open Obituary on an obituary item closes the item and focuses the Obituary h1', async () => {
+    const user = userEvent.setup();
+    seed(
+      Object.fromEntries(
+        [
+          'pronouncement', 'custody', 'find-wishes', 'tell-close-family', 'dependents-care', 'secure-home',
+          'burial-or-cremation', 'casket-or-urn', 'set-service', 'officiant', 'death-certificates', 'pallbearers',
+          'viewing-clothing-photo', 'confirm-service-details',
+        ].map((id) => [id, 'done']),
+      ),
+    );
+    await openOverview();
+    const panel = within(screen.getByRole('complementary', { name: "What you'll need" }));
+    await user.click(panel.getByRole('button', { name: /^Write the obituary/ }));
+    await screen.findByRole('heading', { level: 1, name: /^Write the obituary/ });
+    await user.click(screen.getByRole('button', { name: 'Open Obituary' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toHaveFocus();
+  });
+
   it('opens the next item from the Overview, and Back returns to the Overview button', async () => {
     const user = userEvent.setup();
     await openOverview();
