@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
-import { ClerkProvider, useAuth, useClerk } from '@clerk/react';
+import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/react';
 import { enUS } from '@clerk/localizations';
 import { SIGNED_IN_STORAGE_KEY, useAccount } from '@griever/hooks';
 import type { AccountAuth, AccountTokenResult } from '@griever/shared';
@@ -220,7 +220,8 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   // `auth` is a new object when its status changes; the methods inside are stable.
   const { getToken, signOut } = auth;
   const instance = useClerk();
-  const email = instance.user?.primaryEmailAddress?.emailAddress ?? null;
+  const { user } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
   const openAccountSettings = useCallback(() => {
     instance.openUserProfile();
   }, [instance]);

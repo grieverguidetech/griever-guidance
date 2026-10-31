@@ -33,6 +33,12 @@ interface ProfileProps {
 export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, email, onManageSignIn, settings }: ProfileProps) {
   const id = useId();
   const [cardNote, setCardNote] = useState(false);
+
+  // A second press clears the note and sets it again, so a screen reader says it again.
+  function showCardNote() {
+    setCardNote(false);
+    setTimeout(() => setCardNote(true), 50);
+  }
   const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave });
 
   let message = '';
@@ -89,11 +95,10 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
             {copy.securityHeading}
           </h2>
           {email ? (
-            <p className="m-0">
-              <span className="font-semibold">{copy.emailLabel}</span>
-              <br />
-              <span className="break-words">{email}</span>
-            </p>
+            <dl className="m-0 flex flex-col gap-1">
+              <dt className="font-semibold">{copy.emailLabel}</dt>
+              <dd className="m-0 break-words">{email}</dd>
+            </dl>
           ) : null}
           {onManageSignIn ? (
             <>
@@ -107,27 +112,27 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           ) : null}
         </section>
       ) : null}
-      <section className="flex flex-col gap-3" aria-labelledby={`${id}-payments`}>
+      <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-payments`}>
         <h2 id={`${id}-payments`} className="text-[16px] m-0">
           {copy.paymentsHeading}
         </h2>
-        <div className="gg-panel flex flex-col gap-1">
-          <h3 className="text-[14px] m-0">{copy.planHeading}</h3>
-          <p className="m-0 font-semibold">{copy.planName}</p>
+        <div className="gg-panel !bg-[var(--color-bg)] flex flex-col gap-1">
+          <h3 className="gg-hint text-[14px] font-normal m-0">{copy.planHeading}</h3>
+          <p className="m-0 text-[18px] font-semibold">{copy.planName}</p>
           <p className="gg-hint m-0">{copy.planBody}</p>
         </div>
-        <div className="gg-panel flex flex-col gap-3">
-          <h3 className="text-[14px] m-0">{copy.cardHeading}</h3>
-          <p className="m-0 flex items-center gap-2">
+        <div className="gg-panel !bg-[var(--color-bg)] flex flex-col gap-3">
+          <h3 className="gg-hint text-[14px] font-normal m-0">{copy.cardHeading}</h3>
+          <p className="m-0 flex items-center gap-2 text-[18px] font-semibold">
             <CreditCard aria-hidden="true" size={20} />
             <span>{copy.cardNone}</span>
           </p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="gg-btn gg-btn-secondary" aria-describedby={`${id}-card-note`} onClick={() => setCardNote(true)}>
+            <button type="button" className="gg-btn gg-btn-secondary" onClick={showCardNote}>
               {copy.cardAdd}
             </button>
           </div>
-          <p id={`${id}-card-note`} role="status" aria-live="polite" className="gg-hint m-0 text-[13px]">
+          <p role="status" aria-live="polite" className="gg-hint m-0 text-[13px]">
             {cardNote ? copy.cardNotOpen : ''}
           </p>
         </div>

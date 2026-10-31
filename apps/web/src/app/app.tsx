@@ -950,7 +950,8 @@ function AppBody({
   /**
    * Your account inside the editor shell (flag on). The shell owns the one h1. There is no Back: the
    * side nav and Change lead out. With an open or most recent person the full nav shows; with none
-   * the nav offers only this item, so a quiet "Your people" button leads back (the origin rule).
+   * the nav offers only this item. A quiet "Your people" button leads back whenever the user came from
+   * Your people or has no person (the origin rule).
    */
   function renderAccount(title: string, body: ReactNode) {
     // The open person, else the most recent one. Only with no person at all is the nav the short one.
@@ -986,7 +987,7 @@ function AppBody({
           onAccount={() => undefined}
           notice={endedNote}
         >
-          {noPerson ? (
+          {noPerson || accountFrom.current === 'people' ? (
             <button type="button" className="gg-btn gg-btn-ghost self-start !px-0" onClick={leaveAccount}>
               {cmsShellCopy.peopleTitle}
             </button>
