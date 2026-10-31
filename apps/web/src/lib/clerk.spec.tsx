@@ -97,13 +97,16 @@ describe('localization (C7)', () => {
 
   it('greets a first visit calmly: no "Welcome back", and creating an account is named', () => {
     const title = 'Sign in or create an account';
-    const subtitle = 'It takes a minute. Your details stay private.';
+    const subtitle = 'It takes a minute.';
     expect(localization.signIn?.start?.title).toBe(title);
     expect(localization.signIn?.start?.subtitle).toBe(subtitle);
     expect(localization.signIn?.start?.actionText).toBe('New here?');
     expect(localization.signIn?.start?.actionLink).toBe('Create an account');
     expect(localization.signUp?.start?.title).toBe(title);
     expect(localization.signUp?.start?.subtitle).toBe(subtitle);
+    expect(localization.signIn?.start?.titleCombined).toBe(title);
+    expect(localization.signUp?.start?.titleCombined).toBe(title);
+    expect(localization.signUp?.start?.subtitleCombined).toBe(subtitle);
     expect(JSON.stringify(localization.signIn?.start)).not.toMatch(/welcome back/i);
     expect(JSON.stringify(localization.signUp?.start)).not.toMatch(/welcome/i);
   });

@@ -64,7 +64,7 @@ describe('AccountSection', () => {
     expect(screen.getByText('This is the name on your account.')).toBeInTheDocument();
   });
 
-  it("does not repeat the What you'll need list (the shell panel is the one list)", () => {
+  it("has no second What you'll need list on Your account", () => {
     profile();
     expect(screen.queryByRole('heading', { name: "What you'll need" })).not.toBeInTheDocument();
     expect(screen.queryByText('Not today. Just so none of it surprises you.')).not.toBeInTheDocument();

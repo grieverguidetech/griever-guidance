@@ -20,7 +20,7 @@ const GENERIC_SIGN_IN_ERROR = "That didn't work. Please check what you typed and
 
 /** A first visit and a return visit see the same words: nothing says "Welcome back". */
 const SIGN_IN_TITLE = 'Sign in or create an account';
-const SIGN_IN_SUBTITLE = 'It takes a minute. Your details stay private.';
+const SIGN_IN_SUBTITLE = 'It takes a minute.';
 
 /** Every sign-in failure Clerk words differently gets this one calm sentence (C7). */
 const SIGN_IN_ERROR_KEYS = [
