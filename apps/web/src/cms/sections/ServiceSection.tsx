@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Plus } from '@phosphor-icons/react/Plus';
 import { screenCopy } from '@griever/copy';
 import {
@@ -98,6 +98,19 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
     receptionPlace: values.receptionPlace,
   });
   const messageRef = useRef<HTMLTextAreaElement>(null);
+  const changeRef = useRef<HTMLButtonElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  // The textarea only shows while the family changes the words; otherwise the preview does.
+  const [editing, setEditing] = useState(false);
+  const focusAfter = useRef<'textarea' | 'change' | null>(null);
+  useEffect(() => {
+    if (focusAfter.current === 'textarea') {
+      messageRef.current?.focus();
+    } else if (focusAfter.current === 'change') {
+      changeRef.current?.focus();
+    }
+    focusAfter.current = null;
+  }, [editing]);
   const edited = values.serviceMessage !== undefined;
   // A group with data opens on its own; one the family opened stays open.
   const [opened, setOpened] = useState({ visitation: false, burial: false, reception: false });
@@ -141,10 +154,28 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
   ] as const;
   const closed = chips.filter((c) => !open[c.key]);
   const panel = 'gg-panel gg-enter';
+  const messageText = (values.serviceMessage ?? prefill).trim();
+  const previewId = `${id}-preview`;
+  const hintId = `${id}-message-hint`;
+  const seeMessage = (e: MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const smooth =
+      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+    previewRef.current?.scrollIntoView?.({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    previewRef.current?.focus({ preventScroll: true });
+  };
+  const useDetails = () => {
+    onChange({ serviceMessage: undefined });
+    focusAfter.current = 'change';
+    setEditing(false);
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <p>{copy.intro}</p>
+      <a href={`#${previewId}`} className="gg-btn gg-btn-secondary md:hidden self-start" onClick={seeMessage}>
+        {copy.seeMessage}
+      </a>
       <div className="gg-panel">
         <EventFields
           legend={copy.eventFuneral}
@@ -257,32 +288,52 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
           onChange={(e) => onChange({ serviceNotes: e.target.value })}
         />
       </div>
-      <div className="gg-field">
-        <label htmlFor={`${id}-message`}>{copy.messageLabel}</label>
-        <p id={`${id}-message-hint`}>{edited ? copy.messageHintEdited : copy.messageHint}</p>
-        <textarea
-          id={`${id}-message`}
-          ref={messageRef}
-          aria-describedby={`${id}-message-hint`}
-          className="gg-input"
-          rows={8}
-          value={values.serviceMessage ?? prefill}
-          onChange={(e) => onChange({ serviceMessage: e.target.value })}
-        />
-        {edited && (
-          <button
-            type="button"
-            className="gg-btn gg-btn-secondary"
-            onClick={() => {
-              onChange({ serviceMessage: undefined });
-              // The button goes away on reset, so keep focus on the message.
-              messageRef.current?.focus();
-            }}
-          >
-            {copy.useDetails}
-          </button>
+      <section id={previewId} ref={previewRef} tabIndex={-1} aria-labelledby={`${id}-preview-title`} className="gg-panel flex flex-col gap-3 scroll-mt-4">
+        <h2 id={`${id}-preview-title`} className="text-base font-semibold">
+          {copy.previewTitle}
+        </h2>
+        {editing ? (
+          <div className="gg-field">
+            <label htmlFor={`${id}-message`}>{copy.messageLabel}</label>
+            <textarea
+              id={`${id}-message`}
+              ref={messageRef}
+              aria-describedby={hintId}
+              className="gg-input"
+              rows={8}
+              value={values.serviceMessage ?? prefill}
+              onChange={(e) => onChange({ serviceMessage: e.target.value })}
+            />
+          </div>
+        ) : messageText ? (
+          <p className="font-serif text-[17px] leading-relaxed whitespace-pre-line">{messageText}</p>
+        ) : (
+          <p className="gg-hint">{copy.previewEmpty}</p>
         )}
-      </div>
+        <p id={hintId} className="gg-hint">
+          {edited ? copy.messageHintEdited : copy.messageHint}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {!editing && (
+            <button
+              type="button"
+              ref={changeRef}
+              className="gg-btn gg-btn-secondary"
+              onClick={() => {
+                focusAfter.current = 'textarea';
+                setEditing(true);
+              }}
+            >
+              {copy.changeWords}
+            </button>
+          )}
+          {edited && (
+            <button type="button" className="gg-btn gg-btn-secondary" onClick={useDetails}>
+              {copy.useDetails}
+            </button>
+          )}
+        </div>
+      </section>
       <MarkReady
         ready={values.sectionStatus?.service === 'ready'}
         onChange={onReadyChange}

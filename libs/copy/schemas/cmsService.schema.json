@@ -14,6 +14,10 @@
     "messageLabel",
     "messageHint",
     "messageHintEdited",
+    "previewTitle",
+    "previewEmpty",
+    "changeWords",
+    "seeMessage",
     "useDetails",
     "eventVisitation",
     "eventFuneral",
@@ -61,6 +65,18 @@
       "$ref": "#/$defs/text"
     },
     "messageHintEdited": {
+      "$ref": "#/$defs/text"
+    },
+    "previewTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "previewEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "changeWords": {
+      "$ref": "#/$defs/text"
+    },
+    "seeMessage": {
       "$ref": "#/$defs/text"
     },
     "useDetails": {

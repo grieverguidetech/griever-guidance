@@ -30,6 +30,8 @@ function setup(initial: Values = {}) {
 }
 
 const message = () => screen.getByLabelText('Message') as HTMLTextAreaElement;
+const preview = () => screen.getByRole('region', { name: 'What people will read' });
+const change = () => userEvent.click(screen.getByRole('button', { name: 'Change the words' }));
 
 describe('ServiceSection', () => {
   it('shows the ready hint, and "Back to Overview" only once ready with nothing left', async () => {
@@ -144,7 +146,7 @@ describe('ServiceSection', () => {
     expect(screen.queryByLabelText('Cemetery')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Burial Date' })).toBeNull();
     expect(box).toHaveFocus();
-    expect(message().value).toContain('The burial will be private.');
+    expect(preview()).toHaveTextContent('The burial will be private.');
     await userEvent.click(box);
     expect(screen.getByRole('textbox', { name: 'Burial Cemetery' })).toHaveValue('Rest Haven');
   });
@@ -167,42 +169,93 @@ describe('ServiceSection', () => {
     expect(order.indexOf('Date')).toBeLessThan(order.indexOf('Place'));
   });
 
-  it('the message follows the details until it is edited', async () => {
+  it('the preview follows the details until the words are changed', async () => {
     setup({ personName: 'Margaret Hayes' });
-    expect(message().value).not.toContain('Hall');
+    expect(preview()).toHaveTextContent("Margaret Hayes' service will be held.");
+    expect(preview()).not.toHaveTextContent('Hall');
     await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
-    expect(message().value).toContain('A reception will be held at Hall.');
+    expect(preview()).toHaveTextContent('A reception will be held at Hall.');
+    expect(screen.queryByLabelText('Message')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
 
-  it('after an edit the message stays as typed, and reset brings back the prefill', async () => {
+  it('is not a live region, has no phone styling, and shows a calm placeholder text with no details', () => {
+    setup();
+    expect(preview().closest('[aria-live]')).toBeNull();
+    expect(preview().querySelector('[aria-live]')).toBeNull();
+    expect(preview()).not.toHaveTextContent(/undefined|null/);
+    expect(preview()).toHaveTextContent("Our loved one's service will be held.");
+  });
+
+  it('shows a placeholder when the edited message is empty', () => {
+    setup({ serviceMessage: '' });
+    expect(preview()).toHaveTextContent('Add the details above and the message will appear here.');
+  });
+
+  it('Change the words swaps in the textarea and moves focus into it', async () => {
+    setup({ personName: 'Margaret Hayes' });
+    await change();
+    expect(message()).toHaveFocus();
+    expect(message().value).toContain("Margaret Hayes' service");
+    expect(screen.queryByRole('button', { name: 'Change the words' })).toBeNull();
+  });
+
+  it('after an edit the message stays as typed, and reset restores the preview with focus back', async () => {
     const { patches } = setup({ personName: 'Margaret Hayes' });
+    await change();
     await userEvent.type(message(), 'X');
     expect(patches.at(-1)?.serviceMessage).toMatch(/X$/);
-    const typed = message().value;
-    await add('Add reception');
-    await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
-    expect(message().value).toBe(typed);
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
     expect(patches.at(-1)).toEqual({ serviceMessage: undefined });
-    expect(message().value).toContain('A reception will be held at Hall.');
+    expect(screen.queryByLabelText('Message')).toBeNull();
+    expect(preview()).not.toHaveTextContent(/X$/);
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
-    expect(message()).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Change the words' })).toHaveFocus();
   });
 
-  it('the hint changes once the message is edited, stays linked to the textarea, and reset restores it', async () => {
+  it('new details do not reach an edited message', async () => {
+    setup({ personName: 'Margaret Hayes', serviceMessage: 'My own words.' });
+    await add('Add reception');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
+    expect(preview()).toHaveTextContent('My own words.');
+    expect(preview()).not.toHaveTextContent('Hall');
+  });
+
+  it('the hint is one sentence, changes once edited, stays linked to the textarea, and reset restores it', async () => {
     setup({ personName: 'Margaret Hayes' });
     const original = 'We start it from the details above. You can change it.';
-    const stale =
-      "You changed the message, so new details above won't appear in it. Use the details above to start it again.";
-    const describedBy = () => document.getElementById(message().getAttribute('aria-describedby') ?? '');
-    expect(describedBy()).toHaveTextContent(original);
+    const stale = 'You changed the words, so new details above will not appear in them.';
+    const hint = () => document.querySelector('[id$="-message-hint"]');
+    expect(hint()).toHaveTextContent(original);
+    await change();
+    expect(message()).toHaveAccessibleDescription(original);
     await userEvent.type(message(), 'X');
-    expect(describedBy()).toHaveTextContent(stale);
+    expect(hint()).toHaveTextContent(stale);
     expect(message()).toHaveAccessibleDescription(stale);
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
-    expect(describedBy()).toHaveTextContent(original);
+    expect(hint()).toHaveTextContent(original);
+  });
+
+  describe('See the message link', () => {
+    const link = () => screen.getByRole('link', { name: 'See the message' });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it.each([
+      [true, 'smooth'],
+      [false, 'auto'],
+    ])('scrolls to the preview and focuses it (motion allowed: %s)', async (allowed, behavior) => {
+      vi.stubGlobal('matchMedia', (query: string) => ({ matches: allowed && query.includes('no-preference') }));
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      setup();
+      expect(link()).toHaveClass('md:hidden');
+      await userEvent.click(link());
+      expect(scroll).toHaveBeenCalledWith({ behavior, block: 'start' });
+      expect(preview()).toHaveFocus();
+    });
   });
 
   describe('same day and same place as the service', () => {

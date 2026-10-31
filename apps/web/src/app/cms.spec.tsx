@@ -125,7 +125,7 @@ describe('editor on (#395)', () => {
     view.unmount();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(screen.getByRole('button', { name: /^Change who/ }));
     await expectPeople();
     expect(screen.getByRole('button', { name: 'Harold Price' })).toBeInTheDocument();
     expect(stored()[0].sectionStatus).toEqual({ person: 'in_progress' });
@@ -175,7 +175,7 @@ describe('editor on (#395)', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(stored()).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(screen.getByRole('button', { name: /^Change who/ }));
     await expectPeople();
     expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toHaveFocus();
     expect(stored()).toHaveLength(0);
@@ -188,7 +188,7 @@ describe('editor on (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Service' }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.type(screen.getAllByLabelText('Date')[0], 'May 29, 2026');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(screen.getByRole('button', { name: /^Change who/ }));
     await expectPeople();
     expect(stored()).toHaveLength(1);
     expect(stored()[0].personName).toBe('');
@@ -209,7 +209,7 @@ describe('editor on (#395)', () => {
   it('"Change" keeps a named person', async () => {
     const user = userEvent.setup();
     await openMargaret();
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(screen.getByRole('button', { name: /^Change who/ }));
     await expectPeople();
     expect(stored()).toHaveLength(1);
   });
