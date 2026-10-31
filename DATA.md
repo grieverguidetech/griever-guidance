@@ -193,7 +193,8 @@ older list loads with its values unchanged.
 { …,                          // everything in 2.0a
   // SectionFields
   birthDate, serviceType, serviceTime, servicePlace, serviceAddress, serviceNotes,
-  serviceMessage, announcementMessage, obituaryText, thanksMessage,
+  serviceMessage, announcementMessage, obituaryText, obituaryCity, obituaryCareer,
+  obituarySurvivors, obituaryNote, thanksMessage,
   sectionStatus: { service: "in_progress" },   // 'in_progress' | 'ready'; a missing key = Not started
   // ServiceEventFields
   visitationDate, visitationTime, visitationPlace, serviceOfficiant,

@@ -470,7 +470,8 @@ function hasAnyContent(s: Session): boolean {
 /** Typed fields that are not the name: person details and every section and service-event field. */
 const EDITOR_FIELDS: ReadonlySet<string> = new Set([
   'dateOfPassing', 'obituaryUrl', 'serviceDate', 'birthDate', 'serviceType', 'serviceTime', 'servicePlace',
-  'serviceAddress', 'serviceNotes', 'serviceMessage', 'announcementMessage', 'obituaryText', 'thanksMessage',
+  'serviceAddress', 'serviceNotes', 'serviceMessage', 'announcementMessage', 'obituaryText', 'obituaryCity', 'obituaryCareer', 'obituarySurvivors',
+  'obituaryNote', 'thanksMessage',
   'visitationDate', 'visitationTime', 'visitationPlace', 'serviceOfficiant', 'burialDate', 'burialTime',
   'burialPlace', 'burialPrivate', 'receptionDate', 'receptionTime', 'receptionPlace',
 ]);

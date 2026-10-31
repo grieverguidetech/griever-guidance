@@ -33,6 +33,10 @@ export interface SectionFields {
   serviceMessage?: string;
   announcementMessage?: string;
   obituaryText?: string;
+  obituaryCity?: string;
+  obituaryCareer?: string;
+  obituarySurvivors?: string;
+  obituaryNote?: string;
   thanksMessage?: string;
   /** A missing key means "Not started". */
   sectionStatus?: Partial<Record<SectionKey, SectionStatus>>;
