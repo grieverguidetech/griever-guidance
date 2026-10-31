@@ -333,8 +333,7 @@ describe('AccountSection plans', () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(await readBlob(create.mock.calls[0][0] as Blob)).toContain('A kind man.');
     expect(click).toHaveBeenCalledTimes(1);
-    expect(revoke).toHaveBeenCalledWith('blob:plans');
-    expect(await screen.findByText('Your copy is saved to this device.')).toBeInTheDocument();
+    expect(await screen.findByText('Your copy is downloading.')).toBeInTheDocument();
   });
 
   it('says there is nothing to save, and offers no download, when there are no people', () => {
@@ -346,5 +345,27 @@ describe('AccountSection plans', () => {
   it('shows no plans panel when no plans are given', () => {
     profile();
     expect(screen.queryByRole('heading', { name: 'Your plans' })).not.toBeInTheDocument();
+  });
+
+  it('shows the remove-a-member content once, in its own panel, and removes everything through the plans panel', async () => {
+    const user = userEvent.setup();
+    const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        plans={[{ personName: 'Sam' }]}
+        settings={{ onRemoveEverything, removeMember: <h2>Remove a member</h2> }}
+      />,
+    );
+    const headings = screen.getAllByRole('heading', { level: 2, name: 'Remove a member' });
+    expect(headings).toHaveLength(1);
+    expect(headings[0].parentElement).toHaveClass('gg-panel');
+    await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
+    expect(onRemoveEverything).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
+    expect(onRemoveEverything).toHaveBeenCalledTimes(1);
   });
 });

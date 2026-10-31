@@ -210,6 +210,8 @@ export function plansFileName(now: Date = new Date()): string {
   return `grievers-guidance-plans-${y}-${m}-${d}.txt`;
 }
 
+const REVOKE_DELAY_MS = 1000;
+
 /** Saves the text as a file on this device. Nothing is sent anywhere. */
 export function downloadPlans(text: string, now: Date = new Date()): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
@@ -219,5 +221,6 @@ export function downloadPlans(text: string, now: Date = new Date()): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Safari can cancel the download if the URL is revoked at once.
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
 }

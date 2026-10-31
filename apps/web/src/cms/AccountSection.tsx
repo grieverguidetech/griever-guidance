@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CreditCard } from '@phosphor-icons/react/CreditCard';
 import type { FormEvent, ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
@@ -41,7 +41,7 @@ interface ProfileProps {
 }
 
 /**
- * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Payments, People helping you, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
+ * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Payments, People helping you, Sign out, Your plans (with the device removal), each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
 export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
@@ -176,7 +176,7 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
       </section>
       {plans ? (
         <>
-          {settings?.removeMember}
+          {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
           <PlansPanel plans={plans} settings={settings} />
         </>
       ) : settings ? (
@@ -195,12 +195,15 @@ interface PlansPanelProps {
 function PlansPanel({ plans, settings }: PlansPanelProps) {
   const id = useId();
   const [status, setStatus] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   // Emptied first, then set after a tick, so a second download is announced again.
   function download() {
     setStatus('');
     downloadPlans(buildPlansText(plans, copy));
-    setTimeout(() => setStatus(copy.plansDownloaded), 50);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStatus(copy.plansDownloaded), 50);
   }
 
   return (

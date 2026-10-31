@@ -71,7 +71,7 @@ describe('buildPlansText', () => {
       copy,
     );
     expect(text).toContain('Obituary\n--------\n');
-    expect(text).toContain('Sam Reed');
+    expect(text.split('Obituary\n--------\n')[1]).toContain('Sam Reed');
     expect(text).toContain('Reno');
     expect(text).toContain('teacher');
     expect(text).not.toContain('undefined');
@@ -91,7 +91,8 @@ describe('buildPlansText', () => {
     const text = buildPlansText([{ personName: 'Sam Reed' }], copy);
     expect(text).toContain('Announcement\n------------\n');
     expect(text).toContain('Thank-you message\n-----------------\n');
-    expect(text).toContain('Sam Reed');
+    expect(text.split('Announcement\n------------\n')[1]).toContain('Sam Reed');
+    expect(text.split('Thank-you message\n-----------------\n')[1]).toContain('Sam Reed');
   });
 
   it('uses the "Not named yet" label and keeps text that is not a complete date as typed', () => {
@@ -135,10 +136,12 @@ describe('plansFileName', () => {
 
 describe('downloadPlans', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it('saves a UTF-8 text file through a temporary link and revokes the URL', async () => {
+  it('saves a UTF-8 text file through a temporary link and revokes the URL after a delay', async () => {
+    vi.useFakeTimers();
     const create = vi.fn().mockReturnValue('blob:plans');
     const revoke = vi.fn();
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
@@ -151,10 +154,13 @@ describe('downloadPlans', () => {
 
     const blob = create.mock.calls[0][0] as Blob;
     expect(blob.type).toBe('text/plain;charset=utf-8');
-    expect(await readBlob(blob)).toBe('hello é');
     expect(clicked?.download).toBe('grievers-guidance-plans-2026-10-31.txt');
     expect(clicked?.getAttribute('href')).toBe('blob:plans');
+    expect(revoke).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(revoke).toHaveBeenCalledWith('blob:plans');
     expect(document.querySelector('a[download]')).toBeNull();
+    vi.useRealTimers();
+    expect(await readBlob(blob)).toBe('hello é');
   });
 });
