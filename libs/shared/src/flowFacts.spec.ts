@@ -437,3 +437,40 @@ describe('isValidObituaryLink', () => {
     expect(isValidObituaryLink(raw)).toBe(expected);
   });
 });
+
+describe('parseFlowRecord details (DS-7)', () => {
+  const base = {
+    id: ID,
+    ownerId: OTHER,
+    role: 'owner',
+    facts,
+    updatedAt: '2026-10-12T10:00:00Z',
+    updatedBy: null,
+  };
+
+  it('has no details when the server sent none', () => {
+    expect(parseFlowRecord(base)).toEqual(base);
+  });
+
+  it('keeps valid details and ignores unknown or forbidden keys inside them', () => {
+    const out = parseFlowRecord({
+      ...base,
+      details: { serviceMessage: null, burialPrivate: true, personStatus: 'ready', drafts: {}, futureKey: 1 },
+    });
+    expect(out?.details).toEqual({ serviceMessage: null, burialPrivate: true, personStatus: 'ready' });
+  });
+
+  it.each([
+    ['a bad status', { serviceStatus: 'done' }],
+    ['text over its cap', { serviceTime: 'x'.repeat(101) }],
+    ['a control character', { serviceNotes: 'a\u0001b' }],
+    ['a non-boolean burialPrivate', { burialPrivate: 'yes' }],
+  ])('rejects the record for %s', (_label, details) => {
+    expect(parseFlowRecord({ ...base, details })).toBeNull();
+  });
+
+  it('rejects details that are not an object', () => {
+    expect(parseFlowRecord({ ...base, details: [] })).toBeNull();
+    expect(parseFlowRecord({ ...base, details: 'x' })).toBeNull();
+  });
+});

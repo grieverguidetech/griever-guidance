@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { FLOW_FACT_KEYS } from '@griever/shared';
+import { SYNCED_KEYS } from '@griever/shared';
 import type { FlowFacts } from '@griever/shared';
 import { freshDraft } from './useSendFlow.js';
 import type { SendFlowStorage } from './useSendFlow.js';
@@ -195,7 +195,7 @@ describe('useFlowSync sending', () => {
     for (const req of sent) {
       expect(Object.keys(req.body ?? {}).length).toBeGreaterThan(0);
       for (const key of Object.keys(req.body ?? {})) {
-        expect([...FLOW_FACT_KEYS, 'id']).toContain(key);
+        expect([...SYNCED_KEYS, 'id']).toContain(key);
       }
     }
     const raw = JSON.stringify(sent);
@@ -847,5 +847,153 @@ describe('useFlowSync removed people (#215)', () => {
     await advance(PULL + 10);
     expect(view.result.current.sessions).toEqual([]);
     expect(writes(requests)).toEqual([]);
+  });
+});
+
+describe('useFlowSync details (DS-7)', () => {
+  it('sends an edit to serviceMessage alone as a PATCH with only that key', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const base = session();
+    const { rerender } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceMessage: 'Join us at 10.' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([
+      { method: 'PATCH', path: `/flows/${FLOW}`, body: { serviceMessage: 'Join us at 10.' } },
+    ]);
+  });
+
+  it('sends a reset message (undefined) as null, and a cleared one as an empty string', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const base = session({ serviceMessage: 'Join us at 10.', announcementMessage: 'Sad news.' });
+    const { rerender } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceMessage: undefined, announcementMessage: '' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).map((r) => r.body)).toEqual([{ serviceMessage: null, announcementMessage: '' }]);
+  });
+
+  it('coalesces detail edits with fact edits into one PATCH and sends statuses flat', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const base = session();
+    const { rerender } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, servicePlace: 'St. Mark', serviceDate: 'June 3' }] });
+    await advance(200);
+    rerender({
+      sessions: [
+        {
+          ...base,
+          servicePlace: 'St. Mark',
+          serviceDate: 'June 3',
+          sectionStatus: { service: 'ready' },
+          serviceReady: true,
+        },
+      ],
+    });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).map((r) => r.body)).toEqual([
+      { servicePlace: 'St. Mark', serviceDate: 'June 3', serviceStatus: 'ready', serviceReady: true },
+    ]);
+  });
+
+  it('creates a person the server lacks with every detail, and nothing that is not synced', async () => {
+    const requests = mockFetch((req) =>
+      req.method === 'GET' ? { status: 200, body: [] } : { status: 201, body: record() },
+    );
+    setup([
+      session({
+        serviceMessage: 'Join us.',
+        obituaryText: undefined,
+        servicePlace: '  St. Mark ',
+        burialPrivate: true,
+        sectionStatus: { person: 'ready' },
+      }),
+    ]);
+    await advance(10);
+    const [post] = writes(requests);
+    expect(post.method).toBe('POST');
+    expect(post.body).toMatchObject({
+      id: FLOW,
+      personName: 'Margaret Hayes',
+      serviceMessage: 'Join us.',
+      obituaryText: null,
+      servicePlace: 'St. Mark',
+      burialPrivate: true,
+      personStatus: 'ready',
+      serviceStatus: null,
+    });
+    expect(Object.keys(post.body ?? {}).sort()).toEqual(['id', ...SYNCED_KEYS].sort());
+    expect(JSON.stringify(post.body)).not.toContain('c-secret');
+    expect(JSON.stringify(post.body)).not.toContain('Sam Private');
+  });
+
+  it('reports pending detail keys to applyRemoteFlows so a pull keeps them', async () => {
+    mockFetch((req) => (req.method === 'GET' ? { status: 200, body: [record()] } : 'offline'));
+    const base = session();
+    const { rerender, wake, applyRemoteFlows } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceMessage: 'Join us at 10.', birthDate: '1950' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    applyRemoteFlows.mockClear();
+    await wake();
+    await advance(10);
+    const pending = applyRemoteFlows.mock.calls.at(-1)?.[2] as Record<string, string[]>;
+    expect([...pending[FLOW]].sort()).toEqual(['birthDate', 'serviceMessage']);
+  });
+
+  it('finds details typed before this version synced them (saved baseline holds facts only)', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const storage = memoryStorage({
+      [flowQueueKey(USER)]: JSON.stringify({ queue: {}, known: [FLOW], baselines: { [FLOW]: facts() } }),
+    });
+    setup([session({ serviceNotes: 'Bring chairs' })], { storage });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).map((r) => r.body)).toEqual([{ serviceNotes: 'Bring chairs' }]);
+  });
+
+  it('does not rewrite a pending detail when a pull arrives (real useSessions)', async () => {
+    let flowId = '';
+    mockFetch((req) => {
+      if (req.method === 'GET') {
+        return {
+          status: 200,
+          body: [{ ...record({}, USER, flowId), details: { serviceMessage: 'Server words' } }],
+        };
+      }
+      return 'offline';
+    });
+    const wakes = new Set<() => void>();
+    const view = renderHook(
+      (props: { enabled: boolean }) => {
+        const s = useSessions();
+        useFlowSync({
+          sessions: s.sessions,
+          userId: USER,
+          getAccessToken: async () => 'tok',
+          enabled: props.enabled,
+          subscribe: (fn) => {
+            wakes.add(fn);
+            return () => void wakes.delete(fn);
+          },
+          applyRemoteFlows: s.applyRemoteFlows,
+        });
+        return s;
+      },
+      { initialProps: { enabled: false } },
+    );
+    act(() => {
+      view.result.current.createSession({ personName: 'Margaret' });
+    });
+    flowId = view.result.current.sessions[0].flowId;
+    view.rerender({ enabled: true });
+    await advance(10);
+    // The first pull brought the server words in.
+    expect(view.result.current.sessions[0].serviceMessage).toBe('Server words');
+    act(() => view.result.current.updateSession(view.result.current.sessions[0].id, { serviceMessage: 'My words' }));
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    await act(async () => wakes.forEach((fn) => fn()));
+    await advance(10);
+    expect(view.result.current.sessions[0].serviceMessage).toBe('My words');
   });
 });

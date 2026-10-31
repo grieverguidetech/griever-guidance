@@ -3,8 +3,6 @@ import type {
   ChecklistFields,
   ChecklistItemId,
   ChecklistItemState,
-  FlowFactKey,
-  FlowRecord,
   FlowRole,
   MomentKey,
   SectionFields,
@@ -14,15 +12,17 @@ import type {
   SessionDetails,
   TemplateCategory,
 } from '@griever/shared';
+import type { FlowRecord, SyncedKey } from '@griever/shared';
 import {
   addDays,
+  flowDetailsToSessionFields,
   flowFactsToSessionFields,
   CHECKLIST_PHASES,
   FLOW_FACT_KEYS,
-  mergeFlowFacts,
+  mergeSyncedFieldsWithChanges,
   parseCompleteDate,
   SECTION_ORDER,
-  toFlowFacts,
+  toSyncedFields,
 } from '@griever/shared';
 import { freshDraft, hasDraftInProgress } from './useSendFlow.js';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
@@ -133,7 +133,7 @@ export interface UseSessionsResult {
   applyRemoteFlows: (
     result: { flows: readonly FlowRecord[]; dropped?: number },
     myUserId: string,
-    pendingByFlow?: Readonly<Record<string, Iterable<FlowFactKey>>>,
+    pendingByFlow?: Readonly<Record<string, Iterable<SyncedKey>>>,
   ) => void;
 }
 
@@ -399,40 +399,98 @@ export function generateFlowId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** Updates one session from a server record. Only fact fields without a pending edit can change. */
+type SessionStatusMap = NonNullable<Session['sectionStatus']>;
+
+/**
+ * Keeps `serviceStatus` and `serviceReady` as one fact, as `setSectionStatus('service', ...)` does
+ * locally. A changed remote status decides the flag. A changed remote flag alone decides the status
+ * (`true` becomes 'ready'; `false` only clears a 'ready' status). Returns the extra keys to apply.
+ */
+function coupleService(
+  changed: Record<string, unknown>,
+  currentStatus: SessionStatusMap | undefined,
+): Record<string, unknown> {
+  if ('serviceStatus' in changed) {
+    return { serviceReady: changed.serviceStatus === 'ready' };
+  }
+  if ('serviceReady' in changed) {
+    if (changed.serviceReady === true) {
+      return { serviceStatus: 'ready' };
+    }
+    if (currentStatus?.service === 'ready') {
+      return { serviceStatus: null };
+    }
+  }
+  return {};
+}
+
+/** The two service keys are protected together: a pending edit to one keeps both local. */
+function withServicePair(pending: Iterable<SyncedKey>): Set<SyncedKey> {
+  const keys = new Set<SyncedKey>(pending);
+  if (keys.has('serviceStatus') || keys.has('serviceReady')) {
+    keys.add('serviceStatus');
+    keys.add('serviceReady');
+  }
+  return keys;
+}
+
+/** Updates one session from a server record. Only synced fields without a pending edit can change. */
 function mergeRecordIntoSession(
   session: Session,
   record: FlowRecord,
-  pending: Iterable<FlowFactKey>,
+  pending: Iterable<SyncedKey>,
   myUserId: string,
 ): Session {
-  const pendingKeys = new Set(pending);
-  const local = toFlowFacts(session);
-  const merged = mergeFlowFacts(local, record.facts, pendingKeys);
-  const mapped = flowFactsToSessionFields(merged);
-  // Only write fields that really changed, so text being typed is not rewritten (trimmed etc.).
-  const changed: Record<string, unknown> = {};
-  for (const key of FLOW_FACT_KEYS) {
-    if (!pendingKeys.has(key) && merged[key] !== local[key]) changed[key] = mapped[key];
+  const local = toSyncedFields(session);
+  const { changed } = mergeSyncedFieldsWithChanges(
+    local,
+    { ...record.facts, ...record.details },
+    withServicePair(pending),
+  );
+  // Only the changed keys are written, so text being typed or a pending edit is never rewritten.
+  const wire: Record<string, unknown> = { ...changed, ...coupleService(changed, session.sectionStatus) };
+  const factKeys = new Set<string>(FLOW_FACT_KEYS);
+  const factPatch: Record<string, unknown> = {};
+  const detailPatch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(wire)) {
+    (factKeys.has(key) ? factPatch : detailPatch)[key] = value;
   }
-  const facts = { ...session, ...(changed as Partial<ReturnType<typeof flowFactsToSessionFields>>) };
+  const mappedFacts = flowFactsToSessionFields({ ...local, ...factPatch });
+  const fromFacts: Record<string, unknown> = {};
+  for (const key of Object.keys(factPatch)) {
+    fromFacts[key] = mappedFacts[key as keyof typeof mappedFacts];
+  }
+  const fromDetails = flowDetailsToSessionFields(detailPatch, session.sectionStatus);
+  const updated = { ...session, ...fromFacts, ...fromDetails } as Session;
   const mine = record.ownerId === myUserId;
   // Made on this device and not tied to an account: only the account's own record may claim it.
-  if (session.ownerId === null && !mine) return facts;
-  return { ...facts, ownerId: record.ownerId, role: mine ? 'owner' : 'member' };
+  if (session.ownerId === null && !mine) {
+    return updated;
+  }
+  return { ...updated, ownerId: record.ownerId, role: mine ? 'owner' : 'member' };
 }
 
-function sessionFromRecord(record: FlowRecord): Session {
+function sessionFromRecord(record: FlowRecord, myUserId: string): Session {
   const now = new Date().toISOString();
   // A person that arrives from the server must not jump ahead of the one being worked on.
   const updated = Date.parse(record.updatedAt);
   const lastOpenedAt = new Date(Number.isNaN(updated) ? 0 : updated).toISOString();
+  const details = flowDetailsToSessionFields(record.details ?? {});
+  const facts = flowFactsToSessionFields(record.facts);
+  const status = record.details?.serviceStatus;
+  if (status !== undefined) {
+    facts.serviceReady = status === 'ready';
+  } else if (facts.serviceReady) {
+    details.sectionStatus = { ...details.sectionStatus, service: 'ready' };
+  }
   return {
-    ...flowFactsToSessionFields(record.facts),
+    ...facts,
+    ...details,
     id: newId(),
     flowId: record.id,
     ownerId: record.ownerId,
-    role: 'member',
+    // Ownership decides the role, not the server's per-record flag: your own record is yours.
+    role: record.ownerId === myUserId ? 'owner' : 'member',
     senderName: '',
     createdAt: now,
     lastOpenedAt,
@@ -699,7 +757,7 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
             const record = returned.get(s.flowId);
             return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? [], myUserId) : s;
           });
-        const added = [...returned.values()].filter((r) => !known.has(r.id)).map(sessionFromRecord);
+        const added = [...returned.values()].filter((r) => !known.has(r.id)).map((r) => sessionFromRecord(r, myUserId));
         return [...updated, ...added];
       });
     },
