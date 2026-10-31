@@ -4,7 +4,6 @@ import {
   isDataErrorCode,
   isUuid,
   parseFlowFacts,
-  parseFlowPatch,
   parseInviteEmail,
   type DataAction,
   type DataResult,
@@ -12,6 +11,7 @@ import {
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
 import { BUSY_MESSAGE } from '../errors.js';
+import { parseFlowInput } from '../items/flowItem.js';
 import type { acceptInvite } from '../rules/acceptInvite.js';
 import type { createFlow, listFlows, updateFlow } from '../rules/flows.js';
 import type { createInvite, revokeInvite } from '../rules/invites.js';
@@ -46,6 +46,12 @@ export interface ActionContext {
 
 /** An action whose args already passed validation. Calling it is the first step that can touch DynamoDB. */
 export type PreparedAction = (ctx: ActionContext) => Promise<DataResult>;
+
+/** The createFlow `facts` arg carries the detail keys too. All six facts are required; anything else is refused. */
+function isValidCreateInput(input: unknown): boolean {
+  const parsed = parseFlowInput(input);
+  return parsed !== null && parseFlowFacts(parsed.facts) !== null;
+}
 
 type Args = Record<string, unknown>;
 type Prepare = (args: Args) => PreparedAction | null;
@@ -98,7 +104,7 @@ const PREPARE: Record<DataAction, Prepare> = {
   },
   createFlow: (args) => {
     const id = args['id'];
-    if (!hasExactKeys(args, ['id', 'facts']) || !uuidArg(id) || !parseFlowFacts(args['facts'])) {
+    if (!hasExactKeys(args, ['id', 'facts']) || !uuidArg(id) || !isValidCreateInput(args['facts'])) {
       return null;
     }
     const facts = args['facts'];
@@ -106,7 +112,7 @@ const PREPARE: Record<DataAction, Prepare> = {
   },
   updateFlow: (args) => {
     const id = args['id'];
-    if (!hasExactKeys(args, ['id', 'patch']) || !uuidArg(id) || !parseFlowPatch(args['patch'])) {
+    if (!hasExactKeys(args, ['id', 'patch']) || !uuidArg(id) || !parseFlowInput(args['patch'])) {
       return null;
     }
     const patch = args['patch'];

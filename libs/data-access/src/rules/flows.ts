@@ -2,7 +2,7 @@ import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import {
   isUuid,
   parseFlowFacts,
-  parseFlowPatch,
+  type FlowDetails,
   type FlowRecord,
   type FlowRole,
 } from '@griever/shared';
@@ -17,7 +17,13 @@ import {
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
 import type { DataErrorCode } from '../errors.js';
-import { decodeFlow, encodeFlow, type FlowItem } from '../items/flowItem.js';
+import {
+  decodeFlow,
+  emptyDetails,
+  encodeFlow,
+  parseFlowInput,
+  type FlowItem,
+} from '../items/flowItem.js';
 import {
   encodeProfile,
   getProfile,
@@ -26,13 +32,17 @@ import {
 import { getLive, queryLive } from '../read.js';
 import { runAction, type RunOptions, type TransactItem } from '../transact.js';
 
+/** What the app reads: the record plus every detail key. */
+export type FlowRecordWithDetails = FlowRecord & { details: FlowDetails };
+
 /** The shape the app reads. The role says how the caller is linked to this person. */
-function toRecord(flow: FlowItem, role: FlowRole): FlowRecord {
+function toRecord(flow: FlowItem, role: FlowRole): FlowRecordWithDetails {
   return {
     id: flow.id,
     ownerId: flow.ownerId,
     role,
     facts: flow.facts,
+    details: flow.details,
     updatedAt: flow.updatedAt,
     updatedBy: flow.updatedBy,
   };
@@ -65,7 +75,7 @@ export async function listFlows(
   table: string,
   caller: Caller,
   clock: Clock,
-): Promise<FlowRecord[]> {
+): Promise<FlowRecordWithDetails[]> {
   const own = await queryLive(doc, table, caller.userId, clock, FLOW_PREFIX);
   const records = own.map((item) => toRecord(decodeFlow(item), 'owner'));
   const ownerId = await memberOwnerId(doc, table, caller.userId, clock);
@@ -151,9 +161,10 @@ export async function createFlow(
   facts: unknown,
   clock: Clock,
   options: RunOptions = {},
-): Promise<FlowResult<FlowRecord>> {
-  const parsed = parseFlowFacts(facts);
-  if (!parsed || !isUuid(id)) {
+): Promise<FlowResult<FlowRecordWithDetails>> {
+  const input = parseFlowInput(facts);
+  const parsed = input ? parseFlowFacts(input.facts) : null;
+  if (!input || !parsed || !isUuid(id)) {
     return { ok: false, code: 'invalid' };
   }
   try {
@@ -169,6 +180,7 @@ export async function createFlow(
           id,
           ownerId: caller.userId,
           facts: parsed,
+          details: { ...emptyDetails(), ...input.details },
           createdAt: now,
           updatedAt: now,
           updatedBy: caller.userId,
@@ -254,8 +266,8 @@ async function findEditable(
 }
 
 /**
- * Changes facts on a person. The owner and the owner's members may do it. Only facts can change:
- * any other key, such as ownerId or updatedAt, is invalid. A stranger, an unknown id, a removed
+ * Changes facts and detail keys on a person. The owner and the owner's members may do it. Only
+ * those keys can change: any other key, such as ownerId or updatedAt, is invalid. A stranger, an unknown id, a removed
  * member and a soft-deleted person all get not_found, and nothing changes.
  */
 export async function updateFlow(
@@ -266,9 +278,9 @@ export async function updateFlow(
   patch: unknown,
   clock: Clock,
   options: RunOptions = {},
-): Promise<FlowResult<FlowRecord>> {
-  const parsed = parseFlowPatch(patch);
-  if (!parsed || !isUuid(id)) {
+): Promise<FlowResult<FlowRecordWithDetails>> {
+  const input = parseFlowInput(patch);
+  if (!input || !isUuid(id)) {
     return { ok: false, code: 'invalid' };
   }
   try {
@@ -299,7 +311,7 @@ export async function updateFlow(
           '#gsi1pk = :gsi1pk',
           '#gsi1sk = :gsi1sk',
         ];
-        for (const [key, value] of Object.entries(parsed)) {
+        for (const [key, value] of Object.entries({ ...input.facts, ...input.details })) {
           names[`#${key}`] = key;
           values[`:${key}`] = value;
           sets.push(`#${key} = :${key}`);
