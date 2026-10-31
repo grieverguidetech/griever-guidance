@@ -8,8 +8,8 @@ import { navTitle } from './SideNav';
 const shell = screenCopy('cmsShell');
 const checklist = screenCopy('cmsChecklist');
 
-/** Sections that can be opened and filled in today; each editor ticket widens this. */
-export const AVAILABLE_SECTIONS: readonly SectionKey[] = ['person', 'service'];
+/** Sections that can be opened and filled in. */
+export const AVAILABLE_SECTIONS: readonly SectionKey[] = SECTION_ORDER;
 
 const STATUS_COPY: Record<OverviewStatus, string> = {
   not_started: shell.statusNotStarted,
@@ -21,7 +21,13 @@ const PHASE_COPY: Record<ChecklistPhaseKey, string> = checklist.phases;
 const ITEM_COPY: Record<ChecklistItemId, string> = checklist.items;
 
 type OverviewSession = Pick<SectionFields, 'sectionStatus' | 'serviceType' | 'servicePlace'> &
-  Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing' | 'serviceDate'>>;
+  Partial<
+    Pick<
+      SectionFields,
+      'announcementMessage' | 'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote' | 'thanksMessage'
+    >
+  > &
+  Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing' | 'serviceDate' | 'obituaryPublisher'>>;
 
 interface Props {
   session: OverviewSession;
@@ -73,8 +79,52 @@ function serviceSummary(session: OverviewSession): string {
   return place ? fill(shell.summaryServicePlace, { summary: withDate, place }) : withDate;
 }
 
+const SUMMARY_MAX = 80;
+
+/** First non-empty line of the message, cut short so a card stays one line. */
+function announcementSummary(session: OverviewSession): string {
+  const line = present(session.announcementMessage)
+    .split('\n')
+    .map((part) => part.trim())
+    .find(Boolean);
+  if (!line) {
+    return shell.summaryAnnouncementEmpty;
+  }
+  return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX).trimEnd()}…` : line;
+}
+
+function obituarySummary(session: OverviewSession): string {
+  const publisher = present(session.obituaryPublisher);
+  if (publisher) {
+    return fill(shell.summaryObituaryPublisher, { publisher });
+  }
+  const started = [
+    session.obituaryText,
+    session.obituaryCity,
+    session.obituaryCareer,
+    session.obituarySurvivors,
+    session.obituaryNote,
+  ].some((value) => present(value));
+  return started ? shell.summaryObituaryDraft : shell.summaryObituaryEmpty;
+}
+
+function thanksSummary(session: OverviewSession): string {
+  return present(session.thanksMessage) ? shell.summaryThanksDraft : shell.summaryThanksEmpty;
+}
+
 function summaryFor(key: SectionKey, session: OverviewSession): string {
-  return key === 'person' ? personSummary(session) : serviceSummary(session);
+  switch (key) {
+    case 'person':
+      return personSummary(session);
+    case 'announcement':
+      return announcementSummary(session);
+    case 'obituary':
+      return obituarySummary(session);
+    case 'thanks':
+      return thanksSummary(session);
+    default:
+      return serviceSummary(session);
+  }
 }
 
 /** Decorative; the status text beside it carries the meaning. */

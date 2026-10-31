@@ -16,7 +16,7 @@ import {
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
-import type { ChecklistItemId, MomentKey, SessionDetails, TemplateCategory } from '@griever/shared';
+import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
@@ -28,6 +28,9 @@ import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
 import { ChecklistItemDetail } from '../cms/checklist/ChecklistItemDetail';
 import { PersonSection } from '../cms/sections/PersonSection';
 import { ServiceSection } from '../cms/sections/ServiceSection';
+import { AnnouncementSection } from '../cms/sections/AnnouncementSection';
+import { ObituarySection } from '../cms/sections/ObituarySection';
+import { ThanksSection } from '../cms/sections/ThanksSection';
 import type { CmsNavKey } from '../cms/SideNav';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
@@ -963,7 +966,7 @@ function AppBody({
   }
 
   if (view === 'cms' && active) {
-    const readyChange = (key: 'person' | 'service') => (ready: boolean) =>
+    const readyChange = (key: SectionKey) => (ready: boolean) =>
       sessions.setSectionStatus(active.id, key, ready ? 'ready' : 'in_progress');
     const nextSection = computeSections(active, AVAILABLE_SECTIONS).next;
     // Ready leads on: the next section, or the Overview when nothing is left. The key hook moves focus to the h1.
@@ -1012,10 +1015,10 @@ function AppBody({
               state={active.checklist?.[cmsItem] ?? null}
               onSetState={(state) => sessions.setChecklistItem(active.id, cmsItem, state)}
               onBack={closeCmsItem}
-              onOpenService={() => {
-                // The key hook moves focus to the Service h1.
+              onOpenSection={(section) => {
+                // The key hook moves focus to the section's h1.
                 setCmsItem(null);
-                setCmsSection('service');
+                setCmsSection(section);
               }}
             />
           ) : cmsSection === 'overview' ? (
@@ -1041,8 +1044,30 @@ function AppBody({
               nextSection={nextSection}
               onNext={goNext}
             />
+          ) : cmsSection === 'announcement' ? (
+            <AnnouncementSection
+              values={active}
+              onChange={(patch) => sessions.updateSection(active.id, 'announcement', patch)}
+              onReadyChange={readyChange('announcement')}
+              nextSection={nextSection}
+              onNext={goNext}
+            />
+          ) : cmsSection === 'obituary' ? (
+            <ObituarySection
+              values={active}
+              onChange={(patch) => sessions.updateSection(active.id, 'obituary', patch)}
+              onReadyChange={readyChange('obituary')}
+              nextSection={nextSection}
+              onNext={goNext}
+            />
           ) : (
-            <p>{cmsShellCopy.comingLater}</p>
+            <ThanksSection
+              values={active}
+              onChange={(patch) => sessions.updateSection(active.id, 'thanks', patch)}
+              onReadyChange={readyChange('thanks')}
+              nextSection={nextSection}
+              onNext={goNext}
+            />
           )}
         </CmsShell>
       </Shell>

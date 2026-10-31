@@ -68,7 +68,7 @@ function seed(...people: ReturnType<typeof person>[]) {
   window.localStorage.setItem('gg.sessions.v1', JSON.stringify(people));
 }
 
-function stored(): { id: string; personName: string; lastOpenedAt: string; sectionStatus?: Record<string, string> }[] {
+function stored(): { id: string; personName: string; lastOpenedAt: string; sectionStatus?: Record<string, string>; announcementMessage?: string }[] {
   return JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
 }
 
@@ -134,18 +134,21 @@ describe('editor on (#395)', () => {
     expect(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ })).toHaveTextContent('Ready');
   });
 
-  it('Ready leads on: Next opens Service with focus on its h1, then Back to Overview', async () => {
+  it('Ready leads on: Next opens Announcement with focus on its h1, then Service, then Obituary', async () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^The person/ }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    await user.click(screen.getByRole('button', { name: 'Next: Announcement' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Announcement' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await user.click(screen.getByRole('button', { name: 'Next: Service' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    await user.click(screen.getByRole('button', { name: 'Back to Overview' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Next: Obituary' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toHaveFocus();
   });
 
   it('Service ready leads back: Next: The person focuses The person h1', async () => {
@@ -202,19 +205,41 @@ describe('editor on (#395)', () => {
     expect(stored()).toHaveLength(1);
   });
 
-  it('lists Announcement, Obituary and Thank-yous in the nav as plain text, not buttons', async () => {
+  it('lists Announcement, Obituary and Thank-yous in the nav as buttons that open their editors', async () => {
+    const user = userEvent.setup();
     await openMargaret();
-    const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
-      expect(nav.queryByRole('button', { name })).toBeNull();
-      expect(nav.getByText(name)).toBeInTheDocument();
+      const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
+      await user.click(nav.getByRole('button', { name: new RegExp(`^${name}`) }));
+      expect(await screen.findByRole('heading', { level: 1, name })).toHaveFocus();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(screen.queryByText(/comes later/i)).not.toBeInTheDocument();
     }
+  });
+
+  it('saves an edited announcement, marks it ready and shows it on the Overview', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Announcement/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Announcement' });
+    const message = screen.getByRole('textbox', { name: 'Message' });
+    await user.clear(message);
+    await user.type(message, 'Margaret died peacefully.');
+    expect(stored()[0].announcementMessage).toBe('Margaret died peacefully.');
+    expect(stored()[0].sectionStatus).toEqual({ announcement: 'in_progress' });
+    await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(stored()[0].sectionStatus).toEqual({ announcement: 'ready' });
+    await user.click(screen.getByRole('button', { name: /^Overview/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    expect(within(screen.getByRole('main')).getByRole('button', { name: /^Announcement/ })).toHaveTextContent(
+      'Ready Margaret died peacefully.',
+    );
   });
 
   it('reaches no path, wizard, sms: link or "Open Messages" from any section', async () => {
     const user = userEvent.setup();
     await openMargaret();
-    for (const name of ['Overview', 'The person', 'Service']) {
+    for (const name of ['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
       await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
       expect(document.querySelector('a[href^="sms:"]')).toBeNull();

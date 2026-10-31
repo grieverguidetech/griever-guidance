@@ -1,8 +1,10 @@
 import { CaretLeft } from '@phosphor-icons/react/CaretLeft';
-import { checklistDetail, screenCopy } from '@griever/copy';
+import { checklistDetail, fill, screenCopy } from '@griever/copy';
 import { CHECKLIST_ITEM_SECTIONS } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
+import type { SectionKey } from '@griever/shared';
 import { AVAILABLE_SECTIONS } from '../Overview';
+import { navTitle } from '../SideNav';
 import { ItemStateToggles } from './ItemStateToggles';
 
 const copy = screenCopy('cmsChecklist');
@@ -12,15 +14,15 @@ interface Props {
   state: ChecklistItemState | null;
   onSetState: (state: ChecklistItemState | null) => void;
   onBack: () => void;
-  /** Closes the item and opens the Service section. Without it, no button shows. */
-  onOpenService?: () => void;
+  /** Closes the item and opens its section. Without it, no button shows. */
+  onOpenSection?: (section: SectionKey) => void;
 }
 
 /**
  * More guidance for one item. No h1: CmsShell's title carries the item label.
  * The caller owns focus: it focuses the shell heading (which names the item) on open.
  */
-export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenService }: Props) {
+export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenSection }: Props) {
   const detail = checklistDetail(itemId);
   const parts = detail
     ? [
@@ -33,8 +35,7 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
     : [];
 
   const section = CHECKLIST_ITEM_SECTIONS[itemId];
-  const canOpenService =
-    section === 'service' && AVAILABLE_SECTIONS.includes(section) && Boolean(onOpenService);
+  const canOpenSection = section !== undefined && AVAILABLE_SECTIONS.includes(section) && Boolean(onOpenSection);
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,10 +63,10 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
           <p>{copy.comingSoon}</p>
         )}
       </div>
-      {canOpenService ? (
+      {canOpenSection ? (
         <div>
-          <button type="button" className="gg-btn gg-btn-primary" onClick={onOpenService}>
-            {copy.openService}
+          <button type="button" className="gg-btn gg-btn-primary" onClick={() => onOpenSection?.(section)}>
+            {fill(copy.openSection, { section: navTitle(section) })}
           </button>
         </div>
       ) : null}

@@ -37,5 +37,11 @@
   "summaryServiceDefaultType": "Service",
   "summaryServiceDate": "{type}, {date}",
   "summaryServicePlace": "{summary} at {place}",
-  "summaryServiceEmpty": "Add the date and place"
+  "summaryServiceEmpty": "Add the date and place",
+  "summaryAnnouncementEmpty": "Write a short note",
+  "summaryObituaryEmpty": "Start from the template",
+  "summaryObituaryDraft": "Draft started",
+  "summaryObituaryPublisher": "Published in {publisher}",
+  "summaryThanksEmpty": "Start from the template",
+  "summaryThanksDraft": "Draft started"
 }

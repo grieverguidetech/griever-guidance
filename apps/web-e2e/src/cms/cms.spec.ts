@@ -50,6 +50,21 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
       await page.getByRole('button', { name: add }).click();
     }
   },
+  Announcement: async (page) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Announcement', 'Announcement');
+  },
+  Obituary: async (page) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Obituary', 'Obituary');
+  },
+  'Thank-yous': async (page) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Thank-yous', 'Thank-yous');
+  },
   'The person': async (page) => {
     await startPerson(page);
   },
@@ -114,15 +129,15 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   ).toBeChecked();
 });
 
-test('Ready leads on: The person ready, Next opens Service with its h1; no axe violations after Ready', async ({ page }) => {
+test('Ready leads on: The person ready, Next opens Announcement with its h1; no axe violations after Ready', async ({ page }) => {
   await startPerson(page);
   await page.getByLabel('Their name').fill('Margaret Hayes');
   await page.getByRole('button', { name: 'Mark as ready' }).click();
-  const next = page.getByRole('button', { name: 'Next: Service' });
+  const next = page.getByRole('button', { name: 'Next: Announcement' });
   await expect(next).toBeVisible();
   expect(await violations(page)).toEqual([]);
   await next.click();
-  const heading = page.getByRole('heading', { level: 1, name: 'Service' });
+  const heading = page.getByRole('heading', { level: 1, name: 'Announcement' });
   await expect(heading).toBeVisible();
   await expect(heading).toBeFocused();
 });

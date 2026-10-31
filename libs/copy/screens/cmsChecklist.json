@@ -10,7 +10,7 @@
   "nowPhase": "Now: {phase}",
   "nextItem": "Next on the list: {item}",
   "onTheChecklist": "On the checklist: {item}",
-  "openService": "Open Service",
+  "openSection": "Open {section}",
   "back": "Back",
   "whatItIs": "What it is",
   "whyItMatters": "Why it matters",

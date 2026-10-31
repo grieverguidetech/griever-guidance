@@ -62,23 +62,28 @@ describe('ChecklistItemDetail', () => {
     expect(findHardCodedCopy(source, 'cmsChecklist')).toEqual([]);
   });
 
-  it('shows Open Service for a service item and calls onOpenService', async () => {
-    const onOpenService = vi.fn();
+  it.each([
+    ['set-service', 'service', 'Open Service'],
+    ['write-obituary', 'obituary', 'Open Obituary'],
+    ['notify-community', 'announcement', 'Open Announcement'],
+    ['thank-you-notes', 'thanks', 'Open Thank-yous'],
+  ] as const)('shows "%s" button for %s and calls onOpenSection with the section', async (itemId, section, label) => {
+    const onOpenSection = vi.fn();
     render(
-      <ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} onOpenService={onOpenService} />,
+      <ChecklistItemDetail itemId={itemId} state={null} onSetState={noop} onBack={noop} onOpenSection={onOpenSection} />,
     );
-    await userEvent.click(screen.getByRole('button', { name: copy.openService }));
-    expect(onOpenService).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    expect(onOpenSection).toHaveBeenCalledWith(section);
   });
 
-  it('shows no Open Service for an item without a section, or without the prop', () => {
+  it('shows no Open button for an item without a section, or without the prop', () => {
     const view = render(
-      <ChecklistItemDetail itemId="write-obituary" state={null} onSetState={noop} onBack={noop} onOpenService={noop} />,
+      <ChecklistItemDetail itemId="custody" state={null} onSetState={noop} onBack={noop} onOpenSection={noop} />,
     );
-    expect(screen.queryByRole('button', { name: copy.openService })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Open / })).toBeNull();
     view.unmount();
     render(<ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} />);
-    expect(screen.queryByRole('button', { name: copy.openService })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Open / })).toBeNull();
   });
 
   it('styles Back as a ghost button with a hidden icon, keeping its name', () => {
@@ -90,12 +95,12 @@ describe('ChecklistItemDetail', () => {
 
   it('orders Back, then the toggles, then the guidance panel, then Open Service', () => {
     render(
-      <ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} onOpenService={noop} />,
+      <ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} onOpenSection={noop} />,
     );
     const back = screen.getByRole('button', { name: copy.back });
     const done = screen.getByRole('button', { name: copy.done });
     const heading = screen.getAllByRole('heading', { level: 2 })[0];
-    const open = screen.getByRole('button', { name: copy.openService });
+    const open = screen.getByRole('button', { name: 'Open Service' });
     const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(before(back, done)).toBe(true);
     expect(before(done, heading)).toBe(true);

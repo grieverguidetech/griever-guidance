@@ -21,14 +21,18 @@ describe('SideNav', () => {
     expect(names).toEqual(['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
   });
 
-  it('makes only the open sections and the two ends buttons; later sections are plain text', () => {
+  it('makes every section and the two ends a button', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Overview', 'The person', 'Service', 'Your account']);
-    for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
-      expect(within(nav).queryByRole('button', { name })).toBeNull();
-      expect(within(nav).getByText(name)).toBeInTheDocument();
-    }
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Overview',
+      'The person',
+      'Announcement',
+      'Service',
+      'Obituary',
+      'Thank-yous',
+      'Your account',
+    ]);
   });
 
   it('marks only the current item with aria-current=page', () => {
@@ -101,14 +105,14 @@ describe('SideNav', () => {
     expect(menu).toHaveFocus();
   });
 
-  it('shows statuses when given, with a missing open key as Not started and later sections as Later', () => {
+  it('shows statuses when given, with a missing key as Not started', () => {
     setup({ statuses: { person: 'ready', service: 'in_progress' } });
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getByText('Ready')).toBeInTheDocument();
     expect(within(nav).getByText('In progress')).toBeInTheDocument();
-    expect(within(nav).queryAllByText('Not started')).toHaveLength(0);
-    expect(within(nav).getAllByText('Later')).toHaveLength(3);
-    expect(within(nav).getAllByText('Later')[0]).toHaveClass('gg-meta');
+    expect(within(nav).getAllByText('Not started')).toHaveLength(3);
+    expect(within(nav).getAllByText('Not started')[0].closest('.gg-meta')).not.toBeNull();
+    expect(within(nav).queryByText('Later')).toBeNull();
     expect(within(nav).getByText('Ready').closest('button')?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     expect(within(nav).getByText('In progress').closest('button')?.querySelector('svg')).toBeNull();
   });
@@ -116,8 +120,7 @@ describe('SideNav', () => {
   it('gives an item its label and status as one name, with a space between', () => {
     setup({ statuses: { service: 'in_progress' } });
     expect(screen.getByRole('button', { name: 'Service In progress' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Obituary/ })).toBeNull();
-    expect(screen.getByText('Obituary').closest('li')).toHaveTextContent('Obituary Later');
+    expect(screen.getByRole('button', { name: 'Obituary Not started' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument();
   });
 
