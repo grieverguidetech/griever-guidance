@@ -30,16 +30,29 @@ export interface UseAccountResult {
   clearError: () => void;
   signOut: () => Promise<void>;
   updateSenderName: (name: string) => Promise<boolean>;
+  /** Saves the optional full name and date of birth (null clears one). `invalid` means the server refused a value; no general error is set for it. */
+  updateDetails: (details: ProfileDetails) => Promise<ProfileDetailsResult>;
 }
+
+export interface ProfileDetails {
+  fullName: string | null;
+  /** yyyy-mm-dd */
+  birthDate: string | null;
+}
+
+export type ProfileDetailsResult = { ok: true } | { ok: false; invalid: boolean };
 
 function isCachedProfile(value: unknown): value is CachedProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
-  const { id, senderName, contactSource, accountType } = value as Record<string, unknown>;
+  const { id, senderName, fullName, birthDate, contactSource, accountType } = value as Record<string, unknown>;
   return (
     typeof id === 'string' &&
     (senderName === null || typeof senderName === 'string') &&
+    // Caches from before these fields existed have neither; that still counts.
+    (fullName === undefined || fullName === null || typeof fullName === 'string') &&
+    (birthDate === undefined || birthDate === null || typeof birthDate === 'string') &&
     (contactSource === null || contactSource === 'import' || contactSource === 'manual') &&
     (accountType === undefined || accountType === 'owner' || accountType === 'member')
   );
@@ -60,6 +73,8 @@ function readCache(storage: SendFlowStorage | undefined): CachedProfile | null {
       ? {
           id: parsed.id,
           senderName: parsed.senderName,
+          fullName: parsed.fullName ?? null,
+          birthDate: parsed.birthDate ?? null,
           contactSource: parsed.contactSource,
           accountType: parsed.accountType ?? 'owner',
         }
@@ -102,6 +117,9 @@ function toCached(profile: CachedProfile): CachedProfile {
   return {
     id: profile.id,
     senderName: profile.senderName,
+    // An older gateway may omit these; never keep undefined.
+    fullName: profile.fullName ?? null,
+    birthDate: profile.birthDate ?? null,
     contactSource: profile.contactSource,
     // An older gateway may not send accountType yet; never keep undefined.
     accountType: profile.accountType === 'member' ? 'member' : 'owner',
@@ -265,6 +283,31 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     [callWithToken, keepProfile, fail],
   );
 
+  const updateDetails = useCallback(
+    async (details: ProfileDetails): Promise<ProfileDetailsResult> => {
+      setError(null);
+      const g = ++gen.current;
+      const result = await callWithToken(g, (token) => updateProfile(token, details));
+      if (!mounted.current || g !== gen.current) {
+        return result.ok ? { ok: true } : { ok: false, invalid: result.reason === 'invalid' };
+      }
+      if (result.ok) {
+        setOffline(false);
+        keepProfile(toCached(result.profile));
+        return { ok: true };
+      }
+      if (result.reason === 'invalid') {
+        return { ok: false, invalid: true };
+      }
+      if (result.reason === 'offline') {
+        setOffline(true);
+      }
+      fail(result.reason === 'signed_out' ? 'unavailable' : result.reason);
+      return { ok: false, invalid: false };
+    },
+    [callWithToken, keepProfile, fail],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   const status: AccountAuthStatus = endedHere ? 'signed_out' : authStatus;
@@ -280,5 +323,6 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     clearError,
     signOut,
     updateSenderName,
+    updateDetails,
   };
 }

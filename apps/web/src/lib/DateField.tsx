@@ -11,12 +11,18 @@ import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
  * "Month D, YYYY" on blur only when it is a complete date. Incomplete text stays as typed.
  */
 
+/** Years a field accepts; the default (2000-2100) suits event dates, not a date of birth. */
+export interface YearRange {
+  minYear?: number;
+  maxYear?: number;
+}
+
 /**
  * A complete date ("May 29, 2026", "5/29/2026", "2026-05-29") → "2026-05-29".
  * Anything incomplete ("Oct 28", "5/29", "2026") gives "": no year is ever guessed.
  */
-export function dateToISO(pretty: string): string {
-  const parsed = parseCompleteDate(pretty);
+export function dateToISO(pretty: string, years?: YearRange): string {
+  const parsed = parseCompleteDate(pretty, years);
   if (!parsed) {
     return '';
   }
@@ -49,10 +55,14 @@ interface DateInputProps {
   required?: boolean;
   /** A quiet, non-blocking note under the field (not an alert). Never stops saving. */
   note?: string;
+  /** A message that the date is wrong. Announced as an alert, marks the input invalid, and is linked to it. */
+  error?: string;
   /** Like `note`, but shown only after the field loses focus with this text in it, and hidden again once the text changes. */
   noteOnBlur?: string;
   /** Shows the format help as visible text under the field, not only to a screen reader. */
   visibleHelp?: boolean;
+  /** Widens or narrows the years that count as a complete date. */
+  years?: YearRange;
 }
 
 /** The bare control — pair it with your own `<label htmlFor>` / `.gg-field`. */
@@ -67,7 +77,9 @@ export function DateInput({
   required,
   note: liveNote,
   noteOnBlur,
+  error,
   visibleHelp,
+  years,
 }: DateInputProps) {
   const [blurredValue, setBlurredValue] = useState<string | null>(null);
   const note = liveNote ?? (blurredValue !== null && blurredValue === value ? noteOnBlur : undefined);
@@ -75,6 +87,7 @@ export function DateInput({
   const [focused, setFocused] = useState(false);
   const helpId = `${id}-help`;
   const noteId = `${id}-note`;
+  const errorId = `${id}-error`;
 
   function openPicker() {
     const el = pickerRef.current as
@@ -124,11 +137,12 @@ export function DateInput({
         value={value}
         aria-labelledby={labelledBy}
         aria-required={required || undefined}
-        aria-describedby={[describedBy, helpId, note ? noteId : undefined].filter(Boolean).join(' ')}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={[describedBy, helpId, note ? noteId : undefined, error ? errorId : undefined].filter(Boolean).join(' ')}
         onChange={(e) => onChange(e.target.value)}
         onBlur={(e) => {
           setBlurredValue(e.target.value.trim() ? e.target.value : null);
-          const iso = dateToISO(e.target.value);
+          const iso = dateToISO(e.target.value, years);
           if (iso) onChange(isoToDate(iso));
         }}
       />
@@ -146,7 +160,7 @@ export function DateInput({
         className="gg-datebox-native"
         tabIndex={-1}
         aria-hidden="true"
-        value={dateToISO(value)}
+        value={dateToISO(value, years)}
         min={min}
         max={max}
         onChange={(e) => onChange(isoToDate(e.target.value))}
@@ -155,13 +169,18 @@ export function DateInput({
     </div>
   );
 
-  if (!visibleHelp && !note) {
+  if (!visibleHelp && !note && !error) {
     return box;
   }
   return (
     <>
       {box}
       {visibleHelp && help}
+      {error && (
+        <p id={errorId} role="alert" className="m-0 mt-1 text-[13px] font-semibold leading-[1.5]">
+          {error}
+        </p>
+      )}
       {note && (
         <p id={noteId} className="m-0 mt-1 text-[13px] leading-[1.5]" style={{ color: 'var(--color-text)' }}>
           {note}

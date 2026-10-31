@@ -38,7 +38,18 @@
     "cardHeading",
     "cardNone",
     "cardAdd",
-    "cardNotOpen"
+    "cardNotOpen",
+    "fullNameLabel",
+    "fullNameHint",
+    "birthDateLabel",
+    "birthDateHint",
+    "detailsSave",
+    "detailsSaved",
+    "fullNameTooLong",
+    "fullNameBadChars",
+    "birthDateIncomplete",
+    "birthDateOutOfRange",
+    "detailsInvalid"
   ],
   "properties": {
     "heading": {
@@ -144,6 +155,39 @@
       "$ref": "#/$defs/text"
     },
     "cardNotOpen": {
+      "$ref": "#/$defs/text"
+    },
+    "fullNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "fullNameHint": {
+      "$ref": "#/$defs/text"
+    },
+    "birthDateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "birthDateHint": {
+      "$ref": "#/$defs/text"
+    },
+    "detailsSave": {
+      "$ref": "#/$defs/text"
+    },
+    "detailsSaved": {
+      "$ref": "#/$defs/text"
+    },
+    "fullNameTooLong": {
+      "$ref": "#/$defs/text"
+    },
+    "fullNameBadChars": {
+      "$ref": "#/$defs/text"
+    },
+    "birthDateIncomplete": {
+      "$ref": "#/$defs/text"
+    },
+    "birthDateOutOfRange": {
+      "$ref": "#/$defs/text"
+    },
+    "detailsInvalid": {
       "$ref": "#/$defs/text"
     }
   },
