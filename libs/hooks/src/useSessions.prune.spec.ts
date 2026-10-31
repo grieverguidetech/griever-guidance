@@ -46,8 +46,12 @@ describe('pruneEmpty', () => {
     expect(run([blank('1', { personName: 'Margaret' })])).toEqual(['1']);
   });
 
-  it('keeps an unnamed person who has any section status', () => {
-    expect(run([blank('1', { sectionStatus: { service: 'in_progress' } })])).toEqual(['1']);
+  it('keeps an unnamed person who has a section marked ready', () => {
+    expect(run([blank('1', { sectionStatus: { service: 'ready' } })])).toEqual(['1']);
+  });
+
+  it('drops an unnamed person whose only trace is an in-progress status (typed a letter and erased it)', () => {
+    expect(run([blank('1', { sectionStatus: { person: 'in_progress' }, servicePlace: '' })])).toEqual([]);
   });
 
   it.each([
@@ -57,8 +61,14 @@ describe('pruneEmpty', () => {
     ['birthDate', '1950-01-01'],
     ['burialPrivate', true],
     ['dateOfPassing', 'May 1'],
+    ['obituaryPublisher', 'The Daily News'],
+    ['serviceReady', true],
   ])('keeps an unnamed person who has %s', (key, value) => {
     expect(run([blank('1', { [key]: value })])).toEqual(['1']);
+  });
+
+  it('keeps an unnamed person who has a checklist tick', () => {
+    expect(run([blank('1', { checklist: { 'headstone': 'done' } })])).toEqual(['1']);
   });
 
   it('treats blank-only text as empty', () => {

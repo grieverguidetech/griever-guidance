@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import type { Session } from '@griever/hooks';
 import { PeopleList } from './PeopleList';
 
-function person(id: string, name: string, lastOpenedAt: string, dateOfPassing = ''): Session {
-  return {
+function person(id: string, name: string, lastOpenedAt: string, dateOfPassing = '', overrides: Partial<Session> = {}): Session {
+  const base: Session = {
     id,
     personName: name,
     dateOfPassing,
@@ -18,7 +18,11 @@ function person(id: string, name: string, lastOpenedAt: string, dateOfPassing = 
     recipientsNotified: {},
     momentCompletedAt: {},
     remindersScheduled: [],
-  } as unknown as Session;
+    flowId: `flow-${id}`,
+    ownerId: null,
+    role: 'owner',
+  };
+  return { ...base, ...overrides };
 }
 
 const older = person('a', 'Margaret Hayes', '2026-10-10T00:00:00.000Z', '2026-05-29');
@@ -34,7 +38,30 @@ describe('PeopleList', () => {
     expect(onOpen).toHaveBeenCalledWith('a');
   });
 
-  it('skips unnamed people', () => {
+  it('lists an unnamed person who has work with the date they were started, and opens them', async () => {
+    const onOpen = vi.fn();
+    const unnamed = person('c', '', '2026-10-13T12:00:00.000Z', '', { servicePlace: 'Oak Hill' });
+    render(<PeopleList sessions={[unnamed, older]} onOpen={onOpen} onCreate={vi.fn()} canCreate />);
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(2);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Not named yet, started Oct 13' }));
+    expect(onOpen).toHaveBeenCalledWith('c');
+  });
+
+  it('gives two unnamed people different accessible names', () => {
+    const first = person('c', '', '2026-10-13T12:00:00.000Z', '', { servicePlace: 'Oak Hill' });
+    const second = person('d', '  ', '2026-10-14T12:00:00.000Z', '', { checklist: { headstone: 'done' } });
+    render(<PeopleList sessions={[first, second]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
+    const names = screen.getAllByRole('button', { name: /^Not named yet/ }).map((b) => b.getAttribute('aria-label'));
+    expect(names).toEqual(['Not named yet, started Oct 14', 'Not named yet, started Oct 13']);
+  });
+
+  it('falls back to plain "Not named yet" when the start date is unreadable', () => {
+    const odd = person('c', '', '2026-10-13T12:00:00.000Z', '', { servicePlace: 'Oak Hill', createdAt: 'nope' });
+    render(<PeopleList sessions={[odd]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
+    expect(screen.getByRole('button', { name: 'Not named yet' })).toBeInTheDocument();
+  });
+
+  it('skips unnamed people with no work', () => {
     render(<PeopleList sessions={[person('c', '', '2026-10-13T00:00:00.000Z'), older]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
     expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(1);
   });

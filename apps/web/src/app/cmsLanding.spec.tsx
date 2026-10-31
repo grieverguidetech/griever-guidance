@@ -5,6 +5,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
+import type { Session } from '@griever/hooks';
 import { fakeClerk } from '../test-clerk';
 
 const mocks = vi.hoisted(() => ({
@@ -61,7 +62,7 @@ const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
 
-function person(id: string, name: string, openedAt: string) {
+function person(id: string, name: string, openedAt: string, extra: Partial<Session> = {}) {
   return {
     id,
     personName: name,
@@ -76,6 +77,7 @@ function person(id: string, name: string, openedAt: string) {
     recipientsNotified: {},
     momentCompletedAt: {},
     remindersScheduled: [],
+    ...extra,
   };
 }
 
@@ -141,6 +143,37 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.getAllByText('Harold Price', { exact: true })).toHaveLength(2);
     const harold = stored().find((s) => s.id === 's2');
     expect(Date.parse(harold?.lastOpenedAt ?? '')).toBeGreaterThan(Date.parse('2026-10-12T00:00:00.000Z'));
+  });
+
+  it('reopens an unnamed person who has work, instead of making a blank one', async () => {
+    seed(person('s1', '', '2026-10-10T00:00:00.000Z', { servicePlace: 'Oak Hill' }));
+    render(<App />);
+    expect(await h1('Overview')).toBeInTheDocument();
+    expect(stored()).toHaveLength(1);
+    expect(stored()[0].id).toBe('s1');
+  });
+
+  it('after Change, an unnamed person with a checklist tick is listed and kept', async () => {
+    const user = userEvent.setup();
+    seed(person('s1', '', '2026-10-10T12:00:00.000Z', { checklist: { headstone: 'done' } }));
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(PEOPLE);
+    expect(screen.getByRole('button', { name: 'Not named yet, started Oct 10' })).toBeInTheDocument();
+    expect(stored()).toHaveLength(1);
+  });
+
+  it('lists a shared (member) person with no name but a service place, and lands without making a blank one', async () => {
+    signedInAs('member');
+    mocks.sharing = true;
+    mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
+    seed(person('s1', '', '2026-10-10T12:00:00.000Z', { servicePlace: 'Oak Hill', role: 'member', ownerId: 'o1' }));
+    render(<App />);
+    expect(await h1('Overview')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stored()).toHaveLength(1);
+    expect(stored()[0].id).toBe('s1');
   });
 
   it('opens The person for a new person when nobody is saved (owner), focusing the h1', async () => {

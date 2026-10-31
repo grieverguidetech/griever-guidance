@@ -25,6 +25,8 @@
   "readyHint": "Mark as ready when these details are settled. You can still change them.",
   "peopleTitle": "Your people",
   "peopleListLabel": "People",
+  "peopleUnnamed": "Not named yet",
+  "peopleUnnamedStarted": "Not named yet, started {date}",
   "peopleEmptyOwner": "No one here yet.",
   "peopleEmptyMember": "When someone adds you to help, the people you're helping will show here.",
   "peopleCreateFirst": "Start with someone I've lost",

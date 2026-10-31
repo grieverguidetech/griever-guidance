@@ -1,5 +1,5 @@
 import type { Session } from '@griever/hooks';
-import { namedSessionsByRecent } from '@griever/hooks';
+import { listableSessionsByRecent } from '@griever/hooks';
 import { fill, screenCopy } from '@griever/copy';
 import { parseCompleteDate } from '@griever/shared';
 import { CaretRight } from '@phosphor-icons/react/CaretRight';
@@ -23,9 +23,19 @@ function passingLabel(value: string | null | undefined): string {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-/** The named people, newest first, inside the shell (which owns the h1). */
+/** "Not named yet, started Oct 31": tells unnamed people apart. Plain "Not named yet" when the date can't be read. */
+function unnamedLabel(createdAt: string): string {
+  const time = Date.parse(createdAt);
+  if (Number.isNaN(time)) {
+    return copy.peopleUnnamed;
+  }
+  const date = new Date(time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return fill(copy.peopleUnnamedStarted, { date });
+}
+
+/** The people with a name or any work, newest first, inside the shell (which owns the h1). */
 export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
-  const people = namedSessionsByRecent(sessions);
+  const people = listableSessionsByRecent(sessions);
   const createLabel = people.length > 0 ? copy.peopleCreateAnother : copy.peopleCreateFirst;
 
   // role="list" stays on the <ul>: with list-none styling, Safari/VoiceOver drop the list semantics.
@@ -35,16 +45,18 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
         <ul role="list" className="flex flex-col gap-2 list-none m-0 p-0">
           {people.map((s) => {
             const passed = passingLabel(s.dateOfPassing);
+            const named = s.personName.trim() !== '';
+            const name = named ? s.personName.trim() : unnamedLabel(s.createdAt);
             return (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => onOpen(s.id)}
-                  aria-label={passed ? fill(copy.peoplePassed, { name: s.personName, date: passed }) : s.personName}
+                  aria-label={passed ? fill(copy.peoplePassed, { name, date: passed }) : name}
                   className="gg-panel group flex items-center justify-between gap-3 w-full min-h-11 text-left cursor-pointer hover:shadow-[var(--shadow-sm)] motion-safe:transition-[box-shadow,transform] motion-safe:duration-150 motion-safe:active:translate-y-px"
                 >
                   <span className="flex flex-col min-w-0 break-words">
-                    <span className="font-medium">{s.personName}</span>
+                    <span className={named ? 'font-medium' : 'gg-meta'}>{name}</span>
                     {passed && <span className="gg-meta">{passed}</span>}
                   </span>
                   <CaretRight

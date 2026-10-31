@@ -30,6 +30,8 @@
     "readyHint",
     "peopleTitle",
     "peopleListLabel",
+    "peopleUnnamed",
+    "peopleUnnamedStarted",
     "peopleEmptyOwner",
     "peopleEmptyMember",
     "peopleCreateFirst",
@@ -127,6 +129,12 @@
       "$ref": "#/$defs/text"
     },
     "peopleListLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleUnnamed": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleUnnamedStarted": {
       "$ref": "#/$defs/text"
     },
     "peopleEmptyOwner": {
