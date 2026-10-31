@@ -54,7 +54,7 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await startPerson(page);
     await openSection(page, 'Service', 'Service');
     await page.getByRole('button', { name: 'Change the words', exact: true }).click();
-    await expect(page.getByLabel('Message')).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
   },
   Announcement: async (page) => {
     await startPerson(page);
@@ -84,7 +84,7 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
   'Your people': async (page) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
-    await page.getByRole('button', { name: 'Change', exact: true }).click();
+    await page.getByRole('button', { name: /^Change who/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
     await expect(page.getByRole('heading', { name: "Who you're writing about" })).toHaveCount(0);
   },
