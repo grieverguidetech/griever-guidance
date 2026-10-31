@@ -23,6 +23,7 @@
     "next",
     "overviewIntro",
     "saveLine",
+    "saveLineSynced",
     "saveFailed",
     "backToOverview",
     "comingLater",
@@ -108,6 +109,9 @@
       "$ref": "#/$defs/text"
     },
     "saveLine": {
+      "$ref": "#/$defs/text"
+    },
+    "saveLineSynced": {
       "$ref": "#/$defs/text"
     },
     "saveFailed": {

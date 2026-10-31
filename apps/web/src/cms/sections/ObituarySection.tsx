@@ -28,10 +28,12 @@ interface Props {
   /** The next section still to do, or null when none is left. */
   nextSection?: SectionKey | null;
   onNext?: () => void;
+  /** Opens The person, where the name and dates are edited. */
+  onOpenPerson?: () => void;
 }
 
 /** The obituary template fields, the obituary text and where it is published. The text follows the fields until edited. */
-export function ObituarySection({ values, onChange, onReadyChange, nextSection, onNext }: Props) {
+export function ObituarySection({ values, onChange, onReadyChange, nextSection, onNext, onOpenPerson }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const prefill = buildObituaryDraft(
@@ -70,7 +72,11 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
             ))}
           </dl>
         )}
-        <p className="gg-hint">{copy.detailsHint}</p>
+        {onOpenPerson && (
+          <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenPerson}>
+            {copy.changeDetails}
+          </button>
+        )}
         <div className="gg-field">
           <label htmlFor={`${id}-city`}>{copy.cityLabel}</label>
           <input

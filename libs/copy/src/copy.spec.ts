@@ -210,6 +210,12 @@ describe('buildObituaryDraft', () => {
     );
   });
 
+  it('falls back to "Our loved one" when there is no name', () => {
+    expect(buildObituaryDraft({ fullName: '  ' }, copy)).toBe(
+      'Our loved one has died.\n\nOur loved one will be remembered with love.',
+    );
+  });
+
   it('adds both dates when the name and both dates are given', () => {
     expect(
       buildObituaryDraft(

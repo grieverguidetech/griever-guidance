@@ -11,6 +11,7 @@ type Values = Parameters<typeof ObituarySection>[0]['values'];
 function setup(initial: Values = {}) {
   const patches: ObituaryPatch[] = [];
   const onReadyChange = vi.fn();
+  const onOpenPerson = vi.fn();
   function Harness() {
     const [values, setValues] = useState<Values>(initial);
     return (
@@ -21,23 +22,26 @@ function setup(initial: Values = {}) {
           setValues((v) => ({ ...v, ...patch }));
         }}
         onReadyChange={onReadyChange}
+        onOpenPerson={onOpenPerson}
       />
     );
   }
   render(<Harness />);
-  return { patches, onReadyChange };
+  return { patches, onReadyChange, onOpenPerson };
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
 const person = { personName: 'Ann Lee', dateOfPassing: 'June 1, 2026', birthDate: 'May 2, 1940' };
 
 describe('ObituarySection', () => {
-  it('shows the name and dates read-only, with a hint to change them in The person', () => {
-    setup(person);
+  it('shows the name and dates read-only, with a button to change them in The person', async () => {
+    const { onOpenPerson } = setup(person);
     expect(screen.getByText('Ann Lee')).toBeInTheDocument();
     expect(screen.getByText('May 2, 1940')).toBeInTheDocument();
     expect(screen.getByText('June 1, 2026')).toBeInTheDocument();
-    expect(screen.getByText('To change these, go to The person.')).toBeInTheDocument();
+    expect(screen.getByText('Details from The person')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Change these on The person' }));
+    expect(onOpenPerson).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull();
   });
 

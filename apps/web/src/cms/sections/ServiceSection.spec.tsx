@@ -171,11 +171,11 @@ describe('ServiceSection', () => {
 
   it('the preview follows the details until the words are changed', async () => {
     setup({ personName: 'Margaret Hayes' });
-    expect(preview()).toHaveTextContent("Margaret Hayes' service will be held.");
+    expect(preview()).toHaveTextContent('Add the details above and the message will appear here.');
     expect(preview()).not.toHaveTextContent('Hall');
     await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
-    expect(preview()).toHaveTextContent('A reception will be held at Hall.');
+    expect(preview().querySelector('p.font-serif')?.textContent).toBe('A reception will be held at Hall.');
     expect(screen.queryByLabelText('Message')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
@@ -186,7 +186,7 @@ describe('ServiceSection', () => {
     expect(preview().closest('[aria-live]')).toBeNull();
     expect(preview().querySelector('[aria-live]')).toBeNull();
     expect(preview()).not.toHaveTextContent(/undefined|null/);
-    expect(preview()).toHaveTextContent("Our loved one's service will be held.");
+    expect(preview()).toHaveTextContent('Add the details above and the message will appear here.');
   });
 
   it('shows a placeholder when the edited message is empty', () => {
@@ -195,7 +195,7 @@ describe('ServiceSection', () => {
   });
 
   it('Change the words swaps in the textarea and moves focus into it', async () => {
-    setup({ personName: 'Margaret Hayes' });
+    setup({ personName: 'Margaret Hayes', serviceDate: 'June 3, 2026' });
     await change();
     expect(message()).toHaveFocus();
     expect(message().value).toContain("Margaret Hayes' service");

@@ -27,7 +27,7 @@ describe('defaultServiceMessage', () => {
       obituaryUrl: 'https://example.com/obit',
     });
     expect(text).toContain(
-      "Margaret Hale's service will be held June 3, 2026 at 2:00 PM, St. Mary Chapel, 12 Elm Street.",
+      "Margaret Hale's service will be held June 3, 2026 at 2:00 PM at St. Mary Chapel, 12 Elm Street.",
     );
     expect(text).toContain('Reception to follow.');
     expect(text).toContain('https://example.com/obit');
@@ -41,17 +41,20 @@ describe('defaultServiceMessage', () => {
 
   it('uses the place alone when there is no address', () => {
     const text = defaultServiceMessage({ ...base, servicePlace: 'St. Mary Chapel' });
-    expect(text).toBe("Margaret Hale's service will be held, St. Mary Chapel.");
+    expect(text).toBe("Margaret Hale's service will be held at St. Mary Chapel.");
   });
 
   it('uses the address alone when there is no place', () => {
     const text = defaultServiceMessage({ ...base, serviceAddress: '12 Elm Street' });
-    expect(text).toContain(', 12 Elm Street.');
-    expect(text).not.toContain(', ,');
+    expect(text).toBe("Margaret Hale's service will be held at 12 Elm Street.");
+  });
+
+  it('leaves the message empty when there is no date, time or place', () => {
+    expect(defaultServiceMessage({ ...base })).toBe('');
   });
 
   it('falls back to "Our loved one" with no name', () => {
-    const text = defaultServiceMessage({ personName: '', obituaryUrl: '' });
+    const text = defaultServiceMessage({ personName: '', obituaryUrl: '', serviceDate: 'June 3, 2026' });
     expect(text.startsWith("Our loved one's service")).toBe(true);
     expect(text).not.toContain('!');
   });

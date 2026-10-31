@@ -9,7 +9,7 @@
     "nameLabel",
     "bornLabel",
     "diedLabel",
-    "detailsHint",
+    "changeDetails",
     "cityLabel",
     "careerLabel",
     "survivorsLabel",
@@ -42,7 +42,7 @@
     "diedLabel": {
       "$ref": "#/$defs/text"
     },
-    "detailsHint": {
+    "changeDetails": {
       "$ref": "#/$defs/text"
     },
     "cityLabel": {

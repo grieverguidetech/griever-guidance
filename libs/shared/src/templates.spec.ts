@@ -63,8 +63,33 @@ describe('announcePassing', () => {
 
 describe('shareService', () => {
   it('uses the right possessive for names ending in s', () => {
-    expect(shareService.renderMessage({ deceasedName: 'James' })).toMatch(/^James' service/);
-    expect(shareService.renderMessage({ deceasedName: 'Ann' })).toMatch(/^Ann's service/);
+    expect(shareService.renderMessage({ deceasedName: 'James', serviceDate: 'June 14' })).toMatch(/^James' service/);
+    expect(shareService.renderMessage({ deceasedName: 'Ann', serviceDate: 'June 14' })).toMatch(/^Ann's service/);
+  });
+
+  it('leaves out the "will be held" sentence when there is no date, time or place', () => {
+    const msg = shareService.renderMessage({ deceasedName: 'Ann', serviceNotes: 'Reception to follow.' });
+    expect(msg).toBe('Reception to follow.');
+    expect(msg).not.toContain('will be held');
+    expect(shareService.renderMessage({ deceasedName: 'Ann' })).toBe('');
+  });
+
+  it('starts with the link alone when there is nothing else', () => {
+    expect(shareService.renderMessage({ obituaryUrl: 'https://legacy.com/a' })).toBe('https://legacy.com/a');
+  });
+
+  it('puts "at" before the place, with or without a date', () => {
+    expect(shareService.renderMessage({ deceasedName: 'Ann', serviceLocation: 'Oak Chapel' })).toBe(
+      "Ann's service will be held at Oak Chapel.",
+    );
+    expect(
+      shareService.renderMessage({
+        deceasedName: 'Ann',
+        serviceDate: 'June 14',
+        serviceTime: '2:00 PM',
+        serviceLocation: 'Oak Chapel',
+      }),
+    ).toBe("Ann's service will be held June 14 at 2:00 PM at Oak Chapel.");
   });
 
   it('adds exactly one florist sentence when opted in', () => {

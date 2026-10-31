@@ -147,3 +147,21 @@ describe('defaultServiceEventsMessage', () => {
     expect(text).toBe(defaultServiceMessage(base));
   });
 });
+
+describe('defaultServiceEventsMessage with little else', () => {
+  it('says only that the burial is private', () => {
+    expect(defaultServiceEventsMessage({ personName: 'Margaret Hale', obituaryUrl: '', burialPrivate: true })).toBe(
+      'The burial will be private.',
+    );
+  });
+
+  it('is just the link when there is nothing else', () => {
+    expect(defaultServiceEventsMessage({ personName: 'Margaret Hale', obituaryUrl: 'https://legacy.com/a' })).toBe(
+      'https://legacy.com/a',
+    );
+  });
+
+  it('is empty, with no stray full stop', () => {
+    expect(defaultServiceEventsMessage({ personName: 'Margaret Hale', obituaryUrl: '' })).toBe('');
+  });
+});

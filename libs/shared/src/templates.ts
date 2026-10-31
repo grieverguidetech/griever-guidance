@@ -264,24 +264,33 @@ export const shareService: Template = {
     const notes = fields['serviceNotes']?.trim();
 
     const possessive = /s$/i.test(name) ? `${name}'` : `${name}'s`;
-    let core = `${possessive} service will be held`;
-    if (date) core += ` ${date}`;
-    if (time) core += ` at ${time}`;
-    if (location) core += `, ${location}`;
-    core += '.';
-    if (notes) core += ` ${notes}`;
+    // The "will be held" sentence is left out when there is no date, time or place to put in it.
+    const when = [date, time ? `at ${time}` : ''].filter(Boolean).join(' ');
+    const where = location ? `at ${location}` : '';
+    const held = [when, where].filter(Boolean).join(' ');
+    const sentences: string[] = [];
+    if (held) {
+      sentences.push(`${possessive} service will be held ${held}.`);
+    }
+    if (notes) {
+      sentences.push(notes);
+    }
+    let core = sentences.join(' ');
 
     const florist = fields['floristName']?.trim();
     if (florist) {
-      const where =
+      const deliverTo =
         fields['flowerDeliveryTarget'] === 'home'
           ? "the family's home"
           : 'the service';
-      core += ` If you'd like to send flowers, ${florist} can deliver to ${where}.`;
+      const flowers = `If you'd like to send flowers, ${florist} can deliver to ${deliverTo}.`;
+      core = core ? `${core} ${flowers}` : flowers;
     }
 
     const url = normalizeUrl(fields['obituaryUrl']);
-    if (url) core += `\n\n${url}`;
+    if (url) {
+      core = core ? `${core}\n\n${url}` : url;
+    }
     return core;
   },
 };
@@ -379,6 +388,6 @@ export const templates: Template[] = [
  * service message covers. Placeholders only, no real names, and a calm tone (C7).
  */
 export const SHARE_SERVICE_SAMPLE =
-  "[Name]'s service will be held [day and date] at [time], [place and address]. " +
+  "[Name]'s service will be held [day and date] at [time] at [place and address]. " +
   'A gathering will follow at [place]. Parking is [where]. ' +
   'Please come as you are. It would mean a great deal to see you there.';

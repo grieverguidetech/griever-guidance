@@ -35,6 +35,16 @@ describe('CmsShell people view', () => {
 });
 
 describe('CmsShell save line', () => {
+  it('says the details also wait on the phone when sync is on', () => {
+    render(
+      <CmsShell syncOn personName="Ann" section="service" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
+        <p>Body</p>
+      </CmsShell>,
+    );
+    expect(screen.getByText(/and to your account as you type/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing is sent from here/)).toBeNull();
+  });
+
   const line = 'Saved in this browser as you type. Nothing is sent from here.';
 
   it('shows the static line in editor views, not as a live region, with one h1', () => {

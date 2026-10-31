@@ -115,7 +115,7 @@ describe('Overview', () => {
 
   it('obituary summary: template, draft started, then the publisher', () => {
     const { unmount } = setup();
-    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Start from the template');
+    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Start with a draft');
     unmount();
     const second = setup({ obituaryCity: 'Austin' });
     expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Draft started');
@@ -126,7 +126,7 @@ describe('Overview', () => {
 
   it('thank-yous summary: template, then draft started once the message is edited', () => {
     const { unmount } = setup();
-    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Start from the template');
+    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Start with a draft');
     unmount();
     setup({ thanksMessage: 'Thank you all.' });
     expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Draft started');

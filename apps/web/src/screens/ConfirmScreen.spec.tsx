@@ -56,7 +56,7 @@ describe('Review your message (Share the service)', () => {
   it('has a labelled text field holding the message', () => {
     render(<Harness />);
     expect(screen.getByLabelText('Your message')).toHaveValue(
-      "Margaret Hayes' service will be held June 14 at 2:00 PM, Oak Chapel.",
+      "Margaret Hayes' service will be held June 14 at 2:00 PM at Oak Chapel.",
     );
   });
 
@@ -120,7 +120,7 @@ describe('Review your message (Share the service)', () => {
     expect(screen.queryByText(/Florists near/)).not.toBeInTheDocument();
     await user.type(screen.getByLabelText(/A florist you.d like to name/), "Rose Shop, 617-555-0100");
     expect(screen.getByLabelText('Your message')).toHaveValue(
-      "Margaret Hayes' service will be held June 14 at 2:00 PM, Oak Chapel. If you'd like to send flowers, Rose Shop, 617-555-0100 can deliver to the service.",
+      "Margaret Hayes' service will be held June 14 at 2:00 PM at Oak Chapel. If you'd like to send flowers, Rose Shop, 617-555-0100 can deliver to the service.",
     );
   });
 
