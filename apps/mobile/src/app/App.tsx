@@ -179,16 +179,21 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     const changed: Details = {};
     if (before.personName !== name && name !== session.personName) changed.personName = name;
     if (before.dateOfPassing !== passed && passed !== session.dateOfPassing) changed.dateOfPassing = passed;
-    if (before.serviceDate !== service) changed.serviceDate = service;
+    // Equal to the saved value (a prefill) is not a change, so opening the form never re-writes it.
+    if (before.serviceDate !== service && service !== session.serviceDate) changed.serviceDate = service;
     if (Object.keys(changed).length > 0) onDetails(id, changed);
   }, [flow.step, id, name, passed, service, onDetails, session]);
 
   // The name and date typed at setup are already in the first form when it opens. Once per visit to
   // the form, so clearing a field is never filled back in.
-  const onForm = flow.step === 'details' || flow.step === 'announce';
+  // The obituary's first form is Who should know? (the contacts step), so it counts as a form too.
+  const onForm =
+    flow.step === 'details' ||
+    flow.step === 'announce' ||
+    (flow.step === 'contacts' && flow.templateCategory === 'obituary');
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
-  const { hasDraftContent, setMessageOverride, templateCategory: category } = flow;
+  const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;
   useEffect(() => {
     if (!onForm) {
       prefilled.current = false;
@@ -197,23 +202,25 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (prefilled.current) return;
     prefilled.current = true;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    const fresh = !hasDraftContent && messageOverride === null;
+    if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
+    if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
     // The planned details and edited wording (synced from the web) start a fresh form. A form with
-    // anything typed, or a hand-edited message, is never touched. Fields first: setField clears
-    // the override, so the override is set after.
-    if (!hasDraftContent && category) {
+    // anything typed, or a hand-edited message (even an empty one), is never touched. setField
+    // clears the override, so every field is set first and the override is the last call.
+    if (fresh && category) {
       const planned = sendPrefill(session, category);
       for (const [key, value] of Object.entries(planned.fields)) {
         if (has(key)) {
           setField(key, value);
         }
       }
+      // Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
       if (planned.messageOverride !== null) {
         setMessageOverride(planned.messageOverride);
       }
     }
-    if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
-    if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
-  }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, category, session]);
+  }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   const onFirstForm = flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template';

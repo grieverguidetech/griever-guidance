@@ -8,6 +8,7 @@ export type SendPrefillSource = Pick<
   SessionDetails,
   'personName' | 'dateOfPassing' | 'serviceDate'
 > &
+  Partial<Pick<SessionDetails, 'senderName'>> &
   Pick<
     SectionFields,
     | 'serviceTime'
@@ -47,6 +48,8 @@ export function sendPrefill(
 ): SendPrefill {
   const candidates: Record<string, string> = {
     deceasedName: text(source.personName),
+    // Local only: senderName never syncs, but the thank-you form asks for it, and typing it would clear the message.
+    senderName: text(source.senderName),
     dateOfPassing: text(source.dateOfPassing),
     serviceDate: text(source.serviceDate),
     serviceTime: text(source.serviceTime),
