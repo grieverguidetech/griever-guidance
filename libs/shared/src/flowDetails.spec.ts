@@ -14,6 +14,9 @@ import {
   parseFlowPatch,
   parseFlowDetails,
   parseFlowFacts,
+  parseFlowRecord,
+  pickFlowDetails,
+  withServicePair,
   splitSyncedPatch,
   statusMapToFlat,
   toFlowDetails,
@@ -426,5 +429,62 @@ describe('mergeSyncedFieldsWithChanges', () => {
     );
     expect(merged.servicePlace).toBeNull();
     expect(changed).toEqual({ servicePlace: null });
+  });
+});
+
+describe('parseFlowRecord details handling', () => {
+  const base = {
+    id: '123e4567-e89b-12d3-a456-426614174000',
+    ownerId: '223e4567-e89b-12d3-a456-426614174000',
+    role: 'owner',
+    facts: {
+      personName: 'Joan',
+      dateOfPassing: null,
+      serviceDate: null,
+      obituaryUrl: null,
+      obituaryPublisher: null,
+      serviceReady: true,
+    },
+    updatedAt: '2026-10-12T10:00:00Z',
+    updatedBy: null,
+  };
+
+  it('keeps a full details object, as the data function returns it', () => {
+    const details = toFlowDetails({});
+    expect(parseFlowRecord({ ...base, details })?.details).toEqual(details);
+  });
+
+  it('drops only the details when they fail validation, and keeps the facts', () => {
+    const record = parseFlowRecord({ ...base, details: { serviceStatus: 'done' } });
+    expect(record?.facts.personName).toBe('Joan');
+    expect(record).not.toHaveProperty('details');
+  });
+
+  it('drops only the details when they are not an object', () => {
+    const record = parseFlowRecord({ ...base, details: 'x' });
+    expect(record?.facts.serviceReady).toBe(true);
+    expect(record).not.toHaveProperty('details');
+  });
+
+  it('still rejects a record with bad facts', () => {
+    expect(parseFlowRecord({ ...base, facts: { ...base.facts, personName: 5 }, details: {} })).toBeNull();
+  });
+});
+
+describe('pickFlowDetails and withServicePair', () => {
+  it('copies only own detail keys that have a value', () => {
+    const source = Object.create({ serviceTime: 'inherited' }) as Record<string, unknown>;
+    Object.assign(source, { servicePlace: 'St. Mark', serviceNotes: undefined, personName: 'x' });
+    expect(pickFlowDetails(source)).toEqual({ servicePlace: 'St. Mark' });
+  });
+
+  it('widens either service key to both, and leaves other keys alone', () => {
+    expect([...withServicePair(['serviceReady'])].sort()).toEqual(['serviceReady', 'serviceStatus']);
+    expect([...withServicePair(['serviceStatus', 'personName'])].sort()).toEqual([
+      'personName',
+      'serviceReady',
+      'serviceStatus',
+    ]);
+    expect([...withServicePair(['personName'])]).toEqual(['personName']);
   });
 });

@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
-import { SYNCED_KEYS } from '@griever/shared';
-import type { FlowFacts } from '@griever/shared';
+import { SYNCED_KEYS, toFlowDetails } from '@griever/shared';
+import type { FlowDetails, FlowFacts } from '@griever/shared';
 import { freshDraft } from './useSendFlow.js';
 import type { SendFlowStorage } from './useSendFlow.js';
 import { readRemovedFlows, REMOVED_FLOWS_STORAGE_KEY, useSessions, writeRemovedFlows } from './useSessions.js';
@@ -995,5 +995,108 @@ describe('useFlowSync details (DS-7)', () => {
     await act(async () => wakes.forEach((fn) => fn()));
     await advance(10);
     expect(view.result.current.sessions[0].serviceMessage).toBe('My words');
+  });
+});
+
+describe('service keys sync as stored (real useSessions)', () => {
+  /** The data function returns every detail key: nulls, burialPrivate false, null statuses. */
+  const emptyDetails = (over: Partial<FlowDetails> = {}): FlowDetails => ({ ...toFlowDetails({}), ...over });
+
+  function deviceB(getBody: (flowId: string) => unknown, putOffline = false) {
+    let flowId = '';
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') {
+        return { status: 200, body: getBody(flowId) };
+      }
+      return putOffline ? 'offline' : { status: 200, body: getBody(flowId) };
+    });
+    const wakes = new Set<() => void>();
+    const view = renderHook(
+      (props: { enabled: boolean }) => {
+        const s = useSessions();
+        useFlowSync({
+          sessions: s.sessions,
+          userId: USER,
+          getAccessToken: async () => 'tok',
+          enabled: props.enabled,
+          subscribe: (fn) => {
+            wakes.add(fn);
+            return () => void wakes.delete(fn);
+          },
+          applyRemoteFlows: s.applyRemoteFlows,
+        });
+        return s;
+      },
+      { initialProps: { enabled: false } },
+    );
+    const setFlowId = (id: string) => {
+      flowId = id;
+    };
+    const wake = () => act(async () => wakes.forEach((fn) => fn()));
+    return { view, requests, setFlowId, wake };
+  }
+
+  const cases: Array<[string, boolean, Partial<FlowDetails>, string | undefined]> = [
+    ['Gate Yes with the section not started', true, { serviceStatus: null }, undefined],
+    ['Gate Yes with the section in progress', true, { serviceStatus: 'in_progress' }, 'in_progress'],
+  ];
+
+  for (const [name, ready, detailOver, status] of cases) {
+    for (const path of ['add', 'merge'] as const) {
+      it(`keeps both values and queues nothing: ${name} (${path} path)`, async () => {
+        const body = (flowId: string) => [
+          { ...record({ serviceReady: ready }, USER, flowId || FLOW), details: emptyDetails(detailOver) },
+        ];
+        const b = deviceB(body);
+        if (path === 'merge') {
+          act(() => {
+            b.view.result.current.createSession({ personName: 'Margaret Hayes' });
+          });
+          b.setFlowId(b.view.result.current.sessions[0].flowId);
+        }
+        b.view.rerender({ enabled: true });
+        await advance(10);
+        const [s] = b.view.result.current.sessions;
+        expect(s.serviceReady).toBe(true);
+        expect(s.sectionStatus?.service).toBe(status);
+        await b.wake();
+        await advance(EDIT_DEBOUNCE_MS + 10);
+        expect(writes(b.requests)).toEqual([]);
+        expect(b.view.result.current.sessions[0].serviceReady).toBe(true);
+        expect(b.view.result.current.sessions[0].sectionStatus?.service).toBe(status);
+      });
+    }
+  }
+
+  it('a remote change to one service key while the other is pending sends no PATCH for the remote key', async () => {
+    let pulls = 0;
+    const body = (flowId: string) => {
+      pulls += 1;
+      // The first pull matches the device. Later pulls bring a remote service status.
+      const serviceStatus = pulls === 1 ? null : 'in_progress';
+      return [{ ...record({ serviceReady: false }, USER, flowId), details: emptyDetails({ serviceStatus }) }];
+    };
+    const b = deviceB(body, true);
+    act(() => {
+      b.view.result.current.createSession({ personName: 'Margaret Hayes' });
+    });
+    const local = b.view.result.current.sessions[0];
+    b.setFlowId(local.flowId);
+    b.view.rerender({ enabled: true });
+    await advance(10);
+    // Local edit to serviceReady only; the server write fails, so it stays pending across pulls.
+    act(() => b.view.result.current.setServiceReady(local.id, true));
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    await b.wake();
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    await b.wake();
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(pulls).toBeGreaterThan(1);
+    const sent = writes(b.requests);
+    expect(sent.length).toBeGreaterThan(0);
+    for (const req of sent) {
+      expect(req.body).toEqual({ serviceReady: true });
+    }
+    expect(b.view.result.current.sessions[0].serviceReady).toBe(true);
   });
 });

@@ -465,12 +465,17 @@ describe('parseFlowRecord details (DS-7)', () => {
     ['text over its cap', { serviceTime: 'x'.repeat(101) }],
     ['a control character', { serviceNotes: 'a\u0001b' }],
     ['a non-boolean burialPrivate', { burialPrivate: 'yes' }],
-  ])('rejects the record for %s', (_label, details) => {
-    expect(parseFlowRecord({ ...base, details })).toBeNull();
+  ])('keeps the facts and drops only the details for %s', (_label, details) => {
+    const out = parseFlowRecord({ ...base, details });
+    expect(out?.facts).toEqual(parseFlowRecord(base)?.facts);
+    expect(out).not.toHaveProperty('details');
   });
 
-  it('rejects details that are not an object', () => {
-    expect(parseFlowRecord({ ...base, details: [] })).toBeNull();
-    expect(parseFlowRecord({ ...base, details: 'x' })).toBeNull();
+  it('drops details that are not an object, and keeps the facts', () => {
+    for (const details of [[], 'x']) {
+      const out = parseFlowRecord({ ...base, details });
+      expect(out?.facts.personName).toBe('Margaret Hale');
+      expect(out).not.toHaveProperty('details');
+    }
   });
 });

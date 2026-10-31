@@ -1,6 +1,6 @@
-import { createFlow, listFlows, patchFlow } from './flows.js';
+import { createFlow, listFlows, patchFlow, pickFlowDetails } from './flows.js';
 import { configureApiClient } from './client.js';
-import type { FlowFacts } from '@griever/shared';
+import { pickFlowDetails as sharedPickFlowDetails, type FlowFacts } from '@griever/shared';
 
 const fetchMock = vi.fn();
 const ACCESS = 'access-token-abc';
@@ -225,9 +225,21 @@ describe('round 2 behaviour', () => {
     });
   });
 
-  it('listFlows drops a record whose details are invalid', async () => {
+  it('listFlows keeps the facts of a record whose details are invalid, and drops only the details', async () => {
     fetchMock.mockResolvedValue(json(200, [{ ...record, details: { serviceStatus: 'done' } }]));
-    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [], dropped: 1 });
+    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [record], dropped: 0 });
+  });
+
+  it('a write reply with invalid details is a success without details, not a failure', async () => {
+    const bad = { ...record, details: { serviceStatus: 'done' } };
+    fetchMock.mockResolvedValue(json(200, bad));
+    expect(await createFlow(ACCESS, ID, facts)).toEqual({ ok: true, flow: record });
+    fetchMock.mockResolvedValue(json(200, bad));
+    expect(await patchFlow(ACCESS, ID, { serviceDate: 'June 4' })).toEqual({ ok: true, flow: record });
+  });
+
+  it('pickFlowDetails is the shared helper', () => {
+    expect(pickFlowDetails).toBe(sharedPickFlowDetails);
   });
 
   it('create sends facts and detail keys flat, null messages included', async () => {

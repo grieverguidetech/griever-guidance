@@ -23,6 +23,7 @@ import {
   parseCompleteDate,
   SECTION_ORDER,
   toSyncedFields,
+  withServicePair,
 } from '@griever/shared';
 import { freshDraft, hasDraftInProgress } from './useSendFlow.js';
 import type { SendFlowDraft, SendFlowStorage } from './useSendFlow.js';
@@ -399,41 +400,6 @@ export function generateFlowId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-type SessionStatusMap = NonNullable<Session['sectionStatus']>;
-
-/**
- * Keeps `serviceStatus` and `serviceReady` as one fact, as `setSectionStatus('service', ...)` does
- * locally. A changed remote status decides the flag. A changed remote flag alone decides the status
- * (`true` becomes 'ready'; `false` only clears a 'ready' status). Returns the extra keys to apply.
- */
-function coupleService(
-  changed: Record<string, unknown>,
-  currentStatus: SessionStatusMap | undefined,
-): Record<string, unknown> {
-  if ('serviceStatus' in changed) {
-    return { serviceReady: changed.serviceStatus === 'ready' };
-  }
-  if ('serviceReady' in changed) {
-    if (changed.serviceReady === true) {
-      return { serviceStatus: 'ready' };
-    }
-    if (currentStatus?.service === 'ready') {
-      return { serviceStatus: null };
-    }
-  }
-  return {};
-}
-
-/** The two service keys are protected together: a pending edit to one keeps both local. */
-function withServicePair(pending: Iterable<SyncedKey>): Set<SyncedKey> {
-  const keys = new Set<SyncedKey>(pending);
-  if (keys.has('serviceStatus') || keys.has('serviceReady')) {
-    keys.add('serviceStatus');
-    keys.add('serviceReady');
-  }
-  return keys;
-}
-
 /** Updates one session from a server record. Only synced fields without a pending edit can change. */
 function mergeRecordIntoSession(
   session: Session,
@@ -448,7 +414,7 @@ function mergeRecordIntoSession(
     withServicePair(pending),
   );
   // Only the changed keys are written, so text being typed or a pending edit is never rewritten.
-  const wire: Record<string, unknown> = { ...changed, ...coupleService(changed, session.sectionStatus) };
+  const wire: Record<string, unknown> = { ...changed };
   const factKeys = new Set<string>(FLOW_FACT_KEYS);
   const factPatch: Record<string, unknown> = {};
   const detailPatch: Record<string, unknown> = {};
@@ -477,12 +443,6 @@ function sessionFromRecord(record: FlowRecord, myUserId: string): Session {
   const lastOpenedAt = new Date(Number.isNaN(updated) ? 0 : updated).toISOString();
   const details = flowDetailsToSessionFields(record.details ?? {});
   const facts = flowFactsToSessionFields(record.facts);
-  const status = record.details?.serviceStatus;
-  if (status !== undefined) {
-    facts.serviceReady = status === 'ready';
-  } else if (facts.serviceReady) {
-    details.sectionStatus = { ...details.sectionStatus, service: 'ready' };
-  }
   return {
     ...facts,
     ...details,
