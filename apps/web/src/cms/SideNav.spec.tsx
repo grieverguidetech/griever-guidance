@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { SideNav } from './SideNav';
@@ -151,6 +151,14 @@ describe('SideNav', () => {
     expect(screen.queryByText('Margaret Hale')).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
     expect(onSelect).toHaveBeenCalledWith('account');
+  });
+
+  it('with accountOnly marks "Your account" current only when the account is showing', () => {
+    setup({ accountOnly: true, section: 'overview' });
+    expect(screen.getByRole('button', { name: 'Your account' })).not.toHaveAttribute('aria-current');
+    cleanup();
+    setup({ accountOnly: true, section: 'account' });
+    expect(screen.getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('holds no hard-coded copy', () => {

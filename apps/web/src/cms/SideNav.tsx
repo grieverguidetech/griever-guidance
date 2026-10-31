@@ -100,7 +100,12 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
         <nav aria-label={copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">
             <li>
-              <button type="button" className="gg-row" onClick={() => onSelect('account')}>
+              <button
+                type="button"
+                className={`gg-row ${section === 'account' ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`}
+                aria-current={section === 'account' ? 'page' : undefined}
+                onClick={() => onSelect('account')}
+              >
                 <span>{navTitle('account')}</span>
               </button>
             </li>

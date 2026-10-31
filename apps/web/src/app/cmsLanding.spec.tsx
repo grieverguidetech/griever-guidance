@@ -265,6 +265,7 @@ describe('landing with the editor on (#448)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Your account');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
     await user.click(screen.getByRole('button', { name: PEOPLE }));
     const people = await h1(PEOPLE);
     await waitFor(() => expect(people).toHaveFocus());
