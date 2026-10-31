@@ -132,7 +132,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
         )}
-        {peopleView || section === 'overview' ? null : <p className="gg-hint">{shellCopy.saveLine}</p>}
+        {peopleView || section === 'overview' || section === 'account' ? null : <p className="gg-hint">{shellCopy.saveLine}</p>}
         {notice}
         <div key={`${section}:${title ?? ''}`} className="gg-enter flex flex-col gap-4">
           {children}

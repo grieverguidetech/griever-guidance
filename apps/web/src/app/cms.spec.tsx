@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
   getMembers: vi.fn(),
   updateProfile: vi.fn(),
+  createInvite: vi.fn(),
+  revokeInvite: vi.fn(),
 }));
 
 vi.mock('../lib/features', () => ({
@@ -38,7 +40,10 @@ vi.mock('../lib/authClient', async (importOriginal) => {
 });
 vi.mock('@griever/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@griever/api-client')>();
-  return { ...actual, getProfile: mocks.getProfile, getMembers: mocks.getMembers, updateProfile: mocks.updateProfile };
+  return { ...actual, getProfile: mocks.getProfile, getMembers: mocks.getMembers, updateProfile: mocks.updateProfile,
+    createInvite: mocks.createInvite,
+    revokeInvite: mocks.revokeInvite,
+  };
 });
 
 import { App } from './app';
@@ -97,6 +102,8 @@ beforeEach(() => {
   mocks.getProfile.mockReset();
   mocks.getMembers.mockReset();
   mocks.updateProfile.mockReset();
+  mocks.createInvite.mockReset();
+  mocks.revokeInvite.mockReset();
   window.localStorage.clear();
 });
 
@@ -329,7 +336,8 @@ describe('editor on, signed in (#395)', () => {
     await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { senderName: 'Anna Reyes' });
-    await waitFor(() => expect(screen.queryByRole('heading', { level: 1, name: 'What should we call you?' })).not.toBeInTheDocument());
+    // Back to where they were: the editor they came from, not the account.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
   });
 
@@ -342,7 +350,32 @@ describe('editor on, signed in (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Your account' });
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    await waitFor(() => expect(screen.queryByRole('heading', { level: 1, name: 'Your account' })).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: 'Sign in with the test provider' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your account' })).not.toBeInTheDocument();
+  });
+
+  it('sends and cancels an invitation from inside the editor', async () => {
+    mocks.sharing = true;
+    const invite = { id: 'i1', email: 'sam@example.com', expiresAt: '2026-11-30T00:00:00.000Z' };
+    mocks.getMembers
+      .mockResolvedValueOnce({ ok: true, view: { role: 'owner', members: [], invites: [] } })
+      .mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [invite] } });
+    mocks.createInvite.mockResolvedValue({ ok: true });
+    mocks.revokeInvite.mockResolvedValue({ ok: true });
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await screen.findByRole('heading', { name: 'People helping you' });
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Their email'), 'Sam@Example.com');
+    await user.click(screen.getByRole('button', { name: 'Send an invitation' }));
+    await waitFor(() => expect(mocks.createInvite).toHaveBeenCalledWith(expect.anything(), 'sam@example.com'));
+    await user.click(await screen.findByRole('button', { name: /Cancel this invitation/ }));
+    await waitFor(() => expect(mocks.revokeInvite).toHaveBeenCalledWith(expect.anything(), 'i1'));
   });
 
   it('a member has no "Create a new one"', async () => {

@@ -1008,6 +1008,14 @@ function AppBody({
           setCreating(false);
           void auth.signOut();
         }}
+        settings={{
+          onRemoveEverything: removeEverything,
+          signsOut: true,
+          removeMember:
+            sharingOn && members.view?.role === 'owner' ? (
+              <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
+            ) : undefined,
+        }}
       />,
     );
   }

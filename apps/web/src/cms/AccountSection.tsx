@@ -19,13 +19,15 @@ interface ProfileProps {
   /** Resolves true when saved. A false result keeps what was typed. */
   onSave: (name: string) => Promise<boolean>;
   onSignOut: () => void;
+  /** The Settings actions (remove a member, remove everything from this device), shown under the account content. */
+  settings?: SettingsProps;
 }
 
 /**
  * The signed-in account content inside the CMS shell: name, sign out, the list, and people helping.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, error, showChecklist = true, peopleHelping, onSave, onSignOut }: ProfileProps) {
+export function AccountSection({ asksName, senderName, error, showChecklist = true, peopleHelping, onSave, onSignOut, settings }: ProfileProps) {
   const id = useId();
   const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave });
   const showList = showChecklist && !asksName;
@@ -48,7 +50,7 @@ export function AccountSection({ asksName, senderName, error, showChecklist = tr
   return (
     <>
       <form className="gg-panel flex flex-col gap-3" onSubmit={onSubmit} noValidate>
-        {asksName ? <p className="gg-hint m-0">{copy.askIntro}</p> : null}
+        {asksName ? <p id={`${id}-intro`} className="gg-hint m-0">{copy.askIntro}</p> : null}
         <label htmlFor={`${id}-name`} className="font-semibold">
           {copy.nameLabel}
         </label>
@@ -59,7 +61,8 @@ export function AccountSection({ asksName, senderName, error, showChecklist = tr
           autoComplete="name"
           autoCapitalize="words"
           value={value}
-          aria-describedby={`${id}-status`}
+          aria-describedby={asksName ? `${id}-intro ${id}-status` : `${id}-status`}
+          aria-invalid={isError ? true : undefined}
           onChange={(event) => changeName(event.target.value)}
         />
         <p id={`${id}-status`} role="status" aria-live="polite" className={`m-0 text-[13px] ${isError ? 'font-semibold' : 'gg-hint'}`}>
@@ -84,6 +87,7 @@ export function AccountSection({ asksName, senderName, error, showChecklist = tr
         </section>
       ) : null}
       {peopleHelping}
+      {settings ? <AccountSettingsSection {...settings} /> : null}
     </>
   );
 }

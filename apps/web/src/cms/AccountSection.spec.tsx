@@ -70,6 +70,43 @@ describe('AccountSection', () => {
     expect(screen.getByRole('heading', { level: 2, name: "What you'll need" })).toBeInTheDocument();
   });
 
+  it('shows the Settings actions under the account content when given, and none otherwise', async () => {
+    const user = userEvent.setup();
+    const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        settings={{ onRemoveEverything, signsOut: true, removeMember: <h2>Remove a member</h2> }}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 2, name: 'Remove a member' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
+    expect(screen.getByText(/You'll be signed out on this device/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
+    expect(onRemoveEverything).toHaveBeenCalledTimes(1);
+    unmount();
+    profile();
+    expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
+  });
+
+  it('describes the field by the intro and the status, and flags an error', () => {
+    const { unmount } = render(
+      <AccountSection asksName senderName={null} error="We couldn't save your name. You can try again." onSave={vi.fn()} onSignOut={vi.fn()} />,
+    );
+    const field = screen.getByLabelText('Your name');
+    const ids = (field.getAttribute('aria-describedby') ?? '').split(' ');
+    expect(ids).toHaveLength(2);
+    expect(document.getElementById(ids[0])).toHaveTextContent('This is the name on your account.');
+    expect(document.getElementById(ids[1])).toHaveTextContent("We couldn't save your name");
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    unmount();
+    profile();
+    expect(screen.getByLabelText('Your name')).not.toHaveAttribute('aria-invalid');
+  });
+
   it('shows the people helping node under the form', () => {
     profile({ peopleHelping: <h2>People helping you</h2> });
     expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
