@@ -1,5 +1,9 @@
 import type { Session } from '@griever/hooks';
-import { parseCompleteDate } from '@griever/shared';
+import { buildObituaryDraft, fill, screenCopy } from '@griever/copy';
+import { announcePassing, defaultServiceEventsMessage, parseCompleteDate } from '@griever/shared';
+
+const thanksCopy = screenCopy('cmsThanks');
+const obituaryDraftCopy = screenCopy('obituaryDraft');
 
 /** The copy keys the file needs. The headings live in libs/copy so the wording is in one place. */
 export interface PlansCopy {
@@ -34,6 +38,11 @@ export type PlanPerson = Partial<
   Pick<
     Session,
     | 'personName'
+    | 'obituaryUrl'
+    | 'obituaryCity'
+    | 'obituaryCareer'
+    | 'obituarySurvivors'
+    | 'obituaryNote'
     | 'dateOfPassing'
     | 'birthDate'
     | 'serviceType'
@@ -96,6 +105,56 @@ function section(heading: string, body: string[]): string[] {
   return [heading, '-'.repeat(heading.length), ...body, ''];
 }
 
+/**
+ * The four messages follow the person's details until the family edits them (undefined), so the
+ * same builders the editor sections use fill in an unedited one. A string is the family's wording;
+ * '' means they cleared it and the part is left out.
+ */
+function messages(person: PlanPerson) {
+  const name = person.personName ?? '';
+  return {
+    announcement:
+      person.announcementMessage ??
+      announcePassing.renderMessage({ deceasedName: name, dateOfPassing: person.dateOfPassing ?? '' }),
+    service:
+      person.serviceMessage ??
+      defaultServiceEventsMessage({
+        personName: name,
+        serviceDate: person.serviceDate,
+        obituaryUrl: person.obituaryUrl ?? '',
+        serviceTime: person.serviceTime,
+        servicePlace: person.servicePlace,
+        serviceAddress: person.serviceAddress,
+        serviceNotes: person.serviceNotes,
+        visitationDate: person.visitationDate,
+        visitationTime: person.visitationTime,
+        visitationPlace: person.visitationPlace,
+        burialDate: person.burialDate,
+        burialTime: person.burialTime,
+        burialPlace: person.burialPlace,
+        burialPrivate: person.burialPrivate,
+        receptionDate: person.receptionDate,
+        receptionTime: person.receptionTime,
+        receptionPlace: person.receptionPlace,
+      }),
+    obituary:
+      person.obituaryText ??
+      buildObituaryDraft(
+        {
+          fullName: name,
+          dateOfBirth: person.birthDate,
+          dateOfPassing: person.dateOfPassing ?? undefined,
+          cityOfResidence: person.obituaryCity,
+          career: person.obituaryCareer,
+          survivors: person.obituarySurvivors,
+          personalNote: person.obituaryNote,
+        },
+        obituaryDraftCopy,
+      ),
+    thanks: person.thanksMessage ?? fill(thanksCopy.template, { deceasedName: name.trim() || thanksCopy.nameFallback }),
+  };
+}
+
 function personBlock(person: PlanPerson, copy: PlansCopy): string[] {
   const name = clean(person.personName) || copy.fileUnnamed;
   const dates = labelled([
@@ -120,16 +179,17 @@ function personBlock(person: PlanPerson, copy: PlansCopy): string[] {
     [copy.fileServiceNotes, clean(person.serviceNotes)],
   ]);
   const text = (heading: string, value: string | undefined) => (clean(value) === '' ? [] : section(heading, [clean(value)]));
+  const message = messages(person);
   return [
     name,
     '='.repeat(name.length),
     '',
     ...section(copy.fileDatesHeading, dates),
     ...section(copy.fileServiceHeading, service),
-    ...text(copy.fileAnnouncementHeading, person.announcementMessage),
-    ...text(copy.fileServiceMessageHeading, person.serviceMessage),
-    ...text(copy.fileObituaryHeading, person.obituaryText),
-    ...text(copy.fileThanksHeading, person.thanksMessage),
+    ...text(copy.fileAnnouncementHeading, message.announcement),
+    ...text(copy.fileServiceMessageHeading, message.service),
+    ...text(copy.fileObituaryHeading, message.obituary),
+    ...text(copy.fileThanksHeading, message.thanks),
   ];
 }
 

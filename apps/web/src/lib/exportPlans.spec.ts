@@ -50,12 +50,48 @@ describe('buildPlansText', () => {
   });
 
   it('leaves out empty parts and never writes undefined or null', () => {
-    const text = buildPlansText([{ personName: 'Sam', obituaryText: '  A kind man. ', thanksMessage: '   ', dateOfPassing: null }], copy);
+    const cleared = { announcementMessage: '', serviceMessage: '', thanksMessage: '   ' };
+    const text = buildPlansText([{ personName: 'Sam', obituaryText: '  A kind man. ', dateOfPassing: null, ...cleared }], copy);
     expect(text).toContain('Sam\n===');
     expect(text).toContain('Obituary\n--------\nA kind man.');
     for (const gone of ['Dates', 'Service details', 'Announcement', 'Service message', 'Thank-you message', 'undefined', 'null']) {
       expect(text).not.toContain(gone);
     }
+  });
+
+  it('leaves out an obituary the family cleared, even when the inputs are filled in', () => {
+    const text = buildPlansText([{ personName: 'Sam', obituaryText: '', obituaryCity: 'Reno', obituaryCareer: 'a teacher' }], copy);
+    expect(text).not.toContain('Obituary');
+    expect(text).not.toContain('Reno');
+  });
+
+  it('writes the obituary the editor shows when the text was never edited', () => {
+    const text = buildPlansText(
+      [{ personName: 'Sam Reed', dateOfPassing: '2026-05-29', obituaryCity: 'Reno', obituaryCareer: 'a teacher' }],
+      copy,
+    );
+    expect(text).toContain('Obituary\n--------\n');
+    expect(text).toContain('Sam Reed');
+    expect(text).toContain('Reno');
+    expect(text).toContain('teacher');
+    expect(text).not.toContain('undefined');
+  });
+
+  it('writes the service message the editor shows when it was never edited', () => {
+    const text = buildPlansText(
+      [{ personName: 'Sam Reed', serviceDate: '2026-06-06', serviceTime: '2:00 PM', servicePlace: 'Oak Hall' }],
+      copy,
+    );
+    const body = text.split('Service message\n---------------\n')[1];
+    expect(body).toContain('Oak Hall');
+    expect(body).toContain('2:00 PM');
+  });
+
+  it('writes the announcement and thank-you message that follow the name when never edited', () => {
+    const text = buildPlansText([{ personName: 'Sam Reed' }], copy);
+    expect(text).toContain('Announcement\n------------\n');
+    expect(text).toContain('Thank-you message\n-----------------\n');
+    expect(text).toContain('Sam Reed');
   });
 
   it('uses the "Not named yet" label and keeps text that is not a complete date as typed', () => {
