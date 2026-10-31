@@ -12,13 +12,16 @@ interface Props {
   message: string | null;
   /** Resolves true when the member was removed. */
   onRemove: (id: string) => Promise<boolean>;
+  /** 2 on its own; 3 when it sits beside the People helping you panel, which has the h2. */
+  headingLevel?: 2 | 3;
 }
 
 type Result = { kind: 'removed'; name: string } | { kind: 'failed' } | null;
 type FocusTarget = { row: string } | 'heading' | null;
 
 /** Shown inside Settings, the only place removal is offered (C9): a button and a confirm step, never a swipe. */
-export function RemoveMember({ members, message, onRemove }: Props) {
+export function RemoveMember({ members, message, onRemove, headingLevel = 2 }: Props) {
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<Result>(null);
@@ -83,14 +86,14 @@ export function RemoveMember({ members, message, onRemove }: Props) {
       aria-labelledby="remove-member-heading"
       className="flex flex-col gap-3"
     >
-      <h2
+      <Heading
         id="remove-member-heading"
         ref={headingRef}
         tabIndex={-1}
         className="text-[16px] m-0"
       >
         People helping you
-      </h2>
+      </Heading>
       <div role="status" aria-live="polite" className="text-[13px]">
         {status}
       </div>

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AccountSection, AccountSettingsSection, checkDetails } from './AccountSection';
 
@@ -80,10 +80,10 @@ describe('AccountSection', () => {
         error={null}
         onSave={vi.fn()}
         onSignOut={vi.fn()}
-        settings={{ onRemoveEverything, signsOut: true, removeMember: <h2>Remove a member</h2> }}
+        settings={{ onRemoveEverything, signsOut: true, removeMember: <h2>People helping you</h2> }}
       />,
     );
-    expect(screen.getByRole('heading', { level: 2, name: 'Remove a member' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
     expect(screen.getByText(/You'll be signed out on this device/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
@@ -163,10 +163,10 @@ describe('AccountSettingsSection', () => {
   it('confirms before removing, then removes', async () => {
     const user = userEvent.setup();
     const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
-    render(<AccountSettingsSection onRemoveEverything={onRemoveEverything} removeMember={<h2>Remove a member</h2>} />);
+    render(<AccountSettingsSection onRemoveEverything={onRemoveEverything} removeMember={<h2>People helping you</h2>} />);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Remove a member' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
     expect(onRemoveEverything).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
@@ -333,7 +333,33 @@ describe('AccountSection plans', () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(await readBlob(create.mock.calls[0][0] as Blob)).toContain('A kind man.');
     expect(click).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('Your copy is downloading.')).toBeInTheDocument();
+    expect(await screen.findByText('A copy was made. Check your downloads.')).toBeInTheDocument();
+  });
+
+  it('clears the download note after about ten seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      Object.assign(URL, { createObjectURL: vi.fn().mockReturnValue('blob:x'), revokeObjectURL: vi.fn() });
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Download a copy' }));
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      expect(screen.getByText('A copy was made. Check your downloads.')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+      expect(screen.queryByText('A copy was made. Check your downloads.')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says contacts, not drafts, are left out of the copy', () => {
+    render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
+    expect(screen.getByText(/Contacts are not in it\./)).toBeInTheDocument();
+    expect(screen.queryByText(/drafts/)).not.toBeInTheDocument();
   });
 
   it('says there is nothing to save, and offers no download, when there are no people', () => {
@@ -357,12 +383,16 @@ describe('AccountSection plans', () => {
         onSave={vi.fn()}
         onSignOut={vi.fn()}
         plans={[{ personName: 'Sam' }]}
-        settings={{ onRemoveEverything, removeMember: <h2>Remove a member</h2> }}
+        peopleHelping={<h2>People helping you</h2>}
+        settings={{ onRemoveEverything, removeMember: <h3>People helping you</h3> }}
       />,
     );
-    const headings = screen.getAllByRole('heading', { level: 2, name: 'Remove a member' });
-    expect(headings).toHaveLength(1);
-    expect(headings[0].parentElement).toHaveClass('gg-panel');
+    const headings = screen.getAllByRole('heading', { name: 'People helping you' });
+    expect(headings.map((h) => h.tagName)).toEqual(['H2', 'H3']);
+    expect(headings[1].parentElement).toHaveClass('gg-panel');
+    // The device removal sits inside Your plans, one level under its h2.
+    const plansPanel = screen.getByRole('region', { name: 'Your plans' });
+    expect(within(plansPanel).getByRole('heading', { level: 3, name: 'Remove everything from this device' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
     expect(onRemoveEverything).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
@@ -413,8 +443,8 @@ describe('AccountSection phone and support panels', () => {
     const panel = screen.getByRole('region', { name: 'On your phone' });
     const items = within(panel).getAllByRole('listitem').map((li) => li.textContent);
     expect(items).toEqual([
-      'AnnouncementTell close family and friends, one at a time from your phone.',
-      'Thank-yousThank the people who helped, one at a time.',
+      'Announcement Tell close family and friends, one at a time from your phone.',
+      'Thank-yous Thank the people who helped, one at a time.',
     ]);
     expect(within(panel).getByText('Sending happens in the Grievers Guidance phone app, not on this page.')).toBeInTheDocument();
     expect(within(panel).getByText('The app is not in the app stores yet.')).toBeInTheDocument();
@@ -435,5 +465,7 @@ describe('AccountSection phone and support panels', () => {
     const link = within(panel).getByRole('link', { name: 'grieversguidancetech@gmail.com' });
     expect(link.getAttribute('href')).toMatch(/^mailto:grieversguidancetech@gmail\.com\?subject=/);
     expect(link.className).toContain('min-h-[44px]');
+    expect(link.className).toContain('[overflow-wrap:anywhere]');
+    expect(link.className).not.toContain('break-all');
   });
 });

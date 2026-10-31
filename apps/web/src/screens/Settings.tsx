@@ -18,10 +18,13 @@ interface BodyProps {
   removeMember?: ReactNode;
   /** Told when removing starts and stops, so the screen can hold its Back button. */
   onPendingChange?: (pending: boolean) => void;
+  /** The level of the "Remove everything" heading: 2 on the Settings screen, 3 inside the Your plans panel. */
+  headingLevel?: 2 | 3;
 }
 
 /** The Settings content without its heading or Back button; the CMS shows it as a section. */
-export function SettingsBody({ onRemoveEverything, signsOut = false, removeMember, onPendingChange }: BodyProps) {
+export function SettingsBody({ onRemoveEverything, signsOut = false, removeMember, onPendingChange, headingLevel = 2 }: BodyProps) {
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
@@ -66,9 +69,9 @@ export function SettingsBody({ onRemoveEverything, signsOut = false, removeMembe
         aria-labelledby="remove-heading"
         className="flex flex-col gap-3 pt-4 mt-[var(--space-4)] border-t border-solid border-[color:var(--color-divider)] first:mt-0 first:pt-0 first:border-t-0"
       >
-        <h2 id="remove-heading" className="text-[16px] m-0">
+        <Heading id="remove-heading" className="text-[16px] m-0">
           Remove everything from this device
-        </h2>
+        </Heading>
         {!confirming ? (
           <>
             <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>

@@ -43,7 +43,7 @@ interface ProfileProps {
 }
 
 /**
- * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you, Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
+ * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you (with "remove a member" beside it), Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
 export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
@@ -141,7 +141,6 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
       ) : null}
       {plans ? (
         <>
-          {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
           <PlansPanel plans={plans} settings={settings} />
         </>
       ) : null}
@@ -172,6 +171,7 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
         </div>
       </section>
       {peopleHelping}
+      {plans && settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
       <SupportPanel />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-signout`}>
         <h2 id={`${id}-signout`} className="text-[16px] m-0">
@@ -219,7 +219,7 @@ function SupportPanel() {
       </h2>
       <p className="gg-hint m-0">{copy.supportBody}</p>
       <p className="m-0">
-        <a href={href} className="inline-flex items-center min-h-[44px] underline break-all">
+        <a href={href} className="inline-flex items-center min-h-[44px] underline [overflow-wrap:anywhere]">
           {copy.supportEmail}
         </a>
       </p>
@@ -244,7 +244,10 @@ function PlansPanel({ plans, settings }: PlansPanelProps) {
     setStatus('');
     downloadPlans(buildPlansText(plans, copy));
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setStatus(copy.plansDownloaded), 50);
+    timer.current = setTimeout(() => {
+      setStatus(copy.plansDownloaded);
+      timer.current = setTimeout(() => setStatus(''), 10000);
+    }, 50);
   }
 
   return (
@@ -263,7 +266,7 @@ function PlansPanel({ plans, settings }: PlansPanelProps) {
       <p role="status" aria-live="polite" className="gg-hint m-0 text-[13px]">
         {status}
       </p>
-      {settings ? <SettingsBody onRemoveEverything={settings.onRemoveEverything} signsOut={settings.signsOut} /> : null}
+      {settings ? <SettingsBody onRemoveEverything={settings.onRemoveEverything} signsOut={settings.signsOut} headingLevel={3} /> : null}
     </section>
   );
 }

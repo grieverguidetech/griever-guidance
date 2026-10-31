@@ -198,9 +198,10 @@ describe('Overview', () => {
       const card = screen.getByRole('region', { name: 'Ready to send from your phone' });
       expect(within(card).getByRole('heading', { level: 2, name: 'Ready to send from your phone' })).toBeInTheDocument();
       expect(within(card).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-        'AnnouncementTell close family and friends, one at a time from your phone.',
-        `Obituary${shell.phoneReadyObituary}`,
+        'Announcement Tell close family and friends, one at a time from your phone.',
+        `Obituary ${shell.phoneReadyObituary}`,
       ]);
+      expect(within(card).getByText('The app is not in the app stores yet.')).toBeInTheDocument();
       expect(within(card).queryByRole('progressbar')).not.toBeInTheDocument();
       expect(card.textContent).not.toMatch(/\d/);
     });
