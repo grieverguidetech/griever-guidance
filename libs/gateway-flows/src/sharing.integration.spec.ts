@@ -10,6 +10,7 @@ import {
   loadLocalConfig,
 } from '@griever/data-aws';
 import { DATA_USER_TOKEN_HEADER, type DataResult } from '@griever/shared';
+import { createFlowsRouter } from './flowsRouter.js';
 import { createMembersRouter } from './membersRouter.js';
 
 // A random table pair on DynamoDB Local for this file. CI sets AWS_LOCAL_REQUIRED=true.
@@ -41,7 +42,9 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
   const emails: string[] = [];
   let ownerToken: string;
   let joinerToken: string;
+  let signFor: (caller: Caller) => Promise<string>;
   let router: ReturnType<typeof createMembersRouter>;
+  let flows: ReturnType<typeof createFlowsRouter>;
 
   beforeAll(async () => {
     await ensureTables(dynamo, config);
@@ -59,6 +62,11 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
         privateJwk,
         'RS256',
       );
+    signFor = async (caller) => {
+      const t = await sign(caller);
+      tokens.set(t, caller);
+      return t;
+    };
     ownerToken = await sign(OWNER);
     joinerToken = await sign(JOINER);
     tokens.set(ownerToken, OWNER);
@@ -79,22 +87,28 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
         throw new Error(`unexpected fetch ${url}`);
       }),
     );
+    // Same call the gateway makes, handed to the data app in memory instead of over HTTP.
+    const callData = (async (_config: unknown, userToken: string, action: string, args: Record<string, unknown> = {}) => {
+      const response = await dataApp.request('/v1', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', [DATA_USER_TOKEN_HEADER]: userToken },
+        body: JSON.stringify({ action, args }),
+      });
+      if (response.status === 401) {
+        return { ok: false, code: 'unauthorized' } as DataResult;
+      }
+      return (await response.json()) as DataResult;
+    }) as never;
     router = createMembersRouter({
       getAuthConfig: () => ({ issuer: ISSUER, authorizedParties: [] }),
       getDataConfig: () => ({ url: 'http://127.0.0.1:3002' }),
       getMail: () => ({ apiKey: 're_test', from: 'hello@example.test', webUrl: 'https://app.example.test' }),
-      // Same call the gateway makes, handed to the data app in memory instead of over HTTP.
-      callData: (async (_config: unknown, userToken: string, action: string, args: Record<string, unknown> = {}) => {
-        const response = await dataApp.request('/v1', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', [DATA_USER_TOKEN_HEADER]: userToken },
-          body: JSON.stringify({ action, args }),
-        });
-        if (response.status === 401) {
-          return { ok: false, code: 'unauthorized' } as DataResult;
-        }
-        return (await response.json()) as DataResult;
-      }) as never,
+      callData,
+    });
+    flows = createFlowsRouter({
+      getAuthConfig: () => ({ issuer: ISSUER, authorizedParties: [] }),
+      getDataConfig: () => ({ url: 'http://127.0.0.1:3002' }),
+      callData,
     });
   });
 
@@ -140,6 +154,91 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
     const removed = await send(ownerToken, 'DELETE', `/members/${JOINER.userId}`);
     expect(removed.status).toBe(204);
     expect(await (await send(ownerToken, 'GET', '/members')).json()).toMatchObject({ role: 'owner', members: [] });
+  });
+
+  // Runs after the test above, which removed the member. Invites again, so the joiner helps the owner.
+  describe('person details through /flows', () => {
+    const FLOW_ID = '55555555-5555-4555-8555-555555555555';
+    const FACTS = {
+      personName: 'Margaret Hayes',
+      dateOfPassing: 'May 29, 2026',
+      serviceDate: null,
+      obituaryUrl: null,
+      obituaryPublisher: null,
+      serviceReady: false,
+    };
+    const sendFlows = (token: string, method: string, path: string, body?: unknown) =>
+      flows.request(path, {
+        method,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    const listed = async (token: string) =>
+      (await (await sendFlows(token, 'GET', '/flows')).json()) as {
+        id: string;
+        role: string;
+        details: Record<string, unknown>;
+      }[];
+
+    it('owner creates with details; a member reads them, edits one key, and a second device sees it', async () => {
+      const created = await sendFlows(ownerToken, 'POST', '/flows', {
+        id: FLOW_ID,
+        ...FACTS,
+        serviceType: 'Funeral',
+        servicePlace: 'St. Mary',
+        serviceMessage: null,
+        burialPrivate: true,
+        serviceStatus: 'ready',
+      });
+      expect(created.status).toBe(201);
+
+      // Owner, second device: a fresh GET returns the same detail keys.
+      const ownerView = (await listed(ownerToken)).find((f) => f.id === FLOW_ID);
+      expect(ownerView).toMatchObject({
+        role: 'owner',
+        details: { serviceType: 'Funeral', servicePlace: 'St. Mary', serviceMessage: null, burialPrivate: true, serviceStatus: 'ready' },
+      });
+
+      // Make the joiner a member.
+      const invite = await send(ownerToken, 'POST', '/invites', { email: JOINER.email });
+      expect(invite.status).toBe(201);
+      const raw = /#t=([A-Za-z0-9_-]{43})/.exec(JSON.parse(emails.at(-1)!).text)![1]!;
+      expect((await send(joinerToken, 'POST', '/invites/accept', { token: raw })).status).toBe(200);
+
+      const memberView = (await listed(joinerToken)).find((f) => f.id === FLOW_ID);
+      expect(memberView).toMatchObject({
+        role: 'member',
+        details: { serviceType: 'Funeral', burialPrivate: true, serviceStatus: 'ready' },
+      });
+
+      // The member changes one detail; other keys stay as they were.
+      const patched = await sendFlows(joinerToken, 'PATCH', `/flows/${FLOW_ID}`, { servicePlace: 'Chapel' });
+      expect(patched.status).toBe(200);
+      const after = (await listed(ownerToken)).find((f) => f.id === FLOW_ID);
+      expect(after?.details).toMatchObject({ servicePlace: 'Chapel', serviceType: 'Funeral', burialPrivate: true });
+    });
+
+    it('answers 400 for a forbidden key', async () => {
+      const res = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, { drafts: {} });
+      expect(res.status).toBe(400);
+    });
+
+    it('does not let a member create a person (C11)', async () => {
+      // Self-contained: this test makes its own owner and member, so it does not depend on the one above.
+      const ownerId = 'user_c11_owner';
+      const memberId = 'user_c11_member';
+      const owner = await signFor({ userId: ownerId, email: 'c11owner@example.test', emailVerified: true });
+      const member = await signFor({ userId: memberId, email: 'c11member@example.test', emailVerified: true });
+      expect((await send(owner, 'POST', '/invites', { email: 'c11member@example.test' })).status).toBe(201);
+      const raw = /#t=([A-Za-z0-9_-]{43})/.exec(JSON.parse(emails.at(-1)!).text)![1]!;
+      expect((await send(member, 'POST', '/invites/accept', { token: raw })).status).toBe(200);
+
+      const newId = '66666666-6666-4666-8666-666666666666';
+      const res = await sendFlows(member, 'POST', '/flows', { id: newId, ...FACTS });
+      expect(res.status).toBe(403);
+      expect((await listed(member)).map((f) => f.id)).not.toContain(newId);
+      expect((await listed(owner)).map((f) => f.id)).not.toContain(newId);
+    });
   });
 
   it('answers 404 when removing someone who is not your member', async () => {

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { clerkWebhookRouter, profileRouter } from '@griever/identity';
 import { messagesRouter } from '@griever/gateway-messages';
-import { membersRouter } from '@griever/gateway-flows';
+import { flowsRouter, membersRouter } from '@griever/gateway-flows';
 
 /**
  * The gateway composes three independent domain libs — identity, messages,
@@ -29,7 +29,7 @@ app.use(
     // header is ever sent. There is no "allow all" mode; CORS_ORIGINS must
     // be set explicitly (see apps/gateway/wrangler.toml and .env.local).
     origin: corsOrigins,
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   }),
 );
 
@@ -38,5 +38,6 @@ app.route('/', profileRouter);
 app.route('/', clerkWebhookRouter);
 app.route('/', messagesRouter);
 app.route('/', membersRouter);
+app.route('/', flowsRouter);
 
 export default app;
