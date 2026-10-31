@@ -1014,7 +1014,6 @@ function AppBody({
         asksName={askingName}
         senderName={auth.profile?.senderName ?? null}
         error={auth.error}
-        showChecklist={auth.isSignedIn}
         peopleHelping={
           sharingOn ? (
             <PeopleHelping

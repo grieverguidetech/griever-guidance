@@ -91,8 +91,21 @@ describe('localization (C7)', () => {
   });
 
   it('leaves the other strings as Clerk words them, apart from the "!"', () => {
-    expect(localization.signIn?.start?.title).toBe(enUS.signIn?.start?.title);
-    expect(localization.signIn?.start?.subtitle).toBe('Welcome back. Please sign in to continue');
+    expect(localization.signIn?.start?.actionLink__use_email).toBe(enUS.signIn?.start?.actionLink__use_email);
+    expect(localization.signUp?.start?.actionText).toBe(enUS.signUp?.start?.actionText);
+  });
+
+  it('greets a first visit calmly: no "Welcome back", and creating an account is named', () => {
+    const title = 'Sign in or create an account';
+    const subtitle = 'It takes a minute. Your details stay private.';
+    expect(localization.signIn?.start?.title).toBe(title);
+    expect(localization.signIn?.start?.subtitle).toBe(subtitle);
+    expect(localization.signIn?.start?.actionText).toBe('New here?');
+    expect(localization.signIn?.start?.actionLink).toBe('Create an account');
+    expect(localization.signUp?.start?.title).toBe(title);
+    expect(localization.signUp?.start?.subtitle).toBe(subtitle);
+    expect(JSON.stringify(localization.signIn?.start)).not.toMatch(/welcome back/i);
+    expect(JSON.stringify(localization.signUp?.start)).not.toMatch(/welcome/i);
   });
 });
 
