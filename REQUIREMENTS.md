@@ -21,8 +21,9 @@ Since 2026-10-30 the web has a second job (#385): a desk where the family plans 
 (the person, the service, later the announcement, obituary and thank-yous) so they can send from
 the phone without retyping. **Web = plan at a desk, mobile = send.**
 
-Sending the planned details from the phone needs sync, which comes in a later round. In round 1 the
-planning fields stay on the device that typed them.
+Sending the planned details from the phone needs sync. The sync was approved on 2026-10-30
+(DS-7, ADR 0001): the person's detail fields follow the person to the owner's other devices and
+members. Until the sync ships (#517 to #522), the planning fields stay on the device that typed them.
 
 Every requirement below is subordinate to that. If a requirement makes the app slower or more
 confusing for that person, the requirement is wrong.
@@ -114,7 +115,8 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | DS-3 | Sync is invisible — no spinners or "saving…" states | Partial | DATA.md §4.6 |
 | DS-4 | Deleted sessions soft-delete, hard-purge at 90 days | Removed | The Convex purge cron was removed (#203). No server holds sessions now |
 | DS-5 | "Delete everything" in settings purges immediately, clears every local store | Partial | The Convex server mutation was removed (#203). Local clearing only |
-| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through the AWS data function; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138). DATA.md "Shared people" |
+| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through the AWS data function; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138); the detail fields now follow in DS-7. DATA.md "Shared people" |
+| DS-7 | The person's detail fields (24 text fields for the person, service, visitation, burial, reception, announcement, obituary and thank-you; `burialPrivate`; the five section statuses) are shared with the same people as DS-6, through the same record. Per field, the last save to reach the server wins; no client timestamps. Text above the length caps is cut, not refused. Never shared: drafts, edited wording, recipients, contacts, sender name, checklist ticks and reminders | Not started (shared keys, caps and parser done in #516) | Approved by the product owner 2026-10-30. Keys and caps: `libs/shared/src/flowDetails.ts`. Follow-ups: #517 (data function), #518 (gateway), #519 (sync engine), #520 (web), #521 (mobile), #522 (phone prefill). The survivors' names in `obituarySurvivors` reach the server; this is accepted and recorded in `docs/adr/0001-person-details-sync.md`. The checklist does not sync yet (B9, SE-5) |
 
 ### 3.6 Marketing
 
@@ -127,8 +129,8 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 Added 2026-10-30 (#385, round 1). The web becomes a planning editor: the family plans at a desk,
 and the phone sends (C1). Everything here ships behind `VITE_FEATURE_CMS`, which is **on in
 production** (product owner, 2026-10-30: no users yet). With the flag off the web app is unchanged. Round 1 considers only The person and
-Service when it picks the next section. Round 1 planning fields stay on the device that typed them;
-sending them from the phone needs sync, which comes in a later round. Notes marked "round 1
+Service when it picks the next section. Planning fields sync between devices under DS-7 once it ships (ADR 0001); until then they stay
+on the device that typed them. Notes marked "round 1
 assumption" are the assumptions accepted in #385 (A1 to A9 and B1 to B10).
 
 | ID | Requirement | Status | Notes |
@@ -421,6 +423,14 @@ account. Sign-in is identity only; reaching a person's contacts is still the dev
 path described under "Contacts" and "The send flow". The two never merge.
 
 ---
+
+### Shared keys and caps
+
+`libs/shared/src/flowDetails.ts` is the one list of what may sync for a person. `SYNCED_KEYS` is the
+six facts (`libs/shared/src/flowFacts.ts`) plus the detail keys (`FLOW_DETAIL_KEYS`), with
+`FLOW_DETAIL_MAX_LENGTH` caps. The gateway and the data function both validate keys and lengths
+(C8) from this list. Adding a key is a privacy decision: it needs a change to DS-7 and DATA.md in the
+same PR. See `docs/adr/0001-person-details-sync.md`.
 
 ### Database
 

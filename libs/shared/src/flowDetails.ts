@@ -1,0 +1,337 @@
+// The detail fields of a person that sync between devices, next to the six facts in flowFacts.ts.
+// Same rules: a whitelist, caps that mirror the server, and nothing built by spreading a session
+// (C2, C3, C8). Drafts, edited wording, recipients, contact data, senderName, checklist ticks and
+// reminders never appear here.
+import { FLOW_FACT_KEYS, toFlowFacts, type FlowFacts } from './flowFacts.js';
+import type { SectionKey, SectionStatus } from './sections.js';
+
+export const FLOW_DETAIL_TEXT_KEYS = [
+  'birthDate',
+  'serviceType',
+  'serviceTime',
+  'servicePlace',
+  'serviceAddress',
+  'serviceNotes',
+  'serviceMessage',
+  'announcementMessage',
+  'obituaryText',
+  'obituaryCity',
+  'obituaryCareer',
+  'obituarySurvivors',
+  'obituaryNote',
+  'thanksMessage',
+  'visitationDate',
+  'visitationTime',
+  'visitationPlace',
+  'serviceOfficiant',
+  'burialDate',
+  'burialTime',
+  'burialPlace',
+  'receptionDate',
+  'receptionTime',
+  'receptionPlace',
+] as const;
+
+export type FlowDetailTextKey = (typeof FLOW_DETAIL_TEXT_KEYS)[number];
+
+/** The four composed messages. On the wire null means "follows the details" (local undefined). */
+export const FLOW_MESSAGE_KEYS = [
+  'serviceMessage',
+  'announcementMessage',
+  'obituaryText',
+  'thanksMessage',
+] as const satisfies readonly FlowDetailTextKey[];
+
+export type FlowMessageKey = (typeof FLOW_MESSAGE_KEYS)[number];
+
+/** The flat wire spelling of `sectionStatus`. */
+export const FLOW_STATUS_KEYS = [
+  'personStatus',
+  'announcementStatus',
+  'serviceStatus',
+  'obituaryStatus',
+  'thanksStatus',
+] as const;
+
+export type FlowStatusKey = (typeof FLOW_STATUS_KEYS)[number];
+
+export const FLOW_DETAIL_KEYS = [
+  ...FLOW_DETAIL_TEXT_KEYS,
+  'burialPrivate',
+  ...FLOW_STATUS_KEYS,
+] as const;
+
+export type FlowDetailKey = (typeof FLOW_DETAIL_KEYS)[number];
+
+/** Every key that may cross the wire for a person. */
+export const SYNCED_KEYS = [...FLOW_FACT_KEYS, ...FLOW_DETAIL_KEYS] as const;
+
+export type SyncedKey = (typeof SYNCED_KEYS)[number];
+
+/** Wire status values: null is "Not started". */
+export type FlowStatusValue = SectionStatus | null;
+
+export type FlowDetails = {
+  [K in FlowDetailTextKey]: string | null;
+} & { burialPrivate: boolean } & {
+  [K in FlowStatusKey]: FlowStatusValue;
+};
+
+export type SyncedFields = FlowFacts & FlowDetails;
+
+/** Mirrors the server column checks. Longer text is cut on save, never rejected there (see ADR 0001). */
+export const FLOW_DETAIL_MAX_LENGTH: Record<FlowDetailTextKey, number> = {
+  birthDate: 100,
+  serviceType: 200,
+  serviceTime: 100,
+  servicePlace: 200,
+  serviceAddress: 500,
+  serviceNotes: 2000,
+  serviceMessage: 2000,
+  announcementMessage: 2000,
+  obituaryText: 10000,
+  obituaryCity: 200,
+  obituaryCareer: 2000,
+  obituarySurvivors: 2000,
+  obituaryNote: 2000,
+  thanksMessage: 2000,
+  visitationDate: 100,
+  visitationTime: 100,
+  visitationPlace: 200,
+  serviceOfficiant: 200,
+  burialDate: 100,
+  burialTime: 100,
+  burialPlace: 200,
+  receptionDate: 100,
+  receptionTime: 100,
+  receptionPlace: 200,
+};
+
+/** Keys a client might send by mistake. Each is refused by name; listed so the rule is visible. */
+export const FORBIDDEN_SYNC_KEYS = [
+  'drafts',
+  'draftsUpdatedAt',
+  'messageOverride',
+  'recipientsNotified',
+  'selectedContactIds',
+  'hearsFirstIds',
+  'contactIds',
+  'contacts',
+  'senderName',
+  'momentCompletedAt',
+  'remindersScheduled',
+  'checklist',
+  'checklistTicks',
+  'sectionStatus',
+] as const;
+
+const STATUS_BY_SECTION: Record<SectionKey, FlowStatusKey> = {
+  person: 'personStatus',
+  announcement: 'announcementStatus',
+  service: 'serviceStatus',
+  obituary: 'obituaryStatus',
+  thanks: 'thanksStatus',
+};
+
+const SECTION_BY_STATUS = Object.fromEntries(
+  Object.entries(STATUS_BY_SECTION).map(([section, key]) => [key, section]),
+) as Record<FlowStatusKey, SectionKey>;
+
+type StatusMap = Partial<Record<SectionKey, SectionStatus>>;
+
+/** The status map as five flat keys. A missing entry is null ("Not started"). */
+export function statusMapToFlat(
+  map: StatusMap | undefined,
+): Record<FlowStatusKey, FlowStatusValue> {
+  const out = {} as Record<FlowStatusKey, FlowStatusValue>;
+  for (const key of FLOW_STATUS_KEYS) {
+    out[key] = map?.[SECTION_BY_STATUS[key]] ?? null;
+  }
+  return out;
+}
+
+/** The reverse. Null entries are left out, as a Session stores them. */
+export function flatToStatusMap(
+  flat: Partial<Record<FlowStatusKey, FlowStatusValue>>,
+): StatusMap {
+  const out: StatusMap = {};
+  for (const key of FLOW_STATUS_KEYS) {
+    const value = flat[key];
+    if (value) {
+      out[SECTION_BY_STATUS[key]] = value;
+    }
+  }
+  return out;
+}
+
+/** What a Session (or any object with these optional fields) may contribute. Extra keys are never copied. */
+export type SyncedSource = Partial<
+  FlowFacts & {
+    [K in FlowDetailTextKey]: string | undefined;
+  } & { burialPrivate: boolean; sectionStatus: StatusMap }
+>;
+
+const isMessageKey = (key: FlowDetailTextKey): key is FlowMessageKey =>
+  (FLOW_MESSAGE_KEYS as readonly string[]).includes(key);
+
+const stripNul = (value: string): string => value.replaceAll('\u0000', '');
+
+/** Cuts to `max` without splitting a surrogate pair. */
+function cut(value: string, max: number): string {
+  if (value.length <= max) {
+    return value;
+  }
+  const part = value.slice(0, max);
+  const last = part.charCodeAt(part.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? part.slice(0, -1) : part;
+}
+
+/**
+ * Message keys: undefined becomes null, '' is kept (the family cleared it on purpose). Other text
+ * keys: trimmed, blank becomes null. Both are cut at the cap.
+ */
+function toWireText(key: FlowDetailTextKey, value: string | undefined) {
+  const max = FLOW_DETAIL_MAX_LENGTH[key];
+  if (isMessageKey(key)) {
+    return value === undefined ? null : cut(stripNul(value), max);
+  }
+  return cut(stripNul(value ?? '').trim(), max) || null;
+}
+
+/** Details for a session: the full, valid set (always passes `parseFlowDetails`). */
+export function toFlowDetails(source: SyncedSource): FlowDetails {
+  const out: Record<string, unknown> = {};
+  for (const key of FLOW_DETAIL_TEXT_KEYS) {
+    out[key] = toWireText(key, source[key]);
+  }
+  out.burialPrivate = source.burialPrivate === true;
+  Object.assign(out, statusMapToFlat(source.sectionStatus));
+  return out as FlowDetails;
+}
+
+/** Every synced field for a session, built from the whitelist (never a spread of the session). */
+export function toSyncedFields(source: SyncedSource): SyncedFields {
+  return { ...toFlowFacts(source), ...toFlowDetails(source) };
+}
+
+/** Session-shaped fields from the wire. Message null becomes undefined; other null becomes ''. */
+export type SessionDetailFields = {
+  [K in FlowDetailTextKey]?: string;
+} & { burialPrivate: boolean; sectionStatus: StatusMap };
+
+export function fromSyncedFields(
+  details: Partial<FlowDetails>,
+): Partial<SessionDetailFields> {
+  const out: Record<string, unknown> = {};
+  for (const key of FLOW_DETAIL_TEXT_KEYS) {
+    const value = details[key];
+    if (value === undefined) {
+      continue;
+    }
+    if (value === null) {
+      // A null message is an explicit undefined, so spreading it over a session clears the
+      // local text and the session follows the details again.
+      out[key] = isMessageKey(key) ? undefined : '';
+      continue;
+    }
+    out[key] = value;
+  }
+  if (details.burialPrivate !== undefined) {
+    out.burialPrivate = details.burialPrivate;
+  }
+  if (FLOW_STATUS_KEYS.some((key) => details[key] !== undefined)) {
+    out.sectionStatus = flatToStatusMap(details);
+  }
+  return out as Partial<SessionDetailFields>;
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isStatusValue = (value: unknown): boolean =>
+  value === null || value === 'in_progress' || value === 'ready';
+
+function validDetail(key: FlowDetailKey, value: unknown): boolean {
+  if (key === 'burialPrivate') {
+    return typeof value === 'boolean';
+  }
+  if ((FLOW_STATUS_KEYS as readonly string[]).includes(key)) {
+    return isStatusValue(value);
+  }
+  if (value === null) {
+    return true;
+  }
+  const max = FLOW_DETAIL_MAX_LENGTH[key as FlowDetailTextKey];
+  return (
+    typeof value === 'string' &&
+    value.length <= max &&
+    !value.includes('\u0000')
+  );
+}
+
+/**
+ * Validates a partial set of details (C8). Unknown and forbidden keys are rejected, not dropped,
+ * so a client sending a draft or a contact id gets an error. Null when invalid.
+ */
+export function parseFlowDetails(input: unknown): Partial<FlowDetails> | null {
+  if (!isPlainObject(input)) {
+    return null;
+  }
+  const allowed = new Set<string>(FLOW_DETAIL_KEYS);
+  if (Object.keys(input).some((key) => !allowed.has(key))) {
+    return null;
+  }
+  const out: Record<string, unknown> = {};
+  for (const key of FLOW_DETAIL_KEYS) {
+    if (!(key in input)) {
+      continue;
+    }
+    if (!validDetail(key, input[key])) {
+      return null;
+    }
+    out[key] = input[key];
+  }
+  return out as Partial<FlowDetails>;
+}
+
+/**
+ * Splits a patch into its fact keys and detail keys, so each half is checked by its own parser.
+ * Unknown keys go to the details half, which rejects them.
+ */
+export function splitSyncedPatch(input: unknown): {
+  facts: Record<string, unknown>;
+  details: Record<string, unknown>;
+} | null {
+  if (!isPlainObject(input)) {
+    return null;
+  }
+  const facts: Record<string, unknown> = {};
+  const details: Record<string, unknown> = {};
+  const factKeys = new Set<string>(FLOW_FACT_KEYS);
+  for (const [key, value] of Object.entries(input)) {
+    (factKeys.has(key) ? facts : details)[key] = value;
+  }
+  return { facts, details };
+}
+
+/**
+ * Per field, the last write to reach the server wins, except a field with a pending local edit,
+ * which keeps the local value until that edit is sent. A field missing from `remote` keeps local.
+ * Pure: returns a new object. Covers facts and details.
+ */
+export function mergeSyncedFields(
+  local: SyncedFields,
+  remote: Partial<SyncedFields>,
+  pendingFields: Iterable<SyncedKey>,
+): SyncedFields {
+  const pending = new Set<SyncedKey>(pendingFields);
+  const merged: Record<string, unknown> = {};
+  for (const key of SYNCED_KEYS) {
+    const remoteValue = remote[key as keyof SyncedFields];
+    merged[key] =
+      pending.has(key) || remoteValue === undefined
+        ? local[key as keyof SyncedFields]
+        : remoteValue;
+  }
+  return merged as unknown as SyncedFields;
+}
