@@ -1,0 +1,9 @@
+{
+  "intro": "A short note to thank the people who supported you. Change it so it sounds like you.",
+  "messageLabel": "Message",
+  "messageHint": "We start it from the name above. You can change it.",
+  "messageHintEdited": "You changed the message, so a new name above won't appear in it. Use the starting message to begin again.",
+  "useTemplate": "Use the starting message",
+  "nameFallback": "our loved one",
+  "template": "Thank you for your kindness and support after the passing of {deceasedName}. Your presence and thoughtfulness have meant more than words can express."
+}
