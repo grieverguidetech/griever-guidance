@@ -96,7 +96,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
 
   if (accountOnly) {
     return (
-      <div className="flex flex-col gap-2 md:w-64 md:shrink-0">
+      <div className="flex flex-col gap-2 md:w-48 md:shrink-0">
         <nav aria-label={copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">
             <li>
@@ -111,7 +111,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
   }
 
   return (
-    <div className="flex flex-col gap-2 md:w-64 md:shrink-0 md:sticky md:top-[52px]" onKeyDown={onKeyDown}>
+    <div className="flex flex-col gap-2 md:w-48 md:shrink-0 md:sticky md:top-[52px]" onKeyDown={onKeyDown}>
       {/* A raw button, not the libs/ui Button: it needs a ref (Escape returns focus here) and aria-expanded / aria-controls, which Button does not take. */}
       <button
         ref={menuButton}
@@ -124,7 +124,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
         {fill(copy.menuButton, { section: navTitle(section) })}
       </button>
       <div id={panelId} className={`${open ? 'flex' : 'hidden'} flex-col gap-3 md:flex`}>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-semibold text-[15px] break-words min-w-0 m-0">{name || copy.unnamedPerson}</p>
           <Button
             label={copy.change}
@@ -145,7 +145,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                 // Kept in the list so the order is visible, but there is nothing to open yet.
                 return (
                   <li key={key}>
-                    <p className="gg-row m-0 cursor-default text-[color:var(--text-muted)] hover:!bg-transparent">
+                    <p className="gg-row flex-wrap m-0 cursor-default text-[color:var(--text-muted)] hover:!bg-transparent">
                       <span>{navTitle(key)}</span>
                       {statuses ? (
                         <>
@@ -162,7 +162,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                 <li key={key}>
                   <button
                     type="button"
-                    className={`gg-row ${current ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`}
+                    className={`gg-row flex-wrap ${current ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`}
                     aria-current={current ? 'page' : undefined}
                     onClick={() => choose(key)}
                   >

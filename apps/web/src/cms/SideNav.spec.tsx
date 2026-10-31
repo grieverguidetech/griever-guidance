@@ -38,6 +38,14 @@ describe('SideNav', () => {
     expect(current.map((b) => b.textContent)).toEqual(['The person']);
   });
 
+  it('is 12rem wide from md up, never shrinks, and stays sticky', () => {
+    setup();
+    const column = screen.getByRole('navigation', { name: 'Sections' }).parentElement?.parentElement;
+    expect(column?.className).toContain('md:w-48');
+    expect(column?.className).toContain('md:shrink-0');
+    expect(column?.className).toContain('md:sticky');
+  });
+
   it('shows the person name', () => {
     setup();
     expect(screen.getByText('Margaret Hale')).toBeInTheDocument();

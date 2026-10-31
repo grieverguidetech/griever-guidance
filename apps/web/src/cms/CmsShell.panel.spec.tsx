@@ -58,6 +58,8 @@ describe('CmsShell checklist panel', () => {
     expect(aside.className).toContain('lg:sticky');
     expect(aside.className).toContain('lg:overflow-y-auto');
     expect(aside.className).toContain('lg:max-h-[calc(100dvh-52px)]');
+    expect(aside.className).toContain('lg:w-96');
+    expect(aside.className).toContain('lg:shrink-0');
   });
 
   it('wraps the section content in a keyed gg-enter div that remounts on section change', () => {
