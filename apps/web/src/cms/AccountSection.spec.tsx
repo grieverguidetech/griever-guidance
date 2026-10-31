@@ -59,15 +59,16 @@ describe('AccountSection', () => {
     expect(props.onSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the intro and no list for the name prompt, and the list otherwise', () => {
-    const { unmount } = render(
-      <AccountSection asksName senderName={null} error={null} onSave={vi.fn()} onSignOut={vi.fn()} />,
-    );
+  it('shows the intro for the name prompt', () => {
+    render(<AccountSection asksName senderName={null} error={null} onSave={vi.fn()} onSignOut={vi.fn()} />);
     expect(screen.getByText('This is the name on your account.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 2, name: "What you'll need" })).not.toBeInTheDocument();
-    unmount();
+  });
+
+  it("has no second What you'll need list on Your account", () => {
     profile();
-    expect(screen.getByRole('heading', { level: 2, name: "What you'll need" })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: "What you'll need" })).not.toBeInTheDocument();
+    expect(screen.queryByText('Not today. Just so none of it surprises you.')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 
   it('shows the Settings actions under the account content when given, and none otherwise', async () => {

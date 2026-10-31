@@ -18,6 +18,10 @@ export const CLERK_GIVE_UP_MS = 6000;
 
 const GENERIC_SIGN_IN_ERROR = "That didn't work. Please check what you typed and try again.";
 
+/** A first visit and a return visit see the same words: nothing says "Welcome back". */
+const SIGN_IN_TITLE = 'Sign in or create an account';
+const SIGN_IN_SUBTITLE = 'It takes a minute.';
+
 /** Every sign-in failure Clerk words differently gets this one calm sentence (C7). */
 const SIGN_IN_ERROR_KEYS = [
   'form_password_incorrect',
@@ -46,10 +50,34 @@ function buildLocalization(): Localization {
   for (const key of SIGN_IN_ERROR_KEYS) {
     errors[key] = GENERIC_SIGN_IN_ERROR;
   }
-  return { ...calm, unstable__errors: errors as Localization['unstable__errors'] };
+  return {
+    ...calm,
+    signIn: {
+      ...calm.signIn,
+      start: {
+        ...calm.signIn?.start,
+        title: SIGN_IN_TITLE,
+        titleCombined: SIGN_IN_TITLE,
+        subtitle: SIGN_IN_SUBTITLE,
+        actionText: 'New here?',
+        actionLink: 'Create an account',
+      },
+    },
+    signUp: {
+      ...calm.signUp,
+      start: {
+        ...calm.signUp?.start,
+        title: SIGN_IN_TITLE,
+        titleCombined: SIGN_IN_TITLE,
+        subtitle: SIGN_IN_SUBTITLE,
+        subtitleCombined: SIGN_IN_SUBTITLE,
+      },
+    },
+    unstable__errors: errors as Localization['unstable__errors'],
+  };
 }
 
-/** Clerk's en-US strings with no "!" and one generic sign-in error. */
+/** Clerk's en-US strings with no "!", first-visit-safe sign-in/sign-up copy, and one generic sign-in error. */
 export const localization: Localization = buildLocalization();
 
 function pendingSignOut(): boolean {

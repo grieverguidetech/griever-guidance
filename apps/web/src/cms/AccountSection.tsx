@@ -1,7 +1,6 @@
 import { useId } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
-import { ChecklistRows } from '../lib/ChecklistRows';
 import { SettingsBody } from '../screens/Settings';
 import { useNameForm } from '../screens/Profile';
 
@@ -13,7 +12,6 @@ interface ProfileProps {
   senderName: string | null;
   /** The identity hook's own calm copy, shown as-is. */
   error: string | null;
-  showChecklist?: boolean;
   /** "People helping you", when sharing is on. */
   peopleHelping?: ReactNode;
   /** Resolves true when saved. A false result keeps what was typed. */
@@ -24,13 +22,12 @@ interface ProfileProps {
 }
 
 /**
- * The signed-in account content inside the CMS shell: name, sign out, the list, and people helping.
+ * The signed-in account content inside the CMS shell: name, sign out, and people helping. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, error, showChecklist = true, peopleHelping, onSave, onSignOut, settings }: ProfileProps) {
+export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, settings }: ProfileProps) {
   const id = useId();
   const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave });
-  const showList = showChecklist && !asksName;
 
   let message = '';
   if (nameError) {
@@ -77,15 +74,6 @@ export function AccountSection({ asksName, senderName, error, showChecklist = tr
           </button>
         </div>
       </form>
-      {showList ? (
-        <section aria-labelledby={`${id}-need`} className="gg-panel flex flex-col gap-3">
-          <h2 id={`${id}-need`} className="text-[16px] m-0">
-            {copy.checklist}
-          </h2>
-          <p className="gg-hint m-0">{copy.checklistNote}</p>
-          <ChecklistRows />
-        </section>
-      ) : null}
       {peopleHelping}
       {settings ? <AccountSettingsSection {...settings} /> : null}
     </>
