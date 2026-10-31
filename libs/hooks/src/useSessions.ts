@@ -359,10 +359,10 @@ function migrateSession(stored: StoredSession): Session {
   return copyServiceDraftFields(migrated);
 }
 
-function load(storage: SendFlowStorage | undefined): Session[] {
+function load(storage: SendFlowStorage | undefined, key: string = STORAGE_KEY): Session[] {
   if (!storage) return [];
   try {
-    const raw = storage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -381,6 +381,78 @@ function save(storage: SendFlowStorage | undefined, sessions: Session[]): boolea
   } catch {
     return false;
   }
+}
+
+/**
+ * Which account the people in the main list belong to. The list is shared by every account on the
+ * device, so when a different account signs in, the previous account's people are moved aside
+ * (nothing is deleted) and come back when that account signs in again.
+ */
+export const SESSIONS_ACCOUNT_STORAGE_KEY = 'gg.sessionsAccount.v1';
+const STASH_KEY_PREFIX = 'gg.sessionsStash.v1:';
+const stashKey = (userId: string): string => `${STASH_KEY_PREFIX}${userId}`;
+
+function readMarker(storage: SendFlowStorage | undefined): string | null {
+  try {
+    return storage?.getItem(SESSIONS_ACCOUNT_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function tryWrite(storage: SendFlowStorage | undefined, key: string, value: string): void {
+  try {
+    storage?.setItem(key, value);
+  } catch {
+    // storage unavailable: the swap still holds for this run
+  }
+}
+
+/**
+ * Who the people in `sessions` were kept for: the stored marker, else (a device from before the
+ * marker) the account that owns one of them. null = only device-local people, nothing to move.
+ */
+function listHolder(storage: SendFlowStorage | undefined, sessions: readonly Session[], userId: string): string | null {
+  const marked = readMarker(storage);
+  if (marked) {
+    return marked;
+  }
+  const foreign = sessions.find((s) => s.role === 'owner' && s.ownerId !== null && s.ownerId !== userId);
+  return foreign ? foreign.ownerId : null;
+}
+
+/**
+ * A different account signed in: the previous account's people (theirs, and ones shared with them)
+ * go to that account's own stash; this account's stash comes back. People made on this device and
+ * not tied to an account stay, so the new account adopts them as a first sign-in does today.
+ * Returns null when nothing changes.
+ */
+function swapAccountSessions(
+  storage: SendFlowStorage | undefined,
+  sessions: Session[],
+  userId: string,
+): Session[] | null {
+  const holder = listHolder(storage, sessions, userId);
+  if (holder === null || holder === userId) {
+    tryWrite(storage, SESSIONS_ACCOUNT_STORAGE_KEY, userId);
+    return null;
+  }
+  const isPrevious = (s: Session): boolean => s.role === 'member' || (s.ownerId !== null && s.ownerId !== userId);
+  const leaving = sessions.filter(isPrevious);
+  const staying = sessions.filter((s) => !isPrevious(s));
+  const previousStash = load(storage, stashKey(holder));
+  // Keep anything already stashed for them (it was not in the list); this list wins on the same person.
+  const kept = previousStash.filter((old) => !leaving.some((s) => s.flowId === old.flowId));
+  tryWrite(storage, stashKey(holder), JSON.stringify([...leaving, ...kept]));
+  const returning = load(storage, stashKey(userId));
+  try {
+    storage?.removeItem(stashKey(userId));
+  } catch {
+    // a stale stash is replaced on the next swap
+  }
+  tryWrite(storage, SESSIONS_ACCOUNT_STORAGE_KEY, userId);
+  const have = new Set(staying.map((s) => s.flowId));
+  return [...staying, ...returning.filter((s) => !have.has(s.flowId))];
 }
 
 function newId(): string {
@@ -511,7 +583,12 @@ const EDITOR_FIELDS: ReadonlySet<string> = new Set([
   'burialPlace', 'burialPrivate', 'receptionDate', 'receptionTime', 'receptionPlace',
 ]);
 
-export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
+/**
+ * `userId` is the signed-in account's id; leave it out (or empty) when signed out or not known yet.
+ * When it names a different account than the one the list was kept for, the previous account's
+ * people are moved aside so this account never sees them (see `swapAccountSessions`).
+ */
+export function useSessions(storage?: SendFlowStorage, userId?: string | null): UseSessionsResult {
   const [sessions, setSessions] = useState<Session[]>(() => load(storage));
   // removeSession must return its boolean synchronously, but a setState updater runs later, so the
   // latest list is read from this ref (also updated in removeSession itself for back-to-back calls).
@@ -519,6 +596,18 @@ export function useSessions(storage?: SendFlowStorage): UseSessionsResult {
   sessionsRef.current = sessions;
 
   const [saveFailed, setSaveFailed] = useState(false);
+
+  // Runs before any later hook's effect in the same commit (sync), so it sees the right list.
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+    const next = swapAccountSessions(storage, sessionsRef.current, userId);
+    if (next) {
+      sessionsRef.current = next;
+      setSessions(next);
+    }
+  }, [storage, userId]);
 
   useEffect(() => {
     setSaveFailed(!save(storage, sessions));

@@ -336,7 +336,7 @@ function AppBody({
   offline?: boolean;
 }) {
   const contacts = useContacts(contactStore);
-  const sessions = useSessions(browserStorage);
+  const sessions = useSessions(browserStorage, auth?.userId);
   const sessionList = sessions.sessions;
   // Without auth there is no account gate — everyone is let straight in.
   const isSignedIn = auth ? auth.isSignedIn : true;
