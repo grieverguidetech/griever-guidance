@@ -35,7 +35,7 @@ describe('AnnouncementSection', () => {
     setup({ personName: 'Margaret Hayes', dateOfPassing: 'May 29, 2026' });
     expect(message().value).toContain('Margaret Hayes passed away on May 29, 2026.');
     expect(screen.getByText(/We start it from the details/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use the details from The person' })).toBeNull();
   });
 
   it('follows the details until the first edit, then keeps the edit', async () => {
@@ -51,11 +51,11 @@ describe('AnnouncementSection', () => {
     const user = userEvent.setup();
     const { patches } = setup({ personName: 'Margaret Hayes', announcementMessage: 'My own words' });
     expect(message().value).toBe('My own words');
-    await user.click(screen.getByRole('button', { name: 'Use the details above' }));
+    await user.click(screen.getByRole('button', { name: 'Use the details from The person' }));
     expect(patches.at(-1)).toEqual({ announcementMessage: undefined });
     expect(message().value).toContain('Margaret Hayes passed away');
     expect(message()).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use the details from The person' })).toBeNull();
   });
 
   it('marks the section ready and offers Next', async () => {

@@ -264,20 +264,27 @@ export const shareService: Template = {
     const notes = fields['serviceNotes']?.trim();
 
     const possessive = /s$/i.test(name) ? `${name}'` : `${name}'s`;
-    let core = `${possessive} service will be held`;
-    if (date) core += ` ${date}`;
-    if (time) core += ` at ${time}`;
-    if (location) core += `, ${location}`;
-    core += '.';
-    if (notes) core += ` ${notes}`;
+    // The "will be held" sentence is left out when there is no date, time or place to put in it.
+    const when = [date, time ? `at ${time}` : ''].filter(Boolean).join(' ');
+    const where = location ? `at ${location}` : '';
+    const held = [when, where].filter(Boolean).join(' ');
+    const sentences: string[] = [];
+    if (held) {
+      sentences.push(`${possessive} service will be held ${held}.`);
+    }
+    if (notes) {
+      sentences.push(notes);
+    }
+    let core = sentences.join(' ');
 
     const florist = fields['floristName']?.trim();
     if (florist) {
-      const where =
+      const deliverTo =
         fields['flowerDeliveryTarget'] === 'home'
           ? "the family's home"
           : 'the service';
-      core += ` If you'd like to send flowers, ${florist} can deliver to ${where}.`;
+      const flowers = `If you'd like to send flowers, ${florist} can deliver to ${deliverTo}.`;
+      core = core ? `${core} ${flowers}` : flowers;
     }
 
     const url = normalizeUrl(fields['obituaryUrl']);

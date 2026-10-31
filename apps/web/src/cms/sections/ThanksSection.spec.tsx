@@ -64,7 +64,7 @@ describe('ThanksSection', () => {
     expect(patches.at(-1)).toEqual({ thanksMessage: undefined });
     expect(message().value).toContain('passing of Ann.');
     expect(message()).toHaveFocus();
-    expect(screen.getByText(/We start it from the name above/)).toBeInTheDocument();
+    expect(screen.getByText(/We start it from the name on The person/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Use the starting message' })).toBeNull();
   });
 

@@ -1112,6 +1112,7 @@ function AppBody({
       <Shell wide>
         <CmsShell
           title={cmsItem ? cmsItemLabels[cmsItem] : undefined}
+          syncOn={syncOn}
           aside={({ inSheet, closeSheet }) => (
             <ChecklistPanel
               checklist={active.checklist ?? {}}
@@ -1193,6 +1194,7 @@ function AppBody({
               onReadyChange={readyChange('obituary')}
               nextSection={nextSection}
               onNext={goNext}
+              onOpenPerson={() => setCmsSection('person')}
             />
           ) : (
             <ThanksSection

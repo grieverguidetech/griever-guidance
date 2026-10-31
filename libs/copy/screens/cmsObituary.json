@@ -1,10 +1,10 @@
 {
   "intro": "We start the obituary from the details below. You can change any of it.",
-  "detailsHeading": "From The person",
+  "detailsHeading": "Details from The person",
   "nameLabel": "Name",
   "bornLabel": "Born",
   "diedLabel": "Died",
-  "detailsHint": "To change these, go to The person.",
+  "changeDetails": "Change these on The person",
   "cityLabel": "City where they lived (optional)",
   "careerLabel": "Their work (optional)",
   "survivorsLabel": "Survived by (optional)",

@@ -45,7 +45,7 @@ describe('MarkReady', () => {
 
   it('shows the hint and ties it to the toggle', () => {
     render(<MarkReady ready={false} onChange={() => undefined} />);
-    const hint = screen.getByText('Mark as ready when these details are settled. You can still change them.');
+    const hint = screen.getByText('Mark as ready when these details are settled. Ready means it can be sent from the phone. You can still change them.');
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAccessibleDescription(hint.textContent ?? '');
   });
 

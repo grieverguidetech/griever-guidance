@@ -15,5 +15,6 @@ export const CHECKLIST_ITEM_SECTIONS: Partial<
   'submit-obituary': 'obituary',
   'share-obituary': 'obituary',
   'notify-community': 'announcement',
+  'tell-close-family': 'announcement',
   'thank-you-notes': 'thanks',
 };

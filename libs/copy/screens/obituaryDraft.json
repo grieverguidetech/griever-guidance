@@ -1,4 +1,5 @@
 {
+  "nameFallback": "our loved one",
   "opening": "{fullName} has died.",
   "openingWithDate": "{fullName} died on {dateOfPassing}.",
   "born": "They were born on {dateOfBirth}.",

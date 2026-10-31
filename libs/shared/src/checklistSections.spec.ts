@@ -30,6 +30,7 @@ describe('checklist item sections', () => {
       'submit-obituary': 'obituary',
       'share-obituary': 'obituary',
       'notify-community': 'announcement',
+      'tell-close-family': 'announcement',
       'thank-you-notes': 'thanks',
     });
   });

@@ -52,11 +52,13 @@ interface Props {
   title?: string;
   /** The people list: the nav offers only the account item. */
   peopleView?: boolean;
+  /** True when the details also sync to the account, so the save line can say they wait on the phone. */
+  syncOn?: boolean;
   children: ReactNode;
 }
 
 /** Nav left, editor right from `md`; stacked below. The shell owns the page's only h1. */
-export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, peopleView, children }: Props) {
+export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, peopleView, syncOn, children }: Props) {
   const heading = useRef<HTMLElement | null>(null);
   const setHeading = useCallback((node: unknown) => {
     heading.current = node as HTMLElement | null;
@@ -132,7 +134,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
         )}
-        {peopleView || section === 'overview' || section === 'account' ? null : <p className="gg-hint">{shellCopy.saveLine}</p>}
+        {peopleView || section === 'overview' || section === 'account' ? null : <p className="gg-hint">{syncOn ? shellCopy.saveLineSynced : shellCopy.saveLine}</p>}
         {notice}
         <div key={`${section}:${title ?? ''}`} className="gg-enter flex flex-col gap-4">
           {children}

@@ -108,6 +108,10 @@ function cleanEnd(value: string | undefined): string {
   return (value ?? '').trim().replace(/\.$/, '').trim();
 }
 
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** Full stop at the end of a sentence, unless the person already ended it. */
 function endSentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
@@ -118,7 +122,8 @@ function endSentence(text: string): string {
  * Sentences are grouped into three short paragraphs, separated by a blank line.
  */
 export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy<'obituaryDraft'>): string {
-  const fullName = fields.fullName.trim();
+  // Every sentence starts with the name, so the fallback gets a capital.
+  const fullName = fields.fullName.trim() || capitalize(copy.nameFallback);
   const dateOfBirth = cleanEnd(fields.dateOfBirth);
   const dateOfPassing = cleanEnd(fields.dateOfPassing);
   const cityOfResidence = cleanEnd(fields.cityOfResidence);
