@@ -49,17 +49,26 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
     setCardNote(false);
     setTimeout(() => setCardNote(true), 50);
   }
-  const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave });
+  // The hook's error is shared with the details form; show it on the name form only after its own save failed.
+  const [nameFailed, setNameFailed] = useState(false);
+  async function saveName(name: string) {
+    setNameFailed(false);
+    const ok = await onSave(name);
+    setNameFailed(!ok);
+    return ok;
+  }
+  const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave: saveName });
+  const shownError = nameFailed ? error : null;
 
   let message = '';
   if (nameError) {
     message = nameError;
-  } else if (error) {
-    message = error;
+  } else if (shownError) {
+    message = shownError;
   } else if (saved) {
     message = copy.saved;
   }
-  const isError = Boolean(nameError || error);
+  const isError = Boolean(nameError || shownError);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -189,7 +198,7 @@ export function checkDetails(nameText: string, dateText: string): { fullName: st
     const iso = dateToISO(dateText, BIRTH_YEARS);
     if (!iso) {
       dateError = copy.birthDateIncomplete;
-    } else if (!isValidBirthDate(iso, todayISO())) {
+    } else if (!isValidBirthDate(iso)) {
       dateError = copy.birthDateOutOfRange;
     } else {
       birthDate = iso;
@@ -302,7 +311,7 @@ function DetailsForm({ fullName, birthDate, error, onSave }: DetailsFormProps) {
         describedBy={`${id}-dob-hint`}
         visibleHelp
         years={BIRTH_YEARS}
-        note={dateError ?? undefined}
+        error={dateError ?? undefined}
         onChange={(next) => {
           setTypedDate(next);
           setDateError(null);

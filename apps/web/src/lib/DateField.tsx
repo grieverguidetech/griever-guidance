@@ -55,6 +55,8 @@ interface DateInputProps {
   required?: boolean;
   /** A quiet, non-blocking note under the field (not an alert). Never stops saving. */
   note?: string;
+  /** A message that the date is wrong. Announced as an alert, marks the input invalid, and is linked to it. */
+  error?: string;
   /** Like `note`, but shown only after the field loses focus with this text in it, and hidden again once the text changes. */
   noteOnBlur?: string;
   /** Shows the format help as visible text under the field, not only to a screen reader. */
@@ -75,6 +77,7 @@ export function DateInput({
   required,
   note: liveNote,
   noteOnBlur,
+  error,
   visibleHelp,
   years,
 }: DateInputProps) {
@@ -84,6 +87,7 @@ export function DateInput({
   const [focused, setFocused] = useState(false);
   const helpId = `${id}-help`;
   const noteId = `${id}-note`;
+  const errorId = `${id}-error`;
 
   function openPicker() {
     const el = pickerRef.current as
@@ -133,7 +137,8 @@ export function DateInput({
         value={value}
         aria-labelledby={labelledBy}
         aria-required={required || undefined}
-        aria-describedby={[describedBy, helpId, note ? noteId : undefined].filter(Boolean).join(' ')}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={[describedBy, helpId, note ? noteId : undefined, error ? errorId : undefined].filter(Boolean).join(' ')}
         onChange={(e) => onChange(e.target.value)}
         onBlur={(e) => {
           setBlurredValue(e.target.value.trim() ? e.target.value : null);
@@ -164,13 +169,18 @@ export function DateInput({
     </div>
   );
 
-  if (!visibleHelp && !note) {
+  if (!visibleHelp && !note && !error) {
     return box;
   }
   return (
     <>
       {box}
       {visibleHelp && help}
+      {error && (
+        <p id={errorId} role="alert" className="m-0 mt-1 text-[13px] font-semibold leading-[1.5]">
+          {error}
+        </p>
+      )}
       {note && (
         <p id={noteId} className="m-0 mt-1 text-[13px] leading-[1.5]" style={{ color: 'var(--color-text)' }}>
           {note}

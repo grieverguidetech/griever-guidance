@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AccountSection, AccountSettingsSection } from './AccountSection';
+import { AccountSection, AccountSettingsSection, checkDetails } from './AccountSection';
 
 function profile(overrides: Partial<Parameters<typeof AccountSection>[0]> = {}) {
   const props = {
@@ -93,10 +93,14 @@ describe('AccountSection', () => {
     expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
   });
 
-  it('describes the field by the intro and the status, and flags an error', () => {
+  it('describes the field by the intro and the status, and flags an error after a failed save', async () => {
+    const user = userEvent.setup();
     const { unmount } = render(
-      <AccountSection asksName senderName={null} error="We couldn't save your name. You can try again." onSave={vi.fn()} onSignOut={vi.fn()} />,
+      <AccountSection asksName senderName={null} error="We couldn't save your name. You can try again." onSave={vi.fn().mockResolvedValue(false)} onSignOut={vi.fn()} />,
     );
+    await user.type(screen.getByLabelText('Your name'), 'Anna');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText("We couldn't save your name. You can try again.");
     const field = screen.getByLabelText('Your name');
     const ids = (field.getAttribute('aria-describedby') ?? '').split(' ');
     expect(ids).toHaveLength(2);
@@ -208,7 +212,19 @@ describe('AccountSection details', () => {
     expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
   });
 
-  it('accepts a numeric date and clears both when emptied', async () => {
+  it('accepts a numeric date', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.type(screen.getByLabelText('Date of birth'), '5/29/1980');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(onSaveDetails).toHaveBeenCalledWith({ fullName: null, birthDate: '1980-05-29' });
+  });
+
+  it('refuses a tab in the name', () => {
+    expect(checkDetails('Anna\tLee', '').nameError).toBe('Please enter your name on one line, with no hidden characters.');
+  });
+
+  it('clears both when emptied', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
     await user.clear(screen.getByLabelText('Full name'));
@@ -223,8 +239,9 @@ describe('AccountSection details', () => {
     await user.type(screen.getByLabelText('Date of birth'), 'May 29');
     await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(onSaveDetails).not.toHaveBeenCalled();
-    const message = screen.getByText('Please enter the whole date, with the year. For example, May 29, 1980.');
-    expect(screen.getByLabelText('Date of birth')).toHaveAccessibleDescription(expect.stringContaining(message.textContent ?? ''));
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter the whole date, with the year. For example, May 29, 1980.');
+    expect(screen.getByLabelText('Date of birth')).toBeInvalid();
+    expect(screen.getByLabelText('Date of birth')).toHaveAccessibleDescription(/whole date/);
   });
 
   it('refuses a future date and a date before 1900', async () => {
@@ -268,9 +285,10 @@ describe('AccountSection details', () => {
   it('shows the general error only after its own save fails', async () => {
     const user = userEvent.setup();
     withDetails({ error: 'We cannot reach you.', onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: false }) });
-    expect(screen.getAllByText('We cannot reach you.')).toHaveLength(1);
+    expect(screen.queryByText('We cannot reach you.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(await screen.findAllByText('We cannot reach you.')).toHaveLength(2);
+    expect(await screen.findAllByText('We cannot reach you.')).toHaveLength(1);
+    expect(screen.getByLabelText('Your name')).not.toHaveAttribute('aria-invalid');
   });
 });
 
