@@ -1,0 +1,23 @@
+{
+  "intro": "We start the obituary from the details below. You can change any of it.",
+  "detailsHeading": "From The person",
+  "nameLabel": "Name",
+  "bornLabel": "Born",
+  "diedLabel": "Died",
+  "detailsHint": "To change these, go to The person.",
+  "cityLabel": "City where they lived (optional)",
+  "careerLabel": "Their work (optional)",
+  "survivorsLabel": "Survived by (optional)",
+  "survivorsHint": "For example, their spouse, children and grandchildren.",
+  "noteLabel": "A personal note (optional)",
+  "noteHint": "A memory or a few words about who they were.",
+  "textLabel": "Obituary",
+  "textHint": "We start it from the details above. You can change it.",
+  "textHintEdited": "You changed the obituary, so new details above won’t appear in it. Use the details above to start it again.",
+  "useDetails": "Use the details above",
+  "publishedHeading": "Where it is published",
+  "publishedHint": "Add this once the obituary is out. You can leave it empty.",
+  "urlLabel": "Link to the obituary (optional)",
+  "publisherLabel": "Where it is published (optional)",
+  "publisherPlaceholder": "e.g. The newspaper or funeral home name"
+}

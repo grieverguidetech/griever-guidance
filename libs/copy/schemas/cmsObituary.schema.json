@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the planning editor, The obituary section",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intro",
+    "detailsHeading",
+    "nameLabel",
+    "bornLabel",
+    "diedLabel",
+    "detailsHint",
+    "cityLabel",
+    "careerLabel",
+    "survivorsLabel",
+    "survivorsHint",
+    "noteLabel",
+    "noteHint",
+    "textLabel",
+    "textHint",
+    "textHintEdited",
+    "useDetails",
+    "publishedHeading",
+    "publishedHint",
+    "urlLabel",
+    "publisherLabel",
+    "publisherPlaceholder"
+  ],
+  "properties": {
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "detailsHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "nameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "bornLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "diedLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "detailsHint": {
+      "$ref": "#/$defs/text"
+    },
+    "cityLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "careerLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "survivorsLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "survivorsHint": {
+      "$ref": "#/$defs/text"
+    },
+    "noteLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "noteHint": {
+      "$ref": "#/$defs/text"
+    },
+    "textLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "textHint": {
+      "$ref": "#/$defs/text"
+    },
+    "textHintEdited": {
+      "$ref": "#/$defs/text"
+    },
+    "useDetails": {
+      "$ref": "#/$defs/text"
+    },
+    "publishedHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "publishedHint": {
+      "$ref": "#/$defs/text"
+    },
+    "urlLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherPlaceholder": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
