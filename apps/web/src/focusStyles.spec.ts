@@ -112,6 +112,17 @@ describe('visible focus (#162)', () => {
     }
   });
 
+  it('an input on a panel gets a border that clears 3:1 against the panel and its fill (#514)', () => {
+    const match = CSS.match(/\.gg-panel \.gg-input\s*\{([^}]*)\}/);
+    if (!match) throw new Error('rule .gg-panel .gg-input not found in styles.css');
+    const border = token(colourIn(match[1], 'border-color'));
+    const fillName = colourIn(match[1], 'background');
+    expect(fillName).toBe('bg');
+    for (const bg of [backgrounds.surface, token(fillName)]) {
+      expect(contrast(border, bg)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('computes contrast the WCAG way', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21, 5);
     // Matches the measured value noted in styles.css for the base accent on the page.
