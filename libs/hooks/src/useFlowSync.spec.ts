@@ -240,6 +240,13 @@ describe('useFlowSync sending', () => {
     expect(writes(requests)).toEqual([]);
   });
 
+  it('never creates a person made while another account was signed in (heldFor)', async () => {
+    const requests = mockFetch((req) => (req.method === 'GET' ? { status: 200, body: [] } : { status: 201 }));
+    setup([session({ ownerId: null, heldFor: OTHER })]);
+    await advance(10);
+    expect(writes(requests)).toEqual([]);
+  });
+
   it('lets a member PATCH an edit', async () => {
     const requests = mockFetch(serverWithFlow);
     const member = session({ role: 'member', ownerId: OTHER });
@@ -904,6 +911,7 @@ describe('useFlowSync details (DS-7)', () => {
     );
     setup([
       session({
+        heldFor: USER,
         serviceMessage: 'Join us.',
         obituaryText: undefined,
         servicePlace: '  St. Mark ',

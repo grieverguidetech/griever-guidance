@@ -147,9 +147,9 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
 
 /** Only an owner session (made here or by this account) may be created on the server. */
 const mayCreate = (s: Session, userId: string): boolean =>
-  s.role === 'owner' && (s.ownerId === null || s.ownerId === userId);
+  s.role === 'owner' && (s.ownerId === null || s.ownerId === userId) && (!s.heldFor || s.heldFor === userId);
 
-/** Someone else's account's person on this device is never sent. */
+/** Someone else's account's person on this device is never sent. Keep in step with `isPrevious` in useSessions. */
 const isMine = (s: Session, userId: string): boolean =>
   s.role === 'member' || s.ownerId === null || s.ownerId === userId;
 

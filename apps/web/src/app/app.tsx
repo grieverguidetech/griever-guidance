@@ -336,7 +336,7 @@ function AppBody({
   offline?: boolean;
 }) {
   const contacts = useContacts(contactStore);
-  const sessions = useSessions(browserStorage);
+  const sessions = useSessions(browserStorage, auth?.userId);
   const sessionList = sessions.sessions;
   // Without auth there is no account gate — everyone is let straight in.
   const isSignedIn = auth ? auth.isSignedIn : true;
@@ -352,11 +352,12 @@ function AppBody({
   // Background sync of the person to the account. Only in the editor build (the 4 message keys stay
   // off the wire when the editor is off, C2), with sync on and someone signed in. Nothing is shown (C5).
   const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn;
+  // Sync waits until the device's list is kept for this account, so another account's person is never sent under this token.
   useFlowSync({
     sessions: sessionList,
     userId: auth?.userId ?? '',
     getAccessToken: memberToken,
-    enabled: syncOn,
+    enabled: syncOn && sessions.heldFor === auth?.userId,
     storage: browserStorage,
     subscribe: subscribeToWake,
     applyRemoteFlows: sessions.applyRemoteFlows,

@@ -107,6 +107,8 @@ async function expectStaysOnPeople() {
 
 function signedInAs(accountType: 'owner' | 'member') {
   mocks.auth = true;
+  // The device list is already kept for this account, as it is after any earlier sign-in.
+  localStorage.setItem('gg.sessionsAccount.v1', 'u1');
   mocks.getProfile.mockResolvedValue({
     ok: true,
     profile: {
