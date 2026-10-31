@@ -56,6 +56,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('useAccount userId', () => {
+  it('is the provider id before the profile loads, and null when signed out', async () => {
+    const signedIn = renderHook(() => useAccount({ auth: fakeAuth() }));
+    expect(signedIn.result.current.userId).toBe('u1');
+    expect(signedIn.result.current.profile).toBeNull();
+    const out = renderHook(() => useAccount({ auth: fakeAuth({ status: 'signed_out', userId: null }) }));
+    expect(out.result.current.userId).toBeNull();
+    await waitFor(() => expect(signedIn.result.current.profile).not.toBeNull());
+  });
+});
+
 describe('useAccount boot', () => {
   it('is loading while the provider is loading, and makes no call', async () => {
     const { result } = renderHook(() => useAccount({ auth: fakeAuth({ status: 'loading', userId: null }) }));

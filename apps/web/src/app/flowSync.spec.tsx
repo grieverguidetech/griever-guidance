@@ -7,7 +7,8 @@ import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
 
-const USER = '11111111-1111-4111-8111-111111111111';
+const USER = 'user_test';
+const OWNER_UUID = '11111111-1111-4111-8111-111111111111';
 const FLOW = '22222222-2222-4222-8222-222222222222';
 
 const mocks = vi.hoisted(() => ({
@@ -67,7 +68,7 @@ function stubGateway() {
       }
       const record = {
         id: FLOW,
-        ownerId: USER,
+        ownerId: OWNER_UUID,
         role: 'owner',
         facts: {
           personName: 'Margaret Hayes',
@@ -95,7 +96,7 @@ function seed() {
       {
         id: 's1',
         flowId: FLOW,
-        ownerId: USER,
+        ownerId: null,
         role: 'owner',
         personName: 'Margaret Hayes',
         dateOfPassing: '',
@@ -179,8 +180,9 @@ describe('background sync in the app (#520)', () => {
     mocks.cms = false;
     signedIn(true);
     render(<App />);
-    await screen.findByRole('heading', { name: /who you're writing about|your people|overview/i });
-    await new Promise((r) => setTimeout(r, 300));
+    // Signed in and loaded (the profile was asked for), so only the editor gate keeps sync off.
+    await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 1500));
     expect(flowCalls()).toEqual([]);
   });
 
@@ -193,7 +195,8 @@ describe('background sync in the app (#520)', () => {
     expect(flowCalls()).toEqual([]);
   });
 
-  it('makes no /flows calls when signed out', async () => {
+  it('makes no /flows calls when signed out, even with this device marked as signed in before', async () => {
+    window.localStorage.setItem('gg.signedIn.v1', USER);
     signedIn(false);
     render(<App />);
     await screen.findByRole('heading', { level: 1 });
@@ -203,7 +206,8 @@ describe('background sync in the app (#520)', () => {
 
   it('makes no /flows calls with accounts off, even after an edit', async () => {
     mocks.auth = false;
-    signedIn(false);
+    window.localStorage.setItem('gg.signedIn.v1', USER);
+    signedIn(true);
     render(<App />);
     await editName(' Jr');
     await new Promise((r) => setTimeout(r, 1500));

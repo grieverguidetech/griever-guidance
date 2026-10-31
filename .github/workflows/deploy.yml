@@ -49,6 +49,10 @@ jobs:
             echo "::error::FEATURE_SHARING is true but FEATURE_AUTH is not. Sharing needs accounts, so turn FEATURE_AUTH on first or set FEATURE_SHARING back."
             exit 1
           fi
+          if [ "$FEATURE_SYNC" = "true" ] && { [ "$FEATURE_CMS" != "true" ] || [ "$FEATURE_AUTH" != "true" ]; }; then
+            echo "::error::FEATURE_SYNC is true but FEATURE_CMS or FEATURE_AUTH is not. Sync needs the editor and accounts, so turn those on first or set FEATURE_SYNC back."
+            exit 1
+          fi
           # A secret key is refused whatever the flag says: the publishable key is baked into public JS.
           case "$CLERK_PUBLISHABLE_KEY" in
             sk_*)
@@ -79,6 +83,8 @@ jobs:
         env:
           FEATURE_AUTH: ${{ vars.FEATURE_AUTH }}
           FEATURE_SHARING: ${{ vars.FEATURE_SHARING }}
+          FEATURE_SYNC: ${{ vars.FEATURE_SYNC }}
+          FEATURE_CMS: ${{ vars.FEATURE_CMS }}
           CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
           CLERK_ISSUER: ${{ vars.CLERK_ISSUER }}
 

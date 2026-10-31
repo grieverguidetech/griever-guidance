@@ -92,7 +92,7 @@ const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
 const browserStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
 
-/** Tells sync the app may be online again: the window got focus or the tab became visible. */
+/** Tells sync the app may be online again: the window got focus, the tab became visible or the network came back. */
 function subscribeToWake(onWake: () => void): () => void {
   const onVisible = () => {
     if (document.visibilityState === 'visible') {
@@ -100,9 +100,11 @@ function subscribeToWake(onWake: () => void): () => void {
     }
   };
   window.addEventListener('focus', onWake);
+  window.addEventListener('online', onWake);
   document.addEventListener('visibilitychange', onVisible);
   return () => {
     window.removeEventListener('focus', onWake);
+  window.removeEventListener('online', onWake);
     document.removeEventListener('visibilitychange', onVisible);
   };
 }
@@ -344,7 +346,7 @@ function AppBody({
   const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn;
   useFlowSync({
     sessions: sessionList,
-    userId: auth?.profile?.id ?? '',
+    userId: auth?.userId ?? '',
     getAccessToken: memberToken,
     enabled: syncOn,
     storage: browserStorage,

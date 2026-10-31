@@ -148,3 +148,20 @@ test('Ready leads on: The person ready, Next opens Announcement with its h1; no 
   await expect(heading).toBeVisible();
   await expect(heading).toBeFocused();
 });
+
+test.describe('no sync while signed out (#520)', () => {
+  test('the editor flow makes no /flows request (auth is off in this build)', async ({ page }) => {
+    const flowRequests: string[] = [];
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.startsWith('/flows')) {
+        flowRequests.push(request.url());
+      }
+    });
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Overview', 'Overview');
+    // Past the sync edit debounce (1 s), so a stray send would have shown up.
+    await page.waitForTimeout(1500);
+    expect(flowRequests).toEqual([]);
+  });
+});
