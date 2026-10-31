@@ -292,3 +292,59 @@ describe('AccountSection details', () => {
   });
 });
 
+
+/** jsdom's Blob has no text(). */
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blob);
+  });
+}
+
+describe('AccountSection plans', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('downloads a copy of the plans, then offers the device removal after it', async () => {
+    const user = userEvent.setup();
+    const create = vi.fn().mockReturnValue('blob:plans');
+    const revoke = vi.fn();
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        plans={[{ personName: 'Sam', obituaryText: 'A kind man.' }]}
+        settings={{ onRemoveEverything: vi.fn() }}
+      />,
+    );
+    const panel = screen.getByRole('region', { name: 'Your plans' });
+    expect(within(panel).getByRole('heading', { level: 2, name: 'Your plans' })).toBeInTheDocument();
+    const download = within(panel).getByRole('button', { name: 'Download a copy' });
+    const remove = within(panel).getByRole('button', { name: 'Remove everything from this device' });
+    expect(download.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(download);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(await readBlob(create.mock.calls[0][0] as Blob)).toContain('A kind man.');
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(revoke).toHaveBeenCalledWith('blob:plans');
+    expect(await screen.findByText('Your copy is saved to this device.')).toBeInTheDocument();
+  });
+
+  it('says there is nothing to save, and offers no download, when there are no people', () => {
+    render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[]} />);
+    expect(screen.getByText('There is nothing to save yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download a copy' })).not.toBeInTheDocument();
+  });
+
+  it('shows no plans panel when no plans are given', () => {
+    profile();
+    expect(screen.queryByRole('heading', { name: 'Your plans' })).not.toBeInTheDocument();
+  });
+});

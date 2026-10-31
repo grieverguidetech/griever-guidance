@@ -1037,6 +1037,7 @@ function AppBody({
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}
+        plans={sortedSessions}
         peopleHelping={
           sharingOn ? (
             <PeopleHelping

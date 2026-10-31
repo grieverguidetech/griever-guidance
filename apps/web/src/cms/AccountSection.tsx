@@ -4,6 +4,8 @@ import type { FormEvent, ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { BIRTH_YEAR_MIN, FULL_NAME_MAX_LENGTH, isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
 import { DateInput, dateToISO, isoToDate, todayISO } from '../lib/DateField';
+import { buildPlansText, downloadPlans } from '../lib/exportPlans';
+import type { PlanPerson } from '../lib/exportPlans';
 import { SettingsBody } from '../screens/Settings';
 import { useNameForm } from '../screens/Profile';
 
@@ -34,13 +36,15 @@ interface ProfileProps {
   onManageSignIn?: () => void;
   /** The Settings actions (remove a member, remove everything from this device), shown under the account content. */
   settings?: SettingsProps;
+  /** The people this account can open (the People list). When given, the "Your plans" panel is shown and holds the device removal. */
+  plans?: readonly PlanPerson[];
 }
 
 /**
  * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Payments, People helping you, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings }: ProfileProps) {
+export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
   const id = useId();
   const [cardNote, setCardNote] = useState(false);
 
@@ -170,8 +174,53 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           </button>
         </div>
       </section>
-      {settings ? <AccountSettingsSection {...settings} /> : null}
+      {plans ? (
+        <>
+          {settings?.removeMember}
+          <PlansPanel plans={plans} settings={settings} />
+        </>
+      ) : settings ? (
+        <AccountSettingsSection {...settings} />
+      ) : null}
     </>
+  );
+}
+
+interface PlansPanelProps {
+  plans: readonly PlanPerson[];
+  settings?: SettingsProps;
+}
+
+/** "Your plans": a text copy kept outside the app, then (below it) the device removal. */
+function PlansPanel({ plans, settings }: PlansPanelProps) {
+  const id = useId();
+  const [status, setStatus] = useState('');
+
+  // Emptied first, then set after a tick, so a second download is announced again.
+  function download() {
+    setStatus('');
+    downloadPlans(buildPlansText(plans, copy));
+    setTimeout(() => setStatus(copy.plansDownloaded), 50);
+  }
+
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-plans`}>
+      <h2 id={`${id}-plans`} className="text-[16px] m-0">
+        {copy.plansHeading}
+      </h2>
+      <p className="gg-hint m-0">{plans.length === 0 ? copy.plansNone : copy.plansHint}</p>
+      {plans.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="gg-btn gg-btn-secondary" onClick={download}>
+            {copy.plansDownload}
+          </button>
+        </div>
+      ) : null}
+      <p role="status" aria-live="polite" className="gg-hint m-0 text-[13px]">
+        {status}
+      </p>
+      {settings ? <SettingsBody onRemoveEverything={settings.onRemoveEverything} signsOut={settings.signsOut} /> : null}
+    </section>
   );
 }
 
