@@ -368,10 +368,11 @@ variable keeps the feature off.
 | `OBITUARY_DRAFTING_ENABLED` | web | `VITE_FEATURE_OBITUARY_DRAFTING` | off | On: "Write the obituary" calls the gateway obituary route. Off: the button shows, disabled, with an "in beta" tooltip. The deploy workflow does not set this variable, so production is off. |
 | `SHARING_ENABLED` | web | `VITE_FEATURE_SHARING` | off | Meant to turn on family sharing (invite, join, remove). No screen reads it yet. The deploy check fails if `FEATURE_SHARING` is on and `FEATURE_AUTH` is off. |
 | `CMS_ENABLED` | web | `VITE_FEATURE_CMS` | off | On: Home opens the web editor (Overview, The person, Service) instead of the path; no send flow, wizard or `sms:` link is reachable. Off: the app is unchanged. Production is on (repo variable `FEATURE_CMS`, passed by the deploy workflow). |
+| `SYNC_ENABLED` | web | `VITE_FEATURE_SYNC` | off | On, with `CMS_ENABLED` on and someone signed in: `useFlowSync` sends the person's facts and details to `/flows` in the background and pulls on start, focus, visible tab and a 10-minute timer. No screen shows it; the saved-failed note stays about this browser only. Off: no `/flows` calls. Repo variable `FEATURE_SYNC` (not set). |
 | `AUTH_ENABLED` | mobile | `EXPO_PUBLIC_FEATURE_AUTH` | off | On: wraps the app in `AccountProvider` and adds "Your account" on Home and the picker. Off: no account code runs. |
 | `PAYMENTS` | web, mobile | not defined | n/a | Planned (GRI-15). Does not exist in the code. |
 
-Production values come from GitHub repo variables `FEATURE_AUTH`, `FEATURE_SHARING` and `FEATURE_CMS`, passed to
+Production values come from GitHub repo variables `FEATURE_AUTH`, `FEATURE_SHARING`, `FEATURE_CMS` and `FEATURE_SYNC`, passed to
 the web build in `.github/workflows/deploy.yml`.
 
 ## 6. Accessibility and copy rules in practice

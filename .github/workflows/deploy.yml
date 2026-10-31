@@ -217,6 +217,8 @@ jobs:
           VITE_FEATURE_PAYMENTS: ${{ vars.FEATURE_PAYMENTS }}
           # The web editor stays off unless the repo variable FEATURE_CMS is "true".
           VITE_FEATURE_CMS: ${{ vars.FEATURE_CMS }}
+          # Background sync stays off unless the repo variable FEATURE_SYNC is "true".
+          VITE_FEATURE_SYNC: ${{ vars.FEATURE_SYNC }}
 
       - run: pnpm exec wrangler pages project create griever-guidance-web --production-branch main || true
         env:
