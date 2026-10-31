@@ -7,7 +7,7 @@ import type { SendFlowStorage } from './useSendFlow.js';
 const fetchMock = vi.fn();
 
 function profile(senderName: string | null, id = 'u1'): Profile {
-  return { id, senderName, contactSource: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' };
+  return { id, senderName, contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' };
 }
 
 function reply(status: number, body: unknown = {}): Response {

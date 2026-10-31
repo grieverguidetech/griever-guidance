@@ -11,6 +11,9 @@ export interface Profile {
   userId: string;
   senderName?: string;
   contactSource?: AccountContactSource;
+  /** Private: never logged, never shown to members (members.ts reads senderName only). */
+  fullName?: string;
+  birthDate?: string;
   accountType: 'owner' | 'member';
   /** Bumped by every write that changes role, membership, invites or owned people. */
   version: number;
@@ -29,6 +32,8 @@ export function encodeProfile(profile: Profile): Item {
     userId: profile.userId,
     senderName: profile.senderName,
     contactSource: profile.contactSource,
+    fullName: profile.fullName,
+    birthDate: profile.birthDate,
     accountType: profile.accountType,
     version: profile.version,
     createdAt: profile.createdAt,
@@ -45,6 +50,8 @@ export function decodeProfile(item: Item): Profile {
     updatedAt,
     senderName,
     contactSource,
+    fullName,
+    birthDate,
   } = item;
   if (
     typeof userId !== 'string' ||
@@ -63,6 +70,12 @@ export function decodeProfile(item: Item): Profile {
     updatedAt,
   };
   if (typeof senderName === 'string') profile.senderName = senderName;
+  if (typeof fullName === 'string') {
+    profile.fullName = fullName;
+  }
+  if (typeof birthDate === 'string') {
+    profile.birthDate = birthDate;
+  }
   if (contactSource === 'import' || contactSource === 'manual')
     profile.contactSource = contactSource;
   return profile;
@@ -81,6 +94,8 @@ export async function getProfile(
 export interface ProfileFields {
   senderName?: string | null;
   contactSource?: AccountContactSource | null;
+  fullName?: string | null;
+  birthDate?: string | null;
 }
 /**
  * Creates or updates the profile (access pattern 2). It sets only the given fields and the
@@ -118,6 +133,14 @@ export async function saveProfileFields(
   if (fields.contactSource !== undefined) {
     sets.push('contactSource = :contactSource');
     values[':contactSource'] = fields.contactSource;
+  }
+  if (fields.fullName !== undefined) {
+    sets.push('fullName = :fullName');
+    values[':fullName'] = fields.fullName;
+  }
+  if (fields.birthDate !== undefined) {
+    sets.push('birthDate = :birthDate');
+    values[':birthDate'] = fields.birthDate;
   }
   const { Attributes } = await doc.send(
     new UpdateCommand({

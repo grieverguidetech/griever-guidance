@@ -50,6 +50,8 @@ function profileFor(accountType: 'owner' | 'member') {
     id: 'u1',
     senderName: 'Anna',
     contactSource: null,
+    fullName: null,
+    birthDate: null,
     accountType,
     createdAt: '2026-10-11T00:00:00.000Z',
     updatedAt: '2026-10-11T00:00:00.000Z',

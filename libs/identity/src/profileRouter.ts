@@ -6,10 +6,11 @@ import {
   type ClerkConfig,
   type DataFunctionConfig,
 } from '@griever/gateway-auth';
+import { isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
 import type { AccountContactSource, AccountType, DataResult, Profile, ProfileUpdate } from '@griever/shared';
 
 const MAX_SENDER_NAME_LENGTH = 100;
-const ALLOWED_KEYS = ['senderName', 'contactSource'];
+const ALLOWED_KEYS = ['senderName', 'contactSource', 'fullName', 'birthDate'];
 // A data function failure (busy, unreachable, crashed) is reported as 503: from the user's
 // side the answer is the same, try again later.
 const UNAVAILABLE = 'Your details could not be reached right now. Please try again in a moment.';
@@ -31,6 +32,8 @@ interface StoredProfile {
   userId: string;
   senderName?: string;
   contactSource?: AccountContactSource;
+  fullName?: string;
+  birthDate?: string;
   accountType: AccountType;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +44,8 @@ function toProfile(stored: StoredProfile): Profile {
     id: stored.userId,
     senderName: stored.senderName ?? null,
     contactSource: stored.contactSource ?? null,
+    fullName: stored.fullName ?? null,
+    birthDate: stored.birthDate ?? null,
     accountType: stored.accountType,
     createdAt: stored.createdAt,
     updatedAt: stored.updatedAt,
@@ -54,7 +59,7 @@ export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { e
   }
   const input = body as Record<string, unknown>;
   const unknown = Object.keys(input).find((key) => !ALLOWED_KEYS.includes(key));
-  if (unknown) return { error: 'Only your name and contact source can be saved.' };
+  if (unknown) return { error: 'Only your name, full name, date of birth and contact source can be saved.' };
 
   const fields: ProfileUpdate = {};
   if ('senderName' in input) {
@@ -70,6 +75,20 @@ export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { e
       return { error: 'Contact source must be "import", "manual", or empty.' };
     }
     fields.contactSource = source;
+  }
+  if ('fullName' in input) {
+    const fullName = normalizeFullName(input['fullName']);
+    if (fullName !== null && !isValidFullName(fullName)) {
+      return { error: 'Your full name can be up to 120 characters, on one line, with no tabs.' };
+    }
+    fields.fullName = fullName;
+  }
+  if ('birthDate' in input) {
+    const birthDate = input['birthDate'];
+    if (birthDate !== null && !isValidBirthDate(birthDate)) {
+      return { error: 'Your date of birth must be a real date, written yyyy-mm-dd, from 1900 on and not after today.' };
+    }
+    fields.birthDate = birthDate as string | null;
   }
   return { fields };
 }

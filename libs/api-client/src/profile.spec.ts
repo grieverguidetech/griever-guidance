@@ -7,6 +7,8 @@ const profile: Profile = {
   id: 'u1',
   senderName: 'Peter',
   contactSource: null,
+  fullName: null,
+  birthDate: null,
   accountType: 'owner',
   createdAt: 'x',
   updatedAt: 'x',

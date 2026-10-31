@@ -292,6 +292,8 @@ describe('editor on, signed in (#395)', () => {
         id: 'u1',
         senderName: 'Anna',
         contactSource: null,
+        fullName: null,
+        birthDate: null,
         accountType,
         createdAt: '2026-10-11T00:00:00.000Z',
         updatedAt: '2026-10-11T00:00:00.000Z',
@@ -321,7 +323,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
     mocks.updateProfile.mockResolvedValue({
       ok: true,
-      profile: { id: 'u1', senderName: 'Anna Reyes', contactSource: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
+      profile: { id: 'u1', senderName: 'Anna Reyes', contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
     });
     mocks.loadClerk.mockResolvedValue(fakeClerk().load);
     const user = userEvent.setup();

@@ -8,7 +8,7 @@ import {
   table,
   up,
 } from '../testing/localTable';
-import { getProfile, putProfile } from './profiles.js';
+import { getProfile, parseProfileFields, putProfile } from './profiles.js';
 
 const clock = fixedClock('2026-10-24T00:00:00.000Z');
 const caller = (userId: string) => ({
@@ -95,6 +95,19 @@ describe.runIf(up)('profile rules on DynamoDB Local', () => {
     expect(profile).not.toHaveProperty('senderName');
   });
 
+  it('stores and returns fullName and birthDate, and clears them with null', async () => {
+    const id = caller('user_p_private');
+    await putProfile(doc, table, id, { fullName: 'Sam Smith', birthDate: '1980-05-17' }, clock);
+    expect(await getProfile(doc, table, id, clock)).toMatchObject({
+      fullName: 'Sam Smith',
+      birthDate: '1980-05-17',
+    });
+    await putProfile(doc, table, id, { fullName: null, birthDate: null }, clock);
+    const cleared = await getProfile(doc, table, id, clock);
+    expect(cleared).not.toHaveProperty('fullName');
+    expect(cleared).not.toHaveProperty('birthDate');
+  });
+
   it('counts characters, not code units, for the name limit', async () => {
     const result = await putProfile(
       doc,
@@ -114,6 +127,11 @@ describe.runIf(up)('profile rules on DynamoDB Local', () => {
       { createdAt: 'x' },
       { senderName: 'x'.repeat(101) },
       { contactSource: 'phone' },
+      { fullName: 'x'.repeat(121) },
+      { fullName: 'Sam\u0000' },
+      { birthDate: '2999-01-01' },
+      { birthDate: '1899-12-31' },
+      { birthDate: '2001-02-29' },
       null,
       'Sam',
     ];
@@ -125,5 +143,36 @@ describe.runIf(up)('profile rules on DynamoDB Local', () => {
     expect(
       await getProfile(doc, table, caller('user_p_bad'), clock),
     ).toBeNull();
+  });
+});
+
+// Pure checks of the input parser: these run without DynamoDB Local.
+describe('parseProfileFields: fullName and birthDate', () => {
+  it('accepts valid values and null', () => {
+    expect(parseProfileFields({ fullName: 'Sam Smith', birthDate: '1980-05-17' })).toEqual({
+      fullName: 'Sam Smith',
+      birthDate: '1980-05-17',
+    });
+    expect(parseProfileFields({ fullName: null, birthDate: null })).toEqual({ fullName: null, birthDate: null });
+  });
+
+  it('trims fullName and turns blank into null', () => {
+    expect(parseProfileFields({ fullName: ' Sam ' })).toEqual({ fullName: 'Sam' });
+    expect(parseProfileFields({ fullName: '  ' })).toEqual({ fullName: null });
+  });
+
+  it.each([
+    { fullName: 'x'.repeat(121) },
+    { fullName: 'Sam\u0000' },
+    { fullName: 7 },
+    { fullName: 'Sam\nSmith' },
+    { fullName: 'Sam\tSmith' },
+    { birthDate: '2999-01-01' },
+    { birthDate: '1899-12-31' },
+    { birthDate: '2001-02-29' },
+    { birthDate: '1980-5-17' },
+    { birthDate: 19800517 },
+  ])('refuses %j', (input) => {
+    expect(parseProfileFields(input)).toBeNull();
   });
 });
