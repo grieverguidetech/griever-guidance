@@ -14,7 +14,8 @@ const at = (offsetMs: number) => new Date(clock.now().getTime() + offsetMs).toIS
 const caller = (userId: string) => ({ userId, email: `${userId}@example.test`, emailVerified: true });
 
 const profile = (userId: string, accountType: 'owner' | 'member' = 'owner', senderName?: string, version = 1) =>
-  rawPut(encodeProfile({ userId, accountType, version, senderName, createdAt: at(-99 * HOUR), updatedAt: at(-99 * HOUR) }));
+  // Private fields on every fixture, so a leak into the members list fails the toEqual checks.
+  rawPut(encodeProfile({ userId, accountType, version, senderName, fullName: 'Owner Private', birthDate: '1970-01-01', createdAt: at(-99 * HOUR), updatedAt: at(-99 * HOUR) }));
 
 const join = async (ownerId: string, memberId: string, email: string, createdAt: string, senderName?: string) => {
   await profile(memberId, 'member', senderName);

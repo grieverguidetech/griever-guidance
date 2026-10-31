@@ -64,6 +64,11 @@ describe('parseProfileBody', () => {
     expect(parseProfileBody({ fullName: '😀'.repeat(120) })).toHaveProperty('fields');
   });
 
+  it('trims fullName and turns blank into null', () => {
+    expect(parseProfileBody({ fullName: '  Ada King ' })).toEqual({ fields: { fullName: 'Ada King' } });
+    expect(parseProfileBody({ fullName: '   ' })).toEqual({ fields: { fullName: null } });
+  });
+
   it('uses a fixed message for unknown keys and does not echo the input', () => {
     expect(parseProfileBody({ sneaky: 1 })).toEqual({ error: 'Only your name, full name, date of birth and contact source can be saved.' });
   });
@@ -77,6 +82,8 @@ describe('parseProfileBody', () => {
     ['fullName too long', { fullName: 'x'.repeat(121) }],
     ['fullName with a control character', { fullName: 'Ada\u0000' }],
     ['fullName not a string', { fullName: 5 }],
+    ['fullName with a line break', { fullName: 'Ada\nKing' }],
+    ['fullName with a tab', { fullName: 'Ada\tKing' }],
     ['birthDate in the future', { birthDate: '2999-01-01' }],
     ['birthDate before 1900', { birthDate: '1899-12-31' }],
     ['birthDate not a real day', { birthDate: '2001-02-29' }],

@@ -1,4 +1,4 @@
-import { isValidBirthDate, isValidFullName } from './profileFields.js';
+import { isValidBirthDate, isValidFullName, normalizeFullName } from './profileFields.js';
 
 describe('isValidFullName', () => {
   it('accepts normal names, emoji at the limit, and the empty string', () => {
@@ -11,6 +11,9 @@ describe('isValidFullName', () => {
     expect(isValidFullName('x'.repeat(121))).toBe(false);
     expect(isValidFullName('Ada\u0000')).toBe(false);
     expect(isValidFullName('Ada\u001f')).toBe(false);
+    expect(isValidFullName('Ada\nKing')).toBe(false);
+    expect(isValidFullName('Ada\rKing')).toBe(false);
+    expect(isValidFullName('Ada\tKing')).toBe(false);
     expect(isValidFullName(5)).toBe(false);
     expect(isValidFullName(null)).toBe(false);
   });
@@ -42,5 +45,18 @@ describe('isValidBirthDate', () => {
   it('refuses non-strings', () => {
     expect(isValidBirthDate(19800517, today)).toBe(false);
     expect(isValidBirthDate(null, today)).toBe(false);
+  });
+});
+
+describe('normalizeFullName', () => {
+  it('trims, and turns blank into null', () => {
+    expect(normalizeFullName('  Ada King  ')).toBe('Ada King');
+    expect(normalizeFullName('')).toBeNull();
+    expect(normalizeFullName('   ')).toBeNull();
+    expect(normalizeFullName(null)).toBeNull();
+  });
+
+  it('leaves non-strings for the validator to refuse', () => {
+    expect(normalizeFullName(5)).toBe(5);
   });
 });

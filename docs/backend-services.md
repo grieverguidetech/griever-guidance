@@ -218,11 +218,11 @@ tokenless `POST /invites` gives 401.
 
 ### 3.3 Profile (`libs/identity`)
 
-**Purpose.** `GET` and `PUT /me/profile`: the caller's sender name and contact source.
+**Purpose.** `GET` and `PUT /me/profile`: the caller's sender name, contact source, full name and date of birth.
 
 | Item | Detail |
 |---|---|
-| Fields accepted | `senderName` (string up to 100 characters, or null), `contactSource` (`import`, `manual`, or null). Any other key gives 400 |
+| Fields accepted | `senderName` (string up to 100 characters, or null), `contactSource` (`import`, `manual`, or null), `fullName` (string up to 120 characters or null; blank becomes null; no line breaks, tabs or hidden characters), `birthDate` (`yyyy-mm-dd` or null; a real date from 1900 on, not after today). `fullName` and `birthDate` are private to the account and never shown to members. Any other key gives 400 |
 | PostgREST calls | `GET /rest/v1/profiles?id=eq.<uid>`; `PATCH` the row; if no row, `POST` it; on 409 read again |
 | Errors | Any PostgREST failure gives a calm 503 (C7) |
 | Tests | 2 spec files, about 22 cases |

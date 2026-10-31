@@ -1,5 +1,5 @@
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { isValidBirthDate, isValidFullName } from '@griever/shared';
+import { isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
 import type { Caller } from '../caller';
 import type { Clock } from '../clock';
 import {
@@ -54,10 +54,11 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     fields.contactSource = contactSource;
   }
   if (fullName !== undefined) {
-    if (fullName !== null && !isValidFullName(fullName)) {
+    const cleaned = normalizeFullName(fullName);
+    if (cleaned !== null && !isValidFullName(cleaned)) {
       return null;
     }
-    fields.fullName = fullName;
+    fields.fullName = cleaned;
   }
   if (birthDate !== undefined) {
     if (birthDate !== null && !isValidBirthDate(birthDate)) {

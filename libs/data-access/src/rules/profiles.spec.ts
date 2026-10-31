@@ -156,10 +156,17 @@ describe('parseProfileFields: fullName and birthDate', () => {
     expect(parseProfileFields({ fullName: null, birthDate: null })).toEqual({ fullName: null, birthDate: null });
   });
 
+  it('trims fullName and turns blank into null', () => {
+    expect(parseProfileFields({ fullName: ' Sam ' })).toEqual({ fullName: 'Sam' });
+    expect(parseProfileFields({ fullName: '  ' })).toEqual({ fullName: null });
+  });
+
   it.each([
     { fullName: 'x'.repeat(121) },
     { fullName: 'Sam\u0000' },
     { fullName: 7 },
+    { fullName: 'Sam\nSmith' },
+    { fullName: 'Sam\tSmith' },
     { birthDate: '2999-01-01' },
     { birthDate: '1899-12-31' },
     { birthDate: '2001-02-29' },

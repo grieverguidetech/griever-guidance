@@ -6,7 +6,7 @@ import {
   type ClerkConfig,
   type DataFunctionConfig,
 } from '@griever/gateway-auth';
-import { isValidBirthDate, isValidFullName } from '@griever/shared';
+import { isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
 import type { AccountContactSource, AccountType, DataResult, Profile, ProfileUpdate } from '@griever/shared';
 
 const MAX_SENDER_NAME_LENGTH = 100;
@@ -77,16 +77,16 @@ export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { e
     fields.contactSource = source;
   }
   if ('fullName' in input) {
-    const fullName = input['fullName'];
+    const fullName = normalizeFullName(input['fullName']);
     if (fullName !== null && !isValidFullName(fullName)) {
-      return { error: 'Your full name can be up to 120 characters, with no control characters.' };
+      return { error: 'Your full name can be up to 120 characters, on one line, with no tabs.' };
     }
-    fields.fullName = fullName as string | null;
+    fields.fullName = fullName;
   }
   if ('birthDate' in input) {
     const birthDate = input['birthDate'];
     if (birthDate !== null && !isValidBirthDate(birthDate)) {
-      return { error: 'Your date of birth must be a real date in the past, written yyyy-mm-dd, from 1900 on.' };
+      return { error: 'Your date of birth must be a real date, written yyyy-mm-dd, from 1900 on and not after today.' };
     }
     fields.birthDate = birthDate as string | null;
   }
