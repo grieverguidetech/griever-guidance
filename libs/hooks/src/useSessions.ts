@@ -145,6 +145,16 @@ export function namedSessionsByRecent(sessions: Session[]): Session[] {
     .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
 }
 
+/**
+ * Sessions worth listing in the editor: a name, or any content (so work on someone not yet named
+ * stays reachable). Most recently opened first.
+ */
+export function listableSessionsByRecent(sessions: Session[]): Session[] {
+  return sessions
+    .filter((s) => s.personName.trim() !== '' || hasAnyContent(s))
+    .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
+}
+
 /** The saved shape before drafts were kept per moment: one `draft` slot. */
 type StoredSession = Omit<Session, 'drafts' | 'flowId' | 'ownerId' | 'role'> & {
   flowId?: string;
@@ -472,6 +482,9 @@ const MOMENT_KEY_BY_CATEGORY: Partial<Record<TemplateCategory, MomentKey>> = {
 /** True when a person holds anything worth keeping: a name, a draft, a section status or any typed field. */
 function hasAnyContent(s: Session): boolean {
   if (s.personName.trim() !== '' || Object.keys(s.drafts).length > 0) {
+    return true;
+  }
+  if (Object.keys(s.checklist ?? {}).length > 0) {
     return true;
   }
   if (Object.keys(s.sectionStatus ?? {}).length > 0) {

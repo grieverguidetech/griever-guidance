@@ -10,6 +10,7 @@ import {
   hasDraftInProgress,
   resumeDraft,
   namedSessionsByRecent,
+  listableSessionsByRecent,
   latestInProgressDraft,
   computeSections,
   useFlowSync,
@@ -561,7 +562,10 @@ function AppBody({
   }
 
   const canCreate = !(sharingOn && auth?.profile?.accountType === 'member');
-  const sortedSessions = useMemo(() => namedSessionsByRecent([...sessions.sessions]), [sessions.sessions]);
+  const sortedSessions = useMemo(
+    () => (CMS_ENABLED ? listableSessionsByRecent : namedSessionsByRecent)([...sessions.sessions]),
+    [sessions.sessions],
+  );
 
   // Picks the most recent person when none is open. It never creates one: Home's "Create a new
   // one" is the only way to start a person.

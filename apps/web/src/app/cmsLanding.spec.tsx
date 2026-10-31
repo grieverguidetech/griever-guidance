@@ -143,6 +143,25 @@ describe('landing with the editor on (#448)', () => {
     expect(Date.parse(harold?.lastOpenedAt ?? '')).toBeGreaterThan(Date.parse('2026-10-12T00:00:00.000Z'));
   });
 
+  it('reopens an unnamed person who has work, instead of making a blank one', async () => {
+    seed({ ...person('s1', '', '2026-10-10T00:00:00.000Z'), servicePlace: 'Oak Hill' } as ReturnType<typeof person>);
+    render(<App />);
+    expect(await h1('Overview')).toBeInTheDocument();
+    expect(stored()).toHaveLength(1);
+    expect(stored()[0].id).toBe('s1');
+  });
+
+  it('after Change, an unnamed person with a checklist tick is listed and kept', async () => {
+    const user = userEvent.setup();
+    seed({ ...person('s1', '', '2026-10-10T00:00:00.000Z'), checklist: { 'headstone': 'done' } } as ReturnType<typeof person>);
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(PEOPLE);
+    expect(screen.getByRole('button', { name: 'Not named yet' })).toBeInTheDocument();
+    expect(stored()).toHaveLength(1);
+  });
+
   it('opens The person for a new person when nobody is saved (owner), focusing the h1', async () => {
     render(<App />);
     const heading = await h1('The person');

@@ -34,7 +34,22 @@ describe('PeopleList', () => {
     expect(onOpen).toHaveBeenCalledWith('a');
   });
 
-  it('skips unnamed people', () => {
+  it('lists an unnamed person who has work as "Not named yet", and opens them', async () => {
+    const onOpen = vi.fn();
+    const unnamed = { ...person('c', '', '2026-10-13T00:00:00.000Z'), servicePlace: 'Oak Hill' } as Session;
+    render(<PeopleList sessions={[unnamed, older]} onOpen={onOpen} onCreate={vi.fn()} canCreate />);
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(2);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Not named yet' }));
+    expect(onOpen).toHaveBeenCalledWith('c');
+  });
+
+  it('lists an unnamed person who only has a checklist tick', () => {
+    const ticked = { ...person('d', '  ', '2026-10-13T00:00:00.000Z'), checklist: { 'headstone': 'done' } } as unknown as Session;
+    render(<PeopleList sessions={[ticked]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
+    expect(screen.getByRole('button', { name: 'Not named yet' })).toBeInTheDocument();
+  });
+
+  it('skips unnamed people with no work', () => {
     render(<PeopleList sessions={[person('c', '', '2026-10-13T00:00:00.000Z'), older]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
     expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(1);
   });

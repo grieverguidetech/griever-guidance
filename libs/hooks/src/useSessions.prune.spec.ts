@@ -61,6 +61,10 @@ describe('pruneEmpty', () => {
     expect(run([blank('1', { [key]: value })])).toEqual(['1']);
   });
 
+  it('keeps an unnamed person who has a checklist tick', () => {
+    expect(run([blank('1', { checklist: { 'headstone': 'done' } })])).toEqual(['1']);
+  });
+
   it('treats blank-only text as empty', () => {
     expect(run([blank('1', { servicePlace: '   ' })])).toEqual([]);
   });
