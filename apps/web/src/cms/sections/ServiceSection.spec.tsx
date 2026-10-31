@@ -203,14 +203,14 @@ describe('ServiceSection', () => {
   });
 
   it('after an edit the message stays as typed, and reset restores the preview with focus back', async () => {
-    const { patches } = setup({ personName: 'Margaret Hayes' });
+    const { patches } = setup({ personName: 'Margaret Hayes', serviceDate: 'June 3, 2026' });
     await change();
     await userEvent.type(message(), 'X');
     expect(patches.at(-1)?.serviceMessage).toMatch(/X$/);
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
     expect(patches.at(-1)).toEqual({ serviceMessage: undefined });
     expect(screen.queryByLabelText('Message')).toBeNull();
-    expect(preview().querySelector('p.font-serif')?.textContent).toBe("Margaret Hayes' service will be held.");
+    expect(preview().querySelector('p.font-serif')?.textContent).toBe("Margaret Hayes' service will be held June 3, 2026.");
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Change the words' })).toHaveFocus();
   });
@@ -222,7 +222,7 @@ describe('ServiceSection', () => {
   });
 
   it('Done keeps the words, shows them in the preview and moves focus to Change the words', async () => {
-    setup({ personName: 'Margaret Hayes' });
+    setup({ personName: 'Margaret Hayes', serviceDate: 'June 3, 2026' });
     await change();
     await userEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByLabelText('Message')).toBeNull();
