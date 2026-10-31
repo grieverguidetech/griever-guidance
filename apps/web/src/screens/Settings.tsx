@@ -12,14 +12,26 @@ interface Props {
   removeMember?: ReactNode;
 }
 
-/** Settings is the only place deletion is offered (C9): never inside a flow, never a swipe. */
-export function Settings({ onBack, onRemoveEverything, signsOut = false, removeMember }: Props) {
+interface BodyProps {
+  onRemoveEverything: () => Promise<void>;
+  signsOut?: boolean;
+  removeMember?: ReactNode;
+  /** Told when removing starts and stops, so the screen can hold its Back button. */
+  onPendingChange?: (pending: boolean) => void;
+}
+
+/** The Settings content without its heading or Back button; the CMS shows it as a section. */
+export function SettingsBody({ onRemoveEverything, signsOut = false, removeMember, onPendingChange }: BodyProps) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
   const confirmRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cameFromConfirm = useRef(false);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
 
   // Focus follows the swap: to the warning when it opens, back to the button when it closes.
   useEffect(() => {
@@ -47,16 +59,12 @@ export function Settings({ onBack, onRemoveEverything, signsOut = false, removeM
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <TopBar onBack={pending ? undefined : onBack} />
-      <h1 className="text-[22px]">Settings</h1>
-
+    <>
       {removeMember}
 
       <section
         aria-labelledby="remove-heading"
-        className="flex flex-col gap-3 pt-4"
-        style={{ borderTop: '1px solid var(--color-divider)', marginTop: 'var(--space-4)' }}
+        className="flex flex-col gap-3 pt-4 mt-[var(--space-4)] border-t border-solid border-[color:var(--color-divider)] first:mt-0 first:pt-0 first:border-t-0"
       >
         <h2 id="remove-heading" className="text-[16px] m-0">
           Remove everything from this device
@@ -113,6 +121,19 @@ export function Settings({ onBack, onRemoveEverything, signsOut = false, removeM
           {status}
         </div>
       </section>
+    </>
+  );
+}
+
+/** Settings is the only place deletion is offered (C9): never inside a flow, never a swipe. */
+export function Settings({ onBack, onRemoveEverything, signsOut = false, removeMember }: Props) {
+  const [pending, setPending] = useState(false);
+  return (
+    <div className="flex flex-col gap-4">
+      <TopBar onBack={pending ? undefined : onBack} />
+      <h1 className="text-[22px]">Settings</h1>
+
+      <SettingsBody onRemoveEverything={onRemoveEverything} signsOut={signsOut} removeMember={removeMember} onPendingChange={setPending} />
     </div>
   );
 }

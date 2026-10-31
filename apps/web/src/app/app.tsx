@@ -22,6 +22,7 @@ import { screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { CmsShell } from '../cms/CmsShell';
+import { AccountSection, AccountSettingsSection } from '../cms/AccountSection';
 import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
 import { PeopleList } from '../cms/PeopleList';
 import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
@@ -76,6 +77,7 @@ type CmsSection = Exclude<CmsNavKey, 'account'>;
 /** How long a landing waits for the profile (to tell a member from an owner) before giving up. */
 const LANDING_PROFILE_WAIT_MS = 3000;
 const cmsShellCopy = screenCopy('cmsShell');
+const accountCopy = screenCopy('account');
 const cmsItemLabels = screenCopy('cmsChecklist').items;
 
 const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
@@ -891,6 +893,61 @@ function AppBody({
     goHome();
   }
 
+  /** Where Your account was opened from, flag off or on: the name prompt goes back to where it was. */
+  function leaveAccount() {
+    auth?.clearError();
+    setAskingName(false);
+    if (askingName) {
+      setView(returnTo);
+    } else {
+      backFromAccount();
+    }
+  }
+
+  /**
+   * Your account inside the editor shell (flag on). The shell owns the one h1. There is no Back: the
+   * side nav and Change lead out. From the people list the nav offers only this item, so a quiet
+   * "Your people" button leads back (the origin rule).
+   */
+  function renderAccount(title: string, body: ReactNode) {
+    const fromPeople = accountFrom.current === 'people' || !active;
+    return (
+      <Shell wide>
+        <CmsShell
+          title={title}
+          peopleView={fromPeople}
+          personName={active?.personName ?? ''}
+          section="account"
+          statuses={active?.sectionStatus}
+          onSelect={(key) => {
+            if (key !== 'account') {
+              auth?.clearError();
+              setAskingName(false);
+              setCmsItem(null);
+              setCmsSection(key);
+              setView('cms');
+            }
+          }}
+          onChangePerson={() => {
+            auth?.clearError();
+            setAskingName(false);
+            leaveCms();
+          }}
+          // Already here.
+          onAccount={() => undefined}
+          notice={endedNote}
+        >
+          {fromPeople ? (
+            <button type="button" className="gg-btn gg-btn-ghost self-start !px-0" onClick={leaveAccount}>
+              {cmsShellCopy.peopleTitle}
+            </button>
+          ) : null}
+          {body}
+        </CmsShell>
+      </Shell>
+    );
+  }
+
   /** "Change" in the editor: an unnamed person is dropped, then "Your people". */
   function leaveCms() {
     sessions.pruneEmpty();
@@ -915,6 +972,51 @@ function AppBody({
       <Shell notice={endedNote}>
         <SignInScreen />
       </Shell>
+    );
+  }
+
+  if (CMS_ENABLED && auth && view === 'profile') {
+    return renderAccount(
+      askingName ? accountCopy.askHeading : accountCopy.heading,
+      <AccountSection
+        asksName={askingName}
+        senderName={auth.profile?.senderName ?? null}
+        error={auth.error}
+        showChecklist={auth.isSignedIn}
+        peopleHelping={
+          sharingOn ? (
+            <PeopleHelping
+              view={members.view}
+              status={members.status}
+              message={members.message}
+              onInvite={members.invite}
+              onRevoke={members.revoke}
+            />
+          ) : undefined
+        }
+        onSave={async (name) => {
+          const saved = await auth.updateSenderName(name);
+          if (saved && askingName) {
+            setAskingName(false);
+            setView(returnTo);
+          }
+          return saved;
+        }}
+        onSignOut={() => {
+          accountGeneration.current += 1;
+          setLeftOnPurpose(true);
+          setCreating(false);
+          void auth.signOut();
+        }}
+        settings={{
+          onRemoveEverything: removeEverything,
+          signsOut: true,
+          removeMember:
+            sharingOn && members.view?.role === 'owner' ? (
+              <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
+            ) : undefined,
+        }}
+      />,
     );
   }
 
@@ -1071,6 +1173,21 @@ function AppBody({
           )}
         </CmsShell>
       </Shell>
+    );
+  }
+
+  if (CMS_ENABLED && view === 'settings') {
+    return renderAccount(
+      accountCopy.heading,
+      <AccountSettingsSection
+        onRemoveEverything={removeEverything}
+        signsOut={offline || (auth?.isSignedIn ?? false)}
+        removeMember={
+          sharingOn && members.view?.role === 'owner' ? (
+            <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
+          ) : undefined
+        }
+      />,
     );
   }
 

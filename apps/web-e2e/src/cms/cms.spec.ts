@@ -68,6 +68,13 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
   'The person': async (page) => {
     await startPerson(page);
   },
+  // Auth is off in this build, so this is the settings body; the profile body is covered by the app specs.
+  'Your account': async (page) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Your account', 'Your account');
+    await expect(page.getByRole('button', { name: 'Remove everything from this device' })).toBeVisible();
+  },
   'Your people': async (page) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');

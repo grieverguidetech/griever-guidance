@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { CmsShell } from './CmsShell';
@@ -71,6 +71,14 @@ describe('CmsShell', () => {
     const h1 = screen.getAllByRole('heading', { level: 1 });
     expect(h1).toHaveLength(1);
     expect(h1[0]).toHaveTextContent(title);
+  });
+
+  it('shows the save line on a section but not on the account (its name saves on Save)', () => {
+    setup('service');
+    expect(screen.getByText(/Saved in this browser as you type/)).toBeInTheDocument();
+    cleanup();
+    setup('account');
+    expect(screen.queryByText(/Saved in this browser as you type/)).not.toBeInTheDocument();
   });
 
   it('renders the notice and children, children without an h1', () => {

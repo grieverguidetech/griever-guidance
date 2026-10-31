@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
   getProfile: vi.fn(),
   getMembers: vi.fn(),
+  updateProfile: vi.fn(),
+  createInvite: vi.fn(),
+  revokeInvite: vi.fn(),
 }));
 
 vi.mock('../lib/features', () => ({
@@ -37,7 +40,10 @@ vi.mock('../lib/authClient', async (importOriginal) => {
 });
 vi.mock('@griever/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@griever/api-client')>();
-  return { ...actual, getProfile: mocks.getProfile, getMembers: mocks.getMembers };
+  return { ...actual, getProfile: mocks.getProfile, getMembers: mocks.getMembers, updateProfile: mocks.updateProfile,
+    createInvite: mocks.createInvite,
+    revokeInvite: mocks.revokeInvite,
+  };
 });
 
 import { App } from './app';
@@ -95,6 +101,9 @@ beforeEach(() => {
   mocks.loadClerk.mockReset();
   mocks.getProfile.mockReset();
   mocks.getMembers.mockReset();
+  mocks.updateProfile.mockReset();
+  mocks.createInvite.mockReset();
+  mocks.revokeInvite.mockReset();
   window.localStorage.clear();
 });
 
@@ -261,12 +270,15 @@ describe('editor on (#395)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toHaveFocus();
   });
 
-  it('"Your account" opens Settings when nobody is signed in, and Back returns to the Overview', async () => {
+  it('"Your account" opens the settings content when nobody is signed in, inside the editor, and the nav returns to the Overview', async () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toHaveFocus();
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toHaveFocus();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Remove everything from this device' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
   });
 });
@@ -288,7 +300,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: 'u1' }).load);
   }
 
-  it('"Your account" opens the profile, and Back returns to the Overview', async () => {
+  it('"Your account" opens the profile inside the editor, and the nav returns to the Overview', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
@@ -297,8 +309,73 @@ describe('editor on, signed in (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toHaveFocus();
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
+  });
+
+  it('an account with no name gets the name prompt inside the editor, and saving returns to where they were', async () => {
+    mocks.auth = true;
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
+    mocks.updateProfile.mockResolvedValue({
+      ok: true,
+      profile: { id: 'u1', senderName: 'Anna Reyes', contactSource: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
+    });
+    mocks.loadClerk.mockResolvedValue(fakeClerk().load);
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    // The name check runs on sign-in, so sign in rather than start signed in.
+    await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'What should we call you?' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { senderName: 'Anna Reyes' });
+    // Back to where they were: the editor they came from, not the account.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+  });
+
+  it('Sign out works from inside the editor', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('button', { name: 'Sign in with the test provider' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your account' })).not.toBeInTheDocument();
+  });
+
+  it('sends and cancels an invitation from inside the editor', async () => {
+    mocks.sharing = true;
+    const invite = { id: 'i1', email: 'sam@example.com', expiresAt: '2026-11-30T00:00:00.000Z' };
+    mocks.getMembers
+      .mockResolvedValueOnce({ ok: true, view: { role: 'owner', members: [], invites: [] } })
+      .mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [invite] } });
+    mocks.createInvite.mockResolvedValue({ ok: true });
+    mocks.revokeInvite.mockResolvedValue({ ok: true });
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await screen.findByRole('heading', { name: 'People helping you' });
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Their email'), 'Sam@Example.com');
+    await user.click(screen.getByRole('button', { name: 'Send an invitation' }));
+    await waitFor(() => expect(mocks.createInvite).toHaveBeenCalledWith(expect.anything(), 'sam@example.com'));
+    await user.click(await screen.findByRole('button', { name: /Cancel this invitation/ }));
+    await waitFor(() => expect(mocks.revokeInvite).toHaveBeenCalledWith(expect.anything(), 'i1'));
   });
 
   it('a member has no "Create a new one"', async () => {
