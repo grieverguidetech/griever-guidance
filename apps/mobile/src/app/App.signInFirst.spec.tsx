@@ -14,6 +14,7 @@ jest.mock('../lib/AccountProvider', () => {
   return {
     useAccount: () => React.useContext(Ctx),
     useLaunchState: () => mockLaunch,
+    useSyncAuth: () => null,
     AccountProvider: ({ children }: { children: React.ReactNode }) => {
       const [value, setValue] = React.useState(mockAccount);
       mockSetAccount.current = (a) => {

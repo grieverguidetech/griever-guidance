@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { SIGNED_IN_STORAGE_KEY, useAccount as useAccountState } from '@griever/hooks';
 import type { UseAccountResult } from '@griever/hooks';
@@ -12,6 +12,18 @@ const AccountContext = createContext<UseAccountResult | null>(null);
 
 export function useAccount(): UseAccountResult | null {
   return useContext(AccountContext);
+}
+
+/**
+ * What background sync needs from the sign-in provider: who is signed in and a token getter. The
+ * object only changes when the status or user does; `getToken` always asks the latest provider.
+ * null means accounts are unavailable.
+ */
+export type SyncAuth = { status: AccountAuth['status']; userId: string | null; getToken: () => Promise<string | null> };
+const SyncAuthContext = createContext<SyncAuth | null>(null);
+
+export function useSyncAuth(): SyncAuth | null {
+  return useContext(SyncAuthContext);
 }
 
 /**
@@ -84,6 +96,20 @@ type ProfileCache = ReturnType<typeof useProfileCache>;
  */
 function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: ProfileCache; children: ReactNode }) {
   const [account, setAccount] = useState<UseAccountResult>(LOADING);
+  const latestAuth = useRef(auth);
+  latestAuth.current = auth;
+  const { status, userId } = auth;
+  const syncAuth = useMemo<SyncAuth>(
+    () => ({
+      status,
+      userId,
+      getToken: async () => {
+        const result = await latestAuth.current.getToken();
+        return result.ok ? result.token : null;
+      },
+    }),
+    [status, userId],
+  );
   const launch = useMemo<LaunchState>(
     () => ({ hydrated: cache.ready, signedIn: cache.ready && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
     [cache.ready, cache.storage],
@@ -92,7 +118,9 @@ function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: Pro
     <>
       {cache.ready ? <AccountRunner auth={auth} storage={cache.storage} onAccount={setAccount} /> : null}
       <LaunchContext.Provider value={launch}>
-        <AccountContext.Provider value={account}>{children}</AccountContext.Provider>
+        <AccountContext.Provider value={account}>
+          <SyncAuthContext.Provider value={syncAuth}>{children}</SyncAuthContext.Provider>
+        </AccountContext.Provider>
       </LaunchContext.Provider>
     </>
   );

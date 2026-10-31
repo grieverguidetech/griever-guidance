@@ -10,7 +10,11 @@
     },
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FEATURE_AUTH": "true",
+        "EXPO_PUBLIC_FEATURE_SYNC": "true"
+      }
     },
     "preview": {
       "distribution": "internal",
@@ -21,7 +25,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com"
+        "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com",
+        "EXPO_PUBLIC_FEATURE_AUTH": "true",
+        "EXPO_PUBLIC_FEATURE_SYNC": "true"
       }
     }
   },
