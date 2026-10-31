@@ -110,6 +110,7 @@ Each is off unless set to exactly `true`, at build time.
 | `EXPO_PUBLIC_FEATURE_SYNC` | mobile | Background sync of the person's details, when signed in. Needs `EXPO_PUBLIC_FEATURE_AUTH`. |
 | `VITE_FEATURE_OBITUARY_DRAFTING` | web | AI obituary drafting. Without it the button is disabled. |
 | `VITE_FEATURE_CMS` | web | The web editor (Overview, The person, Service) in place of the path and the send flow. On in production. |
+| `VITE_FEATURE_SYNC` | web | Background sync of the person to the account. Needs the editor and a signed-in user. Off by default. |
 
 With auth off, onboarding starts at adding contacts and sync never starts.
 
@@ -127,7 +128,7 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 
 **`apps/web`**
 - `VITE_API_URL`
-- `VITE_FEATURE_AUTH`, `VITE_FEATURE_OBITUARY_DRAFTING`, `VITE_FEATURE_CMS`
+- `VITE_FEATURE_AUTH`, `VITE_FEATURE_OBITUARY_DRAFTING`, `VITE_FEATURE_CMS`, `VITE_FEATURE_SYNC`
 - `VITE_CLERK_PUBLISHABLE_KEY` (read only when `VITE_FEATURE_AUTH` is `true`)
 
 **Production (GitHub repo variables, not secrets)**

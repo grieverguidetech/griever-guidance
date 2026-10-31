@@ -10,6 +10,11 @@ async function cmsEnabled(): Promise<boolean> {
   return (await import('./features')).CMS_ENABLED;
 }
 
+async function syncEnabled(): Promise<boolean> {
+  vi.resetModules();
+  return (await import('./features')).SYNC_ENABLED;
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
@@ -46,5 +51,22 @@ describe('CMS_ENABLED', () => {
   it.each(['false', '', 'TRUE', 'True', '1', ' true'])('is off for %j', async (value) => {
     vi.stubEnv('VITE_FEATURE_CMS', value);
     expect(await cmsEnabled()).toBe(false);
+  });
+});
+
+describe('SYNC_ENABLED', () => {
+  it('is off when the variable is missing', async () => {
+    vi.stubEnv('VITE_FEATURE_SYNC', undefined);
+    expect(await syncEnabled()).toBe(false);
+  });
+
+  it('is on only for exactly "true"', async () => {
+    vi.stubEnv('VITE_FEATURE_SYNC', 'true');
+    expect(await syncEnabled()).toBe(true);
+  });
+
+  it.each(['false', '', 'TRUE', 'True', '1', ' true'])('is off for %j', async (value) => {
+    vi.stubEnv('VITE_FEATURE_SYNC', value);
+    expect(await syncEnabled()).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import {
   namedSessionsByRecent,
   latestInProgressDraft,
   computeSections,
+  useFlowSync,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { getProfile } from '@griever/api-client';
@@ -21,6 +22,7 @@ import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
+import { SYNC_ENABLED } from '../lib/syncFlag';
 import { CmsShell } from '../cms/CmsShell';
 import { AccountSection, AccountSettingsSection } from '../cms/AccountSection';
 import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
@@ -89,6 +91,23 @@ const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
 
 const browserStorage =
   typeof window !== 'undefined' ? window.localStorage : undefined;
+
+/** Tells sync the app may be online again: the window got focus, the tab became visible or the network came back. */
+function subscribeToWake(onWake: () => void): () => void {
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') {
+      onWake();
+    }
+  };
+  window.addEventListener('focus', onWake);
+  window.addEventListener('online', onWake);
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    window.removeEventListener('focus', onWake);
+  window.removeEventListener('online', onWake);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+}
 
 // Defined at module scope: a component declared inside App would be a new
 // type on every render, remounting the screen and wiping what was typed.
@@ -321,6 +340,19 @@ function AppBody({
   // A failed token read counts as no token: the hook reports "sign in again" rather than loading forever.
   const memberToken = useCallback(async () => (getAccessToken ? getAccessToken().catch(() => null) : null), [getAccessToken]);
   const members = useMembers({ getAccessToken: memberToken, enabled: sharingOn });
+
+  // Background sync of the person to the account. Only in the editor build (the 4 message keys stay
+  // off the wire when the editor is off, C2), with sync on and someone signed in. Nothing is shown (C5).
+  const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn;
+  useFlowSync({
+    sessions: sessionList,
+    userId: auth?.userId ?? '',
+    getAccessToken: memberToken,
+    enabled: syncOn,
+    storage: browserStorage,
+    subscribe: subscribeToWake,
+    applyRemoteFlows: sessions.applyRemoteFlows,
+  });
 
   const [view, setView] = useState<AppView>(() => {
     if (offline) return 'home';

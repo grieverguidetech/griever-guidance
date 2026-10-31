@@ -34,3 +34,9 @@ export const PAYMENTS_ENABLED = import.meta.env['VITE_FEATURE_PAYMENTS'] === 'tr
  * default: with it off the app is unchanged. Production turns it on. Defined in cmsFlag.ts.
  */
 export { CMS_ENABLED } from './cmsFlag';
+
+/**
+ * Background sync of the person's facts and details to the account (the /flows routes). Off by
+ * default, and only used with the web editor (CMS_ENABLED) on and someone signed in. Defined in syncFlag.ts.
+ */
+export { SYNC_ENABLED } from './syncFlag';

@@ -20,6 +20,8 @@ export interface UseAccountResult {
   status: AccountAuthStatus;
   isSignedIn: boolean;
   isLoading: boolean;
+  /** The provider's id for the signed-in user; null when signed out or still loading. Known before the profile is. */
+  userId?: string | null | undefined;
   /** True when signed in but the network could not be reached. */
   offline: boolean;
   /** null when signed out, when no profile exists yet (normal), or before one is known. */
@@ -271,6 +273,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     status,
     isSignedIn: status === 'signed_in',
     isLoading: status === 'loading',
+    userId: status === 'signed_in' ? authUserId : null,
     offline,
     profile,
     error,
