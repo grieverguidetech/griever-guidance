@@ -147,3 +147,9 @@ describe('defaultServiceEventsMessage', () => {
     expect(text).toBe(defaultServiceMessage(base));
   });
 });
+
+describe('defaultServiceEventsMessage with no details', () => {
+  it('is empty, with no stray full stop', () => {
+    expect(defaultServiceEventsMessage({ personName: 'Margaret Hale', obituaryUrl: '' })).toBe('');
+  });
+});

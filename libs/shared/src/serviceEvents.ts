@@ -82,8 +82,9 @@ export function defaultServiceEventsMessage(
   ].filter(Boolean);
 
   const service = defaultServiceMessage({ ...details, obituaryUrl: '' }).trim();
-  const closedService = /[.?]$/.test(service) ? service : `${service}.`;
-  const body = [closedService, ...sentences].join(' ');
+  // An empty service message stays empty, so no stray full stop is added.
+  const closedService = service && !/[.?]$/.test(service) ? `${service}.` : service;
+  const body = [closedService, ...sentences].filter(Boolean).join(' ');
   const url = normalizeUrl(details.obituaryUrl);
   return url ? `${body}\n\n${url}` : body;
 }
