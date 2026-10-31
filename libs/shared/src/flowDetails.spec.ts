@@ -8,8 +8,10 @@ import {
   FORBIDDEN_SYNC_KEYS,
   SYNCED_KEYS,
   flatToStatusMap,
-  fromSyncedFields,
+  flowDetailsToSessionFields,
   mergeSyncedFields,
+  mergeSyncedFieldsWithChanges,
+  parseFlowPatch,
   parseFlowDetails,
   parseFlowFacts,
   splitSyncedPatch,
@@ -150,7 +152,7 @@ describe('null and undefined rule', () => {
   });
 
   it('message null comes back as an explicit undefined, other null as empty', () => {
-    const back = fromSyncedFields({
+    const back = flowDetailsToSessionFields({
       serviceMessage: null,
       thanksMessage: '',
       servicePlace: null,
@@ -205,7 +207,7 @@ describe('status map and flat keys', () => {
   });
 });
 
-describe('toSyncedFields and fromSyncedFields', () => {
+describe('toSyncedFields and flowDetailsToSessionFields', () => {
   const session = {
     personName: 'Margaret Hale',
     dateOfPassing: 'May 29, 2026',
@@ -232,7 +234,7 @@ describe('toSyncedFields and fromSyncedFields', () => {
   });
 
   it('round-trips through the wire', () => {
-    const back = fromSyncedFields(toSyncedFields(session));
+    const back = flowDetailsToSessionFields(toSyncedFields(session));
     expect(back.serviceTime).toBe('10:00 am');
     expect(back.burialPrivate).toBe(true);
     expect(back.sectionStatus).toEqual({ person: 'ready' });
@@ -282,7 +284,7 @@ describe('payload size', () => {
       burialPrivate: true,
     };
     for (const key of FLOW_DETAIL_TEXT_KEYS) {
-      full[key] = 'é'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
+      full[key] = '一'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
     }
     for (const key of FLOW_STATUS_KEYS) {
       full[key] = 'in_progress';
@@ -292,6 +294,8 @@ describe('payload size', () => {
     expect(parseFlowDetails(split?.details)).not.toBeNull();
     const bytes = new TextEncoder().encode(JSON.stringify(full)).length;
     expect(bytes).toBeLessThan(128 * 1024);
+    // 3 bytes per CJK character: the true worst case, 83,492 bytes with the JSON overhead.
+    expect(bytes).toBeGreaterThan(80 * 1024);
   });
 });
 
@@ -304,4 +308,123 @@ const noForbiddenDetail: [ForbiddenDetail] extends [never] ? true : false =
   true;
 it('keeps forbidden keys out of the type', () => {
   expect(noForbiddenDetail).toBe(true);
+});
+
+describe('hardening', () => {
+  it('refuses a smuggled __proto__ key from JSON.parse', () => {
+    const input = JSON.parse(
+      '{"personName":"A","__proto__":{"serviceNotes":"smuggled","senderName":"Anna"}}',
+    );
+    const split = splitSyncedPatch(input);
+    expect(parseFlowDetails(split?.details)).toBeNull();
+    expect(parseFlowPatch(input)).toBeNull();
+    expect(parseFlowDetails(input)).toBeNull();
+  });
+
+  it('does not read inherited keys', () => {
+    const inherited = Object.create({ serviceNotes: 'inherited' });
+    expect(parseFlowDetails(inherited)).toEqual({});
+  });
+
+  it('keeps other statuses when a partial status set arrives', () => {
+    const back = flowDetailsToSessionFields(
+      { serviceStatus: 'ready' },
+      { person: 'ready' },
+    );
+    expect(back.sectionStatus).toEqual({ person: 'ready', service: 'ready' });
+    expect(
+      flowDetailsToSessionFields({ serviceStatus: null }, { service: 'ready' })
+        .sectionStatus,
+    ).toEqual({});
+    expect('sectionStatus' in flowDetailsToSessionFields({})).toBe(false);
+  });
+
+  it('statusMapToFlat drops values that are not statuses', () => {
+    expect(
+      statusMapToFlat({ person: 'bogus' } as never).personStatus,
+    ).toBeNull();
+  });
+
+  it('refuses C0 control characters except tab, newline and carriage return', () => {
+    expect(parseFlowDetails({ serviceNotes: 'a\u0001b' })).toBeNull();
+    expect(parseFlowDetails({ serviceNotes: 'a\u001fb' })).toBeNull();
+    expect(parseFlowDetails({ serviceNotes: 'a\tb\nc\rd' })).not.toBeNull();
+    expect(
+      toFlowDetails({ serviceNotes: 'a\u0001b\u0000c' }).serviceNotes,
+    ).toBe('abc');
+    expect(toFlowDetails({ serviceMessage: 'x\u0007y' }).serviceMessage).toBe(
+      'xy',
+    );
+  });
+
+  it('trims trailing space left by a cut on non-message keys', () => {
+    const value = toFlowDetails({
+      birthDate: `${'a'.repeat(99)} bcd`,
+    }).birthDate;
+    expect(value).toBe('a'.repeat(99));
+  });
+
+  it('no synced key is forbidden', () => {
+    for (const key of SYNCED_KEYS) {
+      expect(FORBIDDEN_SYNC_KEYS).not.toContain(key);
+    }
+  });
+
+  it.each(FORBIDDEN_SYNC_KEYS)('parseFlowPatch rejects %s', (key) => {
+    expect(parseFlowPatch({ [key]: 'x' })).toBeNull();
+  });
+
+  it('lists the send-flow and contact fields', () => {
+    for (const key of [
+      'fields',
+      'tone',
+      'includeFlowers',
+      'customFlorist',
+      'flowerDeliveryTarget',
+      'templateCategory',
+      'templateOverrideId',
+      'serviceDetailsKnown',
+      'selectedContactIds',
+      'phone',
+      'phones',
+      'email',
+      'emails',
+      'displayName',
+    ]) {
+      expect(FORBIDDEN_SYNC_KEYS).toContain(key);
+    }
+  });
+});
+
+describe('mergeSyncedFieldsWithChanges', () => {
+  const local = toSyncedFields({
+    personName: 'A',
+    serviceTime: 'local',
+    servicePlace: 'Hall',
+  });
+
+  it('returns only remote-taken keys that differ and are not pending', () => {
+    const { merged, changed } = mergeSyncedFieldsWithChanges(
+      local,
+      {
+        personName: 'A',
+        serviceTime: 'remote',
+        servicePlace: 'Church',
+        burialPrivate: false,
+      },
+      ['servicePlace'],
+    );
+    expect(changed).toEqual({ serviceTime: 'remote' });
+    expect(merged.servicePlace).toBe('Hall');
+  });
+
+  it('a remote null overwrites a non-pending local value', () => {
+    const { merged, changed } = mergeSyncedFieldsWithChanges(
+      local,
+      { servicePlace: null },
+      [],
+    );
+    expect(merged.servicePlace).toBeNull();
+    expect(changed).toEqual({ servicePlace: null });
+  });
 });

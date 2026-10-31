@@ -37,7 +37,12 @@ the device that typed them.
 - **Last saved wins per field.** Two people who edit the same field at once: one edit is lost. Edits
   to different fields never collide. A real merge or timestamps would cost more than the
   risk of a small family editing the same sentence together.
-- **Payload size.** The largest possible write is well under 128 KB (a test computes it).
+- **Payload size.** A test builds the largest possible write: every detail text at its cap and
+  the facts at theirs, all in 3-byte characters ('一', the worst case per character). The JSON body
+  is 83,492 bytes, under the 128 KB limit. Control characters (except tab, newline, carriage
+  return) are refused, so they cannot add escape overhead.
+- **Typed numbers in free text.** Notes, career and survivors are free text and may hold a phone
+  number the family typed. This is accepted. The app never reads contacts into them.
 
 ## Consequences
 

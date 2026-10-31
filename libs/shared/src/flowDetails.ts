@@ -2,7 +2,12 @@
 // Same rules: a whitelist, caps that mirror the server, and nothing built by spreading a session
 // (C2, C3, C8). Drafts, edited wording, recipients, contact data, senderName, checklist ticks and
 // reminders never appear here.
-import { FLOW_FACT_KEYS, toFlowFacts, type FlowFacts } from './flowFacts.js';
+import {
+  FLOW_FACT_KEYS,
+  hasForbiddenSyncKey,
+  toFlowFacts,
+  type FlowFacts,
+} from './flowFacts.js';
 import type { SectionKey, SectionStatus } from './sections.js';
 
 export const FLOW_DETAIL_TEXT_KEYS = [
@@ -107,24 +112,6 @@ export const FLOW_DETAIL_MAX_LENGTH: Record<FlowDetailTextKey, number> = {
   receptionPlace: 200,
 };
 
-/** Keys a client might send by mistake. Each is refused by name; listed so the rule is visible. */
-export const FORBIDDEN_SYNC_KEYS = [
-  'drafts',
-  'draftsUpdatedAt',
-  'messageOverride',
-  'recipientsNotified',
-  'selectedContactIds',
-  'hearsFirstIds',
-  'contactIds',
-  'contacts',
-  'senderName',
-  'momentCompletedAt',
-  'remindersScheduled',
-  'checklist',
-  'checklistTicks',
-  'sectionStatus',
-] as const;
-
 const STATUS_BY_SECTION: Record<SectionKey, FlowStatusKey> = {
   person: 'personStatus',
   announcement: 'announcementStatus',
@@ -145,7 +132,8 @@ export function statusMapToFlat(
 ): Record<FlowStatusKey, FlowStatusValue> {
   const out = {} as Record<FlowStatusKey, FlowStatusValue>;
   for (const key of FLOW_STATUS_KEYS) {
-    out[key] = map?.[SECTION_BY_STATUS[key]] ?? null;
+    const value = map?.[SECTION_BY_STATUS[key]];
+    out[key] = value === 'in_progress' || value === 'ready' ? value : null;
   }
   return out;
 }
@@ -174,7 +162,10 @@ export type SyncedSource = Partial<
 const isMessageKey = (key: FlowDetailTextKey): key is FlowMessageKey =>
   (FLOW_MESSAGE_KEYS as readonly string[]).includes(key);
 
-const stripNul = (value: string): string => value.replaceAll('\u0000', '');
+// C0 control characters other than tab, newline and carriage return (this includes NUL).
+const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
+const stripControl = (value: string): string =>
+  value.replace(new RegExp(CONTROL_CHARS.source, 'g'), '');
 
 /** Cuts to `max` without splitting a surrogate pair. */
 function cut(value: string, max: number): string {
@@ -193,9 +184,9 @@ function cut(value: string, max: number): string {
 function toWireText(key: FlowDetailTextKey, value: string | undefined) {
   const max = FLOW_DETAIL_MAX_LENGTH[key];
   if (isMessageKey(key)) {
-    return value === undefined ? null : cut(stripNul(value), max);
+    return value === undefined ? null : cut(stripControl(value), max);
   }
-  return cut(stripNul(value ?? '').trim(), max) || null;
+  return cut(stripControl(value ?? '').trim(), max).trimEnd() || null;
 }
 
 /** Details for a session: the full, valid set (always passes `parseFlowDetails`). */
@@ -219,8 +210,13 @@ export type SessionDetailFields = {
   [K in FlowDetailTextKey]?: string;
 } & { burialPrivate: boolean; sectionStatus: StatusMap };
 
-export function fromSyncedFields(
+/**
+ * Details only (not the six facts; use `flowFactsToSessionFields` for those). Status keys present
+ * in `details` are merged into `currentStatus`, so a partial reply never wipes the other statuses.
+ */
+export function flowDetailsToSessionFields(
   details: Partial<FlowDetails>,
+  currentStatus: StatusMap = {},
 ): Partial<SessionDetailFields> {
   const out: Record<string, unknown> = {};
   for (const key of FLOW_DETAIL_TEXT_KEYS) {
@@ -240,7 +236,20 @@ export function fromSyncedFields(
     out.burialPrivate = details.burialPrivate;
   }
   if (FLOW_STATUS_KEYS.some((key) => details[key] !== undefined)) {
-    out.sectionStatus = flatToStatusMap(details);
+    const next: StatusMap = { ...currentStatus };
+    for (const key of FLOW_STATUS_KEYS) {
+      const value = details[key];
+      if (value === undefined) {
+        continue;
+      }
+      const section = SECTION_BY_STATUS[key];
+      if (value === null) {
+        delete next[section];
+      } else {
+        next[section] = value;
+      }
+    }
+    out.sectionStatus = next;
   }
   return out as Partial<SessionDetailFields>;
 }
@@ -265,7 +274,7 @@ function validDetail(key: FlowDetailKey, value: unknown): boolean {
   return (
     typeof value === 'string' &&
     value.length <= max &&
-    !value.includes('\u0000')
+    !CONTROL_CHARS.test(value)
   );
 }
 
@@ -274,7 +283,7 @@ function validDetail(key: FlowDetailKey, value: unknown): boolean {
  * so a client sending a draft or a contact id gets an error. Null when invalid.
  */
 export function parseFlowDetails(input: unknown): Partial<FlowDetails> | null {
-  if (!isPlainObject(input)) {
+  if (!isPlainObject(input) || hasForbiddenSyncKey(input)) {
     return null;
   }
   const allowed = new Set<string>(FLOW_DETAIL_KEYS);
@@ -283,7 +292,7 @@ export function parseFlowDetails(input: unknown): Partial<FlowDetails> | null {
   }
   const out: Record<string, unknown> = {};
   for (const key of FLOW_DETAIL_KEYS) {
-    if (!(key in input)) {
+    if (!Object.hasOwn(input, key)) {
       continue;
     }
     if (!validDetail(key, input[key])) {
@@ -305,11 +314,17 @@ export function splitSyncedPatch(input: unknown): {
   if (!isPlainObject(input)) {
     return null;
   }
-  const facts: Record<string, unknown> = {};
-  const details: Record<string, unknown> = {};
+  // Null-prototype objects: an own "__proto__" key from JSON.parse stays a plain own key.
+  const facts: Record<string, unknown> = Object.create(null);
+  const details: Record<string, unknown> = Object.create(null);
   const factKeys = new Set<string>(FLOW_FACT_KEYS);
-  for (const [key, value] of Object.entries(input)) {
-    (factKeys.has(key) ? facts : details)[key] = value;
+  for (const key of Object.keys(input)) {
+    Object.defineProperty(factKeys.has(key) ? facts : details, key, {
+      value: input[key],
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return { facts, details };
 }
@@ -324,14 +339,35 @@ export function mergeSyncedFields(
   remote: Partial<SyncedFields>,
   pendingFields: Iterable<SyncedKey>,
 ): SyncedFields {
+  return mergeSyncedFieldsWithChanges(local, remote, pendingFields).merged;
+}
+
+/**
+ * Same merge, plus `changed`: only the keys whose value came from `remote` and differs from
+ * `local`. Callers write `changed` to the session and nothing else, so normalised local values
+ * are never written back over a pending edit.
+ */
+export function mergeSyncedFieldsWithChanges(
+  local: SyncedFields,
+  remote: Partial<SyncedFields>,
+  pendingFields: Iterable<SyncedKey>,
+): { merged: SyncedFields; changed: Partial<SyncedFields> } {
   const pending = new Set<SyncedKey>(pendingFields);
   const merged: Record<string, unknown> = {};
+  const changed: Record<string, unknown> = {};
   for (const key of SYNCED_KEYS) {
     const remoteValue = remote[key as keyof SyncedFields];
-    merged[key] =
-      pending.has(key) || remoteValue === undefined
-        ? local[key as keyof SyncedFields]
-        : remoteValue;
+    if (pending.has(key) || remoteValue === undefined) {
+      merged[key] = local[key as keyof SyncedFields];
+      continue;
+    }
+    merged[key] = remoteValue;
+    if (remoteValue !== local[key as keyof SyncedFields]) {
+      changed[key] = remoteValue;
+    }
   }
-  return merged as unknown as SyncedFields;
+  return {
+    merged: merged as unknown as SyncedFields,
+    changed: changed as Partial<SyncedFields>,
+  };
 }
