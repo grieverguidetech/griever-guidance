@@ -47,7 +47,8 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, storage }: UseMo
   const allowed = AUTH_ENABLED && SYNC_ENABLED && userId !== '';
 
   // Read this account's saved queue before the first cycle, so edits made before a restart are kept.
-  const [readyFor, setReadyFor] = useState<string | null>(null);
+  // Keyed to the cache object, not the user id, so a new account waits for its own cache to be read.
+  const [readyQueue, setReadyQueue] = useState<SendFlowStorage | null>(null);
   const queue = useMemo(
     () => (allowed ? createDeviceCache([{ key: flowQueueKey(userId), json: true }]) : null),
     [allowed, userId],
@@ -59,20 +60,20 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, storage }: UseMo
     let live = true;
     void queue.hydrate().then(() => {
       if (live) {
-        setReadyFor(userId);
+        setReadyQueue(queue);
       }
     });
     return () => {
       live = false;
     };
-  }, [queue, userId]);
+  }, [queue]);
 
   const joined = useMemo(() => (queue ? joinStorage(storage, queue) : storage), [storage, queue]);
   const getAccessToken = auth?.getToken;
   useFlowSync({
     sessions,
     userId,
-    enabled: allowed && readyFor === userId,
+    enabled: allowed && queue !== null && readyQueue === queue,
     getAccessToken: getAccessToken ?? (async () => null),
     storage: joined,
     subscribe: subscribeAppActive,

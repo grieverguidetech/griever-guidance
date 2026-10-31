@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { renderHook } from '@testing-library/react-native';
+import { act, renderHook } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import type { SyncAuth } from './AccountProvider';
 import { useMobileFlowSync } from './useMobileFlowSync';
@@ -27,10 +28,16 @@ jest.mock('./AccountProvider', () => ({ useSyncAuth: () => mockAuth }));
 const signedIn: SyncAuth = { status: 'signed_in', userId: 'user_1', getToken: async () => 'tok' };
 const storage = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
 
+type Options = {
+  enabled: boolean;
+  userId: string;
+  subscribe: (cb: () => void) => () => void;
+  storage: { getItem(key: string): string | null };
+};
 
-function lastOptions(): { enabled: boolean; userId: string; subscribe: (cb: () => void) => () => void } {
+function lastOptions(): Options {
   const calls = mockUseFlowSync.mock.calls;
-  return calls[calls.length - 1][0] as ReturnType<typeof lastOptions>;
+  return calls[calls.length - 1][0] as Options;
 }
 
 async function mount(flags: { auth: boolean; sync: boolean }, auth: SyncAuth | null) {
@@ -91,5 +98,42 @@ describe('useMobileFlowSync', () => {
     expect(onWake).toHaveBeenCalledTimes(1);
     unsubscribe();
     expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays disabled until this account\'s queue cache has been read', async () => {
+    mockAuth = signedIn;
+    mockFlags.auth = true;
+    mockFlags.sync = true;
+    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, storage }));
+    expect(lastOptions().enabled).toBe(false);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(lastOptions().enabled).toBe(true);
+    // A different account starts disabled again until its own cache is read.
+    mockAuth = { ...signedIn, userId: 'user_2' };
+    view.rerender({});
+    expect(lastOptions()).toMatchObject({ userId: 'user_2', enabled: false });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(lastOptions()).toMatchObject({ userId: 'user_2', enabled: true });
+  });
+
+  it('serves the saved queue for the account and sends every other key to the session cache', async () => {
+    await AsyncStorage.setItem('gg.flowQueue.v1:user_1', '{"queue":{}}');
+    const base = { getItem: jest.fn((key: string) => (key === 'gg.sessions.v1' ? '[]' : null)), setItem: jest.fn(), removeItem: jest.fn() };
+    mockAuth = signedIn;
+    mockFlags.auth = true;
+    mockFlags.sync = true;
+    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, storage: base }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const joined = lastOptions().storage;
+    expect(joined.getItem('gg.flowQueue.v1:user_1')).toBe('{"queue":{}}');
+    expect(base.getItem).not.toHaveBeenCalledWith('gg.flowQueue.v1:user_1');
+    expect(joined.getItem('gg.sessions.v1')).toBe('[]');
+    expect(base.getItem).toHaveBeenCalledWith('gg.sessions.v1');
   });
 });

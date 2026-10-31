@@ -369,7 +369,7 @@ variable keeps the feature off.
 | `SHARING_ENABLED` | web | `VITE_FEATURE_SHARING` | off | Meant to turn on family sharing (invite, join, remove). No screen reads it yet. The deploy check fails if `FEATURE_SHARING` is on and `FEATURE_AUTH` is off. |
 | `CMS_ENABLED` | web | `VITE_FEATURE_CMS` | off | On: Home opens the web editor (Overview, The person, Service) instead of the path; no send flow, wizard or `sms:` link is reachable. Off: the app is unchanged. Production is on (repo variable `FEATURE_CMS`, passed by the deploy workflow). |
 | `AUTH_ENABLED` | mobile | `EXPO_PUBLIC_FEATURE_AUTH` | off | On: wraps the app in `AccountProvider` and adds "Your account" on Home and the picker. Off: no account code runs. |
-| `SYNC_ENABLED` | mobile | `EXPO_PUBLIC_FEATURE_SYNC` | off | On, with `AUTH_ENABLED` and a signed-in account: `useMobileFlowSync` runs `useFlowSync` in the background and wakes it when the app becomes active. No screen shows it. The `development` and `preview` EAS profiles (`apps/mobile/eas.json`) set it and `EXPO_PUBLIC_FEATURE_AUTH` to `true`; `production` sets neither. |
+| `SYNC_ENABLED` | mobile | `EXPO_PUBLIC_FEATURE_SYNC` | off | On, with `AUTH_ENABLED` and a signed-in account: `useMobileFlowSync` runs `useFlowSync` in the background and wakes it when the app becomes active. No screen shows it. The `development` and `preview` (simulator/APK) EAS profiles (`apps/mobile/eas.json`) set it and `EXPO_PUBLIC_FEATURE_AUTH` to `true`; `production` sets neither. A TestFlight/store profile with these flags comes with #371. |
 | `PAYMENTS` | web, mobile | not defined | n/a | Planned (GRI-15). Does not exist in the code. |
 
 Production values come from GitHub repo variables `FEATURE_AUTH`, `FEATURE_SHARING` and `FEATURE_CMS`, passed to

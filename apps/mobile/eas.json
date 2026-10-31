@@ -13,7 +13,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_FEATURE_AUTH": "true",
-        "EXPO_PUBLIC_FEATURE_SYNC": "true"
+        "EXPO_PUBLIC_FEATURE_SYNC": "true",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_d2VsY29tZWQtcmFwdG9yLTg0MzAuY2xlcmsuYWNjb3VudHMuZGV2JA"
       }
     },
     "preview": {
@@ -27,7 +28,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com",
         "EXPO_PUBLIC_FEATURE_AUTH": "true",
-        "EXPO_PUBLIC_FEATURE_SYNC": "true"
+        "EXPO_PUBLIC_FEATURE_SYNC": "true",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_d2VsY29tZWQtcmFwdG9yLTg0MzAuY2xlcmsuYWNjb3VudHMuZGV2JA"
       }
     }
   },

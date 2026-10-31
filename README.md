@@ -141,7 +141,7 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 **`apps/mobile`**
 - `EXPO_PUBLIC_API_URL`
 - `EXPO_PUBLIC_FEATURE_AUTH`, `EXPO_PUBLIC_FEATURE_SYNC` (the `development` and `preview` EAS profiles in
-  `apps/mobile/eas.json` set both to `true` for dev and TestFlight builds; `production` sets neither)
+  `apps/mobile/eas.json` set both to `true` for development and preview (simulator/APK) builds; `production` sets neither. A TestFlight/store profile with these flags comes with #371)
 
 **`apps/marketing`**
 - `PUBLIC_WEB_URL` (set in the deploy workflow)
