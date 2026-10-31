@@ -911,6 +911,7 @@ describe('useFlowSync details (DS-7)', () => {
     );
     setup([
       session({
+        heldFor: USER,
         serviceMessage: 'Join us.',
         obituaryText: undefined,
         servicePlace: '  St. Mark ',

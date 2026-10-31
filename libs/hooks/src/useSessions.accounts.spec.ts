@@ -188,4 +188,25 @@ describe('useSessions across accounts on one device', () => {
     const again = open(storage, 'user_a');
     expect(names(again.result.current.sessions)).toEqual(['A one']);
   });
+
+  it('keeps A\'s people on disk and out of B\'s view when the stash cannot be written', () => {
+    const storage = mem();
+    storage.data.set(
+      'gg.sessions.v1',
+      JSON.stringify([person({ flowId: FLOW_A, personName: 'Mine', ownerId: null, heldFor: 'user_a', role: 'owner' })]),
+    );
+    storage.data.set('gg.sessionsAccount.v1', 'user_a');
+    const realSet = storage.setItem;
+    storage.setItem = (k: string, v: string) => {
+      if (k.startsWith('gg.sessionsStash.')) {
+        throw new Error('QuotaExceededError');
+      }
+      realSet(k, v);
+    };
+    const asB = open(storage, 'user_b');
+    expect(asB.result.current.sessions).toEqual([]);
+    expect(asB.result.current.heldFor).toBe('user_a');
+    expect(storage.data.get('gg.sessions.v1')).toContain('Mine');
+    expect(storage.data.get('gg.sessionsAccount.v1')).toBe('user_a');
+  });
 });

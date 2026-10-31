@@ -407,11 +407,13 @@ function readMarker(storage: SendFlowStorage | undefined): string | null {
   }
 }
 
-function tryWrite(storage: SendFlowStorage | undefined, key: string, value: string): void {
+/** False when the write failed (for example the storage is full). */
+function tryWrite(storage: SendFlowStorage | undefined, key: string, value: string): boolean {
   try {
     storage?.setItem(key, value);
+    return true;
   } catch {
-    // storage unavailable: the swap still holds for this run
+    return false;
   }
 }
 
@@ -428,10 +430,14 @@ function listHolder(storage: SendFlowStorage | undefined, sessions: readonly Ses
   return foreign ? foreign.ownerId : null;
 }
 
-/** Fallback stash for shared people on a device with no marker: the server lists them again on the next pull. */
+/**
+ * Fallback stash for shared people on a device with no marker. It is kept only so nothing is
+ * deleted; nothing reads it back, because the server lists those people again on the next pull.
+ */
 const UNKNOWN_HOLDER = '_unknown';
 
 /**
+ * Keep in step with `isMine` in useFlowSync: a person hidden here must never be sent for `userId`.
  * True for a person that must not show to `userId`: shared with someone else, owned by another
  * account, or made on this device while another account was signed in (`heldFor`, or no stamp while
  * the marker names that account).
@@ -450,48 +456,56 @@ function isPrevious(s: Session, userId: string, holder: string | null): boolean 
 }
 
 /**
- * The list `userId` may see, and the account it is now kept for. When a different account signs
- * in, the previous account's people go to that account's own stash (nothing is deleted) and this
- * account's stash comes back. People made on this device before any account held the list stay and
- * are stamped for this account, as a first sign-in adopts them today. Writes the list and then
- * the marker, so a later save cannot put one account's list under another's marker.
+ * The list `userId` may see, and the account it is now kept for (`holder`). When a different
+ * account signs in, the previous account's people go to that account's own stash (nothing is
+ * deleted) and this account's stash comes back. People made on this device before any account held
+ * the list stay and are stamped for this account, as a first sign-in adopts them today. If the
+ * stash cannot be written, nothing changes: the list and the marker stay as they were, so the
+ * previous account's people are neither lost nor shown (the caller hides them while `holder` is
+ * not `userId`, and sync stays off). The list is saved before the marker, and the new account's
+ * stash is removed only after that save worked.
  */
 function swapAccountSessions(
   storage: SendFlowStorage | undefined,
   sessions: Session[],
   userId: string,
-): { sessions: Session[]; changed: boolean } {
+): { sessions: Session[]; changed: boolean; holder: string | null } {
   const holder = listHolder(storage, sessions, userId);
   const stamp = (s: Session): Session => (s.ownerId === null && !s.heldFor && s.role === 'owner' ? { ...s, heldFor: userId } : s);
   if (holder === null || holder === userId) {
     // Shared people on a device with no marker cannot be tied to anyone: set them aside; the next pull restores them.
     const orphans = readMarker(storage) === null ? sessions.filter((s) => s.role === 'member') : [];
-    if (orphans.length > 0) {
-      tryWrite(storage, stashKey(UNKNOWN_HOLDER), JSON.stringify(orphans));
+    if (orphans.length > 0 && !tryWrite(storage, stashKey(UNKNOWN_HOLDER), JSON.stringify(orphans))) {
+      return { sessions, changed: false, holder };
     }
     const kept = sessions.filter((s) => !orphans.includes(s)).map(stamp);
     save(storage, kept);
     tryWrite(storage, SESSIONS_ACCOUNT_STORAGE_KEY, userId);
     const changed = kept.length !== sessions.length || kept.some((s) => !sessions.includes(s));
-    return { sessions: changed ? kept : sessions, changed };
+    return { sessions: changed ? kept : sessions, changed, holder: userId };
   }
   const leaving = sessions.filter((s) => isPrevious(s, userId, holder));
   const staying = sessions.filter((s) => !isPrevious(s, userId, holder)).map(stamp);
   const previousStash = load(storage, stashKey(holder));
   // A flowId is one person. If it is both stashed and listed, the listed copy wins: it is the newer one.
   const kept = previousStash.filter((old) => !leaving.some((s) => s.flowId === old.flowId));
-  tryWrite(storage, stashKey(holder), JSON.stringify([...leaving, ...kept]));
+  if (!tryWrite(storage, stashKey(holder), JSON.stringify([...leaving, ...kept]))) {
+    return { sessions, changed: false, holder };
+  }
   const returning = load(storage, stashKey(userId));
+  const have = new Set(staying.map((s) => s.flowId));
+  const next = [...staying, ...returning.filter((s) => !have.has(s.flowId))];
+  if (!save(storage, next)) {
+    // The old list is still on disk next to a good stash; the next load swaps again.
+    return { sessions: next, changed: true, holder: userId };
+  }
   try {
     storage?.removeItem(stashKey(userId));
   } catch {
     // a stale stash is replaced on the next swap
   }
-  const have = new Set(staying.map((s) => s.flowId));
-  const next = [...staying, ...returning.filter((s) => !have.has(s.flowId))];
-  save(storage, next);
   tryWrite(storage, SESSIONS_ACCOUNT_STORAGE_KEY, userId);
-  return { sessions: next, changed: true };
+  return { sessions: next, changed: true, holder: userId };
 }
 
 function newId(): string {
@@ -634,7 +648,8 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     if (!userId) {
       return { sessions: stored, holder: readMarker(storage) };
     }
-    return { sessions: swapAccountSessions(storage, stored, userId).sessions, holder: userId };
+    const swapped = swapAccountSessions(storage, stored, userId);
+    return { sessions: swapped.sessions, holder: swapped.holder };
   });
   const [sessions, setSessions] = useState<Session[]>(initial.sessions);
   const [holder, setHolder] = useState<string | null>(initial.holder);
@@ -657,7 +672,7 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
       sessionsRef.current = next.sessions;
       setSessions(next.sessions);
     }
-    setHolder(userId);
+    setHolder(next.holder);
   }, [storage, userId]);
 
   // Until the swap above has run for a new account, the previous account's people stay out of view.

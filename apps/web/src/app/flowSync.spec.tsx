@@ -55,6 +55,7 @@ interface Call {
 }
 let calls: Call[] = [];
 let gatewayDown = false;
+let serverHasNothing = false;
 
 function stubGateway() {
   vi.stubGlobal(
@@ -81,7 +82,7 @@ function stubGateway() {
         updatedAt: '2026-10-01T00:00:00.000Z',
         updatedBy: null,
       };
-      const body = method === 'GET' ? [record] : record;
+      const body = method === 'GET' ? (serverHasNothing ? [] : [record]) : record;
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }),
   );
@@ -145,6 +146,7 @@ beforeEach(() => {
   mocks.sync = true;
   mocks.auth = true;
   gatewayDown = false;
+  serverHasNothing = false;
   calls = [];
   mocks.loadClerk.mockReset();
   mocks.getProfile.mockReset();
@@ -229,5 +231,28 @@ describe('background sync in the app (#520)', () => {
     expect(screen.queryByText(/sync|offline|couldn't reach/i)).toBeNull();
     const saved = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
     expect(saved[0].personName).toBe('Margaret Hayes Jr');
+  });
+
+  it('another account\'s unsynced person is never sent, nor shown, when a different account signs in', async () => {
+    serverHasNothing = true;
+    window.localStorage.setItem('gg.sessionsAccount.v1', 'user_previous');
+    window.localStorage.setItem(
+      'gg.sessions.v1',
+      JSON.stringify([{ ...JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')[0], heldFor: 'user_previous' }]),
+    );
+    signedIn(true);
+    render(<App />);
+    await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(flowCalls().filter((c) => c.method !== 'GET')).toEqual([]);
+    expect(screen.queryByText(/Margaret Hayes/)).toBeNull();
+    expect(window.localStorage.getItem('gg.sessionsStash.v1:user_previous')).toContain('Margaret Hayes');
+  });
+
+  it('with no earlier account on the device, a local person is adopted and sent', async () => {
+    serverHasNothing = true;
+    signedIn(true);
+    render(<App />);
+    await waitFor(() => expect(flowCalls().some((c) => c.method === 'POST' && c.path === '/flows')).toBe(true), { timeout: 5000 });
   });
 });
