@@ -49,6 +49,7 @@ const LOADING: UseAccountResult = {
   clearError: () => undefined,
   signOut: async () => undefined,
   updateSenderName: async () => false,
+  updateDetails: async () => ({ ok: false, invalid: false }),
 };
 
 /** Calls the hook and hands the result up. Renders nothing. */

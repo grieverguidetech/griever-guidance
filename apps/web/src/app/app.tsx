@@ -1031,6 +1031,9 @@ function AppBody({
       <AccountSection
         asksName={askingName}
         senderName={auth.profile?.senderName ?? null}
+        fullName={auth.profile?.fullName ?? null}
+        birthDate={auth.profile?.birthDate ?? null}
+        onSaveDetails={auth.updateDetails}
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}

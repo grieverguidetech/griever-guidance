@@ -43,6 +43,7 @@ const account = (over: Partial<UseAccountResult>): UseAccountResult => ({
   error: null,
   clearError: () => undefined,
   signOut: async () => undefined,
+  updateDetails: async () => ({ ok: false, invalid: false }),
   updateSenderName: async () => true,
   ...over,
 });

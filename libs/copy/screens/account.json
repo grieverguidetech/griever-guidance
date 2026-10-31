@@ -33,5 +33,16 @@
   "cardHeading": "Payment method",
   "cardNone": "No card added",
   "cardAdd": "Add a card",
-  "cardNotOpen": "Adding a card is not open yet."
+  "cardNotOpen": "Adding a card is not open yet.",
+  "fullNameLabel": "Full name",
+  "fullNameHint": "Optional. Only you can see this.",
+  "birthDateLabel": "Date of birth",
+  "birthDateHint": "Optional. Only you can see this.",
+  "detailsSave": "Save details",
+  "detailsSaved": "Your details are saved.",
+  "fullNameTooLong": "Please use 120 characters or fewer.",
+  "fullNameBadChars": "Please enter your name on one line, with no hidden characters.",
+  "birthDateIncomplete": "Please enter the whole date, with the year. For example, May 29, 1980.",
+  "birthDateOutOfRange": "Please check the date. It can't be in the future or before 1900.",
+  "detailsInvalid": "We couldn't save that. Please check your full name and date of birth and try again."
 }

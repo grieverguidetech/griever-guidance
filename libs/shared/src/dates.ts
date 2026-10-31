@@ -36,7 +36,11 @@ function monthFromName(name: string): number | null {
  * fill in a year like 2001 and a wrong, long-past date must never start a
  * deletion clock.
  */
-export function parseCompleteDate(value: string | undefined | null): Date | null {
+export function parseCompleteDate(
+  value: string | undefined | null,
+  /** Years accepted. The default suits event dates; a date of birth passes a wider range. */
+  { minYear = MIN_YEAR, maxYear = MAX_YEAR }: { minYear?: number; maxYear?: number } = {},
+): Date | null {
   const text = value?.trim();
   if (!text) return null;
 
@@ -55,7 +59,7 @@ export function parseCompleteDate(value: string | undefined | null): Date | null
     return null;
   }
 
-  if (month === null || year < MIN_YEAR || year > MAX_YEAR) return null;
+  if (month === null || year < minYear || year > maxYear) return null;
   const date = new Date(year, month - 1, day);
   // Rejects overflow such as Feb 30 or month 13 rolling into the next period.
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {

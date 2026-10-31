@@ -11,12 +11,18 @@ import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
  * "Month D, YYYY" on blur only when it is a complete date. Incomplete text stays as typed.
  */
 
+/** Years a field accepts; the default (2000-2100) suits event dates, not a date of birth. */
+export interface YearRange {
+  minYear?: number;
+  maxYear?: number;
+}
+
 /**
  * A complete date ("May 29, 2026", "5/29/2026", "2026-05-29") → "2026-05-29".
  * Anything incomplete ("Oct 28", "5/29", "2026") gives "": no year is ever guessed.
  */
-export function dateToISO(pretty: string): string {
-  const parsed = parseCompleteDate(pretty);
+export function dateToISO(pretty: string, years?: YearRange): string {
+  const parsed = parseCompleteDate(pretty, years);
   if (!parsed) {
     return '';
   }
@@ -53,6 +59,8 @@ interface DateInputProps {
   noteOnBlur?: string;
   /** Shows the format help as visible text under the field, not only to a screen reader. */
   visibleHelp?: boolean;
+  /** Widens or narrows the years that count as a complete date. */
+  years?: YearRange;
 }
 
 /** The bare control — pair it with your own `<label htmlFor>` / `.gg-field`. */
@@ -68,6 +76,7 @@ export function DateInput({
   note: liveNote,
   noteOnBlur,
   visibleHelp,
+  years,
 }: DateInputProps) {
   const [blurredValue, setBlurredValue] = useState<string | null>(null);
   const note = liveNote ?? (blurredValue !== null && blurredValue === value ? noteOnBlur : undefined);
@@ -128,7 +137,7 @@ export function DateInput({
         onChange={(e) => onChange(e.target.value)}
         onBlur={(e) => {
           setBlurredValue(e.target.value.trim() ? e.target.value : null);
-          const iso = dateToISO(e.target.value);
+          const iso = dateToISO(e.target.value, years);
           if (iso) onChange(isoToDate(iso));
         }}
       />
@@ -146,7 +155,7 @@ export function DateInput({
         className="gg-datebox-native"
         tabIndex={-1}
         aria-hidden="true"
-        value={dateToISO(value)}
+        value={dateToISO(value, years)}
         min={min}
         max={max}
         onChange={(e) => onChange(isoToDate(e.target.value))}

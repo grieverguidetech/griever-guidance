@@ -7,6 +7,9 @@ export interface CachedProfile {
   /** The user this cache belongs to; a cache for anyone else is discarded at boot. */
   id: string;
   senderName: string | null;
+  /** Private details the person chose to add. Absent in caches written before they existed. */
+  fullName?: string | null;
+  birthDate?: string | null;
   contactSource: AccountContactSource | null;
   /** Cached so an offline boot still hides "create" for members (C5). */
   accountType: AccountType;

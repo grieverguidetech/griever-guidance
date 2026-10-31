@@ -14,6 +14,15 @@ describe('parseLooseDate', () => {
   });
 });
 
+describe('parseCompleteDate year range', () => {
+  it('keeps 2000-2100 by default and accepts a wider range when asked', () => {
+    expect(parseCompleteDate('May 29, 1980')).toBeNull();
+    const date = parseCompleteDate('May 29, 1980', { minYear: 1900 });
+    expect([date?.getFullYear(), date?.getMonth(), date?.getDate()]).toEqual([1980, 4, 29]);
+    expect(parseCompleteDate('May 29, 1850', { minYear: 1900 })).toBeNull();
+  });
+});
+
 describe('parseCompleteDate', () => {
   const ymd = (d: Date | null) => d && [d.getFullYear(), d.getMonth() + 1, d.getDate()];
 

@@ -169,3 +169,108 @@ describe('AccountSettingsSection', () => {
     expect(onRemoveEverything).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('AccountSection details', () => {
+  const ok = { ok: true as const };
+
+  function withDetails(overrides: Partial<Parameters<typeof AccountSection>[0]> = {}) {
+    const onSaveDetails = vi.fn().mockResolvedValue(ok);
+    const props = {
+      senderName: 'Anna',
+      error: null as string | null,
+      onSave: vi.fn().mockResolvedValue(true),
+      onSignOut: vi.fn(),
+      onSaveDetails,
+      ...overrides,
+    };
+    render(<AccountSection {...props} />);
+    return { ...props, onSaveDetails };
+  }
+
+  it('shows no details fields when nothing can save them', () => {
+    profile();
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+  });
+
+  it('shows the saved values, the date as Month D, YYYY', () => {
+    withDetails({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
+    expect(screen.getByLabelText('Full name')).toHaveValue('Anna Lee');
+    expect(screen.getByLabelText('Date of birth')).toHaveValue('May 29, 1980');
+  });
+
+  it('saves the trimmed name and a yyyy-mm-dd date', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.type(screen.getByLabelText('Full name'), '  Anna Lee ');
+    await user.type(screen.getByLabelText('Date of birth'), 'May 29, 1980');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(onSaveDetails).toHaveBeenCalledWith({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
+    expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
+  });
+
+  it('accepts a numeric date and clears both when emptied', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
+    await user.clear(screen.getByLabelText('Full name'));
+    await user.clear(screen.getByLabelText('Date of birth'));
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(onSaveDetails).toHaveBeenCalledWith({ fullName: null, birthDate: null });
+  });
+
+  it('refuses a date with no year, with calm copy next to the field, and does not save', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.type(screen.getByLabelText('Date of birth'), 'May 29');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    const message = screen.getByText('Please enter the whole date, with the year. For example, May 29, 1980.');
+    expect(screen.getByLabelText('Date of birth')).toHaveAccessibleDescription(expect.stringContaining(message.textContent ?? ''));
+  });
+
+  it('refuses a future date and a date before 1900', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.type(screen.getByLabelText('Date of birth'), 'January 1, 2999');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(screen.getByText("Please check the date. It can't be in the future or before 1900.")).toBeInTheDocument();
+    await user.clear(screen.getByLabelText('Date of birth'));
+    await user.type(screen.getByLabelText('Date of birth'), 'January 1, 1850');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(screen.getByText("Please check the date. It can't be in the future or before 1900.")).toBeInTheDocument();
+    expect(onSaveDetails).not.toHaveBeenCalled();
+  });
+
+  it('refuses a name over 120 characters and one with a line break character', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.click(screen.getByLabelText('Full name'));
+    await user.paste('a'.repeat(121));
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Please use 120 characters or fewer.');
+    expect(screen.getByLabelText('Full name')).toBeInvalid();
+    await user.clear(screen.getByLabelText('Full name'));
+    await user.paste('Anna\u0001x');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your name on one line, with no hidden characters.');
+    expect(onSaveDetails).not.toHaveBeenCalled();
+  });
+
+  it('maps a server refusal to calm copy and keeps what was typed', async () => {
+    const user = userEvent.setup();
+    withDetails({ onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: true }) });
+    await user.type(screen.getByLabelText('Full name'), 'Anna Lee');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(await screen.findByText(/We couldn't save that/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Full name')).toHaveValue('Anna Lee');
+    expect(screen.queryByText('Your details are saved.')).not.toBeInTheDocument();
+  });
+
+  it('shows the general error only after its own save fails', async () => {
+    const user = userEvent.setup();
+    withDetails({ error: 'We cannot reach you.', onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: false }) });
+    expect(screen.getAllByText('We cannot reach you.')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(await screen.findAllByText('We cannot reach you.')).toHaveLength(2);
+  });
+});
+

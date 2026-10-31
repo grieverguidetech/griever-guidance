@@ -85,6 +85,8 @@ describe('useAccount boot', () => {
     expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY] as string)).toEqual({
       id: 'u1',
       senderName: 'Peter',
+      fullName: null,
+      birthDate: null,
       contactSource: null,
       accountType: 'owner',
     });
@@ -424,5 +426,77 @@ describe('useAccount signOut', () => {
     });
     expect(result.current.status).toBe('signed_out');
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe('useAccount details', () => {
+  const withDetails = { ...profile('Peter'), fullName: 'Peter Tumulty', birthDate: '1980-05-29' };
+
+  it('keeps the full name and birth date in the cache', async () => {
+    fetchMock.mockImplementation(async () => reply(200, withDetails));
+    const storage = memoryStorage();
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    await waitFor(() => expect(result.current.profile?.fullName).toBe('Peter Tumulty'));
+    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY] as string)).toMatchObject({ fullName: 'Peter Tumulty', birthDate: '1980-05-29' });
+  });
+
+  it('reads an old cache without the fields as null, and an older gateway that omits them as null', async () => {
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const old = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(old.result.current.profile).toMatchObject({ senderName: 'Peter', fullName: null, birthDate: null });
+
+    const { fullName: _f, birthDate: _b, ...omitted } = withDetails;
+    fetchMock.mockImplementation(async () => reply(200, omitted));
+    const fresh = memoryStorage();
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage: fresh }));
+    await waitFor(() => expect(result.current.profile?.senderName).toBe('Peter'));
+    expect(result.current.profile).toMatchObject({ fullName: null, birthDate: null });
+  });
+
+  it('ignores a cache whose new fields have the wrong type', () => {
+    const bad = JSON.stringify({ id: 'u1', senderName: 'Peter', contactSource: null, accountType: 'owner', fullName: 5 });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: bad, [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profile).toBeNull();
+  });
+
+  it('saves the details with PUT and updates the profile', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => reply(200, init?.method === 'PUT' ? withDetails : profile('Peter')));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profile).not.toBeNull());
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.updateDetails({ fullName: 'Peter Tumulty', birthDate: '1980-05-29' });
+    });
+    expect(outcome).toEqual({ ok: true });
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(put?.[1].body as string)).toEqual({ fullName: 'Peter Tumulty', birthDate: '1980-05-29' });
+    expect(result.current.profile?.birthDate).toBe('1980-05-29');
+  });
+
+  it('reports a server 400 as invalid and sets no general error', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => (init?.method === 'PUT' ? reply(400) : reply(200, profile('Peter'))));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profile).not.toBeNull());
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.updateDetails({ fullName: 'x', birthDate: null });
+    });
+    expect(outcome).toEqual({ ok: false, invalid: true });
+    expect(result.current.error).toBeNull();
+  });
+
+  it('reports another failure with the calm general error', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => (init?.method === 'PUT' ? reply(503) : reply(200, profile('Peter'))));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profile).not.toBeNull());
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.updateDetails({ fullName: null, birthDate: null });
+    });
+    expect(outcome).toEqual({ ok: false, invalid: false });
+    expect(result.current.error).toBe(UNREACHABLE);
   });
 });
