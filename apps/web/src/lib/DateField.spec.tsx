@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
-import { DateField, DateInput } from './DateField';
+import { DateField, DateInput, dateToISO } from './DateField';
 
 describe('DateInput notes', () => {
   it('renders the same as before when no note or visible help is asked for', () => {
@@ -72,5 +72,44 @@ describe('DateInput noteOnBlur', () => {
     await userEvent.click(screen.getByLabelText('Date'));
     await userEvent.tab();
     expect(screen.queryByText('Blur note')).toBeNull();
+  });
+});
+
+describe('DateInput blur normalization', () => {
+  function Harness({ start }: { start: string }) {
+    const [value, setValue] = useState(start);
+    return <DateField id="d" label="Date" value={value} onChange={setValue} />;
+  }
+
+  async function blurWith(text: string) {
+    render(<Harness start="" />);
+    const input = screen.getByLabelText('Date');
+    await userEvent.click(input);
+    await userEvent.type(input, text);
+    await userEvent.tab();
+    return input;
+  }
+
+  it.each(['Oct 28', '5/29', '2026'])('leaves incomplete "%s" exactly as typed', async (text) => {
+    expect(await blurWith(text)).toHaveValue(text);
+  });
+
+  it.each([
+    ['October 28, 2026', 'October 28, 2026'],
+    ['10/28/2026', 'October 28, 2026'],
+    ['2026-10-28', 'October 28, 2026'],
+  ])('tidies complete "%s" to "%s"', async (text, expected) => {
+    expect(await blurWith(text)).toHaveValue(expected);
+  });
+});
+
+describe('dateToISO', () => {
+  it('returns an ISO date only for a complete date', () => {
+    expect(dateToISO('October 28, 2026')).toBe('2026-10-28');
+    expect(dateToISO('10/28/2026')).toBe('2026-10-28');
+    expect(dateToISO('2026-10-28')).toBe('2026-10-28');
+    expect(dateToISO('Oct 28')).toBe('');
+    expect(dateToISO('5/29')).toBe('');
+    expect(dateToISO('2026')).toBe('');
   });
 });

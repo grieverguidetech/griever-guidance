@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
+import { parseCompleteDate } from '@griever/shared';
 import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
 
 /**
@@ -7,16 +8,18 @@ import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
  * button to pick one from the platform's native date picker (mobile wheel,
  * desktop calendar). The stored value stays a human-readable string — that
  * string goes straight into the outgoing message — and is tidied to
- * "Month D, YYYY" on blur whenever it parses.
+ * "Month D, YYYY" on blur only when it is a complete date. Incomplete text stays as typed.
  */
 
-/** "May 29, 2026" (or any parseable date) → "2026-05-29"; "" if unparseable. */
+/**
+ * A complete date ("May 29, 2026", "5/29/2026", "2026-05-29") → "2026-05-29".
+ * Anything incomplete ("Oct 28", "5/29", "2026") gives "": no year is ever guessed.
+ */
 export function dateToISO(pretty: string): string {
-  const value = pretty?.trim();
-  if (!value) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
+  const parsed = parseCompleteDate(pretty);
+  if (!parsed) {
+    return '';
+  }
   const y = parsed.getFullYear();
   const m = String(parsed.getMonth() + 1).padStart(2, '0');
   const d = String(parsed.getDate()).padStart(2, '0');
