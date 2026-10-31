@@ -12,14 +12,26 @@ interface Props {
   removeMember?: ReactNode;
 }
 
-/** Settings is the only place deletion is offered (C9): never inside a flow, never a swipe. */
-export function Settings({ onBack, onRemoveEverything, signsOut = false, removeMember }: Props) {
+interface BodyProps {
+  onRemoveEverything: () => Promise<void>;
+  signsOut?: boolean;
+  removeMember?: ReactNode;
+  /** Told when removing starts and stops, so the screen can hold its Back button. */
+  onPendingChange?: (pending: boolean) => void;
+}
+
+/** The Settings content without its heading or Back button; the CMS shows it as a section. */
+export function SettingsBody({ onRemoveEverything, signsOut = false, removeMember, onPendingChange }: BodyProps) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
   const confirmRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cameFromConfirm = useRef(false);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
 
   // Focus follows the swap: to the warning when it opens, back to the button when it closes.
   useEffect(() => {
@@ -47,10 +59,7 @@ export function Settings({ onBack, onRemoveEverything, signsOut = false, removeM
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <TopBar onBack={pending ? undefined : onBack} />
-      <h1 className="text-[22px]">Settings</h1>
-
+    <>
       {removeMember}
 
       <section
@@ -113,6 +122,19 @@ export function Settings({ onBack, onRemoveEverything, signsOut = false, removeM
           {status}
         </div>
       </section>
+    </>
+  );
+}
+
+/** Settings is the only place deletion is offered (C9): never inside a flow, never a swipe. */
+export function Settings({ onBack, onRemoveEverything, signsOut = false, removeMember }: Props) {
+  const [pending, setPending] = useState(false);
+  return (
+    <div className="flex flex-col gap-4">
+      <TopBar onBack={pending ? undefined : onBack} />
+      <h1 className="text-[22px]">Settings</h1>
+
+      <SettingsBody onRemoveEverything={onRemoveEverything} signsOut={signsOut} removeMember={removeMember} onPendingChange={setPending} />
     </div>
   );
 }

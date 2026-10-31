@@ -30,16 +30,20 @@ interface Props {
   showChecklist?: boolean;
 }
 
-/** The screen is the shared Account in libs/ui; this holds what is web only: saving, the sheet, and the list under the form. */
-export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping, showChecklist = true }: Props) {
-  const id = useId();
+interface NameFormOptions {
+  senderName: string | null;
+  onSave: (name: string) => Promise<boolean>;
+  firstTime?: boolean;
+  onContinue?: (name: string) => void;
+}
+
+/** The name field's state and save, shared by this screen and the account section inside the CMS. */
+export function useNameForm({ senderName, onSave, firstTime, onContinue }: NameFormOptions) {
   // Until the person types, show whatever name is known, including one that loads late.
   const [typed, setTyped] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const checklistButton = useRef<ButtonNode>(null);
   const value = typed ?? senderName ?? '';
 
   async function submit() {
@@ -67,6 +71,22 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
       setPending(false);
     }
   }
+
+  function changeName(next: string) {
+    setTyped(next);
+    setSaved(false);
+    setNameError(null);
+  }
+
+  return { value, pending, saved, nameError, changeName, submit };
+}
+
+/** The screen is the shared Account in libs/ui; this holds what is web only: saving, the sheet, and the list under the form. */
+export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping, showChecklist = true }: Props) {
+  const id = useId();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const checklistButton = useRef<ButtonNode>(null);
+  const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave, firstTime, onContinue });
 
   // The name prompt and the first visit stay short: the list shows on the everyday account page.
   const showList = showChecklist && !asksName && !firstTime;
@@ -102,11 +122,7 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
       asksName={asksName}
       intro={intro}
       name={value}
-      onNameChange={(next) => {
-        setTyped(next);
-        setSaved(false);
-        setNameError(null);
-      }}
+      onNameChange={changeName}
       primaryLabel={primaryLabel}
       primaryBusy={pending}
       onPrimary={() => void submit()}
