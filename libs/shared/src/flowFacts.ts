@@ -106,12 +106,15 @@ export function pickFlowFacts(source: FlowFactsSource): Partial<FlowFacts> {
   return out as Partial<FlowFacts>;
 }
 
-// Postgres text can't hold NUL, so it is removed before anything is sent.
-const stripNul = (value: string): string => value.replaceAll('\u0000', '');
+// C0 control characters other than tab, newline and carriage return (this includes NUL, which
+// Postgres text can't hold). Shared with flowDetails.
+export const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
+export const stripControl = (value: string): string =>
+  value.replace(new RegExp(CONTROL_CHARS.source, 'g'), '');
 
 /** Trims and cuts to the database limit, never splitting a surrogate pair. */
 function clampText(value: string, max: number): string {
-  const trimmed = stripNul(value).trim();
+  const trimmed = stripControl(value).trim();
   if (trimmed.length <= max) return trimmed;
   const cut = trimmed.slice(0, max);
   const last = cut.charCodeAt(cut.length - 1);
@@ -132,7 +135,7 @@ function optionalText(
  * the whole write.
  */
 function optionalUrl(value: string | null | undefined): string | null {
-  const url = normalizeUrl(stripNul(value ?? ''));
+  const url = normalizeUrl(stripControl(value ?? ''));
   return isValidObituaryLink(url) ? url : null;
 }
 
@@ -232,9 +235,9 @@ export function coalesceFlowPatches(
   return out as Partial<FlowFacts>;
 }
 
-// NUL is refused by Postgres text columns, so it is refused here first.
+// Control characters (including NUL) are refused here first; the client strips them before sending.
 const isText = (value: unknown, max: number): value is string =>
-  typeof value === 'string' && value.length <= max && !value.includes('\u0000');
+  typeof value === 'string' && value.length <= max && !CONTROL_CHARS.test(value);
 
 const isNullableText = (value: unknown, max: number): boolean =>
   value === null || isText(value, max);

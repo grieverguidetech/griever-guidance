@@ -181,8 +181,7 @@ describe('flows router (real callData, fetch stubbed)', () => {
       expect(dataCalls).toHaveLength(0);
     });
 
-    // Known gap: fact text is not checked for control characters in the shared parser (#529).
-    it.fails('is 400 for a control character in a fact (#529)', async () => {
+    it('is 400 for a control character in a fact', async () => {
       expect((await send('PATCH', `/flows/${FLOW_ID}`, { personName: 'a\u0001b' })).status).toBe(400);
     });
 
