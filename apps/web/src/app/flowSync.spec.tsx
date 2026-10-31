@@ -122,6 +122,8 @@ function signedIn(signed: boolean) {
       id: USER,
       senderName: 'Anna',
       contactSource: null,
+      fullName: null,
+      birthDate: null,
       accountType: 'owner',
       createdAt: '2026-10-11T00:00:00.000Z',
       updatedAt: '2026-10-11T00:00:00.000Z',

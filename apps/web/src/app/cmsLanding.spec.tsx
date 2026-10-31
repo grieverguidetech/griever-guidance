@@ -113,6 +113,8 @@ function signedInAs(accountType: 'owner' | 'member') {
       id: 'u1',
       senderName: 'Anna',
       contactSource: null,
+      fullName: null,
+      birthDate: null,
       accountType,
       createdAt: '2026-10-11T00:00:00.000Z',
       updatedAt: '2026-10-11T00:00:00.000Z',
@@ -348,7 +350,7 @@ describe('landing with the editor on (#448)', () => {
     await act(async () => {
       resolveProfile({
         ok: true,
-        profile: { id: 'u1', senderName: 'Anna', contactSource: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
+        profile: { id: 'u1', senderName: 'Anna', contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
       });
     });
     expect(await h1('The person')).toBeInTheDocument();

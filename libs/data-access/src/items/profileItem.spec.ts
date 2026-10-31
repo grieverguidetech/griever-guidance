@@ -4,6 +4,8 @@ const full: Profile = {
   userId: 'u1',
   senderName: 'Sam',
   contactSource: 'manual',
+  fullName: 'Sam Smith',
+  birthDate: '1980-05-17',
   accountType: 'owner',
   version: 3,
   createdAt: '2026-10-01T00:00:00.000Z',
@@ -20,6 +22,8 @@ describe('profile codec', () => {
         'userId',
         'senderName',
         'contactSource',
+        'fullName',
+        'birthDate',
         'accountType',
         'version',
         'createdAt',
@@ -30,7 +34,7 @@ describe('profile codec', () => {
 
   it('round-trips, and leaves optional fields out when they are not set', () => {
     expect(decodeProfile(encodeProfile(full))).toEqual(full);
-    const { senderName: _s, contactSource: _c, ...bare } = full;
+    const { senderName: _s, contactSource: _c, fullName: _f, birthDate: _b, ...bare } = full;
     expect(decodeProfile(encodeProfile(bare))).toEqual(bare);
   });
 

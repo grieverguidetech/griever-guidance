@@ -11,7 +11,7 @@ import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScre
 const mockGoBack = jest.fn();
 jest.mock('@griever/api-client', () => ({
   ...jest.requireActual<object>('@griever/api-client'),
-  getProfile: async () => ({ ok: true, profile: { id: 'u1', senderName: 'Sam', contactSource: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' } }),
+  getProfile: async () => ({ ok: true, profile: { id: 'u1', senderName: 'Sam', contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' } }),
 }));
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ goBack: mockGoBack }) }));
 

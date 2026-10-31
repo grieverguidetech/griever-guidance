@@ -236,6 +236,8 @@ describe('gateway: /me/profile (Clerk accounts, data function)', () => {
       id: 'user_abc123',
       senderName: 'Ada',
       contactSource: null,
+      fullName: null,
+      birthDate: null,
       accountType: 'owner',
       createdAt: '2026-10-11T10:00:00.000Z',
       updatedAt: '2026-10-11T10:00:00.000Z',

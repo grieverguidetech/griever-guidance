@@ -1,4 +1,5 @@
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { isValidBirthDate, isValidFullName } from '@griever/shared';
 import type { Caller } from '../caller';
 import type { Clock } from '../clock';
 import {
@@ -11,14 +12,14 @@ import {
 /** Longest sender name, in characters. */
 export const SENDER_NAME_MAX_LENGTH = 100;
 
-const PROFILE_KEYS = new Set(['senderName', 'contactSource']);
+const PROFILE_KEYS = new Set(['senderName', 'contactSource', 'fullName', 'birthDate']);
 
 export type ProfileResult =
   | { ok: true; value: Profile }
   | { ok: false; code: 'invalid' };
 
 /**
- * Checks what a user sent to change their profile. Only senderName and contactSource are allowed.
+ * Checks what a user sent to change their profile. Only senderName, contactSource, fullName and birthDate are allowed.
  * Any other key, such as accountType or version, makes the whole input invalid. Null clears a field.
  */
 export function parseProfileFields(input: unknown): ProfileFields | null {
@@ -30,7 +31,7 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     return null;
   }
   const fields: ProfileFields = {};
-  const { senderName, contactSource } = record;
+  const { senderName, contactSource, fullName, birthDate } = record;
   if (senderName !== undefined) {
     // [...text] counts characters like Postgres does, so one emoji counts as 1, not 2.
     if (
@@ -52,6 +53,18 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     }
     fields.contactSource = contactSource;
   }
+  if (fullName !== undefined) {
+    if (fullName !== null && !isValidFullName(fullName)) {
+      return null;
+    }
+    fields.fullName = fullName;
+  }
+  if (birthDate !== undefined) {
+    if (birthDate !== null && !isValidBirthDate(birthDate)) {
+      return null;
+    }
+    fields.birthDate = birthDate;
+  }
   return fields;
 }
 
@@ -66,7 +79,7 @@ export async function getProfile(
 }
 
 /**
- * Creates or updates the caller's own profile. It changes only senderName and contactSource.
+ * Creates or updates the caller's own profile. It changes only senderName, contactSource, fullName and birthDate.
  * accountType, version, userId and createdAt are never taken from the input.
  */
 export async function putProfile(

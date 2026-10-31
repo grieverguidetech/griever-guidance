@@ -158,6 +158,10 @@ export interface Profile {
   id: string;
   senderName: string | null;
   contactSource: AccountContactSource | null;
+  /** Private to the account. Never logged, emailed or shown to members. Max 120 characters. */
+  fullName: string | null;
+  /** Private to the account, as yyyy-mm-dd. Never logged, emailed or shown to members. */
+  birthDate: string | null;
   /** Read-only to clients: set by the server when an invite is accepted. */
   accountType: AccountType;
   createdAt: string;
@@ -165,4 +169,4 @@ export interface Profile {
 }
 
 /** What a user may change on their own profile. */
-export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource'>>;
+export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource' | 'fullName' | 'birthDate'>>;

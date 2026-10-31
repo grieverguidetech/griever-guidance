@@ -10,6 +10,8 @@ const STORED = {
   userId: USER_ID,
   senderName: 'Ada',
   contactSource: 'manual',
+  fullName: 'Ada King',
+  birthDate: '1980-12-10',
   accountType: 'owner',
   version: 3,
   createdAt: '2026-10-11T10:00:00.000Z',
@@ -19,6 +21,8 @@ const PROFILE = {
   id: USER_ID,
   senderName: 'Ada',
   contactSource: 'manual',
+  fullName: 'Ada King',
+  birthDate: '1980-12-10',
   accountType: 'owner',
   createdAt: '2026-10-11T10:00:00.000Z',
   updatedAt: '2026-10-11T10:00:00.000Z',
@@ -50,8 +54,18 @@ describe('parseProfileBody', () => {
     expect(parseProfileBody({ senderName: '😀'.repeat(101) })).toHaveProperty('error');
   });
 
+  it('accepts fullName and birthDate, including null', () => {
+    expect(parseProfileBody({ fullName: 'Ada King', birthDate: '1980-05-17' })).toEqual({
+      fields: { fullName: 'Ada King', birthDate: '1980-05-17' },
+    });
+    expect(parseProfileBody({ fullName: null, birthDate: null })).toEqual({
+      fields: { fullName: null, birthDate: null },
+    });
+    expect(parseProfileBody({ fullName: '😀'.repeat(120) })).toHaveProperty('fields');
+  });
+
   it('uses a fixed message for unknown keys and does not echo the input', () => {
-    expect(parseProfileBody({ sneaky: 1 })).toEqual({ error: 'Only your name and contact source can be saved.' });
+    expect(parseProfileBody({ sneaky: 1 })).toEqual({ error: 'Only your name, full name, date of birth and contact source can be saved.' });
   });
 
   it.each([
@@ -60,6 +74,14 @@ describe('parseProfileBody', () => {
     ['name too long', { senderName: 'x'.repeat(101) }],
     ['name not a string', { senderName: 5 }],
     ['bad contactSource', { contactSource: 'facebook' }],
+    ['fullName too long', { fullName: 'x'.repeat(121) }],
+    ['fullName with a control character', { fullName: 'Ada\u0000' }],
+    ['fullName not a string', { fullName: 5 }],
+    ['birthDate in the future', { birthDate: '2999-01-01' }],
+    ['birthDate before 1900', { birthDate: '1899-12-31' }],
+    ['birthDate not a real day', { birthDate: '2001-02-29' }],
+    ['birthDate wrong format', { birthDate: '05/17/1980' }],
+    ['birthDate not a string', { birthDate: 19800517 }],
     ['array body', []],
     ['string body', 'hi'],
     ['null body', null],
@@ -119,6 +141,8 @@ describe('profile router', () => {
       id: USER_ID,
       senderName: null,
       contactSource: null,
+      fullName: null,
+      birthDate: null,
       accountType: 'member',
       createdAt: 'a',
       updatedAt: 'b',
@@ -180,6 +204,15 @@ describe('profile router', () => {
     expect(callData).toHaveBeenCalledWith(DATA, token, 'putProfile', { fields: { senderName: 'Ada' } });
   });
 
+  it('PUT sends fullName and birthDate to the data function', async () => {
+    callData.mockResolvedValue({ ok: true, data: STORED });
+    const res = await call('PUT', { fullName: 'Ada King', birthDate: '1980-12-10' });
+    expect(res.status).toBe(200);
+    expect(callData).toHaveBeenCalledWith(DATA, token, 'putProfile', {
+      fields: { fullName: 'Ada King', birthDate: '1980-12-10' },
+    });
+  });
+
   it('PUT maps invalid from the data function to 400', async () => {
     callData.mockResolvedValue({ ok: false, code: 'invalid' });
     expect((await call('PUT', { senderName: 'Ada' })).status).toBe(400);
@@ -188,6 +221,8 @@ describe('profile router', () => {
   it.each([
     ['unknown key', { nope: 1 }],
     ['too-long name', { senderName: 'x'.repeat(101) }],
+    ['future birthDate', { birthDate: '2999-01-01' }],
+    ['control character in fullName', { fullName: 'A\u0001' }],
     ['bad contactSource', { contactSource: 'sms' }],
     ['accountType (read-only)', { senderName: 'Ada', accountType: 'member' }],
     ['account_type (read-only)', { account_type: 'member' }],
