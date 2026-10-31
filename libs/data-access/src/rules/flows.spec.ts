@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { FLOW_DETAIL_MAX_LENGTH, FLOW_DETAIL_TEXT_KEYS } from '@griever/shared';
 import { DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 import { fixedClock } from '../clock.js';
-import { encodeFlow, type FlowItem } from '../items/flowItem.js';
+import { emptyDetails, encodeFlow, type FlowItem } from '../items/flowItem.js';
 import { encodeProfile, getProfile } from '../items/profileItem.js';
 import { flowGuardKey, flowKey, memberOfKey, profileKey } from '../keys.js';
 import { getLive } from '../read.js';
@@ -39,6 +40,7 @@ const flow = (ownerId: string, id: string): FlowItem => ({
     obituaryPublisher: null,
     serviceReady: false,
   },
+  details: emptyDetails(),
   createdAt: '2026-10-01T00:00:00.000Z',
   updatedAt: '2026-10-01T00:00:00.000Z',
   updatedBy: ownerId,
@@ -394,5 +396,163 @@ describe.runIf(up)('updateFlow on DynamoDB Local', () => {
         await updateFlow(doc, table, caller(U_OWNER), id, patch, clock),
       ).toEqual({ ok: false, code: 'invalid' });
     }
+  });
+});
+
+describe.runIf(up)('detail keys on DynamoDB Local', () => {
+  const D_OWNER = 'user_d_owner';
+  const D_MEMBER = 'user_d_member';
+  const D_STRANGER = 'user_d_stranger';
+
+  beforeAll(async () => {
+    await createTables();
+    await rawPut(profile(D_OWNER, 'owner'));
+    await rawPut(profile(D_MEMBER, 'member'));
+    await rawPut({
+      ...memberOfKey(D_MEMBER),
+      entity: 'MEMBER_OF',
+      ownerId: D_OWNER,
+    });
+  });
+  afterAll(dropTables);
+
+  it('stores details on create, and the owner list returns them', async () => {
+    const id = randomUUID();
+    const result = await createFlow(
+      doc,
+      table,
+      caller(D_OWNER),
+      id,
+      { ...facts, serviceTime: '2pm', burialPrivate: true, thanksMessage: '' },
+      clock,
+    );
+    expect(result.ok).toBe(true);
+    const [record] = await listFlows(doc, table, caller(D_OWNER), clock);
+    expect(record?.details).toMatchObject({
+      serviceTime: '2pm',
+      burialPrivate: true,
+      thanksMessage: '',
+      servicePlace: null,
+      personStatus: null,
+    });
+  });
+
+  it("lets a member set serviceTime and the owner's list shows it", async () => {
+    const id = randomUUID();
+    await rawPut(encodeFlow(flow(D_OWNER, id)));
+    const result = await updateFlow(
+      doc,
+      table,
+      caller(D_MEMBER),
+      id,
+      { serviceTime: '10:30 am' },
+      clock,
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        role: 'member',
+        details: expect.objectContaining({ serviceTime: '10:30 am' }),
+      }),
+    });
+    const listed = await listFlows(doc, table, caller(D_OWNER), clock);
+    expect(listed.find((r) => r.id === id)?.details.serviceTime).toBe(
+      '10:30 am',
+    );
+  });
+
+  it('updates with only detail keys and leaves the facts alone', async () => {
+    const id = randomUUID();
+    await rawPut(encodeFlow(flow(D_OWNER, id)));
+    await updateFlow(
+      doc,
+      table,
+      caller(D_OWNER),
+      id,
+      { servicePlace: 'Chapel', serviceStatus: 'ready' },
+      clock,
+    );
+    const stored = await getLive(doc, table, flowKey(D_OWNER, id), clock);
+    expect(stored).toMatchObject({
+      servicePlace: 'Chapel',
+      serviceStatus: 'ready',
+      personName: 'Grandma',
+    });
+  });
+
+  it('refuses a member create and writes nothing (C11)', async () => {
+    const id = randomUUID();
+    expect(
+      await createFlow(
+        doc,
+        table,
+        caller(D_MEMBER),
+        id,
+        { ...facts, serviceTime: '2pm' },
+        clock,
+      ),
+    ).toEqual({ ok: false, code: 'forbidden' });
+    await expectNothingWritten(D_OWNER, id);
+    await expectNothingWritten(D_MEMBER, id);
+  });
+
+  it('gives a stranger no list and not_found on update', async () => {
+    const id = randomUUID();
+    await rawPut(encodeFlow(flow(D_OWNER, id)));
+    expect(await listFlows(doc, table, caller(D_STRANGER), clock)).toEqual([]);
+    expect(
+      await updateFlow(
+        doc,
+        table,
+        caller(D_STRANGER),
+        id,
+        { serviceTime: 'x' },
+        clock,
+      ),
+    ).toEqual({ ok: false, code: 'not_found' });
+    const stored = await getLive(doc, table, flowKey(D_OWNER, id), clock);
+    expect(stored?.['serviceTime']).toBeNull();
+  });
+
+  it('refuses forbidden, unknown and too-long detail keys without writing', async () => {
+    const id = randomUUID();
+    await rawPut(encodeFlow(flow(D_OWNER, id)));
+    for (const patch of [
+      { messageOverride: 'x' },
+      { selectedContactIds: [] },
+      { notAKey: 'x' },
+      { serviceTime: 'x'.repeat(101) },
+      { serviceTime: 'ok', draft: 'x' },
+    ]) {
+      expect(
+        await updateFlow(doc, table, caller(D_OWNER), id, patch, clock),
+      ).toEqual({ ok: false, code: 'invalid' });
+    }
+    const stored = await getLive(doc, table, flowKey(D_OWNER, id), clock);
+    expect(stored?.['serviceTime']).toBeNull();
+    expect(
+      await createFlow(
+        doc,
+        table,
+        caller(D_OWNER),
+        randomUUID(),
+        { ...facts, recipientsNotified: [] },
+        clock,
+      ),
+    ).toEqual({ ok: false, code: 'invalid' });
+  });
+
+  it('writes and reads back a max-size item', async () => {
+    const id = randomUUID();
+    const big: Record<string, string> = {};
+    for (const key of FLOW_DETAIL_TEXT_KEYS) {
+      big[key] = '一'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
+    }
+    expect(
+      (await createFlow(doc, table, caller(D_OWNER), id, { ...facts, ...big }, clock))
+        .ok,
+    ).toBe(true);
+    const listed = await listFlows(doc, table, caller(D_OWNER), clock);
+    expect(listed.find((r) => r.id === id)?.details).toMatchObject(big);
   });
 });

@@ -1,4 +1,14 @@
-import { parseFlowFacts, type FlowFacts } from '@griever/shared';
+import {
+  FLOW_DETAIL_KEYS,
+  FLOW_DETAIL_TEXT_KEYS,
+  FLOW_STATUS_KEYS,
+  parseFlowDetails,
+  parseFlowFacts,
+  parseFlowPatch,
+  splitSyncedPatch,
+  type FlowDetails,
+  type FlowFacts,
+} from '@griever/shared';
 import { flowKey, refGsi } from '../keys.js';
 import { type Item } from '../read.js';
 
@@ -6,6 +16,8 @@ export interface FlowItem {
   id: string;
   ownerId: string;
   facts: FlowFacts;
+  /** Every detail key. Left out, encode writes the empty set (null, burialPrivate false). */
+  details?: FlowDetails;
   createdAt: string;
   updatedAt: string;
   /** Who made the last change. Null if that user was deleted. */
@@ -14,10 +26,42 @@ export interface FlowItem {
   deletedAt?: string;
 }
 
+/** A person with no detail yet: every text and status null, burialPrivate false. */
+/** What decodeFlow returns: details are always there. */
+export type StoredFlow = FlowItem & { details: FlowDetails };
+
+export function emptyDetails(): FlowDetails {
+  const out: Record<string, unknown> = { burialPrivate: false };
+  for (const key of [...FLOW_DETAIL_TEXT_KEYS, ...FLOW_STATUS_KEYS]) {
+    out[key] = null;
+  }
+  return out as FlowDetails;
+}
+
+/**
+ * Splits one flat input (the six facts plus any detail keys) into its two halves and checks each
+ * with the shared parser (C8). Unknown and forbidden keys make the whole input invalid.
+ */
+export function parseFlowInput(
+  input: unknown,
+): { facts: Partial<FlowFacts>; details: Partial<FlowDetails> } | null {
+  const split = splitSyncedPatch(input);
+  if (!split) {
+    return null;
+  }
+  const facts = parseFlowPatch(split.facts);
+  const details = parseFlowDetails(split.details);
+  return facts && details ? { facts, details } : null;
+}
+
 export function encodeFlow(flow: FlowItem): Item {
   const facts = parseFlowFacts(flow.facts);
   if (!facts) {
     throw new Error('Flow facts are invalid.');
+  }
+  const details = parseFlowDetails(flow.details ?? emptyDetails());
+  if (!details || FLOW_DETAIL_KEYS.some((key) => !Object.hasOwn(details, key))) {
+    throw new Error('Flow details are invalid.');
   }
   return {
     ...flowKey(flow.ownerId, flow.id),
@@ -30,6 +74,7 @@ export function encodeFlow(flow: FlowItem): Item {
     obituaryUrl: facts.obituaryUrl,
     obituaryPublisher: facts.obituaryPublisher,
     serviceReady: facts.serviceReady,
+    ...details,
     createdAt: flow.createdAt,
     updatedAt: flow.updatedAt,
     updatedBy: flow.updatedBy,
@@ -37,7 +82,7 @@ export function encodeFlow(flow: FlowItem): Item {
     ...(flow.updatedBy ? refGsi(flow.updatedBy, 'FLOW', flow.id) : {}),
   };
 }
-export function decodeFlow(item: Item): FlowItem {
+export function decodeFlow(item: Item): StoredFlow {
   const { id, ownerId, createdAt, updatedAt, updatedBy, deletedAt } = item;
   const facts = parseFlowFacts({
     personName: item.personName,
@@ -47,8 +92,16 @@ export function decodeFlow(item: Item): FlowItem {
     obituaryPublisher: item.obituaryPublisher,
     serviceReady: item.serviceReady,
   });
+  const details = emptyDetails() as Record<string, unknown>;
+  for (const key of FLOW_DETAIL_KEYS) {
+    if (item[key] !== undefined) {
+      details[key] = item[key];
+    }
+  }
+  const parsedDetails = parseFlowDetails(details);
   if (
     !facts ||
+    !parsedDetails ||
     typeof id !== 'string' ||
     typeof ownerId !== 'string' ||
     typeof createdAt !== 'string' ||
@@ -57,14 +110,17 @@ export function decodeFlow(item: Item): FlowItem {
   ) {
     throw new Error('Flow item is broken.');
   }
-  const flow: FlowItem = {
+  const flow: StoredFlow = {
     id,
     ownerId,
     facts,
+    details: parsedDetails as FlowDetails,
     createdAt,
     updatedAt,
     updatedBy,
   };
-  if (typeof deletedAt === 'string') flow.deletedAt = deletedAt;
+  if (typeof deletedAt === 'string') {
+    flow.deletedAt = deletedAt;
+  }
   return flow;
 }

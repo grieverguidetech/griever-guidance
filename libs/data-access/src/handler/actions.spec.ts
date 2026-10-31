@@ -92,6 +92,11 @@ describe('args validation (C8)', () => {
     ['createFlow facts has an unknown key', 'createFlow', { id: ID, facts: { ...FACTS, draft: 'x' } }],
     ['createFlow facts lacks a key', 'createFlow', { id: ID, facts: { personName: 'Grandma' } }],
     ['createFlow facts is a string', 'createFlow', { id: ID, facts: 'x' }],
+    ['createFlow has a forbidden key', 'createFlow', { id: ID, facts: { ...FACTS, messageOverride: 'x' } }],
+    ['createFlow detail is too long', 'createFlow', { id: ID, facts: { ...FACTS, serviceTime: 'x'.repeat(101) } }],
+    ['updateFlow patch has a contact key', 'updateFlow', { id: ID, patch: { serviceTime: '2pm', selectedContactIds: [] } }],
+    ['updateFlow detail is too long', 'updateFlow', { id: ID, patch: { obituaryText: 'x'.repeat(10001) } }],
+    ['updateFlow bad status', 'updateFlow', { id: ID, patch: { serviceStatus: 'done' } }],
     ['updateFlow id is not a uuid', 'updateFlow', { id: 'nope', patch: {} }],
     ['updateFlow patch has an unknown key', 'updateFlow', { id: ID, patch: { ownerId: 'x' } }],
     ['updateFlow patch value is the wrong type', 'updateFlow', { id: ID, patch: { serviceReady: 'yes' } }],
@@ -121,6 +126,17 @@ describe('running an action', () => {
     expect(rules.createInvite).toHaveBeenCalledWith(c.doc, 'gg-test', caller, 'Helper@Example.test', HASH, c.clock);
     await prepareAction('acceptInvite', GOOD['acceptInvite']!)!(c);
     expect(rules.acceptInvite).toHaveBeenCalledWith(c.doc, 'gg-test', caller, HASH, c.clock);
+  });
+
+  it('accepts details on create and on update, and passes them through whole', async () => {
+    const rules = stubRules();
+    const c = context(rules);
+    const facts = { ...FACTS, serviceTime: '2pm', serviceMessage: '', burialPrivate: true };
+    await prepareAction('createFlow', { id: ID, facts })!(c);
+    expect(rules.createFlow).toHaveBeenCalledWith(c.doc, 'gg-test', caller, ID, facts, c.clock);
+    const patch = { serviceTime: '3pm', personStatus: null };
+    await prepareAction('updateFlow', { id: ID, patch })!(c);
+    expect(rules.updateFlow).toHaveBeenCalledWith(c.doc, 'gg-test', caller, ID, patch, c.clock);
   });
 
   it('wraps a success as { ok, data }, and a read with no rows as null data', async () => {
