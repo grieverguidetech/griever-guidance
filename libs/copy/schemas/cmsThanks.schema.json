@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the planning editor, Thank-yous section",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intro", "messageLabel", "messageHint", "messageHintEdited", "useTemplate", "nameFallback", "template"],
+  "properties": {
+    "intro": { "type": "string", "minLength": 1 },
+    "messageLabel": { "type": "string", "minLength": 1 },
+    "messageHint": { "type": "string", "minLength": 1 },
+    "messageHintEdited": { "type": "string", "minLength": 1 },
+    "useTemplate": { "type": "string", "minLength": 1 },
+    "nameFallback": { "type": "string", "minLength": 1 },
+    "template": { "type": "string", "minLength": 1, "pattern": "\\{deceasedName\\}" }
+  }
+}
