@@ -9,7 +9,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
-import { obituaryLink } from '@griever/shared';
+import { obituaryLink, sendPrefill } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { AnnounceScreen } from '../screens/AnnounceScreen';
 import { DetailsFormScreen } from '../screens/DetailsFormScreen';
@@ -188,6 +188,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const onForm = flow.step === 'details' || flow.step === 'announce';
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
+  const { hasDraftContent, setMessageOverride, templateCategory: category } = flow;
   useEffect(() => {
     if (!onForm) {
       prefilled.current = false;
@@ -196,9 +197,23 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (prefilled.current) return;
     prefilled.current = true;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    // The planned details and edited wording (synced from the web) start a fresh form. A form with
+    // anything typed, or a hand-edited message, is never touched. Fields first: setField clears
+    // the override, so the override is set after.
+    if (!hasDraftContent && category) {
+      const planned = sendPrefill(session, category);
+      for (const [key, value] of Object.entries(planned.fields)) {
+        if (has(key)) {
+          setField(key, value);
+        }
+      }
+      if (planned.messageOverride !== null) {
+        setMessageOverride(planned.messageOverride);
+      }
+    }
     if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
     if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
-  }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField]);
+  }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, category, session]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   const onFirstForm = flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template';
