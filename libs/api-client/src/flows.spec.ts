@@ -5,7 +5,7 @@ import { pickFlowDetails as sharedPickFlowDetails, type FlowFacts } from '@griev
 const fetchMock = vi.fn();
 const ACCESS = 'access-token-abc';
 const ID = '123e4567-e89b-12d3-a456-426614174000';
-const OWNER = '223e4567-e89b-12d3-a456-426614174000';
+const OWNER = 'user_2abcDEF123';
 
 const facts: FlowFacts = {
   personName: 'Margaret Hale',

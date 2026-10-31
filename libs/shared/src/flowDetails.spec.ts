@@ -435,7 +435,7 @@ describe('mergeSyncedFieldsWithChanges', () => {
 describe('parseFlowRecord details handling', () => {
   const base = {
     id: '123e4567-e89b-12d3-a456-426614174000',
-    ownerId: '223e4567-e89b-12d3-a456-426614174000',
+    ownerId: 'user_2abcDEF123',
     role: 'owner',
     facts: {
       personName: 'Joan',

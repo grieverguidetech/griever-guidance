@@ -5,8 +5,8 @@ import type { Session } from './useSessions.js';
 import { useSessions } from './useSessions.js';
 
 const A = '11111111-1111-4111-8111-111111111111';
-const ME = '22222222-2222-4222-8222-222222222222';
-const OTHER = '33333333-3333-4333-8333-333333333333';
+const ME = 'user_me';
+const OTHER = 'user_other';
 
 const facts = (over: Partial<FlowFacts> = {}): FlowFacts => ({
   personName: 'Joan',

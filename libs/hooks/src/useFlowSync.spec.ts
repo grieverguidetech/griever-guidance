@@ -15,8 +15,9 @@ import {
   useFlowSync,
 } from './useFlowSync.js';
 
-const USER = '11111111-1111-4111-8111-111111111111';
-const OTHER = '22222222-2222-4222-8222-222222222222';
+const USER = 'user_me';
+const OTHER = 'user_other';
+const OTHER_OWNER_FLOW = '22222222-2222-4222-8222-222222222222';
 const FLOW = '33333333-3333-4333-8333-333333333333';
 const PULL = PULL_INTERVAL_MS;
 
@@ -233,7 +234,7 @@ describe('useFlowSync sending', () => {
   it('never creates a person someone shared (member) or another account owns', async () => {
     const requests = mockFetch((req) => (req.method === 'GET' ? { status: 200, body: [] } : { status: 201 }));
     const member = session({ role: 'member', ownerId: OTHER });
-    const foreign = session({ id: 's2', flowId: OTHER, role: 'owner', ownerId: OTHER });
+    const foreign = session({ id: 's2', flowId: OTHER_OWNER_FLOW, role: 'owner', ownerId: OTHER });
     setup([member, foreign]);
     await advance(10);
     expect(writes(requests)).toEqual([]);

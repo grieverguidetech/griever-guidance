@@ -16,7 +16,7 @@ import {
 } from './index.js';
 
 const ID = '123e4567-e89b-12d3-a456-426614174000';
-const OTHER = '223e4567-e89b-12d3-a456-426614174000';
+const OTHER = 'user_2abcDEF123';
 
 const facts: FlowFacts = {
   personName: 'Margaret Hale',
@@ -274,12 +274,25 @@ describe('validation (C8)', () => {
     expect(parseFlowRecord(record)).toEqual(record);
   });
 
+  it('accepts Clerk-style ids for ownerId and updatedBy, and a 64 character id', () => {
+    const clerk = { ...record, ownerId: 'user_2NNEqL2nrIRdJ194ndJqAHwEfxC', updatedBy: 'user_2abcDEF123' };
+    expect(parseFlowRecord(clerk)).toEqual(clerk);
+    expect(parseFlowRecord({ ...record, ownerId: 'u'.repeat(64) })).not.toBeNull();
+  });
+
+  it('still requires the record id to be a UUID', () => {
+    expect(parseFlowRecord({ ...record, id: 'user_2abcDEF123' })).toBeNull();
+  });
+
   it.each([
     ['a bad id', { ...record, id: 'not-a-uuid' }],
-    ['a bad owner id', { ...record, ownerId: '1' }],
+    ['a bad owner id', { ...record, ownerId: 'user#1' }],
+    ['an empty owner id', { ...record, ownerId: '' }],
+    ['an owner id with a space', { ...record, ownerId: 'user 1' }],
+    ['an owner id over 64 characters', { ...record, ownerId: 'u'.repeat(65) }],
     ['a bad role', { ...record, role: 'admin' }],
     ['a bad updatedAt', { ...record, updatedAt: 'yesterday' }],
-    ['a bad updatedBy', { ...record, updatedBy: 'x' }],
+    ['a bad updatedBy', { ...record, updatedBy: 'x#y' }],
     ['bad facts', { ...record, facts: { ...facts, serviceReady: 1 } }],
     ['not an object', 'x'],
   ])('rejects a record with %s', (_label, input) => {
