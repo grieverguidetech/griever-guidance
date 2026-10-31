@@ -3,9 +3,11 @@ import { CreditCard } from '@phosphor-icons/react/CreditCard';
 import type { FormEvent, ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { BIRTH_YEAR_MIN, FULL_NAME_MAX_LENGTH, isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
+import type { SectionFields } from '@griever/shared';
 import { DateInput, dateToISO, isoToDate, todayISO } from '../lib/DateField';
 import { buildPlansText, downloadPlans } from '../lib/exportPlans';
 import type { PlanPerson } from '../lib/exportPlans';
+import { PhoneReadyList, readyPhoneSections } from './PhoneReady';
 import { SettingsBody } from '../screens/Settings';
 import { useNameForm } from '../screens/Profile';
 
@@ -37,11 +39,11 @@ interface ProfileProps {
   /** The Settings actions (remove a member, remove everything from this device), shown under the account content. */
   settings?: SettingsProps;
   /** The people this account can open (the People list). When given, the "Your plans" panel is shown and holds the device removal. */
-  plans?: readonly PlanPerson[];
+  plans?: readonly (PlanPerson & Pick<Partial<SectionFields>, 'sectionStatus'>)[];
 }
 
 /**
- * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Payments, People helping you, Sign out, Your plans (with the device removal), each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
+ * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you, Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
 export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
@@ -137,6 +139,13 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           ) : null}
         </section>
       ) : null}
+      {plans ? (
+        <>
+          {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
+          <PlansPanel plans={plans} settings={settings} />
+        </>
+      ) : null}
+      <PhonePanel ready={readyPhoneSections(plans ?? [])} />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-payments`}>
         <h2 id={`${id}-payments`} className="text-[16px] m-0">
           {copy.paymentsHeading}
@@ -163,6 +172,7 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
         </div>
       </section>
       {peopleHelping}
+      <SupportPanel />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-signout`}>
         <h2 id={`${id}-signout`} className="text-[16px] m-0">
           {copy.signOutHeading}
@@ -174,15 +184,46 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           </button>
         </div>
       </section>
-      {plans ? (
-        <>
-          {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
-          <PlansPanel plans={plans} settings={settings} />
-        </>
-      ) : settings ? (
-        <AccountSettingsSection {...settings} />
-      ) : null}
+      {!plans && settings ? <AccountSettingsSection {...settings} /> : null}
     </>
+  );
+}
+
+interface PhonePanelProps {
+  ready: ReturnType<typeof readyPhoneSections>;
+}
+
+/** "On your phone": what is ready to send, and where sending happens. No store badges or links until the app is in the stores. */
+function PhonePanel({ ready }: PhonePanelProps) {
+  const id = useId();
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-phone`}>
+      <h2 id={`${id}-phone`} className="text-[16px] m-0">
+        {copy.phoneHeading}
+      </h2>
+      <p className="m-0">{copy.phoneBody}</p>
+      <p className="gg-hint m-0">{copy.phoneNotInStores}</p>
+      {ready.length > 0 ? <PhoneReadyList ready={ready} /> : <p className="gg-hint m-0">{copy.phoneNoneReady}</p>}
+    </section>
+  );
+}
+
+/** "Help and support": an email link to the support address. */
+function SupportPanel() {
+  const id = useId();
+  const href = `mailto:${copy.supportEmail}?subject=${encodeURIComponent(copy.supportSubject)}`;
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-support`}>
+      <h2 id={`${id}-support`} className="text-[16px] m-0">
+        {copy.supportHeading}
+      </h2>
+      <p className="gg-hint m-0">{copy.supportBody}</p>
+      <p className="m-0">
+        <a href={href} className="inline-flex items-center min-h-[44px] underline break-all">
+          {copy.supportEmail}
+        </a>
+      </p>
+    </section>
   );
 }
 

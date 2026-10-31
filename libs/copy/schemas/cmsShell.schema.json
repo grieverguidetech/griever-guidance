@@ -51,7 +51,12 @@
     "summaryObituaryDraft",
     "summaryObituaryPublisher",
     "summaryThanksEmpty",
-    "summaryThanksDraft"
+    "summaryThanksDraft",
+    "phoneReadyHeading",
+    "phoneReadyAnnouncement",
+    "phoneReadyService",
+    "phoneReadyObituary",
+    "phoneReadyThanks"
   ],
   "properties": {
     "navOverview": {
@@ -196,6 +201,21 @@
       "$ref": "#/$defs/text"
     },
     "summaryThanksDraft": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneReadyHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneReadyAnnouncement": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneReadyService": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneReadyObituary": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneReadyThanks": {
       "$ref": "#/$defs/text"
     }
   },

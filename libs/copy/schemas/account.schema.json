@@ -75,7 +75,15 @@
     "fileAnnouncementHeading",
     "fileServiceMessageHeading",
     "fileObituaryHeading",
-    "fileThanksHeading"
+    "fileThanksHeading",
+    "phoneHeading",
+    "phoneBody",
+    "phoneNotInStores",
+    "phoneNoneReady",
+    "supportHeading",
+    "supportBody",
+    "supportEmail",
+    "supportSubject"
   ],
   "properties": {
     "heading": {
@@ -292,6 +300,30 @@
       "$ref": "#/$defs/text"
     },
     "fileThanksHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneBody": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneNotInStores": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneNoneReady": {
+      "$ref": "#/$defs/text"
+    },
+    "supportHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "supportBody": {
+      "$ref": "#/$defs/text"
+    },
+    "supportEmail": {
+      "$ref": "#/$defs/text"
+    },
+    "supportSubject": {
       "$ref": "#/$defs/text"
     }
   },

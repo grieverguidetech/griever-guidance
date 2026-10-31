@@ -122,7 +122,7 @@ describe('AccountSection as a settings page', () => {
   it('has one h2 per section, in order, and no h1', () => {
     profile({ email: 'anna@example.com', onManageSignIn: vi.fn(), peopleHelping: <h2>People helping you</h2> });
     const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(names).toEqual(['Profile', 'Sign-in and security', 'Payments', 'People helping you', 'Sign out']);
+    expect(names).toEqual(['Profile', 'Sign-in and security', 'On your phone', 'Payments', 'People helping you', 'Help and support', 'Sign out']);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 
@@ -367,5 +367,73 @@ describe('AccountSection plans', () => {
     expect(onRemoveEverything).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
     expect(onRemoveEverything).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AccountSection phone and support panels', () => {
+  it('orders every panel: Profile, security, plans, phone, payments, people, support, sign out', () => {
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        email="anna@example.com"
+        onManageSignIn={vi.fn()}
+        plans={[]}
+        peopleHelping={<h2>People helping you</h2>}
+      />,
+    );
+    const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(names).toEqual([
+      'Profile',
+      'Sign-in and security',
+      'Your plans',
+      'On your phone',
+      'Payments',
+      'People helping you',
+      'Help and support',
+      'Sign out',
+    ]);
+  });
+
+  it('lists the ready sections from any person, with no counts, and says the app is not in the stores', () => {
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        plans={[
+          { personName: 'Sam', sectionStatus: { announcement: 'ready', person: 'ready' } },
+          { personName: 'Lee', sectionStatus: { thanks: 'ready', service: 'in_progress' } },
+        ]}
+      />,
+    );
+    const panel = screen.getByRole('region', { name: 'On your phone' });
+    const items = within(panel).getAllByRole('listitem').map((li) => li.textContent);
+    expect(items).toEqual([
+      'AnnouncementTell close family and friends, one at a time from your phone.',
+      'Thank-yousThank the people who helped, one at a time.',
+    ]);
+    expect(within(panel).getByText('Sending happens in the Grievers Guidance phone app, not on this page.')).toBeInTheDocument();
+    expect(within(panel).getByText('The app is not in the app stores yet.')).toBeInTheDocument();
+    expect(within(panel).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('says nothing is ready when no phone section is ready', () => {
+    profile();
+    const panel = screen.getByRole('region', { name: 'On your phone' });
+    expect(within(panel).queryByRole('list')).not.toBeInTheDocument();
+    expect(within(panel).getByText(/Nothing is marked ready yet/)).toBeInTheDocument();
+  });
+
+  it('links Help and support to the support address with mailto', () => {
+    profile();
+    const panel = screen.getByRole('region', { name: 'Help and support' });
+    const link = within(panel).getByRole('link', { name: 'grieversguidancetech@gmail.com' });
+    expect(link.getAttribute('href')).toMatch(/^mailto:grieversguidancetech@gmail\.com\?subject=/);
+    expect(link.className).toContain('min-h-[44px]');
   });
 });

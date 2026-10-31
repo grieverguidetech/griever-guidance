@@ -3,6 +3,7 @@ import { computeChecklist, computeSections } from '@griever/hooks';
 import type { OverviewStatus } from '@griever/hooks';
 import { parseCompleteDate, SECTION_ORDER } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
+import { PhoneReadyCard, readyPhoneSections } from './PhoneReady';
 import { navTitle } from './SideNav';
 
 const shell = screenCopy('cmsShell');
@@ -206,6 +207,8 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
           );
         })}
       </ul>
+
+      <PhoneReadyCard ready={readyPhoneSections([session])} />
 
       {phase ? (
         item && onOpenItem ? (

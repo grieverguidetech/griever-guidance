@@ -70,5 +70,13 @@
   "fileAnnouncementHeading": "Announcement",
   "fileServiceMessageHeading": "Service message",
   "fileObituaryHeading": "Obituary",
-  "fileThanksHeading": "Thank-you message"
+  "fileThanksHeading": "Thank-you message",
+  "phoneHeading": "On your phone",
+  "phoneBody": "Sending happens in the Grievers Guidance phone app, not on this page.",
+  "phoneNotInStores": "The app is not in the app stores yet.",
+  "phoneNoneReady": "Nothing is marked ready yet. When a part is ready, it will be listed here.",
+  "supportHeading": "Help and support",
+  "supportBody": "Write to us if you have a question or something is not working.",
+  "supportEmail": "grieversguidancetech@gmail.com",
+  "supportSubject": "Help with Grievers Guidance"
 }

@@ -46,5 +46,10 @@
   "summaryObituaryDraft": "Draft started",
   "summaryObituaryPublisher": "Published in {publisher}",
   "summaryThanksEmpty": "Start with a draft",
-  "summaryThanksDraft": "Draft started"
+  "summaryThanksDraft": "Draft started",
+  "phoneReadyHeading": "Ready to send from your phone",
+  "phoneReadyAnnouncement": "Tell close family and friends, one at a time from your phone.",
+  "phoneReadyService": "Share the service details with the people who plan to come.",
+  "phoneReadyObituary": "Share the obituary with the people who should see it.",
+  "phoneReadyThanks": "Thank the people who helped, one at a time."
 }
