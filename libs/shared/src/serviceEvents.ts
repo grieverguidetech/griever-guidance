@@ -86,5 +86,8 @@ export function defaultServiceEventsMessage(
   const closedService = service && !/[.?]$/.test(service) ? `${service}.` : service;
   const body = [closedService, ...sentences].filter(Boolean).join(' ');
   const url = normalizeUrl(details.obituaryUrl);
-  return url ? `${body}\n\n${url}` : body;
+  if (!url) {
+    return body;
+  }
+  return body ? `${body}\n\n${url}` : url;
 }

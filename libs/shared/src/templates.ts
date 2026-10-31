@@ -288,7 +288,9 @@ export const shareService: Template = {
     }
 
     const url = normalizeUrl(fields['obituaryUrl']);
-    if (url) core += `\n\n${url}`;
+    if (url) {
+      core = core ? `${core}\n\n${url}` : url;
+    }
     return core;
   },
 };
@@ -386,6 +388,6 @@ export const templates: Template[] = [
  * service message covers. Placeholders only, no real names, and a calm tone (C7).
  */
 export const SHARE_SERVICE_SAMPLE =
-  "[Name]'s service will be held [day and date] at [time], [place and address]. " +
+  "[Name]'s service will be held [day and date] at [time] at [place and address]. " +
   'A gathering will follow at [place]. Parking is [where]. ' +
   'Please come as you are. It would mean a great deal to see you there.';

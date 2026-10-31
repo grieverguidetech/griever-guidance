@@ -74,6 +74,10 @@ describe('shareService', () => {
     expect(shareService.renderMessage({ deceasedName: 'Ann' })).toBe('');
   });
 
+  it('starts with the link alone when there is nothing else', () => {
+    expect(shareService.renderMessage({ obituaryUrl: 'https://legacy.com/a' })).toBe('https://legacy.com/a');
+  });
+
   it('puts "at" before the place, with or without a date', () => {
     expect(shareService.renderMessage({ deceasedName: 'Ann', serviceLocation: 'Oak Chapel' })).toBe(
       "Ann's service will be held at Oak Chapel.",

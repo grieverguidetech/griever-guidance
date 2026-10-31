@@ -175,7 +175,7 @@ describe('ServiceSection', () => {
     expect(preview()).not.toHaveTextContent('Hall');
     await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
-    expect(preview()).toHaveTextContent('A reception will be held at Hall.');
+    expect(preview().querySelector('p.font-serif')?.textContent).toBe('A reception will be held at Hall.');
     expect(screen.queryByLabelText('Message')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
