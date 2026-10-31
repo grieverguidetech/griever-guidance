@@ -180,8 +180,9 @@ describe('ServiceSection', () => {
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
 
-  it('is not a live region, has no phone styling, and shows a calm placeholder text with no details', () => {
+  it('is not a live region, has no sms/bubble class, and shows calm text with no details', () => {
     setup();
+    expect(preview().innerHTML).not.toMatch(/bubble|sms/i);
     expect(preview().closest('[aria-live]')).toBeNull();
     expect(preview().querySelector('[aria-live]')).toBeNull();
     expect(preview()).not.toHaveTextContent(/undefined|null/);
@@ -209,9 +210,28 @@ describe('ServiceSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
     expect(patches.at(-1)).toEqual({ serviceMessage: undefined });
     expect(screen.queryByLabelText('Message')).toBeNull();
-    expect(preview()).not.toHaveTextContent(/X$/);
+    expect(preview().querySelector('p.font-serif')?.textContent).toBe("Margaret Hayes' service will be held.");
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Change the words' })).toHaveFocus();
+  });
+
+  it('Use the details above from the preview keeps focus on Change the words', async () => {
+    setup({ serviceMessage: 'Mine' });
+    await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
+    expect(screen.getByRole('button', { name: 'Change the words' })).toHaveFocus();
+  });
+
+  it('Done keeps the words, shows them in the preview and moves focus to Change the words', async () => {
+    setup({ personName: 'Margaret Hayes' });
+    await change();
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByLabelText('Message')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change the words' })).toHaveFocus();
+    await change();
+    await userEvent.type(message(), ' Thank you.');
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(preview().querySelector('p.font-serif')?.textContent).toMatch(/ Thank you\.$/);
+    expect(screen.getByRole('button', { name: 'Use the details above' })).toBeInTheDocument();
   });
 
   it('new details do not reach an edited message', async () => {
@@ -239,8 +259,10 @@ describe('ServiceSection', () => {
 
   describe('See the message link', () => {
     const link = () => screen.getByRole('link', { name: 'See the message' });
+    const original = Element.prototype.scrollIntoView;
     afterEach(() => {
       vi.unstubAllGlobals();
+      Element.prototype.scrollIntoView = original;
     });
 
     it.each([

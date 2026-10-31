@@ -99,18 +99,19 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
   });
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const changeRef = useRef<HTMLButtonElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLElement>(null);
   // The textarea only shows while the family changes the words; otherwise the preview does.
   const [editing, setEditing] = useState(false);
-  const focusAfter = useRef<'textarea' | 'change' | null>(null);
+  // Each request bumps the counter, so focus moves even when `editing` does not change.
+  const [focusRequest, setFocusRequest] = useState<{ n: number; to: 'textarea' | 'change' } | null>(null);
+  const requestFocus = (to: 'textarea' | 'change') => setFocusRequest((r) => ({ n: (r?.n ?? 0) + 1, to }));
   useEffect(() => {
-    if (focusAfter.current === 'textarea') {
+    if (focusRequest?.to === 'textarea') {
       messageRef.current?.focus();
-    } else if (focusAfter.current === 'change') {
+    } else if (focusRequest?.to === 'change') {
       changeRef.current?.focus();
     }
-    focusAfter.current = null;
-  }, [editing]);
+  }, [focusRequest]);
   const edited = values.serviceMessage !== undefined;
   // A group with data opens on its own; one the family opened stays open.
   const [opened, setOpened] = useState({ visitation: false, burial: false, reception: false });
@@ -166,7 +167,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
   };
   const useDetails = () => {
     onChange({ serviceMessage: undefined });
-    focusAfter.current = 'change';
+    requestFocus('change');
     setEditing(false);
   };
 
@@ -306,7 +307,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
             />
           </div>
         ) : messageText ? (
-          <p className="font-serif text-[17px] leading-relaxed whitespace-pre-line">{messageText}</p>
+          <p className="font-serif text-lg leading-relaxed whitespace-pre-line">{messageText}</p>
         ) : (
           <p className="gg-hint">{copy.previewEmpty}</p>
         )}
@@ -320,11 +321,23 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
               ref={changeRef}
               className="gg-btn gg-btn-secondary"
               onClick={() => {
-                focusAfter.current = 'textarea';
+                requestFocus('textarea');
                 setEditing(true);
               }}
             >
               {copy.changeWords}
+            </button>
+          )}
+          {editing && (
+            <button
+              type="button"
+              className="gg-btn gg-btn-secondary"
+              onClick={() => {
+                requestFocus('change');
+                setEditing(false);
+              }}
+            >
+              {copy.doneEditing}
             </button>
           )}
           {edited && (
