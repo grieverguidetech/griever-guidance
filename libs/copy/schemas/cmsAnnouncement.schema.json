@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the planning editor, Announcement section",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intro",
+    "messageLabel",
+    "messageHint",
+    "messageHintEdited",
+    "useDetails"
+  ],
+  "properties": {
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "messageLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "messageHint": {
+      "$ref": "#/$defs/text"
+    },
+    "messageHintEdited": {
+      "$ref": "#/$defs/text"
+    },
+    "useDetails": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
