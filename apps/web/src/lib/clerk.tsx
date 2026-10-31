@@ -219,6 +219,11 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   const account = useAccount({ auth, storage: browserStorage });
   // `auth` is a new object when its status changes; the methods inside are stable.
   const { getToken, signOut } = auth;
+  const instance = useClerk();
+  const email = instance.user?.primaryEmailAddress?.emailAddress ?? null;
+  const openAccountSettings = useCallback(() => {
+    instance.openUserProfile();
+  }, [instance]);
   const getAccessToken = useCallback(async () => {
     const result = await getToken();
     return result.ok ? result.token : null;
@@ -226,7 +231,7 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   if (unavailable) {
     return <>{children({ unavailable: true })}</>;
   }
-  return <>{children({ unavailable: false, account, getAccessToken, signOut })}</>;
+  return <>{children({ unavailable: false, account, getAccessToken, signOut, email, openAccountSettings: instance.loaded ? openAccountSettings : undefined })}</>;
 }
 
 // The app has no router: when Clerk wants to move the page after sign-in or sign-out, stay put and

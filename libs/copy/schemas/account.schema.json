@@ -23,7 +23,22 @@
     "sessionEnded",
     "unavailable",
     "loading",
-    "checklistNote"
+    "checklistNote",
+    "profileHeading",
+    "securityHeading",
+    "emailLabel",
+    "securityHint",
+    "manageSignIn",
+    "paymentsHeading",
+    "signOutHeading",
+    "signOutHint",
+    "planHeading",
+    "planName",
+    "planBody",
+    "cardHeading",
+    "cardNone",
+    "cardAdd",
+    "cardNotOpen"
   ],
   "properties": {
     "heading": {
@@ -84,6 +99,51 @@
       "$ref": "#/$defs/text"
     },
     "checklistNote": {
+      "$ref": "#/$defs/text"
+    },
+    "profileHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "securityHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "emailLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "securityHint": {
+      "$ref": "#/$defs/text"
+    },
+    "manageSignIn": {
+      "$ref": "#/$defs/text"
+    },
+    "paymentsHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "signOutHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "signOutHint": {
+      "$ref": "#/$defs/text"
+    },
+    "planHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "planName": {
+      "$ref": "#/$defs/text"
+    },
+    "planBody": {
+      "$ref": "#/$defs/text"
+    },
+    "cardHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "cardNone": {
+      "$ref": "#/$defs/text"
+    },
+    "cardAdd": {
+      "$ref": "#/$defs/text"
+    },
+    "cardNotOpen": {
       "$ref": "#/$defs/text"
     }
   },

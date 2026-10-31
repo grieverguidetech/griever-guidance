@@ -8,6 +8,10 @@ export interface ClerkAccountReady {
   account: UseAccountResult;
   getAccessToken: () => Promise<string | null>;
   signOut: () => Promise<void>;
+  /** The primary email of the signed-in user, once Clerk has loaded it. */
+  email?: string | null;
+  /** Opens Clerk's own account screen (email, password, devices). Absent when Clerk is not ready. */
+  openAccountSettings?: () => void;
 }
 
 /** `unavailable`: Clerk is missing a key or did not load in time, and there is no signed-in marker to fall back on. */

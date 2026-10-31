@@ -290,7 +290,7 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('Your account')).toHaveFocus();
   });
 
-  it('Leaving Settings opened from "Your people" returns to "Your people" and stays there', async () => {
+  it('Your account opened from "Your people" shows the full nav for the most recent person, and Change returns to "Your people"', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
@@ -300,27 +300,31 @@ describe('landing with the editor on (#448)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Your account');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    expect(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
-    await user.click(screen.getByRole('button', { name: PEOPLE }));
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Change/ }));
     const people = await h1(PEOPLE);
     await waitFor(() => expect(people).toHaveFocus());
     await expectStaysOnPeople();
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
   });
 
-  it('Leaving Your account opened from "Your people" returns to "Your people"', async () => {
-    signedInAs('owner');
+  it('a section chosen in Your account opens the most recent person', async () => {
     const user = userEvent.setup();
-    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Robert Hayes', '2026-10-20T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: /Change/ }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Your account');
-    await user.click(screen.getByRole('button', { name: PEOPLE }));
-    expect(await h1(PEOPLE)).toBeInTheDocument();
-    await expectStaysOnPeople();
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
+    await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
+    expect(await h1('Overview')).toBeInTheDocument();
+    expect(screen.getAllByText('Robert Hayes').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
   });
 
   it('Leaving Settings opened from an Overview returns to that Overview, through the side nav', async () => {

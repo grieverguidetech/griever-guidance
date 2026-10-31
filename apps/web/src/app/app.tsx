@@ -253,6 +253,8 @@ export function App() {
           auth={state.account}
           getAccessToken={state.getAccessToken}
           endSession={state.signOut}
+          accountEmail={state.email}
+          openAccountSettings={state.openAccountSettings}
           SignInScreen={SignInScreen}
           removed={removed}
           onRemoved={onRemoved}
@@ -311,6 +313,8 @@ function AppBody({
   auth,
   getAccessToken,
   endSession,
+  accountEmail,
+  openAccountSettings,
   SignInScreen,
   offline = false,
   removed = false,
@@ -324,6 +328,9 @@ function AppBody({
   getAccessToken?: () => Promise<string | null>;
   /** Ends the Clerk session; used by "Remove everything from this device". */
   endSession?: () => Promise<void>;
+  /** The signed-in email and Clerk's own account screen, for Your account. */
+  accountEmail?: string | null;
+  openAccountSettings?: () => void;
   SignInScreen?: ClerkModules['SignInScreen'];
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
@@ -942,25 +949,31 @@ function AppBody({
 
   /**
    * Your account inside the editor shell (flag on). The shell owns the one h1. There is no Back: the
-   * side nav and Change lead out. From the people list the nav offers only this item, so a quiet
-   * "Your people" button leads back (the origin rule).
+   * side nav and Change lead out. With an open or most recent person the full nav shows; with none
+   * the nav offers only this item, so a quiet "Your people" button leads back (the origin rule).
    */
   function renderAccount(title: string, body: ReactNode) {
-    const fromPeople = accountFrom.current === 'people' || !active;
+    // The open person, else the most recent one. Only with no person at all is the nav the short one.
+    const person = active ?? sortedSessions[0] ?? null;
+    const noPerson = person === null;
     return (
       <Shell wide>
         <CmsShell
           title={title}
-          peopleView={fromPeople}
-          personName={active?.personName ?? ''}
+          peopleView={noPerson}
+          personName={person?.personName ?? ''}
           section="account"
-          statuses={active?.sectionStatus}
+          statuses={person?.sectionStatus}
           onSelect={(key) => {
             if (key !== 'account') {
               auth?.clearError();
               setAskingName(false);
               setCmsItem(null);
               setCmsSection(key);
+              if (person && person.id !== activeId) {
+                sessions.touchSession(person.id);
+                setActiveId(person.id);
+              }
               setView('cms');
             }
           }}
@@ -973,7 +986,7 @@ function AppBody({
           onAccount={() => undefined}
           notice={endedNote}
         >
-          {fromPeople ? (
+          {noPerson ? (
             <button type="button" className="gg-btn gg-btn-ghost self-start !px-0" onClick={leaveAccount}>
               {cmsShellCopy.peopleTitle}
             </button>
@@ -1018,6 +1031,8 @@ function AppBody({
         asksName={askingName}
         senderName={auth.profile?.senderName ?? null}
         error={auth.error}
+        email={accountEmail}
+        onManageSignIn={openAccountSettings}
         peopleHelping={
           sharingOn ? (
             <PeopleHelping
