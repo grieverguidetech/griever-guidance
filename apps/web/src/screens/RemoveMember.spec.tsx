@@ -27,6 +27,11 @@ describe('RemoveMember', () => {
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
+  it('can render its heading one level down, beside the People helping you panel', () => {
+    render(<RemoveMember members={[{ id: 'a', name: 'Sam Lee', email: 's@example.com' }]} message={null} onRemove={vi.fn()} headingLevel={3} />);
+    expect(screen.getByRole('heading', { level: 3, name: 'People helping you' })).toBeInTheDocument();
+  });
+
   it('does not remove until confirmed', async () => {
     const user = userEvent.setup();
     const onRemove = setup();

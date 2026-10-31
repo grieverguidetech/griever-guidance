@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AccountSection, AccountSettingsSection, checkDetails } from './AccountSection';
 
@@ -80,10 +80,10 @@ describe('AccountSection', () => {
         error={null}
         onSave={vi.fn()}
         onSignOut={vi.fn()}
-        settings={{ onRemoveEverything, signsOut: true, removeMember: <h2>Remove a member</h2> }}
+        settings={{ onRemoveEverything, signsOut: true, removeMember: <h2>People helping you</h2> }}
       />,
     );
-    expect(screen.getByRole('heading', { level: 2, name: 'Remove a member' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
     expect(screen.getByText(/You'll be signed out on this device/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
@@ -122,7 +122,7 @@ describe('AccountSection as a settings page', () => {
   it('has one h2 per section, in order, and no h1', () => {
     profile({ email: 'anna@example.com', onManageSignIn: vi.fn(), peopleHelping: <h2>People helping you</h2> });
     const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(names).toEqual(['Profile', 'Sign-in and security', 'Payments', 'People helping you', 'Sign out']);
+    expect(names).toEqual(['Profile', 'Sign-in and security', 'On your phone', 'Payments', 'People helping you', 'Help and support', 'Sign out']);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 
@@ -163,10 +163,10 @@ describe('AccountSettingsSection', () => {
   it('confirms before removing, then removes', async () => {
     const user = userEvent.setup();
     const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
-    render(<AccountSettingsSection onRemoveEverything={onRemoveEverything} removeMember={<h2>Remove a member</h2>} />);
+    render(<AccountSettingsSection onRemoveEverything={onRemoveEverything} removeMember={<h2>People helping you</h2>} />);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Remove a member' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
     expect(onRemoveEverything).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
@@ -292,3 +292,180 @@ describe('AccountSection details', () => {
   });
 });
 
+
+/** jsdom's Blob has no text(). */
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blob);
+  });
+}
+
+describe('AccountSection plans', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('downloads a copy of the plans, then offers the device removal after it', async () => {
+    const user = userEvent.setup();
+    const create = vi.fn().mockReturnValue('blob:plans');
+    const revoke = vi.fn();
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        plans={[{ personName: 'Sam', obituaryText: 'A kind man.' }]}
+        settings={{ onRemoveEverything: vi.fn() }}
+      />,
+    );
+    const panel = screen.getByRole('region', { name: 'Your plans' });
+    expect(within(panel).getByRole('heading', { level: 2, name: 'Your plans' })).toBeInTheDocument();
+    const download = within(panel).getByRole('button', { name: 'Download a copy' });
+    const remove = within(panel).getByRole('button', { name: 'Remove everything from this device' });
+    expect(download.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(download);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(await readBlob(create.mock.calls[0][0] as Blob)).toContain('A kind man.');
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('A copy was made. Check your downloads.')).toBeInTheDocument();
+  });
+
+  it('clears the download note after about ten seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      Object.assign(URL, { createObjectURL: vi.fn().mockReturnValue('blob:x'), revokeObjectURL: vi.fn() });
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Download a copy' }));
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      expect(screen.getByText('A copy was made. Check your downloads.')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(10000);
+      });
+      expect(screen.queryByText('A copy was made. Check your downloads.')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says contacts, not drafts, are left out of the copy', () => {
+    render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
+    expect(screen.getByText(/Contacts are not in it\./)).toBeInTheDocument();
+    expect(screen.queryByText(/drafts/)).not.toBeInTheDocument();
+  });
+
+  it('says there is nothing to save, and offers no download, when there are no people', () => {
+    render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[]} />);
+    expect(screen.getByText('There is nothing to save yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download a copy' })).not.toBeInTheDocument();
+  });
+
+  it('shows no plans panel when no plans are given', () => {
+    profile();
+    expect(screen.queryByRole('heading', { name: 'Your plans' })).not.toBeInTheDocument();
+  });
+
+  it('shows the remove-a-member content once, in its own panel, and removes everything through the plans panel', async () => {
+    const user = userEvent.setup();
+    const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        plans={[{ personName: 'Sam' }]}
+        peopleHelping={<h2>People helping you</h2>}
+        settings={{ onRemoveEverything, removeMember: <h3>People helping you</h3> }}
+      />,
+    );
+    const headings = screen.getAllByRole('heading', { name: 'People helping you' });
+    expect(headings.map((h) => h.tagName)).toEqual(['H2', 'H3']);
+    expect(headings[1].parentElement).toHaveClass('gg-panel');
+    // The device removal sits inside Your plans, one level under its h2.
+    const plansPanel = screen.getByRole('region', { name: 'Your plans' });
+    expect(within(plansPanel).getByRole('heading', { level: 3, name: 'Remove everything from this device' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
+    expect(onRemoveEverything).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
+    expect(onRemoveEverything).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AccountSection phone and support panels', () => {
+  it('orders every panel: Profile, security, plans, phone, payments, people, support, sign out', () => {
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        email="anna@example.com"
+        onManageSignIn={vi.fn()}
+        plans={[]}
+        peopleHelping={<h2>People helping you</h2>}
+      />,
+    );
+    const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(names).toEqual([
+      'Profile',
+      'Sign-in and security',
+      'Your plans',
+      'On your phone',
+      'Payments',
+      'People helping you',
+      'Help and support',
+      'Sign out',
+    ]);
+  });
+
+  it('lists the ready sections from any person, with no counts, and says the app is not in the stores', () => {
+    render(
+      <AccountSection
+        senderName="Anna"
+        error={null}
+        onSave={vi.fn()}
+        onSignOut={vi.fn()}
+        plans={[
+          { personName: 'Sam', sectionStatus: { announcement: 'ready', person: 'ready' } },
+          { personName: 'Lee', sectionStatus: { thanks: 'ready', service: 'in_progress' } },
+        ]}
+      />,
+    );
+    const panel = screen.getByRole('region', { name: 'On your phone' });
+    const items = within(panel).getAllByRole('listitem').map((li) => li.textContent);
+    expect(items).toEqual([
+      'Announcement Tell close family and friends, one at a time from your phone.',
+      'Thank-yous Thank the people who helped, one at a time.',
+    ]);
+    expect(within(panel).getByText('Sending happens in the Grievers Guidance phone app, not on this page.')).toBeInTheDocument();
+    expect(within(panel).getByText('The app is not in the app stores yet.')).toBeInTheDocument();
+    expect(within(panel).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('says nothing is ready when no phone section is ready', () => {
+    profile();
+    const panel = screen.getByRole('region', { name: 'On your phone' });
+    expect(within(panel).queryByRole('list')).not.toBeInTheDocument();
+    expect(within(panel).getByText(/Nothing is marked ready yet/)).toBeInTheDocument();
+  });
+
+  it('links Help and support to the support address with mailto', () => {
+    profile();
+    const panel = screen.getByRole('region', { name: 'Help and support' });
+    const link = within(panel).getByRole('link', { name: 'grieversguidancetech@gmail.com' });
+    expect(link.getAttribute('href')).toMatch(/^mailto:grieversguidancetech@gmail\.com\?subject=/);
+    expect(link.className).toContain('min-h-[44px]');
+    expect(link.className).toContain('[overflow-wrap:anywhere]');
+    expect(link.className).not.toContain('break-all');
+  });
+});

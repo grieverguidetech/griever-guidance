@@ -1,9 +1,13 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CreditCard } from '@phosphor-icons/react/CreditCard';
 import type { FormEvent, ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { BIRTH_YEAR_MIN, FULL_NAME_MAX_LENGTH, isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
+import type { SectionFields } from '@griever/shared';
 import { DateInput, dateToISO, isoToDate, todayISO } from '../lib/DateField';
+import { buildPlansText, downloadPlans } from '../lib/exportPlans';
+import type { PlanPerson } from '../lib/exportPlans';
+import { PhoneReadyList, readyPhoneSections } from './PhoneReady';
 import { SettingsBody } from '../screens/Settings';
 import { useNameForm } from '../screens/Profile';
 
@@ -34,13 +38,15 @@ interface ProfileProps {
   onManageSignIn?: () => void;
   /** The Settings actions (remove a member, remove everything from this device), shown under the account content. */
   settings?: SettingsProps;
+  /** The people this account can open (the People list). When given, the "Your plans" panel is shown and holds the device removal. */
+  plans?: readonly (PlanPerson & Pick<Partial<SectionFields>, 'sectionStatus'>)[];
 }
 
 /**
- * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Payments, People helping you, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
+ * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you (with "remove a member" beside it), Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings }: ProfileProps) {
+export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
   const id = useId();
   const [cardNote, setCardNote] = useState(false);
 
@@ -133,6 +139,12 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           ) : null}
         </section>
       ) : null}
+      {plans ? (
+        <>
+          <PlansPanel plans={plans} settings={settings} />
+        </>
+      ) : null}
+      <PhonePanel ready={readyPhoneSections(plans ?? [])} />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-payments`}>
         <h2 id={`${id}-payments`} className="text-[16px] m-0">
           {copy.paymentsHeading}
@@ -159,6 +171,8 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
         </div>
       </section>
       {peopleHelping}
+      {plans && settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
+      <SupportPanel />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-signout`}>
         <h2 id={`${id}-signout`} className="text-[16px] m-0">
           {copy.signOutHeading}
@@ -170,8 +184,90 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           </button>
         </div>
       </section>
-      {settings ? <AccountSettingsSection {...settings} /> : null}
+      {!plans && settings ? <AccountSettingsSection {...settings} /> : null}
     </>
+  );
+}
+
+interface PhonePanelProps {
+  ready: ReturnType<typeof readyPhoneSections>;
+}
+
+/** "On your phone": what is ready to send, and where sending happens. No store badges or links until the app is in the stores. */
+function PhonePanel({ ready }: PhonePanelProps) {
+  const id = useId();
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-phone`}>
+      <h2 id={`${id}-phone`} className="text-[16px] m-0">
+        {copy.phoneHeading}
+      </h2>
+      <p className="m-0">{copy.phoneBody}</p>
+      <p className="gg-hint m-0">{copy.phoneNotInStores}</p>
+      {ready.length > 0 ? <PhoneReadyList ready={ready} /> : <p className="gg-hint m-0">{copy.phoneNoneReady}</p>}
+    </section>
+  );
+}
+
+/** "Help and support": an email link to the support address. */
+function SupportPanel() {
+  const id = useId();
+  const href = `mailto:${copy.supportEmail}?subject=${encodeURIComponent(copy.supportSubject)}`;
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-support`}>
+      <h2 id={`${id}-support`} className="text-[16px] m-0">
+        {copy.supportHeading}
+      </h2>
+      <p className="gg-hint m-0">{copy.supportBody}</p>
+      <p className="m-0">
+        <a href={href} className="inline-flex items-center min-h-[44px] underline [overflow-wrap:anywhere]">
+          {copy.supportEmail}
+        </a>
+      </p>
+    </section>
+  );
+}
+
+interface PlansPanelProps {
+  plans: readonly PlanPerson[];
+  settings?: SettingsProps;
+}
+
+/** "Your plans": a text copy kept outside the app, then (below it) the device removal. */
+function PlansPanel({ plans, settings }: PlansPanelProps) {
+  const id = useId();
+  const [status, setStatus] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Emptied first, then set after a tick, so a second download is announced again.
+  function download() {
+    setStatus('');
+    downloadPlans(buildPlansText(plans, copy));
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      setStatus(copy.plansDownloaded);
+      timer.current = setTimeout(() => setStatus(''), 10000);
+    }, 50);
+  }
+
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-plans`}>
+      <h2 id={`${id}-plans`} className="text-[16px] m-0">
+        {copy.plansHeading}
+      </h2>
+      <p className="gg-hint m-0">{plans.length === 0 ? copy.plansNone : copy.plansHint}</p>
+      {plans.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="gg-btn gg-btn-secondary" onClick={download}>
+            {copy.plansDownload}
+          </button>
+        </div>
+      ) : null}
+      <p role="status" aria-live="polite" className="gg-hint m-0 text-[13px]">
+        {status}
+      </p>
+      {settings ? <SettingsBody onRemoveEverything={settings.onRemoveEverything} signsOut={settings.signsOut} headingLevel={3} /> : null}
+    </section>
   );
 }
 

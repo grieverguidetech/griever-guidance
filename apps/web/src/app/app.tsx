@@ -1038,6 +1038,7 @@ function AppBody({
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}
+        plans={sortedSessions}
         peopleHelping={
           sharingOn ? (
             <PeopleHelping
@@ -1068,7 +1069,7 @@ function AppBody({
           signsOut: true,
           removeMember:
             sharingOn && members.view?.role === 'owner' ? (
-              <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
+              <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} headingLevel={3} />
             ) : undefined,
         }}
       />,

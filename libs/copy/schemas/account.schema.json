@@ -49,7 +49,41 @@
     "fullNameBadChars",
     "birthDateIncomplete",
     "birthDateOutOfRange",
-    "detailsInvalid"
+    "detailsInvalid",
+    "plansHeading",
+    "plansHint",
+    "plansDownload",
+    "plansDownloaded",
+    "plansNone",
+    "fileTitle",
+    "fileUnnamed",
+    "fileDatesHeading",
+    "fileDateOfPassing",
+    "fileBirthDate",
+    "fileServiceHeading",
+    "fileServiceType",
+    "fileServiceDate",
+    "fileServiceTime",
+    "fileServicePlace",
+    "fileServiceAddress",
+    "fileServiceNotes",
+    "fileServiceOfficiant",
+    "fileVisitation",
+    "fileBurial",
+    "fileBurialPrivate",
+    "fileReception",
+    "fileAnnouncementHeading",
+    "fileServiceMessageHeading",
+    "fileObituaryHeading",
+    "fileThanksHeading",
+    "phoneHeading",
+    "phoneBody",
+    "phoneNotInStores",
+    "phoneNoneReady",
+    "supportHeading",
+    "supportBody",
+    "supportEmail",
+    "supportSubject"
   ],
   "properties": {
     "heading": {
@@ -188,6 +222,108 @@
       "$ref": "#/$defs/text"
     },
     "detailsInvalid": {
+      "$ref": "#/$defs/text"
+    },
+    "plansHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "plansHint": {
+      "$ref": "#/$defs/text"
+    },
+    "plansDownload": {
+      "$ref": "#/$defs/text"
+    },
+    "plansDownloaded": {
+      "$ref": "#/$defs/text"
+    },
+    "plansNone": {
+      "$ref": "#/$defs/text"
+    },
+    "fileTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "fileUnnamed": {
+      "$ref": "#/$defs/text"
+    },
+    "fileDatesHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "fileDateOfPassing": {
+      "$ref": "#/$defs/text"
+    },
+    "fileBirthDate": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceType": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceDate": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceTime": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServicePlace": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceAddress": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceNotes": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceOfficiant": {
+      "$ref": "#/$defs/text"
+    },
+    "fileVisitation": {
+      "$ref": "#/$defs/text"
+    },
+    "fileBurial": {
+      "$ref": "#/$defs/text"
+    },
+    "fileBurialPrivate": {
+      "$ref": "#/$defs/text"
+    },
+    "fileReception": {
+      "$ref": "#/$defs/text"
+    },
+    "fileAnnouncementHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "fileServiceMessageHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "fileObituaryHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "fileThanksHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneBody": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneNotInStores": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneNoneReady": {
+      "$ref": "#/$defs/text"
+    },
+    "supportHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "supportBody": {
+      "$ref": "#/$defs/text"
+    },
+    "supportEmail": {
+      "$ref": "#/$defs/text"
+    },
+    "supportSubject": {
       "$ref": "#/$defs/text"
     }
   },

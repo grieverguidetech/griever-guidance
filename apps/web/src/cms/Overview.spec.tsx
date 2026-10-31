@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { CHECKLIST_PHASES } from '@griever/shared';
@@ -185,5 +185,25 @@ describe('Overview', () => {
     const source = readFileSync(join(import.meta.dirname, 'Overview.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsShell')).toEqual([]);
     expect(findHardCodedCopy(source, 'cmsChecklist')).toEqual([]);
+  });
+
+  describe('Ready to send from your phone', () => {
+    it('is hidden when no phone section is ready', () => {
+      setup({ sectionStatus: { person: 'ready', service: 'in_progress' } });
+      expect(screen.queryByRole('heading', { name: shell.phoneReadyHeading })).not.toBeInTheDocument();
+    });
+
+    it('lists only the ready phone sections, each with its line, and no counts', () => {
+      setup({ sectionStatus: { person: 'ready', announcement: 'ready', obituary: 'ready', thanks: 'in_progress' } });
+      const card = screen.getByRole('region', { name: 'Ready to send from your phone' });
+      expect(within(card).getByRole('heading', { level: 2, name: 'Ready to send from your phone' })).toBeInTheDocument();
+      expect(within(card).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+        'Announcement Tell close family and friends, one at a time from your phone.',
+        `Obituary ${shell.phoneReadyObituary}`,
+      ]);
+      expect(within(card).getByText('The app is not in the app stores yet.')).toBeInTheDocument();
+      expect(within(card).queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(card.textContent).not.toMatch(/\d/);
+    });
   });
 });
