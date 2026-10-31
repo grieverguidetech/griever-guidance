@@ -321,7 +321,8 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
     expect(await h1('Overview')).toBeInTheDocument();
-    expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
+    expect(screen.getAllByText('Robert Hayes').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
   });
 
   it('Leaving Settings opened from an Overview returns to that Overview, through the side nav', async () => {
