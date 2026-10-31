@@ -407,6 +407,24 @@ describe('response and text edge cases', () => {
     expect(parseFlowPatch({ obituaryPublisher: '\u0000' })).toBeNull();
   });
 
+  it('rejects other control characters in any text fact', () => {
+    expect(parseFlowFacts({ ...facts, personName: 'a\u0001b' })).toBeNull();
+    expect(parseFlowPatch({ personName: 'a\u0001b' })).toBeNull();
+    expect(parseFlowPatch({ serviceDate: 'x\u001f' })).toBeNull();
+    expect(parseFlowPatch({ obituaryPublisher: 'x\u000b' })).toBeNull();
+  });
+
+  it('allows tab, newline and carriage return in text facts', () => {
+    expect(parseFlowPatch({ personName: 'a\tb\nc\rd' })).toEqual({ personName: 'a\tb\nc\rd' });
+  });
+
+  it('toFlowFacts strips control characters so a typed value is never refused', () => {
+    const out = toFlowFacts({ ...facts, personName: 'A\u0001nn\u0008', serviceDate: '\u0002May 1' });
+    expect(out.personName).toBe('Ann');
+    expect(out.serviceDate).toBe('May 1');
+    expect(parseFlowFacts(out)).toEqual(out);
+  });
+
   it('parseFlowRecord keeps only whitelisted facts and drops extras', () => {
     const rec = {
       id: ID,

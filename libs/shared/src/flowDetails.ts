@@ -12,6 +12,8 @@ import {
   type FlowFacts,
   type FlowFactsSource,
   type FlowRecord,
+  CONTROL_CHARS,
+  stripControl,
 } from './flowFacts.js';
 import { isUserId, isUuid } from './members.js';
 import type { SectionKey, SectionStatus } from './sections.js';
@@ -168,10 +170,6 @@ export type SyncedSource = Partial<
 const isMessageKey = (key: FlowDetailTextKey): key is FlowMessageKey =>
   (FLOW_MESSAGE_KEYS as readonly string[]).includes(key);
 
-// C0 control characters other than tab, newline and carriage return (this includes NUL).
-const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
-const stripControl = (value: string): string =>
-  value.replace(new RegExp(CONTROL_CHARS.source, 'g'), '');
 
 /** Cuts to `max` without splitting a surrogate pair. */
 function cut(value: string, max: number): string {
