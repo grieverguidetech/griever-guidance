@@ -149,7 +149,8 @@ describe('AccountSection as a settings page', () => {
     expect(within(payments).getByText('No card added')).toBeInTheDocument();
     expect(within(payments).queryByText('Adding a card is not open yet.')).not.toBeInTheDocument();
     await user.click(within(payments).getByRole('button', { name: 'Add a card' }));
-    expect(within(payments).getByText('Adding a card is not open yet.')).toBeInTheDocument();
+    expect(await within(payments).findByText('Adding a card is not open yet.')).toBeInTheDocument();
+    expect(within(payments).getByRole('button', { name: 'Add a card' })).not.toHaveAttribute('aria-describedby');
     expect(payments.querySelectorAll('input, textarea, select, iframe')).toHaveLength(0);
   });
 });

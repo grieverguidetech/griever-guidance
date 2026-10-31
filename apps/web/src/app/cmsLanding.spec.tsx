@@ -308,6 +308,22 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
   });
 
+  it('with no person, Your account offers only Your people, which returns to the list and creates nothing (C11)', async () => {
+    signedInAs('member');
+    mocks.sharing = true;
+    mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
+    const user = userEvent.setup();
+    render(<App />);
+    await h1(PEOPLE);
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).queryByRole('button', { name: /^Overview/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: PEOPLE }));
+    expect(await h1(PEOPLE)).toBeInTheDocument();
+    expect(stored()).toHaveLength(0);
+  });
+
   it('a section chosen in Your account opens the most recent person', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Robert Hayes', '2026-10-20T00:00:00.000Z'));
@@ -320,7 +336,7 @@ describe('landing with the editor on (#448)', () => {
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
-    expect(await h1('Overview')).toBeInTheDocument();
+    expect(await h1('Overview')).toHaveFocus();
     expect(screen.getAllByText('Robert Hayes').length).toBeGreaterThan(0);
     expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
   });
