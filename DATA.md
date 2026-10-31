@@ -169,7 +169,9 @@ additive: an older list loads, and the file keeps its key and shape.
   saved straight away and is the same on every later load.
 - Applying what the server returns (`applyRemoteFlows`) can change only the whitelisted fact fields
   (`personName`, `dateOfPassing`, `serviceDate`, `obituaryUrl`, `obituaryPublisher`, `serviceReady`)
-  plus `ownerId` and `role`. A field with an unsent local edit keeps the local value. A flow not on
+  plus `ownerId` and `role`. From DS-7 (ADR 0001, #516) it may also change the detail fields listed
+  in 2.0b, through `mergeSyncedFields` in `libs/shared/src/flowDetails.ts`, with the same
+  pending-key protection. A field with an unsent local edit keeps the local value. A flow not on
   the device becomes a `role: 'member'` session. A `member` session whose flow is no longer
   returned is removed (access was lost); an `owner` session is never removed. Drafts,
   `draftsUpdatedAt`, contacts, `recipientsNotified`, `momentCompletedAt`, reminders, `senderName`
@@ -185,6 +187,13 @@ additive: an older list loads, and the file keeps its key and shape.
   or unavailable, the next load makes a new one.
 
 ### 2.0b Section fields on the local session
+
+From DS-7 these fields sync (ADR 0001). On the wire they are flat keys: `sectionStatus` becomes
+`personStatus`, `announcementStatus`, `serviceStatus`, `obituaryStatus`, `thanksStatus` (null = Not
+started). Rules: for the four message keys (`serviceMessage`, `announcementMessage`,
+`obituaryText`, `thanksMessage`) wire null = local `undefined` (the message follows the details)
+and `''` stays `''`; for every other text key a blank value is sent as null and comes back as `''`.
+Caps are in `FLOW_DETAIL_MAX_LENGTH`; text above a cap is cut on save.
 
 The editor saves to the same list (`gg.sessions.v1`). The fields are additive and optional: an
 older list loads with its values unchanged.
@@ -517,7 +526,7 @@ record is a `flows` item in DynamoDB (written by the AWS data function), one per
 the owner's Clerk user id. The data function lets the owner and the owner's members read and write it;
 only an owner can create one (C11). This was Supabase Postgres until #325 and #326 moved it.
 
-**What syncs** (exactly six person fields):
+**What syncs** (the six facts, plus the detail fields from DS-7 once #517 to #522 ship):
 
 - person name
 - date of passing
@@ -525,6 +534,12 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - obituary URL
 - obituary publisher
 - service ready
+- detail fields (`FLOW_DETAIL_KEYS` in `libs/shared/src/flowDetails.ts`, 30 keys): birth date;
+  service type, time, place, address, notes; visitation date, time, place; service officiant;
+  burial date, time, place and `burialPrivate`; reception date, time, place; the four messages
+  (service, announcement, obituary text, thank-you); obituary city, career, survivors, note; and
+  the five section statuses. Last saved wins per field. Survivors' names reach the server
+  (ADR 0001).
 
 **What never syncs:**
 
@@ -533,8 +548,9 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
-- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10): not synced in round 1 (B9); planned later
-- the new web-editor section fields and statuses (the planning text, `serviceMessage` and the other section messages): not synced in round 1. Only `serviceReady` already syncs, and Service Ready sets it (WEB-4).
+- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10) and `account.checklistTicks`: not synced yet (B9); planned later
+- `hearsFirstIds`, `momentCompletedAt`, `remindersScheduled`
+- the parser refuses these by name (`FORBIDDEN_SYNC_KEYS`), so a client that sends one gets an error
 
 Rules:
 

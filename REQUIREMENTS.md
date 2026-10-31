@@ -21,8 +21,9 @@ Since 2026-10-30 the web has a second job (#385): a desk where the family plans 
 (the person, the service, later the announcement, obituary and thank-yous) so they can send from
 the phone without retyping. **Web = plan at a desk, mobile = send.**
 
-Sending the planned details from the phone needs sync, which comes in a later round. In round 1 the
-planning fields stay on the device that typed them.
+Sending the planned details from the phone needs sync. The sync was approved on 2026-10-30
+(DS-7, ADR 0001): the person's detail fields follow the person to the owner's other devices and
+members. Until the sync ships (#517 to #522), the planning fields stay on the device that typed them.
 
 Every requirement below is subordinate to that. If a requirement makes the app slower or more
 confusing for that person, the requirement is wrong.
@@ -36,7 +37,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 | # | Constraint | Source |
 |---|---|---|
 | C1 | Messages are sent from the user's own phone via an `sms:` deep link, one contact at a time. Sending is mobile-only: the web has no send path. Transition (2026-10-30, #385): the old web send flow stays only in the flag-off build (`VITE_FEATURE_CMS` off) until a later round removes it. No backend SMS path, no bulk send, no business number. Account emails (confirmation, reset, invites) come from the backend. They never carry message content, contacts, or the deceased person's details. | §6 rule 3 |
-| C2 | Dropped 2026-10-30 (#385): web planning text is stored on the device so it can be sent from the phone later; nothing is sent from web. The old rule, kept for the record and still in force in the flag-off build: message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to the AWS data function. Drafts, edited wording and who was messaged stay on the device. | §6 "What not to do" |
+| C2 | Dropped 2026-10-30 (#385): web planning text is stored on the device so it can be sent from the phone later; nothing is sent from web. The old rule, kept for the record and still in force in the flag-off build: message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to the AWS data function. Drafts, the send flow's edited wording (`messageOverride`) and who was messaged stay on the device. The four planning messages (service, announcement, obituary text, thank-you) sync under DS-7 (ADR 0001). | §6 "What not to do" |
 | C3 | Contact data never reaches the gateway. Contact data **and contact ids** never reach the gateway or the data function in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
 | C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
 | C5 | Dropped 2026-10-30 (#385): offline is tech debt, last saved wins. The old rule, kept for the record: offline-first, nothing after sign-up may wait on the network, and nothing inside a flow ever does. Only account actions (sign-up, sign-in, reset, invite, revoke an invite, join, remove a member) need a connection, and they say so calmly. The device is authoritative. Existing offline behaviour (mobile, the flag-off web send flow) stays as built until a ticket changes it; nothing new needs to work offline. | DATA.md posture |
@@ -114,7 +115,8 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 | DS-3 | Sync is invisible — no spinners or "saving…" states | Partial | DATA.md §4.6 |
 | DS-4 | Deleted sessions soft-delete, hard-purge at 90 days | Removed | The Convex purge cron was removed (#203). No server holds sessions now |
 | DS-5 | "Delete everything" in settings purges immediately, clears every local store | Partial | The Convex server mutation was removed (#203). Local clearing only |
-| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through the AWS data function; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138). DATA.md "Shared people" |
+| DS-6 | Person details (name, date of passing, service date, obituary link, service ready) are shared with the owner's members through the AWS data function; drafts, contacts and who was told stay on each device | Not started | Planned: #130 (table), #131 (routes), #132, #133, #134 (sync), #135, #136 (start sync, "Shared by Anna"). Ships behind FEATURE_SHARING, off until #135/#136 (#124). Service time and place are a follow-up (#138); the detail fields now follow in DS-7. DATA.md "Shared people" |
+| DS-7 | The person's detail fields (24 text fields for the person, service, visitation, burial, reception, announcement, obituary and thank-you; `burialPrivate`; the five section statuses) are shared with the same people as DS-6, through the same record. Per field, the last save to reach the server wins; no client timestamps. Text above the length caps is cut, not refused. Never shared: drafts, the send flow's edited wording (`messageOverride`), recipients, contacts, sender name, checklist ticks and reminders | Not started (shared keys, caps and parser done in #516) | Approved by the product owner 2026-10-30. Keys and caps: `libs/shared/src/flowDetails.ts`. Follow-ups: #517 (data function), #518 (gateway), #519 (sync engine), #520 (web), #521 (mobile), #522 (phone prefill). The survivors' names in `obituarySurvivors` reach the server; this is accepted and recorded in `docs/adr/0001-person-details-sync.md`. The checklist does not sync yet (B9, SE-5) |
 
 ### 3.6 Marketing
 
@@ -127,8 +129,8 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 Added 2026-10-30 (#385, round 1). The web becomes a planning editor: the family plans at a desk,
 and the phone sends (C1). Everything here ships behind `VITE_FEATURE_CMS`, which is **on in
 production** (product owner, 2026-10-30: no users yet). With the flag off the web app is unchanged. Round 1 considers only The person and
-Service when it picks the next section. Round 1 planning fields stay on the device that typed them;
-sending them from the phone needs sync, which comes in a later round. Notes marked "round 1
+Service when it picks the next section. Planning fields sync between devices under DS-7 once it ships (ADR 0001); until then they stay
+on the device that typed them. Notes marked "round 1
 assumption" are the assumptions accepted in #385 (A1 to A9 and B1 to B10).
 
 | ID | Requirement | Status | Notes |
@@ -421,6 +423,14 @@ account. Sign-in is identity only; reaching a person's contacts is still the dev
 path described under "Contacts" and "The send flow". The two never merge.
 
 ---
+
+### Shared keys and caps
+
+`libs/shared/src/flowDetails.ts` is the one list of what may sync for a person. `SYNCED_KEYS` is the
+six facts (`libs/shared/src/flowFacts.ts`) plus the detail keys (`FLOW_DETAIL_KEYS`), with
+`FLOW_DETAIL_MAX_LENGTH` caps. The gateway and the data function both validate keys and lengths
+(C8) from this list. Adding a key is a privacy decision: it needs a change to DS-7 and DATA.md in the
+same PR. See `docs/adr/0001-person-details-sync.md`.
 
 ### Database
 

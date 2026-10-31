@@ -34,6 +34,46 @@ export const FLOW_FACT_MAX_LENGTH = {
   obituaryPublisher: 200,
 } as const;
 
+/** Keys a client might send by mistake. Each is refused by name; listed so the rule is visible. */
+export const FORBIDDEN_SYNC_KEYS = [
+  'drafts',
+  'draftsUpdatedAt',
+  'messageOverride',
+  'recipientsNotified',
+  'selectedContactIds',
+  'hearsFirstIds',
+  'contactIds',
+  'contacts',
+  'senderName',
+  'momentCompletedAt',
+  'remindersScheduled',
+  'checklist',
+  'checklistTicks',
+  'sectionStatus',
+  // Send-flow fields
+  'fields',
+  'tone',
+  'includeFlowers',
+  'customFlorist',
+  'flowerDeliveryTarget',
+  'templateCategory',
+  'templateOverrideId',
+  'serviceDetailsKnown',
+  // Contact fields
+  'phone',
+  'phones',
+  'email',
+  'emails',
+  'displayName',
+] as const;
+
+const FORBIDDEN = new Set<string>(FORBIDDEN_SYNC_KEYS);
+
+/** True when `input` has a forbidden key as its own property (checked before the unknown-key rule). */
+export function hasForbiddenSyncKey(input: Record<string, unknown>): boolean {
+  return Object.keys(input).some((key) => FORBIDDEN.has(key));
+}
+
 export type FlowRole = 'owner' | 'member';
 
 export interface FlowRecord {
@@ -239,12 +279,12 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * sending a draft or contact id gets an error and not a silent success. Null when invalid.
  */
 export function parseFlowPatch(input: unknown): Partial<FlowFacts> | null {
-  if (!isPlainObject(input)) return null;
+  if (!isPlainObject(input) || hasForbiddenSyncKey(input)) return null;
   const allowed = new Set<string>(FLOW_FACT_KEYS);
   if (Object.keys(input).some((key) => !allowed.has(key))) return null;
   const out: Record<string, unknown> = {};
   for (const key of FLOW_FACT_KEYS) {
-    if (!(key in input)) continue;
+    if (!Object.hasOwn(input, key)) continue;
     if (!validField(key, input[key])) return null;
     out[key] = input[key];
   }
@@ -255,7 +295,7 @@ export function parseFlowPatch(input: unknown): Partial<FlowFacts> | null {
 export function parseFlowFacts(input: unknown): FlowFacts | null {
   const patch = parseFlowPatch(input);
   if (!patch) return null;
-  return FLOW_FACT_KEYS.every((key) => key in patch)
+  return FLOW_FACT_KEYS.every((key) => Object.hasOwn(patch, key))
     ? (patch as FlowFacts)
     : null;
 }
