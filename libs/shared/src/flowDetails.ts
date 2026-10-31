@@ -5,9 +5,15 @@
 import {
   FLOW_FACT_KEYS,
   hasForbiddenSyncKey,
+  isPlainObject,
+  parseFlowFacts,
+  pickFlowFacts,
   toFlowFacts,
   type FlowFacts,
+  type FlowFactsSource,
+  type FlowRecord,
 } from './flowFacts.js';
+import { isUuid } from './members.js';
 import type { SectionKey, SectionStatus } from './sections.js';
 
 export const FLOW_DETAIL_TEXT_KEYS = [
@@ -254,9 +260,6 @@ export function flowDetailsToSessionFields(
   return out as Partial<SessionDetailFields>;
 }
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const isStatusValue = (value: unknown): boolean =>
   value === null || value === 'in_progress' || value === 'ready';
 
@@ -370,4 +373,59 @@ export function mergeSyncedFieldsWithChanges(
     merged: merged as unknown as SyncedFields,
     changed: changed as Partial<SyncedFields>,
   };
+}
+
+/**
+ * Validates a record from the server: uuid ids, a known role, valid facts (extra fact keys dropped)
+ * and, when sent, a `details` object of valid detail keys. Missing detail keys count as "not
+ * sent", never as cleared. Invalid facts or invalid details reject the record. Null when invalid.
+ * Lives here, not in flowFacts.ts, so the two files do not import each other at load time.
+ */
+export function parseFlowRecord(input: unknown): FlowRecord | null {
+  if (!isPlainObject(input)) {
+    return null;
+  }
+  const { id, ownerId, role, facts, details, updatedAt, updatedBy } = input;
+  if (typeof id !== 'string' || !isUuid(id)) {
+    return null;
+  }
+  if (typeof ownerId !== 'string' || !isUuid(ownerId)) {
+    return null;
+  }
+  if (role !== 'owner' && role !== 'member') {
+    return null;
+  }
+  if (typeof updatedAt !== 'string' || Number.isNaN(Date.parse(updatedAt))) {
+    return null;
+  }
+  if (updatedBy !== null && (typeof updatedBy !== 'string' || !isUuid(updatedBy))) {
+    return null;
+  }
+  // Keys the client doesn't know are ignored (a newer server may add some); known ones are checked.
+  const parsed = parseFlowFacts(
+    isPlainObject(facts) ? pickFlowFacts(facts as FlowFactsSource) : null,
+  );
+  if (!parsed) {
+    return null;
+  }
+  const record: FlowRecord = { id, ownerId, role, facts: parsed, updatedAt, updatedBy };
+  if (details === undefined) {
+    return record;
+  }
+  const known = isPlainObject(details) ? pickDetailKeys(details) : null;
+  const parsedDetails = known ? parseFlowDetails(known) : null;
+  if (!parsedDetails) {
+    return null;
+  }
+  return { ...record, details: parsedDetails as FlowDetails };
+}
+
+function pickDetailKeys(source: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of FLOW_DETAIL_KEYS) {
+    if (Object.hasOwn(source, key)) {
+      out[key] = source[key];
+    }
+  }
+  return out;
 }

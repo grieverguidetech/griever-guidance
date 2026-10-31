@@ -1,21 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { createFlow, listFlows, patchFlow } from '@griever/api-client';
+import { createFlow, listFlows, parseSyncedPatch, patchFlow } from '@griever/api-client';
 import type {
   FlowsFailureReason,
   ListFlowsResult,
   PatchFlowResult,
   WriteFlowResult,
 } from '@griever/api-client';
-import {
-  coalesceFlowPatches,
-  diffFlowFacts,
-  FLOW_FACT_KEYS,
-  isUuid,
-  parseFlowFacts,
-  parseFlowPatch,
-  toFlowFacts,
-} from '@griever/shared';
-import type { FlowFactKey, FlowFacts, FlowRecord } from '@griever/shared';
+import { FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields } from '@griever/shared';
+import type { FlowRecord, SyncedFields, SyncedKey } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
 import { readRemovedFlows, writeRemovedFlows } from './useSessions.js';
 import type { Session, UseSessionsResult } from './useSessions.js';
@@ -23,11 +15,11 @@ import type { Session, UseSessionsResult } from './useSessions.js';
 /** The api-client functions the hook uses. Tests pass a stub; the default is the real module. */
 export interface FlowSyncClient {
   listFlows: (accessToken: string, signal?: AbortSignal) => Promise<ListFlowsResult>;
-  createFlow: (accessToken: string, id: string, facts: FlowFacts, signal?: AbortSignal) => Promise<WriteFlowResult>;
+  createFlow: (accessToken: string, id: string, fields: SyncedFields, signal?: AbortSignal) => Promise<WriteFlowResult>;
   patchFlow: (
     accessToken: string,
     id: string,
-    partial: Partial<FlowFacts>,
+    partial: Partial<SyncedFields>,
     signal?: AbortSignal,
   ) => Promise<PatchFlowResult>;
 }
@@ -62,14 +54,46 @@ export const PULL_INTERVAL_MS = 600_000;
 export const EDIT_DEBOUNCE_MS = 1_000;
 export const REQUEST_TIMEOUT_MS = 15_000;
 
-type Pending = Partial<FlowFacts>;
+type Pending = Partial<SyncedFields>;
+
+/** Only the keys whose value differs, taken from `after`. Facts and details alike. */
+function diffSynced(before: SyncedFields, after: SyncedFields): Pending {
+  const out: Record<string, unknown> = {};
+  for (const key of SYNCED_KEYS) {
+    if (before[key] !== after[key]) {
+      out[key] = after[key];
+    }
+  }
+  return out as Pending;
+}
+
+/** Several queued edits become one patch with the latest value per key (later wins). */
+function coalesce(patches: readonly Pending[]): Pending {
+  return Object.assign({}, ...patches) as Pending;
+}
+
+/**
+ * A saved baseline. One saved before details synced holds only the facts: its detail keys are
+ * filled with the empty values, so details already typed on this device are found as edits.
+ */
+function readBaseline(input: unknown): SyncedFields | null {
+  const parsed = parseSyncedPatch(input);
+  if (!parsed) {
+    return null;
+  }
+  const hasFacts = FLOW_FACT_KEYS.every((key) => key in parsed);
+  if (!hasFacts) {
+    return null;
+  }
+  return { ...toFlowDetails({}), ...parsed } as SyncedFields;
+}
 
 interface Stored {
   queue: Record<string, Pending>;
   /** Flows the server is known to have, so the next write is a PATCH. */
   known: string[];
   /** The facts last seen per person (facts only), so edits made while sync was off are still found. */
-  baselines: Record<string, FlowFacts>;
+  baselines: Record<string, SyncedFields>;
 }
 
 interface SyncState {
@@ -77,7 +101,7 @@ interface SyncState {
   queue: Map<string, Pending>;
   known: Set<string>;
   /** The facts last seen per flow, to tell what the user changed. Saved in storage. */
-  baselines: Map<string, FlowFacts>;
+  baselines: Map<string, SyncedFields>;
   /** True once a pull has worked this run: only then do we know which people the server lacks. */
   pulled: boolean;
   /** People the server refused to create; not offered again this run. */
@@ -93,11 +117,11 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
     const parsed = JSON.parse(raw) as Partial<Stored> | null;
     if (!parsed) return state;
     for (const [id, pending] of Object.entries(parsed.queue ?? {})) {
-      const clean = isUuid(id) ? parseFlowPatch(pending) : null;
+      const clean = isUuid(id) ? parseSyncedPatch(pending) : null;
       if (clean && Object.keys(clean).length > 0) state.queue.set(id, clean);
     }
     for (const [id, facts] of Object.entries(parsed.baselines ?? {})) {
-      const clean = isUuid(id) ? parseFlowFacts(facts) : null;
+      const clean = isUuid(id) ? readBaseline(facts) : null;
       if (clean) state.baselines.set(id, clean);
     }
     for (const id of parsed.known ?? []) if (typeof id === 'string' && isUuid(id)) state.known.add(id);
@@ -183,10 +207,10 @@ function scanSessions(
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
     seen.add(s.flowId);
-    const facts = toFlowFacts(s);
+    const facts = toSyncedFields(s);
     const before = state.baselines.get(s.flowId);
     state.baselines.set(s.flowId, facts);
-    const diff = before ? diffFlowFacts(before, facts) : {};
+    const diff = before ? diffSynced(before, facts) : {};
     if (!before || Object.keys(diff).length > 0) dirty = true;
     const unsent =
       state.pulled &&
@@ -199,7 +223,7 @@ function scanSessions(
       state.queue.set(s.flowId, { ...facts });
       changed = true;
     } else if (Object.keys(diff).length > 0) {
-      state.queue.set(s.flowId, coalesceFlowPatches([state.queue.get(s.flowId) ?? {}, diff]));
+      state.queue.set(s.flowId, coalesce([state.queue.get(s.flowId) ?? {}, diff]));
       changed = true;
     }
   }
@@ -222,7 +246,7 @@ function scanSessions(
 const offline = { ok: false, reason: 'offline' } as const;
 
 /**
- * Sends edits to a person's six facts in the background (DS-6). The device stays the source of
+ * Sends edits to a person's facts and details (SYNCED_KEYS) in the background (DS-6, DS-7). The device stays the source of
  * truth: edits are queued per flow, coalesced, and sent as POST (a person the server hasn't seen)
  * or PATCH (only the pending keys). Nothing on screen waits for this (C5). Failures are kept in
  * the queue and retried; nothing is thrown and no state is shown.
@@ -306,18 +330,23 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       } catch {
         // keep pulling; the next change scans again
       }
-      const pendingByFlow: Record<string, FlowFactKey[]> = {};
+      const pendingByFlow: Record<string, SyncedKey[]> = {};
       for (const [id, pending] of state.queue) {
-        pendingByFlow[id] = FLOW_FACT_KEYS.filter((key) => key in pending);
+        pendingByFlow[id] = SYNCED_KEYS.filter((key) => key in pending);
       }
       // Records already merged into sessions must not look like local edits afterwards.
       for (const record of flows) {
         const base = state.baselines.get(record.id);
         if (!base) continue;
         const pendingKeys = new Set(pendingByFlow[record.id] ?? []);
+        const remote: Partial<SyncedFields> = { ...record.facts, ...record.details };
         const next: Record<string, unknown> = { ...base };
-        for (const key of FLOW_FACT_KEYS) if (!pendingKeys.has(key)) next[key] = record.facts[key];
-        state.baselines.set(record.id, next as unknown as FlowFacts);
+        for (const key of SYNCED_KEYS) {
+          if (!pendingKeys.has(key) && remote[key] !== undefined) {
+            next[key] = remote[key];
+          }
+        }
+        state.baselines.set(record.id, next as unknown as SyncedFields);
       }
       writeStored(latest.current.storage, state);
       latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
@@ -338,11 +367,11 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             break;
           }
           const create = mayCreate(session, userId) && !state.known.has(id);
-          const sent: Pending = create ? toFlowFacts(session) : { ...pending };
+          const sent: Pending = create ? toSyncedFields(session) : { ...pending };
           const result = await withTimeout<WriteFlowResult | PatchFlowResult>(
             (signal) =>
               create
-                ? client().createFlow(accessToken, id, sent as FlowFacts, signal)
+                ? client().createFlow(accessToken, id, sent as SyncedFields, signal)
                 : client().patchFlow(accessToken, id, sent, signal),
             offline,
             inFlight,
@@ -353,7 +382,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             const now = state.queue.get(id) ?? {};
             // Keep only what changed while the request was in flight.
             const left: Record<string, unknown> = {};
-            for (const key of FLOW_FACT_KEYS) {
+            for (const key of SYNCED_KEYS) {
               if (key in now && now[key] !== sent[key]) left[key] = now[key];
             }
             if (Object.keys(left).length > 0) state.queue.set(id, left as Pending);

@@ -206,13 +206,64 @@ describe('round 2 behaviour', () => {
   });
 
   it('listFlows ignores unknown fact keys in a record (forward compatibility)', async () => {
-    const newer = { ...record, facts: { ...facts, serviceTime: '10am' } };
+    const newer = { ...record, facts: { ...facts, futureKey: '10am' } };
     fetchMock.mockResolvedValue(json(200, [newer]));
     expect(await listFlows(ACCESS)).toEqual({
       ok: true,
       flows: [record],
       dropped: 0,
     });
+  });
+
+  it('listFlows returns the details object a record carries, and ignores unknown detail keys', async () => {
+    const withDetails = { ...record, details: { serviceTime: '10am', serviceStatus: 'ready', futureKey: 'x' } };
+    fetchMock.mockResolvedValue(json(200, [withDetails]));
+    expect(await listFlows(ACCESS)).toEqual({
+      ok: true,
+      flows: [{ ...record, details: { serviceTime: '10am', serviceStatus: 'ready' } }],
+      dropped: 0,
+    });
+  });
+
+  it('listFlows drops a record whose details are invalid', async () => {
+    fetchMock.mockResolvedValue(json(200, [{ ...record, details: { serviceStatus: 'done' } }]));
+    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [], dropped: 1 });
+  });
+
+  it('create sends facts and detail keys flat, null messages included', async () => {
+    fetchMock.mockResolvedValue(json(200, record));
+    await createFlow(ACCESS, ID, { ...facts, serviceMessage: null, serviceTime: '10am', burialPrivate: false });
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({
+      id: ID,
+      ...facts,
+      serviceMessage: null,
+      serviceTime: '10am',
+      burialPrivate: false,
+    });
+  });
+
+  it('patch sends a detail key alone, and a reset message as null', async () => {
+    fetchMock.mockResolvedValue(json(200, record));
+    await patchFlow(ACCESS, ID, { serviceMessage: null });
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({ serviceMessage: null });
+  });
+
+  it('refuses a detail over its cap or a non-detail key without a request', async () => {
+    const tooLong = { serviceTime: 'x'.repeat(101) };
+    expect(await patchFlow(ACCESS, ID, tooLong)).toEqual({ ok: false, reason: 'invalid' });
+    expect(await createFlow(ACCESS, ID, { ...facts, ...tooLong })).toEqual({ ok: false, reason: 'invalid' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never sends drafts or contact data in a patch, even from a whole session', async () => {
+    fetchMock.mockResolvedValue(json(200, record));
+    await patchFlow(ACCESS, ID, {
+      serviceNotes: 'Bring chairs',
+      drafts: {},
+      selectedContactIds: ['c1'],
+      senderName: 'Anna',
+    } as never);
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({ serviceNotes: 'Bring chairs' });
   });
 
   it('create refuses invalid facts without a request', async () => {

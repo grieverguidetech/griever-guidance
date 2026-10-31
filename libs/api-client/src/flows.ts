@@ -1,13 +1,44 @@
 import {
+  FLOW_DETAIL_KEYS,
   isUuid,
+  parseFlowDetails,
   parseFlowFacts,
   parseFlowPatch,
   parseFlowRecord,
   pickFlowFacts,
+  splitSyncedPatch,
+  type FlowDetails,
   type FlowFacts,
   type FlowRecord,
+  type SyncedFields,
 } from '@griever/shared';
 import { ApiError, apiFetch } from './client.js';
+
+/** Copies only the whitelisted detail keys that are present. Never a spread. */
+export function pickFlowDetails(source: object): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of FLOW_DETAIL_KEYS) {
+    const value = (source as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * Validates a partial set of synced fields (facts and details together) and returns it flat, or
+ * null when any key is unknown, forbidden or out of range (C8). Used for queued edits and bodies.
+ */
+export function parseSyncedPatch(input: unknown): Partial<SyncedFields> | null {
+  const split = splitSyncedPatch(input);
+  if (!split) {
+    return null;
+  }
+  const facts = parseFlowPatch(split.facts);
+  const details = parseFlowDetails(split.details);
+  return facts && details ? { ...facts, ...details } : null;
+}
 
 /**
  * Expected failures are values, never exceptions.
@@ -110,37 +141,35 @@ async function send(
 /**
  * Creates a person (owners only; a member gets `forbidden`). The id is made on the device. This is
  * a plain POST, never an upsert: a repeat for an existing id is a `conflict`. The body is rebuilt
- * from the whitelist and validated before sending (C2/C3, C8).
+ * from the whitelist (facts, then any detail keys) and validated before sending (C2/C3, C8).
  */
 export function createFlow(
   accessToken: string,
   id: string,
-  facts: FlowFacts,
+  fields: FlowFacts & Partial<FlowDetails>,
   signal?: AbortSignal,
 ): Promise<WriteFlowResult> {
-  const body = parseFlowFacts(pickFlowFacts(facts));
-  if (!isUuid(id) || !body)
+  const facts = parseFlowFacts(pickFlowFacts(fields));
+  const details = parseFlowDetails(pickFlowDetails(fields));
+  if (!isUuid(id) || !facts || !details) {
     return Promise.resolve({ ok: false, reason: 'invalid' });
-  return send(accessToken, '/flows', 'POST', { id, ...body }, signal);
+  }
+  return send(accessToken, '/flows', 'POST', { id, ...facts, ...details }, signal);
 }
 
 /** Edits a person. Sends only the changed whitelisted fields; an empty patch sends nothing. */
 export function patchFlow(
   accessToken: string,
   id: string,
-  partial: Partial<FlowFacts>,
+  partial: Partial<SyncedFields>,
   signal?: AbortSignal,
 ): Promise<PatchFlowResult> {
-  const body = parseFlowPatch(pickFlowFacts(partial));
-  if (!isUuid(id) || !body)
+  const body = parseSyncedPatch({ ...pickFlowFacts(partial), ...pickFlowDetails(partial) });
+  if (!isUuid(id) || !body) {
     return Promise.resolve({ ok: false, reason: 'invalid' });
-  if (Object.keys(body).length === 0)
+  }
+  if (Object.keys(body).length === 0) {
     return Promise.resolve({ ok: true, flow: null });
-  return send(
-    accessToken,
-    `/flows/${encodeURIComponent(id)}`,
-    'PATCH',
-    body,
-    signal,
-  );
+  }
+  return send(accessToken, `/flows/${encodeURIComponent(id)}`, 'PATCH', body, signal);
 }

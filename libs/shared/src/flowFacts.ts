@@ -1,7 +1,7 @@
 // What may leave the device for a person, and nothing more (C2, C3). Every object that goes to the
 // gateway is built here from the whitelist, never by spreading a session. Drafts, edited wording
 // (`messageOverride`), recipients, contact ids and `senderName` are deliberately not facts.
-import { isUuid } from './members.js';
+import type { FlowDetails } from './flowDetails.js';
 import { normalizeUrl } from './templates.js';
 
 export interface FlowFacts {
@@ -81,6 +81,8 @@ export interface FlowRecord {
   ownerId: string;
   role: FlowRole;
   facts: FlowFacts;
+  /** The detail keys (DS-7). Absent from an older server; `parseFlowRecord` fills every key when the server sends the object. */
+  details?: FlowDetails;
   /** ISO 8601 timestamp of the last write the server accepted. */
   updatedAt: string;
   updatedBy: string | null;
@@ -271,7 +273,7 @@ function validField(key: FlowFactKey, value: unknown): boolean {
   }
 }
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+export const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
@@ -298,26 +300,4 @@ export function parseFlowFacts(input: unknown): FlowFacts | null {
   return FLOW_FACT_KEYS.every((key) => Object.hasOwn(patch, key))
     ? (patch as FlowFacts)
     : null;
-}
-
-/** Validates a record from the server: uuid ids, a known role, valid facts (extra keys dropped). Null when invalid. */
-export function parseFlowRecord(input: unknown): FlowRecord | null {
-  if (!isPlainObject(input)) return null;
-  const { id, ownerId, role, facts, updatedAt, updatedBy } = input;
-  if (typeof id !== 'string' || !isUuid(id)) return null;
-  if (typeof ownerId !== 'string' || !isUuid(ownerId)) return null;
-  if (role !== 'owner' && role !== 'member') return null;
-  if (typeof updatedAt !== 'string' || Number.isNaN(Date.parse(updatedAt)))
-    return null;
-  if (
-    updatedBy !== null &&
-    (typeof updatedBy !== 'string' || !isUuid(updatedBy))
-  )
-    return null;
-  // Keys the client doesn't know are ignored (a newer server may add some); known ones are checked.
-  const parsed = parseFlowFacts(
-    isPlainObject(facts) ? pickFlowFacts(facts as FlowFactsSource) : null,
-  );
-  if (!parsed) return null;
-  return { id, ownerId, role, facts: parsed, updatedAt, updatedBy };
 }
