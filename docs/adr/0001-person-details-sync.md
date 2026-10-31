@@ -43,6 +43,7 @@ the device that typed them.
   return) are refused, so they cannot add escape overhead.
 - **Typed numbers in free text.** Notes, career and survivors are free text and may hold a phone
   number the family typed. This is accepted. The app never reads contacts into them.
+- **Lowering a cap needs a migration.** The data function refuses to decode a stored value above its cap, so lowering a cap later needs a data migration first.
 
 ## Consequences
 

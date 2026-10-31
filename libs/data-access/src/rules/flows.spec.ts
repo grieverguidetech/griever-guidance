@@ -555,4 +555,34 @@ describe.runIf(up)('detail keys on DynamoDB Local', () => {
     const listed = await listFlows(doc, table, caller(D_OWNER), clock);
     expect(listed.find((r) => r.id === id)?.details).toMatchObject(big);
   });
+
+  it('leaves every other key alone when one key is patched', async () => {
+    const id = randomUUID();
+    await rawPut(
+      encodeFlow({
+        ...flow(D_OWNER, id),
+        details: {
+          ...emptyDetails(),
+          serviceTime: '2pm',
+          personStatus: 'ready',
+          burialPrivate: true,
+          serviceMessage: '',
+        },
+      }),
+    );
+    await updateFlow(doc, table, caller(D_MEMBER), id, { servicePlace: 'Chapel' }, clock);
+    await updateFlow(doc, table, caller(D_OWNER), id, { obituaryCity: 'X' }, clock);
+    const listed = await listFlows(doc, table, caller(D_OWNER), clock);
+    const record = listed.find((r) => r.id === id);
+    expect(record?.details).toEqual({
+      ...emptyDetails(),
+      serviceTime: '2pm',
+      personStatus: 'ready',
+      burialPrivate: true,
+      serviceMessage: '',
+      servicePlace: 'Chapel',
+      obituaryCity: 'X',
+    });
+    expect(record?.facts).toEqual(facts);
+  });
 });

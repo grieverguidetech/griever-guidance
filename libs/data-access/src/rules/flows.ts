@@ -22,7 +22,7 @@ import {
   emptyDetails,
   encodeFlow,
   parseFlowInput,
-  type StoredFlow,
+  type FlowItem,
 } from '../items/flowItem.js';
 import {
   encodeProfile,
@@ -36,7 +36,7 @@ import { runAction, type RunOptions, type TransactItem } from '../transact.js';
 export type FlowRecordWithDetails = FlowRecord & { details: FlowDetails };
 
 /** The shape the app reads. The role says how the caller is linked to this person. */
-function toRecord(flow: StoredFlow, role: FlowRole): FlowRecordWithDetails {
+function toRecord(flow: FlowItem, role: FlowRole): FlowRecordWithDetails {
   return {
     id: flow.id,
     ownerId: flow.ownerId,
@@ -176,7 +176,7 @@ export async function createFlow(
         if (profile?.accountType === 'member') {
           throw new Refusal('forbidden');
         }
-        const flow: StoredFlow = {
+        const flow: FlowItem = {
           id,
           ownerId: caller.userId,
           facts: parsed,
@@ -249,7 +249,7 @@ async function findEditable(
   caller: Caller,
   id: string,
   clock: Clock,
-): Promise<{ flow: StoredFlow; role: FlowRole } | undefined> {
+): Promise<{ flow: FlowItem; role: FlowRole } | undefined> {
   const own = await getLive(doc, table, flowKey(caller.userId, id), clock);
   if (own) {
     return { flow: decodeFlow(own), role: 'owner' };

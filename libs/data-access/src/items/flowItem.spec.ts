@@ -2,6 +2,7 @@ import {
   FLOW_DETAIL_KEYS,
   FLOW_DETAIL_MAX_LENGTH,
   FLOW_DETAIL_TEXT_KEYS,
+  FLOW_MESSAGE_KEYS,
   SYNCED_KEYS,
 } from '@griever/shared';
 import {
@@ -29,11 +30,50 @@ const flow: FlowItem = {
   updatedBy: 'user_owner1',
 };
 
+// Written out on purpose: dropping a key from the shared list must also fail here.
+const DETAIL_KEY_NAMES = [
+  'birthDate',
+  'serviceType',
+  'serviceTime',
+  'servicePlace',
+  'serviceAddress',
+  'serviceNotes',
+  'serviceMessage',
+  'announcementMessage',
+  'obituaryText',
+  'obituaryCity',
+  'obituaryCareer',
+  'obituarySurvivors',
+  'obituaryNote',
+  'thanksMessage',
+  'visitationDate',
+  'visitationTime',
+  'visitationPlace',
+  'serviceOfficiant',
+  'burialDate',
+  'burialTime',
+  'burialPlace',
+  'receptionDate',
+  'receptionTime',
+  'receptionPlace',
+  'burialPrivate',
+  'personStatus',
+  'announcementStatus',
+  'serviceStatus',
+  'obituaryStatus',
+  'thanksStatus',
+];
+
 describe('flow codec', () => {
+  it('has the 30 detail keys', () => {
+    expect(DETAIL_KEY_NAMES).toHaveLength(30);
+    expect([...FLOW_DETAIL_KEYS].sort()).toEqual([...DETAIL_KEY_NAMES].sort());
+  });
+
   it('writes exactly the attributes in design 1.2', () => {
     expect(Object.keys(encodeFlow(flow)).sort()).toEqual(
       [
-        ...FLOW_DETAIL_KEYS,
+        ...DETAIL_KEY_NAMES,
         'pk',
         'sk',
         'entity',
@@ -55,9 +95,9 @@ describe('flow codec', () => {
   });
 
   it('never stores an attribute that looks like contact or message data', () => {
-    const detailKeys = new Set<string>(FLOW_DETAIL_KEYS);
+    const messageKeys = new Set<string>(FLOW_MESSAGE_KEYS);
     for (const name of Object.keys(encodeFlow(flow))) {
-      if (detailKeys.has(name)) {
+      if (messageKeys.has(name)) {
         continue;
       }
       expect(name).not.toMatch(/contact|recipient|draft|message|wording|body/i);

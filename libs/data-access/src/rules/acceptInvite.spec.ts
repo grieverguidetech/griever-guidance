@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { DeleteCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { fixedClock } from '../clock.js';
-import { encodeFlow } from '../items/flowItem.js';
+import { emptyDetails, encodeFlow } from '../items/flowItem.js';
 import {
   decodeInvite,
   encodeInvite,
@@ -75,6 +75,7 @@ const flowItem = (ownerId: string) => ({
   id: randomUUID(),
   ownerId,
   facts: FACTS,
+  details: emptyDetails(),
   createdAt: at(-HOUR),
   updatedAt: at(-HOUR),
   updatedBy: ownerId,

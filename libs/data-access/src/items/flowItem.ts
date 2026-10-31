@@ -16,8 +16,8 @@ export interface FlowItem {
   id: string;
   ownerId: string;
   facts: FlowFacts;
-  /** Every detail key. Left out, encode writes the empty set (null, burialPrivate false). */
-  details?: FlowDetails;
+  /** Every detail key. A key never written reads as null (burialPrivate: false). */
+  details: FlowDetails;
   createdAt: string;
   updatedAt: string;
   /** Who made the last change. Null if that user was deleted. */
@@ -27,9 +27,6 @@ export interface FlowItem {
 }
 
 /** A person with no detail yet: every text and status null, burialPrivate false. */
-/** What decodeFlow returns: details are always there. */
-export type StoredFlow = FlowItem & { details: FlowDetails };
-
 export function emptyDetails(): FlowDetails {
   const out: Record<string, unknown> = { burialPrivate: false };
   for (const key of [...FLOW_DETAIL_TEXT_KEYS, ...FLOW_STATUS_KEYS]) {
@@ -59,7 +56,7 @@ export function encodeFlow(flow: FlowItem): Item {
   if (!facts) {
     throw new Error('Flow facts are invalid.');
   }
-  const details = parseFlowDetails(flow.details ?? emptyDetails());
+  const details = parseFlowDetails(flow.details);
   if (!details || FLOW_DETAIL_KEYS.some((key) => !Object.hasOwn(details, key))) {
     throw new Error('Flow details are invalid.');
   }
@@ -82,7 +79,7 @@ export function encodeFlow(flow: FlowItem): Item {
     ...(flow.updatedBy ? refGsi(flow.updatedBy, 'FLOW', flow.id) : {}),
   };
 }
-export function decodeFlow(item: Item): StoredFlow {
+export function decodeFlow(item: Item): FlowItem {
   const { id, ownerId, createdAt, updatedAt, updatedBy, deletedAt } = item;
   const facts = parseFlowFacts({
     personName: item.personName,
@@ -110,7 +107,7 @@ export function decodeFlow(item: Item): StoredFlow {
   ) {
     throw new Error('Flow item is broken.');
   }
-  const flow: StoredFlow = {
+  const flow: FlowItem = {
     id,
     ownerId,
     facts,

@@ -47,8 +47,8 @@ export interface ActionContext {
 /** An action whose args already passed validation. Calling it is the first step that can touch DynamoDB. */
 export type PreparedAction = (ctx: ActionContext) => Promise<DataResult>;
 
-/** Create needs all six facts; detail keys are optional. Anything else is refused. */
-function parseFlowFactsWithDetails(input: unknown): boolean {
+/** The createFlow `facts` arg carries the detail keys too. All six facts are required; anything else is refused. */
+function isValidCreateInput(input: unknown): boolean {
   const parsed = parseFlowInput(input);
   return parsed !== null && parseFlowFacts(parsed.facts) !== null;
 }
@@ -104,7 +104,7 @@ const PREPARE: Record<DataAction, Prepare> = {
   },
   createFlow: (args) => {
     const id = args['id'];
-    if (!hasExactKeys(args, ['id', 'facts']) || !uuidArg(id) || !parseFlowFactsWithDetails(args['facts'])) {
+    if (!hasExactKeys(args, ['id', 'facts']) || !uuidArg(id) || !isValidCreateInput(args['facts'])) {
       return null;
     }
     const facts = args['facts'];

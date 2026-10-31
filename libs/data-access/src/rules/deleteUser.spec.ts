@@ -1,7 +1,7 @@
 import { ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
 import { fixedClock } from '../clock.js';
-import { encodeFlow } from '../items/flowItem.js';
+import { emptyDetails, encodeFlow } from '../items/flowItem.js';
 import { encodeInvite, encodeToken } from '../items/inviteItems.js';
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
 import { encodeProfile } from '../items/profileItem.js';
@@ -84,6 +84,7 @@ describe.runIf(up)('deleteUser on DynamoDB Local', () => {
         id: goneFlow,
         ownerId: GONE,
         facts,
+        details: emptyDetails(),
         createdAt: NOW,
         updatedAt: NOW,
         updatedBy: GONE,
@@ -130,6 +131,7 @@ describe.runIf(up)('deleteUser on DynamoDB Local', () => {
         id: ownerFlow,
         ownerId: OWNER,
         facts,
+        details: emptyDetails(),
         createdAt: NOW,
         updatedAt: NOW,
         updatedBy: GONE,
@@ -154,6 +156,7 @@ describe.runIf(up)('deleteUser on DynamoDB Local', () => {
         id: otherFlow,
         ownerId: OTHER,
         facts,
+        details: emptyDetails(),
         createdAt: NOW,
         updatedAt: NOW,
         updatedBy: OTHER,
@@ -245,7 +248,7 @@ describe.runIf(up)('deleteUser with many items', () => {
         ids.slice(i, i + 25).flatMap((id, n) => {
           const hash = (i + n).toString(16).padStart(64, '0');
           return [
-            rawPut(encodeFlow({ id, ownerId: BIG, facts, createdAt: NOW, updatedAt: NOW, updatedBy: BIG })),
+            rawPut(encodeFlow({ id, ownerId: BIG, facts, details: emptyDetails(), createdAt: NOW, updatedAt: NOW, updatedBy: BIG })),
             rawPut(flowGuard(id, BIG)),
             rawPut(encodeInvite({ id, ownerId: BIG, email: 'b@example.test', tokenHash: hash, createdAt: NOW, expiresAt: NOW })),
             rawPut(encodeToken(hash, BIG, id)),
