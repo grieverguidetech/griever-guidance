@@ -6,7 +6,7 @@ import type {
   PatchFlowResult,
   WriteFlowResult,
 } from '@griever/api-client';
-import { FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields } from '@griever/shared';
+import { FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields, withServicePair } from '@griever/shared';
 import type { FlowRecord, SyncedFields, SyncedKey } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
 import { readRemovedFlows, writeRemovedFlows } from './useSessions.js';
@@ -92,7 +92,7 @@ interface Stored {
   queue: Record<string, Pending>;
   /** Flows the server is known to have, so the next write is a PATCH. */
   known: string[];
-  /** The facts last seen per person (facts only), so edits made while sync was off are still found. */
+  /** The facts and details last seen per person, so edits made while sync was off are still found. */
   baselines: Record<string, SyncedFields>;
 }
 
@@ -100,7 +100,7 @@ interface SyncState {
   userId: string;
   queue: Map<string, Pending>;
   known: Set<string>;
-  /** The facts last seen per flow, to tell what the user changed. Saved in storage. */
+  /** The facts and details last seen per flow, to tell what the user changed. Saved in storage. */
   baselines: Map<string, SyncedFields>;
   /** True once a pull has worked this run: only then do we know which people the server lacks. */
   pulled: boolean;
@@ -338,7 +338,8 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       for (const record of flows) {
         const base = state.baselines.get(record.id);
         if (!base) continue;
-        const pendingKeys = new Set(pendingByFlow[record.id] ?? []);
+        // The same pair widening as the merge, so baselines match what the merge wrote.
+        const pendingKeys = withServicePair(pendingByFlow[record.id] ?? []);
         const remote: Partial<SyncedFields> = { ...record.facts, ...record.details };
         const next: Record<string, unknown> = { ...base };
         for (const key of SYNCED_KEYS) {

@@ -81,8 +81,11 @@ export interface FlowRecord {
   ownerId: string;
   role: FlowRole;
   facts: FlowFacts;
-  /** The detail keys (DS-7). Absent from an older server; `parseFlowRecord` fills every key when the server sends the object. */
-  details?: FlowDetails;
+  /**
+   * The detail keys (DS-7) the record carries. Absent when an older server sends none or when the
+   * details failed validation. A key that is missing means "not sent", never "cleared".
+   */
+  details?: Partial<FlowDetails>;
   /** ISO 8601 timestamp of the last write the server accepted. */
   updatedAt: string;
   updatedBy: string | null;

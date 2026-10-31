@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { toFlowDetails } from '@griever/shared';
 import type { FlowDetails, FlowFacts, FlowRecord } from '@griever/shared';
 import type { Session } from './useSessions.js';
 import { useSessions } from './useSessions.js';
@@ -17,6 +18,8 @@ const facts = (over: Partial<FlowFacts> = {}): FlowFacts => ({
   ...over,
 });
 
+const emptyDetails = (): FlowDetails => toFlowDetails({});
+
 const record = (
   over: { facts?: Partial<FlowFacts>; details?: Partial<FlowDetails>; ownerId?: string } = {},
 ): FlowRecord => {
@@ -26,7 +29,7 @@ const record = (
     ownerId,
     role: ownerId === ME ? 'owner' : 'member',
     facts: facts(over.facts),
-    ...(over.details ? { details: over.details as FlowDetails } : {}),
+    ...(over.details ? { details: over.details } : {}),
     updatedAt: '2026-10-01T00:00:00.000Z',
     updatedBy: null,
   };
@@ -159,54 +162,62 @@ describe('applyRemoteFlows with details (DS-7)', () => {
     expect(s.sectionStatus).toEqual({ person: 'ready' });
   });
 
-  describe('serviceStatus and serviceReady stay coupled', () => {
-    it('a remote ready status sets the flag', () => {
+  describe('serviceStatus and serviceReady sync as stored', () => {
+    const full = (over: Partial<FlowDetails> = {}): Partial<FlowDetails> => ({ ...emptyDetails(), ...over });
+
+    it('a remote status alone does not touch the flag', () => {
       const [s] = apply([local()], [record({ details: { serviceStatus: 'ready' } })]);
       expect(s.sectionStatus?.service).toBe('ready');
-      expect(s.serviceReady).toBe(true);
-    });
-
-    it('a remote in_progress status clears the flag', () => {
-      const [s] = apply(
-        [local({ serviceReady: true, sectionStatus: { service: 'ready' } })],
-        [record({ facts: { serviceReady: true }, details: { serviceStatus: 'in_progress' } })],
-      );
-      expect(s.sectionStatus?.service).toBe('in_progress');
       expect(s.serviceReady).toBe(false);
     });
 
-    it('a remote flag alone (older device) sets the status to ready', () => {
+    it('a remote flag alone does not touch the status', () => {
       const [s] = apply([local()], [record({ facts: { serviceReady: true } })]);
       expect(s.serviceReady).toBe(true);
-      expect(s.sectionStatus?.service).toBe('ready');
+      expect(s.sectionStatus?.service).toBeUndefined();
     });
 
-    it('a remote flag turned off clears a ready status, but keeps in_progress', () => {
-      const [cleared] = apply(
-        [local({ serviceReady: true, sectionStatus: { service: 'ready' } })],
-        [record({ facts: { serviceReady: false } })],
-      );
-      expect(cleared.sectionStatus?.service).toBeUndefined();
-      const [kept] = apply(
+    for (const [label, status] of [['null', null], ['in_progress', 'in_progress']] as const) {
+      it(`flag true with status ${label}: add and merge paths agree`, () => {
+        const rec = record({ facts: { serviceReady: true }, details: full({ serviceStatus: status }) });
+        const [added] = apply([], [rec]);
+        const [merged] = apply([local()], [rec]);
+        for (const s of [added, merged]) {
+          expect(s.serviceReady).toBe(true);
+          expect(s.sectionStatus?.service).toBe(status ?? undefined);
+        }
+      });
+    }
+
+    it('flag false with status ready: add and merge paths agree', () => {
+      const rec = record({ details: full({ serviceStatus: 'ready' }) });
+      const [added] = apply([], [rec]);
+      const [merged] = apply([local()], [rec]);
+      for (const s of [added, merged]) {
+        expect(s.serviceReady).toBe(false);
+        expect(s.sectionStatus?.service).toBe('ready');
+      }
+    });
+
+    it('a remote flag turned off keeps the local status', () => {
+      const [s] = apply(
         [local({ serviceReady: true, sectionStatus: { service: 'in_progress' } })],
         [record({ facts: { serviceReady: false } })],
       );
-      expect(kept.sectionStatus?.service).toBe('in_progress');
+      expect(s.serviceReady).toBe(false);
+      expect(s.sectionStatus?.service).toBe('in_progress');
     });
 
     it('a pending edit to either one keeps both local', () => {
-      const [s] = apply(
-        [local({ serviceReady: true, sectionStatus: { service: 'ready' } })],
-        [record({ facts: { serviceReady: false }, details: { serviceStatus: 'in_progress' } })],
-        { [A]: ['serviceStatus'] },
-      );
-      expect(s.serviceReady).toBe(true);
-      expect(s.sectionStatus?.service).toBe('ready');
-    });
-
-    it('a new session from a record with only the flag shows the service as ready', () => {
-      const [s] = apply([], [record({ facts: { serviceReady: true } })]);
-      expect(s.sectionStatus?.service).toBe('ready');
+      for (const key of ['serviceStatus', 'serviceReady']) {
+        const [s] = apply(
+          [local({ serviceReady: true, sectionStatus: { service: 'ready' } })],
+          [record({ facts: { serviceReady: false }, details: full({ serviceStatus: 'in_progress' }) })],
+          { [A]: [key] },
+        );
+        expect(s.serviceReady).toBe(true);
+        expect(s.sectionStatus?.service).toBe('ready');
+      }
     });
   });
 

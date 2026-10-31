@@ -378,7 +378,7 @@ export function mergeSyncedFieldsWithChanges(
 /**
  * Validates a record from the server: uuid ids, a known role, valid facts (extra fact keys dropped)
  * and, when sent, a `details` object of valid detail keys. Missing detail keys count as "not
- * sent", never as cleared. Invalid facts or invalid details reject the record. Null when invalid.
+ * sent", never as cleared. Invalid facts reject the record (null). Invalid details drop only `details`.
  * Lives here, not in flowFacts.ts, so the two files do not import each other at load time.
  */
 export function parseFlowRecord(input: unknown): FlowRecord | null {
@@ -412,20 +412,35 @@ export function parseFlowRecord(input: unknown): FlowRecord | null {
   if (details === undefined) {
     return record;
   }
-  const known = isPlainObject(details) ? pickDetailKeys(details) : null;
-  const parsedDetails = known ? parseFlowDetails(known) : null;
-  if (!parsedDetails) {
-    return null;
-  }
-  return { ...record, details: parsedDetails as FlowDetails };
+  // Bad details drop only the details. The facts are valid, so the record stays usable.
+  const parsedDetails = isPlainObject(details) ? parseFlowDetails(pickFlowDetails(details)) : null;
+  return parsedDetails ? { ...record, details: parsedDetails } : record;
 }
 
-function pickDetailKeys(source: Record<string, unknown>): Record<string, unknown> {
+/** Copies only the whitelisted detail keys that are own properties with a value. Never a spread. */
+export function pickFlowDetails(source: object): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of FLOW_DETAIL_KEYS) {
-    if (Object.hasOwn(source, key)) {
-      out[key] = source[key];
+    if (!Object.hasOwn(source, key)) {
+      continue;
     }
+    const value = (source as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * `serviceStatus` (section progress) and `serviceReady` (the Gate answer) are separate facts that
+ * sync as stored. They are protected as a pair: while either has a pending edit, both stay local.
+ */
+export function withServicePair(keys: Iterable<SyncedKey>): Set<SyncedKey> {
+  const out = new Set<SyncedKey>(keys);
+  if (out.has('serviceStatus') || out.has('serviceReady')) {
+    out.add('serviceStatus');
+    out.add('serviceReady');
   }
   return out;
 }

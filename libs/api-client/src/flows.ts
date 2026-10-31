@@ -1,10 +1,10 @@
 import {
-  FLOW_DETAIL_KEYS,
   isUuid,
   parseFlowDetails,
   parseFlowFacts,
   parseFlowPatch,
   parseFlowRecord,
+  pickFlowDetails,
   pickFlowFacts,
   splitSyncedPatch,
   type FlowDetails,
@@ -14,17 +14,7 @@ import {
 } from '@griever/shared';
 import { ApiError, apiFetch } from './client.js';
 
-/** Copies only the whitelisted detail keys that are present. Never a spread. */
-export function pickFlowDetails(source: object): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const key of FLOW_DETAIL_KEYS) {
-    const value = (source as Record<string, unknown>)[key];
-    if (value !== undefined) {
-      out[key] = value;
-    }
-  }
-  return out;
-}
+export { pickFlowDetails };
 
 /**
  * Validates a partial set of synced fields (facts and details together) and returns it flat, or
