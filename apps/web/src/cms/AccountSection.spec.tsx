@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AccountSection, AccountSettingsSection } from './AccountSection';
 
@@ -111,6 +111,46 @@ describe('AccountSection', () => {
   it('shows the people helping node under the form', () => {
     profile({ peopleHelping: <h2>People helping you</h2> });
     expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
+  });
+});
+
+describe('AccountSection as a settings page', () => {
+  it('has one h2 per section, in order, and no h1', () => {
+    profile({ email: 'anna@example.com', onManageSignIn: vi.fn(), peopleHelping: <h2>People helping you</h2> });
+    const names = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(names).toEqual(['Profile', 'Sign-in and security', 'Payments', 'People helping you', 'Sign out']);
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+  });
+
+  it('shows the email read-only and opens Clerk through Manage sign-in', async () => {
+    const user = userEvent.setup();
+    const onManageSignIn = vi.fn();
+    profile({ email: 'anna@example.com', onManageSignIn });
+    expect(screen.getByText('anna@example.com')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Manage sign-in' }));
+    expect(onManageSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves out Sign-in and security and Manage sign-in when there is nothing to show', () => {
+    profile();
+    expect(screen.queryByRole('heading', { name: 'Sign-in and security' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manage sign-in' })).not.toBeInTheDocument();
+  });
+
+  it('Payments has a plan card and a payment method card, and never collects card data', async () => {
+    const user = userEvent.setup();
+    profile();
+    const payments = screen.getByRole('heading', { level: 2, name: 'Payments' }).closest('section') as HTMLElement;
+    expect(within(payments).getByRole('heading', { name: 'Your plan' })).toBeInTheDocument();
+    expect(within(payments).getByText('Free')).toBeInTheDocument();
+    expect(within(payments).getByText('There is nothing to pay today.')).toBeInTheDocument();
+    expect(within(payments).getByRole('heading', { name: 'Payment method' })).toBeInTheDocument();
+    expect(within(payments).getByText('No card added')).toBeInTheDocument();
+    expect(within(payments).queryByText('Adding a card is not open yet.')).not.toBeInTheDocument();
+    await user.click(within(payments).getByRole('button', { name: 'Add a card' }));
+    expect(within(payments).getByText('Adding a card is not open yet.')).toBeInTheDocument();
+    expect(payments.querySelectorAll('input, textarea, select, iframe')).toHaveLength(0);
   });
 });
 

@@ -18,5 +18,20 @@
   "sessionEnded": "You've been signed out. Your work on this device is safe. Sign in again when you're ready.",
   "unavailable": "Accounts aren't available right now.",
   "loading": "One moment.",
-  "checklistNote": "Not today. Just so none of it surprises you."
+  "checklistNote": "Not today. Just so none of it surprises you.",
+  "profileHeading": "Profile",
+  "securityHeading": "Sign-in and security",
+  "emailLabel": "Email",
+  "securityHint": "Change your email, password or the devices signed in to your account.",
+  "manageSignIn": "Manage sign-in",
+  "paymentsHeading": "Payments",
+  "signOutHeading": "Sign out",
+  "signOutHint": "Your work stays on this device. You can sign in again when you are ready.",
+  "planHeading": "Your plan",
+  "planName": "Free",
+  "planBody": "There is nothing to pay today.",
+  "cardHeading": "Payment method",
+  "cardNone": "No card added",
+  "cardAdd": "Add a card",
+  "cardNotOpen": "Adding a card is not open yet."
 }
