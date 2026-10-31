@@ -107,6 +107,7 @@ Each is off unless set to exactly `true`, at build time.
 |---|---|---|
 | `VITE_FEATURE_AUTH` | web | Sign-up and sign-in screens. |
 | `EXPO_PUBLIC_FEATURE_AUTH` | mobile | Sign-up and sign-in screens. |
+| `EXPO_PUBLIC_FEATURE_SYNC` | mobile | Background sync of the person's details, when signed in. Needs `EXPO_PUBLIC_FEATURE_AUTH`. |
 | `VITE_FEATURE_OBITUARY_DRAFTING` | web | AI obituary drafting. Without it the button is disabled. |
 | `VITE_FEATURE_CMS` | web | The web editor (Overview, The person, Service) in place of the path and the send flow. On in production. |
 
@@ -139,7 +140,8 @@ Names only. Never commit values. The examples live in `apps/*/.env.example`.
 
 **`apps/mobile`**
 - `EXPO_PUBLIC_API_URL`
-- `EXPO_PUBLIC_FEATURE_AUTH`
+- `EXPO_PUBLIC_FEATURE_AUTH`, `EXPO_PUBLIC_FEATURE_SYNC` (the `development` and `preview` EAS profiles in
+  `apps/mobile/eas.json` set both to `true` for development and preview (simulator/APK) builds; `production` sets neither. A TestFlight/store profile with these flags comes with #371)
 
 **`apps/marketing`**
 - `PUBLIC_WEB_URL` (set in the deploy workflow)

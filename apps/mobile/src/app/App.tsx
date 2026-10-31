@@ -24,6 +24,7 @@ import { mobileContactStore } from '../lib/contactStore';
 import { sendNote } from '../lib/sendNote';
 import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
+import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -250,7 +251,9 @@ export const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): Retur
 });
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
-  const { sessions, active, switchTo, addPerson, updateDraft, updateSession } = useDeviceSessions(cache);
+  const { sessions, active, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows } = useDeviceSessions(cache);
+  // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
+  useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
   const [atHome, setAtHome] = useState(true);
   const [stage, setStage] = useState<SetupStage | null>(null);
   const [arrived, setArrived] = useState(false);

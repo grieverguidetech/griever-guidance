@@ -39,3 +39,35 @@ describe('PAYMENTS_ENABLED', () => {
     expect(source).not.toMatch(/process\.env\[/);
   });
 });
+
+describe('SYNC_ENABLED', () => {
+  const originalSync = process.env.EXPO_PUBLIC_FEATURE_SYNC;
+  afterEach(() => {
+    if (originalSync === undefined) delete process.env.EXPO_PUBLIC_FEATURE_SYNC;
+    else process.env.EXPO_PUBLIC_FEATURE_SYNC = originalSync;
+  });
+  function syncEnabled(value: string | undefined): boolean {
+    if (value === undefined) delete process.env.EXPO_PUBLIC_FEATURE_SYNC;
+    else process.env.EXPO_PUBLIC_FEATURE_SYNC = value;
+    let result = true;
+    jest.isolateModules(() => {
+      result = (require('./features') as typeof import('./features')).SYNC_ENABLED;
+    });
+    return result;
+  }
+
+  it('is off when the variable is missing', () => {
+    expect(syncEnabled(undefined)).toBe(false);
+  });
+
+  it('is on only for exactly "true"', () => {
+    expect(syncEnabled('true')).toBe(true);
+    expect(syncEnabled('TRUE')).toBe(false);
+    expect(syncEnabled('1')).toBe(false);
+  });
+
+  it('reads the variable with dot access, so Expo inlines it in the bundle', () => {
+    const source = readFileSync(join(__dirname, 'features.ts'), 'utf8');
+    expect(source).toMatch(/process\.env\.EXPO_PUBLIC_FEATURE_SYNC\b/);
+  });
+});
