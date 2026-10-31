@@ -262,7 +262,7 @@ No contact, message or deceased-person data.
 | `profiles` | `id` → `auth.users.id` | `sender_name`, `contact_source`, `account_type` (`owner` or `member`), timestamps | Insert `id`, `sender_name`, `contact_source`. Update `sender_name`, `contact_source` |
 | `memberships` | (`owner_id`, `member_id`), `member_id` unique | One owner per member | None (functions only) |
 | `invites` | `id`; `token_hash` unique | Email, hash, expiry, accepted, revoked | None (functions only). `token_hash` is not readable |
-| `flows` | `id` (made on the device) | Six person fields (C2), `owner_id`, `updated_by`, `deleted_at` | Insert and update of the six fields only. No delete (C9) |
+| `flows` | `id` (made on the device) | Six person fields (C2), `owner_id`, `updated_by` (Supabase `auth.users` uuids then; Clerk ids now), `deleted_at` | Insert and update of the six fields only. No delete (C9) |
 
 **RLS policies (8):** `profiles_select_own`, `profiles_insert_own`, `profiles_update_own`,
 `memberships_select_party`, `invites_select_owner`, `flows_select_owner_or_member`,
@@ -621,6 +621,8 @@ sequenceDiagram
 ### 4.7 Class diagram: data model
 
 `AuthUsers` is the Supabase `auth.users` table (managed by Supabase).
+
+Historical: the `uuid` owner and user columns below are the Supabase schema. Today user ids are Clerk ids (`user_...`, the token `sub`), stored as plain strings of 1 to 64 letters, digits, `_` or `-` (`isUserId` in `libs/shared`). Only flow, invite and member-row ids are UUIDs (#533).
 
 ```mermaid
 classDiagram

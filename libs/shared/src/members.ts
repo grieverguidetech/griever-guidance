@@ -82,3 +82,10 @@ const UUID_PATTERN =
 export function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
 }
+
+// A user id is the Clerk id (`user_...`), the `sub` of the session token. It is not a UUID.
+const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function isUserId(value: string): boolean {
+  return USER_ID_PATTERN.test(value);
+}

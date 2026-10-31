@@ -1,11 +1,10 @@
-import { isUuid } from '@griever/shared';
+import { isUserId, isUuid } from '@griever/shared';
 
 /**
  * Rule: key strings are built only in this file. Other files call these builders (a test scans src for
  * `USER#` templates). Every key for the gg-data table (design #187 §1.2). Each builder checks its input first, so a
  * typed value can never forge another key (no `#`) and no email can end up in a key (C3).
  */
-const USER_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const TOKEN_HASH = /^[0-9a-f]{64}$/;
 
 export interface Key {
@@ -14,7 +13,9 @@ export interface Key {
 }
 
 function userId(value: string): string {
-  if (!USER_ID.test(value)) throw new Error('Invalid user id for a data key.');
+  if (!isUserId(value)) {
+    throw new Error('Invalid user id for a data key.');
+  }
   return value;
 }
 

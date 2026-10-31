@@ -13,7 +13,7 @@ import {
   type FlowFactsSource,
   type FlowRecord,
 } from './flowFacts.js';
-import { isUuid } from './members.js';
+import { isUserId, isUuid } from './members.js';
 import type { SectionKey, SectionStatus } from './sections.js';
 
 export const FLOW_DETAIL_TEXT_KEYS = [
@@ -389,7 +389,7 @@ export function parseFlowRecord(input: unknown): FlowRecord | null {
   if (typeof id !== 'string' || !isUuid(id)) {
     return null;
   }
-  if (typeof ownerId !== 'string' || !isUuid(ownerId)) {
+  if (typeof ownerId !== 'string' || !isUserId(ownerId)) {
     return null;
   }
   if (role !== 'owner' && role !== 'member') {
@@ -398,7 +398,7 @@ export function parseFlowRecord(input: unknown): FlowRecord | null {
   if (typeof updatedAt !== 'string' || Number.isNaN(Date.parse(updatedAt))) {
     return null;
   }
-  if (updatedBy !== null && (typeof updatedBy !== 'string' || !isUuid(updatedBy))) {
+  if (updatedBy !== null && (typeof updatedBy !== 'string' || !isUserId(updatedBy))) {
     return null;
   }
   // Keys the client doesn't know are ignored (a newer server may add some); known ones are checked.

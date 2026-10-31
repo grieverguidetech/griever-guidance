@@ -1,6 +1,7 @@
 import {
   parseInviteEmail,
   INVITE_TOKEN_PATTERN,
+  isUserId,
   isUuid,
   isValidInviteEmail,
   normalizeInviteEmail,
@@ -100,5 +101,15 @@ describe('parseInviteEmail', () => {
   it('returns null for an unusable address', () => {
     expect(parseInviteEmail('anna')).toBeNull();
     expect(parseInviteEmail(' a@b..com ')).toBeNull();
+  });
+});
+
+describe('isUserId', () => {
+  it('accepts Clerk ids and 64 characters', () => {
+    expect(isUserId('user_2NNEqL2nrIRdJ194ndJqAHwEfxC')).toBe(true);
+    expect(isUserId('u'.repeat(64))).toBe(true);
+  });
+  it.each(['', 'user#1', 'user 1', 'u'.repeat(65), 'a/b'])('rejects %j', (value) => {
+    expect(isUserId(value)).toBe(false);
   });
 });
