@@ -20,10 +20,12 @@ interface Props {
   onChange: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
   /** An extra section after the phases, in the same heading and accordion pattern. Starts closed. */
   gather?: ReactNode;
+  /** A preview with nobody saved: no ticks. */
+  readOnly?: boolean;
 }
 
 /** Every phase in order, with its items. No counts, no percentages, no delete. */
-export function PhaseList({ checklist, onOpen, onChange, current, gather }: Props) {
+export function PhaseList({ checklist, onOpen, onChange, current, gather, readOnly = false }: Props) {
   const { phases, currentPhase } = computeChecklist({ checklist });
   // Open on load: the current phase only. Not remembered across loads.
   const [open, setOpen] = useState<Set<string>>(
@@ -71,6 +73,7 @@ export function PhaseList({ checklist, onOpen, onChange, current, gather }: Prop
                 onOpen={onOpen}
                 current={item.id === current}
                 onChange={onChange}
+                readOnly={readOnly}
               />
             ))}
           </ul>

@@ -11,6 +11,8 @@ interface Props {
   onOpen: (id: ChecklistItemId) => void;
   current?: boolean;
   onChange: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
+  /** A preview with nobody saved: just the label, no ticks. */
+  readOnly?: boolean;
 }
 
 /**
@@ -18,10 +20,25 @@ interface Props {
  * not-applicable chip. A handled row (done or not applicable) shows its label muted.
  * aria-pressed carries the state; the muted colour is only a quiet extra cue.
  */
-export function ChecklistItemRow({ id, state, onOpen, onChange, current }: Props) {
+export function ChecklistItemRow({ id, state, onOpen, onChange, current, readOnly = false }: Props) {
   const label = copy.items[id];
   const labelId = useId();
   const handled = state !== 'open';
+  const labelButton = (
+    <button
+      type="button"
+      id={labelId}
+      data-checklist-item={id}
+      aria-current={current ? 'true' : undefined}
+      className={`gg-btn gg-btn-ghost gg-btn-ghost-plain min-w-0 flex-1 justify-start text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
+      onClick={() => onOpen(id)}
+    >
+      {label}
+    </button>
+  );
+  if (readOnly) {
+    return <li className="m-0">{labelButton}</li>;
+  }
   return (
     <li className="m-0">
       <ItemStateToggles
@@ -31,16 +48,7 @@ export function ChecklistItemRow({ id, state, onOpen, onChange, current }: Props
         state={state === 'open' ? null : state}
         onChange={(next) => onChange(id, next)}
       >
-        <button
-          type="button"
-          id={labelId}
-          data-checklist-item={id}
-          aria-current={current ? 'true' : undefined}
-          className={`gg-btn gg-btn-ghost gg-btn-ghost-plain min-w-0 flex-1 justify-start text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
-          onClick={() => onOpen(id)}
-        >
-          {label}
-        </button>
+        {labelButton}
       </ItemStateToggles>
     </li>
   );

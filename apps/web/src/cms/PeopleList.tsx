@@ -12,6 +12,8 @@ interface Props {
   onCreate: () => void;
   /** False hides the create button (members can't start new people, C11). */
   canCreate: boolean;
+  /** The first sync may still bring people: no create button yet, and a calm line in place of "No one here yet". */
+  holding?: boolean;
 }
 
 /** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
@@ -34,7 +36,7 @@ function unnamedLabel(createdAt: string): string {
 }
 
 /** The people with a name or any work, newest first, inside the shell (which owns the h1). */
-export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
+export function PeopleList({ sessions, onOpen, onCreate, canCreate, holding = false }: Props) {
   const people = listableSessionsByRecent(sessions);
   const createLabel = people.length > 0 ? copy.peopleCreateAnother : copy.peopleCreateFirst;
 
@@ -73,11 +75,11 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate }: Props) {
 
       {people.length === 0 && (
         <p className="text-[14px] m-0" style={{ color: 'var(--text-muted)' }}>
-          {canCreate ? copy.peopleEmptyOwner : copy.peopleEmptyMember}
+          {holding ? copy.emptyHolding : canCreate ? copy.peopleEmptyOwner : copy.peopleEmptyMember}
         </p>
       )}
 
-      {canCreate && (
+      {canCreate && !holding && (
         <button type="button" onClick={onCreate} className="gg-btn gg-btn-primary gg-btn-block">
           {createLabel}
         </button>

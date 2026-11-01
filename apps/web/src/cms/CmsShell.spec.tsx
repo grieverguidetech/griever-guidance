@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { CmsShell } from './CmsShell';
@@ -19,15 +19,15 @@ function setup(section: CmsNavKey = 'service') {
 }
 
 describe('CmsShell people view', () => {
-  it('has one h1, only Your people and Your account, and "Your account" calls onAccount after focusing the h1', async () => {
+  it('has one h1, the full nav, and "Your account" calls onAccount after focusing the h1', async () => {
     const onAccount = vi.fn();
     render(
-      <CmsShell title="Your people" peopleView personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={onAccount}>
+      <CmsShell title="Your people" nobody hideChange personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={onAccount}>
         <p>List</p>
       </CmsShell>,
     );
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Your people', 'Your account']);
+    expect(within(screen.getByRole('navigation')).getAllByRole('button')).toHaveLength(7);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
     expect(onAccount).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
@@ -61,7 +61,7 @@ describe('CmsShell save line', () => {
 
   it('is absent in the people view', () => {
     render(
-      <CmsShell title="Your people" peopleView personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
+      <CmsShell title="Your people" nobody hideChange personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
         <p>List</p>
       </CmsShell>,
     );

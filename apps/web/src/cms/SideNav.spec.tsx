@@ -169,24 +169,29 @@ describe('SideNav', () => {
     expect(menu.parentElement).toHaveClass('md:sticky', 'md:top-4');
   });
 
-  it('with accountOnly offers just Your people and Your account: no sections, no name, no Change, no menu button', async () => {
-    const { onSelect } = setup({ accountOnly: true });
+  it('with nobody named still offers the full nav, with no name line', async () => {
+    const { onSelect } = setup({ personName: '', section: 'people', hideChange: true });
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your people', 'Your account']);
-    expect(screen.getAllByRole('button')).toHaveLength(2);
-    expect(screen.queryByText('Margaret Hale')).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
-    expect(onSelect).toHaveBeenCalledWith('account');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Your people' }));
-    expect(onSelect).toHaveBeenCalledWith('people');
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Overview',
+      'Your people',
+      'Announcement',
+      'Service',
+      'Obituary',
+      'Thank-yous',
+      'Your account',
+    ]);
+    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Obituary' }));
+    expect(onSelect).toHaveBeenCalledWith('obituary');
   });
 
-  it('with accountOnly marks the current item: Your people or Your account', () => {
-    setup({ accountOnly: true, section: 'people' });
+  it('with nobody named marks the current item: Your people or Your account', () => {
+    setup({ personName: '', section: 'people' });
     expect(screen.getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Your account' })).not.toHaveAttribute('aria-current');
     cleanup();
-    setup({ accountOnly: true, section: 'account' });
+    setup({ personName: '', section: 'account' });
     expect(screen.getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Your people' })).not.toHaveAttribute('aria-current');
   });

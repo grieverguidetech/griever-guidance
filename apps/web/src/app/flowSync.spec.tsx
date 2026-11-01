@@ -225,6 +225,69 @@ describe('background sync in the app (#520)', () => {
     }
   });
 
+  it('during the first-sync wait the nav is full, a section offers no Start button, and Start appears once the wait ends (#597)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    try {
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+      expect(nav.getAllByRole('button')).toHaveLength(7);
+      expect(screen.getByRole('complementary', { name: "What you'll need" }).querySelector('[data-checklist-item]')).not.toBeNull();
+      await act(async () => {
+        nav.getByRole('button', { name: 'Obituary' }).click();
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
+      expect(screen.getByText('One moment. We are checking your account for people.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: "Start with someone I've lost" })).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1600);
+      });
+      expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a person arriving from the first sync while a section is empty opens in the same section, with a polite note and no focus jump (#597)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    let answer: (response: Response) => void = () => undefined;
+    const record = {
+      id: FLOW,
+      ownerId: OWNER_UUID,
+      role: 'owner',
+      facts: { personName: 'Margaret Hayes', dateOfPassing: null, serviceDate: null, obituaryUrl: null, obituaryPublisher: null, serviceReady: false },
+      updatedAt: '2026-10-01T00:00:00.000Z',
+      updatedBy: null,
+    };
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Loading…');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Obituary' }));
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    const other = screen.getByRole('button', { name: "What you'll need" });
+    other.focus();
+    await act(async () => {
+      answer(new Response(JSON.stringify([record]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
+    await waitFor(() => expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0));
+    expect(screen.getByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "Start with someone I've lost" })).toBeNull();
+    expect(screen.getByText('A person is here now. Their page is open.')).toBeInTheDocument();
+    expect(heading).not.toHaveFocus();
+    expect(other).toHaveFocus();
+  });
+
   it('Your account opens during a sync that never answers, and the landing does not pull it away (#584)', async () => {
     window.localStorage.removeItem('gg.sessions.v1');
     signedIn(true);

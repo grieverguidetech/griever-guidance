@@ -7,7 +7,7 @@ import { CmsShell } from './CmsShell';
 
 const KEY = 'gg.cmsChecklistPanel.v1';
 
-function shell(props: { aside?: boolean; title?: string; empty?: boolean } = {}) {
+function shell(props: { aside?: boolean; title?: string } = {}) {
   return (
     <CmsShell
       personName="Margaret Hale"
@@ -17,7 +17,6 @@ function shell(props: { aside?: boolean; title?: string; empty?: boolean } = {})
       onAccount={vi.fn()}
       aside={props.aside === false ? undefined : <p>Panel words</p>}
       title={props.title}
-      asideIsEmpty={props.empty}
     >
       <h2>Details</h2>
     </CmsShell>
@@ -30,21 +29,10 @@ afterEach(() => {
 });
 
 describe('CmsShell checklist panel', () => {
-  it('with an empty panel: keeps the desktop note, with no phone opener, sheet or Hide toggle', () => {
-    render(shell({ empty: true }));
-    expect(within(screen.getByRole('complementary', { name: "What you'll need" })).getByText('Panel words')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: "What you'll need" })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Hide checklist' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Show checklist' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('with an empty panel: stays shown when a hidden choice is saved, and writes nothing', () => {
-    window.localStorage.setItem(KEY, 'hidden');
-    const setItem = vi.spyOn(Storage.prototype, 'setItem');
-    render(shell({ empty: true }));
-    expect(screen.getByRole('complementary', { name: "What you'll need" })).toBeInTheDocument();
-    expect(setItem).not.toHaveBeenCalled();
+  it('always keeps the phone opener, the sheet and the Hide toggle', () => {
+    render(shell());
+    expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide checklist' })).toBeInTheDocument();
   });
 
   it('shows the panel by default, as a named aside with an expanded toggle', () => {

@@ -3,6 +3,8 @@
   "show": "Show checklist",
   "hide": "Hide checklist",
   "phoneButton": "What you'll need",
+  "previewLine": "Your ticks are kept once you start with someone.",
+  "previewLineMember": "Your ticks are kept once someone shares a person with you.",
   "intro": "Work through it in order. Not everything applies to every family.",
   "obituaryNote": "Write and publish it after the service date is set, before the service itself.",
   "gatherHeading": "Gather when you can",

@@ -32,6 +32,20 @@ describe('ChecklistPanel', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
+  it('as a preview: every phase and item, no ticks, the keep-ticks line, and items still open', async () => {
+    const onOpenItem = vi.fn();
+    const { container } = render(<ChecklistPanel preview="owner" checklist={{}} onSetItem={noop} onOpenItem={onOpenItem} />);
+    expect(screen.getByText(copy.previewLine)).toBeInTheDocument();
+    for (const phase of CHECKLIST_PHASES) {
+      expect(screen.getByRole('button', { name: copy.phases[phase.key] })).toBeInTheDocument();
+    }
+    expect(container.querySelector('[aria-pressed]')).toBeNull();
+    expect(screen.queryByText('Gather when you can')).toBeNull();
+    const first = container.querySelector<HTMLElement>('[data-checklist-item]');
+    await userEvent.setup().click(first as HTMLElement);
+    expect(onOpenItem).toHaveBeenCalledTimes(1);
+  });
+
   it('holds the intro and the certificate card in one panel', () => {
     const { container } = render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
     const panels = container.querySelectorAll('.gg-panel');
