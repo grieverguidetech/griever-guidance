@@ -256,6 +256,7 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   const instance = useClerk();
   const { user } = useUser();
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  const clerkNames = useMemo(() => ({ firstName: user?.firstName ?? null, lastName: user?.lastName ?? null }), [user?.firstName, user?.lastName]);
   const openAccountSettings = useCallback(() => {
     instance.openUserProfile();
   }, [instance]);
@@ -268,7 +269,7 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   if (unavailable) {
     return <>{children({ unavailable: true })}</>;
   }
-  return <>{children({ unavailable: false, account, getAccessToken, signOut, email, openAccountSettings: instance.loaded ? openAccountSettings : undefined, deleteAccount: instance.loaded ? deleteAccount : undefined })}</>;
+  return <>{children({ unavailable: false, account, getAccessToken, signOut, email, clerkNames, openAccountSettings: instance.loaded ? openAccountSettings : undefined, deleteAccount: instance.loaded ? deleteAccount : undefined })}</>;
 }
 
 // The app has no router: when Clerk wants to move the page after sign-in or sign-out, stay put and

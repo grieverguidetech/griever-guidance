@@ -27,10 +27,10 @@ async function openSection(page: Page, name: string, heading: string) {
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
-/** With the editor on and nobody saved, loading the app opens Your people (#566); starting a person opens The person. Auth is off in this build. */
+/** With the editor on and nobody saved, loading the app opens the Overview (#603); starting a person opens The person. Auth is off in this build. */
 async function startPerson(page: Page) {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   await page.getByRole('button', { name: "Start with someone I've lost" }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
 }
@@ -80,15 +80,14 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
   'Your account': async (page) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
-    await openSection(page, 'Your account', 'Your account');
+    await openSection(page, 'Your account', 'Account');
     await expect(page.getByRole('button', { name: 'Remove everything from this device' })).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 2, name: 'Help and support' })).toBeVisible();
   },
   'Your people': async (page) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
-    await page.getByRole('button', { name: /^Change who/ }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+    await openSection(page, 'Your people', 'Your people');
     await expect(page.getByRole('heading', { name: "Who you're writing about" })).toHaveCount(0);
   },
 };
@@ -116,7 +115,7 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
 
   await page.getByLabel('Their name').fill('Margaret Hayes');
   await openSection(page, 'Overview', 'Overview');
-  // The name sits in a paragraph above the nav landmark, not inside it.
+  // The nav has no name line; the name shows on the Overview's The person card.
   await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
 
   // The nav has no The person link: the Overview card opens it.
@@ -191,10 +190,10 @@ test.describe('navigation (#566)', () => {
   test('the side nav stays on Your account after another screen and back, and on Your people', async ({ page }) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
-    await openSection(page, 'Your account', 'Your account');
+    await openSection(page, 'Your account', 'Account');
     await expect(nav(page).getByRole('button', { name: 'Overview' })).toBeVisible();
     await openSection(page, 'Service', 'Service');
-    await openSection(page, 'Your account', 'Your account');
+    await openSection(page, 'Your account', 'Account');
     await expect(nav(page).getByRole('button', { name: 'Overview' })).toBeVisible();
     await openSection(page, 'Your people', 'Your people');
     await expect(nav(page).getByRole('button', { name: 'Your account' })).toBeVisible();
@@ -206,7 +205,7 @@ test.describe('navigation (#566)', () => {
     await page.getByLabel('Their name').fill('Margaret Hayes');
     await openSection(page, 'Overview', 'Overview');
     await openSection(page, 'Service', 'Service');
-    await openSection(page, 'Your account', 'Your account');
+    await openSection(page, 'Your account', 'Account');
     await page.goBack();
     const service = page.getByRole('heading', { level: 1, name: 'Service' });
     await expect(service).toBeVisible();

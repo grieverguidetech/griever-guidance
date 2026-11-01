@@ -221,7 +221,7 @@ describe('checklist in the editor (#421)', () => {
       within(screen.getByRole('main')).getByRole('button', { name: 'Done' }),
     );
     expect(stored().checklist).toEqual({ pronouncement: 'done' });
-    await user.click(screen.getByRole('button', { name: 'Service' }));
+    await user.click(screen.getByRole('button', { name: /^Service/ }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Service' }),
     ).toHaveFocus();
@@ -273,7 +273,7 @@ describe('checklist in the editor (#421)', () => {
     view.unmount();
     render(<App />);
     // Loading lands on Margaret (just opened); "Change" returns to Home to pick Harold.
-    await user.click(await screen.findByRole('button', { name: /Change/ }));
+    await user.click(within(await screen.findByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await user.click(
       await screen.findByRole('button', { name: 'Harold Price' }),
     );

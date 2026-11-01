@@ -9,20 +9,20 @@ import type { CmsNavKey } from './SideNav';
 function setup(section: CmsNavKey = 'service') {
   const onSelect = vi.fn();
   const onAccount = vi.fn();
-  const onChangePerson = vi.fn();
+  const onPeople = vi.fn();
   render(
-    <CmsShell personName="Margaret Hale" section={section} onSelect={onSelect} onChangePerson={onChangePerson} onAccount={onAccount} notice={<p>Saved</p>}>
+    <CmsShell personName="Margaret Hale" section={section} onSelect={onSelect} onPeople={onPeople} onAccount={onAccount} notice={<p>Saved</p>}>
       <h2>Details</h2>
     </CmsShell>,
   );
-  return { onSelect, onAccount, onChangePerson };
+  return { onSelect, onAccount, onPeople };
 }
 
 describe('CmsShell people view', () => {
   it('has one h1, the full nav, and "Your account" calls onAccount after focusing the h1', async () => {
     const onAccount = vi.fn();
     render(
-      <CmsShell title="Your people" nobody hideChange personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={onAccount}>
+      <CmsShell title="Your people" nobody personName="" section="people" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={onAccount}>
         <p>List</p>
       </CmsShell>,
     );
@@ -37,7 +37,7 @@ describe('CmsShell people view', () => {
 describe('CmsShell save line', () => {
   it('says the details also wait on the phone when sync is on', () => {
     render(
-      <CmsShell syncOn personName="Ann" section="service" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
+      <CmsShell syncOn personName="Ann" section="service" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={vi.fn()}>
         <p>Body</p>
       </CmsShell>,
     );
@@ -61,7 +61,7 @@ describe('CmsShell save line', () => {
 
   it('is absent in the people view', () => {
     render(
-      <CmsShell title="Your people" nobody hideChange personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
+      <CmsShell title="Your people" nobody personName="" section="people" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={vi.fn()}>
         <p>List</p>
       </CmsShell>,
     );
@@ -99,16 +99,16 @@ describe('CmsShell', () => {
 
   it('aria-current follows the section', () => {
     setup('service');
-    expect(screen.getByRole('button', { name: 'Service' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: /^Service/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 
-  it('routes section items to onSelect, Your people to onChangePerson and the account item to onAccount', async () => {
-    const { onSelect, onAccount, onChangePerson } = setup();
+  it('routes section items to onSelect, Your people to onPeople and the account item to onAccount', async () => {
+    const { onSelect, onAccount, onPeople } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Overview' }));
     expect(onSelect).toHaveBeenCalledWith('overview');
     await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
-    expect(onChangePerson).toHaveBeenCalledTimes(1);
+    expect(onPeople).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: 'Your account' }));
     expect(onAccount).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -121,17 +121,16 @@ describe('CmsShell', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 
-  it('moves focus off the nav when Change is pressed', async () => {
+  it('moves focus to the h1 when Your people is chosen from the phone menu', async () => {
     setup();
     await userEvent.click(screen.getByRole('button', { name: 'Sections · Service' }));
-    await userEvent.click(screen.getByRole('button', { name: "Change who you're writing about" }));
+    await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 
-  it('Change calls onChangePerson', async () => {
-    const { onChangePerson } = setup();
-    await userEvent.click(screen.getByRole('button', { name: "Change who you're writing about" }));
-    expect(onChangePerson).toHaveBeenCalledTimes(1);
+  it('has no Change button', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
   });
 
   it('holds no hard-coded copy', () => {

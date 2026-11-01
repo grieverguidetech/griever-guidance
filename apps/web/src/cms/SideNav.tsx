@@ -3,7 +3,6 @@ import type { KeyboardEvent } from 'react';
 import { fill, screenCopy } from '@griever/copy';
 import { SECTION_ORDER } from '@griever/shared';
 import type { SectionKey, SectionStatus } from '@griever/shared';
-import { Button } from '@griever/ui';
 import { AVAILABLE_SECTIONS } from './Overview';
 
 const copy = screenCopy('cmsShell');
@@ -101,20 +100,17 @@ interface Props {
   personName: string;
   section: CmsNavKey;
   onSelect: (key: CmsNavKey) => void;
-  onChangePerson: () => void;
-  /** When given, each section shows its status; a missing key reads as not started. */
+  /** Each section shows its status; a missing key reads as not started, so the nav looks the same with nobody saved. */
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
   /** Nothing is the current page (a loading screen), so no item carries aria-current. */
   noCurrent?: boolean;
-  /** Hides Change, on the screen where it would lead nowhere (Your people). */
-  hideChange?: boolean;
 }
 
 /**
  * Wide screens: always shown. Narrow screens: behind a menu button. The button sits outside the
  * nav landmark so a screen reader does not hear the landmark name twice.
  */
-export function SideNav({ personName, section, onSelect, onChangePerson, statuses, noCurrent = false, hideChange = false }: Props) {
+export function SideNav({ personName, section, onSelect, statuses = {}, noCurrent = false }: Props) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -146,21 +142,6 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
         {fill(copy.menuButton, { section: navTitle(navKeyFor(section)) })}
       </button>
       <div id={panelId} className={`${open ? 'flex' : 'hidden'} flex-col gap-3 md:flex`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {name ? <p className="font-semibold text-[15px] break-words min-w-0 m-0">{name}</p> : null}
-          {hideChange ? null : (
-            <Button
-              label={copy.change}
-              accessibilityName={copy.changeLabel}
-              variant="tertiary"
-              onPress={() => {
-                // Close first so focus is never left on a hidden button; the caller then moves it on.
-                setOpen(false);
-                onChangePerson();
-              }}
-            />
-          )}
-        </div>
         <nav aria-label={name ? fill(copy.navLandmarkNamed, { name }) : copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">
             {NAV_ORDER.map((key) => {
@@ -171,12 +152,8 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                   <li key={key}>
                     <p className="gg-row flex-wrap m-0 cursor-default text-[color:var(--text-muted)] hover:!bg-transparent">
                       <span>{navTitle(key)}</span>
-                      {statuses ? (
-                        <>
-                          {' '}
-                          <span className="gg-meta gg-row-trail">{copy.statusLater}</span>
-                        </>
-                      ) : null}
+                      {' '}
+                      <span className="gg-meta gg-row-trail">{copy.statusLater}</span>
                     </p>
                   </li>
                 );
@@ -191,7 +168,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                     onClick={() => choose(key)}
                   >
                     <span>{navTitle(key)}</span>
-                    {statuses && isSectionKey(key) ? (
+                    {isSectionKey(key) ? (
                       <>
                         {' '}
                         <span className="gg-meta gg-row-trail flex items-center gap-1">

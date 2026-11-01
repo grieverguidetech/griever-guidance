@@ -46,6 +46,7 @@ const LOADING: UseAccountResult = {
   offline: false,
   profile: null,
   profileAnswered: false,
+  profileLoaded: false,
   error: null,
   clearError: () => undefined,
   signOut: async () => undefined,

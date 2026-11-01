@@ -8,16 +8,15 @@ import type { CmsNavKey } from './SideNav';
 
 function setup(props: Partial<Parameters<typeof SideNav>[0]> = {}) {
   const onSelect = vi.fn();
-  const onChangePerson = vi.fn();
-  render(<SideNav personName="Margaret Hale" section="service" onSelect={onSelect} onChangePerson={onChangePerson} {...props} />);
-  return { onSelect, onChangePerson };
+  render(<SideNav personName="Margaret Hale" section="service" onSelect={onSelect} {...props} />);
+  return { onSelect };
 }
 
 describe('SideNav', () => {
   it('lists the 7 items in order, with Overview first, Your people under it, and no The person link, inside the Sections nav', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    const names = within(nav).getAllByRole('listitem').map((li) => li.textContent);
+    const names = within(nav).getAllByRole('listitem').map((li) => li.textContent?.trim());
     expect(names).toEqual(['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
   });
 
@@ -29,18 +28,16 @@ describe('SideNav', () => {
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
   });
 
-  it('shows Change, and hides it with hideChange', () => {
+  it('has no Change button and no name line, in any state', () => {
     setup();
-    expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument();
-    cleanup();
-    setup({ hideChange: true });
     expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Margaret Hale')).toBeNull();
   });
 
   it('makes every section and the two ends a button', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
       'Overview',
       'Your people',
       'Announcement',
@@ -55,7 +52,7 @@ describe('SideNav', () => {
     setup({ section: 'people' });
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     const current = within(nav).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page');
-    expect(current.map((b) => b.textContent)).toEqual(['Your people']);
+    expect(current.map((b) => b.textContent?.trim())).toEqual(['Your people']);
   });
 
   it('is 12rem wide from md up, never shrinks, and stays sticky', () => {
@@ -64,25 +61,6 @@ describe('SideNav', () => {
     expect(column?.className).toContain('md:w-48');
     expect(column?.className).toContain('md:shrink-0');
     expect(column?.className).toContain('md:sticky');
-  });
-
-  it('shows the person name', () => {
-    setup();
-    expect(screen.getByText('Margaret Hale')).toBeInTheDocument();
-  });
-
-  it('shows no name line for a blank name, and never "Not named yet"', () => {
-    setup({ personName: '  ' });
-    expect(screen.queryByText('Not named yet')).toBeNull();
-    expect(screen.queryByText('Margaret Hale')).toBeNull();
-  });
-
-  it('Change has a name that starts with its visible word and calls onChangePerson', async () => {
-    const { onChangePerson } = setup();
-    const change = screen.getByRole('button', { name: "Change who you're writing about" });
-    expect(change).toHaveTextContent('Change');
-    await userEvent.click(change);
-    expect(onChangePerson).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the menu button outside the nav landmark and hides it from md up', () => {
@@ -136,6 +114,12 @@ describe('SideNav', () => {
     expect(within(nav).queryByText('Later')).toBeNull();
   });
 
+  it('shows the not-started circles with no statuses given, the same as with nobody saved', () => {
+    setup({ personName: '' });
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).getAllByRole('img', { name: 'Not started' })).toHaveLength(4);
+  });
+
   it('gives an item its label and status as one name, with a space between', () => {
     setup({ statuses: { service: 'in_progress' } });
     expect(screen.getByRole('button', { name: 'Service In progress' })).toBeInTheDocument();
@@ -145,7 +129,7 @@ describe('SideNav', () => {
 
   it('styles the current item beyond aria-current', () => {
     setup({ section: 'service' });
-    const current = screen.getByRole('button', { name: 'Service' });
+    const current = screen.getByRole('button', { name: /^Service/ });
     expect(current).toHaveClass('bg-accent-100', 'shadow-[inset_3px_0_0_var(--color-accent-700)]');
     expect(current).not.toHaveClass('font-semibold');
     expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveClass('bg-accent-100');
@@ -170,9 +154,9 @@ describe('SideNav', () => {
   });
 
   it('with nobody named still offers the full nav, with no name line', async () => {
-    const { onSelect } = setup({ personName: '', section: 'people', hideChange: true });
+    const { onSelect } = setup({ personName: '', section: 'people' });
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
       'Overview',
       'Your people',
       'Announcement',
@@ -181,8 +165,7 @@ describe('SideNav', () => {
       'Thank-yous',
       'Your account',
     ]);
-    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Obituary' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Obituary/ }));
     expect(onSelect).toHaveBeenCalledWith('obituary');
   });
 

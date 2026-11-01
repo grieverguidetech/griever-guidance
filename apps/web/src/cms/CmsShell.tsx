@@ -41,7 +41,8 @@ interface Props {
   personName: string;
   section: CmsNavKey;
   onSelect: (key: CmsNavKey) => void;
-  onChangePerson: () => void;
+  /** Called when Your people is chosen in the nav. */
+  onPeople: () => void;
   /** Called instead of onSelect when the account item is chosen. */
   onAccount: () => void;
   notice?: ReactNode;
@@ -56,13 +57,11 @@ interface Props {
   nobody?: boolean;
   /** A loading screen: no nav item is the current page. */
   noCurrent?: boolean;
-  /** Hides the nav's Change button (Your people, where it leads nowhere). */
-  hideChange?: boolean;
   children: ReactNode;
 }
 
 /** Nav left, editor right from `md`; stacked below. The shell owns the page's only h1. */
-export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, syncOn, nobody = false, noCurrent = false, hideChange = false, children }: Props) {
+export function CmsShell({ personName, section, onSelect, onPeople, onAccount, notice, statuses, aside, title, syncOn, nobody = false, noCurrent = false, children }: Props) {
   const heading = useRef<HTMLElement | null>(null);
   const setHeading = useCallback((node: unknown) => {
     heading.current = node as HTMLElement | null;
@@ -104,7 +103,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
   function select(key: CmsNavKey) {
     heading.current?.focus();
     if (key === 'people') {
-      onChangePerson();
+      onPeople();
       return;
     }
     if (key === 'account') {
@@ -116,10 +115,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
 
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
-      <SideNav personName={personName} section={section} onSelect={select} onChangePerson={() => {
-          heading.current?.focus();
-          onChangePerson();
-        }} statuses={statuses} noCurrent={noCurrent} hideChange={hideChange} />
+      <SideNav personName={personName} section={section} onSelect={select} statuses={statuses} noCurrent={noCurrent} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
         {aside ? (
           <div className="flex flex-wrap items-center justify-between gap-2">

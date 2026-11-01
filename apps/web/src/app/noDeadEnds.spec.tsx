@@ -86,7 +86,7 @@ function expectOneEditorLayout() {
 
 function expectFullNav() {
   const nav = screen.getByRole('navigation', { name: /^Sections/ });
-  expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(NAV);
+  expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(NAV);
   return nav;
 }
 
@@ -106,12 +106,17 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     signedInAs(kind);
     const user = userEvent.setup();
     render(<App />);
-    await h1('Your people');
+    await h1('Overview');
     return user;
   }
 
+  async function openPeople(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
+    await h1('Your people');
+  }
+
   it('shows the full nav and the checklist preview on Your people', async () => {
-    await open();
+    await openPeople(await open());
     expectFullNav();
     expectOneEditorLayout();
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
@@ -125,13 +130,13 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     'opens %s with one next step and keeps the layout',
     async (name) => {
       const user = await open();
-      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name }));
+      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: new RegExp(`^${name}`) }));
       const heading = await h1(name);
       await waitFor(() => expect(heading).toHaveFocus());
       expectFullNav();
       expectOneEditorLayout();
       const nav = screen.getByRole('navigation', { name: /^Sections/ });
-      expect(within(nav).getByRole('button', { name })).toHaveAttribute('aria-current', 'page');
+      expect(within(nav).getByRole('button', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-current', 'page');
       const main = screen.getByRole('main');
       if (kind === 'owner') {
         expect(within(main).getByRole('button', { name: CREATE })).toBeInTheDocument();
@@ -145,7 +150,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
 
   it('opens a checklist item from the panel, shows its guidance, and Back returns to the empty page', async () => {
     const user = await open();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Service' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
     await h1('Service');
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     const opener = aside.querySelector<HTMLElement>('[data-checklist-item]');
@@ -162,34 +167,34 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     expect(stored()).toHaveLength(0);
   });
 
-  it('Back from an item opened in the panel on Your people or Your account returns there', async () => {
+  it('Back from an item opened in the panel on the Overview or Your account returns there', async () => {
     const user = await open();
     const firstItem = () => screen.getByRole('complementary', { name: "What you'll need" }).querySelector<HTMLElement>('[data-checklist-item]') as HTMLElement;
     let label = firstItem().textContent ?? '';
     await user.click(firstItem());
     await h1(label);
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Back' }));
-    await h1('Your people');
+    await h1('Overview');
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     label = firstItem().textContent ?? '';
     await user.click(firstItem());
     await h1(label);
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Back' }));
-    await h1('Your account');
+    await h1('Account');
     expectFullNav();
   });
 
   it('browser Back and Forward walk the empty pages', async () => {
     const user = await open();
     const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav().getByRole('button', { name: 'Obituary' }));
+    await user.click(nav().getByRole('button', { name: /^Obituary/ }));
     await h1('Obituary');
-    await user.click(nav().getByRole('button', { name: 'Service' }));
+    await user.click(nav().getByRole('button', { name: /^Service/ }));
     await h1('Service');
     window.history.back();
     await h1('Obituary');
-    expect(nav().getByRole('button', { name: 'Obituary' })).toHaveAttribute('aria-current', 'page');
+    expect(nav().getByRole('button', { name: /^Obituary/ })).toHaveAttribute('aria-current', 'page');
     window.history.forward();
     await h1('Service');
   });
@@ -197,29 +202,29 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
   it('keeps the full nav on Your account', async () => {
     const user = await open();
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     expectFullNav();
     expectOneEditorLayout();
     expect(screen.getByRole('complementary', { name: "What you'll need" }).querySelector('[data-checklist-item]')).not.toBeNull();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Thank-yous' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Thank-yous/ }));
     await h1('Thank-yous');
   });
 });
 
 describe('an empty owner account starts from a section (#597)', () => {
-  it('creates the person and lands on the chosen section', async () => {
+  it('creates the person and lands on The person, whichever page Start was pressed on (#603)', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
     render(<App />);
-    await h1('Your people');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Obituary' }));
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     await h1('Obituary');
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: CREATE }));
-    await h1('Obituary');
+    await h1('The person');
     expect(stored()).toHaveLength(1);
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(within(aside).queryByText(PREVIEW_LINE)).toBeNull();
-    expect(screen.getByRole('button', { name: "Change who you're writing about" })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
     expect(within(screen.getByRole('main')).queryByRole('button', { name: CREATE })).toBeNull();
   });
 
@@ -227,29 +232,18 @@ describe('an empty owner account starts from a section (#597)', () => {
     signedInAs('owner');
     const user = userEvent.setup();
     render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1('Your people');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Obituary' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     await h1('Obituary');
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: CREATE }));
     await waitFor(() => expect(stored()).toHaveLength(1));
     // Some content makes the new person listable, so the empty page would otherwise be redirected away from.
-    await user.type(await screen.findByLabelText(/city/i), 'Boston');
+    await user.type(await screen.findByLabelText('Their name'), 'Margaret');
     window.history.back();
     await h1('Your people');
     expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expect(screen.queryByText('A person is here now. Their page is open.')).toBeNull();
-  });
-
-  it('Overview creates the person and lands on the Overview', async () => {
-    signedInAs('owner');
-    const user = userEvent.setup();
-    render(<App />);
-    await h1('Your people');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Overview' }));
-    await h1('Overview');
-    await user.click(within(screen.getByRole('main')).getByRole('button', { name: CREATE }));
-    await waitFor(() => expect(stored()).toHaveLength(1));
-    await h1('Overview');
-    expect(within(screen.getByRole('main')).queryByRole('button', { name: CREATE })).toBeNull();
   });
 });

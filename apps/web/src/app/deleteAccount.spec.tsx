@@ -65,7 +65,7 @@ async function openConfirm(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
   await screen.findByRole('heading', { level: 1, name: 'Overview' });
   await user.click(screen.getByRole('button', { name: 'Your account' }));
-  await screen.findByRole('heading', { level: 1, name: 'Your account' });
+  await screen.findByRole('heading', { level: 1, name: 'Account' });
   await user.click(screen.getByRole('button', { name: 'Delete my account' }));
 }
 

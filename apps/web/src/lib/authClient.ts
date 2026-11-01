@@ -14,6 +14,8 @@ export interface ClerkAccountReady {
   openAccountSettings?: () => void;
   /** Deletes the Clerk user (`user.delete()`). Absent when Clerk is not ready. */
   deleteAccount?: () => Promise<void>;
+  /** The given and family name on the Clerk user (set at sign-up). Used once to fill a profile that has none. */
+  clerkNames?: { firstName: string | null; lastName: string | null };
 }
 
 /** Thrown by `deleteAccount` when the person closed Clerk's verify step. Nothing was deleted. */

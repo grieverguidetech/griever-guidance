@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": [
     "heading",
+    "title",
     "askHeading",
     "askIntro",
     "firstTimeIntro",
@@ -121,6 +122,9 @@
   ],
   "properties": {
     "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "title": {
       "$ref": "#/$defs/text"
     },
     "askHeading": {
