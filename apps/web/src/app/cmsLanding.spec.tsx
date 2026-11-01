@@ -269,7 +269,7 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('The person')).toBeInTheDocument();
   });
 
-  it('in "Your people" the nav offers Your people and Your account, under the one h1', async () => {
+  it('in "Your people" the full nav shows for the person, under the one h1', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
@@ -277,13 +277,52 @@ describe('landing with the editor on (#448)', () => {
     await user.click(screen.getByRole('button', { name: /Change/ }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your people', 'Your account']);
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Overview',
+      'Your people',
+      'Announcement',
+      'Service',
+      'Obituary',
+      'Thank-yous',
+      'Your account',
+    ]);
     expect(within(nav).getByRole('button', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
-    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     await user.click(within(nav).getByRole('button', { name: 'Your account' }));
     const focused1 = await h1('Your account');
     await waitFor(() => expect(focused1).toHaveFocus());
+  });
+
+  it('Your people with 2 people shows the full nav and the most recent person\'s checklist, Your people current', async () => {
+    const user = userEvent.setup();
+    seed(
+      person('s1', 'Older Person', '2026-10-01T00:00:00.000Z'),
+      person('s2', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'),
+    );
+    window.history.replaceState(null, '', '/');
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(PEOPLE);
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).getAllByRole('button')).toHaveLength(7);
+    expect(within(nav).getByRole('button', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('button', { name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByText('Margaret Hayes', { selector: 'p' })).toBeInTheDocument();
+    const aside = screen.getByRole('complementary', { name: "What you'll need" });
+    expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
+    expect(within(aside).queryByText(/nobody|no one/i)).toBeNull();
+  });
+
+  it('a section chosen from Your people opens that person there', async () => {
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await h1('Overview');
+    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await h1(PEOPLE);
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Service' }));
+    expect(await h1('Service')).toBeInTheDocument();
   });
 
   it('Your account opened from "Your people" shows the full nav for the most recent person, and Change returns to "Your people"', async () => {

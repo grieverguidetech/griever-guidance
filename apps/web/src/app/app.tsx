@@ -1008,17 +1008,32 @@ function AppBody({
 
   /** The people list inside the shell. Flag on, this is also the fallback, so the old Home never renders. */
   function renderPeople() {
+    // The open person, else the most recent one. Only with nobody at all is the nav the short one.
+    const person = active ?? sortedSessions[0] ?? null;
+    const noPerson = person === null;
     return (
       <Shell wide>
         <CmsShell
           title={cmsShellCopy.peopleTitle}
-          peopleView
-          aside={panelFor(null)}
-          asideIsEmpty
-          personName=""
+          peopleView={noPerson}
+          aside={panelFor(person)}
+          asideIsEmpty={noPerson}
+          personName={person?.personName ?? ''}
           section="people"
-          // Here the nav offers Your people (already here) and the account, which goes to onAccount.
-          onSelect={() => undefined}
+          statuses={person?.sectionStatus}
+          // Your people is already here; a section opens that person there, like the Overview card.
+          onSelect={(key) => {
+            if (!person || key === 'account' || key === 'people') {
+              return;
+            }
+            auth?.clearError();
+            setAskingName(false);
+            setCmsItem(null);
+            setCmsSection(key);
+            sessions.touchSession(person.id);
+            setActiveId(person.id);
+            setView('cms');
+          }}
           onChangePerson={() => undefined}
           onAccount={() => {
             sessions.pruneEmpty();
