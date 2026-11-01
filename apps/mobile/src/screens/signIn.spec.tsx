@@ -230,14 +230,14 @@ describe('sign in', () => {
       renderSignIn();
       press('Continue with Google');
       await waitFor(() => expect(setActive).toHaveBeenCalledWith({ session: 'sess_1' }));
-      expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_google', redirectUrl: 'mobile://sso-callback' });
+      expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_google', redirectUrl: 'grieversguidance://sso-callback' });
     });
 
     it('starts Facebook with its own strategy and the app redirect', async () => {
       mockStartSSO.mockResolvedValue({ createdSessionId: null, authSessionResult: { type: 'cancel' } });
       renderSignIn();
       press('Continue with Facebook');
-      await waitFor(() => expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_facebook', redirectUrl: 'mobile://sso-callback' }));
+      await waitFor(() => expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_facebook', redirectUrl: 'grieversguidance://sso-callback' }));
     });
 
     it('says to use email or Google when Facebook gives no email, and makes no session', async () => {
@@ -246,7 +246,7 @@ describe('sign in', () => {
       renderSignIn();
       press('Continue with Facebook');
       await screen.findByText('Please use your email or Google to sign in.');
-      expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_facebook', redirectUrl: 'mobile://sso-callback' });
+      expect(mockStartSSO).toHaveBeenCalledWith({ strategy: 'oauth_facebook', redirectUrl: 'grieversguidance://sso-callback' });
       expect(setActive).not.toHaveBeenCalled();
     });
 
