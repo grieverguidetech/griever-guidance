@@ -13,7 +13,7 @@
   "gatherNotes": {
     "ssn": "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.",
     "insurance": "Insurers ask for the policy number when you make a claim. You do not need to add it to your account.",
-    "military": "Veterans' burial benefits and honors may need these papers. You do not need to add it to your account."
+    "military": "Veterans' burial benefits and honors may need these papers. You do not need to add them to your account."
   },
   "nowPhase": "Now: {phase}",
   "nextItem": "Next on the list: {item}",

@@ -35,7 +35,7 @@ const SSN_TIP =
 const INSURANCE_TIP =
   'Insurers ask for the policy number when you make a claim. You do not need to add it to your account.';
 const MILITARY_TIP =
-  "Veterans' burial benefits and honors may need these papers. You do not need to add it to your account.";
+  "Veterans' burial benefits and honors may need these papers. You do not need to add them to your account.";
 
 export const CHECKLIST_SEED: ReadonlyArray<{ id: string; label: string; reason?: string; tip?: string }> = [
   { id: 'will-or-wishes', label: 'Any will or written wishes', reason: 'Burial or cremation, and who they named' },
