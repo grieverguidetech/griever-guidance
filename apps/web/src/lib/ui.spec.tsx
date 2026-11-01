@@ -62,7 +62,8 @@ describe('top buttons (#176)', () => {
   it('the link button has no padding and reaches a 44px target without it', () => {
     expect(css).toMatch(/\.gg-link-button\s*{[^}]*padding:\s*0/);
     expect(css).toMatch(/\.gg-link-button\s*{[^}]*text-decoration:\s*underline/);
-    expect(css).toMatch(/\.gg-link-button::before\s*{[^}]*height:\s*44px/);
+    expect(css).toMatch(/\.gg-link-button\s*{[^}]*min-height:\s*44px/);
+    expect(css).not.toMatch(/\.gg-link-button::before/);
   });
 
   it('the shared styles keep them at least 44 by 44 with a border', () => {

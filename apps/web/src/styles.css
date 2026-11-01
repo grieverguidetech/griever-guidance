@@ -451,8 +451,12 @@ h1, h2, h3, h4, h5, h6 {
   }
   /* A text-only link button under a field: underlined, no visible padding. The 44px target comes from the
      ::before, which reaches past the text without moving anything (WCAG 2.5.8). */
+  /* The 44px target is the button box itself, with the text at its top, so it
+     sits flush under the field and never covers the input above it. */
   .gg-link-button {
-    position: relative;
+    display: inline-flex;
+    align-items: flex-start;
+    min-height: 44px;
     align-self: flex-start;
     margin: 0;
     padding: 0;
@@ -464,13 +468,6 @@ h1, h2, h3, h4, h5, h6 {
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
-  }
-  .gg-link-button::before {
-    content: '';
-    position: absolute;
-    inset-inline: 0;
-    top: -4px;
-    height: 44px;
   }
   .gg-link-button:hover { text-decoration-thickness: 2px; }
   /* The empty or checked box inside a toggle chip. */
