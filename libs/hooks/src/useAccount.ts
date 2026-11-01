@@ -175,6 +175,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   const keepProfile = useCallback((next: CachedProfile | null) => {
     writeKey(storageRef.current, PROFILE_STORAGE_KEY, next ? JSON.stringify(next) : null);
     setProfile(next);
+    // A save can supersede the first load; the server has still answered for this user.
+    setProfileAnswered(true);
   }, []);
 
   const clearLocal = useCallback(() => {
