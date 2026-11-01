@@ -282,7 +282,8 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     await user.click(within(nav).getByRole('button', { name: 'Your account' }));
-    expect(await h1('Your account')).toHaveFocus();
+    const focused1 = await h1('Your account');
+    await waitFor(() => expect(focused1).toHaveFocus());
   });
 
   it('Your account opened from "Your people" shows the full nav for the most recent person, and Change returns to "Your people"', async () => {
@@ -333,7 +334,8 @@ describe('landing with the editor on (#448)', () => {
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
-    expect(await h1('Overview')).toHaveFocus();
+    const focused2 = await h1('Overview');
+    await waitFor(() => expect(focused2).toHaveFocus());
     expect(screen.getAllByText('Robert Hayes').length).toBeGreaterThan(0);
     expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
   });
@@ -623,5 +625,36 @@ describe('navigation (#566)', () => {
       window.history.forward();
     });
     expect(await h1(itemTitle)).toBeInTheDocument();
+  });
+  it('an item opened from the panel on Your account does not make a later item return there (#584)', async () => {
+    signedInAs('owner');
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    const opener = document.querySelector<HTMLElement>('main [data-checklist-item]');
+    const itemX = opener?.getAttribute('data-checklist-item') ?? '';
+    await user.click(opener as HTMLElement);
+    await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Overview'));
+    const titleX = document.querySelector('h1')?.textContent ?? '';
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    const panelItems = Array.from(document.querySelectorAll<HTMLElement>('aside [data-checklist-item]'));
+    const itemY = panelItems.find((node) => node.getAttribute('data-checklist-item') !== itemX);
+    expect(itemY).toBeDefined();
+    await user.click(itemY as HTMLElement);
+    await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Your account'));
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
+    await h1('Overview');
+    // Browser Back: Overview, the panel item Y, Your account, then item X.
+    for (const expected of [() => document.querySelector('h1')?.textContent !== 'Overview', () => document.querySelector('h1')?.textContent === 'Your account', () => document.querySelector('h1')?.textContent === titleX]) {
+      act(() => {
+        window.history.back();
+      });
+      await waitFor(() => expect(expected()).toBe(true));
+    }
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Overview');
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your account' })).toBeNull();
   });
 });

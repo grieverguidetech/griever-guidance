@@ -3,7 +3,7 @@
  * audits: opening an item focuses the shell h1 (titled with the item), opening from the phone sheet
  * closes the sheet, and Back returns to the button that opened the item.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({ cms: true }));
@@ -113,7 +113,8 @@ describe('checklist in the editor (#421)', () => {
     await user.click(panel.getByRole('button', { name: /^Set a date, time, and place for the service/ }));
     await screen.findByRole('heading', { level: 1, name: /^Set a date, time, and place/ });
     await user.click(screen.getByRole('button', { name: 'Open Service' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
+    const focused1 = await screen.findByRole('heading', { level: 1, name: 'Service' });
+    await waitFor(() => expect(focused1).toHaveFocus());
     expect(stored().checklist).not.toHaveProperty('set-service');
   });
 
@@ -133,7 +134,8 @@ describe('checklist in the editor (#421)', () => {
     await user.click(panel.getByRole('button', { name: /^Write the obituary/ }));
     await screen.findByRole('heading', { level: 1, name: /^Write the obituary/ });
     await user.click(screen.getByRole('button', { name: 'Open Obituary' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toHaveFocus();
+    const focused2 = await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    await waitFor(() => expect(focused2).toHaveFocus());
   });
 
   it('opens the next item from the Overview, and Back returns to the Overview button', async () => {

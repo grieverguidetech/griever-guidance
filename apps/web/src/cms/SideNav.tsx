@@ -108,13 +108,15 @@ interface Props {
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
   /** No person is open: only Your people and the account are offered. */
   accountOnly?: boolean;
+  /** Nothing is the current page (a loading screen), so no item carries aria-current. */
+  noCurrent?: boolean;
 }
 
 /**
  * Wide screens: always shown. Narrow screens: behind a menu button. The button sits outside the
  * nav landmark so a screen reader does not hear the landmark name twice.
  */
-export function SideNav({ personName, section, onSelect, onChangePerson, statuses, accountOnly = false }: Props) {
+export function SideNav({ personName, section, onSelect, onChangePerson, statuses, accountOnly = false, noCurrent = false }: Props) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -138,7 +140,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
         <nav aria-label={copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">
             {SHORT_NAV.map((key) => {
-              const current = key === section;
+              const current = !noCurrent && key === section;
               return (
                 <li key={key}>
                   <button
@@ -205,7 +207,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                   </li>
                 );
               }
-              const current = key === navKeyFor(section);
+              const current = !noCurrent && key === navKeyFor(section);
               return (
                 <li key={key}>
                   <button

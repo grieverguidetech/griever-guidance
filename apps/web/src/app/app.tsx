@@ -138,14 +138,14 @@ function Shell({
 }
 
 /** An always-present status region; the words appear only after a pause, so a quick load never flashes. */
-function Loading() {
+function Loading({ inShell = false }: { inShell?: boolean }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setShow(true), 500);
     return () => clearTimeout(timer);
   }, []);
   return (
-    <div role="status" className="text-[14px] pt-[52px]" style={{ color: 'var(--text-muted)' }}>
+    <div role="status" className={inShell ? 'text-[14px]' : 'text-[14px] pt-[52px]'} style={{ color: 'var(--text-muted)' }}>
       {show ? 'Loading…' : ''}
     </div>
   );
@@ -628,6 +628,7 @@ function AppBody({
     // Only a section has a subject; the most recent person being re-picked on Your people or the account screens must not add an entry.
     spot: { view, section: cmsSection, item: cmsItem, personId: view === 'cms' ? activeId : null },
     onRestore: (spot) => {
+      itemFromAccount.current = null;
       // Only what this app could have written; anything else is refused.
       const view = TRACKED_VIEWS.find((candidate) => candidate === spot.view);
       const section = CMS_SECTIONS.find((candidate) => candidate === spot.section);
@@ -891,12 +892,20 @@ function AppBody({
 
   function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', closeSheet?: () => void) {
     itemOpener.current = { id, region };
+    itemFromAccount.current = null;
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
     closeSheet?.();
     setCmsItem(id);
   }
 
   function closeCmsItem() {
+    if (itemFromAccount.current !== null && itemFromAccount.current === cmsItem) {
+      // Opened from the panel on Your account: Back returns there.
+      itemFromAccount.current = null;
+      setCmsItem(null);
+      openProfile(false, accountFrom.current);
+      return;
+    }
     restoreOpener.current = true;
     setCmsItem(null);
   }
@@ -906,6 +915,14 @@ function AppBody({
   // from Settings or Profile stay put. Starting a person is always the user's choice, on Your people.
   // Where Your account was opened from (flag on): Back returns there.
   const accountFrom = useRef<'cms' | 'people'>('cms');
+  // The item opened from the panel on Your account, so Back returns there. It only counts while that
+  // same item is open, and it is dropped whenever the item closes or history restores a screen.
+  const itemFromAccount = useRef<ChecklistItemId | null>(null);
+  useEffect(() => {
+    if (cmsItem === null) {
+      itemFromAccount.current = null;
+    }
+  }, [cmsItem]);
   const landed = useRef(false);
   // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
   // is a real move to a new screen, so it asks for the h1 itself.
@@ -976,10 +993,13 @@ function AppBody({
         onSetItem={(id, state) => sessions.setChecklistItem(person.id, id, state)}
         currentItem={null}
         onOpenItem={(id) => {
+          auth?.clearError();
+          setAskingName(false);
           sessions.touchSession(person.id);
           setActiveId(person.id);
           setCmsSection('overview');
           openCmsItem(id, 'main', closeSheet);
+          itemFromAccount.current = id;
           setView('cms');
         }}
       />
@@ -994,6 +1014,7 @@ function AppBody({
           title={cmsShellCopy.peopleTitle}
           peopleView
           aside={panelFor(null)}
+          asideIsEmpty
           personName=""
           section="people"
           // Here the nav offers Your people (already here) and the account, which goes to onAccount.
@@ -1052,6 +1073,7 @@ function AppBody({
           title={title}
           peopleView={noPerson}
           aside={panelFor(person)}
+          asideIsEmpty={noPerson}
           personName={person?.personName ?? ''}
           section="account"
           statuses={person?.sectionStatus}
@@ -1534,14 +1556,23 @@ function AppBody({
           title={cmsShellCopy.loadingTitle}
           peopleView
           aside={panelFor(null)}
+          asideIsEmpty
+          noCurrent
           personName=""
           section="people"
           onSelect={() => undefined}
           onChangePerson={() => undefined}
-          onAccount={() => undefined}
+          onAccount={() => {
+            accountFrom.current = 'people';
+            if (auth?.isSignedIn) {
+              openProfile(false, 'people');
+            } else {
+              setView('settings');
+            }
+          }}
           notice={endedNote}
         >
-          <Loading />
+          <Loading inShell />
         </CmsShell>
       </Shell>
     );
