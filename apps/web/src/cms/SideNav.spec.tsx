@@ -14,19 +14,27 @@ function setup(props: Partial<Parameters<typeof SideNav>[0]> = {}) {
 }
 
 describe('SideNav', () => {
-  it('lists the 7 items in order, with Your people first and no The person link, inside the Sections nav', () => {
+  it('lists the 7 items in order, with Overview first, Your people under it, and no The person link, inside the Sections nav', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     const names = within(nav).getAllByRole('listitem').map((li) => li.textContent);
-    expect(names).toEqual(['Your people', 'Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
+    expect(names).toEqual(['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
+  });
+
+  it('shows Change, and hides it with hideChange', () => {
+    setup();
+    expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument();
+    cleanup();
+    setup({ hideChange: true });
+    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
   });
 
   it('makes every section and the two ends a button', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'Your people',
       'Overview',
+      'Your people',
       'Announcement',
       'Service',
       'Obituary',

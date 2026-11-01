@@ -16,6 +16,17 @@ describe('AppHeader', () => {
   });
 });
 
+describe('AppHeader layout', () => {
+  it('has a bottom border in the divider token, padding and space below', () => {
+    render(<AppHeader />);
+    const cls = screen.getByRole('banner').className;
+    expect(cls).toContain('border-b');
+    expect(cls).toContain('border-[color:var(--color-divider)]');
+    expect(cls).toContain('py-3');
+    expect(cls).toContain('mb-6');
+  });
+});
+
 describe('brand files', () => {
   it('links the SVG favicon and keeps the .ico fallback', () => {
     const html = readFileSync(resolve(webRoot, 'index.html'), 'utf8');
@@ -36,5 +47,14 @@ describe('brand files', () => {
   it('the header wordmark has no dark-scheme colours, since the page has no dark theme', () => {
     const svg = readFileSync(resolve(webRoot, 'public/brand/wordmark.svg'), 'utf8');
     expect(svg).not.toContain('prefers-color-scheme');
+  });
+
+  it('does not squeeze the name: no textLength, and the img ratio matches the viewBox', () => {
+    const svg = readFileSync(resolve(webRoot, 'public/brand/wordmark.svg'), 'utf8');
+    expect(svg).not.toMatch(/textLength|lengthAdjust/);
+    const [, w, h] = /viewBox="0 0 (\d+) (\d+)"/.exec(svg) ?? [];
+    render(<AppHeader />);
+    const logo = screen.getByRole('img', { name: PRODUCT_NAME });
+    expect(Number(logo.getAttribute('width')) / Number(logo.getAttribute('height'))).toBeCloseTo(Number(w) / Number(h), 1);
   });
 });
