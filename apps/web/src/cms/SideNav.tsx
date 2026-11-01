@@ -191,7 +191,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
             />
           )}
         </div>
-        <nav aria-label={copy.navLandmark}>
+        <nav aria-label={name ? fill(copy.navLandmarkNamed, { name }) : copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">
             {NAV_ORDER.map((key) => {
               const later = isSectionKey(key) && !AVAILABLE_SECTIONS.includes(key);

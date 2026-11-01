@@ -13,6 +13,7 @@
     "navThankYous",
     "navAccount",
     "navLandmark",
+    "navLandmarkNamed",
     "menuButton",
     "change",
     "changeLabel",
@@ -86,6 +87,9 @@
       "$ref": "#/$defs/text"
     },
     "navLandmark": {
+      "$ref": "#/$defs/text"
+    },
+    "navLandmarkNamed": {
       "$ref": "#/$defs/text"
     },
     "menuButton": {

@@ -8,6 +8,7 @@
   "navThankYous": "Thank-yous",
   "navAccount": "Your account",
   "navLandmark": "Sections",
+  "navLandmarkNamed": "Sections for {name}",
   "menuButton": "Sections · {section}",
   "change": "Change",
   "changeLabel": "Change who you're writing about",

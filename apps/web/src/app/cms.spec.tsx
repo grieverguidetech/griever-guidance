@@ -110,7 +110,7 @@ beforeEach(() => {
 /** One banner, one nav, one main and one side panel: the standard layout (#584). */
 function expectOneEditorLayout() {
   expect(screen.getAllByRole('banner')).toHaveLength(1);
-  expect(screen.getAllByRole('navigation', { name: 'Sections' })).toHaveLength(1);
+  expect(screen.getAllByRole('navigation', { name: /^Sections/ })).toHaveLength(1);
   expect(screen.getAllByRole('main')).toHaveLength(1);
   expect(screen.getAllByRole('complementary')).toHaveLength(1);
 }
@@ -233,7 +233,7 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
-      const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
       await user.click(nav.getByRole('button', { name: new RegExp(`^${name}`) }));
       const focused5 = await screen.findByRole('heading', { level: 1, name });
       await waitFor(() => expect(focused5).toHaveFocus());
@@ -265,7 +265,7 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     for (const name of ['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
-      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
+      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
       expect(document.querySelector('a[href^="sms:"]')).toBeNull();
       expect(screen.queryByText(/Open Messages/i)).not.toBeInTheDocument();
@@ -297,7 +297,7 @@ describe('editor on (#395)', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
     const focused9 = await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await waitFor(() => expect(focused9).toHaveFocus());
   });
@@ -335,7 +335,7 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
     const focused11 = await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await waitFor(() => expect(focused11).toHaveFocus());
   });
@@ -356,7 +356,7 @@ describe('editor on, signed in (#395)', () => {
     const askHeading = await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
     await waitFor(() => expect(askHeading).toHaveFocus());
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /^Sections/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
