@@ -8,6 +8,7 @@
     "show",
     "hide",
     "phoneButton",
+    "previewLine",
     "intro",
     "obituaryNote",
     "gatherHeading",
@@ -38,6 +39,9 @@
       "$ref": "#/$defs/text"
     },
     "phoneButton": {
+      "$ref": "#/$defs/text"
+    },
+    "previewLine": {
       "$ref": "#/$defs/text"
     },
     "intro": {

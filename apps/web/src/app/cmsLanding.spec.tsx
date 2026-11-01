@@ -6,7 +6,6 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import type { Session } from '@griever/hooks';
-import { screenCopy } from '@griever/copy';
 import { fakeClerk } from '../test-clerk';
 
 const mocks = vi.hoisted(() => ({
@@ -58,7 +57,6 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const cmsShellCopy = screenCopy('cmsShell');
 const PEOPLE = 'Your people';
 const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
@@ -317,7 +315,6 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.getByText('Margaret Hayes', { selector: 'p' })).toBeInTheDocument();
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
-    expect(within(aside).queryByText(cmsShellCopy.panelEmpty)).toBeNull();
   });
 
   it('a section chosen from Your people opens that person there', async () => {
@@ -389,7 +386,7 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
   });
 
-  it('with no person, Your account offers only Your people, which returns to the list and creates nothing (C11)', async () => {
+  it('with no person, Your account keeps the full nav, and Your people returns to the list and creates nothing (C11)', async () => {
     signedInAs('member');
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
@@ -399,7 +396,7 @@ describe('landing with the editor on (#448)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Your account');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).queryByRole('button', { name: /^Overview/ })).not.toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: PEOPLE }));
     expect(await h1(PEOPLE)).toBeInTheDocument();
     expect(stored()).toHaveLength(0);

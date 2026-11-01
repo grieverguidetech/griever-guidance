@@ -425,7 +425,7 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
   });
 
-  it('a brand-new user: name prompt in the shell with a calm panel, then Your people with the same layout', async () => {
+  it('a brand-new user: name prompt in the shell with the checklist preview, then Your people with the same layout', async () => {
     mocks.auth = true;
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
     mocks.updateProfile.mockResolvedValue({
@@ -438,13 +438,13 @@ describe('editor on, signed in (#395)', () => {
     await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
     await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
     expectOneEditorLayout();
-    expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).getByText('Your ticks are kept once you start with someone.')).toBeInTheDocument();
     await user.type(screen.getByLabelText('First name'), 'Anna');
     await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
     await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expectOneEditorLayout();
-    expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).getByText('Your ticks are kept once you start with someone.')).toBeInTheDocument();
   });
 
   it('Your account with a person shows the checklist panel and the nav', async () => {
@@ -457,7 +457,7 @@ describe('editor on, signed in (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Your account' });
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
-    expect(within(screen.getByRole('complementary')).queryByText(/When you open someone on Your people/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).queryByText('Your ticks are kept once you start with someone.')).not.toBeInTheDocument();
   });
 
   it('with two people: a panel item on Your account opens that person at the item, and Back returns to Your account', async () => {

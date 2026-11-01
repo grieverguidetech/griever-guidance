@@ -58,7 +58,8 @@
     "phoneReadyService",
     "phoneReadyObituary",
     "phoneReadyThanks",
-    "panelEmpty",
+    "emptyOwner",
+    "emptyMember",
     "loadingTitle"
   ],
   "properties": {
@@ -224,7 +225,10 @@
     "phoneReadyThanks": {
       "$ref": "#/$defs/text"
     },
-    "panelEmpty": {
+    "emptyOwner": {
+      "$ref": "#/$defs/text"
+    },
+    "emptyMember": {
       "$ref": "#/$defs/text"
     },
     "loadingTitle": {

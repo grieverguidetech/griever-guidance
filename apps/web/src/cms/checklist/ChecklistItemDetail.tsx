@@ -16,13 +16,15 @@ interface Props {
   onBack: () => void;
   /** Closes the item and opens its section. Without it, no button shows. */
   onOpenSection?: (section: SectionKey) => void;
+  /** A preview with nobody saved: the guidance only, no ticks. */
+  readOnly?: boolean;
 }
 
 /**
  * More guidance for one item. No h1: CmsShell's title carries the item label.
  * The caller owns focus: it focuses the shell heading (which names the item) on open.
  */
-export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenSection }: Props) {
+export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenSection, readOnly = false }: Props) {
   const detail = checklistDetail(itemId);
   const parts = detail
     ? [
@@ -45,7 +47,7 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
           {copy.back}
         </button>
       </div>
-      <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />
+      {readOnly ? null : <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />}
       <div className="gg-panel flex flex-col">
         {detail ? (
           parts.map((part, index) => (

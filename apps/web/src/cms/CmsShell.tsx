@@ -50,12 +50,10 @@ interface Props {
   aside?: ReactNode | ((context: AsideContext) => ReactNode);
   /** Replaces the h1 text, for item details. */
   title?: string;
-  /** No person is open (the people list, or the account with nobody saved): the nav offers only Your people and the account. */
-  peopleView?: boolean;
   /** True when the details also sync to the account, so the save line can say they wait on the phone. */
   syncOn?: boolean;
-  /** The panel has no checklist, only a note: no phone opener, sheet or Hide/Show toggle. */
-  asideIsEmpty?: boolean;
+  /** Nobody is saved yet: the save line has nothing to describe, so it is left out. */
+  nobody?: boolean;
   /** A loading screen: no nav item is the current page. */
   noCurrent?: boolean;
   /** Hides the nav's Change button (Your people, where it leads nowhere). */
@@ -64,7 +62,7 @@ interface Props {
 }
 
 /** Nav left, editor right from `md`; stacked below. The shell owns the page's only h1. */
-export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, peopleView, syncOn, asideIsEmpty = false, noCurrent = false, hideChange = false, children }: Props) {
+export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, syncOn, nobody = false, noCurrent = false, hideChange = false, children }: Props) {
   const heading = useRef<HTMLElement | null>(null);
   const setHeading = useCallback((node: unknown) => {
     heading.current = node as HTMLElement | null;
@@ -121,12 +119,11 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
       <SideNav personName={personName} section={section} onSelect={select} onChangePerson={() => {
           heading.current?.focus();
           onChangePerson();
-        }} statuses={statuses} accountOnly={peopleView} noCurrent={noCurrent} hideChange={hideChange} />
+        }} statuses={statuses} noCurrent={noCurrent} hideChange={hideChange} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
         {aside ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
-            {asideIsEmpty ? null : (
             <button
               ref={sheetButton}
               data-checklist-opener=""
@@ -137,23 +134,22 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
             >
               {copy.phoneButton}
             </button>
-            )}
             {/* After the h1 in DOM order so Tab from the heading moves forward; justify-between keeps it top right. */}
-            {panelShown || asideIsEmpty ? null : (
+            {panelShown ? null : (
               <button type="button" className="gg-btn gg-btn-ghost gg-btn-ghost-plain hidden lg:inline-flex" onClick={togglePanel}>{copy.show}</button>
             )}
           </div>
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
         )}
-        {peopleView || section === 'overview' || section === 'account' ? null : <p className="gg-hint">{syncOn ? shellCopy.saveLineSynced : shellCopy.saveLine}</p>}
+        {nobody || section === 'people' || section === 'overview' || section === 'account' ? null : <p className="gg-hint">{syncOn ? shellCopy.saveLineSynced : shellCopy.saveLine}</p>}
         {notice}
         <div key={`${section}:${title ?? ''}`} className="gg-enter flex flex-col gap-4">
           {children}
         </div>
       </main>
       {/* Mounted once: checklist state must live above the shell (props or a hook), not inside `aside`. */}
-      {aside && (panelShown || asideIsEmpty) && !sheetOpen ? (
+      {aside && panelShown && !sheetOpen ? (
         // Scrolling is keyboard reachable because the Hide button inside is focusable.
         <aside
           aria-labelledby={asideTitleId}
@@ -162,14 +158,12 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
           <div className="flex items-center justify-between gap-2">
             <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
             {/* The name flips Hide/Show; no aria-expanded, so there is one signal. */}
-            {asideIsEmpty ? null : (
-              <button type="button" className="gg-btn gg-btn-ghost gg-btn-ghost-plain" onClick={togglePanel}>{copy.hide}</button>
-            )}
+            <button type="button" className="gg-btn gg-btn-ghost gg-btn-ghost-plain" onClick={togglePanel}>{copy.hide}</button>
           </div>
           {renderAside(false)}
         </aside>
       ) : null}
-      {aside && !asideIsEmpty ? (
+      {aside ? (
         <Sheet
           visible={sheetOpen}
           title={copy.panelTitle}
