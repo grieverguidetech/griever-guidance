@@ -97,6 +97,7 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
   const checklistButton = useRef<ButtonNode>(null);
   const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave, firstTime, onContinue });
 
+  // Without onSaveDetails the prompt falls back to the single name field below. The app always passes it; the fallback is for callers that only have a name to save.
   if (asksName && onSaveDetails) {
     return (
       <div className="flex flex-col gap-6">
@@ -106,16 +107,19 @@ export function Profile({ asksName, firstTime, onContinue, saveFailed, senderNam
           </button>
         </div>
         <h1 className="m-0">{copy.askHeading}</h1>
-        <PersonalDetailsForm
-          namesOnly
-          senderName={senderName}
-          firstName={firstName ?? null}
-          lastName={lastName ?? null}
-          birthDate={birthDate ?? null}
-          address={address ?? null}
-          error={error}
-          onSave={onSaveDetails}
-        />
+        <div className="gg-panel">
+          <PersonalDetailsForm
+            namesOnly
+            headingLevel={2}
+            senderName={senderName}
+            firstName={firstName ?? null}
+            lastName={lastName ?? null}
+            birthDate={birthDate ?? null}
+            address={address ?? null}
+            error={error}
+            onSave={onSaveDetails}
+          />
+        </div>
       </div>
     );
   }

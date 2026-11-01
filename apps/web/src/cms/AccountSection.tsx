@@ -20,6 +20,8 @@ interface ProfileProps {
   lastName?: string | null;
   birthDate?: string | null;
   address?: Address | null;
+  /** False until the profile has loaded: Save details waits, so empty fields never overwrite stored values. */
+  profileLoaded?: boolean;
   /** The identity hook's own calm copy, shown as-is. */
   error: string | null;
   /** "People helping you", when sharing is on. */
@@ -43,7 +45,7 @@ interface ProfileProps {
  * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you (with "remove a member" beside it), Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, firstName, lastName, birthDate, address, error, peopleHelping, onSaveDetails, onSignOut, onDeleteAccount, email, onManageSignIn, settings, plans }: ProfileProps) {
+export function AccountSection({ asksName, senderName, firstName, lastName, birthDate, address, profileLoaded = true, error, peopleHelping, onSaveDetails, onSignOut, onDeleteAccount, email, onManageSignIn, settings, plans }: ProfileProps) {
   const id = useId();
   const [cardNote, setCardNote] = useState(false);
 
@@ -61,6 +63,8 @@ export function AccountSection({ asksName, senderName, firstName, lastName, birt
         </h2>
         <PersonalDetailsForm
           namesOnly={asksName}
+          profileLoaded={profileLoaded}
+          headingLevel={3}
           senderName={senderName}
           firstName={firstName ?? null}
           lastName={lastName ?? null}

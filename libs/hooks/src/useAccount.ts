@@ -40,10 +40,10 @@ export interface ProfileDetails {
   firstName?: string | null;
   lastName?: string | null;
   address?: Address | null;
-  /** The old single-string name, for the interim form. The server splits it and leaves senderName alone. */
+  /** Deprecated: the old single-string name. The server still accepts it and leaves senderName alone; the web app no longer sends it. */
   fullName?: string | null;
-  /** yyyy-mm-dd */
-  birthDate: string | null;
+  /** yyyy-mm-dd. Leave it out to leave the stored value alone. */
+  birthDate?: string | null;
 }
 
 export type ProfileDetailsResult = { ok: true } | { ok: false; invalid: boolean };

@@ -385,9 +385,12 @@ describe('editor on, signed in (#395)', () => {
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
     await user.type(screen.getByLabelText('First name'), 'Anna');
-    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
     await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { firstName: 'Anna', lastName: 'Reyes', birthDate: null, address: null });
+    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { firstName: 'Anna', lastName: 'Reyes' });
+    const sent = mocks.updateProfile.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(sent).not.toHaveProperty('birthDate');
+    expect(sent).not.toHaveProperty('address');
     // Back to where they were: the editor they came from, not the account.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
@@ -408,7 +411,7 @@ describe('editor on, signed in (#395)', () => {
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
     await user.type(screen.getByLabelText('First name'), 'Anna');
-    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
     await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expectOneEditorLayout();

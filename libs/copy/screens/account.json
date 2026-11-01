@@ -89,10 +89,10 @@
   "deletedAction": "Back to the start",
   "deletedLeftover": "Some things could not be removed from this device.",
   "personalHeading": "Personal details",
-  "personalHint": "Only you can see these details.",
+  "personalHint": "Your first name signs your messages. The rest is only for you.",
   "askNamesIntro": "Your first name is the name your messages are signed with.",
   "firstNameLabel": "First name",
-  "lastNameLabel": "Last name",
+  "lastNameLabel": "Last name (optional)",
   "firstNameRequired": "Please enter your first name.",
   "fieldTooLong": "That is too long. Please shorten it.",
   "fieldBadChars": "Please enter this on one line, with no hidden characters.",
@@ -102,12 +102,13 @@
   "addressLine2Label": "Address line 2 (optional)",
   "cityLabel": "City",
   "stateLabel": "State",
-  "stateHint": "Two letters, for example NJ.",
+  "stateHint": "Two letters, for example NJ, or the full name.",
   "zipLabel": "ZIP code",
   "addressLine1Required": "Please enter the street address.",
   "cityRequired": "Please enter the city.",
   "stateRequired": "Please enter the state.",
   "stateInvalid": "Please use the two-letter state code, for example NJ.",
   "zipRequired": "Please enter the ZIP code.",
-  "zipInvalid": "Please enter a ZIP code like 07001 or 07001-1234."
+  "zipInvalid": "Please enter a ZIP code like 07001 or 07001-1234.",
+  "checkFields": "Please check the fields with a message under them."
 }

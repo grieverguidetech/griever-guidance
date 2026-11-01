@@ -28,6 +28,7 @@ import { SYNC_ENABLED } from '../lib/syncFlag';
 import { AppHeader } from '../cms/AppHeader';
 import { CmsShell } from '../cms/CmsShell';
 import { AccountSection, AccountSettingsSection } from '../cms/AccountSection';
+import type { PersonalDetails } from '../cms/PersonalDetailsForm';
 import { AccountDeleted } from '../cms/AccountDeleted';
 import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
 import { PeopleList } from '../cms/PeopleList';
@@ -1064,6 +1065,19 @@ function AppBody({
     goHome();
   }
 
+  /** Saves the personal details. The name prompt is done once they are saved: back to where the person was. */
+  async function saveDetails(details: PersonalDetails) {
+    const result = await auth?.updateDetails(details);
+    if (!result) {
+      return { ok: false, invalid: false } as const;
+    }
+    if (result.ok && askingName) {
+      setAskingName(false);
+      setView(returnTo);
+    }
+    return result;
+  }
+
   /** Where Your account was opened from, flag off or on: the name prompt goes back to where it was. */
   function leaveAccount() {
     auth?.clearError();
@@ -1165,15 +1179,8 @@ function AppBody({
         lastName={auth.profile?.lastName ?? null}
         birthDate={auth.profile?.birthDate ?? null}
         address={auth.profile?.address ?? null}
-        onSaveDetails={async (details) => {
-          const result = await auth.updateDetails(details);
-          // The name prompt is done once the names are saved: back to where the person was.
-          if (result.ok && askingName) {
-            setAskingName(false);
-            setView(returnTo);
-          }
-          return result;
-        }}
+        profileLoaded={auth.profile !== null}
+        onSaveDetails={saveDetails}
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}
@@ -1229,14 +1236,7 @@ function AppBody({
           lastName={auth.profile?.lastName ?? null}
           birthDate={auth.profile?.birthDate ?? null}
           address={auth.profile?.address ?? null}
-          onSaveDetails={async (details) => {
-            const result = await auth.updateDetails(details);
-            if (result.ok && askingName) {
-              setAskingName(false);
-              setView(returnTo);
-            }
-            return result;
-          }}
+          onSaveDetails={saveDetails}
           error={auth.error}
           showChecklist={auth.isSignedIn}
           peopleHelping={
