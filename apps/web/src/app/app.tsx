@@ -18,6 +18,7 @@ import {
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
+import { SECTION_ORDER } from '@griever/shared';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
@@ -77,8 +78,10 @@ type AppView =
   | 'people';
 
 /** The editor's sections; the account is a separate view, so it is never a section. */
-type CmsSection = Exclude<CmsNavKey, 'account'>;
+type CmsSection = Exclude<CmsNavKey, 'account' | 'people'>;
 
+/** How long the landing waits for the first sync on a device with nobody saved. Never longer: C5, no blocking on the network. */
+const LANDING_SYNC_WAIT_MS = 1500;
 const cmsShellCopy = screenCopy('cmsShell');
 const accountCopy = screenCopy('account');
 const cmsItemLabels = screenCopy('cmsChecklist').items;
@@ -306,6 +309,9 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
 /** Views that need a person to be open; with nobody open Home is shown instead. */
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary', 'cms'];
 
+/** The sections Back can restore: Overview and the five sections (a person's details are reached from Overview). */
+const CMS_SECTIONS: CmsSection[] = ['overview', ...SECTION_ORDER];
+
 /** The screens Back walks through. */
 const TRACKED_VIEWS: AppView[] = ['cms', 'people', 'profile', 'settings'];
 
@@ -357,7 +363,7 @@ function AppBody({
   // off the wire when the editor is off, C2), with sync on and someone signed in. Nothing is shown (C5).
   const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn;
   // Sync waits until the device's list is kept for this account, so another account's person is never sent under this token.
-  useFlowSync({
+  const flowSync = useFlowSync({
     sessions: sessionList,
     userId: auth?.userId ?? '',
     getAccessToken: memberToken,
@@ -601,12 +607,42 @@ function AppBody({
     // With no sign-in at all (auth off) Back walks the screens too; it only stays off while signed out.
     enabled: CMS_ENABLED && (signedIn || auth === null),
     trackable: TRACKED_VIEWS.includes(view),
-    spot: { view, section: cmsSection, item: cmsItem, personId: activeId },
+    userId: auth?.userId ?? '',
+    signedOut,
+    // Only a section has a subject; the most recent person being re-picked on Your people or the account screens must not add an entry.
+    spot: { view, section: cmsSection, item: cmsItem, personId: view === 'cms' ? activeId : null },
     onRestore: (spot) => {
-      setView(spot.view as AppView);
-      setCmsSection(spot.section as CmsSection);
-      setCmsItem(spot.item as ChecklistItemId | null);
-      setActiveId(spot.personId && sessions.sessions.some((p) => p.id === spot.personId) ? spot.personId : null);
+      // Only what this app could have written; anything else is refused.
+      const view = TRACKED_VIEWS.find((candidate) => candidate === spot.view);
+      const section = CMS_SECTIONS.find((candidate) => candidate === spot.section);
+      const item = spot.item === null ? null : (Object.keys(cmsItemLabels) as ChecklistItemId[]).find((id) => id === spot.item);
+      if (!view || !section || item === undefined) {
+        return false;
+      }
+      // Back never lands in the name prompt, and an error from another screen is not carried over.
+      auth?.clearError();
+      setAskingName(false);
+      // The person was deleted since: a section of theirs goes straight to Your people rather than to nobody.
+      if (view === 'cms' && spot.personId && !sessions.sessions.some((p) => p.id === spot.personId)) {
+        setCmsItem(null);
+        setCmsSection(section);
+        setActiveId(null);
+        setView('people');
+        return { view: 'people', section, item: null, personId: null };
+      }
+      if (item === null && cmsItem !== null) {
+        // Same as closing an item by hand: focus returns to what opened it.
+        restoreOpener.current = true;
+      }
+      setView(view);
+      setCmsSection(section);
+      setCmsItem(item);
+      // Only a section has a subject; the other screens restore with none, and the whoever is open stays open.
+      const personId = view === 'cms' ? spot.personId : null;
+      if (view === 'cms') {
+        setActiveId(personId);
+      }
+      return { view, section, item, personId };
     },
   });
 
@@ -861,9 +897,18 @@ function AppBody({
   // The latest openPerson (re-made each render), so the effect below needn't list it.
   const opens = useRef({ openPerson });
   opens.current = { openPerson };
+  // With sync on and nobody saved (a fresh device), the first pull may bring people: wait for it, for a short cap.
+  const [syncWaitOver, setSyncWaitOver] = useState(false);
+  const waitingForSync = syncOn && !flowSync.pulled && !syncWaitOver;
   useEffect(() => {
-    if (signedOut) landed.current = false;
+    if (signedOut) {
+      landed.current = false;
+      setSyncWaitOver(false);
+    }
     if (!CMS_ENABLED || landed.current || !isSignedIn || auth?.isLoading || view !== 'home') {
+      return;
+    }
+    if (sortedSessions.length === 0 && waitingForSync) {
       return;
     }
     landed.current = true;
@@ -873,7 +918,15 @@ function AppBody({
       return;
     }
     setView('people');
-  }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions]);
+  }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, waitingForSync]);
+
+  useEffect(() => {
+    if (!waitingForSync || landed.current || !isSignedIn || view !== 'home' || sortedSessions.length > 0) {
+      return;
+    }
+    const timer = setTimeout(() => setSyncWaitOver(true), LANDING_SYNC_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [waitingForSync, isSignedIn, view, sortedSessions.length]);
 
   // Armed by the landing. Fires once on the first editor render, then disarms (even with no h1). If the
   // landing is interrupted (another screen shows first), it disarms so it can't fire on a later visit.
@@ -961,7 +1014,7 @@ function AppBody({
           section="account"
           statuses={person?.sectionStatus}
           onSelect={(key) => {
-            if (key !== 'account') {
+            if (key !== 'account' && key !== 'people') {
               auth?.clearError();
               setAskingName(false);
               setCmsItem(null);
@@ -1142,7 +1195,7 @@ function AppBody({
           statuses={active.sectionStatus}
           // The account item goes to onAccount, never here; the check only narrows the type.
           onSelect={(key) => {
-            if (key !== 'account') {
+            if (key !== 'account' && key !== 'people') {
               setCmsItem(null);
               setCmsSection(key);
             }
@@ -1413,6 +1466,15 @@ function AppBody({
           note={finishNote}
           onCloseNote={() => setFinishNote(null)}
         />
+      </Shell>
+    );
+  }
+
+  // Landing is waiting for the first sync: a quiet status, not an empty "Your people" that then jumps.
+  if (CMS_ENABLED && view === 'home' && isSignedIn && !landed.current && waitingForSync && sortedSessions.length === 0) {
+    return (
+      <Shell notice={endedNote}>
+        <Loading />
       </Shell>
     );
   }

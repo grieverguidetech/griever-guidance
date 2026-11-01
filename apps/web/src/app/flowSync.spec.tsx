@@ -2,7 +2,7 @@
  * #520: background sync wired into the real App. Runs only with the editor flag, the sync flag and
  * a signed-in user. fetch is stubbed, so no network. Flags are mocked per test.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -178,6 +178,51 @@ describe('background sync in the app (#520)', () => {
     await waitFor(() => expect(flowCalls().filter((c) => c.method === 'GET')).toHaveLength(1));
     window.dispatchEvent(new Event('focus'));
     await waitFor(() => expect(flowCalls().filter((c) => c.method === 'GET').length).toBeGreaterThan(1));
+  });
+
+  it('a fresh device lands on Overview when the first sync brings people (#566)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
+  });
+
+  it('a fresh device waits at most 1.5 s for the first sync: loading at 1400 ms, Your people at 1600 ms (#566)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    // The server never answers; the landing must not wait on it past the cap.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    try {
+      render(<App />);
+      // Let Clerk and the profile resolve without moving the clock.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1300);
+      });
+      // 1400 ms in: still the quiet loading status, not an empty list.
+      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a fresh device lands on Your people at once when the first sync finds nobody (#566)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    serverHasNothing = true;
+    signedIn(true);
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' }, { timeout: 1400 })).toBeInTheDocument();
   });
 
   it('makes no /flows calls with the editor off', async () => {

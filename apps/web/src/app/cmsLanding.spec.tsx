@@ -243,24 +243,16 @@ describe('landing with the editor on (#448)', () => {
     expect(stored()).toHaveLength(0);
   });
 
-  it('gives up landing when the profile is unavailable, and does not jump later', async () => {
+  it('lands on "Your people" when the profile is unavailable, and does not jump later', async () => {
     signedInAs('owner');
     mocks.sharing = true;
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      render(<App />);
-      expect(await h1(PEOPLE)).toBeInTheDocument();
-      await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3500);
-      });
-      expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
-      expect(stored()).toHaveLength(0);
-    } finally {
-      vi.useRealTimers();
-    }
+    render(<App />);
+    expect(await h1(PEOPLE)).toBeInTheDocument();
+    await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
+    await expectStaysOnPeople();
+    expect(stored()).toHaveLength(0);
   });
 
   it('"Change" returns to Home and stays there, and Home can still create a person', async () => {
@@ -459,9 +451,10 @@ describe('navigation (#566)', () => {
     expect(within(nav).getAllByRole('img', { name: 'Not started' }).length).toBeGreaterThan(0);
   });
 
-  it('Back after sign-in walks the editor screens and never reaches the sign-in', async () => {
-    // The entry before ours stands for the sign-in page: no state of ours on it.
+  it('Back from the first editor screen goes past the sign-in entries and never pushes or shows the sign-in', async () => {
+    // Entries before ours stand for Clerk's hash steps: no state of ours.
     window.history.replaceState(null, '');
+    window.history.pushState(null, '');
     window.history.pushState(null, '');
     signedInAs('owner');
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
@@ -470,16 +463,165 @@ describe('navigation (#566)', () => {
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Service/ }));
     await h1('Service');
+    const back = vi.spyOn(window.history, 'back');
+    const push = vi.spyOn(window.history, 'pushState');
+    act(() => {
+      window.history.back();
+    });
+    const overview = await h1('Overview');
+    await waitFor(() => expect(overview).toHaveFocus());
+    back.mockClear();
+    // Back again lands on the first sign-in step: the app walks on by itself, to the next one and past it.
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() => expect(back.mock.calls.length).toBeGreaterThanOrEqual(2));
+    // Let the last traversal finish, so it cannot leak into the next test.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByText('Sign in with the test provider')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    back.mockRestore();
+    push.mockRestore();
+  });
+
+  describe.each([
+    ['Your account', async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' }));
+    }, 'Your account'],
+    ['Your people', async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: PEOPLE }));
+    }, PEOPLE],
+    ['a section', async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Service/ }));
+    }, 'Service'],
+  ])('Back then Forward on %s', (_label, go, heading) => {
+    it('returns to Overview, then comes back to the screen, with focus on the h1', async () => {
+      seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+      const user = userEvent.setup();
+      render(<App />);
+      await h1('Overview');
+      await go(user);
+      await h1(heading);
+      act(() => {
+        window.history.back();
+      });
+      const overview = await h1('Overview');
+      await waitFor(() => expect(overview).toHaveFocus());
+      act(() => {
+        window.history.forward();
+      });
+      const again = await h1(heading);
+      await waitFor(() => expect(again).toHaveFocus());
+      expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
+    });
+  });
+
+  it('Back to a screen whose person was deleted lands on Your people, with no new entry and Forward kept', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Service/ }));
+    await h1('Service');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: PEOPLE }));
+    await h1(PEOPLE);
+    act(() => {
+      mocks.sessions?.removeSession('s1');
+    });
+    const push = vi.spyOn(window.history, 'pushState');
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: CREATE })).toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Service' })).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+    act(() => {
+      window.history.forward();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
+  it('Back to Your account after the person was deleted restores Your account, not Your people', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: PEOPLE }));
+    await h1(PEOPLE);
+    act(() => {
+      mocks.sessions?.removeSession('s1');
+    });
+    act(() => {
+      window.history.back();
+    });
+    expect(await h1('Your account')).toBeInTheDocument();
+  });
+
+  it('Back then Forward on Settings (signed out, flag on) returns to it', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    expect(screen.getByRole('heading', { name: 'Help and support' })).toBeInTheDocument();
     act(() => {
       window.history.back();
     });
     await h1('Overview');
-    // One more Back goes past the first editor entry, to where sign-in was: the app stays put.
+    act(() => {
+      window.history.forward();
+    });
+    expect(await h1('Your account')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Help and support' })).toBeInTheDocument();
+  });
+
+  it('Back then Forward on the Profile (signed in) returns to it, never to the name prompt', async () => {
+    signedInAs('owner');
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
     act(() => {
       window.history.back();
     });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
-    expect(screen.queryByText('Sign in with the test provider')).toBeNull();
+    await h1('Overview');
+    act(() => {
+      window.history.forward();
+    });
+    expect(await h1('Your account')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: /name/i })).toBeNull();
+  });
+
+  it('Back then Forward on a checklist item returns to it, and Back lands focus on what opened it', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    const opener = document.querySelector<HTMLElement>('main [data-checklist-item]');
+    expect(opener).not.toBeNull();
+    const itemId = opener?.getAttribute('data-checklist-item') ?? '';
+    await user.click(opener as HTMLElement);
+    await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Overview'));
+    const itemTitle = document.querySelector('h1')?.textContent ?? '';
+    act(() => {
+      window.history.back();
+    });
+    await h1('Overview');
+    await waitFor(() => expect(document.querySelector(`[data-checklist-item="${itemId}"]`)).toHaveFocus());
+    act(() => {
+      window.history.forward();
+    });
+    expect(await h1(itemTitle)).toBeInTheDocument();
   });
 });
