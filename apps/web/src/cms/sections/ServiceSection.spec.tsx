@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
+import { PlacesProvider } from '../../lib/places/PlacesContext';
+import type { PlacesClient } from '../../lib/places/placesClient';
 import { ServiceSection, type ServicePatch } from './ServiceSection';
 
 type Values = Parameters<typeof ServiceSection>[0]['values'];
@@ -352,5 +354,34 @@ describe('ServiceSection', () => {
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'ServiceSection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsService')).toEqual([]);
+  });
+});
+
+describe('ServiceSection place suggestions', () => {
+  it('suggests worship places for the service, cemeteries for burial, and nothing for the visitation', async () => {
+    const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue([
+      { id: 'x', text: 'Rest Hill Cemetery, 5 Oak Rd', mainText: 'Rest Hill Cemetery', secondaryText: '5 Oak Rd' },
+    ]);
+    const client: PlacesClient = { suggest, endSession: vi.fn() };
+    function Harness() {
+      const [values, setValues] = useState<Values>({ visitationDate: 'May 1', burialDate: 'May 2' });
+      return (
+        <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+          <ServiceSection values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} onReadyChange={vi.fn()} />
+        </PlacesProvider>
+      );
+    }
+    render(<Harness />);
+    await userEvent.type(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' }), 'oak');
+    await screen.findByRole('listbox');
+    expect(suggest).toHaveBeenLastCalledWith('oak', ['funeral_home', 'church', 'place_of_worship', 'synagogue', 'mosque']);
+
+    const cemetery = screen.getByRole('combobox', { name: 'Burial Cemetery' });
+    await userEvent.type(cemetery, 'rest');
+    await userEvent.click(await screen.findByRole('option', { name: /Rest Hill Cemetery/ }));
+    expect(suggest).toHaveBeenLastCalledWith('rest', ['cemetery']);
+    expect(cemetery).toHaveValue('Rest Hill Cemetery, 5 Oak Rd');
+
+    expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toBeInTheDocument();
   });
 });

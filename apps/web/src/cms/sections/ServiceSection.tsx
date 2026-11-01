@@ -8,6 +8,7 @@ import {
   type ServiceEventFields,
   type SessionDetails,
 } from '@griever/shared';
+import { BURIAL_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
 import { EventFields } from './EventFields';
 import { MarkReady } from './MarkReady';
 
@@ -184,6 +185,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
           values={values}
           onChange={onChange}
           dateOfPassing={values.dateOfPassing}
+          placeTypes={SERVICE_PLACE_TYPES}
           extra={(legendId) => (
             <>
               <GroupText
@@ -249,6 +251,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
               onChange={onChange}
               dateOfPassing={values.dateOfPassing}
               placeLabel={copy.eventCemetery}
+              placeTypes={BURIAL_PLACE_TYPES}
               dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (burialDate) => onChange({ burialDate }))}
               hideFields={values.burialPrivate === true}
               lead={

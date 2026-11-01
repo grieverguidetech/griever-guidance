@@ -3,6 +3,7 @@ import { screenCopy } from '@griever/copy';
 import { dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
 import { DateInput } from '../../lib/DateField';
 import { TimeInput } from '../../lib/TimeField';
+import { PlaceInput } from '../../lib/places/PlaceInput';
 
 /** Only real text keys of the session, so a typo in `keys` fails to compile. */
 export type EventKey = {
@@ -42,6 +43,8 @@ interface Props<K extends EventKey> {
   dateSuggestion?: Suggestion;
   /** The same for an empty place. */
   placeSuggestion?: Suggestion;
+  /** Google place types to suggest in the place field. Without them it is a plain text input. */
+  placeTypes?: readonly string[];
   /** The date of passing as typed. A date before it gets a quiet note. */
   dateOfPassing?: string | null;
 }
@@ -95,6 +98,7 @@ export function EventFields<K extends EventKey>({
   hideFields = false,
   dateSuggestion,
   placeSuggestion,
+  placeTypes,
   dateOfPassing,
 }: Props<K>) {
   const id = useId();
@@ -147,14 +151,12 @@ export function EventFields<K extends EventKey>({
         <label id={`${id}-place-label`} htmlFor={`${id}-place`}>
           {placeLabel}
         </label>
-        <input
+        <PlaceInput
           id={`${id}-place`}
-          aria-labelledby={`${legendId} ${id}-place-label`}
-          type="text"
-          className="gg-input"
-          autoComplete="off"
+          labelledBy={`${legendId} ${id}-place-label`}
+          types={placeTypes}
           value={values[keys.place] ?? ''}
-          onChange={(e) => onChange({ [keys.place]: e.target.value } as Partial<Record<K, string>>)}
+          onChange={(v) => onChange({ [keys.place]: v } as Partial<Record<K, string>>)}
         />
         {placeSuggestion && !values[keys.place] && (
           <SuggestionButton

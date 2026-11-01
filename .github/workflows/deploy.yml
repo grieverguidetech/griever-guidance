@@ -225,6 +225,8 @@ jobs:
           VITE_FEATURE_CMS: ${{ vars.FEATURE_CMS }}
           # Background sync stays off unless the repo variable FEATURE_SYNC is "true".
           VITE_FEATURE_SYNC: ${{ vars.FEATURE_SYNC }}
+          # Place suggestions in the editor. A browser key restricted by referrer; empty means plain text fields.
+          VITE_GOOGLE_MAPS_API_KEY: ${{ vars.GOOGLE_MAPS_API_KEY }}
 
       - run: pnpm exec wrangler pages project create griever-guidance-web --production-branch main || true
         env:
