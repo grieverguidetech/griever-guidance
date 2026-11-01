@@ -22,9 +22,10 @@ describe('ChecklistPanel', () => {
     const order = [
       copy.intro,
       'Certified death certificates',
+      copy.phases['right-away'],
+      copy.phases['first-months'],
       'Gather when you can',
       'Life insurance policies',
-      copy.phases['right-away'],
       "We won't remind you about this list.",
     ].map((part) => text.indexOf(part));
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -50,6 +51,7 @@ describe('ChecklistPanel', () => {
   it('keeps device ticks in the account store', async () => {
     const user = userEvent.setup();
     render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
+    await user.click(within(screen.getByRole('heading', { level: 3, name: 'Gather when you can' })).getByRole('button'));
     const row = screen.getByRole('button', { name: /Life insurance policies/ });
     await waitFor(() => expect(row).toBeEnabled());
     await user.click(row);
@@ -68,13 +70,13 @@ describe('ChecklistPanel', () => {
     expect(onOpenItem).toHaveBeenCalledWith('custody');
   });
 
-  it('has h3 headings: the card, Gather, and the six phases', () => {
+  it('has h3 headings: the card, the six phases, and Gather', () => {
     render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
     const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(names).toEqual([
       'Certified death certificates',
-      'Gather when you can',
       ...CHECKLIST_PHASES.map((p) => copy.phases[p.key]),
+      'Gather when you can',
     ]);
     expect(CHECKLIST_PHASES).toHaveLength(6);
   });
@@ -90,5 +92,34 @@ describe('ChecklistPanel', () => {
   it('holds no hard-coded copy that belongs to the checklist screen', () => {
     const source = readFileSync(join(import.meta.dirname, 'ChecklistPanel.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsChecklist')).toEqual([]);
+  });
+
+  it('lists the phases in the agreed order with the new names, Gather last', () => {
+    render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
+    const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(names.slice(1)).toEqual([
+      'Right away (first 24 to 48 hours)',
+      'Within the first few days',
+      'Obituary checklist',
+      'Planning the service checklist',
+      'Within the first few weeks',
+      'Within the first few months',
+      'Gather when you can',
+    ]);
+  });
+
+  it('opens and closes Gather from the keyboard, closed to start', async () => {
+    const user = userEvent.setup();
+    render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
+    const button = within(screen.getByRole('heading', { level: 3, name: 'Gather when you can' })).getByRole('button');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Life insurance policies/ })).toBeNull();
+    button.focus();
+    await user.keyboard('{Enter}');
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Life insurance policies/ })).toBeVisible();
+    await user.keyboard(' ');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Life insurance policies/ })).toBeNull();
   });
 });
