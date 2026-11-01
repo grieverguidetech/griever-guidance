@@ -192,7 +192,7 @@ describe('background sync in the app (#520)', () => {
     expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
   });
 
-  it('a fresh device waits at most 1.5 s for the first sync: loading at 1400 ms, Your people at 1600 ms (#566)', async () => {
+  it('a fresh device waits at most 1.5 s for the first sync: loading at 1400 ms, the empty Overview at 1600 ms (#566, #603)', async () => {
     window.localStorage.removeItem('gg.sessions.v1');
     signedIn(true);
     // The server never answers; the landing must not wait on it past the cap.
@@ -218,8 +218,8 @@ describe('background sync in the app (#520)', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(200);
       });
-      expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -243,7 +243,7 @@ describe('background sync in the app (#520)', () => {
       expect(nav.getAllByRole('button')).toHaveLength(7);
       expect(screen.getByRole('complementary', { name: "What you'll need" }).querySelector('[data-checklist-item]')).not.toBeNull();
       await act(async () => {
-        nav.getByRole('button', { name: 'Obituary' }).click();
+        nav.getByRole('button', { name: /^Obituary/ }).click();
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
       expect(screen.getByText('One moment. We are checking your account for people.')).toBeInTheDocument();
@@ -273,7 +273,7 @@ describe('background sync in the app (#520)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Loading…');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Obituary' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     const heading = await screen.findByRole('heading', { level: 1, name: 'Obituary' });
     const other = screen.getByRole('button', { name: "What you'll need" });
     other.focus();
@@ -306,23 +306,23 @@ describe('background sync in the app (#520)', () => {
       await act(async () => {
         nav.getByRole('button', { name: 'Your account' }).click();
       });
-      expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000);
       });
-      expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('a fresh device lands on Your people at once when the first sync finds nobody (#566)', async () => {
+  it('a fresh device lands on the empty Overview at once when the first sync finds nobody (#566, #603)', async () => {
     window.localStorage.removeItem('gg.sessions.v1');
     serverHasNothing = true;
     signedIn(true);
     render(<App />);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' }, { timeout: 1400 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' }, { timeout: 1400 })).toBeInTheDocument();
   });
 
   it('makes no /flows calls with the editor off', async () => {

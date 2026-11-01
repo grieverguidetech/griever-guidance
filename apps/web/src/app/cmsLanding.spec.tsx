@@ -146,8 +146,8 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     const heading = await h1('Overview');
     await waitFor(() => expect(heading).toHaveFocus());
-    // The name shows in the shell header and in The person card summary.
-    expect(screen.getAllByText('Harold Price', { exact: true })).toHaveLength(2);
+    // The name shows in The person card summary only: the nav has no name line (#603).
+    expect(screen.getAllByText('Harold Price', { exact: true })).toHaveLength(1);
     const harold = stored().find((s) => s.id === 's2');
     expect(Date.parse(harold?.lastOpenedAt ?? '')).toBeGreaterThan(Date.parse('2026-10-12T00:00:00.000Z'));
   });
@@ -165,7 +165,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', '', '2026-10-10T12:00:00.000Z', { checklist: { headstone: 'done' } }));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     expect(screen.getByRole('button', { name: 'Not named yet, started Oct 10' })).toBeInTheDocument();
     expect(stored()).toHaveLength(1);
@@ -183,9 +183,9 @@ describe('landing with the editor on (#448)', () => {
     expect(stored()[0].id).toBe('s1');
   });
 
-  it('opens Your people when nobody is saved (owner), focusing the h1, and creates no one', async () => {
+  it('opens the Overview when nobody is saved (owner), focusing the h1, and creates no one (#603)', async () => {
     render(<App />);
-    const heading = await h1(PEOPLE);
+    const heading = await h1('Overview');
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByRole('button', { name: CREATE })).toBeInTheDocument();
     expect(stored()).toHaveLength(0);
@@ -194,6 +194,8 @@ describe('landing with the editor on (#448)', () => {
   it('an owner with nobody saved can press "Start with someone I\'ve lost" on Your people (C11)', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: PEOPLE }));
     await h1(PEOPLE);
     await expectStaysOnPeople();
     await user.click(screen.getByRole('button', { name: CREATE }));
@@ -214,7 +216,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await user.click(await screen.findByRole('button', { name: 'Sign out' }));
@@ -222,22 +224,27 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('Overview')).toBeInTheDocument();
   });
 
-  it('opens Your people for a signed-in owner with nobody saved', async () => {
+  it('opens the Overview for a signed-in owner with nobody saved', async () => {
     signedInAs('owner');
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     render(<App />);
-    expect(await h1(PEOPLE)).toBeInTheDocument();
+    expect(await h1('Overview')).toBeInTheDocument();
     expect(stored()).toHaveLength(0);
   });
 
-  it('lands a member with nothing shared on "Your people", with the empty-state copy and no create button (C11)', async () => {
+  it('lands a member with nothing shared on the Overview, and Your people has the empty-state copy and no create button (C11)', async () => {
     signedInAs('member');
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
+    const user = userEvent.setup();
     render(<App />);
-    expect(await h1(PEOPLE)).toBeInTheDocument();
+    expect(await h1('Overview')).toBeInTheDocument();
     await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
+    expect(screen.getByText('This page fills in when someone shares a person with you.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: PEOPLE }));
+    await h1(PEOPLE);
     await expectStaysOnPeople();
     expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: ANOTHER })).not.toBeInTheDocument();
@@ -246,15 +253,16 @@ describe('landing with the editor on (#448)', () => {
     expect(stored()).toHaveLength(0);
   });
 
-  it('lands on "Your people" when the profile is unavailable, and does not jump later', async () => {
+  it('lands on the Overview when the profile is unavailable, and does not jump later', async () => {
     signedInAs('owner');
     mocks.sharing = true;
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     render(<App />);
-    expect(await h1(PEOPLE)).toBeInTheDocument();
+    expect(await h1('Overview')).toBeInTheDocument();
     await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
-    await expectStaysOnPeople();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(stored()).toHaveLength(0);
   });
 
@@ -263,7 +271,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     const home = await h1(PEOPLE);
     await waitFor(() => expect(home).toHaveFocus());
     await expectStaysOnPeople();
@@ -277,10 +285,10 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
       'Overview',
       'Your people',
       'Announcement',
@@ -293,7 +301,7 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     await user.click(within(nav).getByRole('button', { name: 'Your account' }));
-    const focused1 = await h1('Your account');
+    const focused1 = await h1('Account');
     await waitFor(() => expect(focused1).toHaveFocus());
   });
 
@@ -306,13 +314,13 @@ describe('landing with the editor on (#448)', () => {
     window.history.replaceState(null, '', '/');
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getAllByRole('button')).toHaveLength(7);
     expect(within(nav).getByRole('button', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('button', { name: 'Overview' })).toBeInTheDocument();
-    expect(screen.getByText('Margaret Hayes', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Sections for Margaret Hayes' })).toBeInTheDocument();
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
   });
@@ -322,9 +330,9 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Service' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
     expect(await h1('Service')).toBeInTheDocument();
   });
 
@@ -336,9 +344,9 @@ describe('landing with the editor on (#448)', () => {
     );
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Service' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
     const service = await h1('Service');
     await waitFor(() => expect(service).toHaveFocus());
     expect(screen.getByRole('navigation', { name: 'Sections for Margaret Hayes' })).toBeInTheDocument();
@@ -357,7 +365,7 @@ describe('landing with the editor on (#448)', () => {
     );
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     const opener = document.querySelector<HTMLElement>('aside [data-checklist-item]');
     expect(opener).not.toBeNull();
@@ -371,15 +379,15 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     const people = await h1(PEOPLE);
     await waitFor(() => expect(people).toHaveFocus());
     await expectStaysOnPeople();
@@ -394,7 +402,7 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: PEOPLE }));
@@ -407,12 +415,12 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Robert Hayes', '2026-10-20T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: /Change/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Sections for Robert Hayes' })).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
     const focused2 = await h1('Overview');
     await waitFor(() => expect(focused2).toHaveFocus());
@@ -426,7 +434,7 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
@@ -434,14 +442,14 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('Overview')).toBeInTheDocument();
   });
 
-  it('shows "Your people", never the old Home, before the profile arrives', async () => {
+  it('shows the Overview, never the old Home, before the profile arrives', async () => {
     signedInAs('owner');
     mocks.sharing = true;
     let resolveProfile: (value: unknown) => void = () => undefined;
     mocks.getProfile.mockReturnValue(new Promise((resolve) => { resolveProfile = resolve; }));
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     render(<App />);
-    expect(await h1(PEOPLE)).toBeInTheDocument();
+    expect(await h1('Overview')).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.queryByRole('heading', { name: HOME })).not.toBeInTheDocument();
     await act(async () => {
@@ -450,7 +458,7 @@ describe('landing with the editor on (#448)', () => {
         profile: { id: 'u1', senderName: 'Anna', contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
       });
     });
-    expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(stored()).toHaveLength(0);
   });
 
@@ -473,7 +481,7 @@ describe('landing with the editor on (#448)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
     expect(await h1('Overview')).toBeInTheDocument();
@@ -511,12 +519,12 @@ describe('navigation (#566)', () => {
     await h1('Overview');
     const sections = () => screen.getByRole('navigation', { name: /^Sections/ });
     await user.click(within(sections()).getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     expect(within(sections()).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
     await user.click(within(sections()).getByRole('button', { name: /^Service/ }));
     await h1('Service');
     await user.click(within(sections()).getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     expect(within(sections()).getByRole('button', { name: PEOPLE })).toBeInTheDocument();
     expect(within(sections()).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
     expect(within(sections()).queryByRole('button', { name: /^The person/ })).toBeNull();
@@ -570,7 +578,7 @@ describe('navigation (#566)', () => {
   describe.each([
     ['Your account', async (user: ReturnType<typeof userEvent.setup>) => {
       await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
-    }, 'Your account'],
+    }, 'Account'],
     ['Your people', async (user: ReturnType<typeof userEvent.setup>) => {
       await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: PEOPLE }));
     }, PEOPLE],
@@ -635,7 +643,7 @@ describe('navigation (#566)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: PEOPLE }));
     await h1(PEOPLE);
     act(() => {
@@ -644,7 +652,7 @@ describe('navigation (#566)', () => {
     act(() => {
       window.history.back();
     });
-    expect(await h1('Your account')).toBeInTheDocument();
+    expect(await h1('Account')).toBeInTheDocument();
   });
 
   it('Back then Forward on Settings (signed out, flag on) returns to it', async () => {
@@ -653,7 +661,7 @@ describe('navigation (#566)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     expect(screen.getByRole('heading', { name: 'Help and support' })).toBeInTheDocument();
     act(() => {
       window.history.back();
@@ -662,7 +670,7 @@ describe('navigation (#566)', () => {
     act(() => {
       window.history.forward();
     });
-    expect(await h1('Your account')).toBeInTheDocument();
+    expect(await h1('Account')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Help and support' })).toBeInTheDocument();
   });
 
@@ -673,7 +681,7 @@ describe('navigation (#566)', () => {
     render(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     act(() => {
       window.history.back();
     });
@@ -681,7 +689,7 @@ describe('navigation (#566)', () => {
     act(() => {
       window.history.forward();
     });
-    expect(await h1('Your account')).toBeInTheDocument();
+    expect(await h1('Account')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: /name/i })).toBeNull();
   });
 
@@ -718,16 +726,16 @@ describe('navigation (#566)', () => {
     await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Overview'));
     const titleX = document.querySelector('h1')?.textContent ?? '';
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    await h1('Your account');
+    await h1('Account');
     const panelItems = Array.from(document.querySelectorAll<HTMLElement>('aside [data-checklist-item]'));
     const itemY = panelItems.find((node) => node.getAttribute('data-checklist-item') !== itemX);
     expect(itemY).toBeDefined();
     await user.click(itemY as HTMLElement);
-    await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Your account'));
+    await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Account'));
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
     await h1('Overview');
     // Browser Back: Overview, the panel item Y, Your account, then item X.
-    for (const expected of [() => document.querySelector('h1')?.textContent !== 'Overview', () => document.querySelector('h1')?.textContent === 'Your account', () => document.querySelector('h1')?.textContent === titleX]) {
+    for (const expected of [() => document.querySelector('h1')?.textContent !== 'Overview', () => document.querySelector('h1')?.textContent === 'Account', () => document.querySelector('h1')?.textContent === titleX]) {
       act(() => {
         window.history.back();
       });
@@ -735,6 +743,6 @@ describe('navigation (#566)', () => {
     }
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await h1('Overview');
-    expect(screen.queryByRole('heading', { level: 1, name: 'Your account' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Account' })).toBeNull();
   });
 });

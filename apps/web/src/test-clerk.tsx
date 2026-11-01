@@ -17,6 +17,8 @@ export interface FakeClerkOptions {
   signOut?: () => Promise<void>;
   /** Runs when Delete account is confirmed. Like Clerk, a resolve also ends the session; a rejection leaves it. */
   deleteAccount?: () => Promise<void>;
+  /** The given and family name on the Clerk user, as filled in at sign-up. */
+  names?: { firstName: string | null; lastName: string | null };
 }
 
 export interface FakeClerk {
@@ -86,7 +88,7 @@ export function fakeClerk(options: FakeClerkOptions = {}): FakeClerk {
           : undefined,
       [],
     );
-    return <>{children({ unavailable: false, account, getAccessToken, signOut, deleteAccount })}</>;
+    return <>{children({ unavailable: false, account, getAccessToken, signOut, deleteAccount, clerkNames: options.names })}</>;
   }
 
   function SignInScreen() {

@@ -33,6 +33,7 @@ import { AccountDeleted } from '../cms/AccountDeleted';
 import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
 import { PeopleList } from '../cms/PeopleList';
 import { EmptySection } from '../cms/EmptySection';
+import { NameNote } from '../cms/NameNote';
 import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
 import { ChecklistItemDetail } from '../cms/checklist/ChecklistItemDetail';
 import { PersonSection } from '../cms/sections/PersonSection';
@@ -48,6 +49,8 @@ import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { PeopleHelping } from '../screens/PeopleHelping';
 import { RemoveMember } from '../screens/RemoveMember';
+import { lacksFirstName, markPrefilled, namesToPrefill, wasPrefilled } from '../lib/prefillNames';
+import type { ClerkNames } from '../lib/prefillNames';
 import { deleteAccountThenClear, removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import type { ContactDraft } from '../screens/AddContactsManual';
@@ -266,6 +269,7 @@ export function App() {
           getAccessToken={state.getAccessToken}
           endSession={state.signOut}
           accountEmail={state.email}
+          clerkNames={state.clerkNames}
           openAccountSettings={state.openAccountSettings}
           deleteAccount={state.deleteAccount}
           onDeleted={onDeleted}
@@ -337,6 +341,7 @@ function AppBody({
   getAccessToken,
   endSession,
   accountEmail,
+  clerkNames,
   openAccountSettings,
   deleteAccount,
   onDeleted,
@@ -355,6 +360,8 @@ function AppBody({
   endSession?: () => Promise<void>;
   /** The signed-in email and Clerk's own account screen, for Your account. */
   accountEmail?: string | null;
+  /** The names on the Clerk user, used once to fill a profile that has none. */
+  clerkNames?: ClerkNames;
   openAccountSettings?: () => void;
   /** Deletes the Clerk account; absent when Clerk is not ready. */
   deleteAccount?: () => Promise<void>;
@@ -519,7 +526,8 @@ function AppBody({
     setView('home');
     // Ask in the background whether the account has a name. It never holds anyone back, and it
     // clears a prompt left over from an earlier session.
-    if (getAccessToken) {
+    // Editor on: no prompt. Names come from Clerk, and Overview shows a note when there is still none.
+    if (getAccessToken && !CMS_ENABLED) {
       accountGeneration.current += 1;
       const generation = accountGeneration.current;
       void accountLacksName(getAccessToken).then((lacks) => {
@@ -806,7 +814,7 @@ function AppBody({
   }, [view]);
 
   /** "Create a new one" on Home: setup first, then the rest of the walk. */
-  function startNewSession(section: CmsSection = 'person') {
+  function startNewSession() {
     if (CMS_ENABLED) {
       // One tap makes one person, even if a second tap lands before the screen changes.
       if (creatingNow.current) {
@@ -815,11 +823,11 @@ function AppBody({
       creatingNow.current = true;
       setArrivedQuietly(false);
       setArrivalNote('');
-      // The editor has no contacts step or who-hears-first: make the person and open the chosen section (The person by default).
+      // The editor has no contacts step or who-hears-first: make the person and open The person, from any page.
       const created = sessions.createSession();
       setActiveId(created.id);
       setCmsItem(null);
-      setCmsSection(section);
+      setCmsSection('person');
       setView('cms');
       return;
     }
@@ -1012,7 +1020,10 @@ function AppBody({
       opens.current.openPerson(sortedSessions[0].id);
       return;
     }
-    setView('people');
+    // Nobody saved: the Overview's empty page, not Your people.
+    setCmsItem(null);
+    setCmsSection('overview');
+    setView('noOne');
   }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, waitingForSync]);
 
   useEffect(() => {
@@ -1026,13 +1037,49 @@ function AppBody({
   // While the first pull may still bring people, offering "Start" could make a second copy of one.
   const creationHeld = waitingForSync && sortedSessions.length === 0;
 
+  // First sign-in with an account that has no name: fill it from the Clerk user (given and family
+  // name) in one save. The server sets the sender name from the first name. It is tried once per
+  // user on this device and never overwrites a name that exists; a failed save is silent (C5), and
+  // Overview shows a note that leads to Account.
+  const prefilling = useRef(false);
+  const updateDetails = auth?.updateDetails;
+  const profileAnswered = auth?.profileAnswered ?? false;
+  const knownProfile = auth?.profile ?? null;
+  const userId = auth?.userId;
+  useEffect(() => {
+    if (!CMS_ENABLED || !signedIn || offline || !userId || !profileAnswered || !updateDetails || prefilling.current) {
+      return;
+    }
+    if (wasPrefilled(window.localStorage, userId)) {
+      return;
+    }
+    const names = namesToPrefill(knownProfile, clerkNames);
+    if (!names) {
+      return;
+    }
+    prefilling.current = true;
+    void updateDetails(names)
+      .then((result) => {
+        if (result.ok) {
+          markPrefilled(window.localStorage, userId);
+        }
+      })
+      .catch(() => undefined);
+  }, [signedIn, offline, userId, profileAnswered, updateDetails, knownProfile, clerkNames]);
+  // Signed out: the next sign-in (maybe another user) may fill its own names.
+  useEffect(() => {
+    if (signedOut) {
+      prefilling.current = false;
+    }
+  }, [signedOut]);
+
   // Armed by the landing. Fires once on the first editor render, then disarms (even with no h1). If the
   // landing is interrupted (another screen shows first), it disarms so it can't fire on a later visit.
   useEffect(() => {
     if (!focusAfterLanding.current) {
       return;
     }
-    if (view === 'cms' || view === 'people') {
+    if (view === 'cms' || view === 'people' || view === 'noOne') {
       focusAfterLanding.current = false;
       const heading = document.querySelector('h1');
       if (heading) {
@@ -1100,7 +1147,6 @@ function AppBody({
         <CmsShell
           title={cmsShellCopy.peopleTitle}
           nobody={noPerson}
-          hideChange
           aside={panelFor(person)}
           personName={person?.personName ?? ''}
           section="people"
@@ -1123,8 +1169,8 @@ function AppBody({
             setActiveId(person.id);
             setView('cms');
           }}
-          // Change is hidden here (hideChange), and Your people is already open.
-          onChangePerson={() => undefined}
+          // Your people is already open.
+          onPeople={() => undefined}
           onAccount={() => {
             sessions.pruneEmpty();
             accountFrom.current = 'people';
@@ -1164,22 +1210,9 @@ function AppBody({
     return result;
   }
 
-  /** Where Your account was opened from, flag off or on: the name prompt goes back to where it was. */
-  function leaveAccount() {
-    auth?.clearError();
-    setAskingName(false);
-    if (askingName) {
-      setView(returnTo);
-    } else {
-      backFromAccount();
-    }
-  }
-
   /**
    * Your account inside the editor shell (flag on). The shell owns the one h1. There is no Back: the
-   * side nav and Change lead out. With an open or most recent person the full nav shows; with none
-   * the nav offers only this item. A quiet "Your people" button leads back whenever the user came from
-   * Your people or has no person (the origin rule).
+   * side nav leads out, and it looks the same with or without a person.
    */
   function renderAccount(title: string, body: ReactNode) {
     // The open person, else the most recent one; with nobody at all the pages are the empty ones.
@@ -1190,7 +1223,6 @@ function AppBody({
         <CmsShell
           title={title}
           nobody={noPerson}
-          hideChange={noPerson}
           aside={panelFor(person)}
           personName={person?.personName ?? ''}
           section="account"
@@ -1212,7 +1244,7 @@ function AppBody({
               setView('cms');
             }
           }}
-          onChangePerson={() => {
+          onPeople={() => {
             auth?.clearError();
             setAskingName(false);
             leaveCms();
@@ -1221,16 +1253,23 @@ function AppBody({
           onAccount={() => undefined}
           notice={endedNote}
         >
-          {noPerson || accountFrom.current === 'people' || accountFrom.current === 'noOne' ? (
-            <button type="button" className="gg-btn gg-btn-ghost self-start !px-0" onClick={leaveAccount}>
-              {cmsShellCopy.peopleTitle}
-            </button>
-          ) : null}
           {body}
         </CmsShell>
       </Shell>
     );
   }
+
+  /** The line on Overview when the account has no first name: a link to Account. */
+  const nameNote =
+    CMS_ENABLED && signedIn && profileAnswered && lacksFirstName(knownProfile) ? (
+      <NameNote
+        onOpenAccount={() => {
+          accountFrom.current = view === 'noOne' ? 'noOne' : 'cms';
+          setCmsItem(null);
+          openProfile(false);
+        }}
+      />
+    ) : null;
 
   /** A section or the Overview with nobody saved: one calm page and one next step. */
   function openEmpty(section: CmsSection) {
@@ -1270,9 +1309,9 @@ function AppBody({
 
   if (CMS_ENABLED && auth && view === 'profile') {
     return renderAccount(
-      askingName ? accountCopy.askHeading : accountCopy.heading,
+      accountCopy.title,
       <AccountSection
-        asksName={askingName}
+        asksName={false}
         senderName={auth.profile?.senderName ?? null}
         firstName={auth.profile?.firstName ?? null}
         lastName={auth.profile?.lastName ?? null}
@@ -1409,7 +1448,7 @@ function AppBody({
               setCmsSection(key);
             }
           }}
-          onChangePerson={leaveCms}
+          onPeople={leaveCms}
           onAccount={() => {
             sessions.pruneEmpty();
             accountFrom.current = 'cms';
@@ -1435,12 +1474,15 @@ function AppBody({
               }}
             />
           ) : cmsSection === 'overview' ? (
-            <Overview
-              session={active}
-              checklist={active}
-              onOpen={setCmsSection}
-              onOpenItem={(id) => openCmsItem(id, 'main')}
-            />
+            <>
+              {nameNote}
+              <Overview
+                session={active}
+                checklist={active}
+                onOpen={setCmsSection}
+                onOpenItem={(id) => openCmsItem(id, 'main')}
+              />
+            </>
           ) : cmsSection === 'person' ? (
             <PersonSection
               values={active}
@@ -1490,7 +1532,7 @@ function AppBody({
 
   if (CMS_ENABLED && view === 'settings') {
     return renderAccount(
-      accountCopy.heading,
+      accountCopy.title,
       <AccountSettingsSection
         removeMember={
           sharingOn && members.view?.role === 'owner' ? (
@@ -1686,7 +1728,6 @@ function AppBody({
         <CmsShell
           title={cmsShellCopy.loadingTitle}
           nobody
-          hideChange
           aside={panelFor(null)}
           noCurrent
           personName=""
@@ -1696,7 +1737,7 @@ function AppBody({
               openEmpty(key);
             }
           }}
-          onChangePerson={() => setView('people')}
+          onPeople={() => setView('people')}
           onAccount={() => {
             accountFrom.current = 'people';
             if (auth?.isSignedIn) {
@@ -1719,7 +1760,6 @@ function AppBody({
         <CmsShell
           title={cmsItem ? cmsItemLabels[cmsItem] : undefined}
           nobody
-          hideChange
           aside={panelFor(null)}
           personName=""
           section={cmsSection}
@@ -1729,7 +1769,7 @@ function AppBody({
               setCmsSection(key);
             }
           }}
-          onChangePerson={() => {
+          onPeople={() => {
             setCmsItem(null);
             setView('people');
           }}
@@ -1757,7 +1797,10 @@ function AppBody({
               }}
             />
           ) : (
-            <EmptySection canCreate={canCreate} holding={creationHeld} onCreate={() => startNewSession(cmsSection)} />
+            <>
+              {cmsSection === 'overview' ? nameNote : null}
+              <EmptySection canCreate={canCreate} holding={creationHeld} onCreate={() => startNewSession()} />
+            </>
           )}
         </CmsShell>
       </Shell>
