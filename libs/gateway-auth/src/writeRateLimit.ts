@@ -32,8 +32,7 @@ function bindingFrom(env: unknown): RateLimitBinding | null {
 
 /**
  * Per-user limit on write requests (POST, PUT, PATCH, DELETE). Mount it after `clerkAuth` so the
- * key is the verified user id. If no user is set (not expected after clerkAuth) the client IP is
- * the fallback. With no binding (local dev, tests) it does nothing. If the limiter itself errors,
+ * key is the verified user id. With no user it does nothing. With no binding (local dev, tests) it does nothing. If the limiter itself errors,
  * the request goes through: a broken limiter must never block someone saving their work.
  */
 export function writeRateLimit(): MiddlewareHandler {
@@ -46,8 +45,12 @@ export function writeRateLimit(): MiddlewareHandler {
       return next();
     }
     const userId = c.get('userId') as string | undefined;
-    const ip = c.req.header('cf-connecting-ip');
-    const key = userId ? `user:${userId}` : `ip:${ip ?? 'unknown'}`;
+    if (!userId) {
+      // Not expected after clerkAuth. Without a user there is no honest key (one shared bucket would
+      // let one caller limit everyone), so let the route's own checks decide.
+      return next();
+    }
+    const key = `user:${userId}`;
 
     let allowed = true;
     try {

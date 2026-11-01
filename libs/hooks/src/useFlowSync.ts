@@ -298,6 +298,8 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const inFlight = new Set<Cancel>();
     let softFailure = false;
+    // True while the last write got a 429. Edits then must not replace the backoff timer.
+    let rateLimited = false;
     const fail = (reason: FlowsFailureReason | null) => {
       setLastError((prev) => (prev === reason ? prev : reason));
     };
@@ -417,6 +419,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             break;
           }
           fail(result.reason);
+          rateLimited = result.reason === 'rate_limited';
           // A network or server outage, or the gateway's write limit (429), stops the queue: the edits
           // stay queued and the next cycle retries. Anything else is about this person alone: keep
           // their edits, note the error and carry on with the next one.
@@ -458,6 +461,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
           if (!alive) break;
           if (ok) {
             failures = 0;
+            rateLimited = false;
             if (!softFailure) fail(null);
           } else {
             failures += 1;
@@ -482,7 +486,14 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       }, delayMs);
     }
 
-    kickRef.current = arm;
+    // An edit normally runs the next cycle soon. After a 429 it waits for the backoff already armed,
+    // so typing does not cause one more 429 per pause.
+    kickRef.current = (delayMs: number) => {
+      if (rateLimited && timer !== undefined) {
+        return;
+      }
+      arm(delayMs);
+    };
     let unsubscribe: () => void = () => undefined;
     try {
       unsubscribe = latest.current.subscribe(() => {

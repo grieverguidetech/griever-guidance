@@ -357,6 +357,32 @@ describe('useFlowSync failures (C5)', () => {
     expect(result.current.lastError).toBeNull();
   });
 
+  it('an edit during a 429 backoff does not replace the backoff timer', async () => {
+    let status = 429;
+    const requests = mockFetch((req) =>
+      req.method === 'GET' ? { status: 200, body: [record()] } : { status, body: status === 200 ? record() : null },
+    );
+    const base = session();
+    const { rerender } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).length).toBe(1);
+
+    // Keep editing inside the backoff wait: no new write goes out.
+    rerender({ sessions: [{ ...base, serviceDate: 'June 4' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 5' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).length).toBe(1);
+
+    // At the backoff time the newest edit is sent.
+    status = 200;
+    await advance(BACKOFF_START_MS);
+    expect(writes(requests).length).toBe(2);
+    expect(writes(requests).at(-1)?.body).toEqual({ serviceDate: 'June 5' });
+  });
+
   it('does not stall on a request that never answers', async () => {
     const requests = mockFetch((req) => (req.method === 'GET' ? 'hang' : { status: 200, body: record() }));
     const { result } = setup([session()]);

@@ -67,14 +67,15 @@ describe('writeRateLimit', () => {
     expect(b.limit.mock.calls.map(([o]) => o.key)).toEqual(['user:u1', 'user:u2']);
   });
 
-  it('falls back to the client IP when there is no user', async () => {
-    const b = binding(true);
-    await makeApp().request(
+  it('does nothing when there is no user, so there is no shared bucket', async () => {
+    const b = binding(false);
+    const res = await makeApp().request(
       '/x',
       { method: 'POST', headers: { 'cf-connecting-ip': '203.0.113.9' } },
       envWith(b),
     );
-    expect(b.limit.mock.calls[0]?.[0].key).toBe('ip:203.0.113.9');
+    expect(res.status).toBe(200);
+    expect(b.limit).not.toHaveBeenCalled();
   });
 
   it('lets the request through if the limiter throws', async () => {
