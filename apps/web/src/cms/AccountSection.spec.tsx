@@ -465,3 +465,71 @@ describe('AccountSection phone and support panels', () => {
     expect(link.className).not.toContain('break-all');
   });
 });
+
+describe('Delete account panel', () => {
+  it('is not shown without a delete handler', () => {
+    profile();
+    expect(screen.queryByRole('heading', { name: 'Delete account' })).not.toBeInTheDocument();
+  });
+
+  it('idle: explains what is deleted, sits after Sign out, and does not delete', () => {
+    const onDeleteAccount = vi.fn();
+    profile({ onDeleteAccount });
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings.indexOf('Delete account')).toBe(headings.indexOf('Sign out') + 1);
+    expect(screen.getByText(/every person and plan, and the messages they wrote/)).toBeInTheDocument();
+    expect(screen.getByText(/People helping you lose access/)).toBeInTheDocument();
+    expect(screen.getByText(/It cannot be undone/)).toBeInTheDocument();
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('confirm: opening moves focus into the confirm and does not delete', async () => {
+    const user = userEvent.setup();
+    const onDeleteAccount = vi.fn();
+    profile({ onDeleteAccount });
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    expect(screen.getByRole('heading', { name: 'Delete your account for good?' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Yes, delete my account' })).toBeInTheDocument();
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('Cancel returns focus to the opener and still does not delete', async () => {
+    const user = userEvent.setup();
+    const onDeleteAccount = vi.fn();
+    profile({ onDeleteAccount });
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Delete my account' })).toHaveFocus();
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('deleting: shows progress and ignores a second press, then calls the handler once', async () => {
+    const user = userEvent.setup();
+    let finish: () => void = () => undefined;
+    const onDeleteAccount = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    profile({ onDeleteAccount });
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
+    const busy = screen.getByRole('button', { name: 'Deleting your account…' });
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    await user.click(busy);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onDeleteAccount).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Deleting your account…' })).toBeInTheDocument();
+    await act(async () => finish());
+  });
+
+  it('failed: shows a calm error, keeps the confirm open, and can try again', async () => {
+    const user = userEvent.setup();
+    const onDeleteAccount = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined);
+    profile({ onDeleteAccount });
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
+    const note = await screen.findByText(/We could not delete your account\. Nothing was removed\./);
+    expect(note).not.toHaveTextContent('!');
+    expect(screen.getByRole('button', { name: 'Yes, delete my account' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
+    await waitFor(() => expect(onDeleteAccount).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/We could not delete your account/)).not.toBeInTheDocument());
+  });
+});

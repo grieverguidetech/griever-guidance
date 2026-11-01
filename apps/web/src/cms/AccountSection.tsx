@@ -26,6 +26,8 @@ interface ProfileProps {
   /** Resolves true when saved. A false result keeps what was typed. */
   onSave: (name: string) => Promise<boolean>;
   onSignOut: () => void;
+  /** Deletes the account. Resolves once it is deleted; rejects when it was not, and nothing local is removed. When absent, the Delete account panel is not shown. */
+  onDeleteAccount?: () => Promise<void>;
   /** The optional private details. Absent fields read as empty. */
   fullName?: string | null;
   birthDate?: string | null;
@@ -45,7 +47,7 @@ interface ProfileProps {
  * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you (with "remove a member" beside it), Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
+export function AccountSection({ asksName, senderName, error, peopleHelping, onSave, onSignOut, onDeleteAccount, fullName, birthDate, onSaveDetails, email, onManageSignIn, settings, plans }: ProfileProps) {
   const id = useId();
   const [cardNote, setCardNote] = useState(false);
 
@@ -183,7 +185,91 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           </button>
         </div>
       </section>
+      {onDeleteAccount ? <DeletePanel onDelete={onDeleteAccount} /> : null}
     </>
+  );
+}
+
+interface DeletePanelProps {
+  onDelete: () => Promise<void>;
+}
+
+/** "Delete account": one button opens a confirm step; only the second, deliberate button deletes. */
+function DeletePanel({ onDelete }: DeletePanelProps) {
+  const id = useId();
+  const [step, setStep] = useState<'idle' | 'confirm' | 'deleting'>('idle');
+  const [failed, setFailed] = useState(false);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLHeadingElement>(null);
+  const wasConfirming = useRef(false);
+
+  // Opening the confirm moves focus into it; closing it returns focus to the opener.
+  useEffect(() => {
+    if (step === 'confirm' && !wasConfirming.current) {
+      confirmRef.current?.focus();
+    } else if (step === 'idle' && wasConfirming.current) {
+      openerRef.current?.focus();
+    }
+    wasConfirming.current = step !== 'idle';
+  }, [step]);
+
+  async function confirm() {
+    if (step === 'deleting') {
+      return;
+    }
+    setFailed(false);
+    setStep('deleting');
+    try {
+      await onDelete();
+    } catch {
+      setFailed(true);
+      setStep('confirm');
+    }
+  }
+
+  function cancel() {
+    if (step === 'deleting') {
+      return;
+    }
+    setFailed(false);
+    setStep('idle');
+  }
+
+  const deleting = step === 'deleting';
+  return (
+    <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-delete`}>
+      <h2 id={`${id}-delete`} className="text-[16px] m-0">
+        {copy.deleteHeading}
+      </h2>
+      {step === 'idle' ? (
+        <>
+          <p className="gg-hint m-0">{copy.deleteHint}</p>
+          <div className="flex flex-wrap gap-2">
+            <button ref={openerRef} type="button" className="gg-btn gg-btn-secondary" onClick={() => setStep('confirm')}>
+              {copy.deleteOpen}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div role="group" aria-labelledby={`${id}-confirm`} className="flex flex-col gap-3">
+          <h3 id={`${id}-confirm`} ref={confirmRef} tabIndex={-1} className="text-[16px] m-0">
+            {copy.deleteConfirmHeading}
+          </h3>
+          <p className="m-0">{copy.deleteConfirmBody}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="gg-btn gg-btn-secondary" aria-disabled={deleting} onClick={() => void confirm()}>
+              {deleting ? copy.deleting : copy.deleteConfirmAction}
+            </button>
+            <button type="button" className="gg-btn gg-btn-primary" aria-disabled={deleting} onClick={cancel}>
+              {copy.deleteCancel}
+            </button>
+          </div>
+        </div>
+      )}
+      <p role="status" aria-live="polite" className="m-0 text-[13px] font-semibold">
+        {failed ? copy.deleteFailed : ''}
+      </p>
+    </section>
   );
 }
 

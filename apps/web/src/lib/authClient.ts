@@ -12,6 +12,8 @@ export interface ClerkAccountReady {
   email?: string | null;
   /** Opens Clerk's own account screen (email, password, devices). Absent when Clerk is not ready. */
   openAccountSettings?: () => void;
+  /** Deletes the Clerk user (`user.delete()`). Absent when Clerk is not ready. */
+  deleteAccount?: () => Promise<void>;
 }
 
 /** `unavailable`: Clerk is missing a key or did not load in time, and there is no signed-in marker to fall back on. */

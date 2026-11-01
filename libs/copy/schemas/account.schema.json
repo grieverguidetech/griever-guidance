@@ -83,7 +83,19 @@
     "supportHeading",
     "supportBody",
     "supportEmail",
-    "supportSubject"
+    "supportSubject",
+    "deleteHeading",
+    "deleteHint",
+    "deleteOpen",
+    "deleteConfirmHeading",
+    "deleteConfirmBody",
+    "deleteConfirmAction",
+    "deleteCancel",
+    "deleting",
+    "deleteFailed",
+    "deletedHeading",
+    "deletedBody",
+    "deletedAction"
   ],
   "properties": {
     "heading": {
@@ -324,6 +336,42 @@
       "$ref": "#/$defs/text"
     },
     "supportSubject": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteHint": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteOpen": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteConfirmHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteConfirmBody": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteConfirmAction": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteCancel": {
+      "$ref": "#/$defs/text"
+    },
+    "deleting": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "deletedHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "deletedBody": {
+      "$ref": "#/$defs/text"
+    },
+    "deletedAction": {
       "$ref": "#/$defs/text"
     }
   },

@@ -1,5 +1,5 @@
 import { contactStore } from '@griever/data-local';
-import { removeEverythingFromDevice } from './removeFromDevice';
+import { deleteAccountThenClear, removeEverythingFromDevice } from './removeFromDevice';
 
 describe('removeEverythingFromDevice', () => {
   it('removes contacts, gg.* keys and a legacy supabase session, leaves other keys, and ends the session', async () => {
@@ -31,5 +31,28 @@ describe('removeEverythingFromDevice', () => {
   it('does not mark a sign-out pending when there is no session to end', async () => {
     await removeEverythingFromDevice(localStorage);
     expect(localStorage.getItem('gg.signOutPending')).toBeNull();
+  });
+});
+
+describe('deleteAccountThenClear', () => {
+  it('clears this device only after Clerk resolves', async () => {
+    localStorage.setItem('gg.sessions.v1', '[]');
+    let sawKeyWhenDeleting: string | null = null;
+    const deleteAccount = vi.fn(async () => {
+      sawKeyWhenDeleting = localStorage.getItem('gg.sessions.v1');
+    });
+    await deleteAccountThenClear(deleteAccount, localStorage);
+    expect(sawKeyWhenDeleting).toBe('[]');
+    expect(localStorage.getItem('gg.sessions.v1')).toBeNull();
+    expect(localStorage.getItem('gg.signOutPending')).toBeNull();
+  });
+
+  it('rejects and keeps every local store when Clerk fails', async () => {
+    await contactStore.put({ contactId: 'c2' } as never);
+    localStorage.setItem('gg.sessions.v1', '[]');
+    await expect(deleteAccountThenClear(() => Promise.reject(new Error('offline')), localStorage)).rejects.toThrow('offline');
+    expect(localStorage.getItem('gg.sessions.v1')).toBe('[]');
+    expect(await contactStore.list()).toHaveLength(1);
+    await contactStore.clearAll();
   });
 });

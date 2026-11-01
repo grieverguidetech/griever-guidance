@@ -78,5 +78,17 @@
   "supportHeading": "Help and support",
   "supportBody": "Write to us if you have a question or something is not working.",
   "supportEmail": "grieversguidancetech@gmail.com",
-  "supportSubject": "Help with Grievers Guidance"
+  "supportSubject": "Help with Grievers Guidance",
+  "deleteHeading": "Delete account",
+  "deleteHint": "This deletes your account, every person and plan, and the messages they wrote. People helping you lose access. It cannot be undone.",
+  "deleteOpen": "Delete my account",
+  "deleteConfirmHeading": "Delete your account for good?",
+  "deleteConfirmBody": "Your account, every person and plan, and the messages they wrote will be deleted. People helping you will lose access. This cannot be undone.",
+  "deleteConfirmAction": "Yes, delete my account",
+  "deleteCancel": "Cancel",
+  "deleting": "Deleting your account…",
+  "deleteFailed": "We could not delete your account. Nothing was removed. Please check your connection and try again, or write to us for help.",
+  "deletedHeading": "Your account is deleted",
+  "deletedBody": "Everything was removed from this device and from our servers. Take all the time you need.",
+  "deletedAction": "Back to the start"
 }
