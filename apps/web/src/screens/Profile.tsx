@@ -3,6 +3,9 @@ import type { ReactNode, RefObject } from 'react';
 import { screenCopy } from '@griever/copy';
 import { Account } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
+import type { Address } from '@griever/shared';
+import { PersonalDetailsForm } from '../cms/PersonalDetailsForm';
+import type { PersonalDetails, SaveDetailsResult } from '../cms/PersonalDetailsForm';
 import { ChecklistRows } from '../lib/ChecklistRows';
 import { WhatYoullNeedSheet } from '../lib/WhatYoullNeedSheet';
 
@@ -16,6 +19,12 @@ interface Props {
   onBack: () => void;
   /** Resolves true when saved. A false result keeps what was typed. */
   onSave: (name: string) => Promise<boolean>;
+  /** The name prompt asks First name and Last name and saves them here. Without it the prompt keeps the single name field. */
+  onSaveDetails?: (details: PersonalDetails) => Promise<SaveDetailsResult>;
+  firstName?: string | null;
+  lastName?: string | null;
+  birthDate?: string | null;
+  address?: Address | null;
   onSignOut: () => void;
   /** Straight after sign-up: one primary Continue, which hands over the name and goes on to Home. */
   firstTime?: boolean;
@@ -82,11 +91,34 @@ export function useNameForm({ senderName, onSave, firstTime, onContinue }: NameF
 }
 
 /** The screen is the shared Account in libs/ui; this holds what is web only: saving, the sheet, and the list under the form. */
-export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSignOut, error, peopleHelping, showChecklist = true }: Props) {
+export function Profile({ asksName, firstTime, onContinue, saveFailed, senderName, onBack, onSave, onSaveDetails, firstName, lastName, birthDate, address, onSignOut, error, peopleHelping, showChecklist = true }: Props) {
   const id = useId();
   const [sheetOpen, setSheetOpen] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
   const { value, pending, saved, nameError, changeName, submit } = useNameForm({ senderName, onSave, firstTime, onContinue });
+
+  if (asksName && onSaveDetails) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <button type="button" className="gg-btn gg-btn-secondary" onClick={onBack}>
+            {copy.back}
+          </button>
+        </div>
+        <h1 className="m-0">{copy.askHeading}</h1>
+        <PersonalDetailsForm
+          namesOnly
+          senderName={senderName}
+          firstName={firstName ?? null}
+          lastName={lastName ?? null}
+          birthDate={birthDate ?? null}
+          address={address ?? null}
+          error={error}
+          onSave={onSaveDetails}
+        />
+      </div>
+    );
+  }
 
   // The name prompt and the first visit stay short: the list shows on the everyday account page.
   const showList = showChecklist && !asksName && !firstTime;

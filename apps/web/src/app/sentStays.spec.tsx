@@ -85,8 +85,8 @@ async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
 async function nameCheckInterrupts(user: ReturnType<typeof userEvent.setup>, answer: (r: ProfileResult) => void) {
   answer({ ok: true, profile: PROFILE });
   await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
-  await user.type(screen.getByLabelText('Your name'), 'Anna');
-  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await user.type(screen.getByLabelText('First name'), 'Anna');
+  await user.click(screen.getByRole('button', { name: 'Save details' }));
 }
 
 function lateProfile() {
@@ -102,9 +102,9 @@ beforeEach(() => {
   mocks.loadClerk.mockReset();
   mocks.getProfile.mockReset();
   mocks.updateProfile.mockReset();
-  mocks.updateProfile.mockImplementation(async (_token: string, update: { senderName?: string }) => ({
+  mocks.updateProfile.mockImplementation(async (_token: string, update: { senderName?: string; firstName?: string }) => ({
     ok: true,
-    profile: { ...PROFILE, senderName: update.senderName ?? null },
+    profile: { ...PROFILE, senderName: update.senderName ?? update.firstName ?? null, firstName: update.firstName ?? null },
   }));
   // jsdom can't follow the sms: link; the hand-off itself is not under test here.
   vi.spyOn(console, 'error').mockImplementation(() => undefined);

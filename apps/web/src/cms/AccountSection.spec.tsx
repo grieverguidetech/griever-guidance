@@ -1,12 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AccountSection, AccountSettingsSection, checkDetails } from './AccountSection';
+import { AccountSection, AccountSettingsSection } from './AccountSection';
 
 function profile(overrides: Partial<Parameters<typeof AccountSection>[0]> = {}) {
   const props = {
     senderName: 'Anna' as string | null,
     error: null as string | null,
-    onSave: vi.fn().mockResolvedValue(true),
+    onSaveDetails: vi.fn().mockResolvedValue({ ok: true }),
     onSignOut: vi.fn(),
     ...overrides,
   };
@@ -15,53 +15,51 @@ function profile(overrides: Partial<Parameters<typeof AccountSection>[0]> = {}) 
 }
 
 describe('AccountSection', () => {
-  it('shows the saved name, Sign out, and no heading or Back of its own', () => {
+  it('shows the Personal details form, Sign out, and no heading or Back of its own', () => {
     profile();
-    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+    expect(screen.getByRole('heading', { level: 3, name: 'Personal details' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
-  it('saves the trimmed name and says so', async () => {
-    const user = userEvent.setup();
-    const props = profile();
-    await user.clear(screen.getByLabelText('Your name'));
-    await user.type(screen.getByLabelText('Your name'), '  Anna Lee ');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(props.onSave).toHaveBeenCalledWith('Anna Lee');
-    expect(await screen.findByText('Your name is saved.')).toBeInTheDocument();
+  it('has no Your name or Full name field', () => {
+    profile();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
   });
 
-  it('asks for a name when it is blank and does not save', async () => {
+  it('the name prompt asks First name and Last name only, with its intro, and saves with the rest unchanged', async () => {
     const user = userEvent.setup();
-    const props = profile({ senderName: null });
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByText('Please enter your name.')).toBeInTheDocument();
-    expect(props.onSave).not.toHaveBeenCalled();
+    const props = profile({
+      asksName: true,
+      senderName: null,
+      birthDate: '1980-05-29',
+      address: { line1: '1 Main St', line2: '', city: 'Milltown', state: 'NJ', zip: '08850' },
+    });
+    expect(screen.getByText('Your first name is the name your messages are signed with.')).toBeInTheDocument();
+    expect(screen.getByLabelText('First name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Last name')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Date of birth')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('ZIP code')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(props.onSaveDetails).toHaveBeenCalledWith({
+      firstName: 'Anna',
+      lastName: 'Reyes',
+      birthDate: '1980-05-29',
+      address: { line1: '1 Main St', line2: '', city: 'Milltown', state: 'NJ', zip: '08850' },
+    });
   });
 
-  it('keeps what was typed when the save fails', async () => {
+  it('the name prompt needs a first name and does not save without one', async () => {
     const user = userEvent.setup();
-    profile({ onSave: vi.fn().mockResolvedValue(false), error: 'We couldn\'t save your name. You can try again.' });
-    await user.type(screen.getByLabelText('Your name'), ' B');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument());
-    expect(screen.getByLabelText('Your name')).toHaveValue('Anna B');
-    expect(screen.getByText("We couldn't save your name. You can try again.")).toBeInTheDocument();
-    expect(screen.queryByText('Your name is saved.')).not.toBeInTheDocument();
-  });
-
-  it('calls onSignOut', async () => {
-    const user = userEvent.setup();
-    const props = profile();
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(props.onSignOut).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the intro for the name prompt', () => {
-    render(<AccountSection asksName senderName={null} error={null} onSave={vi.fn()} onSignOut={vi.fn()} />);
-    expect(screen.getByText('This is the name on your account.')).toBeInTheDocument();
+    const props = profile({ asksName: true, senderName: null });
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your first name.');
+    expect(screen.getByLabelText('First name')).toBeInvalid();
+    expect(props.onSaveDetails).not.toHaveBeenCalled();
   });
 
   it("has no second What you'll need list on Your account", () => {
@@ -76,7 +74,7 @@ describe('AccountSection', () => {
       <AccountSection
         senderName="Anna"
         error={null}
-        onSave={vi.fn()}
+        onSaveDetails={vi.fn()}
         onSignOut={vi.fn()}
         settings={{ removeMember: <h2>People helping you</h2> }}
       />,
@@ -87,25 +85,6 @@ describe('AccountSection', () => {
     unmount();
     profile();
     expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();
-  });
-
-  it('describes the field by the intro and the status, and flags an error after a failed save', async () => {
-    const user = userEvent.setup();
-    const { unmount } = render(
-      <AccountSection asksName senderName={null} error="We couldn't save your name. You can try again." onSave={vi.fn().mockResolvedValue(false)} onSignOut={vi.fn()} />,
-    );
-    await user.type(screen.getByLabelText('Your name'), 'Anna');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByText("We couldn't save your name. You can try again.");
-    const field = screen.getByLabelText('Your name');
-    const ids = (field.getAttribute('aria-describedby') ?? '').split(' ');
-    expect(ids).toHaveLength(2);
-    expect(document.getElementById(ids[0])).toHaveTextContent('This is the name on your account.');
-    expect(document.getElementById(ids[1])).toHaveTextContent("We couldn't save your name");
-    expect(field).toHaveAttribute('aria-invalid', 'true');
-    unmount();
-    profile();
-    expect(screen.getByLabelText('Your name')).not.toHaveAttribute('aria-invalid');
   });
 
   it('shows the people helping node under the form', () => {
@@ -178,70 +157,157 @@ describe('AccountSettingsSection', () => {
   });
 });
 
-describe('AccountSection details', () => {
+describe('AccountSection personal details', () => {
   const ok = { ok: true as const };
+  const SAVE = { name: 'Save details' };
+  const address = { line1: '1 Main St', line2: 'Apt 2', city: 'Milltown', state: 'NJ', zip: '08850' };
 
   function withDetails(overrides: Partial<Parameters<typeof AccountSection>[0]> = {}) {
     const onSaveDetails = vi.fn().mockResolvedValue(ok);
-    const props = {
-      senderName: 'Anna',
-      error: null as string | null,
-      onSave: vi.fn().mockResolvedValue(true),
-      onSignOut: vi.fn(),
-      onSaveDetails,
-      ...overrides,
-    };
+    const props = { senderName: 'Anna', error: null as string | null, onSignOut: vi.fn(), onSaveDetails, ...overrides };
     render(<AccountSection {...props} />);
     return { ...props, onSaveDetails };
   }
 
-  it('shows no details fields when nothing can save them', () => {
-    profile();
-    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+  async function fillAddress(user: ReturnType<typeof userEvent.setup>, values: Partial<Record<string, string>> = {}) {
+    const all = { 'Address line 1': '1 Main St', 'Address line 2 (optional)': '', City: 'Milltown', State: 'nj', 'ZIP code': '08850', ...values };
+    for (const [label, text] of Object.entries(all)) {
+      if (text) {
+        await user.type(screen.getByLabelText(label), text);
+      }
+    }
+  }
+
+  it('renders every field with visible labels, autocomplete hints and one Save details button', () => {
+    withDetails();
+    const expected: Record<string, string> = {
+      'First name': 'given-name',
+      'Last name': 'family-name',
+      'Address line 1': 'address-line1',
+      'Address line 2 (optional)': 'address-line2',
+      City: 'address-level2',
+      State: 'address-level1',
+      'ZIP code': 'postal-code',
+    };
+    for (const [label, token] of Object.entries(expected)) {
+      expect(screen.getByLabelText(label)).toHaveAttribute('autocomplete', token);
+    }
+    expect(screen.getByLabelText('State')).toHaveAttribute('maxlength', '2');
+    expect(screen.getByLabelText('Date of birth')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Address' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', SAVE)).toHaveLength(1);
+  });
+
+  it('prefills the first name from senderName when no names are saved', () => {
+    withDetails({ senderName: 'Anna' });
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
+    expect(screen.getByLabelText('Last name')).toHaveValue('');
+  });
+
+  it('prefers saved names over senderName, and does not copy senderName into a blank first name when a last name exists', () => {
+    const { unmount } = render(<AccountSection senderName="Ann" firstName="Anna" lastName="Reyes" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} />);
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
+    expect(screen.getByLabelText('Last name')).toHaveValue('Reyes');
+    unmount();
+    render(<AccountSection senderName="Ann" firstName={null} lastName="Reyes" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} />);
+    expect(screen.getByLabelText('First name')).toHaveValue('');
   });
 
   it('shows the saved values, the date as Month D, YYYY', () => {
-    withDetails({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
-    expect(screen.getByLabelText('Full name')).toHaveValue('Anna Lee');
+    withDetails({ firstName: 'Anna', lastName: 'Lee', birthDate: '1980-05-29', address });
     expect(screen.getByLabelText('Date of birth')).toHaveValue('May 29, 1980');
+    expect(screen.getByLabelText('Address line 1')).toHaveValue('1 Main St');
+    expect(screen.getByLabelText('Address line 2 (optional)')).toHaveValue('Apt 2');
+    expect(screen.getByLabelText('City')).toHaveValue('Milltown');
+    expect(screen.getByLabelText('State')).toHaveValue('NJ');
+    expect(screen.getByLabelText('ZIP code')).toHaveValue('08850');
   });
 
-  it('saves the trimmed name and a yyyy-mm-dd date', async () => {
+  it('saves trimmed names, a yyyy-mm-dd date and the address with the state in capitals, then says so', async () => {
     const user = userEvent.setup();
-    const { onSaveDetails } = withDetails();
-    await user.type(screen.getByLabelText('Full name'), '  Anna Lee ');
+    const { onSaveDetails } = withDetails({ senderName: null });
+    await user.type(screen.getByLabelText('First name'), '  Anna ');
+    await user.type(screen.getByLabelText('Last name'), 'Lee');
     await user.type(screen.getByLabelText('Date of birth'), 'May 29, 1980');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(onSaveDetails).toHaveBeenCalledWith({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
+    await fillAddress(user);
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenCalledWith({
+      firstName: 'Anna',
+      lastName: 'Lee',
+      birthDate: '1980-05-29',
+      address: { line1: '1 Main St', line2: '', city: 'Milltown', state: 'NJ', zip: '08850' },
+    });
     expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
+  });
+
+  it('needs a first name, in the full form too, and does not save without one', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails({ senderName: null });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your first name.');
+    expect(screen.getByLabelText('First name')).toBeInvalid();
+  });
+
+  it('saves a first name alone, with no last name, date or address', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails({ senderName: null });
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: null, birthDate: null, address: null });
   });
 
   it('accepts a numeric date', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails();
     await user.type(screen.getByLabelText('Date of birth'), '5/29/1980');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(onSaveDetails).toHaveBeenCalledWith({ fullName: null, birthDate: '1980-05-29' });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '1980-05-29' }));
   });
 
-  it('refuses a tab in the name', () => {
-    expect(checkDetails('Anna\tLee', '').nameError).toBe('Please enter your name on one line, with no hidden characters.');
-  });
-
-  it('clears both when emptied', async () => {
+  it('clears everything but the first name when emptied', async () => {
     const user = userEvent.setup();
-    const { onSaveDetails } = withDetails({ fullName: 'Anna Lee', birthDate: '1980-05-29' });
-    await user.clear(screen.getByLabelText('Full name'));
-    await user.clear(screen.getByLabelText('Date of birth'));
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(onSaveDetails).toHaveBeenCalledWith({ fullName: null, birthDate: null });
+    const { onSaveDetails } = withDetails({ firstName: 'Anna', lastName: 'Lee', birthDate: '1980-05-29', address });
+    for (const label of ['Last name', 'Date of birth', 'Address line 1', 'Address line 2 (optional)', 'City', 'State', 'ZIP code']) {
+      await user.clear(screen.getByLabelText(label));
+    }
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: null, birthDate: null, address: null });
+  });
+
+  it('refuses a partly filled address, naming each missing field, and does not save', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.type(screen.getByLabelText('Address line 1'), '1 Main St');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    const alerts = screen.getAllByRole('alert').map((a) => a.textContent);
+    expect(alerts).toEqual(['Please enter the city.', 'Please enter the state.', 'Please enter the ZIP code.']);
+    expect(screen.getByLabelText('City')).toBeInvalid();
+    expect(screen.getByLabelText('City')).toHaveAccessibleDescription('Please enter the city.');
+    expect(screen.getByLabelText('Address line 1')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('refuses a bad ZIP and a bad state, then clears the message when the field is edited', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await fillAddress(user, { State: 'N', 'ZIP code': '123' });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    expect(screen.getByText('Please enter a ZIP code like 07001 or 07001-1234.')).toBeInTheDocument();
+    expect(screen.getByText('Please use the two-letter state code, for example NJ.')).toBeInTheDocument();
+    expect(screen.getByLabelText('ZIP code')).toBeInvalid();
+    expect(screen.getByLabelText('State')).toBeInvalid();
+    await user.type(screen.getByLabelText('ZIP code'), '45');
+    expect(screen.queryByText('Please enter a ZIP code like 07001 or 07001-1234.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('ZIP code')).not.toHaveAttribute('aria-invalid');
   });
 
   it('refuses a date with no year, with calm copy next to the field, and does not save', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails();
     await user.type(screen.getByLabelText('Date of birth'), 'May 29');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter the whole date, with the year. For example, May 29, 1980.');
     expect(screen.getByLabelText('Date of birth')).toBeInvalid();
@@ -252,47 +318,49 @@ describe('AccountSection details', () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails();
     await user.type(screen.getByLabelText('Date of birth'), 'January 1, 2999');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    await user.click(screen.getByRole('button', SAVE));
     expect(screen.getByText("Please check the date. It can't be in the future or before 1900.")).toBeInTheDocument();
     await user.clear(screen.getByLabelText('Date of birth'));
     await user.type(screen.getByLabelText('Date of birth'), 'January 1, 1850');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    await user.click(screen.getByRole('button', SAVE));
     expect(screen.getByText("Please check the date. It can't be in the future or before 1900.")).toBeInTheDocument();
     expect(onSaveDetails).not.toHaveBeenCalled();
   });
 
-  it('refuses a name over 120 characters and one with a line break character', async () => {
+  it('refuses a name over 100 characters and one with a hidden character', async () => {
     const user = userEvent.setup();
-    const { onSaveDetails } = withDetails();
-    await user.click(screen.getByLabelText('Full name'));
-    await user.paste('a'.repeat(121));
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please use 120 characters or fewer.');
-    expect(screen.getByLabelText('Full name')).toBeInvalid();
-    await user.clear(screen.getByLabelText('Full name'));
+    const { onSaveDetails } = withDetails({ senderName: null });
+    await user.click(screen.getByLabelText('First name'));
+    await user.paste('a'.repeat(101));
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getByRole('alert')).toHaveTextContent('That is too long. Please shorten it.');
+    expect(screen.getByLabelText('First name')).toBeInvalid();
+    await user.clear(screen.getByLabelText('First name'));
     await user.paste('Anna\u0001x');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your name on one line, with no hidden characters.');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter this on one line, with no hidden characters.');
     expect(onSaveDetails).not.toHaveBeenCalled();
   });
 
   it('maps a server refusal to calm copy and keeps what was typed', async () => {
     const user = userEvent.setup();
-    withDetails({ onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: true }) });
-    await user.type(screen.getByLabelText('Full name'), 'Anna Lee');
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    withDetails({ senderName: null, onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: true }) });
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.click(screen.getByRole('button', SAVE));
     expect(await screen.findByText(/We couldn't save that/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Full name')).toHaveValue('Anna Lee');
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
     expect(screen.queryByText('Your details are saved.')).not.toBeInTheDocument();
   });
 
-  it('shows the general error only after its own save fails', async () => {
+  it('shows the general error only after its own save fails, and keeps what was typed', async () => {
     const user = userEvent.setup();
-    withDetails({ error: 'We cannot reach you.', onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: false }) });
+    withDetails({ senderName: null, error: 'We cannot reach you.', onSaveDetails: vi.fn().mockResolvedValue({ ok: false, invalid: false }) });
     expect(screen.queryByText('We cannot reach you.')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.click(screen.getByRole('button', SAVE));
     expect(await screen.findAllByText('We cannot reach you.')).toHaveLength(1);
-    expect(screen.getByLabelText('Your name')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
+    expect(screen.getByLabelText('First name')).not.toHaveAttribute('aria-invalid');
   });
 });
 
@@ -321,7 +389,7 @@ describe('AccountSection plans', () => {
       <AccountSection
         senderName="Anna"
         error={null}
-        onSave={vi.fn()}
+        onSaveDetails={vi.fn()}
         onSignOut={vi.fn()}
         plans={[{ personName: 'Sam', obituaryText: 'A kind man.' }]}
         settings={{}}
@@ -344,7 +412,7 @@ describe('AccountSection plans', () => {
     try {
       Object.assign(URL, { createObjectURL: vi.fn().mockReturnValue('blob:x'), revokeObjectURL: vi.fn() });
       vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-      render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
+      render(<AccountSection senderName="Anna" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
       fireEvent.click(screen.getByRole('button', { name: 'Download a copy' }));
       act(() => {
         vi.advanceTimersByTime(100);
@@ -360,13 +428,13 @@ describe('AccountSection plans', () => {
   });
 
   it('says contacts, not drafts, are left out of the copy', () => {
-    render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
+    render(<AccountSection senderName="Anna" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} plans={[{ personName: 'Sam' }]} />);
     expect(screen.getByText(/Contacts are not in it\./)).toBeInTheDocument();
     expect(screen.queryByText(/drafts/)).not.toBeInTheDocument();
   });
 
   it('says there is nothing to save, and offers no download, when there are no people', () => {
-    render(<AccountSection senderName="Anna" error={null} onSave={vi.fn()} onSignOut={vi.fn()} plans={[]} />);
+    render(<AccountSection senderName="Anna" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} plans={[]} />);
     expect(screen.getByText('There is nothing to save yet.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Download a copy' })).not.toBeInTheDocument();
   });
@@ -381,7 +449,7 @@ describe('AccountSection plans', () => {
       <AccountSection
         senderName="Anna"
         error={null}
-        onSave={vi.fn()}
+        onSaveDetails={vi.fn()}
         onSignOut={vi.fn()}
         plans={[{ personName: 'Sam' }]}
         peopleHelping={<h2>People helping you</h2>}
@@ -402,7 +470,7 @@ describe('AccountSection phone and support panels', () => {
       <AccountSection
         senderName="Anna"
         error={null}
-        onSave={vi.fn()}
+        onSaveDetails={vi.fn()}
         onSignOut={vi.fn()}
         email="anna@example.com"
         onManageSignIn={vi.fn()}
@@ -428,7 +496,7 @@ describe('AccountSection phone and support panels', () => {
       <AccountSection
         senderName="Anna"
         error={null}
-        onSave={vi.fn()}
+        onSaveDetails={vi.fn()}
         onSignOut={vi.fn()}
         plans={[
           { personName: 'Sam', sectionStatus: { announcement: 'ready', person: 'ready' } },

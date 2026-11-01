@@ -335,7 +335,9 @@ describe('editor on, signed in (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     const focused10 = await screen.findByRole('heading', { level: 1, name: 'Your account' });
     await waitFor(() => expect(focused10).toHaveFocus());
-    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
@@ -386,12 +388,13 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { senderName: 'Anna Reyes' });
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { firstName: 'Anna', lastName: 'Reyes', birthDate: null, address: null });
     // Back to where they were: the editor they came from, not the account.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
   });
 
   it('a brand-new user: name prompt in the shell with a calm panel, then Your people with the same layout', async () => {
@@ -408,8 +411,9 @@ describe('editor on, signed in (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();

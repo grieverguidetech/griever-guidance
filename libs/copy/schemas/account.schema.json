@@ -39,14 +39,10 @@
     "cardNone",
     "cardAdd",
     "cardNotOpen",
-    "fullNameLabel",
-    "fullNameHint",
     "birthDateLabel",
     "birthDateHint",
     "detailsSave",
     "detailsSaved",
-    "fullNameTooLong",
-    "fullNameBadChars",
     "birthDateIncomplete",
     "birthDateOutOfRange",
     "detailsInvalid",
@@ -96,7 +92,29 @@
     "deletedHeading",
     "deletedBody",
     "deletedAction",
-    "deletedLeftover"
+    "deletedLeftover",
+    "personalHeading",
+    "personalHint",
+    "askNamesIntro",
+    "firstNameLabel",
+    "lastNameLabel",
+    "firstNameRequired",
+    "fieldTooLong",
+    "fieldBadChars",
+    "addressHeading",
+    "addressHint",
+    "addressLine1Label",
+    "addressLine2Label",
+    "cityLabel",
+    "stateLabel",
+    "stateHint",
+    "zipLabel",
+    "addressLine1Required",
+    "cityRequired",
+    "stateRequired",
+    "stateInvalid",
+    "zipRequired",
+    "zipInvalid"
   ],
   "properties": {
     "heading": {
@@ -204,12 +222,6 @@
     "cardNotOpen": {
       "$ref": "#/$defs/text"
     },
-    "fullNameLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "fullNameHint": {
-      "$ref": "#/$defs/text"
-    },
     "birthDateLabel": {
       "$ref": "#/$defs/text"
     },
@@ -220,12 +232,6 @@
       "$ref": "#/$defs/text"
     },
     "detailsSaved": {
-      "$ref": "#/$defs/text"
-    },
-    "fullNameTooLong": {
-      "$ref": "#/$defs/text"
-    },
-    "fullNameBadChars": {
       "$ref": "#/$defs/text"
     },
     "birthDateIncomplete": {
@@ -376,6 +382,72 @@
       "$ref": "#/$defs/text"
     },
     "deletedLeftover": {
+      "$ref": "#/$defs/text"
+    },
+    "personalHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "personalHint": {
+      "$ref": "#/$defs/text"
+    },
+    "askNamesIntro": {
+      "$ref": "#/$defs/text"
+    },
+    "firstNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "lastNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "firstNameRequired": {
+      "$ref": "#/$defs/text"
+    },
+    "fieldTooLong": {
+      "$ref": "#/$defs/text"
+    },
+    "fieldBadChars": {
+      "$ref": "#/$defs/text"
+    },
+    "addressHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "addressHint": {
+      "$ref": "#/$defs/text"
+    },
+    "addressLine1Label": {
+      "$ref": "#/$defs/text"
+    },
+    "addressLine2Label": {
+      "$ref": "#/$defs/text"
+    },
+    "cityLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "stateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "stateHint": {
+      "$ref": "#/$defs/text"
+    },
+    "zipLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "addressLine1Required": {
+      "$ref": "#/$defs/text"
+    },
+    "cityRequired": {
+      "$ref": "#/$defs/text"
+    },
+    "stateRequired": {
+      "$ref": "#/$defs/text"
+    },
+    "stateInvalid": {
+      "$ref": "#/$defs/text"
+    },
+    "zipRequired": {
+      "$ref": "#/$defs/text"
+    },
+    "zipInvalid": {
       "$ref": "#/$defs/text"
     }
   },
