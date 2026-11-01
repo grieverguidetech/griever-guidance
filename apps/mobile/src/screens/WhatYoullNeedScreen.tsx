@@ -13,9 +13,8 @@ const checklistCopy = screenCopy('cmsChecklist');
 // Which rows are ticked stays on this phone only. Nothing is sent anywhere, and nothing nags.
 export const CHECKLIST_KEY = 'gg.checklist.v1';
 
-// Same words as the web list (a unit test compares the two).
-export const SSN_TIP =
-  "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.";
+// Same words as the web list: both read them from libs/copy.
+export const SSN_TIP = checklistCopy.gatherNotes.ssn;
 
 const CHECKLIST: { id: string; label: string; meta?: string; tip?: string }[] = [
   { id: 'will', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },

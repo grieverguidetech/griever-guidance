@@ -100,13 +100,11 @@ describe('What you will need sheet (#193)', () => {
     await waitFor(async () => expect(await accountStore.getChecklistTicks()).toEqual(['life-insurance', 'military-papers']));
   });
 
-  it('Escape closes an open tip first, then the sheet', async () => {
+  it('Escape closes the sheet, which has no tip button to close first', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(trigger());
-    await user.click(screen.getByRole('button', { name: 'Why we list this' }));
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Why we list this' })).toBeNull();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
   });

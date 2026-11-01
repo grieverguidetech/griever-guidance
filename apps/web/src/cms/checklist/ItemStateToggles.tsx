@@ -17,7 +17,7 @@ interface Props {
   /** Names the group for screen readers, so each row's toggles are told apart. */
   groupLabel: string;
   /**
-   * `detail` (default): two full buttons side by side.
+   * `detail` (default): one full Done button.
    * `row`: a leading check-circle for Done, then `children` (the row label). No not-applicable button here.
    * A row saved as not_applicable shows as done-like: the circle is checked and pressing it clears the state.
    */
@@ -27,16 +27,9 @@ interface Props {
   children?: ReactNode;
 }
 
-/** Two toggles that exclude each other. Pressing the pressed one clears it. */
+/** A Done toggle. Pressing it again clears it. */
 export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detail', labelId, children }: Props) {
   const naNoteId = useId();
-  const toggle = (next: ChecklistItemState) => {
-    if (state === next) {
-      onChange(null);
-      return;
-    }
-    onChange(next);
-  };
 
   if (variant === 'row') {
     const finished = state === 'done' || state === 'not_applicable';
@@ -77,26 +70,25 @@ export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detai
     );
   }
 
+  // A saved not_applicable shows as done; pressing clears it.
+  const finished = state === 'done' || state === 'not_applicable';
   return (
     <div role="group" aria-label={groupLabel} className="flex flex-wrap gap-2">
       <button
         type="button"
         className={PRESSED}
-        aria-pressed={state === 'done'}
-        onClick={() => toggle('done')}
+        aria-pressed={finished}
+        aria-describedby={state === 'not_applicable' ? naNoteId : undefined}
+        onClick={() => onChange(finished ? null : 'done')}
       >
-        {state === 'done' && <Check size={18} weight="bold" aria-hidden="true" />}
+        {finished && <Check size={18} weight="bold" aria-hidden="true" />}
         {copy.done}
       </button>
-      <button
-        type="button"
-        className={PRESSED}
-        aria-pressed={state === 'not_applicable'}
-        onClick={() => toggle('not_applicable')}
-      >
-        {state === 'not_applicable' && <Check size={18} weight="bold" aria-hidden="true" />}
-        {copy.notApplicable}
-      </button>
+      {state === 'not_applicable' && (
+        <span id={naNoteId} className="sr-only">
+          {copy.notApplicable}
+        </span>
+      )}
     </div>
   );
 }

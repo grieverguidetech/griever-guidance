@@ -16,27 +16,33 @@ export interface ContentItem {
   label: string;
   /** Checklist only: why the item is needed (GRI-9). */
   reason?: string;
-  /** Checklist only: a short reason shown when the info button is opened (SSN row). */
+  /** Checklist only: a calm note shown under the item (SSN, insurance and military rows). */
   tip?: string;
   /** Sample and example only: the message text. */
   text?: string;
 }
 
 /**
- * Copy of the CHECKLIST in apps/web/src/lib/ChecklistRows.tsx (`meta` is `reason` here). That
- * constant is private to the screen, so a unit test reads the file and fails if id, label, meta or
- * tip drift apart. The mobile screen has the same label, meta and tip, with its own ids.
+ * Copy of the CHECKLIST in apps/web/src/lib/ChecklistRows.tsx (`meta` is `reason` here, and the
+ * web `note` is `tip`). That constant is private to the screen, so a unit test reads the file and
+ * fails if id, label, meta or note drift apart. The note words live in libs/copy
+ * (cmsChecklist.gatherNotes); the test also checks these strings against them.
+ * The mobile screen has the same label and meta, with its own ids, and the Social Security note.
  * Never change an id: ticks on devices use it.
  */
 const SSN_TIP =
   "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.";
+const INSURANCE_TIP =
+  'Insurers ask for the policy number when you make a claim. You do not need to add it to your account.';
+const MILITARY_TIP =
+  "Veterans' burial benefits and honors may need these papers. You do not need to add it to your account.";
 
 export const CHECKLIST_SEED: ReadonlyArray<{ id: string; label: string; reason?: string; tip?: string }> = [
   { id: 'will-or-wishes', label: 'Any will or written wishes', reason: 'Burial or cremation, and who they named' },
   { id: 'pre-arranged-plans', label: 'Pre-arranged funeral plans', reason: 'Many people have already paid for this' },
   { id: 'ssn-and-id', label: 'Social Security number and ID', tip: SSN_TIP },
-  { id: 'life-insurance', label: 'Life insurance policies' },
-  { id: 'military-papers', label: 'Military discharge papers', reason: 'If they served — it may cover the burial' },
+  { id: 'life-insurance', label: 'Life insurance policies', tip: INSURANCE_TIP },
+  { id: 'military-papers', label: 'Military discharge papers', reason: 'If they served — it may cover the burial', tip: MILITARY_TIP },
 ];
 
 /** Made-up details, so the samples read like a real message. No real person. */

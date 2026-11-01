@@ -19,11 +19,21 @@ interface ScreenItem {
 function parseChecklist(source: string): ScreenItem[] {
   const start = source.indexOf('const CHECKLIST');
   const body = source.slice(source.indexOf('= [', start), source.indexOf('\n];', start));
-  const constant = (name: string) =>
-    new RegExp(`const ${name}[^=]*=\\s*(["'])(.*?)\\1;`, 's').exec(source)?.[2];
+  const gather = JSON.parse(read('libs/copy/screens/cmsChecklist.json')).gatherNotes as Record<string, string>;
+  const fromCopy = (text: string) => {
+    const key = /gatherNotes\.(\w+)/.exec(text)?.[1];
+    return key ? gather[key] : undefined;
+  };
+  const constant = (name: string) => {
+    const literal = new RegExp(`const ${name}[^=]*=\\s*(["'])(.*?)\\1;`, 's').exec(source)?.[2];
+    if (literal) return literal;
+    return fromCopy(new RegExp(`const ${name}[^=]*=\\s*([^;]+);`, 's').exec(source)?.[1] ?? '');
+  };
   const field = (row: string, key: string) => {
     const literal = new RegExp(`\\b${key}: (["'])(.*?)\\1`).exec(row);
     if (literal) return literal[2];
+    const direct = fromCopy(new RegExp(`\\b${key}: ([\\w.]+)`).exec(row)?.[1] ?? '');
+    if (direct) return direct;
     const name = new RegExp(`\\b${key}: ([A-Z_]+)`).exec(row)?.[1];
     return name ? constant(name) : undefined;
   };
@@ -34,7 +44,7 @@ function parseChecklist(source: string): ScreenItem[] {
       id: field(row, 'id') as string,
       label: field(row, 'label') as string,
       meta: field(row, 'meta'),
-      tip: field(row, 'tip'),
+      tip: field(row, 'tip') ?? field(row, 'note'),
     }));
 }
 
@@ -65,11 +75,16 @@ describe('checklist seed', () => {
     expect(seedAsScreen()).toEqual(screen);
   });
 
-  it('matches the mobile screen on label, meta and tip (its ids differ)', () => {
+  it('matches the mobile screen on label and meta, and on the tip where mobile has one (its ids differ)', () => {
     const mobile = parseChecklist(read('apps/mobile/src/screens/WhatYoullNeedScreen.tsx'));
     expect(mobile.length).toBeGreaterThan(0);
-    const strip = ({ label, meta, tip }: ScreenItem) => ({ label, meta, tip });
+    const strip = ({ label, meta }: ScreenItem) => ({ label, meta });
     expect(seedAsScreen().map(strip)).toEqual(mobile.map(strip));
+    mobile.forEach((m, i) => {
+      if (m.tip) {
+        expect(seedAsScreen()[i].tip).toBe(m.tip);
+      }
+    });
   });
 
   it('stores one checklist item per entry, in order, with a version', () => {

@@ -2,12 +2,11 @@
  * #176: the "What you'll need" list starts unticked, each row toggles, and ticks stay on this
  * device only (IndexedDB), never sent anywhere (C3).
  */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accountStore } from '@griever/data-local';
-import { ChecklistRows, SSN_TIP } from './ChecklistRows';
+import { screenCopy } from '@griever/copy';
+import { ChecklistRows } from './ChecklistRows';
 import { WhatYoullNeedSheet } from './WhatYoullNeedSheet';
 
 const ROWS = [
@@ -100,91 +99,41 @@ describe('Checklist rows (#176)', () => {
   });
 });
 
-describe('Social Security tip (#209)', () => {
-  const info = () => screen.getByRole('button', { name: 'Why we list this' });
+describe('Nested notes under the gather rows (#605)', () => {
+  const notes = screenCopy('cmsChecklist').gatherNotes;
 
-  it('hides the tip by default and keeps no reason line under the item', async () => {
+  it('shows the Social Security, insurance and military notes under their items', async () => {
     renderList();
     await loaded();
-    expect(info()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-    expect(row('Social Security number and ID').querySelector('.gg-card-meta')).toBeNull();
-  });
-
-  it('opens on click, closes on a second click, and flips aria-expanded', async () => {
-    const user = userEvent.setup();
-    renderList();
-    await loaded();
-    await user.click(info());
-    expect(info()).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('status')).toHaveTextContent(SSN_TIP);
-    expect(info()).toHaveAttribute('aria-controls', screen.getByRole('status').id);
-    await user.click(info());
-    expect(info()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-  });
-
-  it('opens with Enter, closes with Escape, and puts focus back on the button', async () => {
-    const user = userEvent.setup();
-    renderList();
-    await loaded();
-    info().focus();
-    await user.keyboard('{Enter}');
-    expect(screen.getByText(SSN_TIP)).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-    expect(info()).toHaveFocus();
-  });
-
-  it('closes on Escape but leaves focus alone when it is outside the row', async () => {
-    const user = userEvent.setup();
-    render(
-      <>
-        <button type="button">Elsewhere</button>
-        <ChecklistRows />
-      </>,
+    expect(screen.getByText(notes.ssn)).toBeInTheDocument();
+    expect(screen.getByText(notes.insurance)).toBeInTheDocument();
+    expect(screen.getByText(notes.military)).toBeInTheDocument();
+    expect(notes.ssn).toBe(
+      "You'll need this number when you deal with the funeral home, insurance and banks. You do not need to add it to your account.",
     );
-    await loaded();
-    await user.click(info());
-    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
-    elsewhere.focus();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-    expect(elsewhere).toHaveFocus();
   });
 
-  it('closes when the Social Security row itself is ticked', async () => {
+  it('says each is not needed on the account, and has no exclamation point', () => {
+    for (const note of Object.values(notes)) {
+      expect(note).toContain('You do not need to add it to your account.');
+      expect(note).not.toContain('!');
+    }
+  });
+
+  it('describes each row by its note and has no tooltip button', async () => {
+    renderList();
+    await loaded();
+    expect(row('Social Security number and ID')).toHaveAccessibleDescription(notes.ssn);
+    expect(row('Life insurance policies')).toHaveAccessibleDescription(notes.insurance);
+    expect(row('Military discharge papers')).toHaveAccessibleDescription(notes.military);
+    expect(screen.queryByRole('button', { name: 'Why we list this' })).toBeNull();
+  });
+
+  it('keeps the note when the row is ticked', async () => {
     const user = userEvent.setup();
     renderList();
     await loaded();
-    await user.click(info());
     await user.click(row('Social Security number and ID'));
-    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-  });
-
-  it('closes on a tap outside', async () => {
-    const user = userEvent.setup();
-    render(
-      <>
-        <h1>Elsewhere on the page</h1>
-        <ChecklistRows />
-      </>,
-    );
-    await loaded();
-    await user.click(info());
-    await user.click(screen.getByRole('heading', { name: 'Elsewhere on the page' }));
-    expect(screen.queryByText(SSN_TIP)).not.toBeInTheDocument();
-  });
-
-  it('is at least 44 by 44 and has no exclamation point', () => {
-    renderList();
-    expect(info()).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    expect(SSN_TIP).not.toContain('!');
-  });
-
-  it('uses the same words as the mobile list', () => {
-    const mobile = readFileSync(resolve(process.cwd(), '../mobile/src/screens/WhatYoullNeedScreen.tsx'), 'utf8');
-    const match = mobile.match(/SSN_TIP =\s*"([^"]+)"/);
-    expect(match?.[1]).toBe(SSN_TIP);
+    expect(screen.getByText(notes.ssn)).toBeInTheDocument();
   });
 });

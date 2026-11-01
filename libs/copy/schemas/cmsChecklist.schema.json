@@ -13,6 +13,7 @@
     "intro",
     "obituaryNote",
     "gatherHeading",
+    "gatherNotes",
     "done",
     "notApplicable",
     "nowPhase",
@@ -95,6 +96,16 @@
     },
     "comingSoon": {
       "$ref": "#/$defs/text"
+    },
+    "gatherNotes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ssn", "insurance", "military"],
+      "properties": {
+        "ssn": { "$ref": "#/$defs/text" },
+        "insurance": { "$ref": "#/$defs/text" },
+        "military": { "$ref": "#/$defs/text" }
+      }
     },
     "phases": {
       "type": "object",
