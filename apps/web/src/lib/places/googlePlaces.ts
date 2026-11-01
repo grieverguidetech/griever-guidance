@@ -1,12 +1,18 @@
-import type { PlaceSuggestion, PlacesClient, PlacesLoader, PlacesToken } from './placesClient';
+import type { PlaceDetails, PlaceSuggestion, PlacesClient, PlacesLoader, PlacesToken } from './placesClient';
 
 /** The part of the Maps JavaScript API we use. Typed here so no extra package is needed. */
 /** Google's FormattableText. Read it with toString(); every field is guarded. */
 interface GoogleText {
   toString(): string;
 }
+interface GooglePlace {
+  displayName?: string | null;
+  formattedAddress?: string | null;
+  fetchFields(request: { fields: string[] }): Promise<unknown>;
+}
 interface GooglePrediction {
   placeId: string;
+  toPlace(): GooglePlace;
   text?: GoogleText;
   mainText?: GoogleText;
   secondaryText?: GoogleText;
@@ -73,6 +79,8 @@ function toSuggestion(p: GooglePrediction): PlaceSuggestion | null {
 }
 
 function makeClient(lib: GooglePlacesLibrary): PlacesClient {
+  // Which Google prediction each suggestion came from, so details() can ask for its place.
+  const predictions = new WeakMap<PlaceSuggestion, GooglePrediction>();
   return {
     newToken: () => new lib.AutocompleteSessionToken(),
     async suggest(input, types, token) {
@@ -85,8 +93,24 @@ function makeClient(lib: GooglePlacesLibrary): PlacesClient {
       });
       return suggestions.flatMap((s) => {
         const one = s.placePrediction ? toSuggestion(s.placePrediction) : null;
+        if (one && s.placePrediction) {
+          predictions.set(one, s.placePrediction);
+        }
         return one ? [one] : [];
       });
+    },
+    async details(suggestion): Promise<PlaceDetails> {
+      const prediction = predictions.get(suggestion);
+      if (!prediction) {
+        throw new Error('Unknown suggestion');
+      }
+      const place = prediction.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress'] });
+      const address = withoutCountry(place.formattedAddress ?? '');
+      if (!address) {
+        throw new Error('No address');
+      }
+      return { name: place.displayName || suggestion.mainText, address };
     },
   };
 }

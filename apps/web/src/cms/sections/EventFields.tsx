@@ -160,19 +160,22 @@ export function EventFields<K extends EventKey>({
           id={`${id}-place`}
           labelledBy={`${legendId} ${id}-place-label`}
           types={placeTypes}
-          onPick={(pick) => {
-            if (!addressKey || !pick.secondaryText) {
+          onPick={(pick, details) => {
+            // The full street address from the place itself; the prediction's short line if that failed.
+            const name = details?.name || pick.mainText;
+            const address = details?.address || pick.secondaryText;
+            if (!addressKey || !address) {
               onChange({ [keys.place]: pick.text } as Partial<Record<K, string>>);
               return false;
             }
             const current = (values as Partial<Record<string, string>>)[addressKey] ?? '';
             const mayFill = current === '' || current === pickedAddress.current;
             if (!mayFill) {
-              onChange({ [keys.place]: pick.mainText } as Partial<Record<K, string>>);
+              onChange({ [keys.place]: name } as Partial<Record<K, string>>);
               return false;
             }
-            pickedAddress.current = pick.secondaryText;
-            onChange({ [keys.place]: pick.mainText, [addressKey]: pick.secondaryText } as Partial<Record<K, string>>);
+            pickedAddress.current = address;
+            onChange({ [keys.place]: name, [addressKey]: address } as Partial<Record<K, string>>);
             return true;
           }}
           value={values[keys.place] ?? ''}

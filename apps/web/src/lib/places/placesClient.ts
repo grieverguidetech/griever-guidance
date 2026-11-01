@@ -14,6 +14,14 @@ export interface PlaceSuggestion {
   secondaryText: string;
 }
 
+/** The full details of a picked place. */
+export interface PlaceDetails {
+  /** The place name. */
+  name: string;
+  /** The full street address, with the number and without the country. */
+  address: string;
+}
+
 /** Groups the requests of one typing session. Opaque to callers; each field makes its own. */
 export type PlacesToken = object;
 
@@ -22,6 +30,8 @@ export interface PlacesClient {
   newToken(): PlacesToken;
   /** Suggestions for the typed text, limited to these place types. Rejects on failure. */
   suggest(input: string, types: readonly string[], token: PlacesToken): Promise<PlaceSuggestion[]>;
+  /** The name and full address of a suggestion this client returned. Rejects on failure. Ends the session. */
+  details(suggestion: PlaceSuggestion): Promise<PlaceDetails>;
 }
 
 /** Resolves to a client, or null when suggestions are not available (no key, or Google did not load). Never rejects. */

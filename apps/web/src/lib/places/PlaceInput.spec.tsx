@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PlaceInput, countText } from './PlaceInput';
+import { PlaceInput, countText, type PlaceInputProps as Props } from './PlaceInput';
 import { PlacesProvider } from './PlacesContext';
 import type { PlaceSuggestion, PlacesClient } from './placesClient';
 
@@ -16,10 +18,11 @@ const church: PlaceSuggestion = { id: 'b', text: 'St Mark Church, 2 Elm St, Spri
 function fakeClient(results: PlaceSuggestion[] = [funeralHome, church]) {
   const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue(results);
   const newToken = vi.fn(() => ({}));
-  return { client: { suggest, newToken } satisfies PlacesClient, suggest, newToken };
+  const details = vi.fn<PlacesClient['details']>().mockResolvedValue({ name: 'Oak Funeral Home', address: '1 Main St, Springfield, MO 65801' });
+  return { client: { suggest, newToken, details } satisfies PlacesClient, suggest, newToken, details };
 }
 
-function setup(opts: { enabled?: boolean; load?: () => Promise<PlacesClient | null>; types?: readonly string[] } = {}) {
+function setup(opts: { onPick?: Props['onPick']; enabled?: boolean; load?: () => Promise<PlacesClient | null>; types?: readonly string[] } = {}) {
   const values: string[] = [];
   const types = 'types' in opts ? opts.types : ['funeral_home', 'church'];
   function Harness() {
@@ -32,6 +35,7 @@ function setup(opts: { enabled?: boolean; load?: () => Promise<PlacesClient | nu
           labelledBy="p-label"
           value={value}
           types={types}
+          onPick={opts.onPick}
           onChange={(v) => {
             values.push(v);
             setValue(v);
@@ -48,6 +52,7 @@ function setup(opts: { enabled?: boolean; load?: () => Promise<PlacesClient | nu
 async function typeAndWait(text: string) {
   await userEvent.type(screen.getByLabelText('Place'), text);
   await screen.findByRole('listbox');
+  await waitFor(() => expect(screen.queryByText('Searching…')).toBeNull());
 }
 
 describe('PlaceInput', () => {
@@ -144,12 +149,84 @@ describe('PlaceInput', () => {
     expect(input().value).toBe('oak hall, my own words');
   });
 
-  it('announces "No suggestions" and stays closed when nothing matches', async () => {
+  it('shows "No matches" as a row that cannot be chosen when nothing matches', async () => {
     const { client } = fakeClient([]);
     const { input } = setup({ load: () => Promise.resolve(client) });
     await userEvent.type(input(), 'zzz');
-    expect(await screen.findByText('No suggestions')).toBeInTheDocument();
-    expect(input().getAttribute('aria-expanded')).toBe('false');
+    const row = await screen.findByRole('option', { name: 'No matches' });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('No matches');
+    await userEvent.click(row);
+    expect(input().value).toBe('zzz');
+  });
+
+  it('shows a spinner and a Searching row, announced politely, while a search is pending; results replace them', async () => {
+    let release: (v: PlaceSuggestion[]) => void = () => undefined;
+    const pending: PlacesClient = {
+      suggest: () => new Promise((r) => (release = r)),
+      newToken: () => ({}),
+      details: vi.fn(),
+    };
+    const { input } = setup({ load: () => Promise.resolve(pending) });
+    expect(document.querySelector('.gg-spinner')).toBeNull();
+    await userEvent.type(input(), 'oak');
+    const row = await screen.findByRole('option', { name: 'Searching…' });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(document.querySelector('.gg-spinner')).not.toBeNull();
+    expect(document.querySelector('.gg-spinner')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+    expect(input().getAttribute('aria-busy')).toBe('true');
+    // The Searching row cannot be chosen, and arrow keys do not move onto it.
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(input().value).toBe('oak');
+    expect(input().getAttribute('aria-activedescendant')).toBeNull();
+    await act(async () => release([funeralHome]));
+    expect(await screen.findByRole('option', { name: /Oak Funeral Home/ })).toBeInTheDocument();
+    expect(screen.queryByText('Searching…', { selector: 'li' })).toBeNull();
+    expect(document.querySelector('.gg-spinner')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('1 suggestion available');
+  });
+
+  it('the spinner only spins when motion is allowed', () => {
+    const css = readFileSync(join(import.meta.dirname, '../../styles.css'), 'utf8');
+    const spin = /@media \(prefers-reduced-motion: no-preference\) \{\s*\.gg-spinner \{[^}]*animation:/;
+    expect(css).toMatch(spin);
+    expect(css.replace(spin, '')).not.toMatch(/\.gg-spinner\s*\{[^}]*animation:/);
+  });
+
+  it('on a pick, fetches the details and gives them to onPick', async () => {
+    const { client, details } = fakeClient();
+    const onPick = vi.fn(() => true);
+    setup({ load: () => Promise.resolve(client), onPick });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    await waitFor(() => expect(onPick).toHaveBeenCalledTimes(1));
+    expect(details).toHaveBeenCalledWith(funeralHome);
+    expect(onPick).toHaveBeenCalledWith(funeralHome, { name: 'Oak Funeral Home', address: '1 Main St, Springfield, MO 65801' });
+    expect(screen.getByRole('status')).toHaveTextContent('Address filled in');
+  });
+
+  it('on a pick whose details fail, gives onPick null so it can fall back to the prediction', async () => {
+    const { client, details } = fakeClient();
+    details.mockRejectedValue(new Error('network'));
+    const onPick = vi.fn();
+    setup({ load: () => Promise.resolve(client), onPick });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    await waitFor(() => expect(onPick).toHaveBeenCalledWith(funeralHome, null));
+  });
+
+  it('drops a pick when the user types before its details arrive', async () => {
+    const { client, details } = fakeClient();
+    let release: (d: { name: string; address: string }) => void = () => undefined;
+    details.mockImplementation(() => new Promise((r) => (release = r)));
+    const onPick = vi.fn();
+    const { input } = setup({ load: () => Promise.resolve(client), onPick });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    await userEvent.type(input(), 'x');
+    await act(async () => release({ name: 'a', address: 'b' }));
+    expect(onPick).not.toHaveBeenCalled();
   });
 
   it('ignores an answer that arrives after the text changed', async () => {
@@ -157,13 +234,14 @@ describe('PlaceInput', () => {
     const slow: PlacesClient = {
       suggest: () => new Promise((r) => (release = r)),
       newToken: () => ({}),
+      details: vi.fn(),
     };
     const { input } = setup({ load: () => Promise.resolve(slow) });
     await userEvent.type(input(), 'oak');
     await new Promise((r) => setTimeout(r, 450));
     await userEvent.type(input(), 'x');
     await act(async () => release([funeralHome]));
-    expect(screen.queryByRole('option')).toBeNull();
+    expect(screen.queryByRole('option', { name: /Oak Funeral Home/ })).toBeNull();
   });
 
   it('with no key: a plain text input, no combobox, never loads Google, no error', async () => {
@@ -196,7 +274,7 @@ describe('PlaceInput', () => {
   });
 
   it('when a request fails: the field keeps working, nothing is shown', async () => {
-    const failing: PlacesClient = { suggest: () => Promise.reject(new Error('quota')), newToken: () => ({}) };
+    const failing: PlacesClient = { suggest: () => Promise.reject(new Error('quota')), newToken: () => ({}), details: vi.fn() };
     const { input } = setup({ load: () => Promise.resolve(failing) });
     await userEvent.type(input(), 'oak hall');
     await new Promise((r) => setTimeout(r, 450));
@@ -255,12 +333,10 @@ describe('PlaceInput', () => {
     expect(suggest.mock.calls[1][2]).not.toBe(suggest.mock.calls[0][2]);
   });
 
-  it('keeps the old options until the new answer arrives, and Down Arrow reopens a closed list', async () => {
+  it('Down Arrow reopens a closed list', async () => {
     const { client } = fakeClient();
     const { input } = setup({ load: () => Promise.resolve(client) });
     await typeAndWait('oak');
-    await userEvent.type(input(), 'x');
-    expect(screen.getAllByRole('option')).toHaveLength(2);
     expect(input().getAttribute('aria-expanded')).toBe('true');
     await userEvent.keyboard('{Escape}');
     expect(input().getAttribute('aria-expanded')).toBe('false');
@@ -287,7 +363,7 @@ describe('PlaceInput', () => {
   });
 
   it('countText says none, one or many', () => {
-    expect(countText(0)).toBe('No suggestions');
+    expect(countText(0)).toBe('No matches');
     expect(countText(1)).toBe('1 suggestion available');
     expect(countText(3)).toBe('3 suggestions available');
   });

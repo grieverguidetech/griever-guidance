@@ -136,4 +136,31 @@ describe('the Google client', () => {
       { id: 'p2', text: 'Oak, 1 Main St', mainText: 'Oak, 1 Main St', secondaryText: '' },
     ]);
   });
+
+  it('details: toPlace, then fetchFields for the name and address, with ", USA" stripped', async () => {
+    const fetchFields = vi.fn(async () => undefined);
+    const place = { displayName: 'Oak Funeral Home', formattedAddress: '1 Main St, Springfield, MO 65801, USA', fetchFields };
+    const toPlace = vi.fn(() => place);
+    const client = await ready(async () => ({
+      suggestions: [{ placePrediction: { placeId: 'p1', text: text('Oak, 1 Main St'), mainText: text('Oak'), secondaryText: text('1 Main St'), toPlace } }],
+    }));
+    const [one] = await client.suggest('oak', ['cemetery'], client.newToken());
+    expect(await client.details(one)).toEqual({ name: 'Oak Funeral Home', address: '1 Main St, Springfield, MO 65801' });
+    expect(toPlace).toHaveBeenCalledTimes(1);
+    expect(fetchFields).toHaveBeenCalledWith({ fields: ['displayName', 'formattedAddress'] });
+  });
+
+  it('details rejects when fetchFields fails, when there is no address, or for an unknown suggestion', async () => {
+    const failing = { fetchFields: async () => Promise.reject(new Error('quota')) };
+    const empty = { displayName: 'Oak', formattedAddress: null, fetchFields: async () => undefined };
+    let which = failing as unknown;
+    const client = await ready(async () => ({
+      suggestions: [{ placePrediction: { placeId: 'p1', text: text('Oak, 1 Main St'), toPlace: () => which } }],
+    }));
+    const [one] = await client.suggest('oak', ['cemetery'], client.newToken());
+    await expect(client.details(one)).rejects.toThrow();
+    which = empty;
+    await expect(client.details(one)).rejects.toThrow('No address');
+    await expect(client.details({ id: 'z', text: 'z', mainText: 'z', secondaryText: '' })).rejects.toThrow();
+  });
 });
