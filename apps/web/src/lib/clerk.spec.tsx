@@ -27,6 +27,8 @@ vi.mock('@clerk/react', () => ({
   useAuth: () => mocks.auth,
   useClerk: () => ({ status: mocks.clerkStatus, loaded: mocks.clerkLoaded, openUserProfile: mocks.openUserProfile }),
   useUser: () => ({ user: mocks.user }),
+  // Passthrough: the real hook wraps the fetcher; the Clerk modal itself is Clerk's.
+  useReverification: (fetcher: unknown) => fetcher,
   ClerkProvider: (props: Record<string, unknown> & { children: React.ReactNode }) => {
     mocks.providerProps = props;
     return <>{props.children}</>;
@@ -37,6 +39,8 @@ vi.mock('@griever/api-client', async (importOriginal) => {
   return { ...actual, getProfile: mocks.getProfile };
 });
 
+import { ClerkRuntimeError } from '@clerk/react/errors';
+import { DeleteCancelledError } from './authClient';
 import { CLERK_GIVE_UP_MS, ClerkAccount, deleteClerkAccount, localization, useClerkAuth } from './clerk';
 
 function setAuth(overrides: Partial<Auth> = {}) {
@@ -388,5 +392,28 @@ describe('deleteClerkAccount', () => {
 
   it('rejects when there is no user', async () => {
     await expect(deleteClerkAccount(null)).rejects.toThrow();
+  });
+
+  it('reverification needed then done: the wrapper retries and the delete succeeds', async () => {
+    const del = vi.fn().mockResolvedValue({});
+    let asked = 0;
+    // Stands in for useReverification: Clerk asks once, the person verifies, the call goes through.
+    const run = vi.fn(async (u: { delete: () => Promise<unknown> }) => {
+      asked += 1;
+      return u.delete();
+    });
+    await expect(deleteClerkAccount({ delete: del }, run)).resolves.toBeUndefined();
+    expect(asked).toBe(1);
+    expect(del).toHaveBeenCalledOnce();
+  });
+
+  it('reverification cancelled: rejects with DeleteCancelledError', async () => {
+    const run = () => Promise.reject(new ClerkRuntimeError('cancelled', { code: 'reverification_cancelled' }));
+    await expect(deleteClerkAccount({ delete: vi.fn() }, run)).rejects.toBeInstanceOf(DeleteCancelledError);
+  });
+
+  it('any other error passes through unchanged', async () => {
+    const run = () => Promise.reject(new ClerkRuntimeError('network', { code: 'network_error' }));
+    await expect(deleteClerkAccount({ delete: vi.fn() }, run)).rejects.toMatchObject({ code: 'network_error' });
   });
 });

@@ -3,6 +3,7 @@ import { CreditCard } from '@phosphor-icons/react/CreditCard';
 import type { ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import type { Address, SectionFields } from '@griever/shared';
+import { DeleteCancelledError } from '../lib/authClient';
 import { PersonalDetailsForm } from './PersonalDetailsForm';
 import type { PersonalDetails, SaveDetailsResult } from './PersonalDetailsForm';
 import { buildPlansText, downloadPlans } from '../lib/exportPlans';
@@ -155,7 +156,7 @@ interface DeletePanelProps {
 function DeletePanel({ onDelete }: DeletePanelProps) {
   const id = useId();
   const [step, setStep] = useState<'idle' | 'confirm' | 'deleting'>('idle');
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<'none' | 'failed' | 'cancelled'>('none');
   const openerRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLHeadingElement>(null);
   const wasConfirming = useRef(false);
@@ -174,13 +175,15 @@ function DeletePanel({ onDelete }: DeletePanelProps) {
     if (step === 'deleting') {
       return;
     }
-    setFailed(false);
+    setFailed('none');
     setStep('deleting');
     try {
       await onDelete();
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      setFailed(error instanceof DeleteCancelledError ? 'cancelled' : 'failed');
       setStep('confirm');
+      // Clerk's verify modal has closed: put focus back on the confirm step.
+      confirmRef.current?.focus();
     }
   }
 
@@ -188,7 +191,7 @@ function DeletePanel({ onDelete }: DeletePanelProps) {
     if (step === 'deleting') {
       return;
     }
-    setFailed(false);
+    setFailed('none');
     setStep('idle');
   }
 
@@ -225,7 +228,7 @@ function DeletePanel({ onDelete }: DeletePanelProps) {
         </div>
       )}
       <p role="status" aria-live="polite" className="m-0 text-[13px] font-semibold">
-        {deleting ? copy.deleting : failed ? copy.deleteFailed : ''}
+        {deleting ? copy.deleting : failed === 'cancelled' ? copy.deleteCancelled : failed === 'failed' ? copy.deleteFailed : ''}
       </p>
     </section>
   );

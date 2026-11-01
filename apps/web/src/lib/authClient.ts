@@ -16,6 +16,14 @@ export interface ClerkAccountReady {
   deleteAccount?: () => Promise<void>;
 }
 
+/** Thrown by `deleteAccount` when the person closed Clerk's verify step. Nothing was deleted. */
+export class DeleteCancelledError extends Error {
+  constructor() {
+    super('Account deletion was cancelled at the verification step');
+    this.name = 'DeleteCancelledError';
+  }
+}
+
 /** `unavailable`: Clerk is missing a key or did not load in time, and there is no signed-in marker to fall back on. */
 export type ClerkAccountState = ClerkAccountReady | { unavailable: true };
 
