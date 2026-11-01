@@ -56,7 +56,9 @@
     "phoneReadyAnnouncement",
     "phoneReadyService",
     "phoneReadyObituary",
-    "phoneReadyThanks"
+    "phoneReadyThanks",
+    "panelEmpty",
+    "loadingTitle"
   ],
   "properties": {
     "navOverview": {
@@ -216,6 +218,12 @@
       "$ref": "#/$defs/text"
     },
     "phoneReadyThanks": {
+      "$ref": "#/$defs/text"
+    },
+    "panelEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "loadingTitle": {
       "$ref": "#/$defs/text"
     }
   },

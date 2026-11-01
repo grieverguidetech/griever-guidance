@@ -962,6 +962,30 @@ function AppBody({
     }
   });
 
+  /**
+   * The "What you'll need" panel for the screens around the editor (people, account, loading). With a
+   * person it is their checklist; with none it is a calm note, so the panel never vanishes (#584).
+   */
+  function panelFor(person: Session | null) {
+    if (!person) {
+      return <p className="gg-hint">{cmsShellCopy.panelEmpty}</p>;
+    }
+    return ({ closeSheet }: { inSheet: boolean; closeSheet: () => void }) => (
+      <ChecklistPanel
+        checklist={person.checklist ?? {}}
+        onSetItem={(id, state) => sessions.setChecklistItem(person.id, id, state)}
+        currentItem={null}
+        onOpenItem={(id) => {
+          sessions.touchSession(person.id);
+          setActiveId(person.id);
+          setCmsSection('overview');
+          openCmsItem(id, 'main', closeSheet);
+          setView('cms');
+        }}
+      />
+    );
+  }
+
   /** The people list inside the shell. Flag on, this is also the fallback, so the old Home never renders. */
   function renderPeople() {
     return (
@@ -969,6 +993,7 @@ function AppBody({
         <CmsShell
           title={cmsShellCopy.peopleTitle}
           peopleView
+          aside={panelFor(null)}
           personName=""
           section="people"
           // Here the nav offers Your people (already here) and the account, which goes to onAccount.
@@ -1026,6 +1051,7 @@ function AppBody({
         <CmsShell
           title={title}
           peopleView={noPerson}
+          aside={panelFor(person)}
           personName={person?.personName ?? ''}
           section="account"
           statuses={person?.sectionStatus}
@@ -1503,8 +1529,20 @@ function AppBody({
   // Landing is waiting for the first sync: a quiet status, not an empty "Your people" that then jumps.
   if (CMS_ENABLED && view === 'home' && isSignedIn && !landed.current && waitingForSync && sortedSessions.length === 0) {
     return (
-      <Shell notice={endedNote}>
-        <Loading />
+      <Shell wide>
+        <CmsShell
+          title={cmsShellCopy.loadingTitle}
+          peopleView
+          aside={panelFor(null)}
+          personName=""
+          section="people"
+          onSelect={() => undefined}
+          onChangePerson={() => undefined}
+          onAccount={() => undefined}
+          notice={endedNote}
+        >
+          <Loading />
+        </CmsShell>
       </Shell>
     );
   }

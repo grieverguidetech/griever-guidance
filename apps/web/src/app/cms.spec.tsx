@@ -107,6 +107,14 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
+/** One banner, one nav, one main and one side panel: the standard layout (#584). */
+function expectOneEditorLayout() {
+  expect(screen.getAllByRole('banner')).toHaveLength(1);
+  expect(screen.getAllByRole('navigation', { name: 'Sections' })).toHaveLength(1);
+  expect(screen.getAllByRole('main')).toHaveLength(1);
+  expect(screen.getAllByRole('complementary')).toHaveLength(1);
+}
+
 describe('editor on (#395)', () => {
   it('opens a person on their Overview and records the visit', async () => {
     await openMargaret();
@@ -338,12 +346,48 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    expectOneEditorLayout();
+    expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
     await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { senderName: 'Anna Reyes' });
     // Back to where they were: the editor they came from, not the account.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+  });
+
+  it('a brand-new user: name prompt in the shell with a calm panel, then Your people with the same layout', async () => {
+    mocks.auth = true;
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
+    mocks.updateProfile.mockResolvedValue({
+      ok: true,
+      profile: { id: 'u1', senderName: 'Anna Reyes', contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
+    });
+    mocks.loadClerk.mockResolvedValue(fakeClerk().load);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
+    await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
+    expectOneEditorLayout();
+    expect(within(screen.getByRole('complementary')).getByText(/Once you start with someone/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    expectOneEditorLayout();
+    expect(within(screen.getByRole('complementary')).getByText(/Once you start with someone/)).toBeInTheDocument();
+  });
+
+  it('Your account with a person shows the checklist panel and the nav', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    expectOneEditorLayout();
+    expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).queryByText(/Once you start with someone/)).not.toBeInTheDocument();
   });
 
   it('Sign out works from inside the editor', async () => {
