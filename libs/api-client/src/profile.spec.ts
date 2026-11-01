@@ -41,6 +41,7 @@ describe('getProfile', () => {
     [401, 'signed_out'],
     [404, 'no_profile'],
     [400, 'invalid'],
+    [429, 'rate_limited'],
     [503, 'unavailable'],
     [500, 'failed'],
   ])('maps %i to %s', async (status, reason) => {
@@ -73,6 +74,7 @@ describe('updateProfile', () => {
   it.each([
     [401, 'signed_out'],
     [400, 'invalid'],
+    [429, 'rate_limited'],
     [503, 'unavailable'],
   ])('maps %i to %s', async (status, reason) => {
     fetchMock.mockResolvedValue(json(status, { error: 'x' }));

@@ -417,9 +417,12 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             break;
           }
           fail(result.reason);
-          // Only a network or server outage stops the queue. Anything else is about this person
-          // alone: keep their edits, note the error and carry on with the next one.
-          if (result.reason === 'offline' || result.reason === 'unavailable') return false;
+          // A network or server outage, or the gateway's write limit (429), stops the queue: the edits
+          // stay queued and the next cycle retries. Anything else is about this person alone: keep
+          // their edits, note the error and carry on with the next one.
+          if (result.reason === 'offline' || result.reason === 'unavailable' || result.reason === 'rate_limited') {
+            return false;
+          }
           softFailure = true;
           break;
         }

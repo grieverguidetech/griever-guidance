@@ -338,6 +338,25 @@ describe('useFlowSync failures (C5)', () => {
     expect(writes(requests).map((r) => r.body)).toEqual([{ serviceDate: 'June 3' }, { serviceDate: 'June 3' }]);
   });
 
+  it('keeps the edit and retries later on a 429 from the write limit', async () => {
+    let status = 429;
+    const requests = mockFetch((req) =>
+      req.method === 'GET'
+        ? { status: 200, body: [record()] }
+        : { status, body: status === 200 ? record() : { error: 'Please try again in a minute.' } },
+    );
+    const base = session();
+    const { rerender, result } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(result.current.lastError).toBe('rate_limited');
+    status = 200;
+    await advance(BACKOFF_START_MS + 10);
+    expect(writes(requests).map((r) => r.body)).toEqual([{ serviceDate: 'June 3' }, { serviceDate: 'June 3' }]);
+    expect(result.current.lastError).toBeNull();
+  });
+
   it('does not stall on a request that never answers', async () => {
     const requests = mockFetch((req) => (req.method === 'GET' ? 'hang' : { status: 200, body: record() }));
     const { result } = setup([session()]);

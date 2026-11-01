@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   callData,
   clerkAuth,
+  writeRateLimit,
   type ClerkAuthVariables,
   type ClerkConfig,
   type DataFunctionConfig,
@@ -98,7 +99,7 @@ export function createProfileRouter(config: ProfileRouterConfig) {
   const router = new Hono<{ Variables: ClerkAuthVariables }>();
   const call = config.callData ?? callData;
 
-  router.use('/me/*', clerkAuth(config.getAuthConfig));
+  router.use('/me/*', clerkAuth(config.getAuthConfig), writeRateLimit());
 
   /** Runs one action as the caller. Returns the result, or null if the data function is unreachable. */
   async function run(

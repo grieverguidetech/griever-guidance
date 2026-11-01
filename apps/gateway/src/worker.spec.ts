@@ -252,6 +252,36 @@ describe('gateway: /me/profile (Clerk accounts, data function)', () => {
     expect((await app.request('/me/profile', { headers: auth })).status).toBe(404);
   });
 
+  it('PUT answers 429 with Retry-After when the write limiter says no, and does not call the data function', async () => {
+    const { app, auth, fetchMock } = await setup();
+    const limit = vi.fn(async (_o: { key: string }) => ({ success: false }));
+    const res = await app.request('/me/profile', put(auth, { senderName: 'Ada' }), {
+      WRITE_RATE_LIMITER: { limit },
+    });
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(limit).toHaveBeenCalledWith({ key: 'user:user_abc123' });
+    expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith('/v1'))).toBe(false);
+  });
+
+  it('GET is never limited, and PUT passes when under the limit', async () => {
+    const { app, auth } = await setup();
+    const limit = vi.fn(async (_o: { key: string }) => ({ success: true }));
+    const env = { WRITE_RATE_LIMITER: { limit } };
+    expect((await app.request('/me/profile', { headers: auth }, env)).status).toBe(200);
+    expect(limit).not.toHaveBeenCalled();
+    expect((await app.request('/me/profile', put(auth, { senderName: 'Ada' }), env)).status).toBe(200);
+    expect(limit).toHaveBeenCalledTimes(1);
+  });
+
+  it('a request with no valid token is refused before it reaches the limiter', async () => {
+    const { app } = await setup();
+    const limit = vi.fn(async (_o: { key: string }) => ({ success: false }));
+    const res = await app.request('/me/profile', { method: 'PUT', body: '{}' }, { WRITE_RATE_LIMITER: { limit } });
+    expect(res.status).toBe(401);
+    expect(limit).not.toHaveBeenCalled();
+  });
+
   it('PUT 200 writes and returns the profile', async () => {
     const { app, auth, fetchMock } = await setup();
     const res = await app.request('/me/profile', put(auth, { senderName: 'Ada' }));

@@ -6,7 +6,7 @@ export type ProfileResult =
   | {
       ok: false;
       /** `no_profile` (404) is normal right after sign-up; `invalid` is a 400 from the gateway. */
-      reason: 'signed_out' | 'offline' | 'no_profile' | 'invalid' | 'unavailable' | 'failed';
+      reason: 'signed_out' | 'offline' | 'no_profile' | 'invalid' | 'rate_limited' | 'unavailable' | 'failed';
     };
 
 function profileReason(status: number): Extract<ProfileResult, { ok: false }>['reason'] {
@@ -18,6 +18,9 @@ function profileReason(status: number): Extract<ProfileResult, { ok: false }>['r
   }
   if (status === 400) {
     return 'invalid';
+  }
+  if (status === 429) {
+    return 'rate_limited';
   }
   if (status === 503) {
     return 'unavailable';
