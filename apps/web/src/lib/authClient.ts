@@ -18,8 +18,11 @@ export interface ClerkAccountReady {
 
 /** Thrown by `deleteAccount` when the person closed Clerk's verify step. Nothing was deleted. */
 export class DeleteCancelledError extends Error {
-  constructor() {
+  cause?: unknown;
+  constructor(options?: { cause?: unknown }) {
     super('Account deletion was cancelled at the verification step');
+    // Set by hand: the project's lib target predates the Error cause option.
+    this.cause = options?.cause;
     this.name = 'DeleteCancelledError';
   }
 }

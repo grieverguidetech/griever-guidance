@@ -218,7 +218,7 @@ export interface DeletableUser {
   delete: () => Promise<unknown>;
 }
 
-/** Runs the delete. In the app this is `useReverification(...)`: Clerk shows its verify step when it asks for one, then retries. */
+/** Runs the delete. In the app this is `useReverification(...)`: Clerk shows its verify step when it asks for one, then retries once. */
 export type RunDelete = (user: DeletableUser) => Promise<unknown>;
 
 const runPlainDelete: RunDelete = (user) => user.delete();
@@ -231,13 +231,18 @@ export async function deleteClerkAccount(user: DeletableUser | null | undefined,
   if (!user) {
     throw new Error('No signed-in user');
   }
+  let result: unknown;
   try {
-    await run(user);
+    result = await run(user);
   } catch (error) {
     if (isReverificationCancelledError(error)) {
-      throw new DeleteCancelledError();
+      throw new DeleteCancelledError({ cause: error });
     }
     throw error;
+  }
+  // After its one retry the wrapper resolves (does not throw) with a hint when Clerk still wants verification.
+  if (typeof result === 'object' && result !== null && 'clerk_error' in result) {
+    throw new Error('Clerk still needs verification before the account can be deleted');
   }
 }
 

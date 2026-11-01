@@ -724,7 +724,7 @@ describe('Delete account panel', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     await waitFor(() => expect(deleteStatus()).toHaveTextContent('Your account was not deleted.'));
     expect(deleteStatus()).not.toHaveTextContent('We could not finish');
-    expect(screen.getByRole('heading', { name: 'Delete your account for good?' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Delete your account for good?' })).toHaveFocus());
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     await waitFor(() => expect(onDeleteAccount).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText('Your account was not deleted.')).not.toBeInTheDocument());
@@ -736,6 +736,6 @@ describe('Delete account panel', () => {
     await user.click(screen.getByRole('button', { name: 'Delete my account' }));
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     await waitFor(() => expect(deleteStatus()).toHaveTextContent('We could not finish deleting'));
-    expect(screen.getByRole('heading', { name: 'Delete your account for good?' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Delete your account for good?' })).toHaveFocus());
   });
 });

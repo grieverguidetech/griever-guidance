@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   clerkStatus: 'ready' as 'ready' | 'degraded' | 'loading',
   providerProps: null as null | Record<string, unknown>,
   getProfile: vi.fn(),
+  reverify: (fetcher: unknown) => fetcher,
   clerkLoaded: true,
   openUserProfile: vi.fn(),
   user: null as null | { primaryEmailAddress: { emailAddress: string } },
@@ -28,7 +29,7 @@ vi.mock('@clerk/react', () => ({
   useClerk: () => ({ status: mocks.clerkStatus, loaded: mocks.clerkLoaded, openUserProfile: mocks.openUserProfile }),
   useUser: () => ({ user: mocks.user }),
   // Passthrough: the real hook wraps the fetcher; the Clerk modal itself is Clerk's.
-  useReverification: (fetcher: unknown) => fetcher,
+  useReverification: (fetcher: unknown) => mocks.reverify(fetcher),
   ClerkProvider: (props: Record<string, unknown> & { children: React.ReactNode }) => {
     mocks.providerProps = props;
     return <>{props.children}</>;
@@ -394,22 +395,54 @@ describe('deleteClerkAccount', () => {
     await expect(deleteClerkAccount(null)).rejects.toThrow();
   });
 
-  it('reverification needed then done: the wrapper retries and the delete succeeds', async () => {
-    const del = vi.fn().mockResolvedValue({});
-    let asked = 0;
-    // Stands in for useReverification: Clerk asks once, the person verifies, the call goes through.
-    const run = vi.fn(async (u: { delete: () => Promise<unknown> }) => {
-      asked += 1;
-      return u.delete();
-    });
+  it('reverification needed then done: the runner retries once and the delete succeeds', async () => {
+    const del = vi.fn().mockRejectedValueOnce(new ClerkRuntimeError('verify', { code: 'session_reverification_required' })).mockResolvedValueOnce({});
+    // Stands in for useReverification: the first delete is refused, Clerk verifies, the delete runs again.
+    const run = async (u: { delete: () => Promise<unknown> }) => {
+      try {
+        return await u.delete();
+      } catch (error) {
+        if (error instanceof ClerkRuntimeError && error.code === 'session_reverification_required') {
+          return u.delete();
+        }
+        throw error;
+      }
+    };
     await expect(deleteClerkAccount({ delete: del }, run)).resolves.toBeUndefined();
-    expect(asked).toBe(1);
-    expect(del).toHaveBeenCalledOnce();
+    expect(del).toHaveBeenCalledTimes(2);
+  });
+
+  it('still needs verification after the retry: rejects, not a cancel', async () => {
+    const run = () => Promise.resolve({ clerk_error: { type: 'forbidden', reason: 'reverification-error' } });
+    const result = deleteClerkAccount({ delete: vi.fn() }, run);
+    await expect(result).rejects.toThrow('still needs verification');
+    await expect(result).rejects.not.toBeInstanceOf(DeleteCancelledError);
   });
 
   it('reverification cancelled: rejects with DeleteCancelledError', async () => {
     const run = () => Promise.reject(new ClerkRuntimeError('cancelled', { code: 'reverification_cancelled' }));
     await expect(deleteClerkAccount({ delete: vi.fn() }, run)).rejects.toBeInstanceOf(DeleteCancelledError);
+  });
+
+  it('through ClerkAccount: a cancelled reverification makes state.deleteAccount() reject with DeleteCancelledError', async () => {
+    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_abc');
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
+    mocks.user = { primaryEmailAddress: { emailAddress: 'a@example.com' }, delete: vi.fn() } as never;
+    mocks.reverify = () => () => Promise.reject(new ClerkRuntimeError('cancelled', { code: 'reverification_cancelled' }));
+    let remove: (() => Promise<void>) | undefined;
+    render(
+      <ClerkAccount>
+        {(state) => {
+          if (!state.unavailable) {
+            remove = state.deleteAccount;
+          }
+          return <p>{state.unavailable ? 'unavailable' : state.account.status}</p>;
+        }}
+      </ClerkAccount>,
+    );
+    await screen.findByText('signed_in');
+    await expect(remove?.()).rejects.toBeInstanceOf(DeleteCancelledError);
+    mocks.reverify = (fetcher: unknown) => fetcher;
   });
 
   it('any other error passes through unchanged', async () => {

@@ -183,7 +183,13 @@ function DeletePanel({ onDelete }: DeletePanelProps) {
       setFailed(error instanceof DeleteCancelledError ? 'cancelled' : 'failed');
       setStep('confirm');
       // Clerk's verify modal has closed: put focus back on the confirm step.
-      confirmRef.current?.focus();
+      // Deferred so the modal's own focus-restore cannot override it.
+      const focusConfirm = () => confirmRef.current?.focus();
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(focusConfirm);
+      } else {
+        setTimeout(focusConfirm, 0);
+      }
     }
   }
 

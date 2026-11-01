@@ -137,6 +137,11 @@ describe('delete account in the app (#575)', () => {
     await screen.findByText('Your account was not deleted.');
     expect(window.localStorage.getItem('gg.sessions.v1')).not.toBeNull();
     expect(screen.queryByRole('heading', { level: 1, name: 'Your account is deleted' })).not.toBeInTheDocument();
+    expect(screen.queryByText(SIGNED_OUT_NOTE)).not.toBeInTheDocument();
+    // Sync is back on: a window focus pulls again.
+    const before = gets;
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(gets).toBeGreaterThan(before));
   });
 
   it('while Clerk is deleting: sync is off and the signed-out note never shows', async () => {
