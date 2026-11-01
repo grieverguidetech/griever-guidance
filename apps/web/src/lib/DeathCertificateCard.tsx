@@ -1,6 +1,6 @@
 import { screenCopy } from '@griever/copy';
 
-/** Words shared by the sheet and the CMS checklist panel. */
+/** The Gather heading for the sheet; the CMS panel reads the same copy key. */
 export const GATHER_HEADING = screenCopy('cmsChecklist').gatherHeading;
 export const NO_REMINDER_LINE = "We won't remind you about this list.";
 
