@@ -84,6 +84,7 @@
   "deleteCancel": "Cancel",
   "deleting": "Deleting your account…",
   "deleteFailed": "We could not finish deleting your account. Please try again, or write to us for help.",
+  "deleteCancelled": "Your account was not deleted.",
   "deletedHeading": "Your account is deleted",
   "deletedBody": "What you saved is being removed from our servers.",
   "deletedAction": "Back to the start",

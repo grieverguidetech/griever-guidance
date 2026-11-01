@@ -89,6 +89,7 @@
     "deleteCancel",
     "deleting",
     "deleteFailed",
+    "deleteCancelled",
     "deletedHeading",
     "deletedBody",
     "deletedAction",
@@ -372,6 +373,9 @@
       "$ref": "#/$defs/text"
     },
     "deleteFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteCancelled": {
       "$ref": "#/$defs/text"
     },
     "deletedHeading": {

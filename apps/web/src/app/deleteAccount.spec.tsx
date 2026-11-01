@@ -4,6 +4,7 @@
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { DeleteCancelledError } from '../lib/authClient';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
 
@@ -125,6 +126,22 @@ describe('delete account in the app (#575)', () => {
     window.dispatchEvent(new Event('focus'));
     await waitFor(() => expect(gets).toBeGreaterThan(before));
     await contactStore.clearAll();
+  });
+
+  it('verification cancelled: says the account was not deleted and keeps local data', async () => {
+    mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: () => Promise.reject(new DeleteCancelledError()) }).load);
+    const user = userEvent.setup();
+    render(<App />);
+    await openConfirm(user);
+    await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
+    await screen.findByText('Your account was not deleted.');
+    expect(window.localStorage.getItem('gg.sessions.v1')).not.toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your account is deleted' })).not.toBeInTheDocument();
+    expect(screen.queryByText(SIGNED_OUT_NOTE)).not.toBeInTheDocument();
+    // Sync is back on: a window focus pulls again.
+    const before = gets;
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(gets).toBeGreaterThan(before));
   });
 
   it('while Clerk is deleting: sync is off and the signed-out note never shows', async () => {

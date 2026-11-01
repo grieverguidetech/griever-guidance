@@ -1,4 +1,5 @@
 import { contactStore } from '@griever/data-local';
+import { DeleteCancelledError } from './authClient';
 import { deleteAccountThenClear, removeEverythingFromDevice } from './removeFromDevice';
 
 describe('removeEverythingFromDevice', () => {
@@ -35,6 +36,12 @@ describe('removeEverythingFromDevice', () => {
 });
 
 describe('deleteAccountThenClear', () => {
+  it('cancelled verification: nothing local is removed and the cancel error reaches the caller', async () => {
+    localStorage.setItem('gg.sessions.v1', '[]');
+    await expect(deleteAccountThenClear(() => Promise.reject(new DeleteCancelledError()), localStorage)).rejects.toBeInstanceOf(DeleteCancelledError);
+    expect(localStorage.getItem('gg.sessions.v1')).toBe('[]');
+  });
+
   it('clears this device only after Clerk resolves', async () => {
     localStorage.setItem('gg.sessions.v1', '[]');
     let sawKeyWhenDeleting: string | null = null;

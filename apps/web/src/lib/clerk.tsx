@@ -5,11 +5,12 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
-import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, useAuth, useClerk, useReverification, useUser } from '@clerk/react';
+import { isReverificationCancelledError } from '@clerk/react/errors';
 import { enUS } from '@clerk/localizations';
 import { SIGNED_IN_STORAGE_KEY, useAccount } from '@griever/hooks';
 import type { AccountAuth, AccountTokenResult } from '@griever/shared';
-import { hasSignedInMarker } from './authClient';
+import { DeleteCancelledError, hasSignedInMarker } from './authClient';
 import type { ClerkAccountState } from './authClient';
 import { SIGN_OUT_PENDING_KEY, markSignOutPending } from './removeFromDevice';
 
@@ -217,12 +218,32 @@ export interface DeletableUser {
   delete: () => Promise<unknown>;
 }
 
-/** Deletes the signed-in Clerk user. Rejects when there is no user or Clerk refuses (offline, deletion not enabled). */
-export async function deleteClerkAccount(user: DeletableUser | null | undefined): Promise<void> {
+/** Runs the delete. In the app this is `useReverification(...)`: Clerk shows its verify step when it asks for one, then retries once. */
+export type RunDelete = (user: DeletableUser) => Promise<unknown>;
+
+const runPlainDelete: RunDelete = (user) => user.delete();
+
+/**
+ * Deletes the signed-in Clerk user. Rejects when there is no user or Clerk refuses (offline,
+ * deletion not enabled). Rejects with `DeleteCancelledError` when the person closes the verify step.
+ */
+export async function deleteClerkAccount(user: DeletableUser | null | undefined, run: RunDelete = runPlainDelete): Promise<void> {
   if (!user) {
     throw new Error('No signed-in user');
   }
-  await user.delete();
+  let result: unknown;
+  try {
+    result = await run(user);
+  } catch (error) {
+    if (isReverificationCancelledError(error)) {
+      throw new DeleteCancelledError({ cause: error });
+    }
+    throw error;
+  }
+  // After its one retry the wrapper resolves (does not throw) with a hint when Clerk still wants verification.
+  if (typeof result === 'object' && result !== null && 'clerk_error' in result) {
+    throw new Error('Clerk still needs verification before the account can be deleted');
+  }
 }
 
 const browserStorage = typeof window !== 'undefined' ? window.localStorage : undefined;
@@ -238,7 +259,8 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   const openAccountSettings = useCallback(() => {
     instance.openUserProfile();
   }, [instance]);
-  const deleteAccount = useCallback(() => deleteClerkAccount(user), [user]);
+  const runDelete = useReverification((target: DeletableUser) => target.delete());
+  const deleteAccount = useCallback(() => deleteClerkAccount(user, runDelete), [user, runDelete]);
   const getAccessToken = useCallback(async () => {
     const result = await getToken();
     return result.ok ? result.token : null;
