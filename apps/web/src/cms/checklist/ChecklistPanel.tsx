@@ -13,7 +13,7 @@ interface Props {
   /** The item whose guidance is open; its label button gets aria-current. */
   currentItem?: ChecklistItemId | null;
   /** Nobody is saved yet: every phase and item, no ticks, and a line saying ticks are kept once you start. */
-  preview?: boolean;
+  preview?: false | 'owner' | 'member';
 }
 
 /**
@@ -26,7 +26,7 @@ export function ChecklistPanel({ checklist, onSetItem, onOpenItem, currentItem, 
       <div className="gg-panel flex flex-col gap-4 [&_.gg-card]:bg-transparent [&_.gg-card]:p-0">
         <p className="m-0">{copy.intro}</p>
         <DeathCertificateCard asHeading />
-        {preview ? <p className="gg-hint m-0">{copy.previewLine}</p> : null}
+        {preview ? <p className="gg-hint m-0">{preview === 'member' ? copy.previewLineMember : copy.previewLine}</p> : null}
       </div>
       <PhaseList
         checklist={checklist}
@@ -34,7 +34,7 @@ export function ChecklistPanel({ checklist, onSetItem, onOpenItem, currentItem, 
         current={currentItem}
         onChange={onSetItem}
         gather={preview ? undefined : <ChecklistRows />}
-        readOnly={preview}
+        readOnly={Boolean(preview)}
       />
       <p className="gg-reassure m-0 text-center">{NO_REMINDER_LINE}</p>
     </div>

@@ -54,6 +54,8 @@
   "phoneReadyObituary": "Share the obituary with the people who should see it.",
   "phoneReadyThanks": "Thank the people who helped, one at a time.",
   "emptyOwner": "Nothing is here yet. Start with someone you've lost, and this page opens for them.",
-  "emptyMember": "This shows here when someone shares a person with you.",
+  "emptyMember": "This page fills in when someone shares a person with you.",
+  "emptyHolding": "One moment. We are checking your account for people.",
+  "arrivedNote": "A person is here now. Their page is open.",
   "loadingTitle": "One moment"
 }

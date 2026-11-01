@@ -34,7 +34,7 @@ describe('ChecklistPanel', () => {
 
   it('as a preview: every phase and item, no ticks, the keep-ticks line, and items still open', async () => {
     const onOpenItem = vi.fn();
-    const { container } = render(<ChecklistPanel preview checklist={{}} onSetItem={noop} onOpenItem={onOpenItem} />);
+    const { container } = render(<ChecklistPanel preview="owner" checklist={{}} onSetItem={noop} onOpenItem={onOpenItem} />);
     expect(screen.getByText(copy.previewLine)).toBeInTheDocument();
     for (const phase of CHECKLIST_PHASES) {
       expect(screen.getByRole('button', { name: copy.phases[phase.key] })).toBeInTheDocument();

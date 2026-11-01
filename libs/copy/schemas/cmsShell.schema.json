@@ -60,6 +60,8 @@
     "phoneReadyThanks",
     "emptyOwner",
     "emptyMember",
+    "emptyHolding",
+    "arrivedNote",
     "loadingTitle"
   ],
   "properties": {
@@ -229,6 +231,12 @@
       "$ref": "#/$defs/text"
     },
     "emptyMember": {
+      "$ref": "#/$defs/text"
+    },
+    "emptyHolding": {
+      "$ref": "#/$defs/text"
+    },
+    "arrivedNote": {
       "$ref": "#/$defs/text"
     },
     "loadingTitle": {

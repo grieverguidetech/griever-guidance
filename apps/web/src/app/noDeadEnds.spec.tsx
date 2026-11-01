@@ -39,7 +39,8 @@ import { App } from './app';
 
 const NAV = ['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account'];
 const CREATE = "Start with someone I've lost";
-const MEMBER_LINE = 'This shows here when someone shares a person with you.';
+const MEMBER_LINE = 'This page fills in when someone shares a person with you.';
+const MEMBER_PREVIEW_LINE = 'Your ticks are kept once someone shares a person with you.';
 const PREVIEW_LINE = 'Your ticks are kept once you start with someone.';
 
 function h1(name: string) {
@@ -115,7 +116,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     expectOneEditorLayout();
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
-    expect(within(aside).getByText(PREVIEW_LINE)).toBeInTheDocument();
+    expect(within(aside).getByText(kind === 'owner' ? PREVIEW_LINE : MEMBER_PREVIEW_LINE)).toBeInTheDocument();
     expect(within(aside).queryByRole('button', { name: /Done/ })).toBeNull();
     expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
   });
@@ -159,6 +160,24 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     await user.click(within(main).getByRole('button', { name: 'Back' }));
     await h1('Service');
     expect(stored()).toHaveLength(0);
+  });
+
+  it('Back from an item opened in the panel on Your people or Your account returns there', async () => {
+    const user = await open();
+    const firstItem = () => screen.getByRole('complementary', { name: "What you'll need" }).querySelector<HTMLElement>('[data-checklist-item]') as HTMLElement;
+    let label = firstItem().textContent ?? '';
+    await user.click(firstItem());
+    await h1(label);
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Back' }));
+    await h1('Your people');
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    label = firstItem().textContent ?? '';
+    await user.click(firstItem());
+    await h1(label);
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Back' }));
+    await h1('Your account');
+    expectFullNav();
   });
 
   it('browser Back and Forward walk the empty pages', async () => {
