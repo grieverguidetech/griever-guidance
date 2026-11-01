@@ -45,7 +45,8 @@ function loadScript(key: string): Promise<boolean> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const done = (ok: boolean) => {
       clearTimeout(timer);
-      delete holder[CALLBACK_NAME];
+      // A no-op, not a delete: Google may still call back after the timeout.
+      holder[CALLBACK_NAME] = () => undefined;
       resolve(ok);
     };
     holder[CALLBACK_NAME] = () => done(true);

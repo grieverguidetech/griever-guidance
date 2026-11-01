@@ -66,6 +66,9 @@ describe('loadGooglePlaces', () => {
     const pending = loadGooglePlaces();
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS);
     expect(await pending).toBeNull();
+    const late = (globalThis as unknown as Record<string, unknown>).__griever_maps_ready;
+    expect(typeof late).toBe('function');
+    expect(() => (late as () => void)()).not.toThrow();
     expect(await loadGooglePlaces()).toBeNull();
     expect(scripts()).toHaveLength(1);
   });
