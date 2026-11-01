@@ -50,7 +50,7 @@ interface Props {
   aside?: ReactNode | ((context: AsideContext) => ReactNode);
   /** Replaces the h1 text, for item details. */
   title?: string;
-  /** The people list: the nav offers only the account item. */
+  /** No person is open (the people list, or the account with nobody saved): the nav offers only Your people and the account. */
   peopleView?: boolean;
   /** True when the details also sync to the account, so the save line can say they wait on the phone. */
   syncOn?: boolean;
@@ -99,6 +99,10 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
   // The menu closes on a choice, so focus moves to the heading rather than a hidden button.
   function select(key: CmsNavKey) {
     heading.current?.focus();
+    if (key === 'people') {
+      onChangePerson();
+      return;
+    }
     if (key === 'account') {
       onAccount();
       return;
@@ -107,7 +111,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
   }
 
   return (
-    <div className="flex flex-col gap-4 pt-[52px] md:flex-row md:items-start md:gap-8">
+    <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
       <SideNav personName={personName} section={section} onSelect={select} onChangePerson={() => {
           heading.current?.focus();
           onChangePerson();
@@ -145,7 +149,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
         // Scrolling is keyboard reachable because the Hide button inside is focusable.
         <aside
           aria-labelledby={asideTitleId}
-          className="hidden lg:sticky lg:top-[52px] lg:block lg:w-96 lg:shrink-0 lg:max-h-[calc(100dvh-52px)] lg:overflow-y-auto"
+          className="hidden lg:sticky lg:top-4 lg:block lg:w-96 lg:shrink-0 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto"
         >
           <div className="flex items-center justify-between gap-2">
             <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>

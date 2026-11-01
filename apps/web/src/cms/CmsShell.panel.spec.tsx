@@ -57,7 +57,7 @@ describe('CmsShell checklist panel', () => {
     expect(within(aside).getByRole('button', { name: 'Hide checklist' })).toBeInTheDocument();
     expect(aside.className).toContain('lg:sticky');
     expect(aside.className).toContain('lg:overflow-y-auto');
-    expect(aside.className).toContain('lg:max-h-[calc(100dvh-52px)]');
+    expect(aside.className).toContain('lg:max-h-[calc(100dvh-2rem)]');
     expect(aside.className).toContain('lg:w-96');
     expect(aside.className).toContain('lg:shrink-0');
   });

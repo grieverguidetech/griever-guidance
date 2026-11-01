@@ -118,7 +118,8 @@ describe('editor on (#395)', () => {
   it('"Create a new one" opens The person directly, and a typed name survives a remount', async () => {
     const user = userEvent.setup();
     const view = render(<App />);
-    // Nobody saved: loading opens The person directly (#448). Home's button is covered in cmsLanding.spec.tsx.
+    // Nobody saved: loading opens Your people (#566); starting a person is the user's choice.
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /contacts|who hears first/i })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Their name'), 'Harold Price');
@@ -173,6 +174,7 @@ describe('editor on (#395)', () => {
   it('"Change" returns to Home and drops an unnamed person', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(stored()).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: /^Change who/ }));
@@ -184,6 +186,7 @@ describe('editor on (#395)', () => {
   it('"Change" keeps an unnamed person who has service data', async () => {
     const user = userEvent.setup();
     render(<App />);
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     await user.click(screen.getByRole('button', { name: 'Service' }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
@@ -248,7 +251,7 @@ describe('editor on (#395)', () => {
   it('reaches no path, wizard, sms: link or "Open Messages" from any section', async () => {
     const user = userEvent.setup();
     await openMargaret();
-    for (const name of ['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
+    for (const name of ['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
       await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name }));
       await screen.findByRole('heading', { level: 1, name });
       expect(document.querySelector('a[href^="sms:"]')).toBeNull();
@@ -389,12 +392,12 @@ describe('editor on, signed in (#395)', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument());
   });
 
-  it('an owner with nobody saved lands on The person', async () => {
+  it('an owner with nobody saved lands on Your people', async () => {
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     signedInAs('owner');
     render(<App />);
-    expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
   });
 });
 
