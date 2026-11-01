@@ -40,6 +40,7 @@ const account = (over: Partial<UseAccountResult>): UseAccountResult => ({
   isLoading: false,
   offline: false,
   profile: null,
+  profileAnswered: false,
   error: null,
   clearError: () => undefined,
   signOut: async () => undefined,

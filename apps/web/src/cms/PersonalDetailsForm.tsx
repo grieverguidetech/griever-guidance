@@ -268,10 +268,13 @@ export function PersonalDetailsForm({ namesOnly, profileLoaded = true, headingLe
     }
   }
 
-  const hasErrors = Object.keys(errors).length > 0;
+  // Fixing a field sets its entry to undefined, so count only real messages.
+  const hasErrors = Object.values(errors).some(Boolean);
   let message = '';
   if (pending) {
     message = copy.saving;
+  } else if (waiting) {
+    message = copy.loadingDetails;
   } else if (hasErrors) {
     message = copy.checkFields;
   } else if (serverInvalid) {

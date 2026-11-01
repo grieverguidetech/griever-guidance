@@ -27,6 +27,8 @@ export interface UseAccountResult {
   offline: boolean;
   /** null when signed out, when no profile exists yet (normal), or before one is known. */
   profile: CachedProfile | null;
+  /** True once the server has answered the profile call (a profile, no profile, or a failure), or a cached profile exists. False only while the first answer is still pending. */
+  profileAnswered: boolean;
   error: string | null;
   clearError: () => void;
   signOut: () => Promise<void>;
@@ -158,6 +160,7 @@ function profileFailureKey(reason: string): string {
 export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResult {
   const [offline, setOffline] = useState(false);
   const [profile, setProfile] = useState<CachedProfile | null>(() => readOwnCache(storage));
+  const [profileAnswered, setProfileAnswered] = useState(() => readOwnCache(storage) !== null);
   const [error, setError] = useState<string | null>(null);
   // Set by signOut so the screen leaves the signed-in state before the provider answers.
   const [endedHere, setEndedHere] = useState(false);
@@ -179,6 +182,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     writeKey(storageRef.current, PROFILE_STORAGE_KEY, null);
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, null);
     setProfile(null);
+    setProfileAnswered(false);
     setOffline(false);
     setError(null);
   }, []);
@@ -245,6 +249,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       writeKey(storageRef.current, PROFILE_STORAGE_KEY, null);
     }
     setProfile((current) => (current && current.id !== authUserId ? null : current));
+    // A cached profile for this user counts as an answer; otherwise the first server answer is still to come.
+    setProfileAnswered(stored !== null && stored.id === authUserId);
     // The provider cannot give a token yet; asking now would read as offline. This runs again when it settles.
     if (!authSettled) {
       return;
@@ -254,6 +260,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       if (!mounted.current || g !== gen.current) {
         return;
       }
+      // Any answer, even a failure, ends the wait: a failed load must not lock the person out of saving.
+      setProfileAnswered(true);
       if (result.ok) {
         setOffline(false);
         keepProfile(toCached(result.profile));
@@ -344,6 +352,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     userId: status === 'signed_in' ? authUserId : null,
     offline,
     profile,
+    profileAnswered,
     error,
     clearError,
     signOut,

@@ -364,6 +364,35 @@ describe('editor on, signed in (#395)', () => {
     expect(body).toEqual({ firstName: 'Anna', lastName: null, birthDate: null, address: null });
   });
 
+  async function openYourAccount(user: ReturnType<typeof userEvent.setup>) {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+  }
+
+  it('Save details waits, with a loading line, while the profile call is unanswered', async () => {
+    signedInAs('owner');
+    mocks.getProfile.mockReturnValue(new Promise(() => undefined));
+    const user = userEvent.setup();
+    await openYourAccount(user);
+    expect(screen.getByRole('button', { name: 'Save details' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Loading your details.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('a failed profile load does not lock Save details', async () => {
+    signedInAs('owner');
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
+    const user = userEvent.setup();
+    await openYourAccount(user);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save details' })).not.toHaveAttribute('aria-disabled', 'true'));
+    expect(screen.queryByText('Loading your details.')).not.toBeInTheDocument();
+  });
+
   it('an account with no name gets the name prompt inside the editor, and saving returns to where they were', async () => {
     mocks.auth = true;
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });

@@ -110,5 +110,6 @@
   "stateInvalid": "Please use the two-letter state code, for example NJ.",
   "zipRequired": "Please enter the ZIP code.",
   "zipInvalid": "Please enter a ZIP code like 07001 or 07001-1234.",
-  "checkFields": "Please check the fields with a message under them."
+  "checkFields": "Please check the fields with a message under them.",
+  "loadingDetails": "Loading your details."
 }

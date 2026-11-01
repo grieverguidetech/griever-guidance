@@ -115,7 +115,8 @@
     "stateInvalid",
     "zipRequired",
     "zipInvalid",
-    "checkFields"
+    "checkFields",
+    "loadingDetails"
   ],
   "properties": {
     "heading": {
@@ -452,6 +453,9 @@
       "$ref": "#/$defs/text"
     },
     "checkFields": {
+      "$ref": "#/$defs/text"
+    },
+    "loadingDetails": {
       "$ref": "#/$defs/text"
     }
   },

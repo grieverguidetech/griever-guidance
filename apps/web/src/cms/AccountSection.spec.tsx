@@ -364,6 +364,21 @@ describe('AccountSection personal details', () => {
     expect(onSaveDetails).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '1980-05-29', address }));
   });
 
+  it('shows Loading your details while waiting, and no stale status', () => {
+    withDetails({ profileLoaded: false });
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Loading your details.');
+    expect(screen.getByRole('button', SAVE)).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('clears the check-the-fields line once the only invalid field is fixed', async () => {
+    const user = userEvent.setup();
+    withDetails({ senderName: null });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Please check the fields');
+    await user.type(screen.getByLabelText('First name'), 'A');
+    expect(screen.getAllByRole('status')[0]).toBeEmptyDOMElement();
+  });
+
   it('says Saving in the status line while the save runs', async () => {
     const user = userEvent.setup();
     let finish: (r: { ok: true }) => void = () => undefined;

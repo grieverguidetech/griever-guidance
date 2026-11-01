@@ -1179,7 +1179,7 @@ function AppBody({
         lastName={auth.profile?.lastName ?? null}
         birthDate={auth.profile?.birthDate ?? null}
         address={auth.profile?.address ?? null}
-        profileLoaded={auth.profile !== null}
+        profileLoaded={auth.profileAnswered}
         onSaveDetails={saveDetails}
         error={auth.error}
         email={accountEmail}
