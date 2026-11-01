@@ -40,11 +40,11 @@ describe('CmsShell checklist panel', () => {
     render(shell());
     const aside = screen.getByRole('complementary');
     const hide = within(aside).getByRole('button', { name: 'Hide checklist' });
-    expect(hide).toHaveClass('gg-btn-ghost');
+    expect(hide).toHaveClass('gg-btn-ghost', 'gg-btn-ghost-plain');
     expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toContainElement(hide);
     await userEvent.click(hide);
     const show = screen.getByRole('button', { name: 'Show checklist' });
-    expect(show).toHaveClass('gg-btn-ghost');
+    expect(show).toHaveClass('gg-btn-ghost', 'gg-btn-ghost-plain');
     expect(screen.getByRole('main')).toContainElement(show);
     const h1 = screen.getByRole('heading', { level: 1 });
     expect(h1.compareDocumentPosition(show) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

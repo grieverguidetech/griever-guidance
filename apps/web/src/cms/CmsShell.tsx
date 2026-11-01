@@ -128,7 +128,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
             </button>
             {/* After the h1 in DOM order so Tab from the heading moves forward; justify-between keeps it top right. */}
             {panelShown ? null : (
-              <button type="button" className="gg-btn gg-btn-ghost hidden lg:inline-flex" onClick={togglePanel}>{copy.show}</button>
+              <button type="button" className="gg-btn gg-btn-ghost gg-btn-ghost-plain hidden lg:inline-flex" onClick={togglePanel}>{copy.show}</button>
             )}
           </div>
         ) : (
@@ -150,7 +150,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
           <div className="flex items-center justify-between gap-2">
             <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
             {/* The name flips Hide/Show; no aria-expanded, so there is one signal. */}
-            <button type="button" className="gg-btn gg-btn-ghost" onClick={togglePanel}>{copy.hide}</button>
+            <button type="button" className="gg-btn gg-btn-ghost gg-btn-ghost-plain" onClick={togglePanel}>{copy.hide}</button>
           </div>
           {renderAside(false)}
         </aside>

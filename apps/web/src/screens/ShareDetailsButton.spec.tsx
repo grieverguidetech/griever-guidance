@@ -25,6 +25,11 @@ describe('ShareDetailsButton', () => {
     vi.useRealTimers();
   });
 
+  it('is a block button without the ghost underline', () => {
+    render(<ShareDetailsButton session={session} checklist={checklist} />);
+    expect(screen.getByRole('button', BUTTON)).toHaveClass('gg-btn-ghost', 'gg-btn-ghost-plain', 'gg-btn-block');
+  });
+
   it('opens the share sheet with the text only', async () => {
     const share = vi.fn(async (_data: { text: string }) => undefined);
     const user = userEvent.setup();

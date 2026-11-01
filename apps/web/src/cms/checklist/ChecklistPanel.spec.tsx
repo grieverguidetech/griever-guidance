@@ -41,6 +41,12 @@ describe('ChecklistPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('row buttons opt out of the ghost underline', () => {
+    const { container } = render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
+    const row = container.querySelector('[data-checklist-item]');
+    expect(row).toHaveClass('gg-btn-ghost', 'gg-btn-ghost-plain');
+  });
+
   it('keeps device ticks in the account store', async () => {
     const user = userEvent.setup();
     render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);

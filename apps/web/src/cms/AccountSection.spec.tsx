@@ -72,20 +72,18 @@ describe('AccountSection', () => {
   });
 
   it('shows the Settings actions under the account content when given, and none otherwise', () => {
-    const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
     const { unmount } = render(
       <AccountSection
         senderName="Anna"
         error={null}
         onSave={vi.fn()}
         onSignOut={vi.fn()}
-        settings={{ onRemoveEverything, signsOut: true, removeMember: <h2>People helping you</h2> }}
+        settings={{ removeMember: <h2>People helping you</h2> }}
       />,
     );
     expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
     expect(screen.queryByText('Remove everything from this device')).not.toBeInTheDocument();
-    expect(onRemoveEverything).not.toHaveBeenCalled();
     unmount();
     profile();
     expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();
@@ -166,9 +164,17 @@ describe('AccountSettingsSection', () => {
     expect(screen.queryByRole('button', { name: /Remove everything/ })).not.toBeInTheDocument();
   });
 
-  it('renders nothing without a remove-a-member section', () => {
-    const { container } = render(<AccountSettingsSection />);
-    expect(container).toBeEmptyDOMElement();
+  it('shows Help and support, and no empty page, without a remove-a-member section', () => {
+    render(<AccountSettingsSection />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Help and support' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /@/ })).toHaveAttribute('href', expect.stringMatching(/^mailto:/));
+    expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();
+  });
+
+  it('shows Help and support after the remove-a-member section', () => {
+    render(<AccountSettingsSection removeMember={<h2>People helping you</h2>} />);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(['People helping you', 'Help and support']);
   });
 });
 
@@ -318,7 +324,7 @@ describe('AccountSection plans', () => {
         onSave={vi.fn()}
         onSignOut={vi.fn()}
         plans={[{ personName: 'Sam', obituaryText: 'A kind man.' }]}
-        settings={{ onRemoveEverything: vi.fn() }}
+        settings={{}}
       />,
     );
     const panel = screen.getByRole('region', { name: 'Your plans' });
@@ -371,7 +377,6 @@ describe('AccountSection plans', () => {
   });
 
   it('shows the remove-a-member content once, in its own panel, and has no remove-everything control', () => {
-    const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
     render(
       <AccountSection
         senderName="Anna"
@@ -380,7 +385,7 @@ describe('AccountSection plans', () => {
         onSignOut={vi.fn()}
         plans={[{ personName: 'Sam' }]}
         peopleHelping={<h2>People helping you</h2>}
-        settings={{ onRemoveEverything, removeMember: <h3>People helping you</h3> }}
+        settings={{ removeMember: <h3>People helping you</h3> }}
       />,
     );
     const headings = screen.getAllByRole('heading', { name: 'People helping you' });
@@ -388,7 +393,6 @@ describe('AccountSection plans', () => {
     expect(headings[1].parentElement).toHaveClass('gg-panel');
     expect(screen.queryByRole('heading', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Remove everything/ })).not.toBeInTheDocument();
-    expect(onRemoveEverything).not.toHaveBeenCalled();
   });
 });
 

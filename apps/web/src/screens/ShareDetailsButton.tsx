@@ -80,7 +80,7 @@ export function ShareDetailsButton({ session, checklist }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <button type="button" onClick={share} className="gg-btn gg-btn-ghost gg-btn-block">
+      <button type="button" onClick={share} className="gg-btn gg-btn-ghost gg-btn-ghost-plain gg-btn-block">
         <ShareNetwork size={18} weight="duotone" aria-hidden="true" />
         Share these details
       </button>

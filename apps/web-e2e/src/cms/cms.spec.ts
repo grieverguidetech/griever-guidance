@@ -80,6 +80,7 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await page.getByLabel('Their name').fill('Margaret Hayes');
     await openSection(page, 'Your account', 'Your account');
     await expect(page.getByRole('button', { name: 'Remove everything from this device' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 2, name: 'Help and support' })).toBeVisible();
   },
   'Your people': async (page) => {
     await startPerson(page);

@@ -170,7 +170,7 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
         </div>
       </section>
       {peopleHelping}
-      {plans && settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
+      {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
       <SupportPanel />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-signout`}>
         <h2 id={`${id}-signout`} className="text-[16px] m-0">
@@ -183,7 +183,6 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           </button>
         </div>
       </section>
-      {!plans && settings ? <AccountSettingsSection {...settings} /> : null}
     </>
   );
 }
@@ -427,16 +426,15 @@ function DetailsForm({ fullName, birthDate, error, onSave }: DetailsFormProps) {
 }
 
 interface SettingsProps {
-  /** No longer used: the account page has no "remove everything" control. Kept optional so existing callers compile. */
-  onRemoveEverything?: () => Promise<void>;
-  signsOut?: boolean;
   removeMember?: ReactNode;
 }
 
-/** The Settings content (signed out, or accounts off) inside the CMS shell: only the remove-a-member section, when there is one. */
+/** Your account when nobody is signed in, or accounts are off: the remove-a-member section when there is one, then Help and support. */
 export function AccountSettingsSection({ removeMember }: SettingsProps) {
-  if (!removeMember) {
-    return null;
-  }
-  return <div className="gg-panel flex flex-col gap-4">{removeMember}</div>;
+  return (
+    <>
+      {removeMember ? <div className="gg-panel flex flex-col gap-4">{removeMember}</div> : null}
+      <SupportPanel />
+    </>
+  );
 }

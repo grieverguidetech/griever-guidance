@@ -137,7 +137,7 @@ describe('EventFields', () => {
     // A text link under its field: underlined, no padding of its own, 44px target from the stylesheet.
     expect(day).toHaveClass('gg-link-button');
     expect(day).not.toHaveClass('gg-chip');
-    expect(day.className).not.toMatch(/\bp[xy]?-\d/);
+    expect(day.className).toBe('gg-link-button');
     expect(day.parentElement).toHaveClass('gg-field');
     expect(day.parentElement?.contains(screen.getByLabelText('Date'))).toBe(true);
     await userEvent.click(day);

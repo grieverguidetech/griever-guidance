@@ -1065,8 +1065,6 @@ function AppBody({
           void auth.signOut();
         }}
         settings={{
-          onRemoveEverything: removeEverything,
-          signsOut: true,
           removeMember:
             sharingOn && members.view?.role === 'owner' ? (
               <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} headingLevel={3} />
@@ -1238,8 +1236,6 @@ function AppBody({
     return renderAccount(
       accountCopy.heading,
       <AccountSettingsSection
-        onRemoveEverything={removeEverything}
-        signsOut={offline || (auth?.isSignedIn ?? false)}
         removeMember={
           sharingOn && members.view?.role === 'owner' ? (
             <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
