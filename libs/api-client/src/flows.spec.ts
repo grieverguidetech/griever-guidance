@@ -84,6 +84,7 @@ describe.each(calls)('%s', (_name, run, method, path, okBody) => {
     [409, 'conflict'],
     [400, 'invalid'],
     [422, 'invalid'],
+    [429, 'rate_limited'],
     [500, 'unavailable'],
     [503, 'unavailable'],
     [418, 'failed'],

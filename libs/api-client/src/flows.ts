@@ -35,6 +35,7 @@ export function parseSyncedPatch(input: unknown): Partial<SyncedFields> | null {
  * - `offline`: the request never reached a server. Sync retries later (C5).
  * - `conflict` 409: on create, the id already exists, so switch to `patchFlow`.
  * - `signed_out` 401, `forbidden` 403, `not_found` 404, `invalid` 400/422 (or a bad id, never sent).
+ * - `rate_limited` 429: too many saves in a minute. A soft failure: the edit stays queued and sync tries again later.
  * - `unavailable`: a 5xx. `failed`: anything else, including a reply that is not a valid record.
  */
 export type FlowsFailureReason =
@@ -44,6 +45,7 @@ export type FlowsFailureReason =
   | 'not_found'
   | 'conflict'
   | 'invalid'
+  | 'rate_limited'
   | 'unavailable'
   | 'failed';
 
@@ -63,6 +65,7 @@ function reasonForStatus(status: number): FlowsFailureReason {
   if (status === 404) return 'not_found';
   if (status === 409) return 'conflict';
   if (status === 400 || status === 422) return 'invalid';
+  if (status === 429) return 'rate_limited';
   if (status >= 500) return 'unavailable';
   return 'failed';
 }

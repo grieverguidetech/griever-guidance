@@ -5,6 +5,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import {
   clerkAuth,
+  writeRateLimit,
   type ClerkAuthVariables,
   type ClerkConfig,
   type DataFunctionConfig,
@@ -106,7 +107,7 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
   });
   // Each path is registered once. Limit runs after auth, so a caller with no token gets 401 whatever the size.
   for (const path of ['/flows', '/flows/*']) {
-    router.use(path, clerkAuth(config.getAuthConfig), limit);
+    router.use(path, clerkAuth(config.getAuthConfig), writeRateLimit(), limit);
   }
 
   const respond = (

@@ -46,3 +46,14 @@ WEB_URL = "https://web.grieversguidance.com"
 # The region has no code default; the project's SCP allows only us-east-2.
 DATA_FUNCTION_URL = ""
 DATA_FUNCTION_REGION = "us-east-2"
+
+# Per-user rate limit on write requests (POST/PUT/PATCH/DELETE) under /flows* and /me*
+# (libs/gateway-auth writeRateLimit; docs/backend-services.md "Write rate limit").
+# Workers Rate Limiting binding: `limit` requests per `period` seconds (period must be 10 or 60),
+# counted per key (the Clerk user id). Counts are per Cloudflare location. The code reads the binding
+# by the name below; if the binding is missing the limit is simply off. Change `limit` here to tune it.
+# `namespace_id` is a positive integer you choose; it must be unique among this account's rate limiters.
+[[ratelimits]]
+name = "WRITE_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

@@ -216,6 +216,38 @@ tokenless `POST /invites` gives 401.
 **Note.** REQUIREMENTS §6 "Identity" says `supabaseAuth` is in `libs/identity`. The code is in
 `libs/gateway-auth`. The doc is out of date.
 
+### 3.2.1 Write rate limit (`writeRateLimit`, #530)
+
+**What it does.** Limits write requests (POST, PUT, PATCH, DELETE) under `/flows*` and `/me*` to
+**120 per 60 seconds per signed-in user**. Reads are not counted. The middleware runs right after
+`clerkAuth`, so the key is the verified Clerk user id (`user:<id>`). If a request somehow has no user,
+the key is the client IP (`ip:<cf-connecting-ip>`). `/members*` and `/invites*` are not covered; they
+have their own limits in the data function.
+
+| Item | Detail |
+|---|---|
+| Mechanism | Cloudflare Workers Rate Limiting binding, `[[ratelimits]]` in `apps/gateway/wrangler.toml`. Binding name `WRITE_RATE_LIMITER`, read from the Worker env |
+| Over the limit | `429`, `{"error": "You are saving very quickly. Your changes are kept. Please try again in a minute."}`, header `Retry-After: 60` (the window length; the binding does not report time left) |
+| No binding | Local dev (`apps/gateway/src/main.ts`) and tests have no binding, so the middleware passes through |
+| Limiter error | Passes through. A broken limiter must not block someone saving their work |
+| Accuracy | Counts are per Cloudflare location and eventually consistent. This stops runaway clients; it is not an exact quota |
+| Client | `libs/api-client` maps 429 to `rate_limited` (flows, profile). `useFlowSync` keeps the edit queued, stops the cycle and retries with backoff. Nothing local is dropped. Copy stays calm (C7) |
+
+**Why 120.** The web autosaves one PATCH after 1 s without typing (`EDIT_DEBOUNCE_MS` in
+`libs/hooks/src/useFlowSync.ts`). Writes in one cycle run one after another. Even if someone paused
+just over 1 s between every keystroke, that is at most about 50 writes a minute. 120 is more than
+double that, so a normal editor never reaches it. A script doing hundreds of writes a minute does.
+
+**How to change it.** Edit `limit` (and `period`, which must be 10 or 60) in the `[[ratelimits]]`
+block of `apps/gateway/wrangler.toml` and deploy. If you change `period`, also change
+`WRITE_RATE_LIMIT_RETRY_AFTER_SECONDS` in `libs/gateway-auth/src/writeRateLimit.ts`. To turn the limit
+off, remove the block. To add routes, mount `writeRateLimit()` after `clerkAuth` in that router.
+
+**Cloudflare setup.** No dashboard step. The binding is created on `wrangler deploy` (needs Wrangler 4.x;
+the repo has 4.90). Pick a different `namespace_id` only if `1001` is already used by another rate
+limiter on the account. The first deploy needs the Worker's API token to be allowed to edit Workers
+scripts, which `deploy.yml` already does.
+
 ### 3.3 Profile (`libs/identity`)
 
 **Purpose.** `GET` and `PUT /me/profile`: the caller's sender name, contact source, full name and date of birth.
