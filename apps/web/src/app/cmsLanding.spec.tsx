@@ -554,7 +554,7 @@ describe('navigation (#566)', () => {
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' }));
     await h1('Your account');
-    expect(screen.getByRole('button', { name: 'Remove everything from this device' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Help and support' })).toBeInTheDocument();
     act(() => {
       window.history.back();
     });
@@ -563,7 +563,7 @@ describe('navigation (#566)', () => {
       window.history.forward();
     });
     expect(await h1('Your account')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove everything from this device' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Help and support' })).toBeInTheDocument();
   });
 
   it('Back then Forward on the Profile (signed in) returns to it, never to the name prompt', async () => {
