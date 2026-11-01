@@ -95,7 +95,8 @@
     "deleteFailed",
     "deletedHeading",
     "deletedBody",
-    "deletedAction"
+    "deletedAction",
+    "deletedLeftover"
   ],
   "properties": {
     "heading": {
@@ -372,6 +373,9 @@
       "$ref": "#/$defs/text"
     },
     "deletedAction": {
+      "$ref": "#/$defs/text"
+    },
+    "deletedLeftover": {
       "$ref": "#/$defs/text"
     }
   },

@@ -15,6 +15,8 @@ export interface FakeClerkOptions {
   getToken?: AccountAuth['getToken'];
   /** Runs before the fake session ends; a rejection is passed on and the session stays. */
   signOut?: () => Promise<void>;
+  /** Runs when Delete account is confirmed. Like Clerk, a resolve also ends the session; a rejection leaves it. */
+  deleteAccount?: () => Promise<void>;
 }
 
 export interface FakeClerk {
@@ -74,7 +76,17 @@ export function fakeClerk(options: FakeClerkOptions = {}): FakeClerk {
       },
       [],
     );
-    return <>{children({ unavailable: false, account, getAccessToken, signOut })}</>;
+    const deleteAccount = useMemo(
+      () =>
+        options.deleteAccount
+          ? async () => {
+              await options.deleteAccount?.();
+              setUser(null);
+            }
+          : undefined,
+      [],
+    );
+    return <>{children({ unavailable: false, account, getAccessToken, signOut, deleteAccount })}</>;
   }
 
   function SignInScreen() {

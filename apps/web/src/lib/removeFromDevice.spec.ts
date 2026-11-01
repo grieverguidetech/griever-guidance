@@ -41,7 +41,7 @@ describe('deleteAccountThenClear', () => {
     const deleteAccount = vi.fn(async () => {
       sawKeyWhenDeleting = localStorage.getItem('gg.sessions.v1');
     });
-    await deleteAccountThenClear(deleteAccount, localStorage);
+    expect(await deleteAccountThenClear(deleteAccount, localStorage)).toBe(true);
     expect(sawKeyWhenDeleting).toBe('[]');
     expect(localStorage.getItem('gg.sessions.v1')).toBeNull();
     expect(localStorage.getItem('gg.signOutPending')).toBeNull();
@@ -54,5 +54,19 @@ describe('deleteAccountThenClear', () => {
     expect(localStorage.getItem('gg.sessions.v1')).toBe('[]');
     expect(await contactStore.list()).toHaveLength(1);
     await contactStore.clearAll();
+  });
+
+  it('resolves false, not a rejection, when the account is deleted but the local clear fails', async () => {
+    const broken = {
+      length: 1,
+      key: () => {
+        throw new Error('storage blocked');
+      },
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
+    };
+    const deleteAccount = vi.fn().mockResolvedValue(undefined);
+    expect(await deleteAccountThenClear(deleteAccount, broken)).toBe(false);
+    expect(deleteAccount).toHaveBeenCalledOnce();
   });
 });

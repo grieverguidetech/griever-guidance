@@ -87,8 +87,9 @@
   "deleteConfirmAction": "Yes, delete my account",
   "deleteCancel": "Cancel",
   "deleting": "Deleting your account…",
-  "deleteFailed": "We could not delete your account. Nothing was removed. Please check your connection and try again, or write to us for help.",
+  "deleteFailed": "We could not finish deleting your account. Please try again, or write to us for help.",
   "deletedHeading": "Your account is deleted",
-  "deletedBody": "Everything was removed from this device and from our servers. Take all the time you need.",
-  "deletedAction": "Back to the start"
+  "deletedBody": "What you saved is being removed from our servers.",
+  "deletedAction": "Back to the start",
+  "deletedLeftover": "Some things could not be removed from this device."
 }
