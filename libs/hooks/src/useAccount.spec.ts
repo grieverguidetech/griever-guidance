@@ -150,6 +150,59 @@ describe('useAccount boot', () => {
     expect(storage.data[PROFILE_STORAGE_KEY]).toBeUndefined();
   });
 
+  it('profileAnswered: false while the first answer is pending, true after a profile', async () => {
+    const storage = memoryStorage();
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profileAnswered).toBe(false);
+    await waitFor(() => expect(result.current.profileAnswered).toBe(true));
+    expect(result.current.profile?.senderName).toBe('Peter');
+  });
+
+  it('profileAnswered: true after no_profile, with no profile', async () => {
+    fetchMock.mockResolvedValue(reply(404, { error: 'none' }));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage: memoryStorage() }));
+    expect(result.current.profileAnswered).toBe(false);
+    await waitFor(() => expect(result.current.profileAnswered).toBe(true));
+    expect(result.current.profile).toBeNull();
+  });
+
+  it('profileAnswered: true after a failed fetch, so a failed load does not lock saving', async () => {
+    fetchMock.mockResolvedValue(reply(503, { error: 'down' }));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage: memoryStorage() }));
+    await waitFor(() => expect(result.current.profileAnswered).toBe(true));
+    expect(result.current.profile).toBeNull();
+  });
+
+  it('profileAnswered: true when a save answers before a superseded first load', async () => {
+    let finishLoad: (r: Response) => void = () => undefined;
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        return reply(200, profile('Pete'));
+      }
+      return new Promise<Response>((resolve) => {
+        finishLoad = resolve;
+      });
+    });
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage: memoryStorage() }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(result.current.profileAnswered).toBe(false);
+    await act(async () => {
+      await result.current.updateSenderName('Pete');
+    });
+    await act(async () => {
+      finishLoad(reply(200, profile('Peter')));
+      await Promise.resolve();
+    });
+    expect(result.current.profileAnswered).toBe(true);
+    expect(result.current.profile?.senderName).toBe('Pete');
+  });
+
+  it('profileAnswered: true at once when a cached profile exists', () => {
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profileAnswered).toBe(true);
+  });
+
   it('keeps the cache and stays signed in on a 503', async () => {
     fetchMock.mockResolvedValue(reply(503, { error: 'down' }));
     const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });

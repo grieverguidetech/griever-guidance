@@ -44,13 +44,31 @@ describe('Profile', () => {
     const onSaveDetails = vi.fn(async () => ({ ok: true as const }));
     const onSave = vi.fn(async () => true);
     const user = userEvent.setup();
-    render(<Profile asksName senderName={null} onBack={vi.fn()} onSave={onSave} onSaveDetails={onSaveDetails} onSignOut={vi.fn()} error={null} />);
+    render(
+      <Profile
+        asksName
+        senderName={null}
+        birthDate="1980-05-29"
+        address={{ line1: '1 Main St', line2: '', city: 'Milltown', state: 'NJ', zip: '08850' }}
+        onBack={vi.fn()}
+        onSave={onSave}
+        onSaveDetails={onSaveDetails}
+        onSignOut={vi.fn()}
+        error={null}
+      />,
+    );
     expect(screen.getByRole('heading', { level: 1, name: 'What should we call you?' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('First name'), 'Anna');
-    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
     await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: 'Reyes', birthDate: null, address: null });
+    expect(onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: 'Reyes' });
+    const sent = (onSaveDetails.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(sent).not.toHaveProperty('birthDate');
+    expect(sent).not.toHaveProperty('address');
+    // One heading level at a time: h1, then the form's h2, inside a panel.
+    expect(screen.getByRole('heading', { level: 2, name: 'Personal details' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
   });
 

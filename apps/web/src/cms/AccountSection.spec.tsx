@@ -29,7 +29,7 @@ describe('AccountSection', () => {
     expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
   });
 
-  it('the name prompt asks First name and Last name only, with its intro, and saves with the rest unchanged', async () => {
+  it('the name prompt asks First name and Last name only, with its intro as the first name hint, and sends only the names', async () => {
     const user = userEvent.setup();
     const props = profile({
       asksName: true,
@@ -37,27 +37,34 @@ describe('AccountSection', () => {
       birthDate: '1980-05-29',
       address: { line1: '1 Main St', line2: '', city: 'Milltown', state: 'NJ', zip: '08850' },
     });
-    expect(screen.getByText('Your first name is the name your messages are signed with.')).toBeInTheDocument();
-    expect(screen.getByLabelText('First name')).toBeInTheDocument();
-    expect(screen.getByLabelText('Last name')).toBeInTheDocument();
+    expect(screen.getByLabelText('First name')).toHaveAccessibleDescription('Your first name is the name your messages are signed with.');
+    expect(screen.getByLabelText('First name')).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText('Last name (optional)')).toBeInTheDocument();
     expect(screen.queryByLabelText('Date of birth')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('ZIP code')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('First name'), 'Anna');
-    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
     await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(props.onSaveDetails).toHaveBeenCalledWith({
-      firstName: 'Anna',
-      lastName: 'Reyes',
-      birthDate: '1980-05-29',
-      address: { line1: '1 Main St', line2: '', city: 'Milltown', state: 'NJ', zip: '08850' },
-    });
+    expect(props.onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: 'Reyes' });
+    const sent = (props.onSaveDetails as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(sent).toEqual({ firstName: 'Anna', lastName: 'Reyes' });
+    expect(sent).not.toHaveProperty('birthDate');
+    expect(sent).not.toHaveProperty('address');
+  });
+
+  it('the name prompt blocks only on name errors, even with a bad stored address, and does not wait for the profile', async () => {
+    const user = userEvent.setup();
+    const props = profile({ asksName: true, senderName: null, profileLoaded: false, address: { line1: '', line2: '', city: '', state: 'N', zip: '1' } });
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(props.onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: null });
   });
 
   it('the name prompt needs a first name and does not save without one', async () => {
     const user = userEvent.setup();
     const props = profile({ asksName: true, senderName: null });
     await user.click(screen.getByRole('button', { name: 'Save details' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your first name.');
+    expect(screen.getByLabelText('First name')).toHaveAccessibleDescription(/Please enter your first name\./);
     expect(screen.getByLabelText('First name')).toBeInvalid();
     expect(props.onSaveDetails).not.toHaveBeenCalled();
   });
@@ -182,7 +189,7 @@ describe('AccountSection personal details', () => {
     withDetails();
     const expected: Record<string, string> = {
       'First name': 'given-name',
-      'Last name': 'family-name',
+      'Last name (optional)': 'family-name',
       'Address line 1': 'address-line1',
       'Address line 2 (optional)': 'address-line2',
       City: 'address-level2',
@@ -192,7 +199,15 @@ describe('AccountSection personal details', () => {
     for (const [label, token] of Object.entries(expected)) {
       expect(screen.getByLabelText(label)).toHaveAttribute('autocomplete', token);
     }
-    expect(screen.getByLabelText('State')).toHaveAttribute('maxlength', '2');
+    expect(screen.getByLabelText('State')).not.toHaveAttribute('maxlength');
+    expect(screen.getByLabelText('State')).toHaveAttribute('autocorrect', 'off');
+    expect(screen.getByLabelText('State')).toHaveAttribute('spellcheck', 'false');
+    expect(screen.getByLabelText('ZIP code')).toHaveAttribute('inputmode', 'numeric');
+    expect(screen.getByLabelText('ZIP code')).toHaveAttribute('spellcheck', 'false');
+    expect(screen.getByLabelText('First name')).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText('Last name (optional)')).not.toHaveAttribute('aria-required');
+    // The date field stays off autofill: browsers fill a birthday as yyyy-mm-dd.
+    expect(screen.getByLabelText('Date of birth')).toHaveAttribute('autocomplete', 'off');
     expect(screen.getByLabelText('Date of birth')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Address' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', SAVE)).toHaveLength(1);
@@ -201,13 +216,13 @@ describe('AccountSection personal details', () => {
   it('prefills the first name from senderName when no names are saved', () => {
     withDetails({ senderName: 'Anna' });
     expect(screen.getByLabelText('First name')).toHaveValue('Anna');
-    expect(screen.getByLabelText('Last name')).toHaveValue('');
+    expect(screen.getByLabelText('Last name (optional)')).toHaveValue('');
   });
 
   it('prefers saved names over senderName, and does not copy senderName into a blank first name when a last name exists', () => {
     const { unmount } = render(<AccountSection senderName="Ann" firstName="Anna" lastName="Reyes" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} />);
     expect(screen.getByLabelText('First name')).toHaveValue('Anna');
-    expect(screen.getByLabelText('Last name')).toHaveValue('Reyes');
+    expect(screen.getByLabelText('Last name (optional)')).toHaveValue('Reyes');
     unmount();
     render(<AccountSection senderName="Ann" firstName={null} lastName="Reyes" error={null} onSaveDetails={vi.fn()} onSignOut={vi.fn()} />);
     expect(screen.getByLabelText('First name')).toHaveValue('');
@@ -227,7 +242,7 @@ describe('AccountSection personal details', () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails({ senderName: null });
     await user.type(screen.getByLabelText('First name'), '  Anna ');
-    await user.type(screen.getByLabelText('Last name'), 'Lee');
+    await user.type(screen.getByLabelText('Last name (optional)'), 'Lee');
     await user.type(screen.getByLabelText('Date of birth'), 'May 29, 1980');
     await fillAddress(user);
     await user.click(screen.getByRole('button', SAVE));
@@ -245,7 +260,7 @@ describe('AccountSection personal details', () => {
     const { onSaveDetails } = withDetails({ senderName: null });
     await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your first name.');
+    expect(screen.getByText('Please enter your first name.')).toBeInTheDocument();
     expect(screen.getByLabelText('First name')).toBeInvalid();
   });
 
@@ -268,7 +283,7 @@ describe('AccountSection personal details', () => {
   it('clears everything but the first name when emptied', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails({ firstName: 'Anna', lastName: 'Lee', birthDate: '1980-05-29', address });
-    for (const label of ['Last name', 'Date of birth', 'Address line 1', 'Address line 2 (optional)', 'City', 'State', 'ZIP code']) {
+    for (const label of ['Last name (optional)', 'Date of birth', 'Address line 1', 'Address line 2 (optional)', 'City', 'State', 'ZIP code']) {
       await user.clear(screen.getByLabelText(label));
     }
     await user.click(screen.getByRole('button', SAVE));
@@ -281,11 +296,97 @@ describe('AccountSection personal details', () => {
     await user.type(screen.getByLabelText('Address line 1'), '1 Main St');
     await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).not.toHaveBeenCalled();
-    const alerts = screen.getAllByRole('alert').map((a) => a.textContent);
-    expect(alerts).toEqual(['Please enter the city.', 'Please enter the state.', 'Please enter the ZIP code.']);
+    expect(screen.getByText('Please enter the city.')).toBeInTheDocument();
+    expect(screen.getByText('Please enter the state.')).toBeInTheDocument();
+    expect(screen.getByText('Please enter the ZIP code.')).toBeInTheDocument();
+    expect(screen.queryByText('Please enter the street address.')).not.toBeInTheDocument();
     expect(screen.getByLabelText('City')).toBeInvalid();
     expect(screen.getByLabelText('City')).toHaveAccessibleDescription('Please enter the city.');
     expect(screen.getByLabelText('Address line 1')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('moves focus to the first invalid field, in page order, and puts a short summary in the status line', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await user.type(screen.getByLabelText('Address line 1'), '1 Main St');
+    await user.type(screen.getByLabelText('ZIP code'), '123');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    // City and State are empty and ZIP is wrong; City comes first on the page.
+    expect(screen.getByLabelText('City')).toHaveFocus();
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Please check the fields with a message under them.');
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(0);
+    await user.type(screen.getByLabelText('City'), 'Milltown');
+    await user.type(screen.getByLabelText('State'), 'NJ');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getByLabelText('ZIP code')).toHaveFocus();
+    await user.clear(screen.getByLabelText('First name'));
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getByLabelText('First name')).toHaveFocus();
+  });
+
+  it('turns a full state name into its code on save', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await fillAddress(user, { State: 'New Jersey' });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenLastCalledWith(expect.objectContaining({ address: expect.objectContaining({ state: 'NJ' }) }));
+  });
+
+  it('turns the District of Columbia into DC on save', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await fillAddress(user, { State: 'district of columbia' });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenLastCalledWith(expect.objectContaining({ address: expect.objectContaining({ state: 'DC' }) }));
+  });
+
+  it('refuses a state that is not a code or a name, with the state message', async () => {
+    const user = userEvent.setup();
+    const { onSaveDetails } = withDetails();
+    await fillAddress(user, { State: 'Narnia' });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    expect(screen.getByText('Please use the two-letter state code, for example NJ.')).toBeInTheDocument();
+  });
+
+  it('keeps Save details waiting until the profile has loaded, then saves', async () => {
+    const user = userEvent.setup();
+    const onSaveDetails = vi.fn().mockResolvedValue({ ok: true });
+    const base = { senderName: 'Anna', error: null, onSignOut: vi.fn(), onSaveDetails };
+    const { rerender } = render(<AccountSection {...base} profileLoaded={false} />);
+    expect(screen.getByRole('button', SAVE)).toHaveAttribute('aria-disabled', 'true');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).not.toHaveBeenCalled();
+    rerender(<AccountSection {...base} profileLoaded firstName="Anna" birthDate="1980-05-29" address={address} />);
+    expect(screen.getByRole('button', SAVE)).not.toHaveAttribute('aria-disabled', 'true');
+    await user.click(screen.getByRole('button', SAVE));
+    expect(onSaveDetails).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '1980-05-29', address }));
+  });
+
+  it('shows Loading your details while waiting, and no stale status', () => {
+    withDetails({ profileLoaded: false });
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Loading your details.');
+    expect(screen.getByRole('button', SAVE)).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('clears the check-the-fields line once the only invalid field is fixed', async () => {
+    const user = userEvent.setup();
+    withDetails({ senderName: null });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Please check the fields');
+    await user.type(screen.getByLabelText('First name'), 'A');
+    expect(screen.getAllByRole('status')[0]).toBeEmptyDOMElement();
+  });
+
+  it('says Saving in the status line while the save runs', async () => {
+    const user = userEvent.setup();
+    let finish: (r: { ok: true }) => void = () => undefined;
+    withDetails({ onSaveDetails: vi.fn((): Promise<{ ok: true }> => new Promise((resolve) => { finish = resolve; })) });
+    await user.click(screen.getByRole('button', SAVE));
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Saving…');
+    await act(async () => finish({ ok: true }));
+    expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
   });
 
   it('refuses a bad ZIP and a bad state, then clears the message when the field is edited', async () => {
@@ -333,12 +434,12 @@ describe('AccountSection personal details', () => {
     await user.click(screen.getByLabelText('First name'));
     await user.paste('a'.repeat(101));
     await user.click(screen.getByRole('button', SAVE));
-    expect(screen.getByRole('alert')).toHaveTextContent('That is too long. Please shorten it.');
+    expect(screen.getByText('That is too long. Please shorten it.')).toBeInTheDocument();
     expect(screen.getByLabelText('First name')).toBeInvalid();
     await user.clear(screen.getByLabelText('First name'));
     await user.paste('Anna\u0001x');
     await user.click(screen.getByRole('button', SAVE));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter this on one line, with no hidden characters.');
+    expect(screen.getByText('Please enter this on one line, with no hidden characters.')).toBeInTheDocument();
     expect(onSaveDetails).not.toHaveBeenCalled();
   });
 

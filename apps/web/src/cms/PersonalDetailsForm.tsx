@@ -4,6 +4,7 @@ import { screenCopy } from '@griever/copy';
 import { BIRTH_YEAR_MIN, checkAddress, isValidBirthDate, isValidNamePart, normalizeNamePart, NAME_PART_MAX_LENGTH } from '@griever/shared';
 import type { Address, AddressField } from '@griever/shared';
 import { DateInput, dateToISO, isoToDate, todayISO } from '../lib/DateField';
+import { stateToCode } from './usStates';
 
 const copy = screenCopy('account');
 
@@ -14,9 +15,10 @@ const BIRTH_YEARS = { minYear: 1000, maxYear: 9999 };
 export interface PersonalDetails {
   firstName: string | null;
   lastName: string | null;
-  /** yyyy-mm-dd */
-  birthDate: string | null;
-  address: Address | null;
+  /** yyyy-mm-dd. Left out, the stored value is left alone. */
+  birthDate?: string | null;
+  /** Left out, the stored value is left alone. */
+  address?: Address | null;
 }
 
 export type SaveDetailsResult = { ok: true } | { ok: false; invalid: boolean };
@@ -34,6 +36,18 @@ interface FormValues {
   state: string;
   zip: string;
 }
+
+/** The fields in the order they sit on the page, with the id suffix of each input. */
+const FIELD_ORDER: readonly (readonly [FieldKey, string])[] = [
+  ['firstName', 'first'],
+  ['lastName', 'last'],
+  ['birthDate', 'dob'],
+  ['line1', 'line1'],
+  ['line2', 'line2'],
+  ['city', 'city'],
+  ['state', 'state'],
+  ['zip', 'zip'],
+];
 
 export interface CheckedDetails {
   details: PersonalDetails;
@@ -64,18 +78,23 @@ function addressMessage(field: AddressField, problem: string): string {
 /**
  * Checks every value the way the server does. Returns what to save and the calm message for each field that is wrong.
  * The first name is always required: it is the name messages are signed with.
+ * `namesOnly` is the name prompt: only the names are checked and sent, so the date and address are left alone on the server.
  */
-export function checkDetails(values: FormValues): CheckedDetails {
+export function checkDetails(values: FormValues, namesOnly = false): CheckedDetails {
   const errors: Partial<Record<FieldKey, string>> = {};
   const firstName = normalizeNamePart(values.firstName) as string | null;
   const lastName = normalizeNamePart(values.lastName) as string | null;
   if (firstName === null) {
     errors.firstName = copy.firstNameRequired;
-  } else if (firstName !== null) {
+  } else {
     errors.firstName = namePartError(firstName);
   }
   if (lastName !== null) {
     errors.lastName = namePartError(lastName);
+  }
+
+  if (namesOnly) {
+    return { details: { firstName, lastName }, errors: dropUndefined(errors) };
   }
 
   let birthDate: string | null = null;
@@ -91,7 +110,7 @@ export function checkDetails(values: FormValues): CheckedDetails {
   }
 
   let address: Address | null = null;
-  const checked = checkAddress({ line1: values.line1, line2: values.line2, city: values.city, state: values.state, zip: values.zip });
+  const checked = checkAddress({ line1: values.line1, line2: values.line2, city: values.city, state: stateToCode(values.state), zip: values.zip });
   if (checked.ok) {
     address = checked.address;
   } else {
@@ -100,12 +119,17 @@ export function checkDetails(values: FormValues): CheckedDetails {
     }
   }
 
-  for (const key of Object.keys(errors) as FieldKey[]) {
-    if (errors[key] === undefined) {
-      delete errors[key];
+  return { details: { firstName, lastName, birthDate, address }, errors: dropUndefined(errors) };
+}
+
+function dropUndefined(errors: Partial<Record<FieldKey, string>>): Partial<Record<FieldKey, string>> {
+  const kept: Partial<Record<FieldKey, string>> = {};
+  for (const [key, message] of Object.entries(errors) as [FieldKey, string | undefined][]) {
+    if (message !== undefined) {
+      kept[key] = message;
     }
   }
-  return { details: { firstName, lastName, birthDate, address }, errors };
+  return kept;
 }
 
 interface TextFieldProps {
@@ -116,12 +140,15 @@ interface TextFieldProps {
   autoComplete: string;
   error?: string;
   hint?: string;
-  maxLength?: number;
+  required?: boolean;
+  inputMode?: 'numeric';
+  /** Turns off autocorrect and spell check, for codes such as the state and ZIP. */
+  literal?: boolean;
   autoCapitalize?: string;
 }
 
 /** A visible label, the input, an optional hint, and an alert when the value is wrong. */
-function TextField({ id, label, value, onChange, autoComplete, error, hint, maxLength, autoCapitalize = 'words' }: TextFieldProps) {
+function TextField({ id, label, value, onChange, autoComplete, error, hint, required, inputMode, literal, autoCapitalize = 'words' }: TextFieldProps) {
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
@@ -136,8 +163,11 @@ function TextField({ id, label, value, onChange, autoComplete, error, hint, maxL
         className="gg-input"
         autoComplete={autoComplete}
         autoCapitalize={autoCapitalize}
-        maxLength={maxLength}
+        inputMode={inputMode}
+        autoCorrect={literal ? 'off' : undefined}
+        spellCheck={literal ? false : undefined}
         value={value}
+        aria-required={required ? 'true' : undefined}
         aria-describedby={describedBy || undefined}
         aria-invalid={error ? true : undefined}
         onChange={(event) => onChange(event.target.value)}
@@ -148,7 +178,7 @@ function TextField({ id, label, value, onChange, autoComplete, error, hint, maxL
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="m-0 text-[13px] font-semibold">
+        <p id={errorId} className="m-0 text-[13px] font-semibold">
           {error}
         </p>
       ) : null}
@@ -157,8 +187,12 @@ function TextField({ id, label, value, onChange, autoComplete, error, hint, maxL
 }
 
 interface DetailsFormProps {
-  /** The name prompt: only first and last name; date of birth and address are sent as they are. */
+  /** The name prompt: only first and last name, and only they are sent. */
   namesOnly?: boolean;
+  /** False until the profile has loaded: Save details waits, so empty fields never overwrite stored values. The name prompt ignores it. */
+  profileLoaded?: boolean;
+  /** The level of the Personal details heading; one below the heading above it. */
+  headingLevel?: 2 | 3;
   senderName: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -170,7 +204,7 @@ interface DetailsFormProps {
 }
 
 /** "Personal details": first and last name, date of birth and address, on one Save details button. */
-export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName, birthDate, address, error, onSave }: DetailsFormProps) {
+export function PersonalDetailsForm({ namesOnly, profileLoaded = true, headingLevel = 3, senderName, firstName, lastName, birthDate, address, error, onSave }: DetailsFormProps) {
   const id = useId();
   // Until the person types, show what is known, including values that load late.
   const [typed, setTyped] = useState<Partial<FormValues>>({});
@@ -179,6 +213,7 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [serverInvalid, setServerInvalid] = useState(false);
   const [failed, setFailed] = useState(false);
+  const waiting = !namesOnly && !profileLoaded;
 
   // An account saved before first and last name existed has only the name messages are signed with.
   const noNames = !firstName && !lastName;
@@ -204,22 +239,22 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (pending) {
+    if (pending || waiting) {
       return;
     }
-    const checked = checkDetails(values);
+    const checked = checkDetails(values, namesOnly);
     setErrors(checked.errors);
     setServerInvalid(false);
     setFailed(false);
-    if (Object.keys(checked.errors).length > 0) {
+    const firstWrong = FIELD_ORDER.find(([key]) => checked.errors[key] !== undefined);
+    if (firstWrong) {
+      document.getElementById(`${id}-${firstWrong[1]}`)?.focus();
       return;
     }
-    // The name prompt changes the names only: the rest goes back as it was.
-    const details = namesOnly ? { ...checked.details, birthDate, address } : checked.details;
     setPending(true);
     setSaved(false);
     try {
-      const result = await onSave(details);
+      const result = await onSave(checked.details);
       if (result.ok) {
         setTyped({});
         setSaved(true);
@@ -233,25 +268,36 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
     }
   }
 
+  // Fixing a field sets its entry to undefined, so count only real messages.
+  const hasErrors = Object.values(errors).some(Boolean);
   let message = '';
-  if (serverInvalid) {
+  if (pending) {
+    message = copy.saving;
+  } else if (waiting) {
+    message = copy.loadingDetails;
+  } else if (hasErrors) {
+    message = copy.checkFields;
+  } else if (serverInvalid) {
     message = copy.detailsInvalid;
   } else if (failed && error) {
     message = error;
   } else if (saved) {
     message = copy.detailsSaved;
   }
-  const isError = Boolean(serverInvalid || (failed && error));
+  const isError = Boolean(hasErrors || serverInvalid || (failed && error));
+  const Heading = headingLevel === 2 ? 'h2' : 'h3';
 
   return (
     <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)} noValidate>
-      <h3 className="text-[16px] m-0">{copy.personalHeading}</h3>
-      <p className="gg-hint m-0 text-[13px]">{namesOnly ? copy.askNamesIntro : copy.personalHint}</p>
+      <Heading className="text-[16px] m-0">{copy.personalHeading}</Heading>
+      {namesOnly ? null : <p className="gg-hint m-0 text-[13px]">{copy.personalHint}</p>}
       <TextField
         id={`${id}-first`}
         label={copy.firstNameLabel}
         value={values.firstName}
         autoComplete="given-name"
+        required
+        hint={namesOnly ? copy.askNamesIntro : undefined}
         error={errors.firstName}
         onChange={(next) => change('firstName', 'firstName', next)}
       />
@@ -268,6 +314,7 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
           <label htmlFor={`${id}-dob`} className="font-semibold">
             {copy.birthDateLabel}
           </label>
+          {/* autoComplete stays off in DateInput on purpose: browsers fill a birthday as yyyy-mm-dd, which this field does not read. */}
           <DateInput
             id={`${id}-dob`}
             value={values.date}
@@ -311,17 +358,17 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
               error={errors.city}
               onChange={(next) => change('city', 'city', next)}
             />
-            {/* A two-letter text box is simpler and easier to use than a 50-item list, and works the same with a keyboard or a screen reader. */}
+            {/* A text box is simpler than a 50-item list and works the same with a keyboard or a screen reader. It takes the code or the full name. */}
             <TextField
               id={`${id}-state`}
               label={copy.stateLabel}
               value={values.state}
               autoComplete="address-level1"
               autoCapitalize="characters"
-              maxLength={2}
+              literal
               hint={copy.stateHint}
               error={errors.state}
-              onChange={(next) => change('state', 'state', next.toUpperCase())}
+              onChange={(next) => change('state', 'state', next)}
             />
             <TextField
               id={`${id}-zip`}
@@ -329,6 +376,8 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
               value={values.zip}
               autoComplete="postal-code"
               autoCapitalize="off"
+              inputMode="numeric"
+              literal
               error={errors.zip}
               onChange={(next) => change('zip', 'zip', next)}
             />
@@ -339,7 +388,7 @@ export function PersonalDetailsForm({ namesOnly, senderName, firstName, lastName
         {message}
       </p>
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="gg-btn gg-btn-primary" aria-disabled={pending}>
+        <button type="submit" className="gg-btn gg-btn-primary" aria-disabled={pending || waiting}>
           {pending ? copy.saving : copy.detailsSave}
         </button>
       </div>
