@@ -40,6 +40,20 @@ describe('Profile', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'What should we call you?' })).toBeInTheDocument();
   });
 
+  it('the name prompt asks First name and Last name and saves them through onSaveDetails', async () => {
+    const onSaveDetails = vi.fn(async () => ({ ok: true as const }));
+    const onSave = vi.fn(async () => true);
+    const user = userEvent.setup();
+    render(<Profile asksName senderName={null} onBack={vi.fn()} onSave={onSave} onSaveDetails={onSaveDetails} onSignOut={vi.fn()} error={null} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'What should we call you?' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: 'Reyes', birthDate: null, address: null });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('keeps the typed name when saving fails', async () => {
     const user = userEvent.setup();
     render(

@@ -335,7 +335,9 @@ describe('editor on, signed in (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     const focused10 = await screen.findByRole('heading', { level: 1, name: 'Your account' });
     await waitFor(() => expect(focused10).toHaveFocus());
-    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
@@ -343,7 +345,7 @@ describe('editor on, signed in (#395)', () => {
     await waitFor(() => expect(focused11).toHaveFocus());
   });
 
-  it('saving details with a blank Full name sends only the old shape and leaves the sender name alone', async () => {
+  it('saving details for a sender-name-only account sends the prefilled first name, never a blank one', async () => {
     signedInAs('owner');
     mocks.updateProfile.mockResolvedValue({
       ok: true,
@@ -359,11 +361,7 @@ describe('editor on, signed in (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
     const body = mocks.updateProfile.mock.calls[0]?.[1] as Record<string, unknown>;
-    expect(body).toEqual({ fullName: null, birthDate: null });
-    for (const key of ['firstName', 'lastName', 'address', 'senderName']) {
-      expect(body).not.toHaveProperty(key);
-    }
-    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+    expect(body).toEqual({ firstName: 'Anna', lastName: null, birthDate: null, address: null });
   });
 
   it('an account with no name gets the name prompt inside the editor, and saving returns to where they were', async () => {
@@ -386,12 +384,13 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { senderName: 'Anna Reyes' });
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), { firstName: 'Anna', lastName: 'Reyes', birthDate: null, address: null });
     // Back to where they were: the editor they came from, not the account.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
   });
 
   it('a brand-new user: name prompt in the shell with a calm panel, then Your people with the same layout', async () => {
@@ -408,8 +407,9 @@ describe('editor on, signed in (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.type(screen.getByLabelText('First name'), 'Anna');
+    await user.type(screen.getByLabelText('Last name'), 'Reyes');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();

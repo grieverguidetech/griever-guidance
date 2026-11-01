@@ -1161,10 +1161,19 @@ function AppBody({
       <AccountSection
         asksName={askingName}
         senderName={auth.profile?.senderName ?? null}
-        fullName={[auth.profile?.firstName, auth.profile?.lastName].filter(Boolean).join(' ') || null}
+        firstName={auth.profile?.firstName ?? null}
+        lastName={auth.profile?.lastName ?? null}
         birthDate={auth.profile?.birthDate ?? null}
-        // Interim until the Personal details form lands: the old shape, so it works against the old data function and never touches senderName.
-        onSaveDetails={(details) => auth.updateDetails({ fullName: details.fullName, birthDate: details.birthDate })}
+        address={auth.profile?.address ?? null}
+        onSaveDetails={async (details) => {
+          const result = await auth.updateDetails(details);
+          // The name prompt is done once the names are saved: back to where the person was.
+          if (result.ok && askingName) {
+            setAskingName(false);
+            setView(returnTo);
+          }
+          return result;
+        }}
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}
@@ -1194,14 +1203,6 @@ function AppBody({
             />
           ) : undefined
         }
-        onSave={async (name) => {
-          const saved = await auth.updateSenderName(name);
-          if (saved && askingName) {
-            setAskingName(false);
-            setView(returnTo);
-          }
-          return saved;
-        }}
         onSignOut={() => {
           accountGeneration.current += 1;
           setLeftOnPurpose(true);
@@ -1224,6 +1225,18 @@ function AppBody({
         <Profile
           asksName={askingName}
           senderName={auth.profile?.senderName ?? null}
+          firstName={auth.profile?.firstName ?? null}
+          lastName={auth.profile?.lastName ?? null}
+          birthDate={auth.profile?.birthDate ?? null}
+          address={auth.profile?.address ?? null}
+          onSaveDetails={async (details) => {
+            const result = await auth.updateDetails(details);
+            if (result.ok && askingName) {
+              setAskingName(false);
+              setView(returnTo);
+            }
+            return result;
+          }}
           error={auth.error}
           showChecklist={auth.isSignedIn}
           peopleHelping={
