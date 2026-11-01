@@ -480,4 +480,12 @@ describe('ServiceSection pick fills the address', () => {
     await pickInto('oak');
     expect(addressField()).toHaveValue('1 Main St');
   });
+
+  it('skips the paid details call when the family typed an address', async () => {
+    addressHarness({});
+    await userEvent.type(addressField(), '9 My Road');
+    await pickInto('oak');
+    expect(detailsMock).not.toHaveBeenCalled();
+    expect(addressField()).toHaveValue('9 My Road');
+  });
 });

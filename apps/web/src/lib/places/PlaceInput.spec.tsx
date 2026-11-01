@@ -22,7 +22,7 @@ function fakeClient(results: PlaceSuggestion[] = [funeralHome, church]) {
   return { client: { suggest, newToken, details } satisfies PlacesClient, suggest, newToken, details };
 }
 
-function setup(opts: { onPick?: Props['onPick']; enabled?: boolean; load?: () => Promise<PlacesClient | null>; types?: readonly string[] } = {}) {
+function setup(opts: { onPick?: Props['onPick']; wantsDetails?: Props['wantsDetails']; enabled?: boolean; load?: () => Promise<PlacesClient | null>; types?: readonly string[] } = {}) {
   const values: string[] = [];
   const types = 'types' in opts ? opts.types : ['funeral_home', 'church'];
   function Harness() {
@@ -36,6 +36,7 @@ function setup(opts: { onPick?: Props['onPick']; enabled?: boolean; load?: () =>
           value={value}
           types={types}
           onPick={opts.onPick}
+          wantsDetails={opts.wantsDetails}
           onChange={(v) => {
             values.push(v);
             setValue(v);
@@ -44,8 +45,8 @@ function setup(opts: { onPick?: Props['onPick']; enabled?: boolean; load?: () =>
       </PlacesProvider>
     );
   }
-  render(<Harness />);
-  return { values, input: () => screen.getByRole('combobox', { name: 'Place' }) as HTMLInputElement };
+  const { unmount } = render(<Harness />);
+  return { unmount, values, input: () => screen.getByRole('combobox', { name: 'Place' }) as HTMLInputElement };
 }
 
 /** Types, then waits out the debounce. */
@@ -174,8 +175,11 @@ describe('PlaceInput', () => {
     expect(row).toHaveAttribute('aria-disabled', 'true');
     expect(document.querySelector('.gg-spinner')).not.toBeNull();
     expect(document.querySelector('.gg-spinner')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
-    expect(input().getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'true');
+    expect(input()).not.toHaveAttribute('aria-busy');
+    // Still running after about a second: now it is announced.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Searching…'), { timeout: 2000 });
     // The Searching row cannot be chosen, and arrow keys do not move onto it.
     await userEvent.keyboard('{ArrowDown}{Enter}');
     expect(input().value).toBe('oak');
@@ -185,6 +189,58 @@ describe('PlaceInput', () => {
     expect(screen.queryByText('Searching…', { selector: 'li' })).toBeNull();
     expect(document.querySelector('.gg-spinner')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('1 suggestion available');
+  });
+
+  it('does not announce Searching later when a search fails quickly', async () => {
+    const failing: PlacesClient = {
+      suggest: () => Promise.reject(new Error('down')),
+      newToken: () => ({}),
+      details: vi.fn(),
+    };
+    const { input } = setup({ load: () => Promise.resolve(failing) });
+    await userEvent.type(input(), 'oak');
+    await new Promise((r) => setTimeout(r, 1800));
+    expect(document.body.textContent).not.toContain('Searching…');
+  });
+
+  it('does not announce Searching for a search that finishes quickly', async () => {
+    const { client } = fakeClient();
+    setup({ load: () => Promise.resolve(client) });
+    const seen: string[] = [];
+    const watch = new MutationObserver(() => seen.push(screen.getByRole('status').textContent ?? ''));
+    watch.observe(screen.getByRole('status'), { childList: true, characterData: true, subtree: true });
+    await typeAndWait('oak');
+    watch.disconnect();
+    expect(seen).not.toContain('Searching…');
+    expect(screen.getByRole('status')).toHaveTextContent('2 suggestions available');
+  });
+
+  it('Escape closes the Searching row and the No matches row', async () => {
+    const { client } = fakeClient([]);
+    const { input } = setup({ load: () => Promise.resolve(client) });
+    await userEvent.type(input(), 'zzz');
+    await screen.findByRole('option', { name: 'No matches' });
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    await userEvent.keyboard('{Escape}');
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('option')).toBeNull();
+  });
+
+  it('closes the Searching row with Escape', async () => {
+    const pending: PlacesClient = { suggest: () => new Promise(() => undefined), newToken: () => ({}), details: vi.fn() };
+    const { input } = setup({ load: () => Promise.resolve(pending) });
+    await userEvent.type(input(), 'oak');
+    await screen.findByRole('option', { name: 'Searching…' });
+    await userEvent.keyboard('{Escape}');
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('option')).toBeNull();
+  });
+
+  it('draws the spinner ring light under the accent arc', () => {
+    const css = readFileSync(join(import.meta.dirname, '../../styles.css'), 'utf8');
+    const block = /\.gg-spinner \{[^}]*\}/.exec(css)?.[0] ?? '';
+    expect(block).toContain('border: 2px solid var(--color-neutral-300)');
+    expect(block).toContain('border-top-color: var(--color-accent-700)');
   });
 
   it('the spinner only spins when motion is allowed', () => {
@@ -225,6 +281,58 @@ describe('PlaceInput', () => {
     await typeAndWait('oak');
     await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
     await userEvent.type(input(), 'x');
+    await act(async () => release({ name: 'a', address: 'b' }));
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it('while details load: the spinner and busy list show, and the place name is in the field at once', async () => {
+    const { client, details } = fakeClient();
+    let release: (d: { name: string; address: string }) => void = () => undefined;
+    details.mockImplementation(() => new Promise((r) => (release = r)));
+    const onPick = vi.fn(() => true);
+    const { input } = setup({ load: () => Promise.resolve(client), onPick });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    await waitFor(() => expect(details).toHaveBeenCalled());
+    expect(input().value).toBe('Oak Funeral Home');
+    expect(document.querySelector('.gg-spinner')).not.toBeNull();
+    expect(screen.getByRole('listbox', { hidden: true })).toHaveAttribute('aria-busy', 'true');
+    await act(async () => release({ name: 'Oak Funeral Home', address: '1 Main St' }));
+    expect(document.querySelector('.gg-spinner')).toBeNull();
+    expect(onPick).toHaveBeenCalled();
+  });
+
+  it('gives up on slow details after 3 seconds and falls back to null', async () => {
+    const { client, details } = fakeClient();
+    details.mockImplementation(() => new Promise(() => undefined));
+    const onPick = vi.fn();
+    setup({ load: () => Promise.resolve(client), onPick });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    expect(onPick).not.toHaveBeenCalled();
+    await waitFor(() => expect(onPick).toHaveBeenCalledWith(funeralHome, null), { timeout: 4500 });
+  }, 10000);
+
+  it('does not call details when wantsDetails says the address will not be used', async () => {
+    const { client, details } = fakeClient();
+    const onPick = vi.fn();
+    setup({ load: () => Promise.resolve(client), onPick, wantsDetails: () => false });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    await waitFor(() => expect(onPick).toHaveBeenCalledWith(funeralHome, null));
+    expect(details).not.toHaveBeenCalled();
+  });
+
+  it('does not call onPick when the field unmounts while details load', async () => {
+    const { client, details } = fakeClient();
+    let release: (d: { name: string; address: string }) => void = () => undefined;
+    details.mockImplementation(() => new Promise((r) => (release = r)));
+    const onPick = vi.fn();
+    const { unmount } = setup({ load: () => Promise.resolve(client), onPick });
+    await typeAndWait('oak');
+    await userEvent.click(screen.getByRole('option', { name: /Oak Funeral Home/ }));
+    await waitFor(() => expect(details).toHaveBeenCalled());
+    unmount();
     await act(async () => release({ name: 'a', address: 'b' }));
     expect(onPick).not.toHaveBeenCalled();
   });

@@ -1,0 +1,39 @@
+# Merge gate: a PR can merge only after AC adds the `ready-to-merge` label, which means review
+# fixes are in and CI is green. The "Ready to merge" check is a required status check on `main`.
+# A new push removes the label, so a later commit always needs a fresh look.
+name: Merge gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ready:
+    name: Ready to merge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove the label after a new push
+        if: github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'ready-to-merge')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr edit "$PR" --repo "$REPO" --remove-label ready-to-merge
+          echo "New commits arrived, so the ready-to-merge label was removed."
+          exit 1
+
+      - name: Check the label
+        if: github.event.action != 'synchronize' || !contains(github.event.pull_request.labels.*.name, 'ready-to-merge')
+        env:
+          READY: ${{ contains(github.event.pull_request.labels.*.name, 'ready-to-merge') }}
+        run: |
+          if [ "$READY" != "true" ]; then
+            echo "Not ready yet: this PR needs the ready-to-merge label."
+            exit 1
+          fi
+          echo "Ready to merge."

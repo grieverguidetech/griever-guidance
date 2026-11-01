@@ -7,6 +7,10 @@ const copy = screenCopy('cmsService');
 
 export const PLACE_DEBOUNCE_MS = 300;
 export const PLACE_MIN_CHARS = 3;
+/** A search still running after this long is announced. Faster ones are not, so typing is not interrupted. */
+export const PLACE_SLOW_MS = 1000;
+/** Details slower than this are given up on; the pick then uses the prediction text. */
+export const PLACE_DETAILS_TIMEOUT_MS = 3000;
 
 /** The polite announcement for a number of suggestions. */
 export const countText = (n: number): string =>
@@ -21,6 +25,11 @@ export interface PlaceInputProps {
   /** Google place types to suggest. Without them the field is a plain text input. */
   types?: readonly string[];
   /**
+   * Asked on a pick, before the details call (which is billed). Return false when the address will not
+   * be used; onPick then gets null details. Without it, details are always fetched.
+   */
+  wantsDetails?: (suggestion: PlaceSuggestion) => boolean;
+  /**
    * Takes over a pick, to fill more than this field. Without it a pick sets the value to the whole line.
    * Gets the full details (name and street address) fetched for the pick, or null when that failed;
    * then fall back to the suggestion. Return true when it also filled another field; the status then says so.
@@ -33,7 +42,7 @@ export interface PlaceInputProps {
  * The typed text is always the value. Suggestions only help; with none available, or on any
  * failure, it behaves as a plain input and shows no error.
  */
-export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: PlaceInputProps) {
+export function PlaceInput({ id, labelledBy, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
   const { enabled, load } = usePlaces();
   // Set when Google could not load. The field then drops every combobox attribute.
   const [unavailable, setUnavailable] = useState(false);
@@ -46,10 +55,15 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
   // True while a search runs. The list then shows one "Searching…" row; "empty" shows "No matches".
   const [searching, setSearching] = useState(false);
   const [empty, setEmpty] = useState(false);
+  // True while the details of a pick load.
+  const [picking, setPicking] = useState(false);
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped on every keystroke and pick, so details that arrive after the user moved on are dropped.
   const pickTicket = useRef(0);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const wantsRef = useRef(wantsDetails);
+  wantsRef.current = wantsDetails;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped on every keystroke and close, so a late answer for old text is dropped.
   const request = useRef(0);
@@ -63,7 +77,12 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       if (timer.current) {
         clearTimeout(timer.current);
       }
+      if (slowTimer.current) {
+        clearTimeout(slowTimer.current);
+      }
       request.current += 1;
+      // A pick still waiting for its details must not write after the field is gone.
+      pickTicket.current += 1;
     },
     [],
   );
@@ -78,6 +97,9 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
     request.current += 1;
     if (timer.current) {
       clearTimeout(timer.current);
+    }
+    if (slowTimer.current) {
+      clearTimeout(slowTimer.current);
     }
   };
 
@@ -104,7 +126,12 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
     setEmpty(false);
     setOpen(false);
     setActive(-1);
-    setAnnouncement(copy.placesSearching);
+    setAnnouncement('');
+    slowTimer.current = setTimeout(() => {
+      if (ticket === request.current) {
+        setAnnouncement(copy.placesSearching);
+      }
+    }, PLACE_SLOW_MS);
     try {
       const client = await load();
       if (ticket !== request.current) {
@@ -121,6 +148,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       if (ticket !== request.current) {
         return;
       }
+      clearTimeout(slowTimer.current ?? undefined);
       setOptions(found);
       setActive(-1);
       setSearching(false);
@@ -133,12 +161,18 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
         hideList();
         setAnnouncement('');
       }
+    } finally {
+      // A fast failure or an unavailable client must not announce "Searching…" later.
+      if (ticket === request.current) {
+        clearTimeout(slowTimer.current ?? undefined);
+      }
     }
   };
 
   const handleChange = (text: string) => {
     onChange(text);
     pickTicket.current += 1;
+    setPicking(false);
     cancelPending();
     setActive(-1);
     if (!suggesting || text.trim().length < PLACE_MIN_CHARS) {
@@ -147,7 +181,6 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       setAnnouncement('');
       return;
     }
-    // The list stays as it is until the new answer arrives, so it does not flicker on each key.
     const ticket = request.current;
     timer.current = setTimeout(() => void search(text.trim(), ticket), PLACE_DEBOUNCE_MS);
   };
@@ -159,22 +192,33 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       setOptions([]);
       return;
     }
+    // Show the place name at once; the full address follows when the details arrive.
+    onChange(option.mainText);
     stop();
     setOptions([]);
     pickTicket.current += 1;
     const ticket = pickTicket.current;
+    setPicking(true);
     // The name and full address come from the place itself; the prediction only has a short line.
     let details: PlaceDetails | null = null;
-    try {
-      const client = await load();
-      details = client ? await client.details(option) : null;
-    } catch {
-      details = null;
+    if (wantsRef.current?.(option) ?? true) {
+      let giveUp: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const client = await load();
+        const slow = new Promise<null>((resolve) => {
+          giveUp = setTimeout(() => resolve(null), PLACE_DETAILS_TIMEOUT_MS);
+        });
+        details = client ? await Promise.race([client.details(option), slow]) : null;
+      } catch {
+        details = null;
+      }
+      clearTimeout(giveUp);
     }
     // Typing again, or a newer pick, while the details loaded means the user moved on.
     if (ticket !== pickTicket.current) {
       return;
     }
+    setPicking(false);
     if (onPickRef.current?.(option, details) === true) {
       setAnnouncement(copy.placesAddressFilled);
     }
@@ -186,6 +230,12 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       setOpen(true);
       setActive(0);
       setAnnouncement(countText(options.length));
+      return;
+    }
+    if (e.key === 'Escape' && (open || searching || empty)) {
+      e.preventDefault();
+      e.stopPropagation();
+      stop();
       return;
     }
     if (!open) {
@@ -200,10 +250,6 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
     } else if (e.key === 'Enter' && active >= 0) {
       e.preventDefault();
       void choose(options[active]);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      stop();
     }
   };
 
@@ -214,8 +260,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
         role: 'combobox',
         'aria-autocomplete': 'list' as const,
         'aria-expanded': listVisible,
-        'aria-busy': searching,
-        'aria-controls': listId,
+                'aria-controls': listId,
         'aria-activedescendant': open && active >= 0 ? optionId(active) : undefined,
       }
     : {};
@@ -234,7 +279,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
         onKeyDown={handleKeyDown}
         onBlur={stop}
       />
-      {searching && <span aria-hidden="true" className="gg-spinner absolute right-3 top-1/2 -mt-2" />}
+      {(searching || picking) && <span aria-hidden="true" className="gg-spinner absolute right-3 top-1/2 -mt-2" />}
       {suggesting && (
         <>
           <ul
@@ -242,6 +287,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
             role="listbox"
             aria-label={copy.placesListLabel}
             hidden={!listVisible}
+            aria-busy={searching || picking}
             className="absolute left-0 right-0 z-10 m-0 mt-1 max-h-72 list-none overflow-auto rounded-md border border-neutral-600 bg-bg p-0"
           >
             {searching && (
