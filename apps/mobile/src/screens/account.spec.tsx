@@ -53,7 +53,7 @@ jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'grieversguidance
 
 const profileWith = (senderName: string | null): ProfileResult => ({
   ok: true,
-  profile: { id: 'u1', senderName, contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' },
+  profile: { id: 'u1', senderName, contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' },
 });
 const noProfile: ProfileResult = { ok: false, reason: 'no_profile' };
 const OFFLINE = "You need a connection to do this. Nothing you've typed is lost.";

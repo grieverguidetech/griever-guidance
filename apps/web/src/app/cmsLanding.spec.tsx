@@ -117,8 +117,11 @@ function signedInAs(accountType: 'owner' | 'member') {
       id: 'u1',
       senderName: 'Anna',
       contactSource: null,
+      firstName: null,
+      lastName: null,
       fullName: null,
       birthDate: null,
+      address: null,
       accountType,
       createdAt: '2026-10-11T00:00:00.000Z',
       updatedAt: '2026-10-11T00:00:00.000Z',
@@ -447,7 +450,7 @@ describe('landing with the editor on (#448)', () => {
     await act(async () => {
       resolveProfile({
         ok: true,
-        profile: { id: 'u1', senderName: 'Anna', contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
+        profile: { id: 'u1', senderName: 'Anna', contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
       });
     });
     expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();

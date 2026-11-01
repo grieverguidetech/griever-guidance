@@ -2,7 +2,7 @@ import {
   UpdateCommand,
   type DynamoDBDocumentClient,
 } from '@aws-sdk/lib-dynamodb';
-import type { AccountContactSource } from '@griever/shared';
+import { checkAddress, splitFullName, type AccountContactSource, type Address } from '@griever/shared';
 import type { Clock } from '../clock.js';
 import { profileKey } from '../keys.js';
 import { getLive, type Item } from '../read.js';
@@ -11,9 +11,11 @@ export interface Profile {
   userId: string;
   senderName?: string;
   contactSource?: AccountContactSource;
-  /** Private: never logged, never shown to members (members.ts reads senderName only). */
-  fullName?: string;
+  /** firstName, lastName, birthDate and address are private: never logged, never shown to members (members.ts reads senderName only). */
+  firstName?: string;
+  lastName?: string;
   birthDate?: string;
+  address?: Address;
   accountType: 'owner' | 'member';
   /** Bumped by every write that changes role, membership, invites or owned people. */
   version: number;
@@ -32,8 +34,10 @@ export function encodeProfile(profile: Profile): Item {
     userId: profile.userId,
     senderName: profile.senderName,
     contactSource: profile.contactSource,
-    fullName: profile.fullName,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
     birthDate: profile.birthDate,
+    address: profile.address,
     accountType: profile.accountType,
     version: profile.version,
     createdAt: profile.createdAt,
@@ -51,7 +55,10 @@ export function decodeProfile(item: Item): Profile {
     senderName,
     contactSource,
     fullName,
+    firstName,
+    lastName,
     birthDate,
+    address,
   } = item;
   if (
     typeof userId !== 'string' ||
@@ -70,8 +77,26 @@ export function decodeProfile(item: Item): Profile {
     updatedAt,
   };
   if (typeof senderName === 'string') profile.senderName = senderName;
-  if (typeof fullName === 'string') {
-    profile.fullName = fullName;
+  if (typeof firstName === 'string' || typeof lastName === 'string') {
+    if (typeof firstName === 'string') {
+      profile.firstName = firstName;
+    }
+    if (typeof lastName === 'string') {
+      profile.lastName = lastName;
+    }
+  } else if (typeof fullName === 'string') {
+    // Saved before first and last name existed: split once on read; the next save writes the two fields.
+    const split = splitFullName(fullName);
+    if (split.firstName) {
+      profile.firstName = split.firstName;
+    }
+    if (split.lastName) {
+      profile.lastName = split.lastName;
+    }
+  }
+  const checked = checkAddress(address);
+  if (checked.ok && checked.address) {
+    profile.address = checked.address;
   }
   if (typeof birthDate === 'string') {
     profile.birthDate = birthDate;
@@ -94,8 +119,10 @@ export async function getProfile(
 export interface ProfileFields {
   senderName?: string | null;
   contactSource?: AccountContactSource | null;
-  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   birthDate?: string | null;
+  address?: Address | null;
 }
 /**
  * Creates or updates the profile (access pattern 2). It sets only the given fields and the
@@ -134,19 +161,29 @@ export async function saveProfileFields(
     sets.push('contactSource = :contactSource');
     values[':contactSource'] = fields.contactSource;
   }
-  if (fields.fullName !== undefined) {
-    sets.push('fullName = :fullName');
-    values[':fullName'] = fields.fullName;
+  if (fields.firstName !== undefined) {
+    sets.push('firstName = :firstName');
+    values[':firstName'] = fields.firstName;
+  }
+  if (fields.lastName !== undefined) {
+    sets.push('lastName = :lastName');
+    values[':lastName'] = fields.lastName;
   }
   if (fields.birthDate !== undefined) {
     sets.push('birthDate = :birthDate');
     values[':birthDate'] = fields.birthDate;
   }
+  if (fields.address !== undefined) {
+    sets.push('address = :address');
+    values[':address'] = fields.address;
+  }
+  // Once both first and last name are written, the old single-string name is dropped so it cannot come back.
+  const removes = fields.firstName !== undefined && fields.lastName !== undefined ? ' REMOVE fullName' : '';
   const { Attributes } = await doc.send(
     new UpdateCommand({
       TableName: table,
       Key: profileKey(userId),
-      UpdateExpression: `SET ${sets.join(', ')}`,
+      UpdateExpression: `SET ${sets.join(', ')}${removes}`,
       ExpressionAttributeNames: names,
       ExpressionAttributeValues: values,
       ReturnValues: 'ALL_NEW',

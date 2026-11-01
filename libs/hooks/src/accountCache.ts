@@ -1,4 +1,4 @@
-import type { AccountContactSource, AccountType } from '@griever/shared';
+import type { AccountContactSource, AccountType, Address } from '@griever/shared';
 
 export const PROFILE_STORAGE_KEY = 'gg.profile.v1';
 
@@ -8,8 +8,10 @@ export interface CachedProfile {
   id: string;
   senderName: string | null;
   /** Private details the person chose to add. Absent in caches written before they existed. */
-  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   birthDate?: string | null;
+  address?: Address | null;
   contactSource: AccountContactSource | null;
   /** Cached so an offline boot still hides "create" for members (C5). */
   accountType: AccountType;

@@ -1161,9 +1161,10 @@ function AppBody({
       <AccountSection
         asksName={askingName}
         senderName={auth.profile?.senderName ?? null}
-        fullName={auth.profile?.fullName ?? null}
+        fullName={[auth.profile?.firstName, auth.profile?.lastName].filter(Boolean).join(' ') || null}
         birthDate={auth.profile?.birthDate ?? null}
-        onSaveDetails={auth.updateDetails}
+        // Interim until the Personal details form lands: the old shape, so it works against the old data function and never touches senderName.
+        onSaveDetails={(details) => auth.updateDetails({ fullName: details.fullName, birthDate: details.birthDate })}
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}
