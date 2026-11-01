@@ -9,8 +9,8 @@ const account: NavSpot = { view: 'profile', section: 'account', item: null, pers
 function mount(initial: NavSpot, enabled = true) {
   const onRestore = vi.fn();
   const hook = renderHook(
-    (props: { spot: NavSpot; enabled: boolean; trackable?: boolean }) =>
-      useNavHistory({ enabled: props.enabled, trackable: props.trackable ?? true, spot: props.spot, onRestore }),
+    (props: { spot: NavSpot; enabled: boolean; trackable?: boolean; userId?: string; signedOut?: boolean }) =>
+      useNavHistory({ enabled: props.enabled, trackable: props.trackable ?? true, spot: props.spot, userId: props.userId ?? 'u1', signedOut: props.signedOut ?? false, onRestore }),
     { initialProps: { spot: initial, enabled } },
   );
   return { ...hook, onRestore };
@@ -31,6 +31,7 @@ function writtenState(call: 'replaceState' | 'pushState', spy: ReturnType<typeof
 describe('useNavHistory (#566)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.sessionStorage.clear();
   });
 
   it('replaces the current entry for the first screen, so the sign-in entry is not kept', () => {
@@ -54,7 +55,7 @@ describe('useNavHistory (#566)', () => {
     const replace = vi.spyOn(window.history, 'replaceState');
     const push = vi.spyOn(window.history, 'pushState');
     mount(overview, false);
-    const hidden = renderHook(() => useNavHistory({ enabled: true, trackable: false, spot: overview, onRestore: vi.fn() }));
+    const hidden = renderHook(() => useNavHistory({ enabled: true, trackable: false, spot: overview, userId: 'u1', signedOut: false, onRestore: vi.fn() }));
     hidden.unmount();
     expect(replace).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
@@ -116,5 +117,60 @@ describe('useNavHistory (#566)', () => {
     expect(onRestore).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
     expect(back).not.toHaveBeenCalled();
+  });
+
+  describe('across a reload', () => {
+    function firstLoad(userId: string) {
+      const replace = vi.spyOn(window.history, 'replaceState');
+      const first = mount(overview, true);
+      first.unmount();
+      void userId;
+      return writtenState('replaceState', replace);
+    }
+
+    it('the same user keeps their earlier entries: Back restores the previous screen', () => {
+      const earlier = firstLoad('u1');
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const { onRestore } = mount(service, true);
+      pop(earlier);
+      expect(onRestore).toHaveBeenCalledWith(overview);
+      expect(back).not.toHaveBeenCalled();
+    });
+
+    it('another user walks past the earlier entries', () => {
+      const earlier = firstLoad('u1');
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const other = vi.fn();
+      renderHook(() => useNavHistory({ enabled: true, trackable: true, spot: service, userId: 'u2', signedOut: false, onRestore: other }));
+      pop(earlier);
+      expect(other).not.toHaveBeenCalled();
+      expect(back).toHaveBeenCalledTimes(1);
+    });
+
+    it('a sign-out forgets the token, so the same user signing in again starts fresh', () => {
+      const earlier = firstLoad('u1');
+      const gone = renderHook(() => useNavHistory({ enabled: false, trackable: true, spot: service, userId: '', signedOut: true, onRestore: vi.fn() }));
+      gone.unmount();
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const { onRestore } = mount(service, true);
+      pop(earlier);
+      expect(onRestore).not.toHaveBeenCalled();
+      expect(back).toHaveBeenCalledTimes(1);
+    });
+
+    it('with storage that throws, each load gets its own token (today\'s behaviour)', () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      const earlier = firstLoad('u1');
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const { onRestore } = mount(service, true);
+      pop(earlier);
+      expect(onRestore).not.toHaveBeenCalled();
+      expect(back).toHaveBeenCalledTimes(1);
+    });
   });
 });

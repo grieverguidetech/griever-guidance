@@ -607,6 +607,8 @@ function AppBody({
     // With no sign-in at all (auth off) Back walks the screens too; it only stays off while signed out.
     enabled: CMS_ENABLED && (signedIn || auth === null),
     trackable: TRACKED_VIEWS.includes(view),
+    userId: auth?.userId ?? '',
+    signedOut,
     // Your people has no subject; the most recent person being re-picked there must not add an entry.
     spot: { view, section: cmsSection, item: cmsItem, personId: view === 'people' ? null : activeId },
     onRestore: (spot) => {

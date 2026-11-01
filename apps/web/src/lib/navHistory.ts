@@ -40,12 +40,48 @@ function readSpot(state: unknown, gen: string): NavSpot | null {
   return { view, section, item: item ?? null, personId: personId ?? null };
 }
 
+const GEN_KEY = 'gg.navGen.v1';
+
+function newToken(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/**
+ * The token for this signed-in user in this tab. It survives a reload, so Back still walks the user's own
+ * earlier screens; another user gets a new one. If storage throws, each load gets its own token.
+ */
+function tokenFor(userId: string): string {
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(GEN_KEY) ?? 'null') as { userId?: unknown; gen?: unknown } | null;
+    if (saved && saved.userId === userId && isString(saved.gen)) {
+      return saved.gen;
+    }
+    const gen = newToken();
+    window.sessionStorage.setItem(GEN_KEY, JSON.stringify({ userId, gen }));
+    return gen;
+  } catch {
+    return newToken();
+  }
+}
+
+function forgetToken(): void {
+  try {
+    window.sessionStorage.removeItem(GEN_KEY);
+  } catch {
+    // Nothing to forget.
+  }
+}
+
 interface Options {
   /** True while someone is signed in (or there is no sign-in). Off, nothing is recorded. */
   enabled: boolean;
   /** False for screens that are not part of the walk (the old flows); they add no entries. */
   trackable: boolean;
   spot: NavSpot;
+  /** The signed-in user's id ('' with no sign-in). The same user keeps their entries across a reload. */
+  userId: string;
+  /** True after a sign-out: the next sign-in, even by the same user, starts with new entries. */
+  signedOut: boolean;
   /** Called when Back or Forward lands on an entry this hook made. */
   onRestore: (spot: NavSpot) => void;
 }
@@ -56,7 +92,7 @@ interface Options {
  * state of ours; when Back lands on such an entry we go Back again, so one press walks past all of
  * them and leaves the app like a site with no sign-in. We never push from here.
  */
-export function useNavHistory({ enabled, trackable, spot, onRestore }: Options): void {
+export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onRestore }: Options): void {
   const recorded = useRef<string | null>(null);
   const generation = useRef('');
   const autoBacks = useRef(0);
@@ -65,13 +101,16 @@ export function useNavHistory({ enabled, trackable, spot, onRestore }: Options):
   const { view, section, item, personId } = spot;
 
   useEffect(() => {
+    if (signedOut) {
+      forgetToken();
+    }
     if (!enabled) {
       recorded.current = null;
       generation.current = '';
       return;
     }
     if (generation.current === '') {
-      generation.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      generation.current = tokenFor(userId);
     }
     if (!trackable) {
       return;
@@ -89,7 +128,7 @@ export function useNavHistory({ enabled, trackable, spot, onRestore }: Options):
     }
     recorded.current = key;
     autoBacks.current = 0;
-  }, [enabled, trackable, view, section, item, personId]);
+  }, [enabled, trackable, view, section, item, personId, userId, signedOut]);
 
   useEffect(() => {
     if (!enabled) {
