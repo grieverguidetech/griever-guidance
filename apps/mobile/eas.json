@@ -1,4 +1,7 @@
 {
+  "cli": {
+    "appVersionSource": "remote"
+  },
   "build": {
     "production": {
       "android": {
@@ -6,7 +9,9 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com"
-      }
+      },
+      "environment": "production",
+      "autoIncrement": true
     },
     "development": {
       "developmentClient": true,

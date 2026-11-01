@@ -1,15 +1,18 @@
 {
   "expo": {
-    "name": "Mobile",
+    "name": "Grievers Guidance",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "grieversguidance",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.grieversguidance.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.grieversguidance.app",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

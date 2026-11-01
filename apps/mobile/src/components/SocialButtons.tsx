@@ -38,7 +38,7 @@ export function SocialButtons({
     onStart();
     announce(copy.browserAnnounce);
     try {
-      const redirectUrl = AuthSession.makeRedirectUri({ scheme: 'mobile', path: SSO_REDIRECT_PATH });
+      const redirectUrl = AuthSession.makeRedirectUri({ scheme: 'grieversguidance', path: SSO_REDIRECT_PATH });
       const result = await startSSOFlow({ strategy, redirectUrl });
       if (result.createdSessionId && result.setActive) {
         await result.setActive({ session: result.createdSessionId });

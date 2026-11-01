@@ -49,7 +49,7 @@ jest.mock('@clerk/expo', () => ({
   useSignUp: () => ({ signUp: mockSignUp }),
   useSSO: () => ({ startSSOFlow: jest.fn() }),
 }));
-jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'mobile://sso-callback' }));
+jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'grieversguidance://sso-callback' }));
 
 const profileWith = (senderName: string | null): ProfileResult => ({
   ok: true,
