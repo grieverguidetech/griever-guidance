@@ -12,6 +12,9 @@ import { ChecklistItemRow } from './ChecklistItemRow';
 
 const copy = screenCopy('cmsChecklist');
 const GATHER_KEY = 'gather';
+// Shown after Gather, in this order. The other phases come before Gather, in CHECKLIST_PHASES order.
+// Display only: currentPhase and auto-open follow the time phases only (see computeChecklist).
+const AFTER_GATHER: readonly string[] = ['obituary', 'planning-service'];
 
 interface Props {
   checklist: ChecklistFields['checklist'];
@@ -24,8 +27,15 @@ interface Props {
   readOnly?: boolean;
 }
 
-/** Every phase in order, with its items. No counts, no percentages, no delete. */
-export function PhaseList({ checklist, onOpen, onChange, current, gather, readOnly = false }: Props) {
+/** Every phase with its items: time phases, Gather, then the Obituary and Planning checklists. No counts, no percentages, no delete. */
+export function PhaseList({
+  checklist,
+  onOpen,
+  onChange,
+  current,
+  gather,
+  readOnly = false,
+}: Props) {
   const { phases, currentPhase } = computeChecklist({ checklist });
   // Open on load: the current phase only. Not remembered across loads.
   const [open, setOpen] = useState<Set<string>>(
@@ -52,33 +62,36 @@ export function PhaseList({ checklist, onOpen, onChange, current, gather, readOn
       return next;
     });
   };
+  const renderPhase = (phase: (typeof phases)[number]) => (
+    <AccordionSection
+      key={phase.key}
+      title={copy.phases[phase.key]}
+      open={open.has(phase.key)}
+      panelId={`${panelId}-${phase.key}`}
+      onToggle={() => toggle(phase.key)}
+      done={phase.done}
+    >
+      {phase.key === 'obituary' && <p>{copy.obituaryNote}</p>}
+      <ul className="flex list-none flex-col gap-3 p-0">
+        {phase.items.map((item) => (
+          <ChecklistItemRow
+            key={item.id}
+            id={item.id}
+            state={item.state}
+            onOpen={onOpen}
+            current={item.id === current}
+            onChange={onChange}
+            readOnly={readOnly}
+          />
+        ))}
+      </ul>
+    </AccordionSection>
+  );
   return (
     <div className="flex flex-col gap-6">
-      {phases.map((phase) => (
-        <AccordionSection
-          key={phase.key}
-          title={copy.phases[phase.key]}
-          open={open.has(phase.key)}
-          panelId={`${panelId}-${phase.key}`}
-          onToggle={() => toggle(phase.key)}
-          done={phase.done}
-        >
-          {phase.key === 'obituary' && <p>{copy.obituaryNote}</p>}
-          <ul className="flex list-none flex-col gap-3 p-0">
-            {phase.items.map((item) => (
-              <ChecklistItemRow
-                key={item.id}
-                id={item.id}
-                state={item.state}
-                onOpen={onOpen}
-                current={item.id === current}
-                onChange={onChange}
-                readOnly={readOnly}
-              />
-            ))}
-          </ul>
-        </AccordionSection>
-      ))}
+      {phases
+        .filter((phase) => !AFTER_GATHER.includes(phase.key))
+        .map(renderPhase)}
       {gather && (
         <AccordionSection
           title={copy.gatherHeading}
@@ -89,6 +102,9 @@ export function PhaseList({ checklist, onOpen, onChange, current, gather, readOn
           {gather}
         </AccordionSection>
       )}
+      {AFTER_GATHER.flatMap((key) =>
+        phases.filter((phase) => phase.key === key),
+      ).map(renderPhase)}
     </div>
   );
 }
@@ -103,7 +119,14 @@ interface SectionProps {
 }
 
 /** One heading with a disclosure button and its panel. Used by every phase and by Gather. */
-function AccordionSection({ title, open, panelId, onToggle, done = false, children }: SectionProps) {
+function AccordionSection({
+  title,
+  open,
+  panelId,
+  onToggle,
+  done = false,
+  children,
+}: SectionProps) {
   return (
     <section className="flex flex-col gap-3">
       <h3 className="m-0">
@@ -125,13 +148,22 @@ function AccordionSection({ title, open, panelId, onToggle, done = false, childr
           {done && (
             <>
               {' '}
-              <Check size={20} weight="bold" aria-hidden="true" className="shrink-0 text-success-700" />
+              <Check
+                size={20}
+                weight="bold"
+                aria-hidden="true"
+                className="shrink-0 text-success-700"
+              />
               <span className="sr-only">{copy.done}</span>
             </>
           )}
         </button>
       </h3>
-      <div id={panelId} hidden={!open} className={open ? 'gg-enter' : undefined}>
+      <div
+        id={panelId}
+        hidden={!open}
+        className={open ? 'gg-enter' : undefined}
+      >
         <div className="flex flex-col gap-3">{children}</div>
       </div>
     </section>

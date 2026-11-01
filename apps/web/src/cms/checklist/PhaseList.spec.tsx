@@ -30,7 +30,11 @@ describe('PhaseList', () => {
     const names = screen
       .getAllByRole('heading', { level: 3 })
       .map((h) => h.textContent);
-    expect(names).toEqual(CHECKLIST_PHASES.map((p) => copy.phases[p.key]));
+    expect(names).toEqual(
+      ['right-away', 'first-days', 'first-weeks', 'first-months', 'obituary', 'planning-service'].map(
+        (key) => copy.phases[key as keyof typeof copy.phases],
+      ),
+    );
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
@@ -62,6 +66,19 @@ describe('PhaseList', () => {
     expect(
       within(phaseHeading('first-days')).getByRole('button'),
     ).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens the next time phase, not Obituary or Planning, when first-days is done', () => {
+    const done: NonNullable<ChecklistFields['checklist']> = {};
+    for (const phase of CHECKLIST_PHASES.slice(0, 2)) {
+      for (const id of phase.itemIds) {
+        done[id] = 'done';
+      }
+    }
+    render(<PhaseList checklist={done} onOpen={noop} onChange={noop} gather={<p>g</p>} />);
+    expect(within(phaseHeading('first-weeks')).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+    expect(within(phaseHeading('obituary')).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    expect(within(phaseHeading('planning-service')).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('closes every phase when everything is handled', () => {

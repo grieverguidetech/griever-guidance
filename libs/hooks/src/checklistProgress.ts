@@ -1,5 +1,6 @@
 import {
   CHECKLIST_PHASES,
+  TIME_PHASE_KEYS,
   type ChecklistFields,
   type ChecklistItemState,
   type ChecklistItemId,
@@ -28,7 +29,9 @@ export interface ChecklistProgress {
 /**
  * Works out the current phase and next open item. Phases are not locked:
  * an item ticked in a later phase does not move currentPhase until every
- * earlier phase is done. Returns no counts or percentages (C10).
+ * earlier phase is done. Only the four time phases can be current; the Obituary
+ * and Planning checklists still appear in `phases` (and count as done or not),
+ * but once the time phases are done currentPhase and nextItem are null. Returns no counts or percentages (C10).
  */
 export function computeChecklist(state: ChecklistFields): ChecklistProgress {
   const saved = state.checklist ?? {};
@@ -45,7 +48,9 @@ export function computeChecklist(state: ChecklistFields): ChecklistProgress {
     return { key: phase.key, done, items };
   });
 
-  const current = phases.find((phase) => !phase.done);
+  const current = phases.find(
+    (phase) => TIME_PHASE_KEYS.includes(phase.key) && !phase.done,
+  );
   const next = current?.items.find((item) => item.state === 'open');
 
   return {

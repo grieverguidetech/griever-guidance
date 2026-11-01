@@ -84,13 +84,18 @@ describe('ChecklistPanel', () => {
     expect(onOpenItem).toHaveBeenCalledWith('custody');
   });
 
-  it('has h3 headings: the card, the six phases, and Gather', () => {
+  it('has h3 headings: the card, the six phases with Gather before the two checklists', () => {
     render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
     const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(names).toEqual([
       'Certified death certificates',
-      ...CHECKLIST_PHASES.map((p) => copy.phases[p.key]),
+      copy.phases['right-away'],
+      copy.phases['first-days'],
+      copy.phases['first-weeks'],
+      copy.phases['first-months'],
       'Gather when you can',
+      copy.phases.obituary,
+      copy.phases['planning-service'],
     ]);
     expect(CHECKLIST_PHASES).toHaveLength(6);
   });
@@ -108,17 +113,17 @@ describe('ChecklistPanel', () => {
     expect(findHardCodedCopy(source, 'cmsChecklist')).toEqual([]);
   });
 
-  it('lists the phases in the agreed order with the new names, Gather last', () => {
+  it('lists the phases in the agreed order: time phases, Gather, then the two checklists', () => {
     render(<ChecklistPanel checklist={{}} onSetItem={noop} onOpenItem={noop} />);
     const names = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     expect(names.slice(1)).toEqual([
       'Right away (first 24 to 48 hours)',
       'Within the first few days',
-      'Obituary checklist',
-      'Planning the service checklist',
       'Within the first few weeks',
       'Within the first few months',
       'Gather when you can',
+      'Obituary checklist',
+      'Planning the service checklist',
     ]);
   });
 

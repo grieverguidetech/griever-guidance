@@ -131,6 +131,8 @@ describe('checklist in the editor (#421)', () => {
     );
     await openOverview();
     const panel = within(screen.getByRole('complementary', { name: "What you'll need" }));
+    // Obituary is a separate checklist, so it is not open by default.
+    await user.click(panel.getByRole('button', { name: 'Obituary checklist' }));
     await user.click(panel.getByRole('button', { name: /^Write the obituary/ }));
     await screen.findByRole('heading', { level: 1, name: /^Write the obituary/ });
     await user.click(screen.getByRole('button', { name: 'Open Obituary' }));
