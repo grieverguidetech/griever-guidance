@@ -13,32 +13,22 @@ function setup(state: ChecklistItemState | null) {
 }
 
 describe('ItemStateToggles', () => {
-  it('shows neither pressed when open', () => {
+  it('shows only Done, not pressed when open, and no Doesn\'t apply', () => {
     setup(null);
     expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: "Doesn't apply" })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: "Doesn't apply" })).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  it('reports done, then not applicable', async () => {
+  it('reports done', async () => {
     const onChange = setup(null);
     await userEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onChange).toHaveBeenLastCalledWith('done');
-    await userEvent.click(screen.getByRole('button', { name: "Doesn't apply" }));
-    expect(onChange).toHaveBeenLastCalledWith('not_applicable');
   });
 
-  it('switches from done to not applicable when the other is pressed', async () => {
-    const onChange = setup('done');
-    expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: "Doesn't apply" })).toHaveAttribute('aria-pressed', 'false');
-    await userEvent.click(screen.getByRole('button', { name: "Doesn't apply" }));
-    expect(onChange).toHaveBeenCalledWith('not_applicable');
-  });
-
-  it('shows a hidden check inside the pressed button only', () => {
+  it('shows a hidden check inside the pressed button', () => {
     setup('done');
     expect(screen.getByRole('button', { name: 'Done' }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByRole('button', { name: "Doesn't apply" }).querySelector('svg')).toBeNull();
   });
 
   it('clears when the pressed one is pressed again', async () => {
@@ -47,20 +37,21 @@ describe('ItemStateToggles', () => {
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it('clears a pressed not applicable', async () => {
+  it('shows a saved not_applicable as done, keeps it described, and clears on press', async () => {
     const onChange = setup('not_applicable');
-    await userEvent.click(screen.getByRole('button', { name: "Doesn't apply" }));
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done).toHaveAttribute('aria-pressed', 'true');
+    expect(done).toHaveAccessibleDescription("Doesn't apply");
+    await userEvent.click(done);
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it('works from the keyboard in order', async () => {
+  it('works from the keyboard', async () => {
     const onChange = setup(null);
     await userEvent.tab();
     expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     expect(onChange).toHaveBeenCalledWith('done');
-    await userEvent.tab();
-    expect(screen.getByRole('button', { name: "Doesn't apply" })).toHaveFocus();
   });
 
   describe('row variant', () => {
