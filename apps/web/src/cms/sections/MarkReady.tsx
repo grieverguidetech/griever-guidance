@@ -30,14 +30,16 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext }: Props
           aria-describedby={hintId}
           onClick={() => onChange(!ready)}
         >
-          {ready && (
-            <Check
-              size={18}
-              weight="bold"
-              aria-hidden="true"
-              className="motion-safe:transition-transform motion-safe:duration-[var(--dur-2)] motion-safe:ease-[var(--ease-calm)] motion-safe:starting:scale-[0.8]"
-            />
-          )}
+          <span className="gg-check-box" data-testid="ready-box" aria-hidden="true">
+            {ready && (
+              <Check
+                size={16}
+                weight="bold"
+                aria-hidden="true"
+                className="motion-safe:transition-transform motion-safe:duration-[var(--dur-2)] motion-safe:ease-[var(--ease-calm)] motion-safe:starting:scale-[0.8]"
+              />
+            )}
+          </span>
           {copy.markReady}
         </button>
         <p id={hintId} className="gg-hint">

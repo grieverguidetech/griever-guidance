@@ -189,7 +189,14 @@ h1, h2, h3, h4, h5, h6 {
   .gg-btn-secondary { border-color: var(--color-divider); }
   .gg-btn-secondary:not(:disabled):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
   .gg-btn-secondary:not(:disabled):active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
-  .gg-btn-ghost { color: var(--color-accent-700); padding-inline: var(--space-1); }
+  /* A link-style button: underlined. accent-700 text stays >= 4.5:1 on the 10% hover and 18% active tints (4.61 at worst, on --color-bg). */
+  .gg-btn-ghost {
+    color: var(--color-accent-700);
+    padding-inline: var(--space-1);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .gg-btn-ghost:not(:disabled):hover { text-decoration-thickness: 2px; }
   .gg-btn-ghost:not(:disabled):hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
   .gg-btn-ghost:not(:disabled):active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
   .gg-btn-block { width: 100%; }
@@ -442,6 +449,42 @@ h1, h2, h3, h4, h5, h6 {
     background: var(--color-accent-100);
     box-shadow: inset 0 0 0 2px var(--color-accent-700);
   }
+  /* A text-only link button under a field: underlined, no visible padding. The 44px target comes from the
+     ::before, which reaches past the text without moving anything (WCAG 2.5.8). */
+  .gg-link-button {
+    position: relative;
+    align-self: flex-start;
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 14px;
+    color: var(--color-accent-700);
+    background: transparent;
+    border: 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .gg-link-button::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: -4px;
+    height: 44px;
+  }
+  .gg-link-button:hover { text-decoration-thickness: 2px; }
+  /* The empty or checked box inside a toggle chip. */
+  .gg-check-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    border: 2px solid var(--color-neutral-600);
+    border-radius: var(--radius-md);
+  }
+  .gg-chip[aria-pressed='true'] .gg-check-box { border-color: var(--color-accent-700); }
   .gg-hint { font-size: 13px; color: var(--text-hint); }
   .gg-meta { font-size: 13px; color: var(--text-muted); }
   @keyframes gg-enter {

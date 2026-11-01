@@ -71,8 +71,7 @@ describe('AccountSection', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 
-  it('shows the Settings actions under the account content when given, and none otherwise', async () => {
-    const user = userEvent.setup();
+  it('shows the Settings actions under the account content when given, and none otherwise', () => {
     const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
     const { unmount } = render(
       <AccountSection
@@ -84,13 +83,12 @@ describe('AccountSection', () => {
       />,
     );
     expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
-    expect(screen.getByText(/You'll be signed out on this device/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
-    expect(onRemoveEverything).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Remove everything from this device')).not.toBeInTheDocument();
+    expect(onRemoveEverything).not.toHaveBeenCalled();
     unmount();
     profile();
-    expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();
   });
 
   it('describes the field by the intro and the status, and flags an error after a failed save', async () => {
@@ -160,17 +158,17 @@ describe('AccountSection as a settings page', () => {
 });
 
 describe('AccountSettingsSection', () => {
-  it('confirms before removing, then removes', async () => {
-    const user = userEvent.setup();
-    const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
-    render(<AccountSettingsSection onRemoveEverything={onRemoveEverything} removeMember={<h2>People helping you</h2>} />);
+  it('shows the remove-a-member section and no "Remove everything" control', () => {
+    render(<AccountSettingsSection removeMember={<h2>People helping you</h2>} />);
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'People helping you' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
-    expect(onRemoveEverything).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
-    expect(onRemoveEverything).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Remove everything/ })).not.toBeInTheDocument();
+  });
+
+  it('renders nothing without a remove-a-member section', () => {
+    const { container } = render(<AccountSettingsSection />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
@@ -307,7 +305,7 @@ describe('AccountSection plans', () => {
     vi.restoreAllMocks();
   });
 
-  it('downloads a copy of the plans, then offers the device removal after it', async () => {
+  it('downloads a copy of the plans, with no device removal', async () => {
     const user = userEvent.setup();
     const create = vi.fn().mockReturnValue('blob:plans');
     const revoke = vi.fn();
@@ -326,8 +324,7 @@ describe('AccountSection plans', () => {
     const panel = screen.getByRole('region', { name: 'Your plans' });
     expect(within(panel).getByRole('heading', { level: 2, name: 'Your plans' })).toBeInTheDocument();
     const download = within(panel).getByRole('button', { name: 'Download a copy' });
-    const remove = within(panel).getByRole('button', { name: 'Remove everything from this device' });
-    expect(download.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
 
     await user.click(download);
     expect(create).toHaveBeenCalledTimes(1);
@@ -373,8 +370,7 @@ describe('AccountSection plans', () => {
     expect(screen.queryByRole('heading', { name: 'Your plans' })).not.toBeInTheDocument();
   });
 
-  it('shows the remove-a-member content once, in its own panel, and removes everything through the plans panel', async () => {
-    const user = userEvent.setup();
+  it('shows the remove-a-member content once, in its own panel, and has no remove-everything control', () => {
     const onRemoveEverything = vi.fn().mockResolvedValue(undefined);
     render(
       <AccountSection
@@ -390,13 +386,9 @@ describe('AccountSection plans', () => {
     const headings = screen.getAllByRole('heading', { name: 'People helping you' });
     expect(headings.map((h) => h.tagName)).toEqual(['H2', 'H3']);
     expect(headings[1].parentElement).toHaveClass('gg-panel');
-    // The device removal sits inside Your plans, one level under its h2.
-    const plansPanel = screen.getByRole('region', { name: 'Your plans' });
-    expect(within(plansPanel).getByRole('heading', { level: 3, name: 'Remove everything from this device' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
+    expect(screen.queryByRole('heading', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Remove everything/ })).not.toBeInTheDocument();
     expect(onRemoveEverything).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Remove everything' }));
-    expect(onRemoveEverything).toHaveBeenCalledTimes(1);
   });
 });
 
