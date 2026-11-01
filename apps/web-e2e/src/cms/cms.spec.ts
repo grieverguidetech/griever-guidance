@@ -208,8 +208,12 @@ test.describe('navigation (#566)', () => {
     await openSection(page, 'Service', 'Service');
     await openSection(page, 'Your account', 'Your account');
     await page.goBack();
-    await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
+    const service = page.getByRole('heading', { level: 1, name: 'Service' });
+    await expect(service).toBeVisible();
+    await expect(service).toBeFocused();
     await page.goBack();
-    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+    const overview = page.getByRole('heading', { level: 1, name: 'Overview' });
+    await expect(overview).toBeVisible();
+    await expect(overview).toBeFocused();
   });
 });

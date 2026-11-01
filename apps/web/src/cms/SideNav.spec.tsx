@@ -135,6 +135,13 @@ describe('SideNav', () => {
     expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveClass('bg-accent-100');
   });
 
+  it('on The person screen marks Your people current, and says so in the phone menu button', () => {
+    setup({ section: 'person' });
+    expect(screen.getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Sections · Your people' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page')).toHaveLength(1);
+  });
+
   it('puts the current section in the phone menu button', () => {
     setup({ section: 'overview' });
     expect(screen.getByRole('button', { name: 'Sections · Overview' })).toBeInTheDocument();

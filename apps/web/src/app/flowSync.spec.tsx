@@ -180,6 +180,33 @@ describe('background sync in the app (#520)', () => {
     await waitFor(() => expect(flowCalls().filter((c) => c.method === 'GET').length).toBeGreaterThan(1));
   });
 
+  it('a fresh device lands on Overview when the first sync brings people (#566)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
+  });
+
+  it('a fresh device lands on Your people when the first sync takes longer than the cap, without blocking (#566)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    // The server never answers; the landing must not wait on it past the cap.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' }, { timeout: 4000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+  });
+
+  it('a fresh device lands on Your people at once when the first sync finds nobody (#566)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    serverHasNothing = true;
+    signedIn(true);
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' }, { timeout: 1400 })).toBeInTheDocument();
+  });
+
   it('makes no /flows calls with the editor off', async () => {
     mocks.cms = false;
     signedIn(true);
