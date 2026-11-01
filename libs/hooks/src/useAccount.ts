@@ -29,12 +29,19 @@ export interface UseAccountResult {
   profile: CachedProfile | null;
   /** True once the server has answered the profile call (a profile, no profile, or a failure), or a cached profile exists. False only while the first answer is still pending. */
   profileAnswered: boolean;
+  /** True only after a live profile call for this sign-in answered with a profile or "no profile" (the account really has none). Never from the cache, and not after unavailable, offline or a failed call. */
+  profileLoaded: boolean;
   error: string | null;
   clearError: () => void;
   signOut: () => Promise<void>;
   updateSenderName: (name: string) => Promise<boolean>;
   /** Saves the optional first name, last name, date of birth and address (null clears one). The server sets senderName from firstName. `invalid` means the server refused a value; no general error is set for it. */
-  updateDetails: (details: ProfileDetails) => Promise<ProfileDetailsResult>;
+  updateDetails: (details: ProfileDetails, options?: UpdateDetailsOptions) => Promise<ProfileDetailsResult>;
+}
+
+export interface UpdateDetailsOptions {
+  /** A background save: a failure sets no account error and clears none, because nobody asked for it. */
+  quiet?: boolean;
 }
 
 export interface ProfileDetails {
@@ -161,6 +168,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   const [offline, setOffline] = useState(false);
   const [profile, setProfile] = useState<CachedProfile | null>(() => readOwnCache(storage));
   const [profileAnswered, setProfileAnswered] = useState(() => readOwnCache(storage) !== null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Set by signOut so the screen leaves the signed-in state before the provider answers.
   const [endedHere, setEndedHere] = useState(false);
@@ -185,6 +193,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, null);
     setProfile(null);
     setProfileAnswered(false);
+    setProfileLoaded(false);
     setOffline(false);
     setError(null);
   }, []);
@@ -253,6 +262,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     setProfile((current) => (current && current.id !== authUserId ? null : current));
     // A cached profile for this user counts as an answer; otherwise the first server answer is still to come.
     setProfileAnswered(stored !== null && stored.id === authUserId);
+    setProfileLoaded(false);
     // The provider cannot give a token yet; asking now would read as offline. This runs again when it settles.
     if (!authSettled) {
       return;
@@ -267,11 +277,13 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       if (result.ok) {
         setOffline(false);
         keepProfile(toCached(result.profile));
+        setProfileLoaded(true);
       } else if (result.reason === 'offline') {
         setOffline(true);
       } else if (result.reason === 'no_profile') {
         setOffline(false);
         keepProfile(null);
+        setProfileLoaded(true);
       } else if (result.reason === 'signed_out') {
         setOffline(false);
         fail('unavailable');
@@ -319,8 +331,11 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   );
 
   const updateDetails = useCallback(
-    async (details: ProfileDetails): Promise<ProfileDetailsResult> => {
-      setError(null);
+    async (details: ProfileDetails, options?: UpdateDetailsOptions): Promise<ProfileDetailsResult> => {
+      const quiet = options?.quiet === true;
+      if (!quiet) {
+        setError(null);
+      }
       const g = ++gen.current;
       const result = await callWithToken(g, (token) => updateProfile(token, details));
       if (!mounted.current || g !== gen.current) {
@@ -337,7 +352,9 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       if (result.reason === 'offline') {
         setOffline(true);
       }
-      fail(profileFailureKey(result.reason));
+      if (!quiet) {
+        fail(profileFailureKey(result.reason));
+      }
       return { ok: false, invalid: false };
     },
     [callWithToken, keepProfile, fail],
@@ -355,6 +372,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     offline,
     profile,
     profileAnswered,
+    profileLoaded,
     error,
     clearError,
     signOut,

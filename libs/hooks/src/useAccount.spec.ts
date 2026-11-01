@@ -598,3 +598,55 @@ describe('useAccount details', () => {
     expect(result.current.error).toBe(UNREACHABLE);
   });
 });
+
+describe('useAccount profileLoaded and quiet saves (#603)', () => {
+  it('is true only after a live profile answer', async () => {
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    expect(result.current.profileLoaded).toBe(false);
+    await waitFor(() => expect(result.current.profileLoaded).toBe(true));
+  });
+
+  it('is true for "no profile", since the account really has none', async () => {
+    fetchMock.mockImplementation(async () => reply(404, { error: 'no_profile' }));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profileAnswered).toBe(true));
+    expect(result.current.profileLoaded).toBe(true);
+  });
+
+  it('is false for a cached profile that no live answer has confirmed', () => {
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profileAnswered).toBe(true);
+    expect(result.current.profileLoaded).toBe(false);
+  });
+
+  it('stays false when the profile call fails', async () => {
+    fetchMock.mockImplementation(async () => reply(500));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profileAnswered).toBe(true));
+    expect(result.current.profileLoaded).toBe(false);
+  });
+
+  it('a quiet details save that fails sets no error', async () => {
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profileLoaded).toBe(true));
+    fetchMock.mockImplementation(async () => reply(500));
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.updateDetails({ firstName: 'Anna', lastName: null }, { quiet: true });
+    });
+    expect(outcome).toEqual({ ok: false, invalid: false });
+    expect(result.current.error).toBeNull();
+  });
+
+  it('a normal details save that fails still sets the error', async () => {
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profileLoaded).toBe(true));
+    fetchMock.mockImplementation(async () => reply(500));
+    await act(async () => {
+      await result.current.updateDetails({ firstName: 'Anna', lastName: null });
+    });
+    expect(result.current.error).not.toBeNull();
+  });
+});

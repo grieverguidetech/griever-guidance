@@ -13,7 +13,7 @@ function shell(props: { aside?: boolean; title?: string } = {}) {
       personName="Margaret Hale"
       section="service"
       onSelect={vi.fn()}
-      onChangePerson={vi.fn()}
+      onPeople={vi.fn()}
       onAccount={vi.fn()}
       aside={props.aside === false ? undefined : <p>Panel words</p>}
       title={props.title}
@@ -69,7 +69,7 @@ describe('CmsShell checklist panel', () => {
   });
 
   it('wraps the section content in a keyed gg-enter div that remounts on section change', () => {
-    const props = { personName: 'Margaret Hale', onSelect: vi.fn(), onChangePerson: vi.fn(), onAccount: vi.fn() };
+    const props = { personName: 'Margaret Hale', onSelect: vi.fn(), onPeople: vi.fn(), onAccount: vi.fn() };
     const { rerender } = render(
       <CmsShell {...props} section="service"><h2>Details</h2></CmsShell>,
     );
@@ -159,7 +159,7 @@ describe('CmsShell checklist panel', () => {
   it('gives a function aside the sheet flag and a close that shuts the sheet', async () => {
     const user = userEvent.setup();
     render(
-      <CmsShell personName="Margaret Hale" section="service" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}
+      <CmsShell personName="Margaret Hale" section="service" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={vi.fn()}
         aside={({ inSheet, closeSheet }) => (
           <button type="button" onClick={closeSheet}>{inSheet ? 'In sheet' : 'In panel'}</button>
         )}

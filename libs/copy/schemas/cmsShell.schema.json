@@ -15,8 +15,9 @@
     "navLandmark",
     "navLandmarkNamed",
     "menuButton",
-    "change",
-    "changeLabel",
+    "nameNoteStart",
+    "nameNoteLink",
+    "nameNoteEnd",
     "statusNotStarted",
     "statusInProgress",
     "statusReady",
@@ -98,10 +99,13 @@
     "menuButton": {
       "$ref": "#/$defs/text"
     },
-    "change": {
+    "nameNoteStart": {
       "$ref": "#/$defs/text"
     },
-    "changeLabel": {
+    "nameNoteLink": {
+      "$ref": "#/$defs/text"
+    },
+    "nameNoteEnd": {
       "$ref": "#/$defs/text"
     },
     "statusNotStarted": {
