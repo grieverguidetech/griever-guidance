@@ -70,6 +70,17 @@ export const CHECKLIST_PHASES = [
 
 export type ChecklistPhaseKey = (typeof CHECKLIST_PHASES)[number]['key'];
 
+/**
+ * The phases that follow the clock. Obituary and Planning the service are separate
+ * checklists, not steps in time, so "current phase" never points at them.
+ */
+export const TIME_PHASE_KEYS: readonly ChecklistPhaseKey[] = [
+  'right-away',
+  'first-days',
+  'first-weeks',
+  'first-months',
+];
+
 export type ChecklistItemId =
   (typeof CHECKLIST_PHASES)[number]['itemIds'][number];
 

@@ -13,7 +13,7 @@ import { ChecklistItemRow } from './ChecklistItemRow';
 const copy = screenCopy('cmsChecklist');
 const GATHER_KEY = 'gather';
 // Shown after Gather, in this order. The other phases come before Gather, in CHECKLIST_PHASES order.
-// Display only: currentPhase and auto-open still follow CHECKLIST_PHASES.
+// Display only: currentPhase and auto-open follow the time phases only (see computeChecklist).
 const AFTER_GATHER: readonly string[] = ['obituary', 'planning-service'];
 
 interface Props {

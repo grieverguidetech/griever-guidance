@@ -68,7 +68,7 @@ describe('PhaseList', () => {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('opens Obituary as the current phase even though it renders after Gather', () => {
+  it('opens the next time phase, not Obituary or Planning, when first-days is done', () => {
     const done: NonNullable<ChecklistFields['checklist']> = {};
     for (const phase of CHECKLIST_PHASES.slice(0, 2)) {
       for (const id of phase.itemIds) {
@@ -76,8 +76,9 @@ describe('PhaseList', () => {
       }
     }
     render(<PhaseList checklist={done} onOpen={noop} onChange={noop} gather={<p>g</p>} />);
-    expect(within(phaseHeading('obituary')).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
-    expect(within(phaseHeading('first-weeks')).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    expect(within(phaseHeading('first-weeks')).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+    expect(within(phaseHeading('obituary')).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    expect(within(phaseHeading('planning-service')).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('closes every phase when everything is handled', () => {

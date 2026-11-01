@@ -48,6 +48,24 @@ describe('computeChecklist', () => {
     expect(result.nextItem).toBeNull();
   });
 
+  it('skips Obituary and Planning: first-weeks follows first-days', () => {
+    const state = allWith('done');
+    state.checklist = { ...state.checklist, 'notify-ssa': undefined };
+    const result = computeChecklist(state);
+    expect(result.currentPhase).toBe('first-weeks');
+    expect(result.nextItem).toBe('notify-ssa');
+  });
+
+  it('has no current phase when only the Obituary or Planning checklist is open', () => {
+    const state = allWith('done');
+    state.checklist = { ...state.checklist, 'write-obituary': undefined, eulogy: undefined };
+    const result = computeChecklist(state);
+    expect(result.currentPhase).toBeNull();
+    expect(result.nextItem).toBeNull();
+    const open = result.phases.filter((p) => !p.done).map((p) => p.key);
+    expect(open).toEqual(['obituary', 'planning-service']);
+  });
+
   it('counts a mix of done and not_applicable as all done', () => {
     const state = allWith('done');
     state.checklist = { ...state.checklist, headstone: 'not_applicable' };

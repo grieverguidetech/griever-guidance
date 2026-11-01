@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CHECKLIST_PHASES } from './checklist.js';
+import { CHECKLIST_PHASES, TIME_PHASE_KEYS } from './checklist.js';
 
 const DEVICE_IDS = [
   'will-or-wishes',
@@ -22,6 +22,16 @@ describe('checklist model', () => {
       'first-weeks',
       'first-months',
     ]);
+  });
+
+  it('names the four time phases, in clock order, all real phases', () => {
+    expect(TIME_PHASE_KEYS).toEqual(['right-away', 'first-days', 'first-weeks', 'first-months']);
+    const keys = CHECKLIST_PHASES.map((p) => p.key);
+    for (const key of TIME_PHASE_KEYS) {
+      expect(keys).toContain(key);
+    }
+    expect(TIME_PHASE_KEYS).not.toContain('obituary');
+    expect(TIME_PHASE_KEYS).not.toContain('planning-service');
   });
 
   it('has 37 unique item ids', () => {

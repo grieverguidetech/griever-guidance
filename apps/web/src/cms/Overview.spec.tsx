@@ -154,6 +154,15 @@ describe('Overview', () => {
     expect(screen.queryByRole('button', { name: /On the checklist:/ })).toBeNull();
   });
 
+  it('shows no Now line when only the Obituary and Planning checklists are open', () => {
+    const checklist = { ...allDone.checklist };
+    delete checklist['write-obituary'];
+    delete checklist['eulogy'];
+    setup({}, { checklist });
+    expect(screen.queryByText(/^Now:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /On the checklist:/ })).toBeNull();
+  });
+
   it('shows nothing from the checklist when every phase is done', () => {
     setup({}, allDone);
     expect(screen.queryByText(/^Now:/)).toBeNull();
