@@ -16,9 +16,17 @@ function setup(props: Partial<Parameters<typeof SideNav>[0]> = {}) {
 describe('SideNav', () => {
   it('lists the 7 items in order, with Overview first, Your people under it, and no The person link, inside the Sections nav', () => {
     setup();
-    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const nav = screen.getByRole('navigation', { name: /^Sections/ });
     const names = within(nav).getAllByRole('listitem').map((li) => li.textContent);
     expect(names).toEqual(['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
+  });
+
+  it('names the person in the landmark, and keeps Sections with no name', () => {
+    setup();
+    expect(screen.getByRole('navigation', { name: 'Sections for Margaret Hale' })).toBeInTheDocument();
+    cleanup();
+    setup({ personName: '  ' });
+    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
   });
 
   it('shows Change, and hides it with hideChange', () => {
@@ -31,7 +39,7 @@ describe('SideNav', () => {
 
   it('makes every section and the two ends a button', () => {
     setup();
-    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Overview',
       'Your people',
@@ -45,14 +53,14 @@ describe('SideNav', () => {
 
   it('marks only the current item with aria-current=page', () => {
     setup({ section: 'people' });
-    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const nav = screen.getByRole('navigation', { name: /^Sections/ });
     const current = within(nav).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page');
     expect(current.map((b) => b.textContent)).toEqual(['Your people']);
   });
 
   it('is 12rem wide from md up, never shrinks, and stays sticky', () => {
     setup();
-    const column = screen.getByRole('navigation', { name: 'Sections' }).parentElement?.parentElement;
+    const column = screen.getByRole('navigation', { name: /^Sections/ }).parentElement?.parentElement;
     expect(column?.className).toContain('md:w-48');
     expect(column?.className).toContain('md:shrink-0');
     expect(column?.className).toContain('md:sticky');
@@ -116,7 +124,7 @@ describe('SideNav', () => {
 
   it('shows a green check for ready, a plain icon for not started, and not those words', () => {
     setup({ statuses: { announcement: 'ready', service: 'in_progress' } });
-    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).queryByText('Ready')).toBeNull();
     expect(within(nav).queryByText('Not started')).toBeNull();
     expect(within(nav).getByText('In progress')).toBeInTheDocument();
@@ -163,7 +171,7 @@ describe('SideNav', () => {
 
   it('with accountOnly offers just Your people and Your account: no sections, no name, no Change, no menu button', async () => {
     const { onSelect } = setup({ accountOnly: true });
-    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your people', 'Your account']);
     expect(screen.getAllByRole('button')).toHaveLength(2);
     expect(screen.queryByText('Margaret Hale')).not.toBeInTheDocument();

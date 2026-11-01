@@ -208,7 +208,7 @@ describe('background sync in the app (#520)', () => {
       expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
       expect(screen.getByText('Loading…')).toBeInTheDocument();
       expect(screen.getAllByRole('banner')).toHaveLength(1);
-      expect(screen.getAllByRole('navigation', { name: 'Sections' })).toHaveLength(1);
+      expect(screen.getAllByRole('navigation', { name: /^Sections/ })).toHaveLength(1);
       expect(screen.getAllByRole('main')).toHaveLength(1);
       expect(screen.getAllByRole('complementary')).toHaveLength(1);
       expect(document.querySelector('[aria-current]')).toBeNull();
@@ -236,7 +236,7 @@ describe('background sync in the app (#520)', () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
       expect(screen.getByText('Loading…')).toBeInTheDocument();
-      const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
       await act(async () => {
         nav.getByRole('button', { name: 'Your account' }).click();
       });

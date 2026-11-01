@@ -1024,6 +1024,7 @@ function AppBody({
           statuses={person?.sectionStatus}
           // Your people is already here; a section opens that person there, like the Overview card.
           onSelect={(key) => {
+            // CmsShell routes 'people' and 'account' to their own handlers; the extra checks only narrow the type.
             if (!person || key === 'account' || key === 'people') {
               return;
             }
@@ -1035,6 +1036,7 @@ function AppBody({
             setActiveId(person.id);
             setView('cms');
           }}
+          // Change is hidden here (hideChange), and Your people is already open.
           onChangePerson={() => undefined}
           onAccount={() => {
             sessions.pruneEmpty();
