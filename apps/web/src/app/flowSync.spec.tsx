@@ -207,11 +207,45 @@ describe('background sync in the app (#520)', () => {
       // 1400 ms in: still the quiet loading status, not an empty list.
       expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
       expect(screen.getByText('Loading…')).toBeInTheDocument();
+      expect(screen.getAllByRole('banner')).toHaveLength(1);
+      expect(screen.getAllByRole('navigation', { name: 'Sections' })).toHaveLength(1);
+      expect(screen.getAllByRole('main')).toHaveLength(1);
+      expect(screen.getAllByRole('complementary')).toHaveLength(1);
+      expect(document.querySelector('[aria-current]')).toBeNull();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(200);
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Your account opens during a sync that never answers, and the landing does not pull it away (#584)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    try {
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
+      await act(async () => {
+        nav.getByRole('button', { name: 'Your account' }).click();
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

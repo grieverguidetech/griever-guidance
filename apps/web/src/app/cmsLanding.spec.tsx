@@ -282,7 +282,8 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     await user.click(within(nav).getByRole('button', { name: 'Your account' }));
-    expect(await h1('Your account')).toHaveFocus();
+    const focused1 = await h1('Your account');
+    await waitFor(() => expect(focused1).toHaveFocus());
   });
 
   it('Your account opened from "Your people" shows the full nav for the most recent person, and Change returns to "Your people"', async () => {
@@ -333,7 +334,8 @@ describe('landing with the editor on (#448)', () => {
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(screen.getByText('Robert Hayes')).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
-    expect(await h1('Overview')).toHaveFocus();
+    const focused2 = await h1('Overview');
+    await waitFor(() => expect(focused2).toHaveFocus());
     expect(screen.getAllByText('Robert Hayes').length).toBeGreaterThan(0);
     expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
   });
