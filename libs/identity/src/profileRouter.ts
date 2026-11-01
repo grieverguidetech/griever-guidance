@@ -73,7 +73,7 @@ function toProfile(stored: StoredProfile): Profile {
 }
 
 /** Returns the clean fields, or a calm message describing what is wrong (C8). */
-export function parseProfileBody(body: unknown): { fields: ProfileUpdate & { fullName?: string | null } } | { error: string } {
+export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { error: string } {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return { error: 'Send your details as a JSON object.' };
   }
@@ -81,7 +81,7 @@ export function parseProfileBody(body: unknown): { fields: ProfileUpdate & { ful
   const unknown = Object.keys(input).find((key) => !ALLOWED_KEYS.includes(key));
   if (unknown) return { error: 'Only your name, date of birth, address and contact source can be saved.' };
 
-  const fields: ProfileUpdate & { fullName?: string | null } = {};
+  const fields: ProfileUpdate = {};
   if ('senderName' in input) {
     const name = input['senderName'];
     if (name !== null && (typeof name !== 'string' || [...name].length > MAX_SENDER_NAME_LENGTH)) {

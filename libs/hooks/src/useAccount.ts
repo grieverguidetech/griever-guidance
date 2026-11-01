@@ -36,11 +36,14 @@ export interface UseAccountResult {
 }
 
 export interface ProfileDetails {
-  firstName: string | null;
-  lastName: string | null;
+  /** Send these three together (the Personal details form). Leave them out to leave the stored values alone. */
+  firstName?: string | null;
+  lastName?: string | null;
+  address?: Address | null;
+  /** The old single-string name, for the interim form. The server splits it and leaves senderName alone. */
+  fullName?: string | null;
   /** yyyy-mm-dd */
   birthDate: string | null;
-  address: Address | null;
 }
 
 export type ProfileDetailsResult = { ok: true } | { ok: false; invalid: boolean };

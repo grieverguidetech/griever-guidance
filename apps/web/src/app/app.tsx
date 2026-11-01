@@ -18,7 +18,7 @@ import {
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
-import { SECTION_ORDER, splitFullName } from '@griever/shared';
+import { SECTION_ORDER } from '@griever/shared';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
@@ -1163,14 +1163,8 @@ function AppBody({
         senderName={auth.profile?.senderName ?? null}
         fullName={[auth.profile?.firstName, auth.profile?.lastName].filter(Boolean).join(' ') || null}
         birthDate={auth.profile?.birthDate ?? null}
-        // Interim until the Personal details form lands: the old Full name field is split into first and last name.
-        onSaveDetails={(details) =>
-          auth.updateDetails({
-            ...splitFullName(details.fullName),
-            birthDate: details.birthDate,
-            address: auth.profile?.address ?? null,
-          })
-        }
+        // Interim until the Personal details form lands: the old shape, so it works against the old data function and never touches senderName.
+        onSaveDetails={(details) => auth.updateDetails({ fullName: details.fullName, birthDate: details.birthDate })}
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}

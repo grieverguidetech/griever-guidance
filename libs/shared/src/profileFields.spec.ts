@@ -114,8 +114,8 @@ describe('checkAddress', () => {
     expect(checkAddress({ ...full, line2: 'a\nb' })).toEqual({ ok: false, errors: { line2: 'badChars' } });
     expect(checkAddress({ ...full, city: 'Ben\u0000' })).toEqual({ ok: false, errors: { city: 'badChars' } });
     expect(checkAddress({ ...full, zip: 72712 })).toEqual({ ok: false, errors: { zip: 'invalid' } });
-    expect(checkAddress('12 Oak St')).toMatchObject({ ok: false });
-    expect(checkAddress([])).toMatchObject({ ok: false });
-    expect(checkAddress({ ...full, country: 'US' })).toMatchObject({ ok: false });
+    expect(checkAddress('12 Oak St')).toEqual({ ok: false, errors: { address: 'invalid' } });
+    expect(checkAddress([])).toEqual({ ok: false, errors: { address: 'invalid' } });
+    expect(checkAddress({ ...full, country: 'US' })).toEqual({ ok: false, errors: { address: 'invalid' } });
   });
 });

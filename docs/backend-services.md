@@ -258,7 +258,7 @@ scripts, which `deploy.yml` already does.
 | Fields accepted | `senderName` (string up to 100 characters, or null), `contactSource` (`import`, `manual`, or null), `firstName` and `lastName` (each up to 100 characters or null; blank becomes null; no line breaks, tabs or hidden characters), `birthDate` (`yyyy-mm-dd` or null; a real date from 1900 on, not after today), `address` (null, or `{ line1, line2, city, state, zip }`: line 1, city, 2-letter state and ZIP of 5 or 5+4 digits are required when any part is filled). `senderName` is set from `firstName` on save. `fullName` is still accepted from older clients and is split into first and last name; the response also carries a derived read-only `fullName`. `firstName`, `lastName`, `birthDate` and `address` are private to the account and never shown to members. Any other key gives 400 |
 | PostgREST calls | `GET /rest/v1/profiles?id=eq.<uid>`; `PATCH` the row; if no row, `POST` it; on 409 read again |
 | Errors | Any PostgREST failure gives a calm 503 (C7) |
-| Tests | 2 spec files, about 22 cases |
+| Tests | 2 spec files (`profileRouter.spec.ts`, `clerkWebhook.spec.ts`) |
 
 ### 3.4 Family sharing (`libs/gateway-flows`)
 

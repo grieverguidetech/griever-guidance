@@ -177,8 +177,8 @@ export async function saveProfileFields(
     sets.push('address = :address');
     values[':address'] = fields.address;
   }
-  // Once first or last name is written, the old single-string name is dropped so it cannot come back.
-  const removes = fields.firstName !== undefined || fields.lastName !== undefined ? ' REMOVE fullName' : '';
+  // Once both first and last name are written, the old single-string name is dropped so it cannot come back.
+  const removes = fields.firstName !== undefined && fields.lastName !== undefined ? ' REMOVE fullName' : '';
   const { Attributes } = await doc.send(
     new UpdateCommand({
       TableName: table,

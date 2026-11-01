@@ -62,6 +62,12 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     }
     // An old client: split the one string. firstName and lastName below win if they are sent too.
     const split = splitFullName(cleaned as string | null);
+    if (
+      (split.firstName !== null && !isValidNamePart(split.firstName)) ||
+      (split.lastName !== null && !isValidNamePart(split.lastName))
+    ) {
+      return null;
+    }
     fields.firstName = split.firstName;
     fields.lastName = split.lastName;
   }
@@ -75,8 +81,9 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     }
     fields[key] = cleaned as string | null;
   }
-  if (firstName !== undefined) {
-    fields.senderName = fields.firstName ?? null;
+  // Messages are signed with the first name. A blank first name never clears the signature.
+  if (typeof fields.firstName === 'string' && firstName !== undefined) {
+    fields.senderName = fields.firstName;
   }
   if (address !== undefined) {
     const checked = checkAddress(address);
@@ -118,6 +125,16 @@ export async function putProfile(
   const fields = parseProfileFields(input);
   if (!fields) {
     return { ok: false, code: 'invalid' };
+  }
+  // Saving only one name part: fill the other from what is stored (a legacy fullName is split on read),
+  // so the old fullName can be dropped without losing the part that was not sent.
+  if ((fields.firstName === undefined) !== (fields.lastName === undefined)) {
+    const stored = await readProfile(doc, table, caller.userId, clock);
+    if (fields.firstName === undefined) {
+      fields.firstName = stored?.firstName ?? null;
+    } else {
+      fields.lastName = stored?.lastName ?? null;
+    }
   }
   const profile = await saveProfileFields(
     doc,

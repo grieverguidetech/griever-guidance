@@ -99,7 +99,9 @@ export interface Address {
 
 export type AddressField = keyof Address;
 export type AddressProblem = 'required' | 'tooLong' | 'badChars' | 'badState' | 'badZip' | 'invalid';
-export type AddressCheck = { ok: true; address: Address | null } | { ok: false; errors: Partial<Record<AddressField, AddressProblem>> };
+/** `address` is the whole value (wrong shape); the other keys are single fields. */
+export type AddressErrorKey = AddressField | 'address';
+export type AddressCheck = { ok: true; address: Address | null } | { ok: false; errors: Partial<Record<AddressErrorKey, AddressProblem>> };
 
 const ADDRESS_FIELDS: readonly AddressField[] = ['line1', 'line2', 'city', 'state', 'zip'];
 const STATE = /^[A-Z]{2}$/;
@@ -115,13 +117,13 @@ export function checkAddress(input: unknown): AddressCheck {
     return { ok: true, address: null };
   }
   if (typeof input !== 'object' || Array.isArray(input)) {
-    return { ok: false, errors: { line1: 'invalid' } };
+    return { ok: false, errors: { address: 'invalid' } };
   }
   const record = input as Record<string, unknown>;
   if (Object.keys(record).some((key) => !ADDRESS_FIELDS.includes(key as AddressField))) {
-    return { ok: false, errors: { line1: 'invalid' } };
+    return { ok: false, errors: { address: 'invalid' } };
   }
-  const errors: Partial<Record<AddressField, AddressProblem>> = {};
+  const errors: Partial<Record<AddressErrorKey, AddressProblem>> = {};
   const clean = { line1: '', line2: '', city: '', state: '', zip: '' };
   for (const field of ADDRESS_FIELDS) {
     const raw = record[field];

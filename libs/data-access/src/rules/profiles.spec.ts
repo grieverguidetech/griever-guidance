@@ -108,9 +108,11 @@ describe.runIf(up)('profile rules on DynamoDB Local', () => {
     });
     await putProfile(doc, table, id, { firstName: null, lastName: null, birthDate: null, address: null }, clock);
     const cleared = await getProfile(doc, table, id, clock);
-    for (const key of ['firstName', 'lastName', 'senderName', 'birthDate', 'address']) {
+    for (const key of ['firstName', 'lastName', 'birthDate', 'address']) {
       expect(cleared).not.toHaveProperty(key);
     }
+    // Clearing the first name does not clear the signature.
+    expect(cleared).toMatchObject({ senderName: 'Sam' });
   });
 
   it('splits a legacy stored fullName on read, and drops it once a name is saved', async () => {
@@ -119,8 +121,10 @@ describe.runIf(up)('profile rules on DynamoDB Local', () => {
     expect(await getProfile(doc, table, id, clock)).toMatchObject({ firstName: 'Sam', lastName: 'Smith' });
     await putProfile(doc, table, id, { lastName: 'Jones' }, clock);
     const after = await getProfile(doc, table, id, clock);
-    expect(after).toMatchObject({ lastName: 'Jones' });
-    expect(after).not.toHaveProperty('firstName');
+    expect(after).toMatchObject({ firstName: 'Sam', lastName: 'Jones' });
+    // The legacy string is gone: the next read does not split it again.
+    await putProfile(doc, table, id, { firstName: 'Samuel' }, clock);
+    expect(await getProfile(doc, table, id, clock)).toMatchObject({ firstName: 'Samuel', lastName: 'Jones' });
   });
 
   it('keeps the old fullName and senderName path working for older clients', async () => {
@@ -186,7 +190,6 @@ describe('parseProfileFields: names, birth date and address', () => {
     expect(parseProfileFields({ firstName: null, lastName: null, birthDate: null, address: null })).toEqual({
       firstName: null,
       lastName: null,
-      senderName: null,
       birthDate: null,
       address: null,
     });
@@ -200,6 +203,11 @@ describe('parseProfileFields: names, birth date and address', () => {
 
   it('derives senderName from firstName, and only then', () => {
     expect(parseProfileFields({ firstName: 'Anna', senderName: 'Annie' })).toMatchObject({ senderName: 'Anna' });
+    // A null or blank firstName never clears the signature.
+    expect(parseProfileFields({ firstName: null })).toEqual({ firstName: null });
+    expect(parseProfileFields({ firstName: '  ' })).toEqual({ firstName: null });
+    expect(parseProfileFields({ firstName: null, senderName: 'Annie' })).toEqual({ firstName: null, senderName: 'Annie' });
+    expect(parseProfileFields({ fullName: 'Anna Lee', senderName: 'Annie' })).toEqual({ firstName: 'Anna', lastName: 'Lee', senderName: 'Annie' });
     expect(parseProfileFields({ lastName: 'Lee', senderName: 'Annie' })).toEqual({ lastName: 'Lee', senderName: 'Annie' });
   });
 
@@ -214,6 +222,8 @@ describe('parseProfileFields: names, birth date and address', () => {
     { fullName: 'Sam\u0000' },
     { fullName: 7 },
     { fullName: 'Sam\nSmith' },
+    // Valid as a full name (110 characters) but the first part is over 100.
+    { fullName: `${'x'.repeat(105)} Lee` },
     { firstName: 'x'.repeat(101) },
     { firstName: 7 },
     { lastName: 'Sam\tSmith' },

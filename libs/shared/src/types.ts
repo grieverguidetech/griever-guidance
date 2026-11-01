@@ -175,5 +175,5 @@ export interface Profile {
   updatedAt: string;
 }
 
-/** What a user may change on their own profile. */
-export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource' | 'firstName' | 'lastName' | 'birthDate' | 'address'>>;
+/** What a user may change on their own profile. `fullName` is the old single-string name, kept for older clients; the server splits it. */
+export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource' | 'firstName' | 'lastName' | 'fullName' | 'birthDate' | 'address'>>;

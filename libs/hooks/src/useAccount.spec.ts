@@ -510,6 +510,17 @@ describe('useAccount details', () => {
     expect(result.current.profile).toMatchObject({ birthDate: '1980-05-29', address });
   });
 
+  it('sends only the old shape when given fullName and birthDate', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => reply(200, init?.method === 'PUT' ? withDetails : profile('Peter')));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profile).not.toBeNull());
+    await act(async () => {
+      await result.current.updateDetails({ fullName: null, birthDate: '1980-05-29' });
+    });
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(put?.[1].body as string)).toEqual({ fullName: null, birthDate: '1980-05-29' });
+  });
+
   it('reports a server 400 as invalid and sets no general error', async () => {
     fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => (init?.method === 'PUT' ? reply(400) : reply(200, profile('Peter'))));
     const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
