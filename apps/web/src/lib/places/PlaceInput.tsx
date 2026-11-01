@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { fill, screenCopy } from '@griever/copy';
 import { usePlaces } from './PlacesContext';
-import type { PlaceSuggestion, PlacesToken } from './placesClient';
+import type { PlaceDetails, PlaceSuggestion, PlacesToken } from './placesClient';
 
 const copy = screenCopy('cmsService');
 
@@ -12,7 +12,7 @@ export const PLACE_MIN_CHARS = 3;
 export const countText = (n: number): string =>
   n === 0 ? copy.placesNone : n === 1 ? copy.placesOne : fill(copy.placesMany, { count: n });
 
-interface Props {
+export interface PlaceInputProps {
   id: string;
   /** Ids of the elements that name the field, as for a plain input. */
   labelledBy: string;
@@ -22,9 +22,10 @@ interface Props {
   types?: readonly string[];
   /**
    * Takes over a pick, to fill more than this field. Without it a pick sets the value to the whole line.
-   * Return true when it also filled another field; the status then says so.
+   * Gets the full details (name and street address) fetched for the pick, or null when that failed;
+   * then fall back to the suggestion. Return true when it also filled another field; the status then says so.
    */
-  onPick?: (suggestion: PlaceSuggestion) => boolean | void;
+  onPick?: (suggestion: PlaceSuggestion, details: PlaceDetails | null) => boolean | void;
 }
 
 /**
@@ -32,7 +33,7 @@ interface Props {
  * The typed text is always the value. Suggestions only help; with none available, or on any
  * failure, it behaves as a plain input and shows no error.
  */
-export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: Props) {
+export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: PlaceInputProps) {
   const { enabled, load } = usePlaces();
   // Set when Google could not load. The field then drops every combobox attribute.
   const [unavailable, setUnavailable] = useState(false);
@@ -42,6 +43,13 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [announcement, setAnnouncement] = useState('');
+  // True while a search runs. The list then shows one "Searching…" row; "empty" shows "No matches".
+  const [searching, setSearching] = useState(false);
+  const [empty, setEmpty] = useState(false);
+  // Bumped on every keystroke and pick, so details that arrive after the user moved on are dropped.
+  const pickTicket = useRef(0);
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped on every keystroke and close, so a late answer for old text is dropped.
   const request = useRef(0);
@@ -76,6 +84,8 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
   const hideList = () => {
     setOpen(false);
     setActive(-1);
+    setSearching(false);
+    setEmpty(false);
   };
 
   /** Closes the list and ends the search session. Typed text stays. */
@@ -90,6 +100,11 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
     if (!types) {
       return;
     }
+    setSearching(true);
+    setEmpty(false);
+    setOpen(false);
+    setActive(-1);
+    setAnnouncement(copy.placesSearching);
     try {
       const client = await load();
       if (ticket !== request.current) {
@@ -97,6 +112,8 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       }
       if (!client) {
         setUnavailable(true);
+        setSearching(false);
+        setAnnouncement('');
         return;
       }
       token.current ??= client.newToken();
@@ -106,6 +123,8 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       }
       setOptions(found);
       setActive(-1);
+      setSearching(false);
+      setEmpty(found.length === 0);
       setOpen(found.length > 0);
       setAnnouncement(countText(found.length));
     } catch {
@@ -119,6 +138,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
 
   const handleChange = (text: string) => {
     onChange(text);
+    pickTicket.current += 1;
     cancelPending();
     setActive(-1);
     if (!suggesting || text.trim().length < PLACE_MIN_CHARS) {
@@ -132,17 +152,36 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
     timer.current = setTimeout(() => void search(text.trim(), ticket), PLACE_DEBOUNCE_MS);
   };
 
-  const choose = (option: PlaceSuggestion) => {
-    const filledMore = onPick ? onPick(option) === true : (onChange(option.text), false);
+  const choose = async (option: PlaceSuggestion) => {
+    if (!onPick) {
+      onChange(option.text);
+      stop();
+      setOptions([]);
+      return;
+    }
     stop();
     setOptions([]);
-    if (filledMore) {
+    pickTicket.current += 1;
+    const ticket = pickTicket.current;
+    // The name and full address come from the place itself; the prediction only has a short line.
+    let details: PlaceDetails | null = null;
+    try {
+      const client = await load();
+      details = client ? await client.details(option) : null;
+    } catch {
+      details = null;
+    }
+    // Typing again, or a newer pick, while the details loaded means the user moved on.
+    if (ticket !== pickTicket.current) {
+      return;
+    }
+    if (onPickRef.current?.(option, details) === true) {
       setAnnouncement(copy.placesAddressFilled);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown' && !open && options.length > 0) {
+    if (e.key === 'ArrowDown' && !open && !searching && options.length > 0) {
       e.preventDefault();
       setOpen(true);
       setActive(0);
@@ -160,7 +199,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
       setActive((a) => (a <= 0 ? options.length - 1 : a - 1));
     } else if (e.key === 'Enter' && active >= 0) {
       e.preventDefault();
-      choose(options[active]);
+      void choose(options[active]);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -169,11 +208,13 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
   };
 
   const optionId = (i: number) => `${listId}-${i}`;
+  const listVisible = open || searching || empty;
   const comboboxProps = suggesting
     ? {
         role: 'combobox',
         'aria-autocomplete': 'list' as const,
-        'aria-expanded': open,
+        'aria-expanded': listVisible,
+        'aria-busy': searching,
         'aria-controls': listId,
         'aria-activedescendant': open && active >= 0 ? optionId(active) : undefined,
       }
@@ -186,23 +227,35 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
         aria-labelledby={labelledBy}
         type="text"
         {...comboboxProps}
-        className="gg-input"
+        className={`gg-input ${suggesting ? 'pe-9' : ''}`}
         autoComplete="off"
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={stop}
       />
+      {searching && <span aria-hidden="true" className="gg-spinner absolute right-3 top-1/2 -mt-2" />}
       {suggesting && (
         <>
           <ul
             id={listId}
             role="listbox"
             aria-label={copy.placesListLabel}
-            hidden={!open}
+            hidden={!listVisible}
             className="absolute left-0 right-0 z-10 m-0 mt-1 max-h-72 list-none overflow-auto rounded-md border border-neutral-600 bg-bg p-0"
           >
+            {searching && (
+              <li role="option" aria-disabled="true" aria-selected={false} className="gg-hint flex min-h-[44px] items-center px-3 py-2">
+                {copy.placesSearching}
+              </li>
+            )}
+            {empty && !searching && (
+              <li role="option" aria-disabled="true" aria-selected={false} className="gg-hint flex min-h-[44px] items-center px-3 py-2">
+                {copy.placesNone}
+              </li>
+            )}
             {open &&
+              !searching &&
               options.map((o, i) => (
                 <li
                   key={o.id}
@@ -212,7 +265,7 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: P
                   className={`flex min-h-[44px] cursor-pointer flex-col justify-center px-3 py-2 hover:bg-surface ${i === active ? 'bg-surface outline outline-2 -outline-offset-2 outline-accent-700' : ''}`}
                   // Keeps focus in the input, so choosing never fires a blur first.
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => choose(o)}
+                  onClick={() => void choose(o)}
                 >
                   <span className="font-semibold">{o.mainText}</span>
                   {o.secondaryText && (

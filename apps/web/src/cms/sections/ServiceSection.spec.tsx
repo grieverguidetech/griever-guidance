@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { PlacesProvider } from '../../lib/places/PlacesContext';
@@ -362,7 +362,7 @@ describe('ServiceSection place suggestions', () => {
     const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue([
       { id: 'x', text: 'Rest Hill Cemetery, 5 Oak Rd', mainText: 'Rest Hill Cemetery', secondaryText: '5 Oak Rd' },
     ]);
-    const client: PlacesClient = { suggest, newToken: () => ({}) };
+    const client: PlacesClient = { suggest, newToken: () => ({}), details: () => Promise.reject(new Error('x')) };
     function Harness() {
       const [values, setValues] = useState<Values>({ visitationDate: 'May 1', burialDate: 'May 2' });
       return (
@@ -380,7 +380,7 @@ describe('ServiceSection place suggestions', () => {
     await userEvent.type(cemetery, 'rest');
     await userEvent.click(await screen.findByRole('option', { name: /Rest Hill Cemetery/ }));
     expect(suggest).toHaveBeenLastCalledWith('rest', ['cemetery'], expect.any(Object));
-    expect(cemetery).toHaveValue('Rest Hill Cemetery, 5 Oak Rd');
+    await waitFor(() => expect(cemetery).toHaveValue('Rest Hill Cemetery, 5 Oak Rd'));
 
     expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toBeInTheDocument();
   });
@@ -393,6 +393,7 @@ describe('ServiceSection pick fills the address', () => {
         { id: 'a', text: 'Oak Funeral Home, 1 Main St', mainText: 'Oak Funeral Home', secondaryText: '1 Main St' },
       ]),
       newToken: () => ({}),
+      details: vi.fn<PlacesClient['details']>().mockResolvedValue({ name: 'Oak Funeral Home', address: '1 Main St, Springfield, MO 65801' }),
     };
     function Harness() {
       const [values, setValues] = useState<Values>({});
@@ -405,8 +406,8 @@ describe('ServiceSection pick fills the address', () => {
     render(<Harness />);
     await userEvent.type(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' }), 'oak');
     await userEvent.click(await screen.findByRole('option', { name: /Oak Funeral Home/ }));
-    expect(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' })).toHaveValue('Oak Funeral Home');
-    expect(screen.getByRole('textbox', { name: /Address/ })).toHaveValue('1 Main St');
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' })).toHaveValue('Oak Funeral Home'));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /Address/ })).toHaveValue('1 Main St, Springfield, MO 65801'));
   });
 
   const pickInto = async (typed: string) => {
@@ -414,14 +415,18 @@ describe('ServiceSection pick fills the address', () => {
     await userEvent.clear(place);
     await userEvent.type(place, typed);
     await userEvent.click(await screen.findByRole('option', { name: /Oak Funeral Home/ }));
+    await waitFor(() => expect(place).toHaveValue('Oak Funeral Home'));
   };
   const addressField = () => screen.getByRole('textbox', { name: /Address/ });
 
   const suggestMock = vi.fn<PlacesClient['suggest']>();
+  const detailsMock = vi.fn<PlacesClient['details']>();
 
   function addressHarness(initial: Values) {
+    detailsMock.mockReset();
+    detailsMock.mockRejectedValue(new Error('no details'));
     suggestMock.mockResolvedValue([{ id: 'a', text: 'Oak Funeral Home, 1 Main St', mainText: 'Oak Funeral Home', secondaryText: '1 Main St' }]);
-    const client: PlacesClient = { suggest: suggestMock, newToken: () => ({}) };
+    const client: PlacesClient = { suggest: suggestMock, newToken: () => ({}), details: detailsMock };
     function Harness() {
       const [values, setValues] = useState<Values>(initial);
       return (
@@ -458,5 +463,21 @@ describe('ServiceSection pick fills the address', () => {
     suggestMock.mockResolvedValue([{ id: 'b', text: 'Oak Funeral Home, 2 Elm St', mainText: 'Oak Funeral Home', secondaryText: '2 Elm St' }]);
     await pickInto('oak h');
     expect(addressField()).toHaveValue('1 Main St West');
+  });
+
+  it('uses the full address from the place details, not the short line', async () => {
+    addressHarness({});
+    suggestMock.mockResolvedValue([{ id: 'a', text: 'Oak Funeral Home, Main St', mainText: 'Oak Funeral Home', secondaryText: 'Main St' }]);
+    detailsMock.mockResolvedValueOnce({ name: 'Oak Funeral Home', address: '1 Main St, Springfield, MO 65801' });
+    await pickInto('oak');
+    expect(detailsMock).toHaveBeenCalledTimes(1);
+    expect(addressField()).toHaveValue('1 Main St, Springfield, MO 65801');
+  });
+
+  it('falls back to the prediction text when the details fail', async () => {
+    addressHarness({});
+    detailsMock.mockRejectedValueOnce(new Error('network'));
+    await pickInto('oak');
+    expect(addressField()).toHaveValue('1 Main St');
   });
 });

@@ -40,6 +40,7 @@
     "placesOne",
     "placesMany",
     "placesNone",
+    "placesSearching",
     "placesAddressFilled"
   ],
   "properties": {
@@ -149,6 +150,9 @@
       "$ref": "#/$defs/text"
     },
     "placesNone": {
+      "$ref": "#/$defs/text"
+    },
+    "placesSearching": {
       "$ref": "#/$defs/text"
     },
     "placesAddressFilled": {
