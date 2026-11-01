@@ -134,7 +134,12 @@ describe('EventFields', () => {
     const onUse = vi.fn();
     setup({ dateSuggestion: { label: 'Same day', onUse }, placeSuggestion: { label: 'Same place', onUse } });
     const day = screen.getByRole('button', { name: 'Reception Same day' });
-    expect(day).toHaveClass('gg-chip', 'min-h-[44px]', 'text-accent-700');
+    // A text link under its field: underlined, no padding of its own, 44px target from the stylesheet.
+    expect(day).toHaveClass('gg-link-button');
+    expect(day).not.toHaveClass('gg-chip');
+    expect(day.className).toBe('gg-link-button');
+    expect(day.parentElement).toHaveClass('gg-field');
+    expect(day.parentElement?.contains(screen.getByLabelText('Date'))).toBe(true);
     await userEvent.click(day);
     expect(onUse).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Date')).toHaveFocus();

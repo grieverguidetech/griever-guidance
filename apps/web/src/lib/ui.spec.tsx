@@ -53,6 +53,22 @@ describe('top buttons (#176)', () => {
     }
   });
 
+  it('ghost buttons are underlined, with accent-700 text at rest and hover and accent-800 when active', () => {
+    expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*text-decoration:\s*underline/);
+    expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*color:\s*var\(--color-accent-700\)/);
+    expect(css).toMatch(/\.gg-btn-ghost:not\(:disabled\):active\s*{[^}]*color:\s*var\(--color-accent-800\)/);
+    expect(css.match(/\.gg-btn-ghost:not\(:disabled\):hover\s*{/g)).toHaveLength(1);
+    expect(css).toMatch(/\.gg-btn-ghost\.gg-btn-ghost-plain[^{]*{[^}]*text-decoration:\s*none/);
+    expect(css).toMatch(/\.gg-check-box\s*{[^}]*border:\s*2px solid var\(--color-neutral-700\)/);
+  });
+
+  it('the link button has no padding and reaches a 44px target without it', () => {
+    expect(css).toMatch(/\.gg-link-button\s*{[^}]*padding:\s*0/);
+    expect(css).toMatch(/\.gg-link-button\s*{[^}]*text-decoration:\s*underline/);
+    expect(css).toMatch(/\.gg-link-button\s*{[^}]*min-height:\s*44px/);
+    expect(css).not.toMatch(/\.gg-link-button::before/);
+  });
+
   it('the shared styles keep them at least 44 by 44 with a border', () => {
     expect(css).toMatch(/\.gg-btn\s*{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*min-width:\s*44px/);

@@ -276,7 +276,7 @@ describe('editor on (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toHaveFocus();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Remove everything from this device' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();

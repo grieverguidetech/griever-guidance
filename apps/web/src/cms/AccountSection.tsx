@@ -8,7 +8,6 @@ import { DateInput, dateToISO, isoToDate, todayISO } from '../lib/DateField';
 import { buildPlansText, downloadPlans } from '../lib/exportPlans';
 import type { PlanPerson } from '../lib/exportPlans';
 import { PhoneReadyList, readyPhoneSections } from './PhoneReady';
-import { SettingsBody } from '../screens/Settings';
 import { useNameForm } from '../screens/Profile';
 
 const copy = screenCopy('account');
@@ -36,9 +35,9 @@ interface ProfileProps {
   email?: string | null;
   /** Opens Clerk's own account screen. Absent when Clerk is not ready, and the button is not shown. */
   onManageSignIn?: () => void;
-  /** The Settings actions (remove a member, remove everything from this device), shown under the account content. */
+  /** The Settings actions (remove a member), shown under the account content. */
   settings?: SettingsProps;
-  /** The people this account can open (the People list). When given, the "Your plans" panel is shown and holds the device removal. */
+  /** The people this account can open (the People list). When given, the "Your plans" panel is shown. */
   plans?: readonly (PlanPerson & Pick<Partial<SectionFields>, 'sectionStatus'>)[];
 }
 
@@ -141,7 +140,7 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
       ) : null}
       {plans ? (
         <>
-          <PlansPanel plans={plans} settings={settings} />
+          <PlansPanel plans={plans} />
         </>
       ) : null}
       <PhonePanel ready={readyPhoneSections(plans ?? [])} />
@@ -171,7 +170,7 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
         </div>
       </section>
       {peopleHelping}
-      {plans && settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
+      {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
       <SupportPanel />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-signout`}>
         <h2 id={`${id}-signout`} className="text-[16px] m-0">
@@ -184,7 +183,6 @@ export function AccountSection({ asksName, senderName, error, peopleHelping, onS
           </button>
         </div>
       </section>
-      {!plans && settings ? <AccountSettingsSection {...settings} /> : null}
     </>
   );
 }
@@ -229,11 +227,10 @@ function SupportPanel() {
 
 interface PlansPanelProps {
   plans: readonly PlanPerson[];
-  settings?: SettingsProps;
 }
 
-/** "Your plans": a text copy kept outside the app, then (below it) the device removal. */
-function PlansPanel({ plans, settings }: PlansPanelProps) {
+/** "Your plans": a text copy kept outside the app. */
+function PlansPanel({ plans }: PlansPanelProps) {
   const id = useId();
   const [status, setStatus] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -266,7 +263,6 @@ function PlansPanel({ plans, settings }: PlansPanelProps) {
       <p role="status" aria-live="polite" className="gg-hint m-0 text-[13px]">
         {status}
       </p>
-      {settings ? <SettingsBody onRemoveEverything={settings.onRemoveEverything} signsOut={settings.signsOut} headingLevel={3} /> : null}
     </section>
   );
 }
@@ -430,16 +426,15 @@ function DetailsForm({ fullName, birthDate, error, onSave }: DetailsFormProps) {
 }
 
 interface SettingsProps {
-  onRemoveEverything: () => Promise<void>;
-  signsOut?: boolean;
   removeMember?: ReactNode;
 }
 
-/** The Settings content (signed out, or accounts off) inside the CMS shell: the same body as the Settings screen. */
-export function AccountSettingsSection({ onRemoveEverything, signsOut, removeMember }: SettingsProps) {
+/** Your account when nobody is signed in, or accounts are off: the remove-a-member section when there is one, then Help and support. */
+export function AccountSettingsSection({ removeMember }: SettingsProps) {
   return (
-    <div className="gg-panel flex flex-col gap-4">
-      <SettingsBody onRemoveEverything={onRemoveEverything} signsOut={signsOut} removeMember={removeMember} />
-    </div>
+    <>
+      {removeMember ? <div className="gg-panel flex flex-col gap-4">{removeMember}</div> : null}
+      <SupportPanel />
+    </>
   );
 }

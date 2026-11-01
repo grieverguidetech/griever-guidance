@@ -43,6 +43,15 @@ describe('MarkReady', () => {
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toBeInTheDocument();
   });
 
+  it('shows a bordered empty box when not ready, and the check inside the box when ready', () => {
+    const { rerender } = render(<MarkReady ready={false} onChange={() => undefined} />);
+    const box = screen.getByTestId('ready-box');
+    expect(box).toHaveClass('gg-check-box');
+    expect(box).toBeEmptyDOMElement();
+    rerender(<MarkReady ready onChange={() => undefined} />);
+    expect(screen.getByTestId('ready-box').querySelector('svg')).not.toBeNull();
+  });
+
   it('shows the hint and ties it to the toggle', () => {
     render(<MarkReady ready={false} onChange={() => undefined} />);
     const hint = screen.getByText('Mark as ready when these details are settled. It is a note for you and anyone helping. You can still change them.');
