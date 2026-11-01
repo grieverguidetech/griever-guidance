@@ -25,7 +25,7 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext }: Props
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
           type="button"
-          className="gg-chip"
+          className="gg-chip gg-chip-outlined"
           aria-pressed={ready}
           aria-describedby={hintId}
           onClick={() => onChange(!ready)}
@@ -33,7 +33,7 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext }: Props
           <span className="gg-check-box" data-testid="ready-box" aria-hidden="true">
             {ready && (
               <Check
-                size={16}
+                size={14}
                 weight="bold"
                 aria-hidden="true"
                 className="motion-safe:transition-transform motion-safe:duration-[var(--dur-2)] motion-safe:ease-[var(--ease-calm)] motion-safe:starting:scale-[0.8]"

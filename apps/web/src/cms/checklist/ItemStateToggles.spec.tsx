@@ -74,13 +74,12 @@ describe('ItemStateToggles', () => {
       return onChange;
     }
 
-    it('puts Done first, the label between, and Doesn\'t apply last, in a named group', () => {
+    it('puts Done first, then the label, with no Doesn\'t apply, in a named group', () => {
       setupRow(null);
       const group = screen.getByRole('group', { name: 'Pick' });
       expect(within(group).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual([
         'Done',
         'Label',
-        "Doesn't apply",
       ]);
     });
 
@@ -90,7 +89,7 @@ describe('ItemStateToggles', () => {
       expect(done).toHaveAttribute('aria-pressed', 'true');
       expect(done.textContent).toBe('');
       expect(done.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-      expect(screen.getByRole('button', { name: "Doesn't apply" })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('button', { name: "Doesn't apply" })).toBeNull();
     });
 
     it('uses a different icon for open and done', () => {
@@ -117,17 +116,39 @@ describe('ItemStateToggles', () => {
       expect(done).toHaveAccessibleDescription('Row label');
     });
 
-    it('is a 44px circle and a chip', () => {
+    it('is a 44px circle', () => {
       setupRow(null);
       expect(screen.getByRole('button', { name: 'Done' })).toHaveClass('size-11', 'rounded-full');
-      expect(screen.getByRole('button', { name: "Doesn't apply" })).toHaveClass('gg-chip');
     });
 
-    it('switches and clears like the detail variant', async () => {
-      const onChange = setupRow('done');
-      await userEvent.click(screen.getByRole('button', { name: "Doesn't apply" }));
-      expect(onChange).toHaveBeenLastCalledWith('not_applicable');
+    it('asks for done when an open row is pressed', async () => {
+      const onChange = setupRow(null);
       await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(onChange).toHaveBeenLastCalledWith('done');
+    });
+
+    it('clears a done row on press', async () => {
+      const onChange = setupRow('done');
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(onChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it('describes a saved not_applicable row as Doesn\'t apply, after the label', () => {
+      render(
+        <ItemStateToggles variant="row" state="not_applicable" onChange={vi.fn()} groupLabel="x" labelId="lbl">
+          <button type="button" id="lbl">
+            Row label
+          </button>
+        </ItemStateToggles>,
+      );
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveAccessibleDescription("Row label Doesn't apply");
+    });
+
+    it('shows a saved "doesn\'t apply" as finished, and press clears it', async () => {
+      const onChange = setupRow('not_applicable');
+      const done = screen.getByRole('button', { name: 'Done' });
+      expect(done).toHaveAttribute('aria-pressed', 'true');
+      await userEvent.click(done);
       expect(onChange).toHaveBeenLastCalledWith(null);
     });
   });

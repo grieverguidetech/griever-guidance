@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Check } from '@phosphor-icons/react/Check';
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
 import { Circle } from '@phosphor-icons/react/Circle';
@@ -18,7 +18,8 @@ interface Props {
   groupLabel: string;
   /**
    * `detail` (default): two full buttons side by side.
-   * `row`: a leading check-circle for Done, `children` (the row label), then a trailing chip.
+   * `row`: a leading check-circle for Done, then `children` (the row label). No not-applicable button here.
+   * A row saved as not_applicable shows as done-like: the circle is checked and pressing it clears the state.
    */
   variant?: 'detail' | 'row';
   /** Row variant: id of the label button. It names the group and describes the Done circle. */
@@ -28,6 +29,7 @@ interface Props {
 
 /** Two toggles that exclude each other. Pressing the pressed one clears it. */
 export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detail', labelId, children }: Props) {
+  const naNoteId = useId();
   const toggle = (next: ChecklistItemState) => {
     if (state === next) {
       onChange(null);
@@ -37,6 +39,7 @@ export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detai
   };
 
   if (variant === 'row') {
+    const finished = state === 'done' || state === 'not_applicable';
     return (
       <div
         role="group"
@@ -47,26 +50,29 @@ export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detai
         <button
           type="button"
           className="gg-chip size-11 shrink-0 rounded-full p-0 aria-pressed:shadow-none"
-          aria-pressed={state === 'done'}
+          aria-pressed={finished}
           aria-label={copy.done}
-          aria-describedby={labelId}
-          onClick={() => toggle('done')}
+          aria-describedby={state === 'not_applicable' ? [labelId, naNoteId].filter(Boolean).join(' ') : labelId}
+          onClick={() => {
+            if (finished) {
+              onChange(null);
+              return;
+            }
+            onChange('done');
+          }}
         >
-          {state === 'done' ? (
+          {finished ? (
             <CheckCircle size={28} weight="fill" aria-hidden="true" className="text-accent-700" />
           ) : (
             <Circle size={28} weight="regular" aria-hidden="true" className="text-neutral-700" />
           )}
         </button>
+        {state === 'not_applicable' && (
+          <span id={naNoteId} className="sr-only">
+            {copy.notApplicable}
+          </span>
+        )}
         {children}
-        <button
-          type="button"
-          className="gg-chip shrink-0"
-          aria-pressed={state === 'not_applicable'}
-          onClick={() => toggle('not_applicable')}
-        >
-          {copy.notApplicable}
-        </button>
       </div>
     );
   }

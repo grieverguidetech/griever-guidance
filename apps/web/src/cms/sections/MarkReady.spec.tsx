@@ -12,6 +12,11 @@ describe('MarkReady', () => {
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('has the outlined chip style', () => {
+    render(<MarkReady ready={false} onChange={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveClass('gg-chip', 'gg-chip-outlined');
+  });
+
   it('is pressed when ready', () => {
     render(<MarkReady ready onChange={() => undefined} />);
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'true');

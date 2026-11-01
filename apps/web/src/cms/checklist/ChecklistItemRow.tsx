@@ -16,8 +16,8 @@ interface Props {
 }
 
 /**
- * One line: a check-circle for Done, the label (opens its guidance), then a small
- * not-applicable chip. A handled row (done or not applicable) shows its label muted.
+ * One line: a check-circle for Done, then the label (opens its guidance). A handled row
+ * (done, or saved earlier as not applicable) shows its label muted and the circle checked.
  * aria-pressed carries the state; the muted colour is only a quiet extra cue.
  */
 export function ChecklistItemRow({ id, state, onOpen, onChange, current, readOnly = false }: Props) {
