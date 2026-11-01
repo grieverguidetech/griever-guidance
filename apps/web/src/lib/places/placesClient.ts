@@ -25,8 +25,10 @@ export interface PlacesClient {
 export type PlacesLoader = () => Promise<PlacesClient | null>;
 
 /**
- * Google place types (Places API New, Table A). A request takes at most 5.
- * Service: where a funeral or memorial can be held. Burial: where a person is buried.
+ * Google place types for includedPrimaryTypes. Only Table A types are valid there (a Table B type such
+ * as place_of_worship makes the whole request fail):
+ * https://developers.google.com/maps/documentation/places/web-service/place-types
+ * A request takes at most 5. Service: where a funeral or memorial can be held. Burial: where a person is buried.
  */
-export const SERVICE_PLACE_TYPES = ['funeral_home', 'church', 'place_of_worship', 'synagogue', 'mosque'] as const;
+export const SERVICE_PLACE_TYPES = ['funeral_home', 'church', 'synagogue', 'mosque', 'hindu_temple'] as const;
 export const BURIAL_PLACE_TYPES = ['cemetery'] as const;

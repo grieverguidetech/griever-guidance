@@ -374,7 +374,7 @@ describe('ServiceSection place suggestions', () => {
     render(<Harness />);
     await userEvent.type(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' }), 'oak');
     await screen.findByRole('listbox');
-    expect(suggest).toHaveBeenLastCalledWith('oak', ['funeral_home', 'church', 'place_of_worship', 'synagogue', 'mosque']);
+    expect(suggest).toHaveBeenLastCalledWith('oak', ['funeral_home', 'church', 'synagogue', 'mosque', 'hindu_temple']);
 
     const cemetery = screen.getByRole('combobox', { name: 'Burial Cemetery' });
     await userEvent.type(cemetery, 'rest');
@@ -383,5 +383,29 @@ describe('ServiceSection place suggestions', () => {
     expect(cemetery).toHaveValue('Rest Hill Cemetery, 5 Oak Rd');
 
     expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toBeInTheDocument();
+  });
+});
+
+describe('ServiceSection pick fills the address', () => {
+  it('puts the name in Place and the address in Address for the funeral service', async () => {
+    const client: PlacesClient = {
+      suggest: vi.fn<PlacesClient['suggest']>().mockResolvedValue([
+        { id: 'a', text: 'Oak Funeral Home, 1 Main St', mainText: 'Oak Funeral Home', secondaryText: '1 Main St' },
+      ]),
+      endSession: vi.fn(),
+    };
+    function Harness() {
+      const [values, setValues] = useState<Values>({});
+      return (
+        <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+          <ServiceSection values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} onReadyChange={vi.fn()} />
+        </PlacesProvider>
+      );
+    }
+    render(<Harness />);
+    await userEvent.type(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' }), 'oak');
+    await userEvent.click(await screen.findByRole('option', { name: /Oak Funeral Home/ }));
+    expect(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' })).toHaveValue('Oak Funeral Home');
+    expect(screen.getByRole('textbox', { name: /Address/ })).toHaveValue('1 Main St');
   });
 });

@@ -186,6 +186,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
           onChange={onChange}
           dateOfPassing={values.dateOfPassing}
           placeTypes={SERVICE_PLACE_TYPES}
+          addressKey="serviceAddress"
           extra={(legendId) => (
             <>
               <GroupText

@@ -7,6 +7,9 @@ afterEach(() => {
   document.head.innerHTML = '';
 });
 
+/** Google's FormattableText: read through toString(). */
+const text = (value: string) => ({ toString: () => value });
+
 describe('loadGooglePlaces', () => {
   beforeEach(() => vi.resetModules());
 
@@ -27,6 +30,29 @@ describe('loadGooglePlaces', () => {
     expect(await pending).toBeNull();
   });
 
+  it('falls back to the whole line when the name and address parts are missing', async () => {
+    vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'test-key');
+    vi.stubGlobal('google', {
+      maps: {
+        importLibrary: async () => ({
+          AutocompleteSessionToken: class {},
+          AutocompleteSuggestion: {
+            fetchAutocompleteSuggestions: async () => ({
+              suggestions: [{ placePrediction: { placeId: 'p2', text: text('Oak, 1 Main St') } }, { placePrediction: { placeId: 'p3' } }],
+            }),
+          },
+        }),
+      },
+    });
+    const { loadGooglePlaces } = await import('./googlePlaces');
+    const pending = loadGooglePlaces();
+    (document.querySelector('script') as HTMLScriptElement).onload?.(new Event('load'));
+    const client = await pending;
+    expect(await client!.suggest('oak', ['cemetery'])).toEqual([
+      { id: 'p2', text: 'Oak, 1 Main St', mainText: 'Oak, 1 Main St', secondaryText: '' },
+    ]);
+  });
+
   it('maps predictions, sends the types and one session token until the session ends', async () => {
     vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'test-key');
     const tokens: object[] = [];
@@ -34,7 +60,7 @@ describe('loadGooglePlaces', () => {
       tokens.push(req.sessionToken);
       return {
         suggestions: [
-          { placePrediction: { placeId: 'p1', text: { text: 'Oak, 1 Main St' }, mainText: { text: 'Oak' }, secondaryText: { text: '1 Main St' } } },
+          { placePrediction: { placeId: 'p1', text: text('Oak, 1 Main St'), mainText: text('Oak'), secondaryText: text('1 Main St') } },
           { placePrediction: null },
         ],
       };
@@ -54,7 +80,7 @@ describe('loadGooglePlaces', () => {
     expect(client).not.toBeNull();
     const found = await client!.suggest('oak', ['cemetery']);
     expect(found).toEqual([{ id: 'p1', text: 'Oak, 1 Main St', mainText: 'Oak', secondaryText: '1 Main St' }]);
-    expect(fetchAutocompleteSuggestions).toHaveBeenCalledWith(expect.objectContaining({ input: 'oak', includedPrimaryTypes: ['cemetery'] }));
+    expect(fetchAutocompleteSuggestions).toHaveBeenCalledWith(expect.objectContaining({ input: 'oak', includedPrimaryTypes: ['cemetery'], region: 'us', language: 'en-US' }));
     await client!.suggest('oakl', ['cemetery']);
     expect(tokens[1]).toBe(tokens[0]);
     client!.endSession();

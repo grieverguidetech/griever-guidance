@@ -45,6 +45,8 @@ interface Props<K extends EventKey> {
   placeSuggestion?: Suggestion;
   /** Google place types to suggest in the place field. Without them it is a plain text input. */
   placeTypes?: readonly string[];
+  /** A separate address field of this event. A picked place then fills Place with its name and this with its address. */
+  addressKey?: EventKey;
   /** The date of passing as typed. A date before it gets a quiet note. */
   dateOfPassing?: string | null;
 }
@@ -99,6 +101,7 @@ export function EventFields<K extends EventKey>({
   dateSuggestion,
   placeSuggestion,
   placeTypes,
+  addressKey,
   dateOfPassing,
 }: Props<K>) {
   const id = useId();
@@ -155,6 +158,13 @@ export function EventFields<K extends EventKey>({
           id={`${id}-place`}
           labelledBy={`${legendId} ${id}-place-label`}
           types={placeTypes}
+          onPick={(pick) => {
+            if (addressKey && pick.secondaryText) {
+              onChange({ [keys.place]: pick.mainText, [addressKey]: pick.secondaryText } as Partial<Record<K, string>>);
+            } else {
+              onChange({ [keys.place]: pick.text } as Partial<Record<K, string>>);
+            }
+          }}
           value={values[keys.place] ?? ''}
           onChange={(v) => onChange({ [keys.place]: v } as Partial<Record<K, string>>)}
         />

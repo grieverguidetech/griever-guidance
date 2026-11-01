@@ -1,12 +1,13 @@
 import type { PlaceSuggestion, PlacesClient, PlacesLoader } from './placesClient';
 
 /** The part of the Maps JavaScript API we use. Typed here so no extra package is needed. */
+/** Google's FormattableText. Read it with toString(); every field is guarded. */
 interface GoogleText {
-  text: string;
+  toString(): string;
 }
 interface GooglePrediction {
   placeId: string;
-  text: GoogleText;
+  text?: GoogleText;
   mainText?: GoogleText;
   secondaryText?: GoogleText;
 }
@@ -17,6 +18,8 @@ interface GooglePlacesLibrary {
       input: string;
       includedPrimaryTypes: string[];
       sessionToken: object;
+      region: string;
+      language: string;
     }): Promise<{ suggestions: { placePrediction: GooglePrediction | null }[] }>;
   };
 }
@@ -40,16 +43,20 @@ function loadScript(key: string): Promise<void> {
   });
 }
 
-function toSuggestion(p: GooglePrediction): PlaceSuggestion {
-  return {
-    id: p.placeId,
-    text: p.text.text,
-    mainText: p.mainText?.text ?? p.text.text,
-    secondaryText: p.secondaryText?.text ?? '',
-  };
+/** Falls back to the single line when the name or address part is missing. */
+function toSuggestion(p: GooglePrediction): PlaceSuggestion | null {
+  const text = p.text?.toString() ?? '';
+  if (!text) {
+    return null;
+  }
+  const main = p.mainText?.toString() ?? '';
+  const secondary = p.secondaryText?.toString() ?? '';
+  return { id: p.placeId, text, mainText: main || text, secondaryText: secondary };
 }
 
 function makeClient(lib: GooglePlacesLibrary): PlacesClient {
+  // One token per typing session, reset after a pick. We make no Place Details call, so Google bills
+  // each session as search-only.
   let token: object | null = null;
   return {
     async suggest(input, types) {
@@ -58,8 +65,13 @@ function makeClient(lib: GooglePlacesLibrary): PlacesClient {
         input,
         includedPrimaryTypes: [...types],
         sessionToken: token,
+        region: 'us',
+        language: 'en-US',
       });
-      return suggestions.flatMap((s) => (s.placePrediction ? [toSuggestion(s.placePrediction)] : []));
+      return suggestions.flatMap((s) => {
+        const one = s.placePrediction ? toSuggestion(s.placePrediction) : null;
+        return one ? [one] : [];
+      });
     },
     endSession() {
       token = null;

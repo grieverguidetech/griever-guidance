@@ -16,6 +16,8 @@ interface Props {
   onChange: (value: string) => void;
   /** Google place types to suggest. Without them the field is a plain text input. */
   types?: readonly string[];
+  /** Takes over a pick, to fill more than this field. Without it a pick sets the value to the whole line. */
+  onPick?: (suggestion: PlaceSuggestion) => void;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * The typed text is always the value. Suggestions only help; with none available, or on any
  * failure, it behaves as a plain input and shows no error.
  */
-export function PlaceInput({ id, labelledBy, value, onChange, types }: Props) {
+export function PlaceInput({ id, labelledBy, value, onChange, types, onPick }: Props) {
   const { enabled, load } = usePlaces();
   const suggesting = enabled && types !== undefined;
   const listId = `${useId()}-list`;
@@ -91,7 +93,11 @@ export function PlaceInput({ id, labelledBy, value, onChange, types }: Props) {
   };
 
   const choose = (option: PlaceSuggestion) => {
-    onChange(option.text);
+    if (onPick) {
+      onPick(option);
+    } else {
+      onChange(option.text);
+    }
     close();
     void load().then((client) => client?.endSession());
   };
