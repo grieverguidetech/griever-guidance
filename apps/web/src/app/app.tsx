@@ -609,8 +609,8 @@ function AppBody({
     trackable: TRACKED_VIEWS.includes(view),
     userId: auth?.userId ?? '',
     signedOut,
-    // Your people has no subject; the most recent person being re-picked there must not add an entry.
-    spot: { view, section: cmsSection, item: cmsItem, personId: view === 'people' ? null : activeId },
+    // Only a section has a subject; the most recent person being re-picked on Your people or the account screens must not add an entry.
+    spot: { view, section: cmsSection, item: cmsItem, personId: view === 'cms' ? activeId : null },
     onRestore: (spot) => {
       // Only what this app could have written; anything else is refused.
       const view = TRACKED_VIEWS.find((candidate) => candidate === spot.view);
@@ -622,8 +622,8 @@ function AppBody({
       // Back never lands in the name prompt, and an error from another screen is not carried over.
       auth?.clearError();
       setAskingName(false);
-      // The person was deleted since: go straight to Your people rather than to a screen with nobody on it.
-      if (spot.personId && !sessions.sessions.some((p) => p.id === spot.personId)) {
+      // The person was deleted since: a section of theirs goes straight to Your people rather than to nobody.
+      if (view === 'cms' && spot.personId && !sessions.sessions.some((p) => p.id === spot.personId)) {
         setCmsItem(null);
         setCmsSection(section);
         setActiveId(null);
@@ -637,8 +637,12 @@ function AppBody({
       setView(view);
       setCmsSection(section);
       setCmsItem(item);
-      setActiveId(spot.personId);
-      return { view, section, item, personId: view === 'people' ? null : spot.personId };
+      // Only a section has a subject; the other screens restore with none, and the whoever is open stays open.
+      const personId = view === 'cms' ? spot.personId : null;
+      if (view === 'cms') {
+        setActiveId(personId);
+      }
+      return { view, section, item, personId };
     },
   });
 

@@ -137,40 +137,61 @@ describe('useNavHistory (#566)', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  describe('Forward from an entry that is not ours (S6)', () => {
-    beforeEach(() => {
+  describe('the walk past the sign-in entries marks each entry it lands on (S8)', () => {
+    function walkOf(replace: ReturnType<typeof vi.spyOn>) {
+      return (replace.mock.calls.at(-1)?.[0] as { ggWalk?: { gen: string; pos: number } }).ggWalk;
+    }
+
+    it('marks unmarked entries -1, -2 in place and keeps going Back, however late the pops arrive', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      const replace = vi.spyOn(window.history, 'replaceState');
+      mount(overview);
+      replace.mockClear();
+      pop(null);
+      expect(walkOf(replace)?.pos).toBe(-1);
+      // A late pop: nothing here depends on how long it took.
       vi.useFakeTimers();
-    });
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it('after the walk stops at the first entry, a pop to an unknown entry goes Forward, not Back', () => {
-      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
-      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
-      mount(overview);
-      pop(null);
-      expect(back).toHaveBeenCalledTimes(1);
-      // back() found nowhere to go: no popstate comes, and the settle timer ends the walk.
       act(() => {
-        vi.advanceTimersByTime(400);
+        vi.advanceTimersByTime(5000);
       });
+      vi.useRealTimers();
       pop(null);
-      expect(forward).toHaveBeenCalledTimes(1);
-      expect(back).toHaveBeenCalledTimes(1);
-    });
-
-    it('while the walk is still landing, a pop to an unknown entry keeps going Back', () => {
-      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
-      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
-      mount(overview);
-      pop(null);
-      pop(null);
+      expect(walkOf(replace)?.pos).toBe(-2);
       expect(back).toHaveBeenCalledTimes(2);
       expect(forward).not.toHaveBeenCalled();
     });
 
-    it('after a pageshow from the back/forward cache, Forward onto an unknown entry does not leave the app', () => {
+    it('a pop to a marked entry lower than where we are goes Back; higher goes Forward until one of ours', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      const replace = vi.spyOn(window.history, 'replaceState');
+      const { onRestore } = mount(overview);
+      const mine = writtenState(replace);
+      const gen = (mine as { ggNav: { gen: string } }).ggNav.gen;
+      const marked = (pos: number) => ({ ggWalk: { gen, pos } });
+      pop(marked(-1));
+      pop(marked(-2));
+      expect(back).toHaveBeenCalledTimes(2);
+      // The user now presses Forward: -1, then our entry.
+      pop(marked(-1));
+      expect(forward).toHaveBeenCalledTimes(1);
+      pop(mine);
+      expect(forward).toHaveBeenCalledTimes(1);
+      expect(onRestore).toHaveBeenCalledWith(overview);
+      expect(back).toHaveBeenCalledTimes(2);
+    });
+
+    it('a walk marker from another sign-in is not trusted: the entry counts as new and goes Back', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      mount(overview);
+      pop({ ggWalk: { gen: 'older', pos: -1 } });
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(forward).not.toHaveBeenCalled();
+    });
+
+    it('after a pageshow from the back/forward cache on one of our entries, a pop to an unknown entry goes Back', () => {
       const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
       const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
       mount(overview);
@@ -178,8 +199,23 @@ describe('useNavHistory (#566)', () => {
         window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
       });
       pop(null);
-      expect(back).not.toHaveBeenCalled();
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(forward).not.toHaveBeenCalled();
+    });
+
+    it('after a pageshow on a marked entry, Forward onto the marked entry above goes Forward, not Back', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      const replace = vi.spyOn(window.history, 'replaceState');
+      mount(overview);
+      const gen = (writtenState(replace) as { ggNav: { gen: string } }).ggNav.gen;
+      window.history.replaceState({ ggWalk: { gen, pos: -2 } }, '');
+      act(() => {
+        window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
+      });
+      pop({ ggWalk: { gen, pos: -1 } });
       expect(forward).toHaveBeenCalledTimes(1);
+      expect(back).not.toHaveBeenCalled();
     });
   });
 

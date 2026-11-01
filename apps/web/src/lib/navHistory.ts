@@ -9,8 +9,8 @@ export interface NavSpot {
 }
 
 const KEY = 'ggNav';
-/** How long an automatic Back may take to land before we decide the walk has stopped (the first entry of the tab). */
-const AUTO_BACK_SETTLE_MS = 300;
+/** Marks an entry below our first one that the walk has been on, with how far below it is. */
+const WALK_KEY = 'ggWalk';
 /** Most automatic extra moves in a row, so an odd history can never loop. */
 const MAX_AUTO_MOVES = 50;
 
@@ -40,6 +40,19 @@ function readSpot(state: unknown, gen: string): NavSpot | null {
     return null;
   }
   return { view, section, item: item ?? null, personId: personId ?? null };
+}
+
+/** How far below our first entry a marked entry is (-1, -2, ...), or null when it is not marked by this sign-in. */
+function readWalkPos(state: unknown, gen: string): number | null {
+  if (typeof state !== 'object' || state === null) {
+    return null;
+  }
+  const raw = (state as Record<string, unknown>)[WALK_KEY];
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const { gen: entryGen, pos } = raw as Record<string, unknown>;
+  return entryGen === gen && typeof pos === 'number' && Number.isInteger(pos) && pos < 0 ? pos : null;
 }
 
 const GEN_KEY = 'gg.navGen.v1';
@@ -95,18 +108,19 @@ interface Options {
 /**
  * Gives in-app moves their own history entries so Back walks through them. The first screen replaces
  * the current entry (the sign-in one). Clerk's hash routing leaves one entry per sign-in step, with no
- * state of ours; when Back lands on such an entry we go Back again, so one press walks past all of
- * them and leaves the app like a site with no sign-in. We never push from here.
+ * state of ours. When Back lands on such an entry from one of ours we go Back again, so one press walks
+ * past all of them and leaves the app like a site with no sign-in. Each entry the walk lands on is marked
+ * in place with how far below our first entry it is; a later pop to a marked entry is a Back when it is
+ * lower than where we were and a Forward when it is higher, so a slow or repeated pop cannot be mistaken
+ * for the other direction. An entry not yet marked can only be met on the first pass, which always comes
+ * from our own entries, so it counts as Back. We never push from here.
  */
 export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onRestore }: Options): void {
   const recorded = useRef<string | null>(null);
   const generation = useRef('');
   const autoMoves = useRef(0);
-  // True while the entry we are on is one of ours.
-  const onOurs = useRef(false);
-  // True from our own back() until it lands (or the settle timer says it has stopped).
-  const autoBackPending = useRef(false);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Where the entry we are on sits below our first entry: 0 on ours, then -1, -2, ...
+  const pos = useRef(0);
   const latest = useRef({ onRestore });
   latest.current = { onRestore };
   const { view, section, item, personId } = spot;
@@ -118,7 +132,7 @@ export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onR
     if (!enabled) {
       recorded.current = null;
       generation.current = '';
-      onOurs.current = false;
+      pos.current = 0;
       return;
     }
     if (generation.current === '') {
@@ -139,7 +153,7 @@ export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onR
       window.history.pushState(state, '');
     }
     recorded.current = key;
-    onOurs.current = true;
+    pos.current = 0;
     autoMoves.current = 0;
   }, [enabled, trackable, view, section, item, personId, userId, signedOut]);
 
@@ -147,43 +161,38 @@ export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onR
     if (!enabled) {
       return;
     }
-    function goBackAgain() {
-      autoBackPending.current = true;
-      clearTimeout(settleTimer.current);
-      // No popstate in time means back() had nowhere to go: the walk has stopped.
-      settleTimer.current = setTimeout(() => {
-        autoBackPending.current = false;
-      }, AUTO_BACK_SETTLE_MS);
-      window.history.back();
-    }
 
     /** An entry that is not a screen of ours: a sign-in step, or one from an earlier sign-in. */
-    function onForeign() {
+    function onForeign(state: unknown) {
       if (autoMoves.current >= MAX_AUTO_MOVES) {
         return;
       }
       autoMoves.current += 1;
-      if (autoBackPending.current || onOurs.current) {
-        // We came from one of ours, or are already walking back: keep going back, past all of them.
-        onOurs.current = false;
-        goBackAgain();
+      const marked = readWalkPos(state, generation.current);
+      if (marked !== null && marked > pos.current) {
+        // Higher than where we were: the user pressed Forward. Keep going, to the next screen of ours.
+        pos.current = marked;
+        window.history.forward();
         return;
       }
-      // The user pressed Forward from an entry that is not ours: keep going forward, to the next screen of ours.
-      window.history.forward();
+      // Lower, or not marked yet (only met on the first pass, which starts on one of ours): Back.
+      const next = marked ?? pos.current - 1;
+      pos.current = next;
+      if (marked === null) {
+        window.history.replaceState({ ...(window.history.state ?? {}), [WALK_KEY]: { gen: generation.current, pos: next } }, '');
+      }
+      window.history.back();
     }
 
     function onPop(event: PopStateEvent) {
-      clearTimeout(settleTimer.current);
       const target = readSpot(event.state, generation.current);
       const shown = target ? latest.current.onRestore(target) : false;
       if (!shown) {
-        onForeign();
+        onForeign(event.state);
         return;
       }
-      autoBackPending.current = false;
       autoMoves.current = 0;
-      onOurs.current = true;
+      pos.current = 0;
       recorded.current = JSON.stringify([shown.view, shown.section, shown.item, shown.personId]);
       if (target && recorded.current !== JSON.stringify([target.view, target.section, target.item, target.personId])) {
         // A fallback was shown: make this entry say so, without touching the entries after it.
@@ -191,18 +200,17 @@ export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onR
       }
     }
 
-    // Back from another page into this one (the back/forward cache): nothing says which entry we are on.
+    // Back from another page into this one (the back/forward cache): the entry we are on tells where we are.
     function onPageShow(event: PageTransitionEvent) {
       if (event.persisted) {
-        onOurs.current = false;
-        autoBackPending.current = false;
+        const state = window.history.state;
+        pos.current = readSpot(state, generation.current) !== null ? 0 : (readWalkPos(state, generation.current) ?? 0);
       }
     }
 
     window.addEventListener('popstate', onPop);
     window.addEventListener('pageshow', onPageShow);
     return () => {
-      clearTimeout(settleTimer.current);
       window.removeEventListener('popstate', onPop);
       window.removeEventListener('pageshow', onPageShow);
     };

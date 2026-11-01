@@ -547,6 +547,24 @@ describe('navigation (#566)', () => {
     push.mockRestore();
   });
 
+  it('Back to Your account after the person was deleted restores Your account, not Your people', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your account' }));
+    await h1('Your account');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: PEOPLE }));
+    await h1(PEOPLE);
+    act(() => {
+      mocks.sessions?.removeSession('s1');
+    });
+    act(() => {
+      window.history.back();
+    });
+    expect(await h1('Your account')).toBeInTheDocument();
+  });
+
   it('Back then Forward on Settings (signed out, flag on) returns to it', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     const user = userEvent.setup();
