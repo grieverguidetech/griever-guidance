@@ -10,6 +10,7 @@
     "phoneButton",
     "intro",
     "obituaryNote",
+    "gatherHeading",
     "done",
     "notApplicable",
     "nowPhase",
@@ -43,6 +44,9 @@
       "$ref": "#/$defs/text"
     },
     "obituaryNote": {
+      "$ref": "#/$defs/text"
+    },
+    "gatherHeading": {
       "$ref": "#/$defs/text"
     },
     "done": {

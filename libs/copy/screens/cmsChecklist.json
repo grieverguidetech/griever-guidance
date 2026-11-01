@@ -5,6 +5,7 @@
   "phoneButton": "What you'll need",
   "intro": "Work through it in order. Not everything applies to every family.",
   "obituaryNote": "Write and publish it after the service date is set, before the service itself.",
+  "gatherHeading": "Gather when you can",
   "done": "Done",
   "notApplicable": "Doesn't apply",
   "nowPhase": "Now: {phase}",
@@ -21,8 +22,8 @@
   "phases": {
     "right-away": "Right away (first 24 to 48 hours)",
     "first-days": "Within the first few days",
-    "obituary": "Obituary",
-    "planning-service": "Planning the service",
+    "obituary": "Obituary checklist",
+    "planning-service": "Planning the service checklist",
     "first-weeks": "Within the first few weeks",
     "first-months": "Within the first few months"
   },

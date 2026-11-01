@@ -1,5 +1,7 @@
+import { screenCopy } from '@griever/copy';
+
 /** Words shared by the sheet and the CMS checklist panel. */
-export const GATHER_HEADING = 'Gather when you can';
+export const GATHER_HEADING = screenCopy('cmsChecklist').gatherHeading;
 export const NO_REMINDER_LINE = "We won't remind you about this list.";
 
 /**
