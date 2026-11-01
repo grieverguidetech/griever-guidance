@@ -374,6 +374,22 @@ without it.
 for listing, written by the client on push. This is what lets the design team add screen keys
 without a backend change.
 
+### 3.4 The profile item (DynamoDB, live)
+
+One `PROFILE` item per account (`pk` = `USER#<id>`, `sk` = `PROFILE`), written by the AWS data function (`libs/data-access`).
+
+| Attribute | Notes |
+|---|---|
+| `userId`, `accountType`, `version`, `createdAt`, `updatedAt` | Set by the server only |
+| `senderName` | The name messages are signed with. Set from `firstName` on every save that sends `firstName`. Members see it (it is the only profile field they see). Mobile and the send flow read this one. |
+| `contactSource` | `import` or `manual` |
+| `firstName`, `lastName` | Optional, up to 100 characters each, one line. Owner only. |
+| `birthDate` | Optional, `yyyy-mm-dd`, 1900 or later, not in the future. Owner only. |
+| `address` | Optional map `{ line1, line2, city, state, zip }`. US shape: state is 2 capital letters, ZIP is 5 or 5+4 digits, `line2` may be empty. Owner only. |
+| `fullName` (legacy) | Items saved before #593 hold one string. It is split on read (last word = last name) and removed the first time `firstName` or `lastName` is saved. Older clients may still send `fullName`; it is split on write. |
+
+`firstName`, `lastName`, `birthDate` and `address` are never in a member view, a log line, an email or a flow.
+
 ---
 
 ## 4. Cursor-based synchronization (no live backend)

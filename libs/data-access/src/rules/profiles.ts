@@ -1,5 +1,5 @@
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
+import { checkAddress, isValidBirthDate, isValidFullName, isValidNamePart, normalizeFullName, normalizeNamePart, splitFullName } from '@griever/shared';
 import type { Caller } from '../caller';
 import type { Clock } from '../clock';
 import {
@@ -12,14 +12,16 @@ import {
 /** Longest sender name, in characters. */
 export const SENDER_NAME_MAX_LENGTH = 100;
 
-const PROFILE_KEYS = new Set(['senderName', 'contactSource', 'fullName', 'birthDate']);
+const PROFILE_KEYS = new Set(['senderName', 'contactSource', 'fullName', 'firstName', 'lastName', 'birthDate', 'address']);
 
 export type ProfileResult =
   | { ok: true; value: Profile }
   | { ok: false; code: 'invalid' };
 
 /**
- * Checks what a user sent to change their profile. Only senderName, contactSource, fullName and birthDate are allowed.
+ * Checks what a user sent to change their profile. Only senderName, contactSource, firstName, lastName, birthDate and address are allowed.
+ * fullName is still accepted from older clients and is split into first and last name.
+ * Sending firstName also sets senderName to it (messages are signed with the first name).
  * Any other key, such as accountType or version, makes the whole input invalid. Null clears a field.
  */
 export function parseProfileFields(input: unknown): ProfileFields | null {
@@ -31,7 +33,7 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     return null;
   }
   const fields: ProfileFields = {};
-  const { senderName, contactSource, fullName, birthDate } = record;
+  const { senderName, contactSource, fullName, firstName, lastName, birthDate, address } = record;
   if (senderName !== undefined) {
     // [...text] counts characters like Postgres does, so one emoji counts as 1, not 2.
     if (
@@ -58,7 +60,30 @@ export function parseProfileFields(input: unknown): ProfileFields | null {
     if (cleaned !== null && !isValidFullName(cleaned)) {
       return null;
     }
-    fields.fullName = cleaned;
+    // An old client: split the one string. firstName and lastName below win if they are sent too.
+    const split = splitFullName(cleaned as string | null);
+    fields.firstName = split.firstName;
+    fields.lastName = split.lastName;
+  }
+  for (const [key, value] of [['firstName', firstName], ['lastName', lastName]] as const) {
+    if (value === undefined) {
+      continue;
+    }
+    const cleaned = normalizeNamePart(value);
+    if (cleaned !== null && !isValidNamePart(cleaned)) {
+      return null;
+    }
+    fields[key] = cleaned as string | null;
+  }
+  if (firstName !== undefined) {
+    fields.senderName = fields.firstName ?? null;
+  }
+  if (address !== undefined) {
+    const checked = checkAddress(address);
+    if (!checked.ok) {
+      return null;
+    }
+    fields.address = checked.address;
   }
   if (birthDate !== undefined) {
     if (birthDate !== null && !isValidBirthDate(birthDate)) {
@@ -80,7 +105,7 @@ export async function getProfile(
 }
 
 /**
- * Creates or updates the caller's own profile. It changes only senderName, contactSource, fullName and birthDate.
+ * Creates or updates the caller's own profile. It changes only senderName, contactSource, firstName, lastName, birthDate and address.
  * accountType, version, userId and createdAt are never taken from the input.
  */
 export async function putProfile(

@@ -15,7 +15,7 @@ const caller = (userId: string) => ({ userId, email: `${userId}@example.test`, e
 
 const profile = (userId: string, accountType: 'owner' | 'member' = 'owner', senderName?: string, version = 1) =>
   // Private fields on every fixture, so a leak into the members list fails the toEqual checks.
-  rawPut(encodeProfile({ userId, accountType, version, senderName, fullName: 'Owner Private', birthDate: '1970-01-01', createdAt: at(-99 * HOUR), updatedAt: at(-99 * HOUR) }));
+  rawPut(encodeProfile({ userId, accountType, version, senderName, firstName: 'Owner', lastName: 'Private', birthDate: '1970-01-01', address: { line1: '1 Private Rd', line2: '', city: 'Hidden', state: 'AR', zip: '72712' }, createdAt: at(-99 * HOUR), updatedAt: at(-99 * HOUR) }));
 
 const join = async (ownerId: string, memberId: string, email: string, createdAt: string, senderName?: string) => {
   await profile(memberId, 'member', senderName);

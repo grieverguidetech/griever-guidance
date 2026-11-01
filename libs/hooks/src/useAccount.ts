@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AccountAuth, AccountAuthStatus } from '@griever/shared';
+import { checkAddress, splitFullName } from '@griever/shared';
+import type { AccountAuth, AccountAuthStatus, Address } from '@griever/shared';
 import { getProfile, updateProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
 import { PROFILE_STORAGE_KEY, identityErrorMessage } from './accountCache.js';
@@ -30,14 +31,16 @@ export interface UseAccountResult {
   clearError: () => void;
   signOut: () => Promise<void>;
   updateSenderName: (name: string) => Promise<boolean>;
-  /** Saves the optional full name and date of birth (null clears one). `invalid` means the server refused a value; no general error is set for it. */
+  /** Saves the optional first name, last name, date of birth and address (null clears one). The server sets senderName from firstName. `invalid` means the server refused a value; no general error is set for it. */
   updateDetails: (details: ProfileDetails) => Promise<ProfileDetailsResult>;
 }
 
 export interface ProfileDetails {
-  fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   /** yyyy-mm-dd */
   birthDate: string | null;
+  address: Address | null;
 }
 
 export type ProfileDetailsResult = { ok: true } | { ok: false; invalid: boolean };
@@ -46,13 +49,16 @@ function isCachedProfile(value: unknown): value is CachedProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
-  const { id, senderName, fullName, birthDate, contactSource, accountType } = value as Record<string, unknown>;
+  const { id, senderName, fullName, firstName, lastName, birthDate, address, contactSource, accountType } = value as Record<string, unknown>;
   return (
     typeof id === 'string' &&
     (senderName === null || typeof senderName === 'string') &&
     // Caches from before these fields existed have neither; that still counts.
     (fullName === undefined || fullName === null || typeof fullName === 'string') &&
+    (firstName === undefined || firstName === null || typeof firstName === 'string') &&
+    (lastName === undefined || lastName === null || typeof lastName === 'string') &&
     (birthDate === undefined || birthDate === null || typeof birthDate === 'string') &&
+    (address === undefined || address === null || checkAddress(address).ok) &&
     (contactSource === null || contactSource === 'import' || contactSource === 'manual') &&
     (accountType === undefined || accountType === 'owner' || accountType === 'member')
   );
@@ -68,17 +74,23 @@ function readCache(storage: SendFlowStorage | undefined): CachedProfile | null {
       return null;
     }
     const parsed: unknown = JSON.parse(raw);
+    if (!isCachedProfile(parsed)) {
+      return null;
+    }
+    // A cache written before first and last name existed holds one fullName; split it the way the server does.
+    const legacyFullName = (parsed as { fullName?: string | null }).fullName;
+    const legacy = parsed.firstName || parsed.lastName ? null : splitFullName(legacyFullName);
     // A cache written before accountType existed reads as an owner.
-    return isCachedProfile(parsed)
-      ? {
-          id: parsed.id,
-          senderName: parsed.senderName,
-          fullName: parsed.fullName ?? null,
-          birthDate: parsed.birthDate ?? null,
-          contactSource: parsed.contactSource,
-          accountType: parsed.accountType ?? 'owner',
-        }
-      : null;
+    return {
+      id: parsed.id,
+      senderName: parsed.senderName,
+      firstName: parsed.firstName ?? legacy?.firstName ?? null,
+      lastName: parsed.lastName ?? legacy?.lastName ?? null,
+      birthDate: parsed.birthDate ?? null,
+      address: parsed.address ?? null,
+      contactSource: parsed.contactSource,
+      accountType: parsed.accountType ?? 'owner',
+    };
   } catch {
     return null;
   }
@@ -118,8 +130,10 @@ function toCached(profile: CachedProfile): CachedProfile {
     id: profile.id,
     senderName: profile.senderName,
     // An older gateway may omit these; never keep undefined.
-    fullName: profile.fullName ?? null,
+    firstName: profile.firstName ?? null,
+    lastName: profile.lastName ?? null,
     birthDate: profile.birthDate ?? null,
+    address: profile.address ?? null,
     contactSource: profile.contactSource,
     // An older gateway may not send accountType yet; never keep undefined.
     accountType: profile.accountType === 'member' ? 'member' : 'owner',

@@ -7,7 +7,7 @@ import type { SendFlowStorage } from './useSendFlow.js';
 const fetchMock = vi.fn();
 
 function profile(senderName: string | null, id = 'u1'): Profile {
-  return { id, senderName, contactSource: null, fullName: null, birthDate: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' };
+  return { id, senderName, contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' };
 }
 
 function reply(status: number, body: unknown = {}): Response {
@@ -85,8 +85,10 @@ describe('useAccount boot', () => {
     expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY] as string)).toEqual({
       id: 'u1',
       senderName: 'Peter',
-      fullName: null,
+      firstName: null,
+      lastName: null,
       birthDate: null,
+      address: null,
       contactSource: null,
       accountType: 'owner',
     });
@@ -445,36 +447,52 @@ describe('useAccount signOut', () => {
 });
 
 describe('useAccount details', () => {
-  const withDetails = { ...profile('Peter'), fullName: 'Peter Tumulty', birthDate: '1980-05-29' };
+  const address = { line1: '12 Oak St', line2: '', city: 'Bentonville', state: 'AR', zip: '72712' };
+  const withDetails = { ...profile('Peter'), firstName: 'Peter', lastName: 'Tumulty', birthDate: '1980-05-29', address };
 
-  it('keeps the full name and birth date in the cache', async () => {
+  it('keeps the names, birth date and address in the cache', async () => {
     fetchMock.mockImplementation(async () => reply(200, withDetails));
     const storage = memoryStorage();
     const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
-    await waitFor(() => expect(result.current.profile?.fullName).toBe('Peter Tumulty'));
-    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY] as string)).toMatchObject({ fullName: 'Peter Tumulty', birthDate: '1980-05-29' });
+    await waitFor(() => expect(result.current.profile?.lastName).toBe('Tumulty'));
+    expect(JSON.parse(storage.data[PROFILE_STORAGE_KEY] as string)).toMatchObject({
+      firstName: 'Peter',
+      lastName: 'Tumulty',
+      birthDate: '1980-05-29',
+      address,
+    });
   });
 
   it('reads an old cache without the fields as null, and an older gateway that omits them as null', async () => {
     const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
     fetchMock.mockImplementation(() => new Promise(() => undefined));
     const old = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
-    expect(old.result.current.profile).toMatchObject({ senderName: 'Peter', fullName: null, birthDate: null });
+    expect(old.result.current.profile).toMatchObject({ senderName: 'Peter', firstName: null, lastName: null, birthDate: null, address: null });
 
-    const { fullName: _f, birthDate: _b, ...omitted } = withDetails;
+    const { firstName: _f, lastName: _l, address: _a, birthDate: _b, ...omitted } = withDetails;
     fetchMock.mockImplementation(async () => reply(200, omitted));
     const fresh = memoryStorage();
     const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage: fresh }));
     await waitFor(() => expect(result.current.profile?.senderName).toBe('Peter'));
-    expect(result.current.profile).toMatchObject({ fullName: null, birthDate: null });
+    expect(result.current.profile).toMatchObject({ firstName: null, lastName: null, birthDate: null, address: null });
+  });
+
+  it('splits a cache written with the old fullName', () => {
+    const oldCache = JSON.stringify({ id: 'u1', senderName: 'Peter', contactSource: null, accountType: 'owner', fullName: 'Peter Tumulty' });
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: oldCache, [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profile).toMatchObject({ firstName: 'Peter', lastName: 'Tumulty' });
   });
 
   it('ignores a cache whose new fields have the wrong type', () => {
-    const bad = JSON.stringify({ id: 'u1', senderName: 'Peter', contactSource: null, accountType: 'owner', fullName: 5 });
-    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: bad, [SIGNED_IN_STORAGE_KEY]: 'u1' });
-    fetchMock.mockImplementation(() => new Promise(() => undefined));
-    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
-    expect(result.current.profile).toBeNull();
+    for (const patch of [{ fullName: 5 }, { firstName: 5 }, { address: { line1: 'x' } }]) {
+      const bad = JSON.stringify({ id: 'u1', senderName: 'Peter', contactSource: null, accountType: 'owner', ...patch });
+      const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: bad, [SIGNED_IN_STORAGE_KEY]: 'u1' });
+      fetchMock.mockImplementation(() => new Promise(() => undefined));
+      const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+      expect(result.current.profile).toBeNull();
+    }
   });
 
   it('saves the details with PUT and updates the profile', async () => {
@@ -482,13 +500,14 @@ describe('useAccount details', () => {
     const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
     await waitFor(() => expect(result.current.profile).not.toBeNull());
     let outcome: unknown;
+    const details = { firstName: 'Peter', lastName: 'Tumulty', birthDate: '1980-05-29', address };
     await act(async () => {
-      outcome = await result.current.updateDetails({ fullName: 'Peter Tumulty', birthDate: '1980-05-29' });
+      outcome = await result.current.updateDetails(details);
     });
     expect(outcome).toEqual({ ok: true });
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
-    expect(JSON.parse(put?.[1].body as string)).toEqual({ fullName: 'Peter Tumulty', birthDate: '1980-05-29' });
-    expect(result.current.profile?.birthDate).toBe('1980-05-29');
+    expect(JSON.parse(put?.[1].body as string)).toEqual(details);
+    expect(result.current.profile).toMatchObject({ birthDate: '1980-05-29', address });
   });
 
   it('reports a server 400 as invalid and sets no general error', async () => {
@@ -497,7 +516,7 @@ describe('useAccount details', () => {
     await waitFor(() => expect(result.current.profile).not.toBeNull());
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.updateDetails({ fullName: 'x', birthDate: null });
+      outcome = await result.current.updateDetails({ firstName: 'x', lastName: null, birthDate: null, address: null });
     });
     expect(outcome).toEqual({ ok: false, invalid: true });
     expect(result.current.error).toBeNull();
@@ -509,7 +528,7 @@ describe('useAccount details', () => {
     await waitFor(() => expect(result.current.profile).not.toBeNull());
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.updateDetails({ fullName: null, birthDate: null });
+      outcome = await result.current.updateDetails({ firstName: null, lastName: null, birthDate: null, address: null });
     });
     expect(outcome).toEqual({ ok: false, invalid: false });
     expect(result.current.error).toBe(UNREACHABLE);

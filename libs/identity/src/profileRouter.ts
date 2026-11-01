@@ -7,11 +7,19 @@ import {
   type ClerkConfig,
   type DataFunctionConfig,
 } from '@griever/gateway-auth';
-import { isValidBirthDate, isValidFullName, normalizeFullName } from '@griever/shared';
-import type { AccountContactSource, AccountType, DataResult, Profile, ProfileUpdate } from '@griever/shared';
+import {
+  checkAddress,
+  isValidBirthDate,
+  isValidFullName,
+  isValidNamePart,
+  normalizeFullName,
+  normalizeNamePart,
+  splitFullName,
+} from '@griever/shared';
+import type { AccountContactSource, Address, AccountType, DataResult, Profile, ProfileUpdate } from '@griever/shared';
 
 const MAX_SENDER_NAME_LENGTH = 100;
-const ALLOWED_KEYS = ['senderName', 'contactSource', 'fullName', 'birthDate'];
+const ALLOWED_KEYS = ['senderName', 'contactSource', 'fullName', 'firstName', 'lastName', 'birthDate', 'address'];
 // A data function failure (busy, unreachable, crashed) is reported as 503: from the user's
 // side the answer is the same, try again later.
 const UNAVAILABLE = 'Your details could not be reached right now. Please try again in a moment.';
@@ -33,20 +41,31 @@ interface StoredProfile {
   userId: string;
   senderName?: string;
   contactSource?: AccountContactSource;
+  /** Only on items saved before first and last name existed. */
   fullName?: string;
+  firstName?: string;
+  lastName?: string;
   birthDate?: string;
+  address?: Address;
   accountType: AccountType;
   createdAt: string;
   updatedAt: string;
 }
 
 function toProfile(stored: StoredProfile): Profile {
+  // An older data function may still send only fullName; split it the same way the new one does.
+  const legacy = splitFullName(stored.firstName || stored.lastName ? null : stored.fullName);
+  const firstName = stored.firstName ?? legacy.firstName;
+  const lastName = stored.lastName ?? legacy.lastName;
   return {
     id: stored.userId,
     senderName: stored.senderName ?? null,
     contactSource: stored.contactSource ?? null,
-    fullName: stored.fullName ?? null,
+    firstName,
+    lastName,
+    fullName: [firstName, lastName].filter(Boolean).join(' ') || null,
     birthDate: stored.birthDate ?? null,
+    address: stored.address ?? null,
     accountType: stored.accountType,
     createdAt: stored.createdAt,
     updatedAt: stored.updatedAt,
@@ -54,15 +73,15 @@ function toProfile(stored: StoredProfile): Profile {
 }
 
 /** Returns the clean fields, or a calm message describing what is wrong (C8). */
-export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { error: string } {
+export function parseProfileBody(body: unknown): { fields: ProfileUpdate & { fullName?: string | null } } | { error: string } {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return { error: 'Send your details as a JSON object.' };
   }
   const input = body as Record<string, unknown>;
   const unknown = Object.keys(input).find((key) => !ALLOWED_KEYS.includes(key));
-  if (unknown) return { error: 'Only your name, full name, date of birth and contact source can be saved.' };
+  if (unknown) return { error: 'Only your name, date of birth, address and contact source can be saved.' };
 
-  const fields: ProfileUpdate = {};
+  const fields: ProfileUpdate & { fullName?: string | null } = {};
   if ('senderName' in input) {
     const name = input['senderName'];
     if (name !== null && (typeof name !== 'string' || [...name].length > MAX_SENDER_NAME_LENGTH)) {
@@ -82,7 +101,25 @@ export function parseProfileBody(body: unknown): { fields: ProfileUpdate } | { e
     if (fullName !== null && !isValidFullName(fullName)) {
       return { error: 'Your full name can be up to 120 characters, on one line, with no tabs.' };
     }
+    // From an older client; the data function splits it into first and last name.
     fields.fullName = fullName;
+  }
+  for (const [key, label] of [['firstName', 'first'], ['lastName', 'last']] as const) {
+    if (!(key in input)) {
+      continue;
+    }
+    const name = normalizeNamePart(input[key]);
+    if (name !== null && !isValidNamePart(name)) {
+      return { error: `Your ${label} name can be up to 100 characters, on one line, with no tabs.` };
+    }
+    fields[key] = name as string | null;
+  }
+  if ('address' in input) {
+    const checked = checkAddress(input['address']);
+    if (!checked.ok) {
+      return { error: 'Please check your address: line 1, city, a 2-letter state and a ZIP code of 5 or 9 digits.' };
+    }
+    fields.address = checked.address;
   }
   if ('birthDate' in input) {
     const birthDate = input['birthDate'];

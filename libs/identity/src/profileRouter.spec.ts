@@ -17,12 +17,16 @@ const STORED = {
   createdAt: '2026-10-11T10:00:00.000Z',
   updatedAt: '2026-10-11T10:00:00.000Z',
 };
+// STORED has only the old fullName, so this also checks it is split on read.
 const PROFILE = {
   id: USER_ID,
   senderName: 'Ada',
   contactSource: 'manual',
+  firstName: 'Ada',
+  lastName: 'King',
   fullName: 'Ada King',
   birthDate: '1980-12-10',
+  address: null,
   accountType: 'owner',
   createdAt: '2026-10-11T10:00:00.000Z',
   updatedAt: '2026-10-11T10:00:00.000Z',
@@ -69,8 +73,16 @@ describe('parseProfileBody', () => {
     expect(parseProfileBody({ fullName: '   ' })).toEqual({ fields: { fullName: null } });
   });
 
+  it('accepts firstName, lastName and address, cleaned', () => {
+    const address = { line1: '1 Main St', line2: '', city: 'Bentonville', state: 'AR', zip: '72712-1234' };
+    expect(parseProfileBody({ firstName: ' Ada ', lastName: '  ', address: { ...address, state: 'ar' } })).toEqual({
+      fields: { firstName: 'Ada', lastName: null, address },
+    });
+    expect(parseProfileBody({ address: null })).toEqual({ fields: { address: null } });
+  });
+
   it('uses a fixed message for unknown keys and does not echo the input', () => {
-    expect(parseProfileBody({ sneaky: 1 })).toEqual({ error: 'Only your name, full name, date of birth and contact source can be saved.' });
+    expect(parseProfileBody({ sneaky: 1 })).toEqual({ error: 'Only your name, date of birth, address and contact source can be saved.' });
   });
 
   it.each([
@@ -84,6 +96,13 @@ describe('parseProfileBody', () => {
     ['fullName not a string', { fullName: 5 }],
     ['fullName with a line break', { fullName: 'Ada\nKing' }],
     ['fullName with a tab', { fullName: 'Ada\tKing' }],
+    ['firstName too long', { firstName: 'x'.repeat(101) }],
+    ['lastName not a string', { lastName: 5 }],
+    ['lastName with a line break', { lastName: 'Ada\nKing' }],
+    ['address missing the city', { address: { line1: '1 Main St', state: 'AR', zip: '72712' } }],
+    ['address with a bad ZIP', { address: { line1: '1 Main St', city: 'B', state: 'AR', zip: '7271' } }],
+    ['address with a long state', { address: { line1: '1 Main St', city: 'B', state: 'Ark', zip: '72712' } }],
+    ['address not an object', { address: 'home' }],
     ['birthDate in the future', { birthDate: '2999-01-01' }],
     ['birthDate before 1900', { birthDate: '1899-12-31' }],
     ['birthDate not a real day', { birthDate: '2001-02-29' }],
@@ -148,8 +167,11 @@ describe('profile router', () => {
       id: USER_ID,
       senderName: null,
       contactSource: null,
+      firstName: null,
+      lastName: null,
       fullName: null,
       birthDate: null,
+      address: null,
       accountType: 'member',
       createdAt: 'a',
       updatedAt: 'b',
@@ -218,6 +240,25 @@ describe('profile router', () => {
     expect(callData).toHaveBeenCalledWith(DATA, token, 'putProfile', {
       fields: { fullName: 'Ada King', birthDate: '1980-12-10' },
     });
+  });
+
+  it('PUT sends firstName, lastName, birthDate and address, and returns them', async () => {
+    const address = { line1: '1 Main St', line2: '', city: 'Bentonville', state: 'AR', zip: '72712' };
+    callData.mockResolvedValue({
+      ok: true,
+      data: { ...STORED, fullName: undefined, firstName: 'Ada', lastName: 'King', address },
+    });
+    const res = await call('PUT', { firstName: 'Ada', lastName: 'King', birthDate: '1980-12-10', address });
+    expect(res.status).toBe(200);
+    expect(callData).toHaveBeenCalledWith(DATA, token, 'putProfile', {
+      fields: { firstName: 'Ada', lastName: 'King', birthDate: '1980-12-10', address },
+    });
+    expect(await res.json()).toEqual({ ...PROFILE, address });
+  });
+
+  it('GET prefers firstName and lastName over a stored fullName', async () => {
+    callData.mockResolvedValue({ ok: true, data: { ...STORED, firstName: 'Grace', lastName: 'Hopper' } });
+    expect(await (await call('GET')).json()).toMatchObject({ firstName: 'Grace', lastName: 'Hopper', fullName: 'Grace Hopper' });
   });
 
   it('PUT maps invalid from the data function to 400', async () => {

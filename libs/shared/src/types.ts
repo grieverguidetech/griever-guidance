@@ -1,4 +1,5 @@
 import type { AccountType } from './members.js';
+import type { Address } from './profileFields.js';
 
 export type SendStatus = 'pending' | 'sent' | 'failed';
 
@@ -158,7 +159,13 @@ export interface Profile {
   id: string;
   senderName: string | null;
   contactSource: AccountContactSource | null;
-  /** Private to the account. Never logged, emailed or shown to members. Max 120 characters. */
+  /** Private to the account. Never logged, emailed or shown to members. Max 100 characters. */
+  firstName: string | null;
+  /** Private to the account, like firstName. */
+  lastName: string | null;
+  /** Private to the account, like firstName. Optional mailing address. */
+  address: Address | null;
+  /** Read-only and deprecated: first and last name joined, for clients older than firstName/lastName. */
   fullName: string | null;
   /** Private to the account, as yyyy-mm-dd. Never logged, emailed or shown to members. */
   birthDate: string | null;
@@ -169,4 +176,4 @@ export interface Profile {
 }
 
 /** What a user may change on their own profile. */
-export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource' | 'fullName' | 'birthDate'>>;
+export type ProfileUpdate = Partial<Pick<Profile, 'senderName' | 'contactSource' | 'firstName' | 'lastName' | 'birthDate' | 'address'>>;
