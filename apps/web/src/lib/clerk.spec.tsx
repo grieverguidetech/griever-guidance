@@ -37,7 +37,7 @@ vi.mock('@griever/api-client', async (importOriginal) => {
   return { ...actual, getProfile: mocks.getProfile };
 });
 
-import { CLERK_GIVE_UP_MS, ClerkAccount, localization, useClerkAuth } from './clerk';
+import { CLERK_GIVE_UP_MS, ClerkAccount, deleteClerkAccount, localization, useClerkAuth } from './clerk';
 
 function setAuth(overrides: Partial<Auth> = {}) {
   mocks.auth = {
@@ -372,5 +372,21 @@ describe('ClerkAccount', () => {
       },
     });
     expect(window.localStorage.getItem('gg.signedIn.v1')).toBe('user_1');
+  });
+});
+
+describe('deleteClerkAccount', () => {
+  it('calls user.delete()', async () => {
+    const del = vi.fn().mockResolvedValue({});
+    await deleteClerkAccount({ delete: del });
+    expect(del).toHaveBeenCalledOnce();
+  });
+
+  it('rejects when Clerk refuses', async () => {
+    await expect(deleteClerkAccount({ delete: () => Promise.reject(new Error('not allowed')) })).rejects.toThrow('not allowed');
+  });
+
+  it('rejects when there is no user', async () => {
+    await expect(deleteClerkAccount(null)).rejects.toThrow();
   });
 });

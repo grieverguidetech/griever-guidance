@@ -212,6 +212,19 @@ export function useClerkAuth(): { auth: AccountAuth; unavailable: boolean } {
   return { auth, unavailable };
 }
 
+/** The part of Clerk's user this app uses to delete the account. */
+export interface DeletableUser {
+  delete: () => Promise<unknown>;
+}
+
+/** Deletes the signed-in Clerk user. Rejects when there is no user or Clerk refuses (offline, deletion not enabled). */
+export async function deleteClerkAccount(user: DeletableUser | null | undefined): Promise<void> {
+  if (!user) {
+    throw new Error('No signed-in user');
+  }
+  await user.delete();
+}
+
 const browserStorage = typeof window !== 'undefined' ? window.localStorage : undefined;
 
 function AccountBridge({ children }: { children: (state: ClerkAccountState) => ReactNode }) {
@@ -225,6 +238,7 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   const openAccountSettings = useCallback(() => {
     instance.openUserProfile();
   }, [instance]);
+  const deleteAccount = useCallback(() => deleteClerkAccount(user), [user]);
   const getAccessToken = useCallback(async () => {
     const result = await getToken();
     return result.ok ? result.token : null;
@@ -232,7 +246,7 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   if (unavailable) {
     return <>{children({ unavailable: true })}</>;
   }
-  return <>{children({ unavailable: false, account, getAccessToken, signOut, email, openAccountSettings: instance.loaded ? openAccountSettings : undefined })}</>;
+  return <>{children({ unavailable: false, account, getAccessToken, signOut, email, openAccountSettings: instance.loaded ? openAccountSettings : undefined, deleteAccount: instance.loaded ? deleteAccount : undefined })}</>;
 }
 
 // The app has no router: when Clerk wants to move the page after sign-in or sign-out, stay put and

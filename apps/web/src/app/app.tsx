@@ -28,6 +28,7 @@ import { SYNC_ENABLED } from '../lib/syncFlag';
 import { AppHeader } from '../cms/AppHeader';
 import { CmsShell } from '../cms/CmsShell';
 import { AccountSection, AccountSettingsSection } from '../cms/AccountSection';
+import { AccountDeleted } from '../cms/AccountDeleted';
 import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
 import { PeopleList } from '../cms/PeopleList';
 import { ChecklistPanel } from '../cms/checklist/ChecklistPanel';
@@ -45,7 +46,7 @@ import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { PeopleHelping } from '../screens/PeopleHelping';
 import { RemoveMember } from '../screens/RemoveMember';
-import { removeEverythingFromDevice } from '../lib/removeFromDevice';
+import { deleteAccountThenClear, removeEverythingFromDevice } from '../lib/removeFromDevice';
 import { AddContactsManual } from '../screens/AddContactsManual';
 import type { ContactDraft } from '../screens/AddContactsManual';
 import { WhoHearsFirst } from '../screens/WhoHearsFirst';
@@ -235,6 +236,9 @@ export function App() {
   // reads the now-empty storage and starts from the first screen.
   const [removals, setRemovals] = useState(0);
   const removed = removals > 0;
+  // The account was deleted: the done screen replaces the whole app.
+  const [deleted, setDeleted] = useState(false);
+  const onDeleted = useCallback(() => setDeleted(true), []);
   // The announcement lives outside the keyed subtree so it is already in the page when its text
   // arrives. It is emptied on removal and filled a moment after the remount, so it is read out.
   const [announcement, setAnnouncement] = useState('');
@@ -259,6 +263,8 @@ export function App() {
           endSession={state.signOut}
           accountEmail={state.email}
           openAccountSettings={state.openAccountSettings}
+          deleteAccount={state.deleteAccount}
+          onDeleted={onDeleted}
           SignInScreen={SignInScreen}
           removed={removed}
           onRemoved={onRemoved}
@@ -266,6 +272,9 @@ export function App() {
       )}
     </AuthGate>
   );
+  if (deleted) {
+    return <AccountDeleted />;
+  }
   return (
     <>
       {removed && (
@@ -325,6 +334,8 @@ function AppBody({
   endSession,
   accountEmail,
   openAccountSettings,
+  deleteAccount,
+  onDeleted,
   SignInScreen,
   offline = false,
   removed = false,
@@ -341,6 +352,9 @@ function AppBody({
   /** The signed-in email and Clerk's own account screen, for Your account. */
   accountEmail?: string | null;
   openAccountSettings?: () => void;
+  /** Deletes the Clerk account; absent when Clerk is not ready. */
+  deleteAccount?: () => Promise<void>;
+  onDeleted?: () => void;
   SignInScreen?: ClerkModules['SignInScreen'];
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
@@ -1085,6 +1099,14 @@ function AppBody({
         error={auth.error}
         email={accountEmail}
         onManageSignIn={openAccountSettings}
+        onDeleteAccount={
+          deleteAccount && onDeleted
+            ? async () => {
+                await deleteAccountThenClear(deleteAccount, window.localStorage);
+                onDeleted();
+              }
+            : undefined
+        }
         plans={sortedSessions}
         peopleHelping={
           sharingOn ? (
