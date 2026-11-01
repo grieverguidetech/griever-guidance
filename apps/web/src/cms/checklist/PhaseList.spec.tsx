@@ -173,11 +173,12 @@ describe('PhaseList', () => {
     // The finished phase is closed, so its group is hidden from the accessibility tree.
     const group = screen.getByRole('group', { name: copy.items.pronouncement, hidden: true });
     expect(
-      within(group).getByRole('button', { name: copy.notApplicable, hidden: true }),
-    ).toHaveAttribute('aria-pressed', 'true');
+      within(group).queryByRole('button', { name: copy.notApplicable, hidden: true }),
+    ).toBeNull();
+    // Shown as finished, like Done.
     expect(
       within(group).getByRole('button', { name: copy.done, hidden: true }),
-    ).toHaveAttribute('aria-pressed', 'false');
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows handled rows with a muted label and an open row with the normal one', () => {
@@ -239,7 +240,7 @@ describe('PhaseList', () => {
     expect(onChange).toHaveBeenCalledWith('pronouncement', 'done');
   });
 
-  it("tabs through Done, label, Doesn't apply", async () => {
+  it("tabs through Done, then the label", async () => {
     render(<PhaseList checklist={{}} onOpen={noop} onChange={noop} />);
     await userEvent.tab();
     expect(
@@ -255,8 +256,6 @@ describe('PhaseList', () => {
     expect(
       screen.getByRole('button', { name: copy.items.pronouncement }),
     ).toHaveFocus();
-    await userEvent.tab();
-    expect(document.activeElement).toHaveTextContent(copy.notApplicable);
   });
 
   it('shows no counts and no delete control', () => {
