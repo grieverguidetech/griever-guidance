@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, View, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { screenCopy } from '@griever/copy';
 import { SerifText as Text, Button } from '@griever/ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/App';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
+
+const checklistCopy = screenCopy('cmsChecklist');
 
 // Which rows are ticked stays on this phone only. Nothing is sent anywhere, and nothing nags.
 export const CHECKLIST_KEY = 'gg.checklist.v1';
@@ -133,7 +136,7 @@ export function WhatYoullNeedScreen() {
         </Text>
       </View>
 
-      <Text style={styles.gatherHeading}>Gather when you can</Text>
+      <Text style={styles.gatherHeading}>{checklistCopy.gatherHeading}</Text>
       <ChecklistRows tipOpen={tipOpen} onTipChange={setTipOpen} />
     </ScrollView>
   );
