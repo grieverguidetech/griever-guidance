@@ -311,6 +311,21 @@ describe('useAccount updateSenderName', () => {
   });
 });
 
+describe('useAccount save rate limit', () => {
+  it('shows its own calm copy on a 429 and keeps the profile', async () => {
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profile).not.toBeNull());
+    fetchMock.mockResolvedValue(reply(429, { error: 'slow down' }));
+    let saved: boolean | undefined;
+    await act(async () => {
+      saved = await result.current.updateSenderName('Pete');
+    });
+    expect(saved).toBe(false);
+    expect(result.current.error).toBe("We couldn't save that just now. Please try again in a minute.");
+    expect(result.current.profile?.senderName).toBe('Peter');
+  });
+});
+
 describe('useAccount stale results', () => {
   it('drops a slow boot profile that finishes after sign-out', async () => {
     let release: (r: Response) => void = () => undefined;

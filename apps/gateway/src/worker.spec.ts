@@ -282,6 +282,39 @@ describe('gateway: /me/profile (Clerk accounts, data function)', () => {
     expect(limit).not.toHaveBeenCalled();
   });
 
+  const FLOW_ID = '33333333-3333-4333-8333-333333333333';
+  it.each([
+    ['POST', '/flows'],
+    ['PATCH', `/flows/${FLOW_ID}`],
+  ])('%s %s answers 429 when limited and does not call the data function', async (method, path) => {
+    const { app, auth, fetchMock } = await setup();
+    const limit = vi.fn(async (_o: { key: string }) => ({ success: false }));
+    const res = await app.request(
+      path,
+      { method, headers: { 'Content-Type': 'application/json', ...auth }, body: '{}' },
+      { WRITE_RATE_LIMITER: { limit } },
+    );
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(limit).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith('/v1'))).toBe(false);
+  });
+
+  it.each([
+    ['POST', '/flows'],
+    ['PATCH', `/flows/${FLOW_ID}`],
+  ])('%s %s counts exactly once per request when under the limit', async (method, path) => {
+    const { app, auth } = await setup();
+    const limit = vi.fn(async (_o: { key: string }) => ({ success: true }));
+    await app.request(
+      path,
+      { method, headers: { 'Content-Type': 'application/json', ...auth }, body: '{}' },
+      { WRITE_RATE_LIMITER: { limit } },
+    );
+    expect(limit).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith({ key: 'user:user_abc123' });
+  });
+
   it('PUT 200 writes and returns the profile', async () => {
     const { app, auth, fetchMock } = await setup();
     const res = await app.request('/me/profile', put(auth, { senderName: 'Ada' }));
