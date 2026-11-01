@@ -345,7 +345,7 @@ describe('editor on, signed in (#395)', () => {
     await waitFor(() => expect(focused11).toHaveFocus());
   });
 
-  it('saving details with a blank Full name sends only the old shape and leaves the sender name alone', async () => {
+  it('saving details for a sender-name-only account sends the prefilled first name, never a blank one', async () => {
     signedInAs('owner');
     mocks.updateProfile.mockResolvedValue({
       ok: true,
@@ -361,11 +361,7 @@ describe('editor on, signed in (#395)', () => {
     await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
     const body = mocks.updateProfile.mock.calls[0]?.[1] as Record<string, unknown>;
-    expect(body).toEqual({ fullName: null, birthDate: null });
-    for (const key of ['firstName', 'lastName', 'address', 'senderName']) {
-      expect(body).not.toHaveProperty(key);
-    }
-    expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
+    expect(body).toEqual({ firstName: 'Anna', lastName: null, birthDate: null, address: null });
   });
 
   it('an account with no name gets the name prompt inside the editor, and saving returns to where they were', async () => {
