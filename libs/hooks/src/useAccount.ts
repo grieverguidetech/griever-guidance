@@ -126,10 +126,6 @@ function toCached(profile: CachedProfile): CachedProfile {
   };
 }
 
-/**
- * Account state over any sign-in provider. Sign-up, sign-in and password reset belong to the
- * provider; this hook only reads who is signed in, keeps the profile, and signs out.
- */
 /** Which message a failed profile call shows. A 429 on a save gets its own copy, not the sign-in one. */
 function profileFailureKey(reason: string): string {
   if (reason === 'signed_out') {
@@ -138,6 +134,10 @@ function profileFailureKey(reason: string): string {
   return reason === 'rate_limited' ? 'profile_rate_limited' : reason;
 }
 
+/**
+ * Account state over any sign-in provider. Sign-up, sign-in and password reset belong to the
+ * provider; this hook only reads who is signed in, keeps the profile, and signs out.
+ */
 export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResult {
   const [offline, setOffline] = useState(false);
   const [profile, setProfile] = useState<CachedProfile | null>(() => readOwnCache(storage));

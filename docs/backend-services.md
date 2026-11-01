@@ -221,7 +221,7 @@ tokenless `POST /invites` gives 401.
 **What it does.** Limits write requests (POST, PUT, PATCH, DELETE) under `/flows*` and `/me*` to
 **120 per 60 seconds per signed-in user**. Reads are not counted. The middleware runs right after
 `clerkAuth`, so the key is the verified Clerk user id (`user:<id>`). If a request somehow has no user,
-the key is the client IP (`ip:<cf-connecting-ip>`). `/members*` and `/invites*` are not covered by this middleware. Only invite creation
+it is not counted (it already got a 401 from `clerkAuth`). `/members*` and `/invites*` are not covered by this middleware. Only invite creation
 has a limit of its own (in the data function). The count is per user, so it is shared across all of that
 user's tabs and devices (web and phone together).
 
