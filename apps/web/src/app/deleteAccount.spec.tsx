@@ -101,7 +101,8 @@ describe('delete account in the app (#575)', () => {
     render(<App />);
     await openConfirm(user);
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your account is deleted' })).toHaveFocus();
+    const focused1 = await screen.findByRole('heading', { level: 1, name: 'Your account is deleted' });
+    await waitFor(() => expect(focused1).toHaveFocus());
     expect(window.localStorage.getItem('gg.sessions.v1')).toBeNull();
     expect(await contactStore.list()).toHaveLength(0);
     expect(screen.queryByText(SIGNED_OUT_NOTE)).not.toBeInTheDocument();

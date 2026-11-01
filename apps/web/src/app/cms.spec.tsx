@@ -160,13 +160,16 @@ describe('editor on (#395)', () => {
     expect(screen.queryByRole('button', { name: /^Next:/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await user.click(screen.getByRole('button', { name: 'Next: Announcement' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Announcement' })).toHaveFocus();
+    const focused1 = await screen.findByRole('heading', { level: 1, name: 'Announcement' });
+    await waitFor(() => expect(focused1).toHaveFocus());
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await user.click(screen.getByRole('button', { name: 'Next: Service' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
+    const focused2 = await screen.findByRole('heading', { level: 1, name: 'Service' });
+    await waitFor(() => expect(focused2).toHaveFocus());
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await user.click(screen.getByRole('button', { name: 'Next: Obituary' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toHaveFocus();
+    const focused3 = await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    await waitFor(() => expect(focused3).toHaveFocus());
   });
 
   it('Service ready leads back: Next: The person focuses The person h1', async () => {
@@ -176,7 +179,8 @@ describe('editor on (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await user.click(screen.getByRole('button', { name: 'Next: The person' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toHaveFocus();
+    const focused4 = await screen.findByRole('heading', { level: 1, name: 'The person' });
+    await waitFor(() => expect(focused4).toHaveFocus());
   });
 
   it('"Change" returns to Home and drops an unnamed person', async () => {
@@ -231,7 +235,8 @@ describe('editor on (#395)', () => {
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
       const nav = within(screen.getByRole('navigation', { name: 'Sections' }));
       await user.click(nav.getByRole('button', { name: new RegExp(`^${name}`) }));
-      expect(await screen.findByRole('heading', { level: 1, name })).toHaveFocus();
+      const focused5 = await screen.findByRole('heading', { level: 1, name });
+      await waitFor(() => expect(focused5).toHaveFocus());
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
       expect(screen.queryByText(/comes later/i)).not.toBeInTheDocument();
     }
@@ -272,25 +277,29 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toHaveFocus();
+    const focused6 = await screen.findByRole('heading', { level: 1, name: 'Service' });
+    await waitFor(() => expect(focused6).toHaveFocus());
     await user.click(screen.getByRole('button', { name: /^Overview/ }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: /^The person Not started .*Continue$/ }),
     );
-    expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toHaveFocus();
+    const focused7 = await screen.findByRole('heading', { level: 1, name: 'The person' });
+    await waitFor(() => expect(focused7).toHaveFocus());
   });
 
   it('"Your account" opens the settings content when nobody is signed in, inside the editor, and the nav returns to the Overview', async () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toHaveFocus();
+    const focused8 = await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await waitFor(() => expect(focused8).toHaveFocus());
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
+    const focused9 = await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await waitFor(() => expect(focused9).toHaveFocus());
   });
 });
 
@@ -321,12 +330,14 @@ describe('editor on, signed in (#395)', () => {
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toHaveFocus();
+    const focused10 = await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    await waitFor(() => expect(focused10).toHaveFocus());
     expect(screen.getByLabelText('Your name')).toHaveValue('Anna');
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Overview/ }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toHaveFocus();
+    const focused11 = await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await waitFor(() => expect(focused11).toHaveFocus());
   });
 
   it('an account with no name gets the name prompt inside the editor, and saving returns to where they were', async () => {
@@ -342,7 +353,8 @@ describe('editor on, signed in (#395)', () => {
     render(<App />);
     // The name check runs on sign-in, so sign in rather than start signed in.
     await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'What should we call you?' })).toBeInTheDocument();
+    const askHeading = await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
+    await waitFor(() => expect(askHeading).toHaveFocus());
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
@@ -369,12 +381,12 @@ describe('editor on, signed in (#395)', () => {
     await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
     await screen.findByRole('heading', { level: 1, name: 'What should we call you?' });
     expectOneEditorLayout();
-    expect(within(screen.getByRole('complementary')).getByText(/Once you start with someone/)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
     await user.type(screen.getByLabelText('Your name'), 'Anna Reyes');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expectOneEditorLayout();
-    expect(within(screen.getByRole('complementary')).getByText(/Once you start with someone/)).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).getByText(/When you open someone on Your people/)).toBeInTheDocument();
   });
 
   it('Your account with a person shows the checklist panel and the nav', async () => {
@@ -387,7 +399,28 @@ describe('editor on, signed in (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Your account' });
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
-    expect(within(screen.getByRole('complementary')).queryByText(/Once you start with someone/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).queryByText(/When you open someone on Your people/)).not.toBeInTheDocument();
+  });
+
+  it('with two people: a panel item on Your account opens that person at the item, and Back returns to Your account', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Thomas Hale', '2026-10-01T00:00:00.000Z'));
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: /^Change/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Your people' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your account' });
+    const panel = within(screen.getByRole('complementary'));
+    const item = panel.getAllByRole('button', { name: /pronouncement/i })[0];
+    await user.click(item);
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1).toHaveTextContent(/pronouncement/i);
+    expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Thomas Hale')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
   });
 
   it('Sign out works from inside the editor', async () => {
