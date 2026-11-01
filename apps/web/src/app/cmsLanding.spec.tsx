@@ -414,7 +414,7 @@ describe('navigation (#566)', () => {
     const user = userEvent.setup();
     render(<App />);
     await h1('Overview');
-    expect(screen.getByRole('banner')).toHaveTextContent('Grievers Guidance');
+    expect(within(screen.getByRole('banner')).getByRole('img', { name: 'Grievers Guidance' })).toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: PEOPLE }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: 'Sections' });
