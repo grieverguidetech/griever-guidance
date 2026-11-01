@@ -660,7 +660,14 @@ function AppBody({
       const view = TRACKED_VIEWS.find((candidate) => candidate === spot.view);
       const section = CMS_SECTIONS.find((candidate) => candidate === spot.section);
       const item = spot.item === null ? null : (Object.keys(cmsItemLabels) as ChecklistItemId[]).find((id) => id === spot.item);
-      if (!view || !section || item === undefined || (view === 'noOne' && section === 'person')) {
+      if (
+        !view ||
+        !section ||
+        item === undefined ||
+        (view === 'noOne' && section === 'person') ||
+        // Someone exists now, so the empty page is gone: refuse it and let Back walk on past it.
+        (view === 'noOne' && sortedSessions.length > 0)
+      ) {
         return false;
       }
       // Back never lands in the name prompt, and an error from another screen is not carried over.

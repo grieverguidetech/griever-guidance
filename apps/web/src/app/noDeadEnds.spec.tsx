@@ -223,6 +223,23 @@ describe('an empty owner account starts from a section (#597)', () => {
     expect(within(screen.getByRole('main')).queryByRole('button', { name: CREATE })).toBeNull();
   });
 
+  it('browser Back after Start leaves the empty page for Your people, with no arrival note', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Your people');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Obituary' }));
+    await h1('Obituary');
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: CREATE }));
+    await waitFor(() => expect(stored()).toHaveLength(1));
+    // Some content makes the new person listable, so the empty page would otherwise be redirected away from.
+    await user.type(await screen.findByLabelText(/city/i), 'Boston');
+    window.history.back();
+    await h1('Your people');
+    expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    expect(screen.queryByText('A person is here now. Their page is open.')).toBeNull();
+  });
+
   it('Overview creates the person and lands on the Overview', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
