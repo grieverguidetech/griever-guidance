@@ -58,11 +58,13 @@ interface Props {
   asideIsEmpty?: boolean;
   /** A loading screen: no nav item is the current page. */
   noCurrent?: boolean;
+  /** Hides the nav's Change button (Your people, where it leads nowhere). */
+  hideChange?: boolean;
   children: ReactNode;
 }
 
 /** Nav left, editor right from `md`; stacked below. The shell owns the page's only h1. */
-export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, peopleView, syncOn, asideIsEmpty = false, noCurrent = false, children }: Props) {
+export function CmsShell({ personName, section, onSelect, onChangePerson, onAccount, notice, statuses, aside, title, peopleView, syncOn, asideIsEmpty = false, noCurrent = false, hideChange = false, children }: Props) {
   const heading = useRef<HTMLElement | null>(null);
   const setHeading = useCallback((node: unknown) => {
     heading.current = node as HTMLElement | null;
@@ -119,7 +121,7 @@ export function CmsShell({ personName, section, onSelect, onChangePerson, onAcco
       <SideNav personName={personName} section={section} onSelect={select} onChangePerson={() => {
           heading.current?.focus();
           onChangePerson();
-        }} statuses={statuses} accountOnly={peopleView} noCurrent={noCurrent} />
+        }} statuses={statuses} accountOnly={peopleView} noCurrent={noCurrent} hideChange={hideChange} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
         {aside ? (
           <div className="flex flex-wrap items-center justify-between gap-2">

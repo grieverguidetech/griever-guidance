@@ -110,13 +110,15 @@ interface Props {
   accountOnly?: boolean;
   /** Nothing is the current page (a loading screen), so no item carries aria-current. */
   noCurrent?: boolean;
+  /** Hides Change, on the screen where it would lead nowhere (Your people). */
+  hideChange?: boolean;
 }
 
 /**
  * Wide screens: always shown. Narrow screens: behind a menu button. The button sits outside the
  * nav landmark so a screen reader does not hear the landmark name twice.
  */
-export function SideNav({ personName, section, onSelect, onChangePerson, statuses, accountOnly = false, noCurrent = false }: Props) {
+export function SideNav({ personName, section, onSelect, onChangePerson, statuses, accountOnly = false, noCurrent = false, hideChange = false }: Props) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -176,16 +178,18 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
       <div id={panelId} className={`${open ? 'flex' : 'hidden'} flex-col gap-3 md:flex`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           {name ? <p className="font-semibold text-[15px] break-words min-w-0 m-0">{name}</p> : null}
-          <Button
-            label={copy.change}
-            accessibilityName={copy.changeLabel}
-            variant="tertiary"
-            onPress={() => {
-              // Close first so focus is never left on a hidden button; the caller then moves it on.
-              setOpen(false);
-              onChangePerson();
-            }}
-          />
+          {hideChange ? null : (
+            <Button
+              label={copy.change}
+              accessibilityName={copy.changeLabel}
+              variant="tertiary"
+              onPress={() => {
+                // Close first so focus is never left on a hidden button; the caller then moves it on.
+                setOpen(false);
+                onChangePerson();
+              }}
+            />
+          )}
         </div>
         <nav aria-label={copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">

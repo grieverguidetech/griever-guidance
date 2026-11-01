@@ -1016,6 +1016,7 @@ function AppBody({
         <CmsShell
           title={cmsShellCopy.peopleTitle}
           peopleView={noPerson}
+          hideChange
           aside={panelFor(person)}
           asideIsEmpty={noPerson}
           personName={person?.personName ?? ''}

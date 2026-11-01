@@ -21,6 +21,14 @@ describe('SideNav', () => {
     expect(names).toEqual(['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
   });
 
+  it('shows Change, and hides it with hideChange', () => {
+    setup();
+    expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument();
+    cleanup();
+    setup({ hideChange: true });
+    expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
+  });
+
   it('makes every section and the two ends a button', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
