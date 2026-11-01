@@ -121,7 +121,7 @@ describe('ItemStateToggles', () => {
       expect(screen.getByRole('button', { name: 'Done' })).toHaveClass('size-11', 'rounded-full');
     });
 
-    it('sets done, then clears it', async () => {
+    it('asks for done when an open row is pressed', async () => {
       const onChange = setupRow(null);
       await userEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(onChange).toHaveBeenLastCalledWith('done');
@@ -131,6 +131,17 @@ describe('ItemStateToggles', () => {
       const onChange = setupRow('done');
       await userEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(onChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it('describes a saved not_applicable row as Doesn\'t apply, after the label', () => {
+      render(
+        <ItemStateToggles variant="row" state="not_applicable" onChange={vi.fn()} groupLabel="x" labelId="lbl">
+          <button type="button" id="lbl">
+            Row label
+          </button>
+        </ItemStateToggles>,
+      );
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveAccessibleDescription("Row label Doesn't apply");
     });
 
     it('shows a saved "doesn\'t apply" as finished, and press clears it', async () => {
