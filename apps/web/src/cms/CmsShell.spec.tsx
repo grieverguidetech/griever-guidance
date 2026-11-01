@@ -19,15 +19,15 @@ function setup(section: CmsNavKey = 'service') {
 }
 
 describe('CmsShell people view', () => {
-  it('has one h1, no section buttons, and "Your account" calls onAccount after focusing the h1', async () => {
+  it('has one h1, only Your people and Your account, and "Your account" calls onAccount after focusing the h1', async () => {
     const onAccount = vi.fn();
     render(
-      <CmsShell title="Your people" peopleView personName="" section="overview" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={onAccount}>
+      <CmsShell title="Your people" peopleView personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={onAccount}>
         <p>List</p>
       </CmsShell>,
     );
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Your account']);
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Your people', 'Your account']);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
     expect(onAccount).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
@@ -61,7 +61,7 @@ describe('CmsShell save line', () => {
 
   it('is absent in the people view', () => {
     render(
-      <CmsShell title="Your people" peopleView personName="" section="overview" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
+      <CmsShell title="Your people" peopleView personName="" section="people" onSelect={vi.fn()} onChangePerson={vi.fn()} onAccount={vi.fn()}>
         <p>List</p>
       </CmsShell>,
     );
@@ -98,15 +98,17 @@ describe('CmsShell', () => {
   });
 
   it('aria-current follows the section', () => {
-    setup('person');
-    expect(screen.getByRole('button', { name: 'The person' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'Service' })).not.toHaveAttribute('aria-current');
+    setup('service');
+    expect(screen.getByRole('button', { name: 'Service' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 
-  it('routes section items to onSelect and the account item to onAccount', async () => {
-    const { onSelect, onAccount } = setup();
-    await userEvent.click(screen.getByRole('button', { name: 'The person' }));
-    expect(onSelect).toHaveBeenCalledWith('person');
+  it('routes section items to onSelect, Your people to onChangePerson and the account item to onAccount', async () => {
+    const { onSelect, onAccount, onChangePerson } = setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(onSelect).toHaveBeenCalledWith('overview');
+    await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
+    expect(onChangePerson).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: 'Your account' }));
     expect(onAccount).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -115,7 +117,7 @@ describe('CmsShell', () => {
   it('moves focus to the h1 after a menu choice on a phone', async () => {
     setup();
     await userEvent.click(screen.getByRole('button', { name: 'Sections · Service' }));
-    await userEvent.click(screen.getByRole('button', { name: 'The person' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Overview' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 

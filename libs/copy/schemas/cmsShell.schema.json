@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": [
     "navOverview",
+    "navPeople",
     "navPerson",
     "navAnnouncement",
     "navService",
@@ -15,7 +16,6 @@
     "menuButton",
     "change",
     "changeLabel",
-    "unnamedPerson",
     "statusNotStarted",
     "statusInProgress",
     "statusReady",
@@ -62,6 +62,9 @@
     "navOverview": {
       "$ref": "#/$defs/text"
     },
+    "navPeople": {
+      "$ref": "#/$defs/text"
+    },
     "navPerson": {
       "$ref": "#/$defs/text"
     },
@@ -90,9 +93,6 @@
       "$ref": "#/$defs/text"
     },
     "changeLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "unnamedPerson": {
       "$ref": "#/$defs/text"
     },
     "statusNotStarted": {

@@ -14,19 +14,19 @@ function setup(props: Partial<Parameters<typeof SideNav>[0]> = {}) {
 }
 
 describe('SideNav', () => {
-  it('lists the 7 items in order inside the Sections nav', () => {
+  it('lists the 7 items in order, with Your people first and no The person link, inside the Sections nav', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     const names = within(nav).getAllByRole('listitem').map((li) => li.textContent);
-    expect(names).toEqual(['Overview', 'The person', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
+    expect(names).toEqual(['Your people', 'Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
   });
 
   it('makes every section and the two ends a button', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Your people',
       'Overview',
-      'The person',
       'Announcement',
       'Service',
       'Obituary',
@@ -36,10 +36,10 @@ describe('SideNav', () => {
   });
 
   it('marks only the current item with aria-current=page', () => {
-    setup({ section: 'person' });
+    setup({ section: 'people' });
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     const current = within(nav).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page');
-    expect(current.map((b) => b.textContent)).toEqual(['The person']);
+    expect(current.map((b) => b.textContent)).toEqual(['Your people']);
   });
 
   it('is 12rem wide from md up, never shrinks, and stays sticky', () => {
@@ -55,9 +55,10 @@ describe('SideNav', () => {
     expect(screen.getByText('Margaret Hale')).toBeInTheDocument();
   });
 
-  it('shows "Not named yet" for a blank name', () => {
+  it('shows no name line for a blank name, and never "Not named yet"', () => {
     setup({ personName: '  ' });
-    expect(screen.getByText('Not named yet')).toBeInTheDocument();
+    expect(screen.queryByText('Not named yet')).toBeNull();
+    expect(screen.queryByText('Margaret Hale')).toBeNull();
   });
 
   it('Change has a name that starts with its visible word and calls onChangePerson', async () => {
@@ -90,8 +91,8 @@ describe('SideNav', () => {
     const { onSelect } = setup();
     const menu = screen.getByRole('button', { name: 'Sections · Service' });
     await userEvent.click(menu);
-    await userEvent.click(screen.getByRole('button', { name: 'The person' }));
-    expect(onSelect).toHaveBeenCalledWith<[CmsNavKey]>('person');
+    await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
+    expect(onSelect).toHaveBeenCalledWith<[CmsNavKey]>('people');
     expect(menu).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -105,16 +106,18 @@ describe('SideNav', () => {
     expect(menu).toHaveFocus();
   });
 
-  it('shows statuses when given, with a missing key as Not started', () => {
-    setup({ statuses: { person: 'ready', service: 'in_progress' } });
+  it('shows a green check for ready, a plain icon for not started, and not those words', () => {
+    setup({ statuses: { announcement: 'ready', service: 'in_progress' } });
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    expect(within(nav).getByText('Ready')).toBeInTheDocument();
+    expect(within(nav).queryByText('Ready')).toBeNull();
+    expect(within(nav).queryByText('Not started')).toBeNull();
     expect(within(nav).getByText('In progress')).toBeInTheDocument();
-    expect(within(nav).getAllByText('Not started')).toHaveLength(3);
-    expect(within(nav).getAllByText('Not started')[0].closest('.gg-meta')).not.toBeNull();
+    const ready = within(nav).getByRole('img', { name: 'Ready' });
+    expect(ready.closest('button')).toHaveTextContent('Announcement');
+    expect(ready.getAttribute('class')).toContain('success');
+    // Obituary and Thank-yous are not started; Overview and the ends carry no status.
+    expect(within(nav).getAllByRole('img', { name: 'Not started' })).toHaveLength(2);
     expect(within(nav).queryByText('Later')).toBeNull();
-    expect(within(nav).getByText('Ready').closest('button')?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
-    expect(within(nav).getByText('In progress').closest('button')?.querySelector('svg')).toBeNull();
   });
 
   it('gives an item its label and status as one name, with a space between', () => {
@@ -129,7 +132,7 @@ describe('SideNav', () => {
     const current = screen.getByRole('button', { name: 'Service' });
     expect(current).toHaveClass('bg-accent-100', 'shadow-[inset_3px_0_0_var(--color-accent-700)]');
     expect(current).not.toHaveClass('font-semibold');
-    expect(screen.getByRole('button', { name: 'The person' })).not.toHaveClass('bg-accent-100');
+    expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveClass('bg-accent-100');
   });
 
   it('puts the current section in the phone menu button', () => {
@@ -140,25 +143,29 @@ describe('SideNav', () => {
   it('is sticky from md up at the shell offset', () => {
     setup();
     const menu = screen.getByRole('button', { name: 'Sections · Service' });
-    expect(menu.parentElement).toHaveClass('md:sticky', 'md:top-[52px]');
+    expect(menu.parentElement).toHaveClass('md:sticky', 'md:top-4');
   });
 
-  it('with accountOnly offers just "Your account": no sections, no name, no Change, no menu button', async () => {
+  it('with accountOnly offers just Your people and Your account: no sections, no name, no Change, no menu button', async () => {
     const { onSelect } = setup({ accountOnly: true });
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your account']);
-    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['Your people', 'Your account']);
+    expect(screen.getAllByRole('button')).toHaveLength(2);
     expect(screen.queryByText('Margaret Hale')).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Your account' }));
     expect(onSelect).toHaveBeenCalledWith('account');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Your people' }));
+    expect(onSelect).toHaveBeenCalledWith('people');
   });
 
-  it('with accountOnly marks "Your account" current only when the account is showing', () => {
-    setup({ accountOnly: true, section: 'overview' });
+  it('with accountOnly marks the current item: Your people or Your account', () => {
+    setup({ accountOnly: true, section: 'people' });
+    expect(screen.getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Your account' })).not.toHaveAttribute('aria-current');
     cleanup();
     setup({ accountOnly: true, section: 'account' });
     expect(screen.getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Your people' })).not.toHaveAttribute('aria-current');
   });
 
   it('holds no hard-coded copy', () => {

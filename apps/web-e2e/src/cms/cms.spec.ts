@@ -27,9 +27,11 @@ async function openSection(page: Page, name: string, heading: string) {
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
-/** With the editor on and nobody saved, loading the app opens The person directly (#448; auth is off in this build). */
+/** With the editor on and nobody saved, loading the app opens Your people (#566); starting a person opens The person. Auth is off in this build. */
 async function startPerson(page: Page) {
   await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+  await page.getByRole('button', { name: "Start with someone I've lost" }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
 }
 
@@ -116,7 +118,9 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   // The name sits in a paragraph above the nav landmark, not inside it.
   await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
 
-  await openSection(page, 'The person', 'The person');
+  // The nav has no The person link: the Overview card opens it.
+  await page.getByRole('main').getByRole('button', { name: /^The person/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
   await expect(page.getByLabel('Their name')).toHaveValue('Margaret Hayes');
 
   await openSection(page, 'Service', 'Service');
@@ -169,5 +173,42 @@ test.describe('no sync while signed out (#520)', () => {
     // Past the sync edit debounce (1 s), so a stray send would have shown up.
     await page.waitForTimeout(1500);
     expect(flowRequests).toEqual([]);
+  });
+});
+
+test.describe('navigation (#566)', () => {
+  test('the header shows the product name, and the side nav has Your people and no The person link or status words', async ({ page }) => {
+    await startPerson(page);
+    await expect(page.getByRole('banner')).toHaveText('Grievers Guidance');
+    await expect(nav(page).getByRole('button', { name: /^The person/ })).toHaveCount(0);
+    await expect(nav(page).getByRole('button', { name: 'Your people' })).toBeVisible();
+    await expect(nav(page).getByText('Not started')).toHaveCount(0);
+    await expect(nav(page).getByText('Ready', { exact: true })).toHaveCount(0);
+    await expect(nav(page).getByText('Not named yet')).toHaveCount(0);
+  });
+
+  test('the side nav stays on Your account after another screen and back, and on Your people', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Your account', 'Your account');
+    await expect(nav(page).getByRole('button', { name: 'Overview' })).toBeVisible();
+    await openSection(page, 'Service', 'Service');
+    await openSection(page, 'Your account', 'Your account');
+    await expect(nav(page).getByRole('button', { name: 'Overview' })).toBeVisible();
+    await openSection(page, 'Your people', 'Your people');
+    await expect(nav(page).getByRole('button', { name: 'Your account' })).toBeVisible();
+    await expect(nav(page).getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('Back walks the editor screens in the order they were opened', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Overview', 'Overview');
+    await openSection(page, 'Service', 'Service');
+    await openSection(page, 'Your account', 'Your account');
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   });
 });

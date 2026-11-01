@@ -8,12 +8,13 @@ import { AVAILABLE_SECTIONS } from './Overview';
 
 const copy = screenCopy('cmsShell');
 
-export type CmsNavKey = 'overview' | SectionKey | 'account';
+export type CmsNavKey = 'people' | 'overview' | SectionKey | 'account';
 
 type CopyKey = keyof typeof copy;
 
 /** The words for each nav item. A new SectionKey fails to compile until it has a row here. */
 const NAV_COPY: Record<CmsNavKey, CopyKey> = {
+  people: 'navPeople',
   overview: 'navOverview',
   person: 'navPerson',
   announcement: 'navAnnouncement',
@@ -27,17 +28,12 @@ function isSectionKey(key: CmsNavKey): key is SectionKey {
   return (SECTION_ORDER as readonly string[]).includes(key);
 }
 
-const STATUS_COPY: Record<SectionStatus | 'not_started', CopyKey> = {
-  not_started: 'statusNotStarted',
-  in_progress: 'statusInProgress',
-  ready: 'statusReady',
-};
-
-/** Decorative; the status text beside it carries the meaning. */
-function CheckIcon() {
+/** The green check for a ready section. It carries the name, since the word is not shown. */
+function CheckIcon({ name }: { name: string }) {
   return (
     <svg
-      aria-hidden="true"
+      role="img"
+      aria-label={name}
       focusable="false"
       width="14"
       height="14"
@@ -54,8 +50,45 @@ function CheckIcon() {
   );
 }
 
-/** The nav order: Overview, the sections in their real-world order, then the account. */
-export const NAV_ORDER: readonly CmsNavKey[] = ['overview', ...SECTION_ORDER, 'account'];
+/** A plain empty circle for a section not started. It carries the name, since the word is not shown. */
+function NotStartedIcon({ name }: { name: string }) {
+  return (
+    <svg
+      role="img"
+      aria-label={name}
+      focusable="false"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="shrink-0 text-[color:var(--text-muted)]"
+    >
+      <circle cx="8" cy="8" r="5.5" />
+    </svg>
+  );
+}
+
+function StatusMark({ status }: { status: SectionStatus | 'not_started' }) {
+  if (status === 'ready') {
+    return <CheckIcon name={copy.statusReady} />;
+  }
+  if (status === 'in_progress') {
+    return <span>{copy.statusInProgress}</span>;
+  }
+  return <NotStartedIcon name={copy.statusNotStarted} />;
+}
+
+/** The nav order: Your people, Overview, the sections in their real-world order (a person's details are reached from Your people), then the account. */
+export const NAV_ORDER: readonly CmsNavKey[] = [
+  'people',
+  'overview',
+  ...SECTION_ORDER.filter((key) => key !== 'person'),
+  'account',
+];
+
+const SHORT_NAV: readonly CmsNavKey[] = ['people', 'account'];
 
 export function navTitle(key: CmsNavKey): string {
   return copy[NAV_COPY[key]];
@@ -68,7 +101,7 @@ interface Props {
   onChangePerson: () => void;
   /** When given, each section shows its status; a missing key reads as not started. */
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
-  /** The people list: no person is the subject, so only the account item is offered. */
+  /** No person is open: only Your people and the account are offered. */
   accountOnly?: boolean;
 }
 
@@ -99,16 +132,21 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
       <div className="flex flex-col gap-2 md:w-48 md:shrink-0">
         <nav aria-label={copy.navLandmark}>
           <ul className="flex flex-col gap-1 list-none p-0 m-0">
-            <li>
-              <button
-                type="button"
-                className={`gg-row ${section === 'account' ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`}
-                aria-current={section === 'account' ? 'page' : undefined}
-                onClick={() => onSelect('account')}
-              >
-                <span>{navTitle('account')}</span>
-              </button>
-            </li>
+            {SHORT_NAV.map((key) => {
+              const current = key === section;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    className={`gg-row ${current ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`}
+                    aria-current={current ? 'page' : undefined}
+                    onClick={() => onSelect(key)}
+                  >
+                    <span>{navTitle(key)}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
       </div>
@@ -116,7 +154,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
   }
 
   return (
-    <div className="flex flex-col gap-2 md:w-48 md:shrink-0 md:sticky md:top-[52px]" onKeyDown={onKeyDown}>
+    <div className="flex flex-col gap-2 md:w-48 md:shrink-0 md:sticky md:top-4" onKeyDown={onKeyDown}>
       {/* A raw button, not the libs/ui Button: it needs a ref (Escape returns focus here) and aria-expanded / aria-controls, which Button does not take. */}
       <button
         ref={menuButton}
@@ -130,7 +168,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
       </button>
       <div id={panelId} className={`${open ? 'flex' : 'hidden'} flex-col gap-3 md:flex`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-semibold text-[15px] break-words min-w-0 m-0">{name || copy.unnamedPerson}</p>
+          {name ? <p className="font-semibold text-[15px] break-words min-w-0 m-0">{name}</p> : null}
           <Button
             label={copy.change}
             accessibilityName={copy.changeLabel}
@@ -176,8 +214,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                       <>
                         {' '}
                         <span className="gg-meta gg-row-trail flex items-center gap-1">
-                          {statuses[key] === 'ready' ? <CheckIcon /> : null}
-                          <span>{copy[STATUS_COPY[statuses[key] ?? 'not_started']]}</span>
+                          <StatusMark status={statuses[key] ?? 'not_started'} />
                         </span>
                       </>
                     ) : null}

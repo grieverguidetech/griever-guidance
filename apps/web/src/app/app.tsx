@@ -24,6 +24,7 @@ import { screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { SYNC_ENABLED } from '../lib/syncFlag';
+import { AppHeader } from '../cms/AppHeader';
 import { CmsShell } from '../cms/CmsShell';
 import { AccountSection, AccountSettingsSection } from '../cms/AccountSection';
 import { AVAILABLE_SECTIONS, Overview } from '../cms/Overview';
@@ -36,6 +37,7 @@ import { AnnouncementSection } from '../cms/sections/AnnouncementSection';
 import { ObituarySection } from '../cms/sections/ObituarySection';
 import { ThanksSection } from '../cms/sections/ThanksSection';
 import type { CmsNavKey } from '../cms/SideNav';
+import { useNavHistory } from '../lib/navHistory';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { Profile } from '../screens/Profile';
@@ -77,8 +79,6 @@ type AppView =
 /** The editor's sections; the account is a separate view, so it is never a section. */
 type CmsSection = Exclude<CmsNavKey, 'account'>;
 
-/** How long a landing waits for the profile (to tell a member from an owner) before giving up. */
-const LANDING_PROFILE_WAIT_MS = 3000;
 const cmsShellCopy = screenCopy('cmsShell');
 const accountCopy = screenCopy('account');
 const cmsItemLabels = screenCopy('cmsChecklist').items;
@@ -125,6 +125,7 @@ function Shell({
   return (
     <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
       <div className={wide ? 'w-full px-5 md:px-8 pb-8' : 'w-full max-w-[420px] px-5 py-8'}>
+        {wide ? <AppHeader /> : null}
         {notice}
         {children}
       </div>
@@ -304,6 +305,9 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
 
 /** Views that need a person to be open; with nobody open Home is shown instead. */
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary', 'cms'];
+
+/** The screens Back walks through. */
+const TRACKED_VIEWS: AppView[] = ['cms', 'people', 'profile', 'settings'];
 
 function isAccountView(view: AppView): boolean {
   return view === 'signIn';
@@ -592,6 +596,20 @@ function AppBody({
     if (!active && NEEDS_PERSON.includes(view)) setView(CMS_ENABLED ? 'people' : 'home');
   }, [active, view]);
 
+  // Back walks the editor's screens and never returns to the sign-in (#566).
+  useNavHistory({
+    // With no sign-in at all (auth off) Back walks the screens too; it only stays off while signed out.
+    enabled: CMS_ENABLED && (signedIn || auth === null),
+    trackable: TRACKED_VIEWS.includes(view),
+    spot: { view, section: cmsSection, item: cmsItem, personId: activeId },
+    onRestore: (spot) => {
+      setView(spot.view as AppView);
+      setCmsSection(spot.section as CmsSection);
+      setCmsItem(spot.item as ChecklistItemId | null);
+      setActiveId(spot.personId && sessions.sessions.some((p) => p.id === spot.personId) ? spot.personId : null);
+    },
+  });
+
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
     (d: SendFlowDraft) => {
@@ -832,54 +850,30 @@ function AppBody({
   }
 
   // Editor on: the first time the app reaches Home after load or sign-in, open the most recent person's
-  // Overview, or The person for a new one. The ref makes it once per sign-in, so "Change" and Back from
-  // Settings or Profile stay on Home. A known member with nobody shared yet (C11) stays on Home.
+  // Overview, or "Your people" when nobody is saved. The ref makes it once per sign-in, so "Change" and Back
+  // from Settings or Profile stay put. Starting a person is always the user's choice, on Your people.
   // Where Your account was opened from (flag on): Back returns there.
   const accountFrom = useRef<'cms' | 'people'>('cms');
   const landed = useRef(false);
   // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
   // is a real move to a new screen, so it asks for the h1 itself.
   const focusAfterLanding = useRef(false);
-  // The latest openPerson and startNewSession (re-made each render), so the effect below needn't list them.
-  const opens = useRef({ openPerson, startNewSession });
-  opens.current = { openPerson, startNewSession };
-  const profileKnown = !sharingOn || !!auth?.profile;
+  // The latest openPerson (re-made each render), so the effect below needn't list it.
+  const opens = useRef({ openPerson });
+  opens.current = { openPerson };
   useEffect(() => {
     if (signedOut) landed.current = false;
     if (!CMS_ENABLED || landed.current || !isSignedIn || auth?.isLoading || view !== 'home') {
       return;
     }
+    landed.current = true;
+    focusAfterLanding.current = true;
     if (sortedSessions.length > 0) {
-      landed.current = true;
-      focusAfterLanding.current = true;
       opens.current.openPerson(sortedSessions[0].id);
       return;
     }
-    // A member is only known once the profile has loaded; until then Home stays and we ask again.
-    if (!profileKnown) {
-      return;
-    }
-    landed.current = true;
-    focusAfterLanding.current = true;
-    if (canCreate) {
-      opens.current.startNewSession();
-    } else {
-      setView('people');
-    }
-  }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, profileKnown, canCreate]);
-
-  // No profile after a while (the call failed or is slow): give up landing for this sign-in rather
-  // than jump someone later who has already started using Home.
-  useEffect(() => {
-    const waiting = CMS_ENABLED && !landed.current && isSignedIn && !auth?.isLoading && view === 'home' && !profileKnown;
-    if (!waiting) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      landed.current = true;
-    }, LANDING_PROFILE_WAIT_MS);
-    return () => clearTimeout(timer);
-  }, [isSignedIn, auth?.isLoading, view, profileKnown]);
+    setView('people');
+  }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions]);
 
   // Armed by the landing. Fires once on the first editor render, then disarms (even with no h1). If the
   // landing is interrupted (another screen shows first), it disarms so it can't fire on a later visit.
@@ -907,8 +901,8 @@ function AppBody({
           title={cmsShellCopy.peopleTitle}
           peopleView
           personName=""
-          section="overview"
-          // Only the account item is offered here, and it goes to onAccount.
+          section="people"
+          // Here the nav offers Your people (already here) and the account, which goes to onAccount.
           onSelect={() => undefined}
           onChangePerson={() => undefined}
           onAccount={() => {

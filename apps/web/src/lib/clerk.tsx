@@ -236,9 +236,10 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
 }
 
 // The app has no router: when Clerk wants to move the page after sign-in or sign-out, stay put and
-// drop any leftover sign-in hash. The app reacts to the session itself.
+// drop any leftover sign-in hash. The app reacts to the session itself. Replace, never push, so Back
+// cannot return to a sign-in step; the entry's state is kept because the app records its own there.
 function stayHere(): void {
-  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
 }
 
 /**
