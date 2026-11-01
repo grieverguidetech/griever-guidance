@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
+import { PlacesProvider } from '../../lib/places/PlacesContext';
+import type { PlacesClient } from '../../lib/places/placesClient';
 import { ServiceSection, type ServicePatch } from './ServiceSection';
 
 type Values = Parameters<typeof ServiceSection>[0]['values'];
@@ -352,5 +354,109 @@ describe('ServiceSection', () => {
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'ServiceSection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsService')).toEqual([]);
+  });
+});
+
+describe('ServiceSection place suggestions', () => {
+  it('suggests worship places for the service, cemeteries for burial, and nothing for the visitation', async () => {
+    const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue([
+      { id: 'x', text: 'Rest Hill Cemetery, 5 Oak Rd', mainText: 'Rest Hill Cemetery', secondaryText: '5 Oak Rd' },
+    ]);
+    const client: PlacesClient = { suggest, newToken: () => ({}) };
+    function Harness() {
+      const [values, setValues] = useState<Values>({ visitationDate: 'May 1', burialDate: 'May 2' });
+      return (
+        <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+          <ServiceSection values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} onReadyChange={vi.fn()} />
+        </PlacesProvider>
+      );
+    }
+    render(<Harness />);
+    await userEvent.type(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' }), 'oak');
+    await screen.findByRole('listbox');
+    expect(suggest).toHaveBeenLastCalledWith('oak', ['funeral_home', 'church', 'synagogue', 'mosque', 'hindu_temple'], expect.any(Object));
+
+    const cemetery = screen.getByRole('combobox', { name: 'Burial Cemetery' });
+    await userEvent.type(cemetery, 'rest');
+    await userEvent.click(await screen.findByRole('option', { name: /Rest Hill Cemetery/ }));
+    expect(suggest).toHaveBeenLastCalledWith('rest', ['cemetery'], expect.any(Object));
+    expect(cemetery).toHaveValue('Rest Hill Cemetery, 5 Oak Rd');
+
+    expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toBeInTheDocument();
+  });
+});
+
+describe('ServiceSection pick fills the address', () => {
+  it('puts the name in Place and the address in Address for the funeral service', async () => {
+    const client: PlacesClient = {
+      suggest: vi.fn<PlacesClient['suggest']>().mockResolvedValue([
+        { id: 'a', text: 'Oak Funeral Home, 1 Main St', mainText: 'Oak Funeral Home', secondaryText: '1 Main St' },
+      ]),
+      newToken: () => ({}),
+    };
+    function Harness() {
+      const [values, setValues] = useState<Values>({});
+      return (
+        <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+          <ServiceSection values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} onReadyChange={vi.fn()} />
+        </PlacesProvider>
+      );
+    }
+    render(<Harness />);
+    await userEvent.type(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' }), 'oak');
+    await userEvent.click(await screen.findByRole('option', { name: /Oak Funeral Home/ }));
+    expect(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' })).toHaveValue('Oak Funeral Home');
+    expect(screen.getByRole('textbox', { name: /Address/ })).toHaveValue('1 Main St');
+  });
+
+  const pickInto = async (typed: string) => {
+    const place = screen.getByRole('combobox', { name: 'Funeral or memorial service Place' });
+    await userEvent.clear(place);
+    await userEvent.type(place, typed);
+    await userEvent.click(await screen.findByRole('option', { name: /Oak Funeral Home/ }));
+  };
+  const addressField = () => screen.getByRole('textbox', { name: /Address/ });
+
+  const suggestMock = vi.fn<PlacesClient['suggest']>();
+
+  function addressHarness(initial: Values) {
+    suggestMock.mockResolvedValue([{ id: 'a', text: 'Oak Funeral Home, 1 Main St', mainText: 'Oak Funeral Home', secondaryText: '1 Main St' }]);
+    const client: PlacesClient = { suggest: suggestMock, newToken: () => ({}) };
+    function Harness() {
+      const [values, setValues] = useState<Values>(initial);
+      return (
+        <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+          <ServiceSection values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} onReadyChange={vi.fn()} />
+        </PlacesProvider>
+      );
+    }
+    render(<Harness />);
+  }
+
+  it('keeps an address the family typed', async () => {
+    addressHarness({});
+    await userEvent.type(addressField(), '9 My Road');
+    await pickInto('oak');
+    expect(addressField()).toHaveValue('9 My Road');
+    expect(screen.getByRole('combobox', { name: 'Funeral or memorial service Place' })).toHaveValue('Oak Funeral Home');
+  });
+
+  it('replaces the address an earlier pick filled, and says so in the status', async () => {
+    addressHarness({});
+    await pickInto('oak');
+    expect(addressField()).toHaveValue('1 Main St');
+    expect(screen.getAllByRole('status').some((n) => n.textContent === 'Address filled in')).toBe(true);
+    suggestMock.mockResolvedValue([{ id: 'b', text: 'Oak Funeral Home, 2 Elm St', mainText: 'Oak Funeral Home', secondaryText: '2 Elm St' }]);
+    await pickInto('oak h');
+    expect(addressField()).toHaveValue('2 Elm St');
+  });
+
+  it('does not replace an address edited after a pick', async () => {
+    addressHarness({});
+    await pickInto('oak');
+    await userEvent.type(addressField(), ' West');
+    suggestMock.mockResolvedValue([{ id: 'b', text: 'Oak Funeral Home, 2 Elm St', mainText: 'Oak Funeral Home', secondaryText: '2 Elm St' }]);
+    await pickInto('oak h');
+    expect(addressField()).toHaveValue('1 Main St West');
   });
 });

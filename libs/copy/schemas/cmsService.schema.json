@@ -35,7 +35,12 @@
     "sameDay",
     "samePlace",
     "dateUnreadable",
-    "beforePassing"
+    "beforePassing",
+    "placesListLabel",
+    "placesOne",
+    "placesMany",
+    "placesNone",
+    "placesAddressFilled"
   ],
   "properties": {
     "typeLabel": {
@@ -132,6 +137,21 @@
       "$ref": "#/$defs/text"
     },
     "beforePassing": {
+      "$ref": "#/$defs/text"
+    },
+    "placesListLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "placesOne": {
+      "$ref": "#/$defs/text"
+    },
+    "placesMany": {
+      "$ref": "#/$defs/text"
+    },
+    "placesNone": {
+      "$ref": "#/$defs/text"
+    },
+    "placesAddressFilled": {
       "$ref": "#/$defs/text"
     }
   },

@@ -1,8 +1,9 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
 import { DateInput } from '../../lib/DateField';
 import { TimeInput } from '../../lib/TimeField';
+import { PlaceInput } from '../../lib/places/PlaceInput';
 
 /** Only real text keys of the session, so a typo in `keys` fails to compile. */
 export type EventKey = {
@@ -42,6 +43,10 @@ interface Props<K extends EventKey> {
   dateSuggestion?: Suggestion;
   /** The same for an empty place. */
   placeSuggestion?: Suggestion;
+  /** Google place types to suggest in the place field. Without them it is a plain text input. */
+  placeTypes?: readonly string[];
+  /** A separate address field of this event. A picked place then fills Place with its name and this with its address. */
+  addressKey?: EventKey;
   /** The date of passing as typed. A date before it gets a quiet note. */
   dateOfPassing?: string | null;
 }
@@ -95,9 +100,13 @@ export function EventFields<K extends EventKey>({
   hideFields = false,
   dateSuggestion,
   placeSuggestion,
+  placeTypes,
+  addressKey,
   dateOfPassing,
 }: Props<K>) {
   const id = useId();
+  // The address the last pick wrote, so a later pick may replace it but never a typed one.
+  const pickedAddress = useRef<string | null>(null);
   const kind = dateNote(values[keys.date], { field: 'event', dateOfPassing });
   const note = kind === 'beforePassing' ? copy.beforePassing : undefined;
   const noteOnBlur = kind === 'unreadable' ? copy.dateUnreadable : undefined;
@@ -147,14 +156,27 @@ export function EventFields<K extends EventKey>({
         <label id={`${id}-place-label`} htmlFor={`${id}-place`}>
           {placeLabel}
         </label>
-        <input
+        <PlaceInput
           id={`${id}-place`}
-          aria-labelledby={`${legendId} ${id}-place-label`}
-          type="text"
-          className="gg-input"
-          autoComplete="off"
+          labelledBy={`${legendId} ${id}-place-label`}
+          types={placeTypes}
+          onPick={(pick) => {
+            if (!addressKey || !pick.secondaryText) {
+              onChange({ [keys.place]: pick.text } as Partial<Record<K, string>>);
+              return false;
+            }
+            const current = (values as Partial<Record<string, string>>)[addressKey] ?? '';
+            const mayFill = current === '' || current === pickedAddress.current;
+            if (!mayFill) {
+              onChange({ [keys.place]: pick.mainText } as Partial<Record<K, string>>);
+              return false;
+            }
+            pickedAddress.current = pick.secondaryText;
+            onChange({ [keys.place]: pick.mainText, [addressKey]: pick.secondaryText } as Partial<Record<K, string>>);
+            return true;
+          }}
           value={values[keys.place] ?? ''}
-          onChange={(e) => onChange({ [keys.place]: e.target.value } as Partial<Record<K, string>>)}
+          onChange={(v) => onChange({ [keys.place]: v } as Partial<Record<K, string>>)}
         />
         {placeSuggestion && !values[keys.place] && (
           <SuggestionButton
