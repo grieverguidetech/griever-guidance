@@ -90,6 +90,11 @@ export const NAV_ORDER: readonly CmsNavKey[] = [
 
 const SHORT_NAV: readonly CmsNavKey[] = ['people', 'account'];
 
+/** The nav item that stands for a screen. A person's details have no item of their own: they belong to Your people. */
+function navKeyFor(section: CmsNavKey): CmsNavKey {
+  return section === 'person' ? 'people' : section;
+}
+
 export function navTitle(key: CmsNavKey): string {
   return copy[NAV_COPY[key]];
 }
@@ -164,7 +169,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        {fill(copy.menuButton, { section: navTitle(section) })}
+        {fill(copy.menuButton, { section: navTitle(navKeyFor(section)) })}
       </button>
       <div id={panelId} className={`${open ? 'flex' : 'hidden'} flex-col gap-3 md:flex`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -200,7 +205,7 @@ export function SideNav({ personName, section, onSelect, onChangePerson, statuse
                   </li>
                 );
               }
-              const current = key === section;
+              const current = key === navKeyFor(section);
               return (
                 <li key={key}>
                   <button

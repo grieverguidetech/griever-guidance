@@ -273,6 +273,19 @@ describe('useFlowSync sending', () => {
     await advance(EDIT_DEBOUNCE_MS + PULL);
     expect(requests).toEqual([]);
   });
+
+  it('reports pulled only after the first pull is applied, never when disabled (#566)', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const off = setup([session()], { enabled: false });
+    await advance(10);
+    expect(off.result.current.pulled).toBe(false);
+    off.unmount();
+    const on = setup([session()]);
+    expect(on.result.current.pulled).toBe(false);
+    await advance(10);
+    expect(requests.length).toBeGreaterThan(0);
+    expect(on.result.current.pulled).toBe(true);
+  });
 });
 
 

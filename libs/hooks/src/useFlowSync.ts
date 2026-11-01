@@ -43,6 +43,8 @@ export interface UseFlowSyncOptions {
 /** For tests only. Nothing in the UI reads it (C5: no visible sync state). */
 export interface UseFlowSyncResult {
   lastError: FlowsFailureReason | null;
+  /** True once the first pull of this sign-in has been applied. The editor's landing waits for it, briefly. */
+  pulled: boolean;
 }
 
 export const FLOW_QUEUE_STORAGE_KEY = 'gg.flowQueue.v1';
@@ -253,6 +255,7 @@ const offline = { ok: false, reason: 'offline' } as const;
  */
 export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
   const [lastError, setLastError] = useState<FlowsFailureReason | null>(null);
+  const [pulledFor, setPulledFor] = useState<string | null>(null);
   const latest = useRef(options);
   latest.current = options;
   const stateRef = useRef<SyncState | null>(null);
@@ -261,6 +264,13 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
 
   const { enabled, userId, sessions } = options;
   const active = enabled && userId !== '';
+
+  // A new sign-in starts without a pull.
+  useEffect(() => {
+    if (!active) {
+      setPulledFor(null);
+    }
+  }, [active]);
 
   // Notice edits. Runs after every sessions change.
   useEffect(() => {
@@ -351,6 +361,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       }
       writeStored(latest.current.storage, state);
       latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
+      setPulledFor(userId);
       return true;
     };
 
@@ -502,7 +513,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     };
   }, [active, userId]);
 
-  return { lastError };
+  return { lastError, pulled: active && pulledFor === userId };
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {

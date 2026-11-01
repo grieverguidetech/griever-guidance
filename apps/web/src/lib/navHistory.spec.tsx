@@ -22,6 +22,12 @@ function pop(state: unknown) {
   });
 }
 
+/** The state the hook wrote for the latest entry, as the browser would hand it back on a Back. */
+function writtenState(call: 'replaceState' | 'pushState', spy: ReturnType<typeof vi.spyOn>) {
+  void call;
+  return spy.mock.calls.at(-1)?.[0];
+}
+
 describe('useNavHistory (#566)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -54,28 +60,61 @@ describe('useNavHistory (#566)', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('restores the spot when Back lands on one of its entries, without pushing again', () => {
+  it('restores the spot when Back lands on one of its entries, without pushing or going back again', () => {
     const push = vi.spyOn(window.history, 'pushState');
-    const { onRestore } = mount(overview);
-    pop({ ggNav: service });
-    expect(onRestore).toHaveBeenCalledWith(service);
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    const replace = vi.spyOn(window.history, 'replaceState');
+    const { onRestore, rerender } = mount(overview);
+    const first = writtenState('replaceState', replace);
+    rerender({ spot: service, enabled: true });
+    push.mockClear();
+    pop(first);
+    expect(onRestore).toHaveBeenCalledWith(overview);
     expect(push).not.toHaveBeenCalled();
+    expect(back).not.toHaveBeenCalled();
   });
 
-  it('stays put when Back goes past its entries (the sign-in), by pushing the current spot again', () => {
+  it('goes Back again past an entry with no state of ours (a sign-in step), and never pushes', () => {
     const push = vi.spyOn(window.history, 'pushState');
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
     const { onRestore } = mount(overview);
+    push.mockClear();
     pop(null);
+    pop({ other: 1 });
+    expect(back).toHaveBeenCalledTimes(2);
+    expect(push).not.toHaveBeenCalled();
     expect(onRestore).not.toHaveBeenCalled();
-    expect(push).toHaveBeenCalledTimes(1);
-    expect(push.mock.calls[0][0]).toEqual({ ggNav: overview });
+  });
+
+  it('ignores entries that are malformed or written by an earlier sign-in, and walks past them', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    const replace = vi.spyOn(window.history, 'replaceState');
+    const { onRestore } = mount(overview);
+    const mine = writtenState('replaceState', replace) as { ggNav: Record<string, unknown> };
+    pop({ ggNav: { ...mine.ggNav, gen: 'an-older-sign-in' } });
+    pop({ ggNav: { ...mine.ggNav, view: 7 } });
+    pop({ ggNav: { ...mine.ggNav, personId: 7 } });
+    expect(onRestore).not.toHaveBeenCalled();
+    expect(back).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops going Back after a long run of foreign entries, so it can never loop', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    mount(overview);
+    for (let i = 0; i < 80; i += 1) {
+      pop(null);
+    }
+    expect(back.mock.calls.length).toBeLessThanOrEqual(50);
+    expect(back.mock.calls.length).toBeGreaterThan(0);
   });
 
   it('ignores Back when disabled', () => {
     const push = vi.spyOn(window.history, 'pushState');
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
     const { onRestore } = mount(overview, false);
     pop(null);
     expect(onRestore).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+    expect(back).not.toHaveBeenCalled();
   });
 });
