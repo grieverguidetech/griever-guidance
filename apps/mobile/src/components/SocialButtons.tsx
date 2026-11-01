@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSSO } from '@clerk/expo';
 import { screenCopy } from '@griever/copy';
 import * as AuthSession from 'expo-auth-session';
+import { APP_URL_SCHEME } from '../lib/urlScheme';
 import { clerkMessage, FACEBOOK_NO_EMAIL } from '../lib/clerkMessages';
 import { SecondaryButton, announce } from './authForm';
 
@@ -38,7 +39,7 @@ export function SocialButtons({
     onStart();
     announce(copy.browserAnnounce);
     try {
-      const redirectUrl = AuthSession.makeRedirectUri({ scheme: 'grieversguidance', path: SSO_REDIRECT_PATH });
+      const redirectUrl = AuthSession.makeRedirectUri({ scheme: APP_URL_SCHEME, path: SSO_REDIRECT_PATH });
       const result = await startSSOFlow({ strategy, redirectUrl });
       if (result.createdSessionId && result.setActive) {
         await result.setActive({ session: result.createdSessionId });

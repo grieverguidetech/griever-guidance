@@ -24,11 +24,11 @@
   },
   "peerDependencies": {
     "react": "19.3.0",
-    "react-native": "0.88.1"
+    "react-native": "0.88.0"
   },
   "devDependencies": {
     "react": "19.3.0",
-    "react-native": "0.88.1",
+    "react-native": "0.88.0",
     "react-native-web": "0.21.4"
   }
 }
