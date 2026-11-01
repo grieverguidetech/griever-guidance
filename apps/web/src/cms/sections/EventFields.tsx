@@ -107,6 +107,11 @@ export function EventFields<K extends EventKey>({
   const id = useId();
   // The address the last pick wrote, so a later pick may replace it but never a typed one.
   const pickedAddress = useRef<string | null>(null);
+  // The address may be filled when it is empty or still what the last pick wrote, never over typed text.
+  const mayFillAddress = () => {
+    const current = addressKey ? ((values as Partial<Record<string, string>>)[addressKey] ?? '') : '';
+    return current === '' || current === pickedAddress.current;
+  };
   const kind = dateNote(values[keys.date], { field: 'event', dateOfPassing });
   const note = kind === 'beforePassing' ? copy.beforePassing : undefined;
   const noteOnBlur = kind === 'unreadable' ? copy.dateUnreadable : undefined;
@@ -160,6 +165,7 @@ export function EventFields<K extends EventKey>({
           id={`${id}-place`}
           labelledBy={`${legendId} ${id}-place-label`}
           types={placeTypes}
+          wantsDetails={(pick) => Boolean(addressKey && pick.secondaryText && mayFillAddress())}
           onPick={(pick, details) => {
             // The full street address from the place itself; the prediction's short line if that failed.
             const name = details?.name || pick.mainText;
@@ -168,9 +174,7 @@ export function EventFields<K extends EventKey>({
               onChange({ [keys.place]: pick.text } as Partial<Record<K, string>>);
               return false;
             }
-            const current = (values as Partial<Record<string, string>>)[addressKey] ?? '';
-            const mayFill = current === '' || current === pickedAddress.current;
-            if (!mayFill) {
+            if (!mayFillAddress()) {
               onChange({ [keys.place]: name } as Partial<Record<K, string>>);
               return false;
             }
