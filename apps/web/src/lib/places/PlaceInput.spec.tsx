@@ -191,6 +191,18 @@ describe('PlaceInput', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 suggestion available');
   });
 
+  it('does not announce Searching later when a search fails quickly', async () => {
+    const failing: PlacesClient = {
+      suggest: () => Promise.reject(new Error('down')),
+      newToken: () => ({}),
+      details: vi.fn(),
+    };
+    const { input } = setup({ load: () => Promise.resolve(failing) });
+    await userEvent.type(input(), 'oak');
+    await new Promise((r) => setTimeout(r, 1800));
+    expect(document.body.textContent).not.toContain('Searching…');
+  });
+
   it('does not announce Searching for a search that finishes quickly', async () => {
     const { client } = fakeClient();
     setup({ load: () => Promise.resolve(client) });

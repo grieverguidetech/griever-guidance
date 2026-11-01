@@ -161,6 +161,11 @@ export function PlaceInput({ id, labelledBy, value, onChange, types, onPick, wan
         hideList();
         setAnnouncement('');
       }
+    } finally {
+      // A fast failure or an unavailable client must not announce "Searching…" later.
+      if (ticket === request.current) {
+        clearTimeout(slowTimer.current ?? undefined);
+      }
     }
   };
 
