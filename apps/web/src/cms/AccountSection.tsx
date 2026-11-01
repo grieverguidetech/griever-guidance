@@ -257,17 +257,18 @@ function DeletePanel({ onDelete }: DeletePanelProps) {
           </h3>
           <p className="m-0">{copy.deleteConfirmBody}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="gg-btn gg-btn-secondary" aria-disabled={deleting} onClick={() => void confirm()}>
-              {deleting ? copy.deleting : copy.deleteConfirmAction}
-            </button>
             <button type="button" className="gg-btn gg-btn-primary" aria-disabled={deleting} onClick={cancel}>
               {copy.deleteCancel}
+            </button>
+            {/* The busy button keeps full contrast; the status line below says what is happening. */}
+            <button type="button" className={`gg-btn gg-btn-secondary ${deleting ? '!opacity-100' : ''}`} aria-disabled={deleting} onClick={() => void confirm()}>
+              {copy.deleteConfirmAction}
             </button>
           </div>
         </div>
       )}
       <p role="status" aria-live="polite" className="m-0 text-[13px] font-semibold">
-        {failed ? copy.deleteFailed : ''}
+        {deleting ? copy.deleting : failed ? copy.deleteFailed : ''}
       </p>
     </section>
   );

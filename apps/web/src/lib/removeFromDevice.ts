@@ -62,15 +62,17 @@ export async function removeEverythingFromDevice(
 
 /**
  * Deletes the Clerk account, and only when that succeeds clears this device. When Clerk refuses or
- * cannot be reached, `deleteAccount` rejects and nothing local is touched. The Clerk session is
- * gone with the account, so there is no session left to end. The `user.deleted` webhook purges the
- * server side.
+ * cannot be reached, `deleteAccount` rejects and nothing local is touched. Resolves true when the
+ * local clear worked, false when it did not (the account is deleted either way). Clerk's
+ * user.delete() emits user:signOut itself (clerk-js 6.x), so no end-session call is needed. The
+ * `user.deleted` webhook purges the server side.
  */
-export async function deleteAccountThenClear(deleteAccount: () => Promise<void>, storage: KeyStorage): Promise<void> {
+export async function deleteAccountThenClear(deleteAccount: () => Promise<void>, storage: KeyStorage): Promise<boolean> {
   await deleteAccount();
   try {
     await removeEverythingFromDevice(storage);
+    return true;
   } catch {
-    // The account is already deleted; a local clear that fails must not read as a failed deletion.
+    return false;
   }
 }

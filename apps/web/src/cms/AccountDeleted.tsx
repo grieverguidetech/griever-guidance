@@ -3,8 +3,8 @@ import { screenCopy } from '@griever/copy';
 
 const copy = screenCopy('account');
 
-/** Shown after the account is deleted. Focus lands on the heading so a screen reader starts there. */
-export function AccountDeleted() {
+/** Shown after the account is deleted. `cleared` is false when this device could not be fully cleared. Focus lands on the heading so a screen reader starts there. */
+export function AccountDeleted({ cleared = true }: { cleared?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -16,6 +16,7 @@ export function AccountDeleted() {
           {copy.deletedHeading}
         </h1>
         <p className="m-0">{copy.deletedBody}</p>
+        {cleared ? null : <p className="m-0">{copy.deletedLeftover}</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="gg-btn gg-btn-primary" onClick={() => window.location.assign('/')}>
             {copy.deletedAction}
