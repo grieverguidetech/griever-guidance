@@ -51,5 +51,7 @@
   "phoneReadyAnnouncement": "Tell close family and friends, one at a time from your phone.",
   "phoneReadyService": "Share the service details with the people who plan to come.",
   "phoneReadyObituary": "Share the obituary with the people who should see it.",
-  "phoneReadyThanks": "Thank the people who helped, one at a time."
+  "phoneReadyThanks": "Thank the people who helped, one at a time.",
+  "panelEmpty": "Once you start with someone, the things you will need show here, in the order that helps.",
+  "loadingTitle": "One moment"
 }
