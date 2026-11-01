@@ -612,16 +612,24 @@ function AppBody({
     // Your people has no subject; the most recent person being re-picked there must not add an entry.
     spot: { view, section: cmsSection, item: cmsItem, personId: view === 'people' ? null : activeId },
     onRestore: (spot) => {
-      // Only what this app could have written; anything else is ignored.
+      // Only what this app could have written; anything else is refused.
       const view = TRACKED_VIEWS.find((candidate) => candidate === spot.view);
       const section = CMS_SECTIONS.find((candidate) => candidate === spot.section);
       const item = spot.item === null ? null : (Object.keys(cmsItemLabels) as ChecklistItemId[]).find((id) => id === spot.item);
       if (!view || !section || item === undefined) {
-        return;
+        return false;
       }
       // Back never lands in the name prompt, and an error from another screen is not carried over.
       auth?.clearError();
       setAskingName(false);
+      // The person was deleted since: go straight to Your people rather than to a screen with nobody on it.
+      if (spot.personId && !sessions.sessions.some((p) => p.id === spot.personId)) {
+        setCmsItem(null);
+        setCmsSection(section);
+        setActiveId(null);
+        setView('people');
+        return { view: 'people', section, item: null, personId: null };
+      }
       if (item === null && cmsItem !== null) {
         // Same as closing an item by hand: focus returns to what opened it.
         restoreOpener.current = true;
@@ -629,7 +637,8 @@ function AppBody({
       setView(view);
       setCmsSection(section);
       setCmsItem(item);
-      setActiveId(spot.personId && sessions.sessions.some((p) => p.id === spot.personId) ? spot.personId : null);
+      setActiveId(spot.personId);
+      return { view, section, item, personId: view === 'people' ? null : spot.personId };
     },
   });
 

@@ -2,7 +2,7 @@
  * #520: background sync wired into the real App. Runs only with the editor flag, the sync flag and
  * a signed-in user. fetch is stubbed, so no network. Flags are mocked per test.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -189,14 +189,32 @@ describe('background sync in the app (#520)', () => {
     expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
   });
 
-  it('a fresh device lands on Your people when the first sync takes longer than the cap, without blocking (#566)', async () => {
+  it('a fresh device waits at most 1.5 s for the first sync: loading at 1400 ms, Your people at 1600 ms (#566)', async () => {
     window.localStorage.removeItem('gg.sessions.v1');
     signedIn(true);
     // The server never answers; the landing must not wait on it past the cap.
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
-    render(<App />);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' }, { timeout: 4000 })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    try {
+      render(<App />);
+      // Let Clerk and the profile resolve without moving the clock.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1300);
+      });
+      // 1400 ms in: still the quiet loading status, not an empty list.
+      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a fresh device lands on Your people at once when the first sync finds nobody (#566)', async () => {

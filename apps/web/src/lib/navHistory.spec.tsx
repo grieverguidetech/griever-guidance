@@ -7,7 +7,7 @@ const service: NavSpot = { ...overview, section: 'service' };
 const account: NavSpot = { view: 'profile', section: 'account', item: null, personId: 'p1' };
 
 function mount(initial: NavSpot, enabled = true) {
-  const onRestore = vi.fn();
+  const onRestore = vi.fn((target: NavSpot): NavSpot | false => target);
   const hook = renderHook(
     (props: { spot: NavSpot; enabled: boolean; trackable?: boolean; userId?: string; signedOut?: boolean }) =>
       useNavHistory({ enabled: props.enabled, trackable: props.trackable ?? true, spot: props.spot, userId: props.userId ?? 'u1', signedOut: props.signedOut ?? false, onRestore }),
@@ -23,8 +23,7 @@ function pop(state: unknown) {
 }
 
 /** The state the hook wrote for the latest entry, as the browser would hand it back on a Back. */
-function writtenState(call: 'replaceState' | 'pushState', spy: ReturnType<typeof vi.spyOn>) {
-  void call;
+function writtenState(spy: ReturnType<typeof vi.spyOn>) {
   return spy.mock.calls.at(-1)?.[0];
 }
 
@@ -55,7 +54,7 @@ describe('useNavHistory (#566)', () => {
     const replace = vi.spyOn(window.history, 'replaceState');
     const push = vi.spyOn(window.history, 'pushState');
     mount(overview, false);
-    const hidden = renderHook(() => useNavHistory({ enabled: true, trackable: false, spot: overview, userId: 'u1', signedOut: false, onRestore: vi.fn() }));
+    const hidden = renderHook(() => useNavHistory({ enabled: true, trackable: false, spot: overview, userId: 'u1', signedOut: false, onRestore: (target) => target }));
     hidden.unmount();
     expect(replace).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
@@ -66,7 +65,7 @@ describe('useNavHistory (#566)', () => {
     const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
     const replace = vi.spyOn(window.history, 'replaceState');
     const { onRestore, rerender } = mount(overview);
-    const first = writtenState('replaceState', replace);
+    const first = writtenState(replace);
     rerender({ spot: service, enabled: true });
     push.mockClear();
     pop(first);
@@ -91,12 +90,97 @@ describe('useNavHistory (#566)', () => {
     const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
     const replace = vi.spyOn(window.history, 'replaceState');
     const { onRestore } = mount(overview);
-    const mine = writtenState('replaceState', replace) as { ggNav: Record<string, unknown> };
+    const mine = writtenState(replace) as { ggNav: Record<string, unknown> };
     pop({ ggNav: { ...mine.ggNav, gen: 'an-older-sign-in' } });
     pop({ ggNav: { ...mine.ggNav, view: 7 } });
     pop({ ggNav: { ...mine.ggNav, personId: 7 } });
     expect(onRestore).not.toHaveBeenCalled();
     expect(back).toHaveBeenCalledTimes(3);
+  });
+
+  it('treats an entry onRestore refuses as foreign, and keeps the old record', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    const push = vi.spyOn(window.history, 'pushState');
+    const replace = vi.spyOn(window.history, 'replaceState');
+    const refuse = vi.fn((): NavSpot | false => false);
+    const { rerender } = renderHook((props: { spot: NavSpot }) =>
+      useNavHistory({ enabled: true, trackable: true, spot: props.spot, userId: 'u1', signedOut: false, onRestore: refuse }),
+      { initialProps: { spot: overview } },
+    );
+    const mine = writtenState(replace);
+    pop(mine);
+    expect(refuse).toHaveBeenCalledTimes(1);
+    expect(back).toHaveBeenCalledTimes(1);
+    // Still recorded as overview: showing it again is not a new move.
+    push.mockClear();
+    rerender({ spot: overview });
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('when onRestore shows a fallback, records that spot on the entry and pushes nothing', () => {
+    const push = vi.spyOn(window.history, 'pushState');
+    const replace = vi.spyOn(window.history, 'replaceState');
+    const people: NavSpot = { view: 'people', section: 'overview', item: null, personId: null };
+    const onRestore = vi.fn((): NavSpot | false => people);
+    const { rerender } = renderHook((props: { spot: NavSpot }) =>
+      useNavHistory({ enabled: true, trackable: true, spot: props.spot, userId: 'u1', signedOut: false, onRestore }),
+      { initialProps: { spot: overview } },
+    );
+    const first = writtenState(replace);
+    rerender({ spot: service });
+    push.mockClear();
+    replace.mockClear();
+    pop(first);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect((replace.mock.calls[0][0] as { ggNav: NavSpot }).ggNav).toMatchObject(people);
+    rerender({ spot: people });
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  describe('Forward from an entry that is not ours (S6)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('after the walk stops at the first entry, a pop to an unknown entry goes Forward, not Back', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      mount(overview);
+      pop(null);
+      expect(back).toHaveBeenCalledTimes(1);
+      // back() found nowhere to go: no popstate comes, and the settle timer ends the walk.
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      pop(null);
+      expect(forward).toHaveBeenCalledTimes(1);
+      expect(back).toHaveBeenCalledTimes(1);
+    });
+
+    it('while the walk is still landing, a pop to an unknown entry keeps going Back', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      mount(overview);
+      pop(null);
+      pop(null);
+      expect(back).toHaveBeenCalledTimes(2);
+      expect(forward).not.toHaveBeenCalled();
+    });
+
+    it('after a pageshow from the back/forward cache, Forward onto an unknown entry does not leave the app', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+      const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => undefined);
+      mount(overview);
+      act(() => {
+        window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
+      });
+      pop(null);
+      expect(back).not.toHaveBeenCalled();
+      expect(forward).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('stops going Back after a long run of foreign entries, so it can never loop', () => {
@@ -120,16 +204,15 @@ describe('useNavHistory (#566)', () => {
   });
 
   describe('across a reload', () => {
-    function firstLoad(userId: string) {
+    function firstLoad() {
       const replace = vi.spyOn(window.history, 'replaceState');
       const first = mount(overview, true);
       first.unmount();
-      void userId;
-      return writtenState('replaceState', replace);
+      return writtenState(replace);
     }
 
     it('the same user keeps their earlier entries: Back restores the previous screen', () => {
-      const earlier = firstLoad('u1');
+      const earlier = firstLoad();
       const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
       const { onRestore } = mount(service, true);
       pop(earlier);
@@ -138,9 +221,9 @@ describe('useNavHistory (#566)', () => {
     });
 
     it('another user walks past the earlier entries', () => {
-      const earlier = firstLoad('u1');
+      const earlier = firstLoad();
       const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
-      const other = vi.fn();
+      const other = vi.fn((target: NavSpot): NavSpot | false => target);
       renderHook(() => useNavHistory({ enabled: true, trackable: true, spot: service, userId: 'u2', signedOut: false, onRestore: other }));
       pop(earlier);
       expect(other).not.toHaveBeenCalled();
@@ -148,8 +231,8 @@ describe('useNavHistory (#566)', () => {
     });
 
     it('a sign-out forgets the token, so the same user signing in again starts fresh', () => {
-      const earlier = firstLoad('u1');
-      const gone = renderHook(() => useNavHistory({ enabled: false, trackable: true, spot: service, userId: '', signedOut: true, onRestore: vi.fn() }));
+      const earlier = firstLoad();
+      const gone = renderHook(() => useNavHistory({ enabled: false, trackable: true, spot: service, userId: '', signedOut: true, onRestore: (target) => target }));
       gone.unmount();
       const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
       const { onRestore } = mount(service, true);
@@ -165,7 +248,7 @@ describe('useNavHistory (#566)', () => {
       vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
         throw new Error('blocked');
       });
-      const earlier = firstLoad('u1');
+      const earlier = firstLoad();
       const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
       const { onRestore } = mount(service, true);
       pop(earlier);

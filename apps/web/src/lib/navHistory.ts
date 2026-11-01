@@ -9,8 +9,10 @@ export interface NavSpot {
 }
 
 const KEY = 'ggNav';
-/** Most automatic extra Backs in a row, so an odd history can never loop. */
-const MAX_AUTO_BACKS = 50;
+/** How long an automatic Back may take to land before we decide the walk has stopped (the first entry of the tab). */
+const AUTO_BACK_SETTLE_MS = 300;
+/** Most automatic extra moves in a row, so an odd history can never loop. */
+const MAX_AUTO_MOVES = 50;
 
 interface Stored extends NavSpot {
   /** Which sign-in wrote the entry; entries from an earlier sign-in in this tab are not ours any more. */
@@ -82,8 +84,12 @@ interface Options {
   userId: string;
   /** True after a sign-out: the next sign-in, even by the same user, starts with new entries. */
   signedOut: boolean;
-  /** Called when Back or Forward lands on an entry this hook made. */
-  onRestore: (spot: NavSpot) => void;
+  /**
+   * Called when Back or Forward lands on an entry this hook made. Returns the spot it actually showed
+   * (the same one, or a fallback such as Your people when the person is gone), or false to refuse it.
+   * A refused entry is treated like one that is not ours.
+   */
+  onRestore: (spot: NavSpot) => NavSpot | false;
 }
 
 /**
@@ -95,7 +101,12 @@ interface Options {
 export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onRestore }: Options): void {
   const recorded = useRef<string | null>(null);
   const generation = useRef('');
-  const autoBacks = useRef(0);
+  const autoMoves = useRef(0);
+  // True while the entry we are on is one of ours.
+  const onOurs = useRef(false);
+  // True from our own back() until it lands (or the settle timer says it has stopped).
+  const autoBackPending = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef({ onRestore });
   latest.current = { onRestore };
   const { view, section, item, personId } = spot;
@@ -107,6 +118,7 @@ export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onR
     if (!enabled) {
       recorded.current = null;
       generation.current = '';
+      onOurs.current = false;
       return;
     }
     if (generation.current === '') {
@@ -127,28 +139,72 @@ export function useNavHistory({ enabled, trackable, spot, userId, signedOut, onR
       window.history.pushState(state, '');
     }
     recorded.current = key;
-    autoBacks.current = 0;
+    onOurs.current = true;
+    autoMoves.current = 0;
   }, [enabled, trackable, view, section, item, personId, userId, signedOut]);
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
-    function onPop(event: PopStateEvent) {
-      const target = readSpot(event.state, generation.current);
-      if (!target) {
-        // A sign-in step, or an entry from an earlier sign-in: not a screen. Keep walking back.
-        if (autoBacks.current < MAX_AUTO_BACKS) {
-          autoBacks.current += 1;
-          window.history.back();
-        }
+    function goBackAgain() {
+      autoBackPending.current = true;
+      clearTimeout(settleTimer.current);
+      // No popstate in time means back() had nowhere to go: the walk has stopped.
+      settleTimer.current = setTimeout(() => {
+        autoBackPending.current = false;
+      }, AUTO_BACK_SETTLE_MS);
+      window.history.back();
+    }
+
+    /** An entry that is not a screen of ours: a sign-in step, or one from an earlier sign-in. */
+    function onForeign() {
+      if (autoMoves.current >= MAX_AUTO_MOVES) {
         return;
       }
-      autoBacks.current = 0;
-      recorded.current = JSON.stringify([target.view, target.section, target.item, target.personId]);
-      latest.current.onRestore(target);
+      autoMoves.current += 1;
+      if (autoBackPending.current || onOurs.current) {
+        // We came from one of ours, or are already walking back: keep going back, past all of them.
+        onOurs.current = false;
+        goBackAgain();
+        return;
+      }
+      // The user pressed Forward from an entry that is not ours: keep going forward, to the next screen of ours.
+      window.history.forward();
     }
+
+    function onPop(event: PopStateEvent) {
+      clearTimeout(settleTimer.current);
+      const target = readSpot(event.state, generation.current);
+      const shown = target ? latest.current.onRestore(target) : false;
+      if (!shown) {
+        onForeign();
+        return;
+      }
+      autoBackPending.current = false;
+      autoMoves.current = 0;
+      onOurs.current = true;
+      recorded.current = JSON.stringify([shown.view, shown.section, shown.item, shown.personId]);
+      if (target && recorded.current !== JSON.stringify([target.view, target.section, target.item, target.personId])) {
+        // A fallback was shown: make this entry say so, without touching the entries after it.
+        window.history.replaceState({ ...(window.history.state ?? {}), [KEY]: { ...shown, gen: generation.current } }, '');
+      }
+    }
+
+    // Back from another page into this one (the back/forward cache): nothing says which entry we are on.
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        onOurs.current = false;
+        autoBackPending.current = false;
+      }
+    }
+
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      clearTimeout(settleTimer.current);
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('pageshow', onPageShow);
+    };
   }, [enabled]);
 }

@@ -517,6 +517,36 @@ describe('navigation (#566)', () => {
     });
   });
 
+  it('Back to a screen whose person was deleted lands on Your people, with no new entry and Forward kept', async () => {
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Service/ }));
+    await h1('Service');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: PEOPLE }));
+    await h1(PEOPLE);
+    act(() => {
+      mocks.sessions?.removeSession('s1');
+    });
+    const push = vi.spyOn(window.history, 'pushState');
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: CREATE })).toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Service' })).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+    act(() => {
+      window.history.forward();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
   it('Back then Forward on Settings (signed out, flag on) returns to it', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     const user = userEvent.setup();
