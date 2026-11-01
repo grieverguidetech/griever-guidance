@@ -467,6 +467,8 @@ describe('AccountSection phone and support panels', () => {
 });
 
 describe('Delete account panel', () => {
+  const deleteStatus = () => within(screen.getByRole('region', { name: 'Delete account' })).getByRole('status');
+
   it('is not shown without a delete handler', () => {
     profile();
     expect(screen.queryByRole('heading', { name: 'Delete account' })).not.toBeInTheDocument();
@@ -493,6 +495,15 @@ describe('Delete account panel', () => {
     expect(onDeleteAccount).not.toHaveBeenCalled();
   });
 
+  it('puts Cancel before the delete button in the DOM', async () => {
+    const user = userEvent.setup();
+    profile({ onDeleteAccount: vi.fn() });
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    const names = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(names.indexOf('Cancel')).toBeGreaterThanOrEqual(0);
+    expect(names.indexOf('Cancel')).toBeLessThan(names.indexOf('Yes, delete my account'));
+  });
+
   it('Cancel returns focus to the opener and still does not delete', async () => {
     const user = userEvent.setup();
     const onDeleteAccount = vi.fn();
@@ -510,12 +521,14 @@ describe('Delete account panel', () => {
     profile({ onDeleteAccount });
     await user.click(screen.getByRole('button', { name: 'Delete my account' }));
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
-    const busy = screen.getByRole('button', { name: 'Deleting your account…' });
+    const busy = screen.getByRole('button', { name: 'Yes, delete my account' });
     expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(busy).toHaveClass('!opacity-100');
+    expect(deleteStatus()).toHaveTextContent('Deleting your account…');
     await user.click(busy);
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onDeleteAccount).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Deleting your account…' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Delete your account for good?' })).toBeInTheDocument();
     await act(async () => finish());
   });
 
@@ -525,11 +538,11 @@ describe('Delete account panel', () => {
     profile({ onDeleteAccount });
     await user.click(screen.getByRole('button', { name: 'Delete my account' }));
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
-    const note = await screen.findByText(/We could not delete your account\. Nothing was removed\./);
-    expect(note).not.toHaveTextContent('!');
+    await waitFor(() => expect(deleteStatus()).toHaveTextContent('We could not finish deleting your account. Please try again, or write to us for help.'));
+    expect(deleteStatus()).not.toHaveTextContent('!');
     expect(screen.getByRole('button', { name: 'Yes, delete my account' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     await waitFor(() => expect(onDeleteAccount).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByText(/We could not delete your account/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/We could not finish deleting/)).not.toBeInTheDocument());
   });
 });

@@ -237,8 +237,8 @@ export function App() {
   const [removals, setRemovals] = useState(0);
   const removed = removals > 0;
   // The account was deleted: the done screen replaces the whole app.
-  const [deleted, setDeleted] = useState(false);
-  const onDeleted = useCallback(() => setDeleted(true), []);
+  const [deleted, setDeleted] = useState<{ cleared: boolean } | null>(null);
+  const onDeleted = useCallback((cleared: boolean) => setDeleted({ cleared }), []);
   // The announcement lives outside the keyed subtree so it is already in the page when its text
   // arrives. It is emptied on removal and filled a moment after the remount, so it is read out.
   const [announcement, setAnnouncement] = useState('');
@@ -273,7 +273,7 @@ export function App() {
     </AuthGate>
   );
   if (deleted) {
-    return <AccountDeleted />;
+    return <AccountDeleted cleared={deleted.cleared} />;
   }
   return (
     <>
@@ -354,7 +354,7 @@ function AppBody({
   openAccountSettings?: () => void;
   /** Deletes the Clerk account; absent when Clerk is not ready. */
   deleteAccount?: () => Promise<void>;
-  onDeleted?: () => void;
+  onDeleted?: (cleared: boolean) => void;
   SignInScreen?: ClerkModules['SignInScreen'];
   /** Signed in on this device, but accounts can't be reached: local work only. */
   offline?: boolean;
@@ -375,7 +375,9 @@ function AppBody({
 
   // Background sync of the person to the account. Only in the editor build (the 4 message keys stay
   // off the wire when the editor is off, C2), with sync on and someone signed in. Nothing is shown (C5).
-  const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn;
+  // True while the account is being deleted: no pull or flush runs, and the sign-out Clerk causes is not shown as a lost session.
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn && !deletingAccount;
   // Sync waits until the device's list is kept for this account, so another account's person is never sent under this token.
   const flowSync = useFlowSync({
     sessions: sessionList,
@@ -542,7 +544,7 @@ function AppBody({
       setView('signIn');
     }
   }, [signedOut, leftOnPurpose, view]);
-  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view);
+  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view) && !deletingAccount;
   // One polite region that is always there, so the note is announced when its text appears.
   const signedOutNote = auth ? (
     <div role="status" aria-live="polite" className="text-[13px]">
@@ -1102,8 +1104,14 @@ function AppBody({
         onDeleteAccount={
           deleteAccount && onDeleted
             ? async () => {
-                await deleteAccountThenClear(deleteAccount, window.localStorage);
-                onDeleted();
+                setDeletingAccount(true);
+                try {
+                  const cleared = await deleteAccountThenClear(deleteAccount, window.localStorage);
+                  onDeleted(cleared);
+                } catch (error) {
+                  setDeletingAccount(false);
+                  throw error;
+                }
               }
             : undefined
         }
