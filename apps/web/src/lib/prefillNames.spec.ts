@@ -42,6 +42,20 @@ describe('the prefilled marker', () => {
     expect(wasPrefilled(window.localStorage, 'u2')).toBe(false);
   });
 
+  it('keeps several users as a JSON set of ids', () => {
+    window.localStorage.clear();
+    markPrefilled(window.localStorage, 'u1');
+    markPrefilled(window.localStorage, 'u2');
+    markPrefilled(window.localStorage, 'u1');
+    expect(JSON.parse(window.localStorage.getItem('gg.namesPrefilled.v1') ?? '')).toEqual(['u1', 'u2']);
+    expect(wasPrefilled(window.localStorage, 'u2')).toBe(true);
+  });
+
+  it('reads a damaged value as nobody', () => {
+    window.localStorage.setItem('gg.namesPrefilled.v1', 'not json');
+    expect(wasPrefilled(window.localStorage, 'u1')).toBe(false);
+  });
+
   it('survives blocked storage', () => {
     const blocked = {
       getItem: () => {

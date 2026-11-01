@@ -6,6 +6,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
+import { identityErrorMessage } from '@griever/hooks';
 import { fakeClerk } from '../test-clerk';
 
 const mocks = vi.hoisted(() => ({
@@ -124,9 +125,10 @@ describe('landing and names (#603 1)', () => {
     const user = userEvent.setup();
     render(<App />);
     await h1('Overview');
-    const note = await screen.findByText((_, node) => node?.tagName === 'P' && node.textContent === NAME_NOTE);
+    const note = await screen.findByRole('button', { name: NAME_NOTE });
+    expect(note.className).toContain('gg-btn');
     expect(mocks.updateProfile).not.toHaveBeenCalled();
-    await user.click(within(note).getByRole('button', { name: 'Account' }));
+    await user.click(note);
     expect(await h1('Account')).toBeInTheDocument();
   });
 
@@ -135,7 +137,93 @@ describe('landing and names (#603 1)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     render(<App />);
     await h1('Overview');
-    expect(await screen.findByText((_, node) => node?.tagName === 'P' && node.textContent === NAME_NOTE)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: NAME_NOTE })).toBeInTheDocument();
+  });
+});
+
+describe('the Clerk name prefill is safe (#603 review)', () => {
+  const clerkNames = { firstName: 'Anna', lastName: 'Reyes' };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+
+  it('sends nothing when the profile call is unavailable, and the note shows', async () => {
+    signedIn(clerkNames);
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
+    render(<App />);
+    await h1('Overview');
+    await settle();
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: NAME_NOTE })).toBeInTheDocument();
+  });
+
+  it('sends nothing when a nameless cached profile is followed by a slower named answer', async () => {
+    signedIn(clerkNames);
+    window.localStorage.setItem('gg.profile.v1', JSON.stringify(profile()));
+    window.localStorage.setItem('gg.signedIn.v1', 'u1');
+    mocks.getProfile.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, profile: profile({ firstName: 'Ann', senderName: 'Ann' }) }), 120)),
+    );
+    render(<App />);
+    await h1('Overview');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('saves once; later navigation and re-renders send nothing more', async () => {
+    signedIn(clerkNames);
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
+    const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
+    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await h1('Account');
+    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await h1('Your people');
+    await user.click(nav().getByRole('button', { name: 'Overview' }));
+    await h1('Overview');
+    await settle();
+    expect(mocks.updateProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a failed save in the session, shows no account error, and shows the note', async () => {
+    signedIn(clerkNames);
+    mocks.updateProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
+    const user = userEvent.setup();
+    render(<App />);
+    await h1('Overview');
+    await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: NAME_NOTE })).toBeInTheDocument();
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
+    await h1('Account');
+    await settle();
+    expect(screen.queryByText(identityErrorMessage('unavailable'))).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Overview' }));
+    await h1('Overview');
+    await settle();
+    expect(mocks.updateProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('a second mount with the marker sends nothing', async () => {
+    signedIn(clerkNames);
+    window.localStorage.setItem('gg.namesPrefilled.v1', JSON.stringify(['u1']));
+    render(<App />);
+    await h1('Overview');
+    await settle();
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('keeps the note away while the save is pending, so it never flashes', async () => {
+    signedIn(clerkNames);
+    let finish: (value: unknown) => void = () => undefined;
+    mocks.updateProfile.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    render(<App />);
+    await h1('Overview');
+    await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(screen.queryByRole('button', { name: NAME_NOTE })).not.toBeInTheDocument();
+    finish({ ok: true, profile: profile({ firstName: 'Anna', lastName: 'Reyes', senderName: 'Anna' }) });
+    await settle();
+    expect(screen.queryByRole('button', { name: NAME_NOTE })).not.toBeInTheDocument();
   });
 });
 

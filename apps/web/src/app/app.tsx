@@ -1044,10 +1044,14 @@ function AppBody({
   const prefilling = useRef(false);
   const updateDetails = auth?.updateDetails;
   const profileAnswered = auth?.profileAnswered ?? false;
+  // Only a live answer from the server: a cache or a failed load must never trigger a save.
+  const profileLoaded = auth?.profileLoaded ?? false;
+  // True while the background save runs, so the note never flashes and then unmounts under focus.
+  const [prefillState, setPrefillState] = useState<'idle' | 'pending' | 'done'>('idle');
   const knownProfile = auth?.profile ?? null;
   const userId = auth?.userId;
   useEffect(() => {
-    if (!CMS_ENABLED || !signedIn || offline || !userId || !profileAnswered || !updateDetails || prefilling.current) {
+    if (!CMS_ENABLED || !signedIn || offline || !userId || !profileLoaded || !updateDetails || prefilling.current) {
       return;
     }
     if (wasPrefilled(window.localStorage, userId)) {
@@ -1058,18 +1062,21 @@ function AppBody({
       return;
     }
     prefilling.current = true;
-    void updateDetails(names)
+    setPrefillState('pending');
+    void updateDetails(names, { quiet: true })
       .then((result) => {
         if (result.ok) {
           markPrefilled(window.localStorage, userId);
         }
       })
-      .catch(() => undefined);
-  }, [signedIn, offline, userId, profileAnswered, updateDetails, knownProfile, clerkNames]);
+      .catch(() => undefined)
+      .finally(() => setPrefillState('done'));
+  }, [signedIn, offline, userId, profileLoaded, updateDetails, knownProfile, clerkNames]);
   // Signed out: the next sign-in (maybe another user) may fill its own names.
   useEffect(() => {
     if (signedOut) {
       prefilling.current = false;
+      setPrefillState('idle');
     }
   }, [signedOut]);
 
@@ -1259,9 +1266,13 @@ function AppBody({
     );
   }
 
+  // The note waits while the save runs, and from the moment the names are due until it starts, so it never flashes.
+  const prefillHolds =
+    prefillState === 'pending' ||
+    (prefillState === 'idle' && profileLoaded && !!userId && !wasPrefilled(window.localStorage, userId) && namesToPrefill(knownProfile, clerkNames) !== null);
   /** The line on Overview when the account has no first name: a link to Account. */
   const nameNote =
-    CMS_ENABLED && signedIn && profileAnswered && lacksFirstName(knownProfile) ? (
+    CMS_ENABLED && signedIn && profileAnswered && !prefillHolds && lacksFirstName(knownProfile) ? (
       <NameNote
         onOpenAccount={() => {
           accountFrom.current = view === 'noOne' ? 'noOne' : 'cms';
@@ -1280,7 +1291,7 @@ function AppBody({
     setView('noOne');
   }
 
-  /** "Change" in the editor: an unnamed person is dropped, then "Your people". */
+  /** "Your people" in the side nav: an unnamed person is dropped, then Your people opens. */
   function leaveCms() {
     sessions.pruneEmpty();
     setCmsItem(null);

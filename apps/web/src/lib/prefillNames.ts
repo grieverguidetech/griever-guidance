@@ -37,17 +37,27 @@ export function namesToPrefill(
   return { firstName, lastName: clean(clerkNames?.lastName) };
 }
 
-export function wasPrefilled(storage: Pick<Storage, 'getItem'>, userId: string): boolean {
+function readMarked(storage: Pick<Storage, 'getItem'>): string[] {
   try {
-    return storage.getItem(NAMES_PREFILLED_KEY) === userId;
+    const parsed: unknown = JSON.parse(storage.getItem(NAMES_PREFILLED_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
   } catch {
-    return false;
+    return [];
   }
 }
 
-export function markPrefilled(storage: Pick<Storage, 'setItem'>, userId: string): void {
+/** True when this user's names were already filled (or tried and saved) on this device. */
+export function wasPrefilled(storage: Pick<Storage, 'getItem'>, userId: string): boolean {
+  return readMarked(storage).includes(userId);
+}
+
+/** Remembers the user in a JSON set of user ids, so another account on the same device keeps its own turn. */
+export function markPrefilled(storage: Pick<Storage, 'getItem' | 'setItem'>, userId: string): void {
   try {
-    storage.setItem(NAMES_PREFILLED_KEY, userId);
+    const marked = readMarked(storage);
+    if (!marked.includes(userId)) {
+      storage.setItem(NAMES_PREFILLED_KEY, JSON.stringify([...marked, userId]));
+    }
   } catch {
     // Without storage the save may be tried again next visit; it only fills a profile that has no name.
   }

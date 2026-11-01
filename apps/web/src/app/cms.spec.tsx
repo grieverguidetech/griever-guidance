@@ -413,7 +413,7 @@ describe('editor on, signed in (#395)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
     expectOneEditorLayout();
-    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Account' }));
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Add your first name in Account so your messages are signed.' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     await user.type(await screen.findByLabelText('First name'), 'Anna');
     await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
@@ -421,6 +421,23 @@ describe('editor on, signed in (#395)', () => {
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ firstName: 'Anna', lastName: 'Reyes' })));
     expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
+  });
+
+  it('a brand-new user lands on the empty Overview in the shell with the checklist preview, and Your people has the same layout', async () => {
+    mocks.auth = true;
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
+    mocks.loadClerk.mockResolvedValue(fakeClerk().load);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
+    expectOneEditorLayout();
+    expect(within(screen.getByRole('complementary')).getByText('Your ticks are kept once you start with someone.')).toBeInTheDocument();
+    await user.click(peopleNav());
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    expectOneEditorLayout();
+    expect(within(screen.getByRole('complementary')).getByText('Your ticks are kept once you start with someone.')).toBeInTheDocument();
   });
 
   it('Your account with a person shows the checklist panel and the nav', async () => {
