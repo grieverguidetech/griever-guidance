@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PlaceInput } from './PlaceInput';
+import { PlaceInput, countText } from './PlaceInput';
 import { PlacesProvider } from './PlacesContext';
 import type { PlaceSuggestion, PlacesClient } from './placesClient';
 
@@ -15,8 +15,8 @@ const church: PlaceSuggestion = { id: 'b', text: 'St Mark Church, 2 Elm St, Spri
 
 function fakeClient(results: PlaceSuggestion[] = [funeralHome, church]) {
   const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue(results);
-  const endSession = vi.fn();
-  return { client: { suggest, endSession } satisfies PlacesClient, suggest, endSession };
+  const newToken = vi.fn(() => ({}));
+  return { client: { suggest, newToken } satisfies PlacesClient, suggest, newToken };
 }
 
 function setup(opts: { enabled?: boolean; load?: () => Promise<PlacesClient | null>; types?: readonly string[] } = {}) {
@@ -61,7 +61,7 @@ describe('PlaceInput', () => {
     expect(suggest).not.toHaveBeenCalled();
     expect(await screen.findAllByRole('option')).toHaveLength(2);
     expect(suggest).toHaveBeenCalledTimes(1);
-    expect(suggest).toHaveBeenCalledWith('oak', ['funeral_home', 'church']);
+    expect(suggest).toHaveBeenCalledWith('oak', ['funeral_home', 'church'], expect.any(Object));
   });
 
   it('sends one request for fast typing, with the whole text', async () => {
@@ -69,7 +69,7 @@ describe('PlaceInput', () => {
     setup({ load: () => Promise.resolve(client) });
     await typeAndWait('oak fun');
     expect(suggest).toHaveBeenCalledTimes(1);
-    expect(suggest).toHaveBeenCalledWith('oak fun', ['funeral_home', 'church']);
+    expect(suggest).toHaveBeenCalledWith('oak fun', ['funeral_home', 'church'], expect.any(Object));
   });
 
   it('is a combobox with a listbox, the count announced politely, and options at least 44px', async () => {
@@ -104,8 +104,8 @@ describe('PlaceInput', () => {
     expect(input()).toHaveFocus();
   });
 
-  it('Enter on the highlighted option fills the field with name and address, closes, and ends the session', async () => {
-    const { client, endSession } = fakeClient();
+  it('Enter on the highlighted option fills the field with name and address and closes', async () => {
+    const { client } = fakeClient();
     const { input, values } = setup({ load: () => Promise.resolve(client) });
     await typeAndWait('oak');
     await userEvent.keyboard('{ArrowDown}{Enter}');
@@ -114,7 +114,6 @@ describe('PlaceInput', () => {
     expect(screen.queryByRole('option')).toBeNull();
     expect(input().getAttribute('aria-expanded')).toBe('false');
     expect(input()).toHaveFocus();
-    expect(endSession).toHaveBeenCalledTimes(1);
   });
 
   it('a click on an option fills the field', async () => {
@@ -157,7 +156,7 @@ describe('PlaceInput', () => {
     let release: (v: PlaceSuggestion[]) => void = () => undefined;
     const slow: PlacesClient = {
       suggest: () => new Promise((r) => (release = r)),
-      endSession: vi.fn(),
+      newToken: () => ({}),
     };
     const { input } = setup({ load: () => Promise.resolve(slow) });
     await userEvent.type(input(), 'oak');
@@ -185,23 +184,111 @@ describe('PlaceInput', () => {
     expect(screen.getByRole('textbox', { name: 'Place' })).not.toHaveAttribute('aria-expanded');
   });
 
-  it('when Google does not load: the field keeps working, nothing is shown', async () => {
-    const { input } = setup({ load: () => Promise.resolve(null) });
-    await userEvent.type(input(), 'oak hall');
-    await new Promise((r) => setTimeout(r, 450));
-    expect(input().value).toBe('oak hall');
-    expect(screen.queryByRole('option')).toBeNull();
+  it('when Google does not load: the field becomes a plain textbox, nothing is shown', async () => {
+    setup({ load: () => Promise.resolve(null) });
+    await userEvent.type(screen.getByLabelText('Place'), 'oak hall');
+    const field = await screen.findByRole('textbox', { name: 'Place' });
+    expect(field).toHaveValue('oak hall');
+    expect(field).not.toHaveAttribute('aria-expanded');
+    expect(field).not.toHaveAttribute('aria-controls');
+    expect(screen.queryByRole('listbox')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('when a request fails: the field keeps working, nothing is shown', async () => {
-    const failing: PlacesClient = { suggest: () => Promise.reject(new Error('quota')), endSession: vi.fn() };
+    const failing: PlacesClient = { suggest: () => Promise.reject(new Error('quota')), newToken: () => ({}) };
     const { input } = setup({ load: () => Promise.resolve(failing) });
     await userEvent.type(input(), 'oak hall');
     await new Promise((r) => setTimeout(r, 450));
     expect(input().value).toBe('oak hall');
     expect(screen.queryByRole('option')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shares no token between fields, keeps one while typing, and starts a new one after a pick', async () => {
+    const { client, suggest, newToken } = fakeClient();
+    const load = () => Promise.resolve(client);
+    function Two() {
+      const [a, setA] = useState('');
+      const [b, setB] = useState('');
+      return (
+        <PlacesProvider value={{ enabled: true, load }}>
+          <label htmlFor="a">A</label>
+          <PlaceInput id="a" labelledBy="" value={a} types={['church']} onChange={setA} />
+          <label htmlFor="b">B</label>
+          <PlaceInput id="b" labelledBy="" value={b} types={['cemetery']} onChange={setB} />
+        </PlacesProvider>
+      );
+    }
+    render(<Two />);
+    const fieldA = screen.getByRole('combobox', { name: 'A' });
+    const fieldB = screen.getByRole('combobox', { name: 'B' });
+    await userEvent.type(fieldA, 'oak');
+    await screen.findByRole('listbox');
+    await userEvent.type(fieldA, 'x');
+    await waitFor(() => expect(suggest).toHaveBeenCalledTimes(2));
+    const tokenA = suggest.mock.calls[0][2];
+    expect(suggest.mock.calls[1][2]).toBe(tokenA);
+    await userEvent.type(fieldB, 'rest');
+    await waitFor(() => expect(suggest).toHaveBeenCalledTimes(3));
+    expect(suggest.mock.calls[2][2]).not.toBe(tokenA);
+    expect(newToken).toHaveBeenCalledTimes(2);
+    // Leaving a field ends its session: coming back starts a new token.
+    await userEvent.clear(fieldA);
+    await userEvent.type(fieldA, 'elm');
+    await waitFor(() => expect(suggest).toHaveBeenCalledTimes(4));
+    expect(suggest.mock.calls[3][2]).not.toBe(tokenA);
+  });
+
+  it('Escape ends the session and does not reach a parent handler', async () => {
+    const { client, suggest } = fakeClient();
+    const parentEscape = vi.fn();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && parentEscape();
+    const { input } = setup({ load: () => Promise.resolve(client) });
+    document.addEventListener('keydown', onKey);
+    await typeAndWait('oak');
+    await userEvent.keyboard('{Escape}');
+    document.removeEventListener('keydown', onKey);
+    expect(parentEscape).not.toHaveBeenCalled();
+    await userEvent.type(input(), 'x');
+    await waitFor(() => expect(suggest).toHaveBeenCalledTimes(2));
+    expect(suggest.mock.calls[1][2]).not.toBe(suggest.mock.calls[0][2]);
+  });
+
+  it('keeps the old options until the new answer arrives, and Down Arrow reopens a closed list', async () => {
+    const { client } = fakeClient();
+    const { input } = setup({ load: () => Promise.resolve(client) });
+    await typeAndWait('oak');
+    await userEvent.type(input(), 'x');
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    await userEvent.keyboard('{Escape}');
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    await userEvent.keyboard('{ArrowDown}');
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('scrolls the active option into view, nearest', async () => {
+    const { client } = fakeClient();
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    setup({ load: () => Promise.resolve(client) });
+    await typeAndWait('oak');
+    await userEvent.keyboard('{ArrowDown}');
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+  });
+
+  it('puts a separator between the name and the address for a screen reader', async () => {
+    const { client } = fakeClient();
+    setup({ load: () => Promise.resolve(client) });
+    await typeAndWait('oak');
+    expect(screen.getByRole('option', { name: /Oak Funeral Home\s*,\s*1 Main St/ })).toBeInTheDocument();
+  });
+
+  it('countText says none, one or many', () => {
+    expect(countText(0)).toBe('No suggestions');
+    expect(countText(1)).toBe('1 suggestion available');
+    expect(countText(3)).toBe('3 suggestions available');
   });
 });

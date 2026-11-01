@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
 import { DateInput } from '../../lib/DateField';
@@ -105,6 +105,8 @@ export function EventFields<K extends EventKey>({
   dateOfPassing,
 }: Props<K>) {
   const id = useId();
+  // The address the last pick wrote, so a later pick may replace it but never a typed one.
+  const pickedAddress = useRef<string | null>(null);
   const kind = dateNote(values[keys.date], { field: 'event', dateOfPassing });
   const note = kind === 'beforePassing' ? copy.beforePassing : undefined;
   const noteOnBlur = kind === 'unreadable' ? copy.dateUnreadable : undefined;
@@ -159,11 +161,19 @@ export function EventFields<K extends EventKey>({
           labelledBy={`${legendId} ${id}-place-label`}
           types={placeTypes}
           onPick={(pick) => {
-            if (addressKey && pick.secondaryText) {
-              onChange({ [keys.place]: pick.mainText, [addressKey]: pick.secondaryText } as Partial<Record<K, string>>);
-            } else {
+            if (!addressKey || !pick.secondaryText) {
               onChange({ [keys.place]: pick.text } as Partial<Record<K, string>>);
+              return false;
             }
+            const current = (values as Partial<Record<string, string>>)[addressKey] ?? '';
+            const mayFill = current === '' || current === pickedAddress.current;
+            if (!mayFill) {
+              onChange({ [keys.place]: pick.mainText } as Partial<Record<K, string>>);
+              return false;
+            }
+            pickedAddress.current = pick.secondaryText;
+            onChange({ [keys.place]: pick.mainText, [addressKey]: pick.secondaryText } as Partial<Record<K, string>>);
+            return true;
           }}
           value={values[keys.place] ?? ''}
           onChange={(v) => onChange({ [keys.place]: v } as Partial<Record<K, string>>)}

@@ -14,11 +14,14 @@ export interface PlaceSuggestion {
   secondaryText: string;
 }
 
+/** Groups the requests of one typing session. Opaque to callers; each field makes its own. */
+export type PlacesToken = object;
+
 export interface PlacesClient {
+  /** Starts a session. Fields never share one. Drop it after a pick, or when the field is left. */
+  newToken(): PlacesToken;
   /** Suggestions for the typed text, limited to these place types. Rejects on failure. */
-  suggest(input: string, types: readonly string[]): Promise<PlaceSuggestion[]>;
-  /** Call after the user picks a suggestion, so the next search starts a new session. */
-  endSession(): void;
+  suggest(input: string, types: readonly string[], token: PlacesToken): Promise<PlaceSuggestion[]>;
 }
 
 /** Resolves to a client, or null when suggestions are not available (no key, or Google did not load). Never rejects. */

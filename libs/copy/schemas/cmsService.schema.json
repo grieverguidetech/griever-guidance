@@ -39,7 +39,8 @@
     "placesListLabel",
     "placesOne",
     "placesMany",
-    "placesNone"
+    "placesNone",
+    "placesAddressFilled"
   ],
   "properties": {
     "typeLabel": {
@@ -148,6 +149,9 @@
       "$ref": "#/$defs/text"
     },
     "placesNone": {
+      "$ref": "#/$defs/text"
+    },
+    "placesAddressFilled": {
       "$ref": "#/$defs/text"
     }
   },

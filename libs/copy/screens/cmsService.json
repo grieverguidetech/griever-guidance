@@ -34,5 +34,6 @@
   "placesListLabel": "Place suggestions",
   "placesOne": "1 suggestion available",
   "placesMany": "{count} suggestions available",
-  "placesNone": "No suggestions"
+  "placesNone": "No suggestions",
+  "placesAddressFilled": "Address filled in"
 }

@@ -1,4 +1,4 @@
-import type { PlaceSuggestion, PlacesClient, PlacesLoader } from './placesClient';
+import type { PlaceSuggestion, PlacesClient, PlacesLoader, PlacesToken } from './placesClient';
 
 /** The part of the Maps JavaScript API we use. Typed here so no extra package is needed. */
 /** Google's FormattableText. Read it with toString(); every field is guarded. */
@@ -12,12 +12,12 @@ interface GooglePrediction {
   secondaryText?: GoogleText;
 }
 interface GooglePlacesLibrary {
-  AutocompleteSessionToken: new () => object;
+  AutocompleteSessionToken: new () => PlacesToken;
   AutocompleteSuggestion: {
     fetchAutocompleteSuggestions(request: {
       input: string;
       includedPrimaryTypes: string[];
-      sessionToken: object;
+      sessionToken: PlacesToken;
       region: string;
       language: string;
     }): Promise<{ suggestions: { placePrediction: GooglePrediction | null }[] }>;
@@ -28,39 +28,53 @@ interface GoogleMapsGlobal {
 }
 
 const MAPS_SCRIPT = 'https://maps.googleapis.com/maps/api/js';
+const CALLBACK_NAME = '__griever_maps_ready';
+/** A load slower than this counts as failed. */
+export const LOAD_TIMEOUT_MS = 8000;
 
 /** The browser key, or '' when the build has none. */
 export const googleMapsKey = (): string => String(import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] ?? '').trim();
 
-function loadScript(key: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+/**
+ * Adds the Maps script with Google's documented `callback` parameter, which runs once the API is ready.
+ * Resolves true then, false on a script error or after the timeout. Never rejects.
+ */
+function loadScript(key: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const holder = globalThis as unknown as Record<string, unknown>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const done = (ok: boolean) => {
+      clearTimeout(timer);
+      delete holder[CALLBACK_NAME];
+      resolve(ok);
+    };
+    holder[CALLBACK_NAME] = () => done(true);
+    timer = setTimeout(() => done(false), LOAD_TIMEOUT_MS);
     const script = document.createElement('script');
-    script.src = `${MAPS_SCRIPT}?key=${encodeURIComponent(key)}&loading=async&libraries=places`;
+    script.src = `${MAPS_SCRIPT}?key=${encodeURIComponent(key)}&loading=async&libraries=places&callback=${CALLBACK_NAME}`;
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('maps script failed'));
+    script.onerror = () => done(false);
     document.head.appendChild(script);
   });
 }
 
+const withoutCountry = (line: string) => line.replace(/,\s*USA$/, '');
+
 /** Falls back to the single line when the name or address part is missing. */
 function toSuggestion(p: GooglePrediction): PlaceSuggestion | null {
-  const text = p.text?.toString() ?? '';
+  const text = withoutCountry(p.text?.toString() ?? '');
   if (!text) {
     return null;
   }
   const main = p.mainText?.toString() ?? '';
-  const secondary = p.secondaryText?.toString() ?? '';
+  const secondary = withoutCountry(p.secondaryText?.toString() ?? '');
   return { id: p.placeId, text, mainText: main || text, secondaryText: secondary };
 }
 
 function makeClient(lib: GooglePlacesLibrary): PlacesClient {
-  // One token per typing session, reset after a pick. We make no Place Details call, so Google bills
-  // each session as search-only.
-  let token: object | null = null;
   return {
-    async suggest(input, types) {
-      token ??= new lib.AutocompleteSessionToken();
+    newToken: () => new lib.AutocompleteSessionToken(),
+    async suggest(input, types, token) {
       const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input,
         includedPrimaryTypes: [...types],
@@ -73,9 +87,6 @@ function makeClient(lib: GooglePlacesLibrary): PlacesClient {
         return one ? [one] : [];
       });
     },
-    endSession() {
-      token = null;
-    },
   };
 }
 
@@ -84,7 +95,8 @@ let loading: Promise<PlacesClient | null> | null = null;
 /**
  * Loads Google Maps the first time it is called, and only if the build has a key.
  * Nothing is requested from Google until then, so a visitor who never types in a place
- * field never contacts Google. A failed load is remembered; the field stays plain text.
+ * field never contacts Google. The answer, a failure too, is remembered: one script tag,
+ * one promise, and no retry. After a failure the fields stay plain text.
  */
 export const loadGooglePlaces: PlacesLoader = () => {
   const key = googleMapsKey();
@@ -93,7 +105,9 @@ export const loadGooglePlaces: PlacesLoader = () => {
   }
   loading ??= (async () => {
     try {
-      await loadScript(key);
+      if (!(await loadScript(key))) {
+        return null;
+      }
       const maps = (globalThis as { google?: GoogleMapsGlobal }).google?.maps;
       if (!maps?.importLibrary) {
         return null;

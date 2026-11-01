@@ -509,18 +509,22 @@ shared person sync never carries contact ids or edited wording (C2 until it was 
   user's own message text. It is kept only in the on-device draft until sent and never syncs (C2, dropped 2026-10-30 for the web editor; still true in the flag-off send flow).
   The removed Convex design would have synced it as `screens.B4.values.messageOverride`, but nothing
   wrote it there.
-- **Place suggestions (Google, #580).** In the web editor's Service section, the service place and burial
-  place fields can ask Google Places for suggestions. Google gets only the text typed in that field (at
-  least 3 characters, after a 300 ms pause), the place types asked for, the browser key, and an
-  autocomplete session token, plus what any browser request sends (IP address, user agent, referrer).
-  It gets nothing else from the person, no contacts and no messages. Nothing loads from Google until the user types in one of
-  these fields, and the build needs `VITE_GOOGLE_MAPS_API_KEY`; without it the fields are plain text and
-  Google is never contacted. The chosen place text is saved like any typed text. Google's own terms and
-  privacy policy apply to those requests.
 - **Send jobs / delivery receipts.** Server-owned already (README B5); they are read down by their
   own query, not through the session cursor.
 - *(The C3 checklist ticks are **not** synced: they stay in the local `account` store — see §2.1.
   They are the one thing that outlives a session.)*
+
+### Third parties: Google Places
+
+In the web editor's Service section, the service place and burial place fields can ask Google Places
+for suggestions (#580). Google gets only the text typed in that field (at least 3 characters, after a
+300 ms pause), the place types asked for, the browser key, and an autocomplete session token, plus what
+any browser request sends (IP address, user agent, referrer). It gets nothing else from the person, no
+contacts and no messages. Nothing loads from Google until the user types in one of these fields, and the
+build needs `VITE_GOOGLE_MAPS_API_KEY`; without it the fields are plain text and Google is never
+contacted. The picked text (and the address it fills) is saved like any typed text and syncs with the
+other person details (`servicePlace`, `serviceAddress`, `burialPlace`). Google's own terms and privacy
+policy apply to those requests.
 
 ### Shared people
 
