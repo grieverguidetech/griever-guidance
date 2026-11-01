@@ -115,7 +115,7 @@ describe('Nested notes under the gather rows (#605)', () => {
 
   it('says each is not needed on the account, and has no exclamation point', () => {
     for (const note of Object.values(notes)) {
-      expect(note).toContain('You do not need to add it to your account.');
+      expect(note).toMatch(/You do not need to add (it|them) to your account\./);
       expect(note).not.toContain('!');
     }
   });
