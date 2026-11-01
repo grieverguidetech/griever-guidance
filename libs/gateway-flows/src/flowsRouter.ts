@@ -105,10 +105,10 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     maxSize: MAX_BODY_BYTES,
     onError: (c) => c.json({ error: FLOWS_TOO_LARGE }, 413),
   });
-  // Each path is registered once. Limit runs after auth, so a caller with no token gets 401 whatever the size.
-  for (const path of ['/flows', '/flows/*']) {
-    router.use(path, clerkAuth(config.getAuthConfig), writeRateLimit(), limit);
-  }
+  // Registered once: in Hono, '/flows/*' also matches '/flows', so a second '/flows' entry would run
+  // the whole chain twice on POST /flows. Limit runs after auth, so a caller with no token gets 401
+  // whatever the size.
+  router.use('/flows/*', clerkAuth(config.getAuthConfig), writeRateLimit(), limit);
 
   const respond = (
     c: Context<Env>,

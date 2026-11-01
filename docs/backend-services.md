@@ -221,8 +221,9 @@ tokenless `POST /invites` gives 401.
 **What it does.** Limits write requests (POST, PUT, PATCH, DELETE) under `/flows*` and `/me*` to
 **120 per 60 seconds per signed-in user**. Reads are not counted. The middleware runs right after
 `clerkAuth`, so the key is the verified Clerk user id (`user:<id>`). If a request somehow has no user,
-the key is the client IP (`ip:<cf-connecting-ip>`). `/members*` and `/invites*` are not covered; they
-have their own limits in the data function.
+the key is the client IP (`ip:<cf-connecting-ip>`). `/members*` and `/invites*` are not covered by this middleware. Only invite creation
+has a limit of its own (in the data function). The count is per user, so it is shared across all of that
+user's tabs and devices (web and phone together).
 
 | Item | Detail |
 |---|---|
@@ -231,7 +232,7 @@ have their own limits in the data function.
 | No binding | Local dev (`apps/gateway/src/main.ts`) and tests have no binding, so the middleware passes through |
 | Limiter error | Passes through. A broken limiter must not block someone saving their work |
 | Accuracy | Counts are per Cloudflare location and eventually consistent. This stops runaway clients; it is not an exact quota |
-| Client | `libs/api-client` maps 429 to `rate_limited` (flows, profile). `useFlowSync` keeps the edit queued, stops the cycle and retries with backoff. Nothing local is dropped. Copy stays calm (C7) |
+| Client | `libs/api-client` maps 429 to `rate_limited` (flows, profile). `useFlowSync` keeps the edit queued, stops the cycle and retries with backoff of 5, 10, 20, 40 s and on (capped at 5 min); it ignores `Retry-After`, and edits made during the wait do not restart the timer. For flows, nothing local is dropped. A profile save that gets a 429 shows its own calm message and the entered text stays on screen. Copy stays calm (C7) |
 
 **Why 120.** The web autosaves one PATCH after 1 s without typing (`EDIT_DEBOUNCE_MS` in
 `libs/hooks/src/useFlowSync.ts`). Writes in one cycle run one after another. Even if someone paused

@@ -19,6 +19,7 @@ const MESSAGES = {
   email_taken: 'This email already has an account. Sign in instead.',
   invalid_credentials: "That email and password don't match. Please try again.",
   rate_limited: 'Too many tries. Please wait a few minutes and try again.',
+  profile_rate_limited: "We couldn't save that just now. Please try again in a minute.",
   offline: "You need a connection to do this. Nothing you've typed is lost.",
   unavailable: "We can't reach your account right now. Please try again in a little while.",
   weak_password: 'Please choose a stronger password.',
