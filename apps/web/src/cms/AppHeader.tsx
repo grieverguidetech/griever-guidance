@@ -5,7 +5,7 @@
 export function AppHeader() {
   return (
     <header className="flex items-center min-h-11 py-2">
-      <img src="/brand/wordmark.svg" alt="Grievers Guidance" className="h-6 w-auto" />
+      <img src="/brand/wordmark.svg" alt="Grievers Guidance" width={188} height={24} className="h-6 w-auto" />
     </header>
   );
 }

@@ -30,5 +30,11 @@ describe('brand files', () => {
     const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
     expect(doc.querySelector('parsererror')).toBeNull();
     expect(doc.documentElement.nodeName).toBe('svg');
+    expect(svg).not.toMatch(/<script|href=|<foreignObject/i);
+  });
+
+  it('the header wordmark has no dark-scheme colours, since the page has no dark theme', () => {
+    const svg = readFileSync(resolve(webRoot, 'public/brand/wordmark.svg'), 'utf8');
+    expect(svg).not.toContain('prefers-color-scheme');
   });
 });

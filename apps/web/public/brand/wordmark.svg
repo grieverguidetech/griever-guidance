@@ -3,7 +3,6 @@
     .sun { fill: #006786; }
     .line { stroke: #201e1d; }
     .name { fill: #201e1d; }
-    @media (prefers-color-scheme: dark) { .line { stroke: #f3f2f2; } .name { fill: #f3f2f2; } .sun { fill: #62c5ee; } }
   </style>
   <g transform="scale(0.5)">
     <path class="sun" d="M12 40a20 20 0 0 1 40 0z"/>
