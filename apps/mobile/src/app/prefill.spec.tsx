@@ -22,49 +22,53 @@ const openMoment = async (session: Session, moment: RegExp) => {
 };
 const openService = (session: Session) => openMoment(session, /Share the service/);
 
+// Service and thank-you open on Who should know?; the planned details are on the send screen.
 const toConfirm = async () => {
-  fireEvent.press(await screen.findByText('Continue'));
   fireEvent.press(await screen.findByText('Dee'));
   fireEvent.press(screen.getByText('Continue'));
 };
 
 describe('send flow starts from the planned details', () => {
-  it('fills the service form once from the synced time and place', async () => {
+  it('opens Who should know?, then Confirm shows the planned time and place', async () => {
     await openService({ ...base, serviceTime: '2:00 PM', servicePlace: 'St. Mary', serviceAddress: '12 Main St' } as Session);
-    expect((await screen.findByPlaceholderText('e.g. 2:00 PM')).props.value).toBe('2:00 PM');
-    expect(screen.getByPlaceholderText('Start typing a place or address').props.value).toBe('St. Mary, 12 Main St');
-    // Clearing every prefilled field is not filled back in while the form stays open.
-    fireEvent.changeText(screen.getByPlaceholderText('e.g. 2:00 PM'), '');
-    fireEvent.changeText(screen.getByPlaceholderText('Start typing a place or address'), '');
-    expect(screen.getByPlaceholderText('e.g. 2:00 PM').props.value).toBe('');
-    expect(screen.getByPlaceholderText('Start typing a place or address').props.value).toBe('');
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    await toConfirm();
+    expect(await screen.findByDisplayValue('2:00 PM')).toBeTruthy();
+    expect(screen.getByDisplayValue('St. Mary, 12 Main St')).toBeTruthy();
+  });
+
+  it('carries the planned date from the person to Confirm', async () => {
+    await openService({ ...base, serviceDate: 'June 14' } as Session);
+    await screen.findByRole('heading', { name: 'Who should know?' });
+    await toConfirm();
+    expect((await screen.findByLabelText('Service date')).props.value).toBe('June 14');
   });
 
   it('uses the edited service message as the message', async () => {
     await openService({ ...base, serviceDate: 'June 14', serviceTime: '2:00 PM', servicePlace: 'St. Mary', serviceMessage: 'Please join us at two.' } as Session);
-    await screen.findByPlaceholderText('e.g. 2:00 PM');
+    await screen.findByRole('heading', { name: 'Who should know?' });
     await toConfirm();
     expect(await screen.findByDisplayValue('Please join us at two.')).toBeTruthy();
   });
 
   it('never overwrites a draft in progress', async () => {
     const draft = {
-      step: 'details', templateCategory: 'service', templateOverrideId: null,
+      step: 'contacts', templateCategory: 'service', templateOverrideId: null,
       fields: { serviceDate: 'June 20', serviceTime: '9:00 AM', serviceLocation: 'Home' }, serviceDetailsKnown: null, selectedContactIds: [],
       includeFlowers: false, customFlorist: '', flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
     };
     await openService({
       ...base, serviceDate: 'June 14', servicePlace: 'St. Mary', serviceTime: '2:00 PM', serviceMessage: 'Synced wording', drafts: { service: draft },
     } as unknown as Session);
-    expect((await screen.findByPlaceholderText('e.g. 2:00 PM')).props.value).toBe('9:00 AM');
+    await screen.findByRole('heading', { name: 'Who should know?' });
     await toConfirm();
+    expect(await screen.findByDisplayValue('9:00 AM')).toBeTruthy();
     expect(screen.queryByDisplayValue('Synced wording')).toBeNull();
   });
 
   it('keeps the edited thank-you wording when the name is filled from the person', async () => {
     await openMoment({ ...base, senderName: 'The Hayes Family', thanksMessage: 'Thank you all.' } as Session, /thank-yous/);
-    expect((await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes')).props.value).toBe('Anna');
-    expect(screen.getByPlaceholderText('e.g. The Hayes Family').props.value).toBe('The Hayes Family');
+    await screen.findByRole('heading', { name: 'Who should know?' });
     await toConfirm();
     expect(await screen.findByText('Thank you all.')).toBeTruthy();
   });
@@ -80,11 +84,14 @@ describe('send flow starts from the planned details', () => {
 
   it('leaves a draft with an emptied message alone', async () => {
     const draft = {
-      step: 'details', templateCategory: 'service', templateOverrideId: null, fields: {},
+      step: 'contacts', templateCategory: 'service', templateOverrideId: null, fields: {},
       serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
       flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: '',
     };
     await openService({ ...base, serviceTime: '2:00 PM', drafts: { service: draft } } as unknown as Session);
-    expect((await screen.findByPlaceholderText('e.g. 2:00 PM')).props.value).toBe('');
+    await screen.findByRole('heading', { name: 'Who should know?' });
+    await toConfirm();
+    expect(await screen.findByDisplayValue('')).toBeTruthy();
+    expect(screen.queryByDisplayValue('2:00 PM')).toBeNull();
   });
 });

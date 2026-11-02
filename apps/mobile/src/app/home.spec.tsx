@@ -121,7 +121,7 @@ describe('the order in the app', () => {
     expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
   });
 
-  it('opens the details form with the name from setup already filled', async () => {
+  it('opens Who should know? with the name from setup already in the draft', async () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], [{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]);
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
@@ -132,10 +132,12 @@ describe('the order in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('One thing at a time.');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
-    await waitFor(async () =>
-      expect((await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes')).props.value).toBe('Ben Cole'),
-    );
-    // The date is kept on the person; this moment's form has no date field, the message reads it from them.
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    await waitFor(async () => {
+      const kept = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { fields: Record<string, string> }> }[];
+      expect(kept.find((p) => p.personName === 'Ben Cole')?.drafts?.['aftercare']?.fields['deceasedName']).toBe('Ben Cole');
+    });
+    // The date is kept on the person; the message reads it from them.
     const kept = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? "[]") as { personName: string; dateOfPassing: string }[];
     expect(kept.find((p) => p.personName === "Ben Cole")?.dateOfPassing).toBe('June 7, 2025');
   });
@@ -160,9 +162,12 @@ describe('the order in the app', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
-    await waitFor(async () =>
-      expect((await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes')).props.value).toBe('Anna Lee'),
-    );
+    // The draft on the retired details step resumes on Who should know?, and keeps its fields.
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    await waitFor(async () => {
+      const [kept] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { drafts: Record<string, { step: string; fields: Record<string, string> }> }[];
+      expect(kept.drafts['aftercare']).toMatchObject({ step: 'contacts', fields: { deceasedName: 'Anna Lee' } });
+    });
   });
 });
 
@@ -177,13 +182,13 @@ describe('Home from every step', () => {
     jest.restoreAllMocks();
   });
 
-  it('Back from a resumed details step chains through the hub to Home', async () => {
+  it('Back from a resumed first step chains through the hub to Home', async () => {
     const anna = { ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({ deceasedName: 'Anna' }) } };
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
-    await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
+    await screen.findByRole('heading', { name: 'Who should know?' });
     // No Home bar (#364): Back from the first form goes to the hub, and Back there goes Home.
     expect(screen.queryByLabelText('Back to home')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));

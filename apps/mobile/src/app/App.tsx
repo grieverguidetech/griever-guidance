@@ -12,7 +12,6 @@ import type { Session, SendFlowDraft } from '@griever/hooks';
 import { obituaryLink, sendPrefill } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { AnnounceScreen } from '../screens/AnnounceScreen';
-import { DetailsFormScreen } from '../screens/DetailsFormScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ConfirmScreen } from '../screens/ConfirmScreen';
 import { SendingScreen } from '../screens/SendingScreen';
@@ -77,7 +76,6 @@ const Opening = () => (
 export type RootStackParamList = {
   Home: undefined;
   Starting: undefined;
-  DetailsForm: undefined;
   Announce: undefined;
   ContactSelector: undefined;
   Confirm: undefined;
@@ -125,7 +123,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const latest = latestInProgressDraft(session);
   const flow = useSendFlow({
     session,
-    draft: latest && resumeDraft(latest),
+    draft: latest && resumeDraft(latest, true),
+    // Service and thank-you open on Who should know?; their details are edited on the send screen.
+    skipDetails: true,
     drafts: session.drafts,
     onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
   });
@@ -162,7 +162,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
-  // What is typed on the details form becomes this person's details, so Home can list
+  // What is typed on the announcement form becomes this person's details, so Home can list
   // them and retention can use the service date. Compared with what was there when the form
   // opened, so opening it (its fields start empty) never wipes the saved name.
   const name = flow.fields['deceasedName'] ?? '';
@@ -171,7 +171,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const seen = useRef<Details | null>(null);
   const { setField, selectedTemplate } = flow;
   useEffect(() => {
-    if (flow.step !== 'details' && flow.step !== 'announce') {
+    if (flow.step !== 'announce') {
       seen.current = null;
       return;
     }
@@ -189,11 +189,10 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 
   // The name and date typed at setup are already in the first form when it opens. Once per visit to
   // the form, so clearing a field is never filled back in.
-  // The obituary's first form is Who should know? (the contacts step), so it counts as a form too.
+  // For every other moment the first form is Who should know? (the contacts step), so it counts as a form too.
   const onForm =
-    flow.step === 'details' ||
     flow.step === 'announce' ||
-    (flow.step === 'contacts' && flow.templateCategory === 'obituary');
+    (flow.step === 'contacts' && flow.templateCategory !== 'announcement');
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
   const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;
@@ -602,9 +601,6 @@ const Navigation = ({
           <Stack.Screen name="Announce">
             {() => withPersonContext(bar, <AnnounceScreen flow={flow} onEditPerson={onEditPerson} />)}
           </Stack.Screen>
-        )}
-        {(flow.step === 'details' || flow.step === 'serviceKnown') && (
-          <Stack.Screen name="DetailsForm">{() => withPersonContext(bar, <DetailsFormScreen flow={flow} />)}</Stack.Screen>
         )}
         {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
