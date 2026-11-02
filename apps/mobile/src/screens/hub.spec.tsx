@@ -3,6 +3,8 @@ import { AccessibilityInfo, BackHandler, Modal, Platform, StyleSheet } from 'rea
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
+import { screenCopy } from '@griever/copy';
+import { templates } from '@griever/shared';
 import { colors } from '@griever/tokens';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
@@ -146,7 +148,7 @@ describe('HubScreen', () => {
     // The service is the next step, so it is a card; its status sits in the card.
     expect(screen.getByText('Ready')).toBeTruthy();
     expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs the obituary link/)).toBeTruthy();
-    expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs your name or family name/)).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs your name/)).toBeTruthy();
     const titles = screen.getAllByText(/Announced the passing|Share the service|Share the obituary|Send thank-yous/).map((n) => n.props.children);
     expect(titles).toEqual(['Announced the passing', 'Share the service', 'Share the obituary', 'Send thank-yous']);
   });
@@ -169,7 +171,7 @@ describe('HubScreen', () => {
     expect(within(screen.getByRole('button', { name: /Share the service/ })).getByText(/Needs the service date/)).toBeTruthy();
     const thanks = screen.getByRole('button', { name: /Send thank-yous/ });
     expect(thanks.props.accessibilityHint).toBe('Included with the full plan');
-    expect(within(thanks).getByText(/Needs your name or family name/)).toBeTruthy();
+    expect(within(thanks).getByText(/Needs your name/)).toBeTruthy();
   });
 
   it('opens What you will need in a sheet', () => {
@@ -310,14 +312,22 @@ describe('HubScreen', () => {
   it('names the first missing required field in the status line (#654)', () => {
     setup(anna, true);
     const lines = screen.getAllByText(/^Needs /).map((n) => n.props.children);
-    expect(lines).toEqual(expect.arrayContaining(['Needs the service date', 'Needs your name or family name']));
+    expect(lines).toEqual(expect.arrayContaining(['Needs the service date', 'Needs your name']));
     expect(lines).toContain('Needs the obituary link');
     expect(screen.queryByText('Needs a detail')).toBeNull();
   });
 
+  it('has a plain name for every required template field (#654)', () => {
+    const names = screenCopy('pathLanding').statusFieldNames as Record<string, string>;
+    const required = templates.flatMap((t) => t.fields).filter((f) => f.required).map((f) => f.key);
+    for (const key of required) {
+      expect(names[key]).toBeTruthy();
+    }
+  });
+
   it('moves to the next missing field once the first is filled', () => {
     setup({ ...anna, serviceDate: 'June 14, 2026', serviceTime: '2:00 PM' } as Session, true);
-    expect(screen.getByText('Needs the location')).toBeTruthy();
+    expect(screen.getByText('Needs the place')).toBeTruthy();
   });
 
   it('uses the header variant for Edit person, so it is not the first strong button', () => {

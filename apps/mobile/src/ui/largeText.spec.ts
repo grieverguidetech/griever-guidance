@@ -25,6 +25,8 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['ui/screens/Account.tsx', 'topBar'],
   ['ui/screens/Sending.tsx', 'person'],
   ['screens/ContactSelectorScreen.tsx', 'topBar'],
+  ['ui/screens/PersonSetup.tsx', 'topBar'],
+  ['ui/screens/ShareObituary.tsx', 'topBar'],
 ];
 
 describe('rows that hold two controls wrap and keep a gap (#654)', () => {
@@ -43,6 +45,25 @@ describe('inputs are at least 15 pt (#654)', () => {
     ['ui/screens/Announce.tsx', 'input'],
     ['components/DetailsRow.tsx', 'input'],
     ['components/SavedNote.tsx', 'note'],
+    ['ui/screens/PersonSetup.tsx', 'input'],
+    ['ui/screens/ShareObituary.tsx', 'input'],
+  ])('%s %s', (file, name) => {
+    const size = /fontSize:\s*(\d+)/.exec(styleBlock(file, name));
+    expect(Number(size?.[1])).toBeGreaterThanOrEqual(15);
+  });
+});
+
+describe('text is at least 15 pt (#654)', () => {
+  it.each([
+    ['screens/ContactsStepScreen.tsx', 'empty'],
+    ['screens/ContactsStepScreen.tsx', 'reason'],
+    ['screens/ContactsStepScreen.tsx', 'name'],
+    ['screens/ContactsStepScreen.tsx', 'phone'],
+    ['screens/ContactsStepScreen.tsx', 'count'],
+    ['screens/ContactsStepScreen.tsx', 'eyebrow'],
+    ['screens/ContactsStepScreen.tsx', 'status'],
+    ['screens/ContactsStepScreen.tsx', 'note'],
+    ['ui/screens/WhoShouldKnow.tsx', 'error'],
   ])('%s %s', (file, name) => {
     const size = /fontSize:\s*(\d+)/.exec(styleBlock(file, name));
     expect(Number(size?.[1])).toBeGreaterThanOrEqual(15);

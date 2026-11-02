@@ -69,12 +69,14 @@ describe('mobile-only hub copy (#654)', () => {
 
   it('names a missing field, with and without "the"', () => {
     const hub = screenCopy('pathLanding');
-    expect(fill(hub.statusNeedsField, { field: 'service time' })).toBe('Needs the service time');
-    expect(fill(hub.statusNeedsOwnField, { field: 'your name' })).toBe('Needs your name');
+    expect(fill(hub.statusNeedsField, { field: hub.statusFieldNames['serviceTime'] })).toBe('Needs the service time');
+    expect(fill(hub.statusNeedsField, { field: hub.statusFieldNames['senderName'] })).toBe('Needs your name');
   });
 
   it('has the Bring back my words button for the review screen', () => {
     expect(screenCopy('review').bringBack).toBe('Bring back my words');
+    expect(screenCopy('review').suggestedInPlace).toBe('Suggested wording in place.');
+    expect(screenCopy('review').wordsBack).toBe('Your words are back.');
   });
 });
 

@@ -725,6 +725,7 @@ export function PersonRow({
         {selected ? (
           <Text
             style={styles.tick}
+            allowFontScaling={false}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
@@ -767,7 +768,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
   },
-  error: { fontSize: 12, color: DANGER },
+  error: { fontSize: 15, color: DANGER },
   formButtons: { flexDirection: 'row', gap: spacing[2], alignItems: 'center' },
   row: {
     minHeight: minTouchTarget,
@@ -781,7 +782,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors['neutral-600'],
   },
-  rowSelected: { borderColor: colors.accent },
+  // Selected: accent-700 edge and a pale accent fill, so it differs from an unselected row by more than a thin line (see colors.spec).
+  rowSelected: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
   box: {
     position: 'absolute',
     right: spacing[3],

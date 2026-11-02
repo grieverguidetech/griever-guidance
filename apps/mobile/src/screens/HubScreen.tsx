@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
+import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
@@ -11,7 +11,6 @@ import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { SentNoteText } from '../lib/sendNote';
-import { fieldPhrase, firstMissingField } from '../lib/firstMissingField';
 
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
@@ -38,16 +37,14 @@ function statusLine(status: SendCardStatus, session: Session, key: MomentKey): s
   return fill(copy.statusSent, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
 }
 
-/** "Needs the service time": names the first missing required field. Falls back to the plain line. */
+/** "Needs the service date": names the first missing required field. Falls back to the plain line. */
 function needsLine(session: Session, key: MomentKey): string {
   const field = firstMissingField(session, key);
-  if (!field) {
+  const name = field ? (copy.statusFieldNames as Record<string, string>)[field.key] : undefined;
+  if (!name) {
     return copy.statusNeedsDetail;
   }
-  const phrase = fieldPhrase(field.label);
-  // A label such as "Your name or family name" already starts with "your": no "the" before it.
-  const template = phrase.startsWith('your ') ? copy.statusNeedsOwnField : copy.statusNeedsField;
-  return fill(template, { field: phrase });
+  return fill(copy.statusNeedsField, { field: name });
 }
 
 /** A finished card adds its date and the send-again hint; the others show the status line alone. */

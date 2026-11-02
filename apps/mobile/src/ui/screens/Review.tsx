@@ -30,6 +30,10 @@ export interface ReviewCopy {
   useSuggested: string;
   /** Restores the words that "Use the suggested wording" just dropped. */
   bringBack: string;
+  /** Said politely after "Use the suggested wording". */
+  suggestedInPlace: string;
+  /** Said politely after "Bring back my words". */
+  wordsBack: string;
   checklist: string;
   /** Why Send is unavailable when the message is empty. */
   blank: string;
@@ -100,6 +104,12 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   const toneReasonId = useId();
   // The words dropped by "Use the suggested wording", kept until the next edit.
   const [dropped, setDropped] = useState<string | null>(null);
+  // The swap removes the button that was pressed, so focus moves on to its replacement once it is drawn.
+  const [focusNext, setFocusNext] = useState<'bringBack' | 'useSuggested' | null>(null);
+  const [swapNote, setSwapNote] = useState<string | undefined>(undefined);
+  const useSuggestedRef = useRef<ButtonNode>(null);
+  const bringBackRef = useRef<ButtonNode>(null);
+  const swapNoteId = useId();
   const blank = message.trim() === '';
   const shareReasonId = useId();
   const shareErrorId = useId();
@@ -116,20 +126,40 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
     }
   }, [editing, returnFocus]);
 
+  useEffect(() => {
+    if (focusNext === 'bringBack') {
+      focusNode(bringBackRef.current);
+    } else if (focusNext === 'useSuggested') {
+      if (editing) {
+        fieldRef.current?.focus();
+      } else {
+        focusNode(useSuggestedRef.current);
+      }
+    }
+    if (focusNext) {
+      setFocusNext(null);
+    }
+  }, [focusNext, editing]);
+
   const changeMessage = (next: string) => {
     setDropped(null);
+    setSwapNote(undefined);
     onMessageChange(next);
   };
 
   const useSuggestedWording = () => {
     setDropped(message);
     onUseSuggested();
+    setSwapNote(copy.suggestedInPlace);
+    setFocusNext('bringBack');
   };
 
   const bringBackWords = () => {
     if (dropped !== null) {
       onMessageChange(dropped);
       setDropped(null);
+      setSwapNote(copy.wordsBack);
+      setFocusNext('useSuggested');
     }
   };
 
@@ -187,8 +217,9 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           <Status id={toneReasonId} message={edited ? copy.toneKept : undefined} />
         </View>
       ) : null}
-      {edited ? <Button label={copy.useSuggested} variant="ghost" onPress={useSuggestedWording} /> : null}
-      {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" onPress={bringBackWords} /> : null}
+      {edited ? <Button label={copy.useSuggested} variant="ghost" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}
+      {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
+      <Status id={swapNoteId} message={swapNote} />
       {share?.only ? null : (
         <>
           <Button

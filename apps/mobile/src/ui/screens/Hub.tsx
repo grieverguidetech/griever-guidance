@@ -1,7 +1,7 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { colors, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
@@ -139,12 +139,10 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     // Opens this step's message: a draft still under way (a re-send left half-way) comes back,
     // otherwise it is new and empty, because a finished send keeps no wording (C2).
     return (
-      <View style={styles.stepBox}>
-        <Row onPress={() => onStart(row.key)}>
-          <Body tone="muted">{text.doneLabel}</Body>
-          <Meta meta={row.meta} />
-        </Row>
-      </View>
+      <Row bordered onPress={() => onStart(row.key)}>
+        <Body tone="strong">{text.doneLabel}</Body>
+        <Meta meta={row.meta} />
+      </Row>
     );
   }
 
@@ -168,13 +166,11 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
   }
 
   return (
-    <View style={styles.stepBox}>
-      <Row onPress={() => onStart(row.key)}>
-        <Body tone="muted">{row.started ? `${text.title} · ${copy.metaStarted}` : text.title}</Body>
-        <Body>{text.body}</Body>
-        <Meta meta={row.meta} />
-      </Row>
-    </View>
+    <Row bordered onPress={() => onStart(row.key)}>
+      <Body tone="strong">{row.started ? `${text.title} · ${copy.metaStarted}` : text.title}</Body>
+      <Body>{text.body}</Body>
+      <Meta meta={row.meta} />
+    </Row>
   );
 }
 
@@ -198,8 +194,6 @@ const styles = StyleSheet.create({
   // The name may be long; it wraps, and the Edit person button keeps its full width.
   eyebrowText: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
-  // A visible edge so a finished or later step reads as something to press (neutral-600: 3:1 or more).
-  stepBox: { paddingHorizontal: spacing[3], borderWidth: 1, borderColor: colors['neutral-600'], borderRadius: radius.md },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 

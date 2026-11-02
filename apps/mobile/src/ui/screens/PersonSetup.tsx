@@ -160,7 +160,7 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
   optional: { color: colors['neutral-700'], fontWeight: '400' },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 14,
+    fontSize: 15,
   },
   // Native focus cue (web draws its own ring through data-gg-field).
   inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },

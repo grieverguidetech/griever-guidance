@@ -1,7 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { Pressable, StyleSheet } from 'react-native';
-import { minTouchTarget, spacing } from '@griever/tokens';
+import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
 
@@ -23,10 +23,12 @@ export interface RowProps {
    * The row keeps room for it. It is not part of the row's name.
    */
   trailing?: ReactNode;
+  /** Draws a visible edge round the whole row, so the pressable area and the focus ring match it. */
+  bordered?: boolean;
 }
 
 /** A whole line that is one button, for example a step in a list. */
-export function Row({ children, onPress, ariaDisabled = false, describedBy, hint, rowRef, trailing }: RowProps) {
+export function Row({ children, onPress, ariaDisabled = false, describedBy, hint, rowRef, trailing, bordered = false }: RowProps) {
   const extra: Record<string, unknown> = {};
   if (describedBy) {
     extra['aria-describedby'] = describedBy;
@@ -45,7 +47,7 @@ export function Row({ children, onPress, ariaDisabled = false, describedBy, hint
       // No accessibility `disabled` state, even when aria-disabled: on native it swallows the tap.
       accessibilityHint={hint}
       onPress={onPress}
-      style={[styles.row, trailing ? styles.withTrailing : undefined]}
+      style={[styles.row, bordered && styles.bordered, trailing ? styles.withTrailing : undefined]}
       {...extra}
     >
       <Phrasing>{children}</Phrasing>
@@ -56,5 +58,7 @@ export function Row({ children, onPress, ariaDisabled = false, describedBy, hint
 
 const styles = StyleSheet.create({
   row: { minHeight: minTouchTarget, paddingVertical: spacing[2], gap: 2 },
+  // neutral-600 on the page is 3:1 or more.
+  bordered: { paddingHorizontal: spacing[3], borderWidth: 1, borderColor: colors['neutral-600'], borderRadius: radius.md },
   withTrailing: { paddingRight: spacing[6] },
 });

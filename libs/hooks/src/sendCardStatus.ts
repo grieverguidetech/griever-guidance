@@ -1,5 +1,5 @@
 import { sendPrefill, templates } from '@griever/shared';
-import type { MomentKey } from '@griever/shared';
+import type { MomentKey, TemplateField } from '@griever/shared';
 import { hasObituaryLink, MOMENT_CATEGORY } from './usePathMoments.js';
 import type { Session } from './useSessions.js';
 
@@ -22,17 +22,30 @@ export function sendCardStatus(session: Session, key: MomentKey): SendCardStatus
   if (key === 'announce') {
     return 'ready';
   }
-  const template = templates.find((t) => t.category === category);
-  if (!template) {
+  if (!templates.some((t) => t.category === category)) {
     return 'ready';
   }
-  const filled: Record<string, string> = { ...sendPrefill(session, category).fields };
-  if (hasLink) {
-    filled['obituaryUrl'] = session.obituaryUrl.trim();
-  }
-  const missing = template.fields.some((field) => field.required && !filled[field.key]);
+  const missing = firstMissingField(session, key) !== null;
   if (missing && key === 'obituary' && !hasLink && (session.obituaryText?.trim() ?? '') !== '') {
     return 'waitingForLink';
   }
   return missing ? 'needsDetail' : 'ready';
+}
+
+/**
+ * The first required field of a moment's template that is still empty, after the planned details
+ * and the obituary link are filled in. Null when none is missing (or the moment has no template).
+ * The single source for sendCardStatus and for screens that name the missing field.
+ */
+export function firstMissingField(session: Session, key: MomentKey): TemplateField | null {
+  const category = MOMENT_CATEGORY[key];
+  const template = templates.find((t) => t.category === category);
+  if (!template) {
+    return null;
+  }
+  const filled: Record<string, string> = { ...sendPrefill(session, category).fields };
+  if (hasObituaryLink(session)) {
+    filled['obituaryUrl'] = session.obituaryUrl.trim();
+  }
+  return template.fields.find((field) => field.required && !filled[field.key]) ?? null;
 }
