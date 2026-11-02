@@ -1,4 +1,4 @@
-import { BURIAL_PLACE_TYPES, SERVICE_PLACE_TYPES } from './placesClient';
+import { ANY_PLACE_TYPES, BURIAL_PLACE_TYPES, SERVICE_PLACE_TYPES } from './placesClient';
 
 // Pins the exact lists. Each must be a Table A type, and a request takes at most 5:
 // https://developers.google.com/maps/documentation/places/web-service/place-types
@@ -9,5 +9,8 @@ describe('place types', () => {
   });
   it('burial places', () => {
     expect([...BURIAL_PLACE_TYPES]).toEqual(['cemetery']);
+  });
+  it('any place has no types, so no filter is sent', () => {
+    expect([...ANY_PLACE_TYPES]).toEqual([]);
   });
 });
