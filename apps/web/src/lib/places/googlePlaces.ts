@@ -22,7 +22,7 @@ interface GooglePlacesLibrary {
   AutocompleteSuggestion: {
     fetchAutocompleteSuggestions(request: {
       input: string;
-      includedPrimaryTypes: string[];
+      includedPrimaryTypes?: string[];
       sessionToken: PlacesToken;
       region: string;
       language: string;
@@ -86,7 +86,8 @@ function makeClient(lib: GooglePlacesLibrary): PlacesClient {
     async suggest(input, types, token) {
       const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input,
-        includedPrimaryTypes: [...types],
+        // An empty list is left out: Google reads no filter as any place or address.
+        ...(types.length > 0 ? { includedPrimaryTypes: [...types] } : {}),
         sessionToken: token,
         region: 'us',
         language: 'en-US',

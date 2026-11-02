@@ -128,6 +128,14 @@ describe('the Google client', () => {
     });
   });
 
+  it('leaves includedPrimaryTypes out when the type list is empty', async () => {
+    const fetchAutocompleteSuggestions = vi.fn(async () => ({ suggestions: [] }));
+    const client = await ready(fetchAutocompleteSuggestions);
+    const token = client.newToken();
+    await client.suggest('12 elm', [], token);
+    expect(fetchAutocompleteSuggestions).toHaveBeenCalledWith({ input: '12 elm', sessionToken: token, region: 'us', language: 'en-US' });
+  });
+
   it('falls back to the whole line when the name and address parts are missing', async () => {
     const client = await ready(async () => ({
       suggestions: [{ placePrediction: { placeId: 'p2', text: text('Oak, 1 Main St') } }, { placePrediction: { placeId: 'p3' } }],

@@ -358,13 +358,14 @@ describe('ServiceSection', () => {
 });
 
 describe('ServiceSection place suggestions', () => {
-  it('suggests worship places for the service, cemeteries for burial, and nothing for the visitation', async () => {
+  it('suggests worship places for the service, cemeteries for burial, and any place for the visitation and reception', async () => {
     const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue([
       { id: 'x', text: 'Rest Hill Cemetery, 5 Oak Rd', mainText: 'Rest Hill Cemetery', secondaryText: '5 Oak Rd' },
     ]);
-    const client: PlacesClient = { suggest, newToken: () => ({}), details: () => Promise.reject(new Error('x')) };
+    const details = vi.fn<PlacesClient['details']>().mockRejectedValue(new Error('x'));
+    const client: PlacesClient = { suggest, newToken: () => ({}), details };
     function Harness() {
-      const [values, setValues] = useState<Values>({ visitationDate: 'May 1', burialDate: 'May 2' });
+      const [values, setValues] = useState<Values>({ visitationDate: 'May 1', burialDate: 'May 2', receptionDate: 'May 3' });
       return (
         <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
           <ServiceSection values={values} onChange={(p) => setValues((v) => ({ ...v, ...p }))} onReadyChange={vi.fn()} />
@@ -382,7 +383,18 @@ describe('ServiceSection place suggestions', () => {
     expect(suggest).toHaveBeenLastCalledWith('rest', ['cemetery'], expect.any(Object));
     await waitFor(() => expect(cemetery).toHaveValue('Rest Hill Cemetery, 5 Oak Rd'));
 
-    expect(screen.getByRole('textbox', { name: 'Visitation or calling hours Place' })).toBeInTheDocument();
+    const visitation = screen.getByRole('combobox', { name: 'Visitation or calling hours Place' });
+    await userEvent.type(visitation, '12 elm');
+    await screen.findByRole('listbox');
+    expect(suggest).toHaveBeenLastCalledWith('12 elm', [], expect.any(Object));
+    details.mockClear();
+    await userEvent.click(screen.getByRole('option', { name: /Rest Hill Cemetery/ }));
+    // No address field to fill, so the pick saves the line as shown and makes no paid details call.
+    await waitFor(() => expect(visitation).toHaveValue('Rest Hill Cemetery, 5 Oak Rd'));
+    expect(details).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getByRole('combobox', { name: 'Reception Place' }), '9 pine');
+    await waitFor(() => expect(suggest).toHaveBeenLastCalledWith('9 pine', [], expect.any(Object)));
   });
 });
 

@@ -516,14 +516,15 @@ shared person sync never carries contact ids or edited wording (C2 until it was 
 
 ### Third parties: Google Places
 
-In the web editor's Service section, the service place and burial place fields can ask Google Places
-for suggestions (#580). Google gets only the text typed in that field (at least 3 characters, after a
+In the web editor's Service section, the service, burial, visitation and reception place fields can ask
+Google Places for suggestions (#580, #614). Visitation and reception ask with no place-type filter, so a
+street address typed there (often a family home) goes to Google. Google gets only the text typed in that field (at least 3 characters, after a
 300 ms pause), the place types asked for, the browser key, and an autocomplete session token, plus what
 any browser request sends (IP address, user agent, referrer). It gets nothing else from the person, no
 contacts and no messages. Nothing loads from Google until the user types in one of these fields, and the
 build needs `VITE_GOOGLE_MAPS_API_KEY`; without it the fields are plain text and Google is never
 contacted. The picked text (and the address it fills) is saved like any typed text and syncs with the
-other person details (`servicePlace`, `serviceAddress`, `burialPlace`). Google's own terms and privacy
+other person details (`servicePlace`, `serviceAddress`, `burialPlace`, `visitationPlace`, `receptionPlace`). Google's own terms and privacy
 policy apply to those requests.
 
 ### Shared people

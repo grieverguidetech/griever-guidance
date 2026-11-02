@@ -8,7 +8,7 @@ import {
   type ServiceEventFields,
   type SessionDetails,
 } from '@griever/shared';
-import { BURIAL_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
+import { ANY_PLACE_TYPES, BURIAL_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
 import { EventFields } from './EventFields';
 import { MarkReady } from './MarkReady';
 
@@ -238,6 +238,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
               values={values}
               onChange={onChange}
               dateOfPassing={values.dateOfPassing}
+              placeTypes={ANY_PLACE_TYPES}
               dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (visitationDate) => onChange({ visitationDate }))}
               placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (visitationPlace) => onChange({ visitationPlace }))}
             />
@@ -277,6 +278,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
               values={values}
               onChange={onChange}
               dateOfPassing={values.dateOfPassing}
+              placeTypes={ANY_PLACE_TYPES}
               dateSuggestion={sameAs(values.serviceDate, copy.sameDay, (receptionDate) => onChange({ receptionDate }))}
               placeSuggestion={sameAs(values.servicePlace, copy.samePlace, (receptionPlace) => onChange({ receptionPlace }))}
             />
