@@ -6,11 +6,12 @@ import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Body, Button, Heading, PersonRow, SelectedCount, WhoShouldKnow } from '@griever/ui';
+import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, WhoShouldKnow } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
-import { Field } from '../components/authForm';
+import { ErrorText, Field } from '../components/authForm';
+import { useRecheckWhenBlocked } from '../lib/useRecheckWhenBlocked';
 import { SavedNote } from '../components/SavedNote';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
@@ -79,6 +80,11 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       focusNode(importButton.current);
     }
   }, [reviewing]);
+  // Back from Settings: if contacts can be read (or asked about) now, drop the blocked line and go to the import button.
+  useRecheckWhenBlocked(blocked, () => {
+    setBlocked(false);
+    focusNode(importButton.current);
+  });
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
 
   async function handleImport() {
@@ -88,6 +94,8 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
     inFlight.current = true;
     setImporting(true);
     setImportError(null);
+    // Cleared so the line and Open Settings come back (and are read again) if it is still refused.
+    setBlocked(false);
     try {
       const storedPhones = new Set(contacts.contacts.map((c) => c.phone));
       const result = await runImport(expoContactsSource, storedPhones, detectDeviceRegion());
@@ -149,9 +157,10 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
     const needle = reviewQuery.trim().toLowerCase();
     const shownFresh = needle ? mode.fresh.filter((c) => c.displayName.toLowerCase().includes(needle)) : mode.fresh;
     return (
-      <View style={styles.flex}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
         style={styles.flex}
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[styles.content, styles.review]}
         keyboardShouldPersistTaps="handled"
         data={shownFresh}
@@ -169,7 +178,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
             </View>
             {mode.fresh.length === 0 ? <Body tone="muted">{copy.importEmpty}</Body> : null}
             {mode.fresh.length > 0 ? <Field label={copy.searchLabel} value={reviewQuery} onChangeText={setReviewQuery} returnKeyType="search" autoCorrect={false} autoCapitalize="none" /> : null}
-            {mode.fresh.length > 0 && shownFresh.length === 0 ? <Body tone="muted">{copy.searchEmpty}</Body> : null}
+            {mode.fresh.length > 0 && shownFresh.length === 0 ? <LiveLine label={copy.searchEmpty} /> : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -182,9 +191,11 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         ItemSeparatorComponent={Gap}
       />
       <View style={styles.sticky}>
-        {addError ? <Body tone="danger" live>{addError}</Body> : null}
+        <ErrorText message={addError} />
         <View style={styles.footerRow}>
-          <SelectedCount label={fill(copy.chosen, { count: reviewSelected.size })} />
+          <View style={styles.countBox}>
+            <SelectedCount label={fill(copy.chosen, { count: reviewSelected.size })} />
+          </View>
           <Button
             label={copy.add}
             busy={adding}
@@ -205,7 +216,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           </Body>
         ) : null}
       </View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -292,5 +303,6 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   sticky: { gap: spacing[1], padding: spacing[3], borderTopWidth: 1, borderTopColor: colors['neutral-300'], backgroundColor: colors.bg },
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing[1] },
+  footerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: spacing[2], paddingTop: spacing[1] },
+  countBox: { flexShrink: 1 },
 });

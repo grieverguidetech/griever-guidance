@@ -43,7 +43,7 @@
     "openSettings",
     "bringAcrossBusy",
     "loadingPeople",
-    "told",
+    "sent",
     "saveFailed",
     "saving",
     "doneForNow"
@@ -169,7 +169,7 @@
     "loadingPeople": {
       "$ref": "#/$defs/text"
     },
-    "told": {
+    "sent": {
       "$ref": "#/$defs/text"
     },
     "saveFailed": {

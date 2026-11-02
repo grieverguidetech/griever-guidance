@@ -32,11 +32,11 @@ const copy: WhoShouldKnowCopy = {
   selectAllShown: 'Select all shown',
   blockedLine: 'Contacts are turned off for this app. You can add people yourself, or turn them on in Settings.',
   openSettings: 'Open Settings',
-  bringAcrossBusy: 'Reading your contacts...',
-  loadingPeople: 'Getting your people...',
-  told: 'Told',
+  bringAcrossBusy: 'Reading your contacts…',
+  loadingPeople: 'Getting your people…',
+  sent: 'Sent',
   saveFailed: 'We could not save that. Please try again.',
-  saving: 'Saving...',
+  saving: 'Saving…',
 };
 
 const people = [
@@ -300,40 +300,60 @@ describe('WhoShouldKnow', () => {
   });
 
   describe('mobile-only props (#652)', () => {
-    it('tags the people already told, and nobody else', () => {
+    it('tags the people already sent, and nobody else, and the tag is part of the row name', () => {
       setup({ grouped: false, toldIds: ['b'] });
-      expect(screen.getAllByText('Told')).toHaveLength(1);
-      expect(within(screen.getByRole('checkbox', { name: /Bob Smith/ })).getByText('Told')).toBeInTheDocument();
+      expect(screen.getAllByText('Sent')).toHaveLength(1);
+      expect(within(screen.getByRole('checkbox', { name: /Bob Smith/ })).getByText('Sent')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /Bob Smith.*Sent/ })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /Aunt Carol/ })).not.toHaveAccessibleName(/Sent/);
     });
 
-    it('shows no Told tag when the prop is not passed (web)', () => {
+    it('shows no Sent tag when the prop is not passed (web)', () => {
       setup({ grouped: false });
-      expect(screen.queryByText('Told')).toBeNull();
+      expect(screen.queryByText('Sent')).toBeNull();
     });
 
     it('shows a muted loading line while the saved people load, and no empty line', () => {
       setup({ grouped: false, people: [], loading: true });
-      expect(screen.getByText('Getting your people...')).toBeInTheDocument();
+      expect(screen.getByText('Getting your people…')).toBeInTheDocument();
       expect(screen.queryByText('No one saved yet. Add someone below.')).toBeNull();
     });
 
-    it('shows the blocked line and Open Settings instead of the import button', async () => {
+    it('shows the blocked line and Open Settings, keeps the import button, and focuses Open Settings', async () => {
       const user = userEvent.setup();
       const onOpenSettings = vi.fn();
-      setup({ grouped: false, bringAcross: { onPress: vi.fn(), blocked: { onOpenSettings } } });
+      const onPress = vi.fn();
+      setup({ grouped: false, bringAcross: { onPress, blocked: { onOpenSettings } } });
       expect(screen.getByText(copy.blockedLine)).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Add from your contacts' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Open Settings' })).toHaveFocus();
       await user.click(screen.getByRole('button', { name: 'Open Settings' }));
       expect(onOpenSettings).toHaveBeenCalledTimes(1);
+      await user.click(screen.getByRole('button', { name: 'Add from your contacts' }));
+      expect(onPress).toHaveBeenCalledTimes(1);
     });
 
-    it('reads "Reading your contacts..." with a busy state while the import runs, and does not press again', async () => {
+    it('shows no Open Settings when the import is not blocked', () => {
+      setup({ grouped: false, bringAcross: { onPress: vi.fn() } });
+      expect(screen.queryByRole('button', { name: 'Open Settings' })).toBeNull();
+    });
+
+    it('reads "Reading your contacts…" with a busy state while the import runs, and does not press again', async () => {
       const user = userEvent.setup();
       const onPress = vi.fn();
       setup({ grouped: false, bringAcross: { onPress, busy: true } });
-      const button = screen.getByRole('button', { name: 'Reading your contacts...' });
+      const button = screen.getByRole('button', { name: 'Reading your contacts…' });
       await user.click(button);
       expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it('marks a busy button aria-busy on web', () => {
+      setup({ grouped: false, bringAcross: { onPress: vi.fn(), busy: true } });
+      expect(screen.getByRole('button', { name: 'Reading your contacts…' })).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('with scrollList, the rows keep list and listitem roles', () => {
+      setup({ grouped: false, scrollList: true });
+      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(3);
     });
 
     it('with scrollList, the count and Continue sit outside the list', () => {
@@ -372,7 +392,7 @@ describe('WhoShouldKnow', () => {
       await fill(user);
       const add = screen.getByRole('button', { name: 'Add' });
       await user.click(add);
-      await user.click(screen.getByRole('button', { name: 'Saving...' }));
+      await user.click(screen.getByRole('button', { name: 'Saving…' }));
       expect(onAddPerson).toHaveBeenCalledTimes(1);
       finish();
       await screen.findByRole('button', { name: 'Add another person' });

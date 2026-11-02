@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Linking } from 'react-native';
+import { AccessibilityInfo, AppState, Linking } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
@@ -10,10 +10,11 @@ import { ContactSelectorScreen } from './ContactSelectorScreen';
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  findNodeHandle: (node: unknown) => node ?? null,
 }));
 
 const mockFetch = jest.fn<() => Promise<unknown[]>>();
+const mockAvailable = jest.fn<() => Promise<boolean>>();
 const twoPeople = async () => [
   { key: 'x', displayName: 'Starred Sam', phones: ['+16175550111'], emails: [], starred: true },
   { key: 'y', displayName: 'Plain Pat', phones: ['+16175550112'], emails: [] },
@@ -22,13 +23,26 @@ jest.mock('../lib/expoContactsSource', () => ({
   expoContactsSource: {
     id: 'native',
     preselected: false,
-    isAvailable: async () => true,
+    isAvailable: () => mockAvailable(),
     fetch: () => mockFetch(),
   },
 }));
 
+// The words inside a rendered node, to tell which button took focus.
+const textOf = (node: unknown): string => {
+  if (typeof node === 'string') {
+    return node;
+  }
+  if (Array.isArray(node)) {
+    return node.map(textOf).join('');
+  }
+  const props = (node as { props?: { children?: unknown } } | null)?.props;
+  return props ? textOf(props.children) : '';
+};
+
 beforeEach(() => {
   mockFetch.mockReset().mockImplementation(twoPeople);
+  mockAvailable.mockReset().mockResolvedValue(true);
 });
 
 const make = (id: string, name: string, tier: Contact['tier']): Contact => ({
@@ -103,6 +117,7 @@ describe('ContactSelectorScreen search', () => {
     expect(selectContacts).toHaveBeenCalledWith(['3']);
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'zzz');
     expect(screen.getByText(copy.searchEmpty)).toBeTruthy();
+    expect(screen.getByText(copy.searchEmpty).props.accessibilityLiveRegion).toBe('polite');
   });
 });
 
@@ -331,9 +346,65 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     renderScreen();
     openImport();
     expect(await screen.findByText(copy.blockedLine)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: copy.bringAcross })).toBeNull();
+    // The import button stays, so a press can ask again.
+    expect(screen.getByRole('button', { name: copy.bringAcross })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: copy.openSettings }));
     expect(openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('refused for good: announces the line and moves focus to Open Settings', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    renderScreen();
+    focus.mockClear();
+    openImport();
+    await screen.findByText(copy.blockedLine);
+    expect(announce).toHaveBeenCalledWith(copy.blockedLine);
+    expect(focus).toHaveBeenCalledTimes(1);
+    // Focus went to the Open Settings button itself.
+    const target = focus.mock.calls[0]?.[0] as unknown as { props: { role: string; children: unknown } };
+    expect(target.props.role).toBe('button');
+    expect(textOf(target.props.children)).toBe(copy.openSettings);
+  });
+
+  it('pressing the import button again after a refusal asks again and goes on if allowed', async () => {
+    mockFetch.mockRejectedValueOnce(new Cancelled('blocked'));
+    renderScreen();
+    openImport();
+    await screen.findByText(copy.blockedLine);
+    fireEvent.press(screen.getByRole('button', { name: copy.bringAcross }));
+    expect(await screen.findByRole('heading', { name: copy.bringAcross })).toBeTruthy();
+    expect(screen.queryByText(copy.blockedLine)).toBeNull();
+  });
+
+  it('coming back from Settings with contacts allowed clears the line and focuses the import button', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    let onChange: (state: string) => void = () => undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (state: string) => void) => {
+      onChange = cb;
+      return { remove: () => undefined };
+    }) as never);
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    renderScreen();
+    openImport();
+    await screen.findByText(copy.blockedLine);
+    // Still refused: nothing changes.
+    mockAvailable.mockResolvedValue(false);
+    await act(async () => {
+      onChange('active');
+    });
+    expect(screen.getByText(copy.blockedLine)).toBeTruthy();
+    mockAvailable.mockResolvedValue(true);
+    focus.mockClear();
+    await act(async () => {
+      onChange('active');
+    });
+    await waitFor(() => expect(screen.queryByText(copy.blockedLine)).toBeNull());
+    expect(screen.queryByRole('button', { name: copy.openSettings })).toBeNull();
+    expect(screen.getByRole('button', { name: copy.bringAcross })).toBeTruthy();
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(textOf((focus.mock.calls[0]?.[0] as unknown as { props: { children: unknown } }).props.children)).toBe(copy.bringAcross);
   });
 
   it('a plain no, or a refusal the system can ask about again, shows nothing', async () => {
@@ -347,7 +418,7 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('shows a busy spinner and "Reading your contacts..." while the read runs, and ignores a second tap', async () => {
+  it('shows a busy spinner and "Reading your contacts…" while the read runs, and ignores a second tap', async () => {
     let finish: (value: unknown[]) => void = () => undefined;
     mockFetch.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
     renderScreen();
@@ -383,6 +454,7 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     expect(screen.getByText('Plain Pat')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'zzz');
     expect(screen.getByText(copy.searchEmpty)).toBeTruthy();
+    expect(screen.getByText(copy.searchEmpty).props.accessibilityLiveRegion).toBe('polite');
   });
 
   it('a double tap on Add saves once, and Add reads as saving', async () => {
@@ -407,11 +479,14 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     const importContacts = jest.fn(async () => {
       throw new Error('disk');
     });
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     renderScreen(saved, 'announcement', [], {}, { importContacts } as never);
     openImport();
     fireEvent.press(await screen.findByRole('checkbox', { name: /Plain Pat/ }));
     fireEvent.press(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByText(copy.saveFailed)).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith(copy.saveFailed);
+    expect(screen.getByRole('alert')).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: /Plain Pat/, checked: true })).toBeTruthy();
     expect(screen.getByText('1 chosen')).toBeTruthy();
   });
@@ -420,16 +495,29 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
 describe('ContactSelectorScreen people list (#652)', () => {
   const copy = screenCopy('whoShouldKnow');
 
-  it('tags rows already sent this moment as Told, and no others', () => {
+  it('tags rows already sent this moment as Sent, and no others, in the row name', () => {
     renderScreen(saved, 'service', [], { service: ['2'], announcement: ['2'] });
-    expect(screen.getAllByText(copy.told)).toHaveLength(1);
-    expect(within(screen.getByRole('checkbox', { name: /Mum/ })).getByText(copy.told)).toBeTruthy();
-    expect(within(screen.getByRole('checkbox', { name: /Dad/ })).queryByText(copy.told)).toBeNull();
+    expect(copy.sent).toBe('Sent');
+    expect(screen.getAllByText(copy.sent)).toHaveLength(1);
+    // The tag sits inside the same checkbox as the name, so it is read with it (RNTL matches name per child text).
+    expect(within(screen.getByRole('checkbox', { name: /Mum/ })).getByText(copy.sent)).toBeTruthy();
+    expect(within(screen.getByRole('checkbox', { name: /Dad/ })).queryByText(copy.sent)).toBeNull();
   });
 
-  it('shows no Told tag when no one was sent', () => {
+  it('shows no Sent tag when no one was sent', () => {
     renderScreen(saved, 'service');
-    expect(screen.queryByText(copy.told)).toBeNull();
+    expect(screen.queryByText(copy.sent)).toBeNull();
+  });
+
+  it('names the shortcuts with "select all"', () => {
+    renderScreen(saved, 'service', [], { announcement: ['2'], service: ['2'] });
+    expect(screen.getByRole('button', { name: 'Everyone you told: select all' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Not sent yet: select all' })).toBeTruthy();
+  });
+
+  it('reads the loading line out politely', () => {
+    renderScreen([], 'announcement', [], {}, { loading: true });
+    expect(screen.getByText(copy.loadingPeople).props.accessibilityLiveRegion).toBe('polite');
   });
 
   it('shows a muted loading line while the saved people load', () => {

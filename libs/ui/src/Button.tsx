@@ -43,7 +43,7 @@ export interface ButtonProps {
    */
   busy?: boolean;
   /**
-   * While `busy`, the words shown instead of the label, for example "Reading your contacts...". They are
+   * While `busy`, the words shown instead of the label, for example "Reading your contacts…". They are
    * announced once when the work starts (iOS). A busy button always shows a small spinner too.
    */
   busyLabel?: string;
@@ -97,6 +97,9 @@ export function Button({
   }
   if (pressed !== undefined) {
     extra['aria-pressed'] = pressed;
+  }
+  if (busy) {
+    extra['aria-busy'] = true;
   }
   if (opensDialog) {
     extra['aria-haspopup'] = 'dialog';

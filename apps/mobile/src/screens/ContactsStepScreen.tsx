@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { BackHandler, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SerifText as Text, Button } from '@griever/ui';
+import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { SerifText as Text, Button, LiveLine } from '@griever/ui';
+import type { ButtonNode } from '@griever/ui';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164 } from '@griever/contacts';
 import type { NormalizedContact } from '@griever/contacts';
 import { screenCopy } from '@griever/copy';
 import { expoContactsSource } from '../lib/expoContactsSource';
+import { useRecheckWhenBlocked } from '../lib/useRecheckWhenBlocked';
 import { ErrorText, Field, ScreenHeader, announce, authStyles } from '../components/authForm';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED, MUTED_STRONG } from '../components/colors';
 
@@ -36,6 +38,10 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
   const [saving, setSaving] = useState(false);
   // Contacts are turned off for good: only Settings can turn them on.
   const [blocked, setBlocked] = useState(false);
+  // Counts each time the refusal is shown, so the line is read and Open Settings takes focus every time.
+  const [blockedShown, setBlockedShown] = useState(0);
+  const settingsButton = useRef<ButtonNode>(null);
+  const importButton = useRef<ButtonNode>(null);
   // At least one person came in from the phone's contacts.
   const [imported, setImported] = useState(false);
   const [query, setQuery] = useState('');
@@ -51,6 +57,24 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
     setStatus(message);
     announce(message);
   };
+
+  const focusButton = (node: ButtonNode | null) => {
+    const handle = node ? findNodeHandle(node) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+  useEffect(() => {
+    if (blockedShown > 0) {
+      announce(copy.blockedLine);
+      focusButton(settingsButton.current);
+    }
+  }, [blockedShown]);
+  // Back from Settings: if contacts can be read (or asked about) now, drop the line and go to the import button.
+  useRecheckWhenBlocked(blocked, () => {
+    setBlocked(false);
+    focusButton(importButton.current);
+  });
 
   // Back goes up one level; from the review it leaves the screen when it was opened from Home.
   const leaveStep = useCallback(() => {
@@ -76,6 +100,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
     inFlight.current = true;
     setImporting(true);
     setError(null);
+    setBlocked(false);
     try {
       const stored = new Set(contacts.contacts.map((c) => c.phone));
       const result = await runImport(expoContactsSource, stored, detectDeviceRegion());
@@ -86,7 +111,10 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
     } catch (err) {
       if (err instanceof Cancelled) {
         // A plain "no" is nothing chosen. Refused for good needs a line and a way to Settings.
-        setBlocked(err.reason === 'blocked');
+        if (err.reason === 'blocked') {
+          setBlocked(true);
+          setBlockedShown((n) => n + 1);
+        }
       } else {
         setError(IMPORT_FAILED);
       }
@@ -178,7 +206,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
     const shown = needle ? fresh.filter((c) => c.displayName.toLowerCase().includes(needle)) : fresh;
     const none = chosen.size === 0;
     return (
-      <View style={styles.screen}>
+      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           {back}
           <ScreenHeader>{copy.bringAcross}</ScreenHeader>
@@ -192,7 +220,16 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
           keyExtractor={(item) => item.key}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={<Text style={styles.empty}>{fresh.length === 0 ? copy.importEmpty : copy.searchEmpty}</Text>}
+          keyboardDismissMode="on-drag"
+          ListEmptyComponent={
+            fresh.length === 0 ? (
+              <Text style={styles.empty}>{copy.importEmpty}</Text>
+            ) : (
+              <View style={styles.empty}>
+                <LiveLine label={copy.searchEmpty} />
+              </View>
+            )
+          }
           renderItem={({ item }) => {
             const selected = chosen.has(item.key);
             return (
@@ -226,6 +263,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
         />
         <View style={styles.footerBox}>
           <ErrorText message={error} />
+          {none ? <Text style={styles.reason}>{copy.chooseOne}</Text> : null}
           <View style={styles.footer}>
             <Text style={styles.count}>{chosen.size} chosen</Text>
             <Button
@@ -243,7 +281,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
             />
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -298,11 +336,21 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
             <View accessibilityLiveRegion="polite">
               <Text style={styles.status}>{copy.blockedLine}</Text>
             </View>
-            <Button label={copy.openSettings} onPress={() => void Linking.openSettings()} />
+            <View style={styles.gap}>
+              <Button label={copy.openSettings} buttonRef={settingsButton} onPress={() => void Linking.openSettings()} />
+            </View>
           </>
-        ) : (
-          <Button label="Bring in from my phone" busy={importing} busyLabel={copy.bringAcrossBusy} onPress={() => void importFromPhone()} />
-        )}
+        ) : null}
+        <View style={blocked ? styles.gap : undefined}>
+          <Button
+            label="Bring in from my phone"
+            busy={importing}
+            busyLabel={copy.bringAcrossBusy}
+            buttonRef={importButton}
+            variant={blocked ? 'secondary' : 'primary'}
+            onPress={() => void importFromPhone()}
+          />
+        </View>
       </View>
       <View style={styles.gap}>
         <Button
@@ -344,6 +392,7 @@ const styles = StyleSheet.create({
   backRow: { alignSelf: 'flex-start', marginBottom: 16 },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
   empty: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 },
+  reason: { fontSize: 13, color: MUTED_STRONG, paddingHorizontal: 24, paddingTop: 12 },
   row: {
     minHeight: 44,
     flexDirection: 'row',
@@ -374,11 +423,13 @@ const styles = StyleSheet.create({
   footerBox: { borderTopWidth: 1, borderTopColor: '#f3f4f6' },
   footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     padding: 24,
   },
-  count: { fontSize: 14, color: MUTED },
+  count: { fontSize: 14, color: MUTED, flexShrink: 1 },
   saved: { marginTop: 24 },
   eyebrow: { fontSize: 13, fontWeight: '600', color: MUTED_STRONG, marginBottom: 8 },
   savedRow: { minHeight: 44, justifyContent: 'center', marginBottom: 4 },

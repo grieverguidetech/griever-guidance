@@ -67,7 +67,7 @@ export interface WhoShouldKnowCopy {
   /** A muted line while the saved people load. */
   loadingPeople: string;
   /** A muted tag on a row already sent this moment. */
-  told: string;
+  sent: string;
   /** Add by hand did not save. */
   saveFailed: string;
   /** Shown on Add while it saves. */
@@ -110,7 +110,10 @@ export interface WhoShouldKnowProps {
     busy?: boolean;
     /** A calm line when it did not work. */
     notice?: string;
-    /** Contacts are turned off for good: shows the calm line and an Open Settings button. */
+    /**
+     * Contacts are turned off for good: shows the calm line and an Open Settings button (focused when it
+     * appears). The import button stays, so a press asks again and carries on if it is allowed now.
+     */
     blocked?: { onOpenSettings: () => void };
     buttonRef?: Ref<ButtonNode>;
   };
@@ -131,7 +134,7 @@ export interface WhoShouldKnowProps {
   shortcuts?: { label: string; accessibilityName?: string; onPress: () => void }[];
   /** Mobile: Continue works with no one ticked (service and obituary can be shared without a text). Leave unset on web. */
   allowNone?: boolean;
-  /** Mobile: ids of the people already sent this moment. Their rows get a muted "Told" tag. Leave unset on web. */
+  /** Mobile: ids of the people already sent this moment. Their rows get a muted "Sent" tag. Leave unset on web. */
   toldIds?: string[];
   /**
    * Mobile: the list is a FlatList that scrolls by itself, and the count and Continue stay pinned below it.
@@ -192,13 +195,21 @@ export function WhoShouldKnow({
   const noneNote = allowNone && selectedIds.length === 0;
   const reasonId = useId();
   const noteId = useId();
+  const settingsRef = useRef<ButtonNode>(null);
+  const isBlocked = Boolean(bringAcross?.blocked);
+  // The calm line appears with Open Settings: put the screen reader there.
+  useEffect(() => {
+    if (isBlocked) {
+      focusNode(settingsRef.current);
+    }
+  }, [isBlocked]);
   const told = new Set(toldIds ?? []);
   const row = (person: WhoPerson) => (
     <PersonRow
       person={person}
       selected={selectedIds.includes(person.id)}
       onToggle={() => onToggle(person.id)}
-      toldLabel={told.has(person.id) ? copy.told : undefined}
+      toldLabel={told.has(person.id) ? copy.sent : undefined}
     />
   );
 
@@ -265,7 +276,7 @@ export function WhoShouldKnow({
       {search && people.length > 0 && shown.length === 0 ? (
         <LiveLine label={copy.searchEmpty} />
       ) : null}
-      {loading ? <Body tone="muted">{copy.loadingPeople}</Body> : null}
+      {loading ? <LiveLine label={copy.loadingPeople} /> : null}
       {people.length === 0 && !loading ? (
         <Body tone="muted">{copy.empty}</Body>
       ) : null}
@@ -279,23 +290,23 @@ export function WhoShouldKnow({
           <Button
             label={copy.openSettings}
             variant="secondary"
+            buttonRef={settingsRef}
             onPress={bringAcross.blocked.onOpenSettings}
           />
         </>
-      ) : (
-        <Button
-          label={copy.bringAcross}
-          busyLabel={copy.bringAcrossBusy}
-          variant="secondary"
-          busy={bringAcross.busy}
-          buttonRef={bringAcross.buttonRef}
-          onPress={() => {
-            if (!bringAcross.busy) {
-              bringAcross.onPress();
-            }
-          }}
-        />
-      )}
+      ) : null}
+      <Button
+        label={copy.bringAcross}
+        busyLabel={copy.bringAcrossBusy}
+        variant="secondary"
+        busy={bringAcross.busy}
+        buttonRef={bringAcross.buttonRef}
+        onPress={() => {
+          if (!bringAcross.busy) {
+            bringAcross.onPress();
+          }
+        }}
+      />
       <Alert message={bringAcross.notice} />
     </View>
   ) : null;
@@ -315,7 +326,9 @@ export function WhoShouldKnow({
         </Body>
       ) : null}
       <View style={styles.footerRow}>
-        <SelectedCount label={selectedLabel} />
+        <View style={styles.countBox}>
+          <SelectedCount label={selectedLabel} />
+        </View>
         <Button
           label={copy.continue}
           ariaDisabled={noneChosen}
@@ -339,9 +352,10 @@ export function WhoShouldKnow({
           style={styles.fill}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          role="list"
           data={shown}
           keyExtractor={(person) => person.id}
-          renderItem={({ item }) => row(item)}
+          renderItem={({ item }) => <View role="listitem">{row(item)}</View>}
           ItemSeparatorComponent={RowGap}
           ListHeaderComponent={
             <View style={[styles.screen, styles.listEdge]}>
@@ -561,7 +575,7 @@ function Alert({ message, id }: { message?: string; id?: string }) {
 }
 
 /** A calm line that is read out when it first shows (iOS ignores live regions, so it is announced too). */
-function LiveLine({ label }: { label: string }) {
+export function LiveLine({ label }: { label: string }) {
   useEffect(() => {
     if (Platform.OS === 'ios') {
       AccessibilityInfo.announceForAccessibility(label);
@@ -649,7 +663,7 @@ export function PersonRow({
   person: WhoPerson;
   selected: boolean;
   onToggle: () => void;
-  /** A muted tag under the number, for a person already sent this moment (for example "Told"). */
+  /** A muted tag under the number, for a person already sent this moment (for example "Sent"). */
   toldLabel?: string;
 }) {
   // react-native-web only presses a role=button on Space; a checkbox needs Space too.
@@ -711,10 +725,13 @@ const styles = StyleSheet.create({
   bringAcross: { gap: spacing[1] },
   footerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing[2],
     paddingTop: spacing[1],
   },
+  countBox: { flexShrink: 1 },
   field: { gap: spacing[1] },
   input: {
     minHeight: minTouchTarget,
