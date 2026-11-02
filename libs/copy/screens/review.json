@@ -22,6 +22,9 @@
   "sample": "Sample message",
   "greetingSwitch": "Start with their first name",
   "greetingPreview": "For example: {greeting}",
+  "detailsHeading": "Details",
+  "detailsNeeded": "Needed",
+  "detailsHint": "Fill in the details marked Needed to send.",
   "flowers": {
     "heading": "Include a way to send flowers",
     "note": "For people who can't be there in person.",

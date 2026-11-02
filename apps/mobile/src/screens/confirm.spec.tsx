@@ -12,12 +12,12 @@ import { SendingScreen } from './SendingScreen';
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '' } as SessionDetails;
 const contacts = { contacts: [{ contactId: 'c0', name: 'Dee', phone: '+15555550100' }] } as never;
 
-function Harness() {
+function Harness({ fields }: { fields?: Record<string, string> } = {}) {
   const flow = useSendFlow({
     session,
     draft: freshDraft({
       templateCategory: 'service', templateOverrideId: 'share-service', step: 'review',
-      fields: { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' },
+      fields: fields ?? { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' },
     }),
   });
   const { selectContacts } = flow;
@@ -100,5 +100,35 @@ describe('Review your message (Share the service)', () => {
     expect(screen.getByText('Add a message before you send it.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Text these people' }).props.accessibilityState?.disabled).toBe(true);
     expect(screen.getByLabelText('Your message').props.value).toBe('   ');
+  });
+
+  describe('Details row', () => {
+    it('changes the preview when the date changes', () => {
+      render(<Harness />);
+      expect(screen.getByLabelText('Service date').props.value).toBe('June 14');
+      fireEvent.changeText(screen.getByLabelText('Service date'), 'June 20');
+      expect(screen.getByLabelText('Your message').props.value).toContain('June 20');
+      expect(screen.getByLabelText('Your message').props.value).not.toContain('June 14');
+    });
+
+    it('blocks Send and says why while a required field is empty', () => {
+      render(<Harness fields={{ serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: '' }} />);
+      expect(screen.getByText('Needed')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Text these people' }).props.accessibilityState?.disabled).toBe(true);
+      expect(screen.getByText('Fill in the details marked Needed to send.')).toBeTruthy();
+      fireEvent.changeText(screen.getByLabelText('Location'), 'Oak Chapel');
+      expect(screen.queryByText('Needed')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Text these people' }).props.accessibilityState?.disabled).toBeFalsy();
+    });
+
+    it('hides the inputs for hand-edited text, and Use the suggested wording brings them back', () => {
+      render(<Harness />);
+      fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+      expect(screen.queryByLabelText('Service date')).toBeNull();
+      expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+      fireEvent.press(screen.getByText('Use the suggested wording'));
+      expect(screen.getByLabelText('Service date')).toBeTruthy();
+      expect(screen.getByLabelText('Your message').props.value).toContain('June 14');
+    });
   });
 });
