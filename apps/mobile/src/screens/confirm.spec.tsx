@@ -22,7 +22,7 @@ function Harness() {
   });
   const { selectContacts } = flow;
   useEffect(() => { selectContacts(['c0']); }, [selectContacts]);
-  return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ConfirmScreen flow={flow} />;
+  return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ConfirmScreen flow={flow} contacts={contacts} />;
 }
 
 describe('Review your message (Share the service)', () => {
@@ -36,7 +36,44 @@ describe('Review your message (Share the service)', () => {
     fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are, 2 PM at Oak Chapel.');
     fireEvent.press(screen.getByText('Text these people'));
     fireEvent.press(await screen.findByText('Open Messages'));
-    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Come as you are, 2 PM at Oak Chapel.');
+    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Dee,\nCome as you are, 2 PM at Oak Chapel.');
+  });
+
+  it('shows the same text it hands to Messages', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    open.mockClear();
+    render(<Harness />);
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    fireEvent.press(screen.getByText('Text these people'));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    const body = decodeURIComponent(String(open.mock.calls[0][0])).split('body=')[1];
+    expect(body).toBe('Dee,\nCome as you are.');
+    expect(screen.getByText(body)).toBeTruthy();
+  });
+
+  it('sends the plain message with the switch off', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    open.mockClear();
+    render(<Harness />);
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    fireEvent.press(screen.getByRole('switch', { name: 'Start with their first name' }));
+    fireEvent.press(screen.getByText('Text these people'));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    const body = decodeURIComponent(String(open.mock.calls[0][0])).split('body=')[1];
+    expect(body).toBe('Come as you are.');
+  });
+
+  it('has a switch with an accessible name and state, and previews the greeting', () => {
+    render(<Harness />);
+    const toggle = screen.getByRole('switch', { name: 'Start with their first name' });
+    expect(toggle.props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByText('For example: Dee,')).toBeTruthy();
+    fireEvent.press(toggle);
+    expect(screen.getByRole('switch', { name: 'Start with their first name' }).props.accessibilityState).toEqual({ checked: false });
+    expect(screen.queryByText(/For example/)).toBeNull();
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    fireEvent.press(screen.getByRole('switch', { name: 'Start with their first name' }));
+    expect(announce).toHaveBeenCalledWith('For example: Dee,', { queue: true });
   });
 
   it('opens and closes the sample with accessibilityState.expanded and a 44 point target', () => {
