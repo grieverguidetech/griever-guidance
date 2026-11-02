@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { isDraftStarted, usePathMoments } from '@griever/hooks';
-import type { Session } from '@griever/hooks';
+import { isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
+import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
-import { doneRowMeta, fill, screenCopy } from '@griever/copy';
+import { fill, screenCopy } from '@griever/copy';
 import { Hub, PaywallSheet, SentNote } from '@griever/ui';
 import type { ButtonNode, HubRow } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
@@ -18,13 +18,29 @@ const paywallCopy = screenCopy('paywall');
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 
-/** Where a moment's drafts are kept. */
-export const CATEGORY_BY_MOMENT: Record<MomentKey, TemplateCategory> = {
-  announce: 'announcement',
-  service: 'service',
-  obituary: 'obituary',
-  thanks: 'aftercare',
-};
+/** Where a moment's drafts are kept (one map, shared with the hooks). */
+export { MOMENT_CATEGORY as CATEGORY_BY_MOMENT } from '@griever/hooks';
+
+/** The status line for a card, from the copy file. */
+function statusLine(status: SendCardStatus): string {
+  if (status === 'ready') {
+    return copy.statusReady;
+  }
+  if (status === 'needsDetail') {
+    return copy.statusNeedsDetail;
+  }
+  return fill(copy.statusSent, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
+}
+
+/** A finished card adds its date and the send-again hint; the others show the status line alone. */
+function rowMeta(status: SendCardStatus, done: boolean, completedAt: string | undefined, started: boolean): string {
+  const line = statusLine(status);
+  if (!done) {
+    return line;
+  }
+  const date = completedAt ? ` · ${formatDate(completedAt)}` : '';
+  return `${line}${date} · ${started ? copy.metaStarted : copy.metaSendAgain}`;
+}
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -116,20 +132,13 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   };
 
   const rows: HubRow[] = moments.map((moment) => {
-    const started = isDraftStarted(session.drafts[CATEGORY_BY_MOMENT[moment.key]]);
+    const started = isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]]);
     return {
       key: moment.key,
       status: moment.status,
       started,
       locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
-      meta:
-        moment.status === 'done'
-          ? doneRowMeta(copy, {
-              recipientCount: moment.recipientCount,
-              dateLabel: moment.completedAt ? formatDate(moment.completedAt) : undefined,
-              started,
-            })
-          : undefined,
+      meta: rowMeta(sendCardStatus(session, moment.key), moment.status === 'done', moment.completedAt, started),
     };
   });
 
@@ -147,6 +156,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
           opener.current = row;
           setPaywallOpen(true);
         }}
+        metaOnAllRows
         headingRef={heading}
         checklistRef={checklistButton}
       >

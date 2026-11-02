@@ -58,7 +58,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Skip'));
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByText(/^2 people · /)).toBeTruthy();
+    expect(await screen.findByText(/^Sent to 2 people · /)).toBeTruthy();
     await waitFor(async () => {
       const saved = await savedAnna();
       expect(saved.recipientsNotified.announcement).toEqual(['c1', 'c3']);
@@ -79,16 +79,16 @@ describe('recording who was messaged (#621)', () => {
     const saved = await savedAnna();
     expect(saved.recipientsNotified).toEqual({});
     expect(saved.momentCompletedAt).toEqual({});
-    expect(screen.queryByText(/^\d+ (person|people) · /)).toBeNull();
+    expect(screen.queryByText(/^Sent to \d+ (person|people) · /)).toBeNull();
   });
 
   it('opens the flow again from the done row, without bouncing back to the hub', async () => {
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByText(/^1 person · /)).toBeTruthy();
+    expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
     // Start the announcement again from its done row.
-    fireEvent.press(screen.getByText(/^1 person · /));
+    fireEvent.press(screen.getByText(/^Sent to 1 person · /));
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByLabelText(/Anything you'd like to add/)).toBeTruthy();
