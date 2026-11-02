@@ -40,7 +40,10 @@ export interface HubRow {
   locked: boolean;
   /** This host cannot do this step yet: shown with a calm reason, and not pressable. */
   unavailable?: boolean;
-  /** The small line under a done step, already built (see doneRowMeta in libs/copy). */
+  /**
+   * The small status line under a step, already built (for example doneRowMeta in libs/copy, or
+   * "Ready"). Shown on any row, and part of the row's accessible name. Optional: web passes it on done rows only.
+   */
   meta?: string;
 }
 
@@ -127,7 +130,7 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
   }
 
   if (row.locked) {
-    return <LockedStep title={text.title} body={text.body} reason={copy.lockedReason} onLocked={onLocked} />;
+    return <LockedStep title={text.title} body={text.body} meta={row.meta} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
   if (row.status === 'done') {
@@ -135,9 +138,7 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
     return (
       <Row onPress={() => onStart(row.key)}>
         <Body tone="muted">{text.doneLabel}</Body>
-        <Body tone="muted" small>
-          {row.meta}
-        </Body>
+        <Meta meta={row.meta} />
       </Row>
     );
   }
@@ -150,6 +151,7 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
         </Body>
         <Body tone="strong">{text.title}</Body>
         <Body>{text.body}</Body>
+        <Meta meta={row.meta} />
         <Button label={row.started ? copy.continue : copy.start} onPress={() => onStart(row.key)} />
       </Card>
     );
@@ -159,7 +161,19 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
     <Row onPress={() => onStart(row.key)}>
       <Body tone="muted">{row.started ? `${text.title} · ${copy.metaStarted}` : text.title}</Body>
       <Body>{text.body}</Body>
+      <Meta meta={row.meta} />
     </Row>
+  );
+}
+
+function Meta({ meta }: { meta?: string }) {
+  if (!meta) {
+    return null;
+  }
+  return (
+    <Body tone="muted" small>
+      {meta}
+    </Body>
   );
 }
 
@@ -176,7 +190,7 @@ const styles = StyleSheet.create({
 });
 
 /** A step in the full plan: stays focusable and explained, and a press asks for the paywall. */
-function LockedStep(props: { title: string; body: string; reason: string; onLocked: (opener: unknown) => void }) {
+function LockedStep(props: { title: string; body: string; meta?: string; reason: string; onLocked: (opener: unknown) => void }) {
   const reasonId = useId();
   const row = useRef<unknown>(null);
   return (
@@ -191,6 +205,7 @@ function LockedStep(props: { title: string; body: string; reason: string; onLock
     >
       <Body tone="strong">{props.title}</Body>
       <Body>{props.body}</Body>
+      <Meta meta={props.meta} />
       <Body id={reasonId} hidden small>
         {props.reason}
       </Body>

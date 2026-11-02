@@ -43,6 +43,27 @@ function setup(over: Partial<HubProps> = {}) {
   return handlers;
 }
 
+describe('Hub meta on any row', () => {
+  it('shows meta on next, later and locked rows, and in the row name', () => {
+    const withMeta: HubRow[] = [
+      { key: 'announce', status: 'next', started: false, locked: false, meta: 'Ready' },
+      { key: 'service', status: 'later', started: false, locked: false, meta: 'Needs a detail' },
+      { key: 'obituary', status: 'later', started: false, locked: false, meta: 'Needs a detail' },
+      { key: 'thanks', status: 'later', started: false, locked: true, meta: 'Needs a detail' },
+    ];
+    setup({ rows: withMeta });
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Share the service[\s\S]*Needs a detail/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Share the obituary[\s\S]*Needs a detail/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Send thank-yous[\s\S]*Needs a detail/ })).toBeInTheDocument();
+  });
+
+  it('shows no meta line when a row has none', () => {
+    setup();
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+  });
+});
+
 describe('Hub', () => {
   it('has one h1 and the eyebrow and intro', () => {
     setup();

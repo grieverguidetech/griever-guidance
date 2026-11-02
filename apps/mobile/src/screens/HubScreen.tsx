@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { isDraftStarted, usePathMoments } from '@griever/hooks';
-import type { Session } from '@griever/hooks';
+import { isDraftStarted, sendCardStatus, usePathMoments } from '@griever/hooks';
+import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
-import { doneRowMeta, fill, screenCopy } from '@griever/copy';
+import { fill, screenCopy } from '@griever/copy';
 import { Hub, PaywallSheet, SentNote } from '@griever/ui';
 import type { ButtonNode, HubRow } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
@@ -25,6 +25,27 @@ export const CATEGORY_BY_MOMENT: Record<MomentKey, TemplateCategory> = {
   obituary: 'obituary',
   thanks: 'aftercare',
 };
+
+/** The status line for a card, from the copy file. */
+function statusLine(status: SendCardStatus): string {
+  if (status === 'ready') {
+    return copy.statusReady;
+  }
+  if (status === 'needsDetail') {
+    return copy.statusNeedsDetail;
+  }
+  return fill(copy.statusSent, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
+}
+
+/** A finished card adds its date and the send-again hint; the others show the status line alone. */
+function rowMeta(status: SendCardStatus, done: boolean, completedAt: string | undefined, started: boolean): string {
+  const line = statusLine(status);
+  if (!done) {
+    return line;
+  }
+  const date = completedAt ? ` · ${formatDate(completedAt)}` : '';
+  return `${line}${date} · ${started ? copy.metaStarted : copy.metaSendAgain}`;
+}
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -122,14 +143,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
       status: moment.status,
       started,
       locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
-      meta:
-        moment.status === 'done'
-          ? doneRowMeta(copy, {
-              recipientCount: moment.recipientCount,
-              dateLabel: moment.completedAt ? formatDate(moment.completedAt) : undefined,
-              started,
-            })
-          : undefined,
+      meta: rowMeta(sendCardStatus(session, moment.key), moment.status === 'done', moment.completedAt, started),
     };
   });
 
