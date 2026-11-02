@@ -35,7 +35,9 @@
     "searchEmpty",
     "selectAllShown",
     "everyoneYouTold",
-    "notSentYet"
+    "notSentYet",
+    "everyoneYouToldName",
+    "notSentYetName"
   ],
   "properties": {
     "heading": {
@@ -128,6 +130,12 @@
       "$ref": "#/$defs/text"
     },
     "notSentYet": {
+      "$ref": "#/$defs/text"
+    },
+    "everyoneYouToldName": {
+      "$ref": "#/$defs/text"
+    },
+    "notSentYetName": {
       "$ref": "#/$defs/text"
     },
     "searchEmpty": {

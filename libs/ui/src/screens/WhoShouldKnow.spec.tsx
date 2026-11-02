@@ -284,5 +284,10 @@ describe('WhoShouldKnow', () => {
       await user.click(screen.getByRole('button', { name: 'Everyone you told' }));
       expect(onPress).toHaveBeenCalledTimes(1);
     });
+
+    it('renders no shortcut when there are no people', () => {
+      setup({ grouped: false, people: [], shortcuts: [{ label: 'Everyone you told', onPress: vi.fn() }] });
+      expect(screen.queryByRole('button', { name: 'Everyone you told' })).toBeNull();
+    });
   });
 });

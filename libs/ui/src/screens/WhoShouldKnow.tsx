@@ -110,7 +110,7 @@ export interface WhoShouldKnowProps {
    * Mobile: extra buttons that tick a ready-made group of people, for example "Everyone you told".
    * Each one only adds ticks. Leave unset on web.
    */
-  shortcuts?: { label: string; onPress: () => void }[];
+  shortcuts?: { label: string; accessibilityName?: string; onPress: () => void }[];
 }
 
 /**
@@ -195,6 +195,7 @@ export function WhoShouldKnow({
             <Button
               key={shortcut.label}
               label={shortcut.label}
+              accessibilityName={shortcut.accessibilityName}
               variant="secondary"
               onPress={shortcut.onPress}
             />

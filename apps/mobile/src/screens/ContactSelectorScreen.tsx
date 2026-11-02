@@ -16,7 +16,7 @@ import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 interface Props extends FlowProps {
   contacts: UseContactsResult;
   /** Who each moment was sent to. Stays on this phone. */
-  notified?: Partial<Record<TemplateCategory, string[]>>;
+  notified: Partial<Record<TemplateCategory, string[]>>;
 }
 
 type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
@@ -209,14 +209,17 @@ function buildShortcuts(
   const saved = new Set(savedIds);
   const told = (notified?.announcement ?? []).filter((id) => saved.has(id));
   const thisMoment = new Set(notified?.[category] ?? []);
-  const list: { label: string; onPress: () => void }[] = [];
+  const list: { label: string; accessibilityName: string; onPress: () => void }[] = [];
   if (told.length > 0) {
-    list.push({ label: copy.everyoneYouTold, onPress: () => select(told) });
+    list.push({ label: copy.everyoneYouTold, accessibilityName: copy.everyoneYouToldName, onPress: () => select(told) });
   }
-  if (thisMoment.size > 0) {
+  const notSent = savedIds.filter((id) => !thisMoment.has(id));
+  const reached = savedIds.some((id) => thisMoment.has(id));
+  if (reached && notSent.length > 0) {
     list.push({
       label: copy.notSentYet,
-      onPress: () => select(savedIds.filter((id) => !thisMoment.has(id))),
+      accessibilityName: copy.notSentYetName,
+      onPress: () => select(notSent),
     });
   }
   return list;
