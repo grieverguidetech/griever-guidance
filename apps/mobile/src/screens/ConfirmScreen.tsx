@@ -10,8 +10,10 @@ import type { FlowProps } from '../app/App';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { ACCENT, MUTED } from '../components/colors';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
+import { shareMessage } from '../lib/shareSheet';
 
 const copy = screenCopy('review');
+const sendingCopy = screenCopy('sending');
 
 interface Props extends FlowProps {
   /** Used only to show the first picked person's greeting in the preview. */
@@ -23,15 +25,17 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [sampleOpen, setSampleOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
+  const [shareFailed, setShareFailed] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
+  const shareButton = useRef<ButtonNode>(null);
 
   if (!selectedTemplate) {
     return null;
   }
 
   // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
-  const focusChecklistButton = () => {
-    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+  const focusButton = (button: { current: ButtonNode | null }) => {
+    const handle = button.current ? findNodeHandle(button.current) : null;
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
@@ -40,6 +44,9 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const isAnnouncement = flow.templateCategory === 'announcement';
   const isService = flow.templateCategory === 'service';
   const recipientCount = selectedContactIds.length;
+  // Service and obituary can be posted from the share sheet; with no one picked it is the only action.
+  const canShare = isService || flow.templateCategory === 'obituary';
+  const shareOnly = canShare && recipientCount === 0;
   const recipients = recipientsPhrase(recipientCount, copy);
   const firstPicked = contacts?.contacts.find((c) => c.contactId === selectedContactIds[0]);
   const greeting = firstPicked ? firstName(firstPicked.name) : '';
@@ -47,6 +54,20 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
   const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
   const preview = flow.greeting && greeting !== '' ? fill(copy.greetingPreview, { greeting: `${greeting},` }) : '';
+
+  // The shared text has no greeting, no per-person note and nothing is recorded: it is not a send.
+  async function shareElsewhere() {
+    setShareFailed(false);
+    const result = await shareMessage(composedMessage);
+    setShareFailed(result === 'failed');
+    // The sheet takes the screen reader's cursor; bring it back to the button that opened it.
+    focusButton(shareButton);
+  }
+
+  function changeMessage(message: string | null) {
+    setShareFailed(false);
+    setMessageOverride(message);
+  }
 
   function toggleGreeting() {
     const next = !flow.greeting;
@@ -62,11 +83,11 @@ export function ConfirmScreen({ flow, contacts }: Props) {
         <Review
           copy={copy}
           kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}
-          intro={fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
+          intro={shareOnly ? copy.introShareOnly : fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
           message={composedMessage}
-          onMessageChange={setMessageOverride}
+          onMessageChange={changeMessage}
           edited={flow.messageOverride !== null}
-          onUseSuggested={() => setMessageOverride(null)}
+          onUseSuggested={() => changeMessage(null)}
           tone={flow.tone}
           onToneChange={flow.setTone}
           sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
@@ -76,25 +97,38 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           onSend={startSendJob}
           onWhatYoullNeed={() => setChecklistOpen(true)}
           checklistRef={checklistButton}
+          share={
+            canShare
+              ? {
+                  label: copy.shareElsewhere,
+                  buttonRef: shareButton,
+                  onPress: () => void shareElsewhere(),
+                  error: shareFailed ? sendingCopy.shareError : undefined,
+                  only: shareOnly,
+                }
+              : undefined
+          }
         >
-          <Pressable
-            style={styles.greetingRow}
-            onPress={toggleGreeting}
-            accessibilityRole="switch"
-            accessibilityLabel={copy.greetingSwitch}
-            accessibilityState={{ checked: flow.greeting }}
-          >
-            <Text style={styles.greetingLabel} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-              {copy.greetingSwitch}
-            </Text>
-            <Switch
-              value={flow.greeting}
-              onValueChange={toggleGreeting}
-              trackColor={{ true: ACCENT }}
-              importantForAccessibility="no-hide-descendants"
-              accessibilityElementsHidden
-            />
-          </Pressable>
+          {!shareOnly && (
+            <Pressable
+              style={styles.greetingRow}
+              onPress={toggleGreeting}
+              accessibilityRole="switch"
+              accessibilityLabel={copy.greetingSwitch}
+              accessibilityState={{ checked: flow.greeting }}
+            >
+              <Text style={styles.greetingLabel} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                {copy.greetingSwitch}
+              </Text>
+              <Switch
+                value={flow.greeting}
+                onValueChange={toggleGreeting}
+                trackColor={{ true: ACCENT }}
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden
+              />
+            </Pressable>
+          )}
           {showDetails && (
             <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} />
           )}
@@ -120,7 +154,7 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           )}
         </Review>
       </ScrollView>
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={() => focusButton(checklistButton)} />
     </KeyboardAvoidingView>
   );
 }

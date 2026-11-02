@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { AccessibilityInfo, Linking } from 'react-native';
+import { AccessibilityInfo, Linking, Share } from 'react-native';
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import { SHARE_SERVICE_SAMPLE } from '@griever/shared';
 import type { SessionDetails } from '@griever/shared';
@@ -12,16 +12,22 @@ import { SendingScreen } from './SendingScreen';
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '' } as SessionDetails;
 const contacts = { contacts: [{ contactId: 'c0', name: 'Dee', phone: '+15555550100' }] } as never;
 
-function Harness({ fields, thanks, senderName }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string } = {}) {
+// Stable defaults: a new array each render would re-run the effect below.
+const PICKED = ['c0'];
+const NONE: string[] = [];
+
+function Harness({ fields, thanks, senderName, category, ids = PICKED }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[] } = {}) {
   const flow = useSendFlow({
     session: { ...session, ...(senderName === undefined ? {} : { senderName }) },
     draft: freshDraft({
-      templateCategory: thanks ? 'aftercare' : 'service', templateOverrideId: thanks ? 'thank-you-note' : 'share-service', step: 'review',
+      templateCategory: category ?? (thanks ? 'aftercare' : 'service'),
+      templateOverrideId: category ? undefined : thanks ? 'thank-you-note' : 'share-service',
+      step: 'review',
       fields: fields ?? { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' },
     }),
   });
   const { selectContacts } = flow;
-  useEffect(() => { selectContacts(['c0']); }, [selectContacts]);
+  useEffect(() => { selectContacts(ids); }, [selectContacts, ids]);
   return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ConfirmScreen flow={flow} contacts={contacts} />;
 }
 
@@ -115,7 +121,8 @@ describe('Review your message (Share the service)', () => {
       render(<Harness fields={{ serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: '' }} />);
       expect(screen.getByLabelText('Location, Needed')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Text these people' }).props.accessibilityState?.disabled).toBe(true);
-      expect(screen.getByText('Fill in the empty details to send.')).toBeTruthy();
+      // Send and Share elsewhere each carry the reason, so each button points at its own line.
+      expect(screen.getAllByText('Fill in the empty details to send.')).toHaveLength(2);
       fireEvent.changeText(screen.getByLabelText('Location, Needed'), 'Oak Chapel');
       expect(screen.queryByLabelText(/Needed/)).toBeNull();
       expect(screen.getByRole('button', { name: 'Text these people' }).props.accessibilityState?.disabled).toBeFalsy();
@@ -147,5 +154,84 @@ describe('Review your message (Share the service)', () => {
       fireEvent.changeText(screen.getByLabelText('Personal note (optional)'), 'Your flowers meant a lot.');
       expect(screen.getByText(/Your flowers meant a lot\./)).toBeTruthy();
     });
+  });
+});
+
+describe('Share elsewhere', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const shared = { action: Share.sharedAction, activityType: undefined };
+  const shareButton = () => screen.getByRole('button', { name: 'Share elsewhere' });
+
+  it('shows on the service after Send, and shares the message without a greeting', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
+    render(<Harness />);
+    expect(screen.getByText('Text these people')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    fireEvent.press(shareButton());
+    await waitFor(() => expect(share).toHaveBeenCalledWith({ message: 'Come as you are.' }));
+  });
+
+  it('puts Send and its privacy line before Share elsewhere when people are picked', () => {
+    render(<Harness />);
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('Text these people')).toBeLessThan(tree.indexOf('Share elsewhere'));
+    expect(tree.indexOf("You'll text each person")).toBeLessThan(tree.indexOf('Share elsewhere'));
+  });
+
+  it('with no one picked is the only action, and records nothing', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    open.mockClear();
+    render(<Harness ids={NONE} />);
+    expect(screen.queryByText('Text these people')).toBeNull();
+    expect(screen.queryByText(/^Text /)).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    fireEvent.press(shareButton());
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Sending|sent/i)).toBeNull();
+  });
+
+  it('is disabled with a share-specific hint when the message is blank', () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
+    render(<Harness ids={NONE} />);
+    fireEvent.changeText(screen.getByLabelText('Your message'), '   ');
+    expect(shareButton().props.accessibilityState?.disabled).toBe(true);
+    expect(shareButton().props.accessibilityHint).toBe('Add a message before you share it.');
+    expect(screen.getByText('Add a message before you share it.')).toBeTruthy();
+    expect(screen.queryByText(/send/i)).toBeNull();
+    fireEvent.press(shareButton());
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it('shows the calm error in a status line, announces it, and clears it when the message changes', async () => {
+    jest.spyOn(Share, 'share').mockRejectedValue(new Error('no'));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    render(<Harness ids={NONE} />);
+    fireEvent.press(shareButton());
+    const line = await screen.findByText("That didn't go through. You can try again.");
+    expect(line.props.role).toBe('status');
+    expect(line.props.accessibilityLiveRegion).toBe('polite');
+    expect(announce).toHaveBeenCalledWith("That didn't go through. You can try again.");
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'A new line.');
+    expect(screen.queryByText("That didn't go through. You can try again.")).toBeNull();
+  });
+
+  it('shows on the obituary', () => {
+    render(<Harness category="obituary" ids={NONE} />);
+    expect(shareButton()).toBeTruthy();
+  });
+
+  it('is not on the announcement or the thank-you, and Send is', () => {
+    const { unmount } = render(<Harness category="announcement" />);
+    expect(screen.queryByText('Share elsewhere')).toBeNull();
+    expect(screen.getByText('Text 1 person')).toBeTruthy();
+    unmount();
+    render(<Harness thanks senderName="The Hayes Family" fields={{}} />);
+    expect(screen.queryByText('Share elsewhere')).toBeNull();
+    expect(screen.getByText('Text these people')).toBeTruthy();
   });
 });
