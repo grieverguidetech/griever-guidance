@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, AppState, findNodeHandle, Linking, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, AppState, findNodeHandle, KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
@@ -11,6 +11,9 @@ import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 
 const copy = screenCopy('sending');
+/** A tap this soon after a hand-off is the same tap landing on the button that took the first one's place. */
+export const HAND_OFF_GUARD_MS = 1000;
+
 const copyOptional = screenCopy('announce').optional;
 
 interface Props extends FlowProps {
@@ -27,10 +30,11 @@ interface Props extends FlowProps {
  * comes back active, it asks whether that person was sent (REQUIREMENTS.md section 6, Decision 3).
  * One tap marks them sent and opens Messages for the next; Not yet keeps the person; Skip stays.
  * Nothing is marked sent without a tap. If no return is detected, Next works as before.
- * The send job is not saved.
+ * The send job is not saved. Each person marked sent is written to the device the moment it
+ * happens (ids only, in App.tsx), so a restart never texts them twice.
  */
 export function SendingScreen({ flow, contacts }: Props) {
-  const { sendJob, markActiveSent, markActiveSkipped } = flow;
+  const { sendJob, markActiveSent, markActiveSkipped, stopSending } = flow;
   // Who the last hand-off was for, and whose "Sent?" question is showing. Ids, so a new active
   // person starts clean without a reset.
   const [handedOffId, setHandedOffId] = useState<string | null>(null);
@@ -38,6 +42,8 @@ export function SendingScreen({ flow, contacts }: Props) {
   // Whose hand-off failed to open Messages; shows a calm line and puts them back on the Text button.
   const [failedId, setFailedId] = useState<string | null>(null);
   const wentAway = useRef(false);
+  // When Messages was last opened. A tap right after lands on the button that replaced the one tapped.
+  const handedOffAt = useRef(0);
   // The contact whose question was already answered Yes, so a second tap cannot mark the next one.
   const confirmedFor = useRef<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -98,6 +104,7 @@ export function SendingScreen({ flow, contacts }: Props) {
   const done = sendJob.recipients.filter((r) => r.status === 'delivered' || r.status === 'skipped').length;
   const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
   const isLast = activeIndex === total - 1;
+  const thankYou = flow.templateCategory === 'aftercare';
   const nameFor = (id: string) => contacts.contacts.find((c) => c.contactId === id)?.name ?? copy.recipientFallback;
 
   function handOffTo(contactId: string) {
@@ -106,6 +113,7 @@ export function SendingScreen({ flow, contacts }: Props) {
       return;
     }
     const link = buildSmsLink(contact.phone, flow.messageFor(contact.name, contactId), Platform.OS === 'ios');
+    handedOffAt.current = Date.now();
     setHandedOffId(contactId);
     setAskingId(null);
     setFailedId(null);
@@ -116,6 +124,17 @@ export function SendingScreen({ flow, contacts }: Props) {
     });
   }
 
+  function justHandedOff() {
+    return Date.now() - handedOffAt.current < HAND_OFF_GUARD_MS;
+  }
+
+  function markNext() {
+    if (justHandedOff()) {
+      return;
+    }
+    markActiveSent();
+  }
+
   function openMessages() {
     if (active) {
       handOffTo(active.contactId);
@@ -124,19 +143,21 @@ export function SendingScreen({ flow, contacts }: Props) {
 
   // One tap: this person is sent, and Messages opens for the next, if there is one.
   function confirmSent() {
-    if (!activeId || confirmedFor.current === activeId) {
+    if (!activeId || confirmedFor.current === activeId || justHandedOff()) {
       return;
     }
     confirmedFor.current = activeId;
     const next = isLast ? undefined : sendJob?.recipients[activeIndex + 1];
     markActiveSent();
-    if (next) {
+    // The thank-you moves to the next card without opening Messages, so the note for that person can be written first.
+    if (next && !thankYou) {
       handOffTo(next.contactId);
     }
   }
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Sending
         copy={copy}
         intro={copy.introTextOnly}
@@ -164,7 +185,7 @@ export function SendingScreen({ flow, contacts }: Props) {
             : null
         }
         note={
-          flow.templateCategory === 'aftercare' && activeContact
+          thankYou && activeContact
             ? {
                 label: fill(copy.addLine, { name: activeContact.name }),
                 optional: copyOptional,
@@ -182,24 +203,26 @@ export function SendingScreen({ flow, contacts }: Props) {
                   : fill(copy.sentPromptNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
                 hint: isLast
                   ? fill(copy.sentHintDone, { name: activeContact.name })
-                  : fill(copy.sentHintNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
+                  : fill(thankYou ? copy.sentHintNextNote : copy.sentHintNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
                 notYet: copy.notYet,
                 onYes: confirmSent,
                 onNotYet: () => setHandedOffId(null),
               }
             : undefined
         }
-        error={activeId !== null && failedId === activeId ? copy.shareError : undefined}
+        error={activeId !== null && failedId === activeId && activeContact ? fill(copy.smsError, { name: activeContact.name }) : undefined}
         focusOpenOnError
         onOpenMessages={openMessages}
-        onNext={markActiveSent}
+        onNext={markNext}
         onSkip={markActiveSkipped}
+        stop={{ label: copy.stopForNow, onPress: stopSending }}
         headingRef={heading}
         onWhatYoullNeed={() => setChecklistOpen(true)}
         checklistRef={checklistButton}
       />
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

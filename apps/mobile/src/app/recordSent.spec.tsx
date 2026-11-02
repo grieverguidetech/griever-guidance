@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Linking } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, BackHandler, Linking } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
@@ -26,6 +26,9 @@ const savedAnna = async (): Promise<Session> => {
   const list = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[];
   return list.find((s) => s.id === 'a') as Session;
 };
+
+// A tap this soon after opening Messages is ignored (the double-tap guard), so a test waits like a person would.
+const afterMessages = () => new Promise((resolve) => setTimeout(resolve, 1100));
 
 const NOTE = 'She was peaceful at home.';
 
@@ -54,9 +57,11 @@ describe('recording who was messaged (#621)', () => {
     // The composed message really carries the note, so the check below means something.
     expect(await screen.findByText(new RegExp(NOTE))).toBeTruthy();
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
     fireEvent.press(await screen.findByText('Text Fay'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText(/^Sent to 2 people · /)).toBeTruthy();
     await waitFor(async () => {
@@ -85,6 +90,7 @@ describe('recording who was messaged (#621)', () => {
   it('opens the flow again from the done row, without bouncing back to the hub', async () => {
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
     // Start the announcement again from its done row.
@@ -93,5 +99,49 @@ describe('recording who was messaged (#621)', () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByLabelText(/Anything you'd like to add/)).toBeTruthy();
     expect(screen.queryByText('One thing at a time.')).toBeNull();
+  });
+
+  it('writes each person to the phone when confirmed, before the send ends', async () => {
+    await toSending(['Dee', 'Eli', 'Fay']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    fireEvent.press(await screen.findByText('Text Eli'));
+    // Still on the send screen, two people to go: Dee is already kept.
+    await waitFor(async () => {
+      expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
+    });
+    // Ids only: no message text and no job is stored (C2).
+    const raw = (await AsyncStorage.getItem(SESSIONS_KEY)) ?? '';
+    expect(raw).not.toContain('sendJob');
+    expect(raw).not.toContain('Hello Dee');
+  });
+
+  it('Android Back on the send screen goes to the hub and keeps who was told', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    await toSending(['Dee', 'Eli']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    await screen.findByText('Text Eli');
+    act(() => void [...handlers].reverse().some((h) => h()));
+    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
+    expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
+  });
+
+  it('Stop for now ends the send, keeps who was told, and the hub says how many', async () => {
+    await toSending(['Dee', 'Eli', 'Fay']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    fireEvent.press(await screen.findByText('Stop for now'));
+    expect(await screen.findByText('You told 1 of 3.')).toBeTruthy();
+    expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
+    expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
   });
 });

@@ -140,6 +140,40 @@ describe('useSendFlow — sending one contact at a time', () => {
     expect(result.current.sendJob).toBeNull();
   });
 
+  it('drops people already told from a draft saved mid-send', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a', 'b', 'c'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft, told: { announcement: ['a', 'b'], service: ['c'] } }));
+    expect(result.current.step).toBe('review');
+    expect(result.current.selectedContactIds).toEqual(['c']);
+  });
+
+  it('opens on the people when everyone in the saved send was already told', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft, told: { announcement: ['a'] } }));
+    expect(result.current.step).toBe('contacts');
+    expect(result.current.selectedContactIds).toEqual([]);
+  });
+
+  it('keeps the whole selection when told is not given', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a', 'b'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft }));
+    expect(result.current.selectedContactIds).toEqual(['a', 'b']);
+  });
+
+  it('stopSending ends the job at sent and leaves the queued people unmarked', () => {
+    const { result } = readyToSend();
+    act(() => result.current.markActiveSent());
+    act(() => result.current.stopSending());
+    expect(result.current.step).toBe('sent');
+    expect(result.current.sendJob?.recipients.map((r) => r.status)).toEqual(['delivered', 'sending', 'queued']);
+  });
+
+  it('stopSending does nothing outside a send', () => {
+    const { result } = announcement({ step: 'review' });
+    act(() => result.current.stopSending());
+    expect(result.current.step).toBe('review');
+  });
+
   it('reports drafts without the send job', () => {
     const onDraftChange = vi.fn();
     const { result } = renderHook(() =>

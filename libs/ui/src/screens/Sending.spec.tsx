@@ -166,6 +166,27 @@ describe('Sending', () => {
     expect(screen.queryByRole('button', { name: 'Open Messages' })).toBeNull();
   });
 
+  it('shows a quiet Stop for now that calls onPress, and hides it when unset', async () => {
+    const user = userEvent.setup();
+    const onPress = vi.fn();
+    const view = render(<Sending {...base()} stop={{ label: 'Stop for now', onPress }} />);
+    await user.click(screen.getByRole('button', { name: 'Stop for now' }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+    view.rerender(<Sending {...base()} />);
+    expect(screen.queryByRole('button', { name: 'Stop for now' })).toBeNull();
+  });
+
+  it('labels each other-person row once as name and status', () => {
+    render(<Sending {...base()} others={[{ id: 'b', name: 'Bob Smith', status: 'sent' }]} />);
+    expect(screen.getByLabelText('Bob Smith, Sent')).toBeInTheDocument();
+  });
+
+  it('does not repeat the hand-off note as a hint on Next', () => {
+    render(<Sending {...base()} handOff={{ note: 'Send it in Messages.', again: 'Again', onAgain: vi.fn() }} />);
+    expect(screen.getByRole('button', { name: 'Next' })).not.toHaveAccessibleDescription('Send it in Messages.');
+    expect(screen.getByRole('status')).toHaveTextContent('Send it in Messages.');
+  });
+
   it('offers Done on the last person', () => {
     setup({
       current: { position: '3 of 3', name: 'Dana Lee', message: 'Hi', isLast: true },

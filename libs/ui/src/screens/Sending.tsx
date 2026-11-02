@@ -74,6 +74,8 @@ export interface SendingProps {
   share?: { label: string; onPress: () => void };
   onNext: () => void;
   onSkip: () => void;
+  /** A quiet "Stop for now" under the card. Leave unset to hide it. */
+  stop?: { label: string; onPress: () => void };
   headingRef?: HeadingProps['headingRef'];
   /** Opens "What you'll need". Leave unset to hide the button. There is no Back: going back to Review could start the send again. */
   onWhatYoullNeed?: () => void;
@@ -86,7 +88,7 @@ export interface SendingProps {
  * share sheet) and then Next. Built from libs/ui so web (through react-native-web) and mobile show
  * the same screen. It owns no state; the app holds the hand-off and does the platform work.
  */
-export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, note, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
+export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, note, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, stop, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();
   const noteLabelId = useId();
   const inputFont = useSerifStyle('regular');
@@ -184,7 +186,8 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
             </View>
           ) : handOff ? (
             <View style={styles.actions}>
-              <Button label={current.isLast ? copy.done : copy.next} buttonRef={nextRef} hint={handOff.note} onPress={onNext} />
+              {/* No hint: the note below is a live region and says the same, so it is read once. */}
+              <Button label={current.isLast ? copy.done : copy.next} buttonRef={nextRef} onPress={onNext} />
               <Button label={handOff.again} variant="ghost" onPress={handOff.onAgain} />
             </View>
           ) : (
@@ -197,9 +200,11 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
           <Status id={statusId} message={error ?? (confirmSent ? undefined : handOff?.note)} tone={error ? 'danger' : 'muted'} />
         </Card>
       ) : null}
+      {current && stop ? <Button label={stop.label} variant="ghost" onPress={stop.onPress} /> : null}
       <View style={styles.list}>
         {others.map((person) => (
-          <View key={person.id} style={styles.person}>
+          // One element per row, read as "Name, status".
+          <View key={person.id} style={styles.person} accessible accessibilityLabel={`${person.name}, ${copy[person.status]}`}>
             <Body>{person.name}</Body>
             <Body tone="muted">{copy[person.status]}</Body>
           </View>
