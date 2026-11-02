@@ -168,7 +168,7 @@ const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
   input: {
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 14,
+    fontSize: 15,
   },
   // Native focus cue (web draws its own ring through data-gg-field).
   inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },

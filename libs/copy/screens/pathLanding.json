@@ -16,8 +16,11 @@
   "statusReady": "Ready",
   "statusNeedsDetail": "Needs a detail",
   "statusWaitingForLink": "Waiting for the link",
+  "statusNeedsField": "Needs the {field}",
+  "statusNeedsOwnField": "Needs {field}",
   "statusSent": "Sent to {n} {noun}",
   "lockedReason": "Included with the full plan",
+  "announcedLabel": "Announced the passing",
   "notInAppYet": "Not in the app yet. You can do this one on the web.",
   "moments": {
     "announce": { "title": "Announce the passing", "body": "A gentle note letting people know.", "doneLabel": "Told close family" },

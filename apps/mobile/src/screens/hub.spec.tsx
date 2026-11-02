@@ -3,6 +3,7 @@ import { AccessibilityInfo, BackHandler, Modal, Platform, StyleSheet } from 'rea
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
+import { colors } from '@griever/tokens';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
 
@@ -125,7 +126,7 @@ describe('HubScreen', () => {
       drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
     } as unknown as Session;
     setup(done);
-    expect(screen.getByRole('button', { name: /Told close family/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Announced the passing/ })).toBeTruthy();
     expect(screen.getByText(/Sent to 2 people · October 2, 2026 · Send again/)).toBeTruthy();
     expect(screen.getByText('Started')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
@@ -141,13 +142,13 @@ describe('HubScreen', () => {
       momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
     } as unknown as Session;
     setup(mixed);
-    expect(within(screen.getByRole('button', { name: /Told close family/ })).getByText(/Sent to 1 person/)).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Announced the passing/ })).getByText(/Sent to 1 person/)).toBeTruthy();
     // The service is the next step, so it is a card; its status sits in the card.
     expect(screen.getByText('Ready')).toBeTruthy();
-    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs a detail/)).toBeTruthy();
-    expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs a detail/)).toBeTruthy();
-    const titles = screen.getAllByText(/Told close family|Share the service|Share the obituary|Send thank-yous/).map((n) => n.props.children);
-    expect(titles).toEqual(['Told close family', 'Share the service', 'Share the obituary', 'Send thank-yous']);
+    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs the obituary link/)).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs your name or family name/)).toBeTruthy();
+    const titles = screen.getAllByText(/Announced the passing|Share the service|Share the obituary|Send thank-yous/).map((n) => n.props.children);
+    expect(titles).toEqual(['Announced the passing', 'Share the service', 'Share the obituary', 'Send thank-yous']);
   });
 
   it('the obituary card reads "Waiting for the link" once its text is written and the link is not', () => {
@@ -165,10 +166,10 @@ describe('HubScreen', () => {
     setup(anna, true);
     const service = screen.getByRole('button', { name: /Share the service/ });
     expect(service.props.accessibilityHint).toBe('Included with the full plan');
-    expect(within(screen.getByRole('button', { name: /Share the service/ })).getByText(/Needs a detail/)).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Share the service/ })).getByText(/Needs the service date/)).toBeTruthy();
     const thanks = screen.getByRole('button', { name: /Send thank-yous/ });
     expect(thanks.props.accessibilityHint).toBe('Included with the full plan');
-    expect(within(thanks).getByText(/Needs a detail/)).toBeTruthy();
+    expect(within(thanks).getByText(/Needs your name or family name/)).toBeTruthy();
   });
 
   it('opens What you will need in a sheet', () => {
@@ -304,5 +305,44 @@ describe('HubScreen', () => {
   it('uses no exclamation points', () => {
     setup();
     expect(JSON.stringify(screen.toJSON())).not.toContain('!');
+  });
+
+  it('names the first missing required field in the status line (#654)', () => {
+    setup(anna, true);
+    const lines = screen.getAllByText(/^Needs /).map((n) => n.props.children);
+    expect(lines).toEqual(expect.arrayContaining(['Needs the service date', 'Needs your name or family name']));
+    expect(lines).toContain('Needs the obituary link');
+    expect(screen.queryByText('Needs a detail')).toBeNull();
+  });
+
+  it('moves to the next missing field once the first is filled', () => {
+    setup({ ...anna, serviceDate: 'June 14, 2026', serviceTime: '2:00 PM' } as Session, true);
+    expect(screen.getByText('Needs the location')).toBeTruthy();
+  });
+
+  it('uses the header variant for Edit person, so it is not the first strong button', () => {
+    setup();
+    const edit = screen.getByRole('button', { name: 'Edit person' });
+    const flat = StyleSheet.flatten(typeof edit.props.style === 'function' ? edit.props.style({ pressed: false }) : edit.props.style);
+    expect(flat.backgroundColor).toBeUndefined();
+    expect(flat.borderColor).toBe(colors['accent-600']);
+  });
+
+  it('draws an edge around the finished and later steps, so they read as pressable', () => {
+    const done = {
+      ...anna,
+      recipientsNotified: { announcement: ['c1'] },
+      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
+    } as unknown as Session;
+    setup(done);
+    for (const name of [/Announced the passing/, /Share the obituary/]) {
+      let box = screen.getByRole('button', { name }).parent;
+      while (box && !StyleSheet.flatten(box.props.style)?.borderWidth) {
+        box = box.parent;
+      }
+      const flat = StyleSheet.flatten(box?.props.style);
+      expect(flat.borderWidth).toBe(1);
+      expect(flat.borderColor).toBe(colors['neutral-600']);
+    }
   });
 });

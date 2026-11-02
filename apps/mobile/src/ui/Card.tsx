@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors['neutral-300'],
+    borderColor: colors['neutral-600'],
   },
   selected: { borderWidth: 2, borderColor: colors.accent },
 });

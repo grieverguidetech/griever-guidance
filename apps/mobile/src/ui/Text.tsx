@@ -63,12 +63,12 @@ const styles = StyleSheet.create({
   },
   accent2: { color: colors['accent-2-700'] },
   body: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   default: { color: colors['neutral-800'] },
   strong: { color: colors.ink },
   muted: { color: colors['neutral-700'] },
   danger: { color: '#b91c1c' },
-  small: { fontSize: 12, lineHeight: 18 },
+  small: { fontSize: 15, lineHeight: 22 },
 });

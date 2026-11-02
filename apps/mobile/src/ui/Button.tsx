@@ -123,7 +123,7 @@ export function Button({
   const unavailableFill = ariaDisabled && variant === 'primary';
   const text = (
     <Phrasing>
-      <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), variant === 'tertiary' && styles.labelTertiary]}>
+      <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), (variant === 'tertiary' || variant === 'ghost') && styles.labelTertiary]}>
         {working && busyLabel ? busyLabel : label}
       </Text>
     </Phrasing>

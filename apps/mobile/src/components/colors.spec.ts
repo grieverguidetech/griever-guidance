@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
+import { colors } from '@griever/tokens';
 import { ACCENT, ACCENT_TINT, ERROR, FIELD_BORDER, MUTED, MUTED_STRONG, SUCCESS } from './colors';
 
 function luminance(hex: string): number {
@@ -34,5 +35,13 @@ describe('mobile colours', () => {
 
   it('keeps field borders at least 3:1 on white', () => {
     expect(contrast(FIELD_BORDER, '#ffffff')).toBeGreaterThanOrEqual(3);
+  });
+
+  // #654: Card, PersonRow and the Hub step boxes use neutral-600 (3.85:1 on the page, 3.55:1 on the card fill).
+  it.each([
+    ['page', colors.bg],
+    ['card fill', colors.surface],
+  ])('keeps the neutral-600 box border at least 3:1 on the %s', (_name, background) => {
+    expect(contrast(colors['neutral-600'], background)).toBeGreaterThanOrEqual(3);
   });
 });

@@ -739,12 +739,16 @@ export function PersonRow({
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[1],
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   bringAcross: { gap: spacing[1] },
   footerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: spacing[1],
@@ -761,7 +765,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 14,
+    fontSize: 15,
   },
   error: { fontSize: 12, color: DANGER },
   formButtons: { flexDirection: 'row', gap: spacing[2], alignItems: 'center' },
@@ -775,7 +779,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 2,
-    borderColor: colors['neutral-300'],
+    borderColor: colors['neutral-600'],
   },
   rowSelected: { borderColor: colors.accent },
   box: {
@@ -811,6 +815,8 @@ const styles = StyleSheet.create({
   head: { gap: spacing[1] },
   sectionHead: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[1],
     justifyContent: 'space-between',
     alignItems: 'center',
   },

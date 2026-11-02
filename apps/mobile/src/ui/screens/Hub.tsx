@@ -1,7 +1,7 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
@@ -94,7 +94,7 @@ export function Hub(props: HubProps) {
             <Eyebrow>{props.eyebrow}</Eyebrow>
           </View>
           <View style={styles.noShrink}>
-            <Button label={copy.editPerson} variant="primary" onPress={props.onEdit} />
+            <Button label={copy.editPerson} variant="header" onPress={props.onEdit} />
           </View>
         </View>
         <Heading level={1} headingRef={props.headingRef}>
@@ -139,10 +139,12 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     // Opens this step's message: a draft still under way (a re-send left half-way) comes back,
     // otherwise it is new and empty, because a finished send keeps no wording (C2).
     return (
-      <Row onPress={() => onStart(row.key)}>
-        <Body tone="muted">{text.doneLabel}</Body>
-        <Meta meta={row.meta} />
-      </Row>
+      <View style={styles.stepBox}>
+        <Row onPress={() => onStart(row.key)}>
+          <Body tone="muted">{text.doneLabel}</Body>
+          <Meta meta={row.meta} />
+        </Row>
+      </View>
     );
   }
 
@@ -166,11 +168,13 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
   }
 
   return (
-    <Row onPress={() => onStart(row.key)}>
-      <Body tone="muted">{row.started ? `${text.title} · ${copy.metaStarted}` : text.title}</Body>
-      <Body>{text.body}</Body>
-      <Meta meta={row.meta} />
-    </Row>
+    <View style={styles.stepBox}>
+      <Row onPress={() => onStart(row.key)}>
+        <Body tone="muted">{row.started ? `${text.title} · ${copy.metaStarted}` : text.title}</Body>
+        <Body>{text.body}</Body>
+        <Meta meta={row.meta} />
+      </Row>
+    </View>
   );
 }
 
@@ -187,13 +191,15 @@ function Meta({ meta }: { meta?: string }) {
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
-  eyebrowRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eyebrowRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   rows: { gap: spacing[2] },
   // The name may be long; it wraps, and the Edit person button keeps its full width.
   eyebrowText: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
+  // A visible edge so a finished or later step reads as something to press (neutral-600: 3:1 or more).
+  stepBox: { paddingHorizontal: spacing[3], borderWidth: 1, borderColor: colors['neutral-600'], borderRadius: radius.md },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 
