@@ -4,12 +4,13 @@ import { hasObituaryLink, MOMENT_CATEGORY } from './usePathMoments.js';
 import type { Session } from './useSessions.js';
 
 /** What a person-screen card says about its moment. */
-export type SendCardStatus = 'ready' | 'needsDetail' | { sent: number };
+export type SendCardStatus = 'ready' | 'needsDetail' | 'waitingForLink' | { sent: number };
 
 /**
  * Pure: reads the session and nothing else. `sent` when people were messaged (the obituary also
  * needs its link). `needsDetail` when a required field of the moment's template is still empty after
- * the planned details are filled in. Otherwise `ready`. The announcement never needs a detail.
+ * the planned details are filled in. `waitingForLink` for the obituary when its text is written and only
+ * the link is missing (step 1 done, step 2 to come). Otherwise `ready`. The announcement never needs a detail.
  */
 export function sendCardStatus(session: Session, key: MomentKey): SendCardStatus {
   const category = MOMENT_CATEGORY[key];
@@ -30,5 +31,8 @@ export function sendCardStatus(session: Session, key: MomentKey): SendCardStatus
     filled['obituaryUrl'] = session.obituaryUrl.trim();
   }
   const missing = template.fields.some((field) => field.required && !filled[field.key]);
+  if (missing && key === 'obituary' && !hasLink && (session.obituaryText?.trim() ?? '') !== '') {
+    return 'waitingForLink';
+  }
   return missing ? 'needsDetail' : 'ready';
 }

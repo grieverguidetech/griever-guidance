@@ -22,6 +22,11 @@ const copy: ShareObituaryCopy = {
   draftTitle: 'Not written yet?',
   draftBody: 'We can help you draft it.',
   draftButton: 'Help me write it',
+  emailTitle: 'Step 1',
+  emailBody: 'Your email app opens.',
+  emailButton: 'Email it to the paper or funeral home',
+  emailNoText: 'Write it on the web first.',
+  emailFailed: "We couldn't open email.",
 };
 
 function setup(over: Partial<ShareObituaryProps> = {}) {
@@ -171,6 +176,33 @@ describe('ShareObituary', () => {
     expect(button).toHaveAccessibleDescription('in beta');
     await user.click(button);
     expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  it('shows no email card on the web (no publisherEmail)', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: 'Email it to the paper or funeral home' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Step 1')).not.toBeInTheDocument();
+  });
+
+  it('shows the email button when there is text, and a tap calls the handler', async () => {
+    const user = userEvent.setup();
+    const onPress = vi.fn();
+    setup({ publisherEmail: { hasText: true, onPress } });
+    await user.click(screen.getByRole('button', { name: 'Email it to the paper or funeral home' }));
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(screen.queryByText("We couldn't open email.")).not.toBeInTheDocument();
+  });
+
+  it('says the obituary is not written, with no button, when there is no text', () => {
+    setup({ publisherEmail: { hasText: false, onPress: vi.fn() } });
+    expect(screen.getByText('Write it on the web first.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Email it to the paper or funeral home' })).not.toBeInTheDocument();
+    expect(continueButton()).toBeInTheDocument();
+  });
+
+  it('says so when mail and sharing both failed', () => {
+    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), failed: true } });
+    expect(screen.getByText("We couldn't open email.")).toBeInTheDocument();
   });
 
   it('draws the eyebrow in the second accent when asked', () => {

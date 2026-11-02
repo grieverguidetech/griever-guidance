@@ -23,7 +23,13 @@
     "draftTitle",
     "draftBody",
     "draftButton",
-    "draftBeta"
+    "draftBeta",
+    "emailTitle",
+    "emailBody",
+    "emailButton",
+    "emailSubject",
+    "emailFailed",
+    "emailNoText"
   ],
   "properties": {
     "heading": {
@@ -85,6 +91,25 @@
       "$ref": "#/$defs/text"
     },
     "draftBeta": {
+      "$ref": "#/$defs/text"
+    },
+    "emailTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "emailBody": {
+      "$ref": "#/$defs/text"
+    },
+    "emailButton": {
+      "$ref": "#/$defs/text"
+    },
+    "emailSubject": {
+      "type": "string",
+      "pattern": "\\{name\\}"
+    },
+    "emailFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "emailNoText": {
       "$ref": "#/$defs/text"
     }
   },

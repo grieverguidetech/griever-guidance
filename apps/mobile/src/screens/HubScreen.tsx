@@ -29,6 +29,9 @@ function statusLine(status: SendCardStatus): string {
   if (status === 'needsDetail') {
     return copy.statusNeedsDetail;
   }
+  if (status === 'waitingForLink') {
+    return copy.statusWaitingForLink;
+  }
   return fill(copy.statusSent, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
 }
 
