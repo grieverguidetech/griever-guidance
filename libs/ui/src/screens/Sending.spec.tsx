@@ -109,6 +109,29 @@ describe('Sending', () => {
     expect(onAgain).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the question only when confirmSent is set, and one tap calls onYes', async () => {
+    const user = userEvent.setup();
+    const onYes = vi.fn();
+    const onNotYet = vi.fn();
+    const handOff = { note: 'n', again: 'Open Messages again', onAgain: vi.fn() };
+    const view = render(<Sending {...base()} handOff={handOff} />);
+    expect(screen.queryByRole('button', { name: 'Sent to A? Next: B' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Not yet' })).toBeNull();
+    view.rerender(<Sending {...base()} handOff={handOff} confirmSent={{ yes: 'Sent to A? Next: B', notYet: 'Not yet', onYes, onNotYet }} />);
+    expect(screen.getByRole('button', { name: 'Sent to A? Next: B' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Sent to A? Next: B' }));
+    await user.click(screen.getByRole('button', { name: 'Not yet' }));
+    expect(onYes).toHaveBeenCalledTimes(1);
+    expect(onNotYet).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+  });
+
+  it('uses openLabel for the hand-off button when given', () => {
+    render(<Sending {...base()} openLabel="Text A" />);
+    expect(screen.getByRole('button', { name: 'Text A' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open Messages' })).toBeNull();
+  });
+
   it('offers Done on the last person', () => {
     setup({
       current: { position: '3 of 3', name: 'Dana Lee', message: 'Hi', isLast: true },

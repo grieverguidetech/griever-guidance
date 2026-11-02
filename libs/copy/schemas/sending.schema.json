@@ -11,6 +11,10 @@
     "position",
     "recipientFallback",
     "openMessages",
+    "textPerson",
+    "sentPromptNext",
+    "sentPromptDone",
+    "notYet",
     "openMessagesAgain",
     "share",
     "shareAgain",
@@ -50,6 +54,21 @@
       "$ref": "#/$defs/text"
     },
     "openMessages": {
+      "$ref": "#/$defs/text"
+    },
+    "textPerson": {
+      "type": "string",
+      "pattern": "\\{name\\}"
+    },
+    "sentPromptNext": {
+      "type": "string",
+      "pattern": "\\{name\\}.*\\{next\\}"
+    },
+    "sentPromptDone": {
+      "type": "string",
+      "pattern": "\\{name\\}"
+    },
+    "notYet": {
       "$ref": "#/$defs/text"
     },
     "openMessagesAgain": {

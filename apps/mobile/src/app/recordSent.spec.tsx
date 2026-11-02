@@ -53,10 +53,10 @@ describe('recording who was messaged (#621)', () => {
     await toSending(['Dee', 'Eli', 'Fay'], NOTE);
     // The composed message really carries the note, so the check below means something.
     expect(await screen.findByText(new RegExp(NOTE))).toBeTruthy();
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Fay'));
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText(/^Sent to 2 people · /)).toBeTruthy();
     await waitFor(async () => {
@@ -84,7 +84,7 @@ describe('recording who was messaged (#621)', () => {
 
   it('opens the flow again from the done row, without bouncing back to the hub', async () => {
     await toSending(['Dee']);
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
     // Start the announcement again from its done row.
