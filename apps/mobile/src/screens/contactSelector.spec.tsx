@@ -48,7 +48,9 @@ function renderScreen(
   selectedContactIds: string[] = [],
 ) {
   const toggleContact = jest.fn();
+  const selectContacts = jest.fn();
   const flow = {
+    selectContacts,
     selectedContactIds,
     toggleContact,
     nextStep: jest.fn(),
@@ -60,7 +62,7 @@ function renderScreen(
     <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} />
   );
   const { rerender } = render(ui(selectedContactIds));
-  return { toggleContact, rerender: (ids: string[]) => rerender(ui(ids)) };
+  return { toggleContact, selectContacts, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
 // The screen's own title is a heading too; the tier headings are the rest.
@@ -69,6 +71,30 @@ const headers = () =>
     .queryAllByRole('heading')
     .map((h) => h.props.children)
     .filter((text) => text !== 'Who should know?');
+
+describe('ContactSelectorScreen search', () => {
+  const copy = screenCopy('whoShouldKnow');
+
+  it('keeps a tick when the search hides the person, and the count stays right', () => {
+    const { rerender } = renderScreen(saved, 'announcement', ['2']);
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'cat');
+    expect(screen.queryByText('Mum')).toBeNull();
+    expect(screen.getByText('1 selected')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), '');
+    expect(screen.getByText('Mum')).toBeTruthy();
+    rerender(['2']);
+    expect(screen.getByRole('checkbox', { name: /Mum/ }).props.accessibilityState.checked).toBe(true);
+  });
+
+  it('selects only the people shown, and says so when no one matches', () => {
+    const { selectContacts } = renderScreen();
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'CAT');
+    fireEvent.press(screen.getByRole('button', { name: 'Select all' }));
+    expect(selectContacts).toHaveBeenCalledWith(['3']);
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'zzz');
+    expect(screen.getByText(copy.searchEmpty)).toBeTruthy();
+  });
+});
 
 describe('ContactSelectorScreen grouping', () => {
   it('for an announcement with mixed tiers, shows one list in saved order, with no tier headings', () => {
@@ -81,8 +107,8 @@ describe('ContactSelectorScreen grouping', () => {
     expect(screen.queryByText(copy.introGrouped)).toBeNull();
     const rendered = screen.getAllByText(/^(Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
     expect(rendered).toEqual(['Neighbour Ned', 'Mum', 'Cousin Cat', 'Dad']);
-    // The shared list only draws Select all under a tier heading, so the one list has none.
-    expect(screen.queryByRole('button', { name: /^Select all/ })).toBeNull();
+    // The one list has a single Select all, not one per tier.
+    expect(screen.getAllByRole('button', { name: /^Select all/ })).toHaveLength(1);
   });
 
   it('shows a plain list in saved order, with no headings, for other templates', () => {

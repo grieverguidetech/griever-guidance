@@ -42,6 +42,10 @@ export interface WhoShouldKnowCopy {
   continue: string;
   empty: string;
   bringAcross: string;
+  /** Only used when `search` is set. */
+  searchLabel?: string;
+  /** Shown when the search matches no one. Only used when `search` is set. */
+  searchEmpty?: string;
 }
 
 export interface WhoPerson {
@@ -87,19 +91,27 @@ export interface WhoShouldKnowProps {
   /** After the Continue button, for example the saved note. */
   footer?: ReactNode;
   headingRef?: HeadingProps['headingRef'];
+  /**
+   * Mobile: a name search above the list, and a Select all for the single list that acts on the
+   * people shown. Leave unset on web. The typed text is kept in this component only.
+   */
+  search?: boolean;
 }
 
 /**
  * "Who should know?": pick the people who get the message. Built from libs/ui so web (through
  * react-native-web) and mobile show the same screen.
  */
-export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabel, onToggle, onSelectAll, toE164, onAddPerson, onBack, onContinue, onWhatYoullNeed, checklistRef, bringAcross, loading, footer, headingRef }: WhoShouldKnowProps) {
+export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabel, onToggle, onSelectAll, toE164, onAddPerson, onBack, onContinue, onWhatYoullNeed, checklistRef, bringAcross, loading, footer, headingRef, search = false }: WhoShouldKnowProps) {
+  const [query, setQuery] = useState('');
+  const needle = search ? query.trim().toLowerCase() : '';
+  const shown = needle ? people.filter((p) => p.name.toLowerCase().includes(needle)) : people;
   const sections = grouped
     ? [
-        { key: 'first', label: copy.tierFirst, items: people.filter((p) => (p.tier ?? 'family') === 'first') },
-        { key: 'family', label: copy.tierFamily, items: people.filter((p) => (p.tier ?? 'family') === 'family') },
+        { key: 'first', label: copy.tierFirst, items: shown.filter((p) => (p.tier ?? 'family') === 'first') },
+        { key: 'family', label: copy.tierFamily, items: shown.filter((p) => (p.tier ?? 'family') === 'family') },
       ].filter((s) => s.items.length > 0)
-    : [{ key: 'all', label: null, items: people }];
+    : [{ key: 'all', label: null, items: shown }];
   const noneChosen = selectedIds.length === 0;
   const reasonId = useId();
   return (
@@ -114,6 +126,14 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
         <Heading level={1} headingRef={headingRef}>{copy.heading}</Heading>
         <Body tone="muted">{grouped ? copy.introGrouped : copy.introUngrouped}</Body>
       </View>
+      {search && people.length > 0 ? (
+        <Field label={copy.searchLabel ?? ''} placeholder="" value={query} onChangeText={setQuery} />
+      ) : null}
+      {search && !grouped && shown.length > 0 ? (
+        <View style={styles.sectionHead}>
+          <Button label={copy.selectAll} variant="tertiary" onPress={() => onSelectAll(shown.map((p) => p.id))} />
+        </View>
+      ) : null}
       {sections.map((section) => (
         <View key={section.key} style={styles.section}>
           {section.label ? (
@@ -127,16 +147,20 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
               />
             </View>
           ) : null}
-          {section.items.map((person) => (
-            <PersonRow
-              key={person.id}
-              person={person}
-              selected={selectedIds.includes(person.id)}
-              onToggle={() => onToggle(person.id)}
-            />
-          ))}
+          <View role="list" style={styles.list}>
+            {section.items.map((person) => (
+              <View key={person.id} role="listitem">
+                <PersonRow
+                  person={person}
+                  selected={selectedIds.includes(person.id)}
+                  onToggle={() => onToggle(person.id)}
+                />
+              </View>
+            ))}
+          </View>
         </View>
       ))}
+      {search && people.length > 0 && shown.length === 0 ? <Body tone="muted">{copy.searchEmpty}</Body> : null}
       {people.length === 0 && !loading ? <Body tone="muted">{copy.empty}</Body> : null}
       {bringAcross ? (
         <View style={styles.bringAcross}>
@@ -435,4 +459,5 @@ const styles = StyleSheet.create({
   head: { gap: spacing[1] },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   section: { gap: spacing[2] },
+  list: { gap: spacing[2] },
 });
