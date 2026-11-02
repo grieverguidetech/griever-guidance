@@ -1,7 +1,7 @@
-import { colors } from '@griever/tokens';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
+import { colors } from '@griever/tokens';
 import { SerifText as Text, Button } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';

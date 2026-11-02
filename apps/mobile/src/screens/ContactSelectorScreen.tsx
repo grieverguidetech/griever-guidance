@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, FlatList, Linking, Text, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, Linking, Text, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
@@ -67,6 +67,17 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
     focusNode(listHeading.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Android Back in the review does what the on-screen Back does: back to the list.
+  useEffect(() => {
+    if (!reviewing) {
+      return undefined;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setMode({ kind: 'list' });
+      return true;
+    });
+    return () => sub.remove();
+  }, [reviewing]);
   // Focus follows the view: the review heading on the way in, the import button on the way back.
   useEffect(() => {
     if (reviewing) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { SerifText as Text, Button } from '../ui';
+import { SerifText as Text, Button, Heading } from '../ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -152,8 +152,10 @@ export function WhatYoullNeedScreen() {
       <Text style={styles.subtitle}>Not today. Just so none of it surprises you.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardKicker} accessibilityRole="header">The one people get wrong</Text>
-        <Text style={styles.cardTitle}>Certified death certificates</Text>
+        <Text style={styles.cardKicker}>The one people get wrong</Text>
+        <View style={styles.cardTitle}>
+          <Heading level={2}>Certified death certificates</Heading>
+        </View>
         <Text style={styles.cardBody}>
           Ask the funeral home for 8 to 10 certified copies. Banks, insurers and Social Security each
           keep an original — photocopies are usually refused.
@@ -179,7 +181,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardKicker: { fontSize: 11, fontWeight: '500', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  cardTitle: { fontSize: 15, fontWeight: '500', color: '#111827', marginBottom: 8 },
+  cardTitle: { marginBottom: 8 },
   cardBody: { fontSize: 14, color: '#374151', lineHeight: 20 },
   gatherHeading: { fontSize: 11, fontWeight: '500', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
   checklistItem: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 44, paddingVertical: 8, marginBottom: 8 },

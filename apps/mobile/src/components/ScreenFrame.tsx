@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import { Animated, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@griever/tokens';
-import { FADE_MS, useReduceMotion } from '../lib/useReduceMotion';
+import { FADE_MS } from '../lib/useReduceMotion';
+import { useNoFade } from '../lib/useScreenReader';
 
 /**
  * The one safe-area rule for every screen: the page colour fills the whole display, and the content
@@ -17,18 +18,18 @@ export function ScreenFrame({ children }: { children: ReactNode }) {
 
 /**
  * Fades a screen in when it first shows (the top-level screens are swapped in place, not pushed on
- * a stack). Shows at once when Reduce Motion is on. Opacity only; nothing moves (C7).
+ * a stack). Shows at once, with no animation, when Reduce Motion or a screen reader is on. Opacity only; nothing moves (C7).
  */
 export function FadeIn({ children }: { children: ReactNode }) {
-  const reduce = useReduceMotion();
+  const reduce = useNoFade();
   const opacity = useRef(new Animated.Value(reduce ? 1 : 0)).current;
   const played = useRef(false);
   useEffect(() => {
-    if (played.current) {
-      return;
-    }
     if (reduce) {
       opacity.setValue(1);
+      return;
+    }
+    if (played.current) {
       return;
     }
     played.current = true;

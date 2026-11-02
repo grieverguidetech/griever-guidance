@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { colors } from '@griever/tokens';
@@ -33,7 +33,8 @@ import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
 import { SerifReadyContext, SerifText as Text } from '../ui';
 import { useSerifFonts } from '../lib/serifFonts';
-import { screenTransition, useReduceMotion } from '../lib/useReduceMotion';
+import { screenTransition } from '../lib/useReduceMotion';
+import { useNoFade } from '../lib/useScreenReader';
 import { FadeIn, ScreenFrame } from '../components/ScreenFrame';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
@@ -421,33 +422,33 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   if (atHome) {
     return (
       <FadeIn key="home">
-      <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
-        {(navigation) => (
-          <HomeScreen
-            sessions={sessions}
-            canCreate
-            onOpen={(id) => {
-              switchTo(id);
-              open();
-            }}
-            onCreate={() => {
-              addPerson();
-              setNote(null);
-              setStage('setup');
-              setAtHome(false);
-            }}
-            onWhatYoullNeed={AUTH_ENABLED ? undefined : () => navigation.navigate('WhatYoullNeed')}
-            onImportContacts={() => {
-              // Leaving Home for the import ends the note, so it is not read again on return.
-              setNote(null);
-              setBackFromImport(false);
-              setImporting(true);
-            }}
-            focusImport={backFromImport}
-            onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
-          />
-        )}
-      </HomeNavigation>
+        <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
+          {(navigation) => (
+            <HomeScreen
+              sessions={sessions}
+              canCreate
+              onOpen={(id) => {
+                switchTo(id);
+                open();
+              }}
+              onCreate={() => {
+                addPerson();
+                setNote(null);
+                setStage('setup');
+                setAtHome(false);
+              }}
+              onWhatYoullNeed={AUTH_ENABLED ? undefined : () => navigation.navigate('WhatYoullNeed')}
+              onImportContacts={() => {
+                // Leaving Home for the import ends the note, so it is not read again on return.
+                setNote(null);
+                setBackFromImport(false);
+                setImporting(true);
+              }}
+              focusImport={backFromImport}
+              onAccount={AUTH_ENABLED ? () => navigation.navigate('Account') : undefined}
+            />
+          )}
+        </HomeNavigation>
       </FadeIn>
     );
   }
@@ -525,53 +526,53 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   if (atHub) {
     return (
       <FadeIn key="hub">
-      <ScreenFrame>
-      <HubScreen
-        key={active.id}
-        session={active}
-        note={note}
-        onBack={goHome}
-        onStart={(key: MomentKey) => {
-          setNote(null);
-          setAtHub(false);
-          if (key === 'obituary') {
-            // The link comes first (C10 allows it here, never at setup); then Who should know?.
-            setAtShareObituary(true);
-          } else {
-            setStartCategory(CATEGORY_BY_MOMENT[key]);
-          }
-        }}
-        onEditPerson={() => {
-          setNote(null);
-          setAtHub(false);
-          setEditFrom('hub');
-          setStage('setup');
-        }}
-      />
-      </ScreenFrame>
+        <ScreenFrame>
+          <HubScreen
+            key={active.id}
+            session={active}
+            note={note}
+            onBack={goHome}
+            onStart={(key: MomentKey) => {
+              setNote(null);
+              setAtHub(false);
+              if (key === 'obituary') {
+                // The link comes first (C10 allows it here, never at setup); then Who should know?.
+                setAtShareObituary(true);
+              } else {
+                setStartCategory(CATEGORY_BY_MOMENT[key]);
+              }
+            }}
+            onEditPerson={() => {
+              setNote(null);
+              setAtHub(false);
+              setEditFrom('hub');
+              setStage('setup');
+            }}
+          />
+        </ScreenFrame>
       </FadeIn>
     );
   }
   return (
     <FadeIn key="flow">
-    <SendSession
-      key={active.id}
-      session={active}
-      contacts={contacts}
-      arrived={arrived}
-      startCategory={startCategory}
-      onHub={() => setAtHub(true)}
-      onShareObituary={() => setAtShareObituary(true)}
-      onEditPerson={() => {
-        setEditFrom('flow');
-        setStage('setup');
-      }}
-      onDraftChange={updateDraft}
-      onDetails={updateSession}
-      onHome={goHome}
-      onFinished={finish}
-      onTold={recordMomentComplete}
-    />
+      <SendSession
+        key={active.id}
+        session={active}
+        contacts={contacts}
+        arrived={arrived}
+        startCategory={startCategory}
+        onHub={() => setAtHub(true)}
+        onShareObituary={() => setAtShareObituary(true)}
+        onEditPerson={() => {
+          setEditFrom('flow');
+          setStage('setup');
+        }}
+        onDraftChange={updateDraft}
+        onDetails={updateSession}
+        onHome={goHome}
+        onFinished={finish}
+        onTold={recordMomentComplete}
+      />
     </FadeIn>
   );
 };
@@ -592,22 +593,22 @@ const sharedScreens = (leaveFirst?: () => void) => (
       <Stack.Screen name="Account">
         {({ navigation }) => (
           <ScreenFrame>
-          <AccountScreen
-            onBack={() => {
-              leaveFirst?.();
-              if (navigation.canGoBack()) navigation.goBack();
-              else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-            }}
-            // Opened as the first screen: once signed in (and named), land on the normal first screen.
-            onSignedIn={
-              leaveFirst
-                ? () => {
-                    leaveFirst();
-                    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-                  }
-                : undefined
-            }
-          />
+            <AccountScreen
+              onBack={() => {
+                leaveFirst?.();
+                if (navigation.canGoBack()) navigation.goBack();
+                else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+              }}
+              // Opened as the first screen: once signed in (and named), land on the normal first screen.
+              onSignedIn={
+                leaveFirst
+                  ? () => {
+                      leaveFirst();
+                      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+                    }
+                  : undefined
+              }
+            />
           </ScreenFrame>
         )}
       </Stack.Screen>
@@ -615,12 +616,11 @@ const sharedScreens = (leaveFirst?: () => void) => (
   </>
 );
 
-// One calm fade between screens, none with Reduce Motion on. The page colour shows between screens.
-const useScreenOptions = () => ({
-  headerShown: false,
-  contentStyle: { backgroundColor: colors.bg },
-  ...screenTransition(useReduceMotion()),
-});
+// One calm fade between screens, none with Reduce Motion or a screen reader on. The page colour shows between screens.
+const useScreenOptions = () => {
+  const noFade = useNoFade();
+  return useMemo(() => ({ headerShown: false, contentStyle: { backgroundColor: colors.bg }, ...screenTransition(noFade) }), [noFade]);
+};
 
 const HomeNavigation = ({
   children,

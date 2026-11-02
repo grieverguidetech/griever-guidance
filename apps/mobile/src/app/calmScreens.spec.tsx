@@ -21,6 +21,32 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   },
 }));
 
+// Records the options each stack gets, so a test can see the navigators use screenTransition.
+const mockScreenOptions: Record<string, unknown>[] = [];
+jest.mock('../lib/expoContactsSource', () => ({
+  expoContactsSource: {
+    id: 'native',
+    preselected: false,
+    isAvailable: () => Promise.resolve(true),
+    fetch: () => Promise.resolve([{ key: 'x', displayName: 'Starred Sam', phones: ['+16175550111'], emails: [] }]),
+  },
+}));
+jest.mock('@react-navigation/native-stack', () => {
+  const actual = jest.requireActual<typeof import('@react-navigation/native-stack')>('@react-navigation/native-stack');
+  const React = jest.requireActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    createNativeStackNavigator: (...args: Parameters<typeof actual.createNativeStackNavigator>) => {
+      const stack = actual.createNativeStackNavigator(...args);
+      const Navigator = (props: { screenOptions?: Record<string, unknown> }) => {
+        mockScreenOptions.push(props.screenOptions ?? {});
+        return React.createElement(stack.Navigator as never, props as never);
+      };
+      return { ...stack, Navigator };
+    },
+  };
+});
+
 const anna = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
@@ -62,6 +88,27 @@ describe('Android Back inside the flow (#653)', () => {
   });
 });
 
+describe('Android Back in the import review (#653)', () => {
+  it('steps back to the list, as the on-screen Back does, and is released outside the review', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    const pressBack = () => [...handlers].reverse().some((h) => h());
+    await startAnnouncement(true);
+    fireEvent.press(await screen.findByText('Continue'));
+    await screen.findByRole('heading', { name: 'Who should know?' });
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    await screen.findByRole('heading', { name: 'Add from your contacts' });
+    const handled = jest.fn();
+    act(() => handled(pressBack()));
+    expect(handled).toHaveBeenCalledWith(true);
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(screen.queryByText('Starred Sam')).toBeNull();
+  });
+});
+
 describe('Edit from a step (#653)', () => {
   it('reads "Edit their details", and Continue returns to the step with no contacts check', async () => {
     // No saved contacts: the old Continue went on to the contacts step.
@@ -87,5 +134,35 @@ describe('Focus on arrival (#653)', () => {
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByRole('heading', { name: 'Read it once before it goes' });
     expect(focus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('The stacks use the calm transition (#653)', () => {
+  const lastOptions = () => mockScreenOptions[mockScreenOptions.length - 1];
+  const settle = async () => {
+    await startAnnouncement(true);
+    await screen.findByLabelText(/Anything you'd like to add/);
+    await act(async () => undefined);
+  };
+
+  it('fades with no screen reader and no Reduce Motion', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
+    await settle();
+    expect(lastOptions()).toMatchObject({ animation: 'fade', animationDuration: 200 });
+  });
+
+  it('has no animation with Reduce Motion on', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
+    await settle();
+    expect(lastOptions()).toMatchObject({ animation: 'none' });
+  });
+
+  it('has no animation with a screen reader on', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+    await settle();
+    expect(lastOptions()).toMatchObject({ animation: 'none' });
   });
 });
