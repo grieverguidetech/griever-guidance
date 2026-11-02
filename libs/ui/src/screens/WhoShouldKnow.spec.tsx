@@ -270,4 +270,19 @@ describe('WhoShouldKnow', () => {
       expect(screen.queryByRole('button', { name: /^Select all/ })).toBeNull();
     });
   });
+
+  describe('shortcuts', () => {
+    it('renders none by default', () => {
+      setup({ grouped: false });
+      expect(screen.queryByRole('button', { name: 'Everyone you told' })).toBeNull();
+    });
+
+    it('renders each shortcut as a button and calls its handler', async () => {
+      const user = userEvent.setup();
+      const onPress = vi.fn();
+      setup({ grouped: false, shortcuts: [{ label: 'Everyone you told', onPress }] });
+      await user.click(screen.getByRole('button', { name: 'Everyone you told' }));
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+  });
 });

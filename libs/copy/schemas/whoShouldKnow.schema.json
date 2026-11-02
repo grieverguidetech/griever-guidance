@@ -33,7 +33,9 @@
     "chosen",
     "searchLabel",
     "searchEmpty",
-    "selectAllShown"
+    "selectAllShown",
+    "everyoneYouTold",
+    "notSentYet"
   ],
   "properties": {
     "heading": {
@@ -120,6 +122,12 @@
       "$ref": "#/$defs/text"
     },
     "selectAllShown": {
+      "$ref": "#/$defs/text"
+    },
+    "everyoneYouTold": {
+      "$ref": "#/$defs/text"
+    },
+    "notSentYet": {
       "$ref": "#/$defs/text"
     },
     "searchEmpty": {

@@ -106,6 +106,11 @@ export interface WhoShouldKnowProps {
    * people shown. Leave unset on web. The typed text is kept in this component only.
    */
   search?: boolean;
+  /**
+   * Mobile: extra buttons that tick a ready-made group of people, for example "Everyone you told".
+   * Each one only adds ticks. Leave unset on web.
+   */
+  shortcuts?: { label: string; onPress: () => void }[];
 }
 
 /**
@@ -131,6 +136,7 @@ export function WhoShouldKnow({
   footer,
   headingRef,
   search = false,
+  shortcuts,
 }: WhoShouldKnowProps) {
   const [query, setQuery] = useState('');
   const needle = search ? query.trim().toLowerCase() : '';
@@ -182,6 +188,18 @@ export function WhoShouldKnow({
           onChangeText={setQuery}
           search
         />
+      ) : null}
+      {shortcuts && shortcuts.length > 0 && people.length > 0 ? (
+        <View style={styles.shortcuts}>
+          {shortcuts.map((shortcut) => (
+            <Button
+              key={shortcut.label}
+              label={shortcut.label}
+              variant="secondary"
+              onPress={shortcut.onPress}
+            />
+          ))}
+        </View>
       ) : null}
       {search && !grouped && shown.length > 0 ? (
         <View style={styles.sectionHead}>
@@ -604,6 +622,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  shortcuts: { gap: spacing[2] },
   section: { gap: spacing[2] },
   list: { gap: spacing[2] },
 });
