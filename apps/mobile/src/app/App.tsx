@@ -109,7 +109,7 @@ type SessionProps = {
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
   /** The last person has been dealt with: go to the hub and show this calm line. */
-  onFinished: (note: SentNoteText) => void;
+  onFinished: (note: SentNoteText, sent: { category: TemplateCategory | null; deliveredIds: string[] }) => void;
 };
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
@@ -240,7 +240,10 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   useEffect(() => {
     if (step !== 'sent' || finished.current) return;
     finished.current = true;
-    onFinished(sendNote(templateCategory, sendJob?.recipients ?? []));
+    const recipients = sendJob?.recipients ?? [];
+    // Only contact ids go up to the hub, never the message text (C2).
+    const deliveredIds = recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId);
+    onFinished(sendNote(templateCategory, recipients), { category: templateCategory, deliveredIds });
   }, [step, templateCategory, sendJob, onFinished]);
 
   const stepped = withoutServiceKnown(flow);
@@ -273,7 +276,7 @@ export const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): Retur
 });
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
-  const { sessions, active, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows } = useDeviceSessions(cache);
+  const { sessions, active, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
   useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
   const [atHome, setAtHome] = useState(true);
@@ -302,14 +305,22 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setBackFromImport(false);
     setAtHome(true);
   }, []);
-  const finish = useCallback((text: SentNoteText) => {
-    setArrived(false);
-    setAtHub(true);
-    setStartCategory(null);
-    setNote(text);
-    setBackFromImport(false);
-    setAtHome(false);
-  }, []);
+  const activeId = active?.id;
+  const finish = useCallback(
+    (text: SentNoteText, sent: { category: TemplateCategory | null; deliveredIds: string[] }) => {
+      // An all-skipped send records nothing. The record stays on this phone (recipientsNotified is never synced).
+      if (activeId && sent.category && sent.deliveredIds.length > 0) {
+        recordMomentComplete(activeId, sent.category, sent.deliveredIds);
+      }
+      setArrived(false);
+      setAtHub(true);
+      setStartCategory(null);
+      setNote(text);
+      setBackFromImport(false);
+      setAtHome(false);
+    },
+    [activeId, recordMomentComplete],
+  );
 
   // Setup is over: open the path. The one place the last setup step hands over (#227 changes this).
   const finishSetup = useCallback(() => {

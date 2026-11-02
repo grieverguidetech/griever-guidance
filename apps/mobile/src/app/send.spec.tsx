@@ -321,7 +321,8 @@ describe('the end of a send', () => {
     await screen.findByText('Everyone has been told.');
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    // The announcement is now recorded as done, so the next step (Share the service) carries Start.
+    fireEvent.press(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
   });
 
