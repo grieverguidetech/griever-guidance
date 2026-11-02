@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+import { AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SendFlowStorage } from '@griever/hooks';
 
@@ -7,6 +9,59 @@ export type DeviceCache = SendFlowStorage & { hydrate(): Promise<void> };
 export type CacheKey = { key: string; json: boolean };
 
 export const HYDRATE_TIMEOUT_MS = 3000;
+
+/** Shown (and announced) when the phone is not keeping saves. Honest, and says what to do. */
+export const NOT_SAVED_NOTE_TEXT = 'This phone could not save just now. Keep this screen open.';
+
+// Whether this phone is keeping the user's saved work. Only a cache made with `reportsPersisting`
+// (the session cache) reports in; the phone is "not saving" while it is failing. A later good write
+// clears it. Other writers keep their own local state (the checklist does).
+const failing = new Set<string>();
+const listeners = new Set<() => void>();
+
+/** Records that a writer's last save worked (`true`) or did not (`false`). */
+export function reportPersisting(source: string, ok: boolean): void {
+  const wasFailing = failing.has(source);
+  if (ok === !wasFailing) {
+    return;
+  }
+  const wasPersisting = failing.size === 0;
+  if (ok) {
+    failing.delete(source);
+  } else {
+    failing.add(source);
+  }
+  // Once, here, when saving changes from working to failing: not once per mounted SavedNote.
+  if (wasPersisting && failing.size > 0) {
+    AccessibilityInfo.announceForAccessibility(NOT_SAVED_NOTE_TEXT);
+  }
+  listeners.forEach((listener) => listener());
+}
+
+/** False while the session cache (the only reporting cache) has a failed save or is memory-only. */
+export function isPersisting(): boolean {
+  return failing.size === 0;
+}
+
+export function subscribePersisting(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Re-renders when the phone starts or stops keeping saves. */
+export function usePersisting(): boolean {
+  return useSyncExternalStore(subscribePersisting, isPersisting, isPersisting);
+}
+
+/** For tests: forget every reported failure. */
+export function resetPersisting(): void {
+  failing.clear();
+  listeners.forEach((listener) => listener());
+}
+
+let nextCacheId = 0;
 
 /**
  * `useSessions` reads its storage synchronously, but AsyncStorage is async. So this is a small
@@ -19,9 +74,20 @@ export const HYDRATE_TIMEOUT_MS = 3000;
  * bad key means the keys no longer agree): nothing saved on the phone is overwritten, so a later
  * launch can still read it.
  */
-export function createDeviceCache(keys: CacheKey[]): DeviceCache {
+export function createDeviceCache(keys: CacheKey[], options: { reportsPersisting?: boolean } = {}): DeviceCache {
+  const reports = options.reportsPersisting === true;
   const memory = new Map<string, string>();
   const memoryOnly = new Set<string>();
+  const source = `deviceCache:${nextCacheId++}`;
+  const report = (ok: boolean) => {
+    if (reports) {
+      reportPersisting(source, ok);
+    }
+  };
+  const markMemoryOnly = (key: string) => {
+    memoryOnly.add(key);
+    report(false);
+  };
   return {
     async hydrate() {
       const unresolved = new Set(keys.map((k) => k.key));
@@ -35,7 +101,7 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
               if (json) JSON.parse(raw);
             }
           } catch {
-            memoryOnly.add(key);
+            markMemoryOnly(key);
           }
           unresolved.delete(key);
         }),
@@ -43,7 +109,7 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<void>((resolve) => {
         timer = setTimeout(() => {
-          unresolved.forEach((key) => memoryOnly.add(key));
+          unresolved.forEach(markMemoryOnly);
           unresolved.clear();
           resolve();
         }, HYDRATE_TIMEOUT_MS);
@@ -54,13 +120,23 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
     getItem: (key) => memory.get(key) ?? null,
     setItem(key, value) {
       memory.set(key, value);
-      if (memoryOnly.size > 0) return;
-      void AsyncStorage.setItem(key, value).catch(() => undefined);
+      if (memoryOnly.size > 0) {
+        return;
+      }
+      AsyncStorage.setItem(key, value).then(
+        () => report(true),
+        () => report(false),
+      );
     },
     removeItem(key) {
       memory.delete(key);
-      if (memoryOnly.size > 0) return;
-      void AsyncStorage.removeItem(key).catch(() => undefined);
+      if (memoryOnly.size > 0) {
+        return;
+      }
+      AsyncStorage.removeItem(key).then(
+        () => report(true),
+        () => report(false),
+      );
     },
   };
 }

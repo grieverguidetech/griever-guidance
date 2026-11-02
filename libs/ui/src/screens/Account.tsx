@@ -34,7 +34,7 @@ export interface AccountProps {
   fieldDisabled?: boolean;
   /** Save, Continue or Sign in: the one primary action. The app decides what it does. */
   primaryLabel: string;
-  onPrimary: () => void;
+  onPrimary: () => void | Promise<void>;
   /** The primary action is running: reads as unavailable and presses are ignored. */
   primaryBusy?: boolean;
   /** Leave unset to hide Sign out (first visit, or the session has ended). */
@@ -82,9 +82,35 @@ export function Account({
   const statusId = useId();
   const [focused, setFocused] = useState(false);
   const fieldRef = useRef<ComponentRef<typeof TextInput>>(null);
+  // A ref, not state: two fast taps can both run before a re-render shows `primaryBusy`.
+  const inFlight = useRef(false);
   const submit = () => {
-    if (!primaryBusy) {
-      onPrimary();
+    // Web keeps its original behaviour exactly; the ref guard is for the phone apps.
+    if (Platform.OS === 'web') {
+      if (!primaryBusy) {
+        onPrimary();
+      }
+      return;
+    }
+    if (primaryBusy || inFlight.current) {
+      return;
+    }
+    inFlight.current = true;
+    const release = () => {
+      inFlight.current = false;
+    };
+    let result: void | Promise<void>;
+    try {
+      result = onPrimary();
+    } catch (error) {
+      release();
+      throw error;
+    }
+    if (result && typeof result.then === 'function') {
+      // Held until the save settles. A handler that returns nothing finishes at once.
+      void result.then(release, release);
+    } else {
+      release();
     }
   };
   return (

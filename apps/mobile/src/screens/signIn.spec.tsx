@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, Platform, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
 
@@ -43,6 +43,8 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 const OFFLINE = "You need a connection to do this. Nothing you've typed is lost.";
 const type = (label: string, text: string) => fireEvent.changeText(screen.getByLabelText(label), text);
 const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
+// The handler a button was given, so a test can fire it twice inside one act() (before any re-render).
+const pressHandler = (label: string) => screen.UNSAFE_getAllByProps({ label })[0].props.onPress as () => void;
 const value = (label: string) => screen.getByLabelText(label).props.value;
 
 beforeEach(() => {
@@ -72,6 +74,32 @@ describe('sign in', () => {
     await waitFor(() => expect(mockSignIn.finalize).toHaveBeenCalledTimes(1));
     expect(mockSignIn.password).toHaveBeenCalledWith({ emailAddress: 'a@b.co', password: 'secret-pass' });
     expect(onAttempt).toHaveBeenCalledWith('a@b.co');
+  });
+
+  it('calls sign-in once when the button is pressed twice before a re-render', async () => {
+    let finish: () => void = () => undefined;
+    mockSignIn.password.mockImplementation(() => new Promise((resolve) => (finish = () => resolve({ error: null }))));
+    renderSignIn();
+    const onPress = pressHandler('Sign in');
+    act(() => {
+      onPress();
+      onPress();
+    });
+    expect(mockSignIn.password).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+  });
+
+  it('starts one browser flow when a social button is pressed twice before a re-render', async () => {
+    let finish: () => void = () => undefined;
+    mockStartSSO.mockImplementation(() => new Promise((resolve) => (finish = () => resolve({ createdSessionId: null, authSessionResult: { type: 'cancel' } }))));
+    renderSignIn();
+    const onPress = pressHandler('Continue with Google');
+    act(() => {
+      onPress();
+      onPress();
+    });
+    expect(mockStartSSO).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
   });
 
   it('keeps the typed fields and shows calm copy on a wrong password', async () => {
@@ -299,7 +327,27 @@ describe('sign in', () => {
     });
   });
 
-  it('uses the shared look: error in web\'s danger pink, focus ring in the accent, serif heading', async () => {
+  it.each([
+    ['android', 'assertive', 0],
+    ['ios', undefined, 1],
+  ] as const)('announces the error one way on %s', async (os, region, announced) => {
+    jest.replaceProperty(Platform, 'OS', os);
+    const announceSpy = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    announceSpy.mockClear();
+    mockSignIn.password.mockImplementation(fail('form_password_incorrect'));
+    renderSignIn();
+    type('Email', 'a@b.co');
+    type('Password', 'wrong');
+    press('Sign in');
+    await screen.findByRole('alert');
+    const regions = screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'assertive' }).filter((n) => typeof n.type === 'string');
+    expect(regions).toHaveLength(region ? 1 : 0);
+    const message = screen.getByRole('alert').props.children;
+    expect(announceSpy.mock.calls.filter(([text]) => text === message)).toHaveLength(announced);
+    jest.restoreAllMocks();
+  });
+
+  it('uses the shared look: error in the app danger red, focus ring in the accent, serif heading', async () => {
     mockSignIn.password.mockImplementation(fail('form_password_incorrect'));
     renderSignIn();
     fireEvent(screen.getByLabelText('Email'), 'focus');
@@ -308,7 +356,9 @@ describe('sign in', () => {
     expect(StyleSheet.flatten(screen.getByLabelText('Email').props.style)).toMatchObject({ borderWidth: 1 });
     press('Sign in');
     const alert = await screen.findByRole('alert');
-    expect(StyleSheet.flatten(alert.props.style).color).toBe('#aa0b56');
+    expect(StyleSheet.flatten(alert.props.style).color).toBe('#b91c1c');
+    // No polite live region around or inside the alert.
+    expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' })).toHaveLength(0);
     expect(StyleSheet.flatten(screen.getByRole('heading', { name: 'Sign in' }).props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
   });
 
@@ -331,6 +381,20 @@ describe('sign up', () => {
     type('Email', ' sam@x.co ');
     type('Password', password);
   }
+
+  it('creates the account once when the button is pressed twice before a re-render', async () => {
+    let finish: () => void = () => undefined;
+    mockSignUp.password.mockImplementation(() => new Promise((resolve) => (finish = () => resolve({ error: null }))));
+    renderSignUp();
+    fill();
+    const onPress = pressHandler('Create account');
+    act(() => {
+      onPress();
+      onPress();
+    });
+    expect(mockSignUp.password).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+  });
 
   it('creates the account with a 6-digit code, hands up the name, then finalizes', async () => {
     mockSignUp.verifications.verifyEmailCode.mockImplementation(async () => {
