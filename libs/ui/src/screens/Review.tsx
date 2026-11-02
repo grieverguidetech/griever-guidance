@@ -54,6 +54,8 @@ export interface ReviewProps {
   /** The send button's name, already built (see sendLabel in libs/copy). */
   sendLabel: string;
   hasRecipients: boolean;
+  /** Why Send is unavailable for a reason the app knows (for example a required detail is empty). Blank and no-recipients come first. */
+  blockedReason?: string;
   onBack: () => void;
   onSend: () => void;
   /** Opens "What you'll need". Leave unset to hide the button. */
@@ -70,7 +72,7 @@ export interface ReviewProps {
  * libs/ui so web (through react-native-web) and mobile show the same screen. The message and tone
  * live in the app; only whether the field is open lives here.
  */
-export function Review({ copy, kind, intro, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, sendLabel, hasRecipients, onBack, onSend, onWhatYoullNeed, checklistRef, children, headingRef }: ReviewProps) {
+export function Review({ copy, kind, intro, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, sendLabel, hasRecipients, blockedReason, onBack, onSend, onWhatYoullNeed, checklistRef, children, headingRef }: ReviewProps) {
   const announcement = kind === 'announcement';
   const [editing, setEditing] = useState(false);
   const [returnFocus, setReturnFocus] = useState(false);
@@ -79,7 +81,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   const reasonId = useId();
   const toneReasonId = useId();
   const blank = message.trim() === '';
-  const reason = blank ? copy.blank : hasRecipients ? undefined : copy.noRecipients;
+  const reason = blank ? copy.blank : !hasRecipients ? copy.noRecipients : blockedReason;
 
   // Focus follows the field: into it when Edit wording opens, back to the toggle when it closes.
   useEffect(() => {

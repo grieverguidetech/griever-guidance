@@ -9,6 +9,7 @@ import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { ACCENT, MUTED } from '../components/colors';
+import { DetailsRow, isMissing } from '../components/DetailsRow';
 
 const copy = screenCopy('review');
 
@@ -42,6 +43,9 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const recipients = recipientsPhrase(recipientCount, copy);
   const firstPicked = contacts?.contacts.find((c) => c.contactId === selectedContactIds[0]);
   const greeting = firstPicked ? firstName(firstPicked.name) : '';
+  const detailsFields = detailsFieldsFor(flow);
+  const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
+  const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
   const preview = flow.greeting && greeting !== '' ? fill(copy.greetingPreview, { greeting: `${greeting},` }) : '';
 
   function toggleGreeting() {
@@ -67,6 +71,7 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           onToneChange={flow.setTone}
           sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
           hasRecipients={recipientCount > 0}
+          blockedReason={detailsMissing ? copy.detailsHint : undefined}
           onBack={prevStep}
           onSend={startSendJob}
           onWhatYoullNeed={() => setChecklistOpen(true)}
@@ -90,6 +95,9 @@ export function ConfirmScreen({ flow, contacts }: Props) {
               accessibilityElementsHidden
             />
           </Pressable>
+          {showDetails && (
+            <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} />
+          )}
           {preview !== '' && <Text style={styles.sample}>{preview}</Text>}
           {isService && (
             <>
@@ -115,6 +123,24 @@ export function ConfirmScreen({ flow, contacts }: Props) {
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </KeyboardAvoidingView>
   );
+}
+
+/** The templates that get a Details row, and the fields the person has not already given in setup. */
+function detailsFieldsFor(flow: FlowProps['flow']) {
+  const template = flow.selectedTemplate;
+  if (!template || (template.id !== 'share-service' && template.id !== 'thank-you-note')) {
+    return [];
+  }
+  const session = flow.session;
+  return template.fields.filter((field) => {
+    if (field.key === 'deceasedName') {
+      return !session?.personName;
+    }
+    if (field.key === 'senderName') {
+      return !session?.senderName;
+    }
+    return true;
+  });
 }
 
 const styles = StyleSheet.create({

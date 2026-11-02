@@ -27,6 +27,9 @@
     "sample",
     "greetingSwitch",
     "greetingPreview",
+    "detailsHeading",
+    "detailsNeeded",
+    "detailsHint",
     "flowers"
   ],
   "properties": {
@@ -53,6 +56,9 @@
     "sample": { "$ref": "#/$defs/text" },
     "greetingSwitch": { "$ref": "#/$defs/text" },
     "greetingPreview": { "type": "string", "pattern": "\\{greeting\\}" },
+    "detailsHeading": { "$ref": "#/$defs/text" },
+    "detailsNeeded": { "$ref": "#/$defs/text" },
+    "detailsHint": { "$ref": "#/$defs/text" },
     "flowers": {
       "type": "object",
       "additionalProperties": false,

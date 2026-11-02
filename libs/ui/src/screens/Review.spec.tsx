@@ -187,6 +187,20 @@ describe('Review', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it('blocks Send with the reason the app gives, but a blank message still wins', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+    const { unmount } = render(<Harness blockedReason="Fill in the empty details to send." onSend={onSend} />);
+    expect(screen.getByText('Fill in the empty details to send.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Text 2 people' })).toHaveAttribute('aria-disabled', 'true');
+    await user.click(screen.getByRole('button', { name: 'Text 2 people' }));
+    expect(onSend).not.toHaveBeenCalled();
+    unmount();
+    render(<Harness blockedReason="Fill in the empty details to send." message="  " />);
+    expect(screen.getByText('Add a message before you send it.')).toBeInTheDocument();
+    expect(screen.queryByText('Fill in the empty details to send.')).toBeNull();
+  });
+
   it('answers Back', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
