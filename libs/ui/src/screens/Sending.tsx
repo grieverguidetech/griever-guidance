@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { Ref } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -10,6 +10,7 @@ import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
 import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
+import { useSerifStyle } from '../typography';
 
 /** The words the screen needs. libs/copy/screens/sending.json has these keys, plus more. */
 export interface SendingCopy {
@@ -63,7 +64,7 @@ export interface SendingProps {
    * Mobile thank-you only. An optional line for this person, added as the last line of their text.
    * Shown before the hand-off. The web never sets it.
    */
-  note?: { label: string; value: string; onChange: (value: string) => void };
+  note?: { label: string; optional: string; value: string; onChange: (value: string) => void };
   /** Mobile only. Moves focus to the hand-off button when `error` shows. Web leaves it unset. */
   focusOpenOnError?: boolean;
   /** A calm error line, for example when sharing did not go through. */
@@ -87,6 +88,8 @@ export interface SendingProps {
  */
 export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, note, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();
+  const noteLabelId = useId();
+  const inputFont = useSerifStyle('regular');
   const nextRef = useRef<ButtonNode>(null);
   const openRef = useRef<ButtonNode>(null);
   const yesRef = useRef<ButtonNode>(null);
@@ -158,15 +161,20 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
           </View>
           <Body>{current.message}</Body>
           {note && !handOff ? (
-            <TextInput
-              style={styles.input}
-              accessibilityLabel={note.label}
-              aria-label={note.label}
-              placeholder={note.label}
-              placeholderTextColor={colors['neutral-600']}
-              value={note.value}
-              onChangeText={note.onChange}
-            />
+            <View style={styles.field}>
+              <Body tone="strong" id={noteLabelId}>
+                {note.label} <Text style={styles.optional}>{note.optional}</Text>
+              </Body>
+              <TextInput
+                style={[styles.input, inputFont]}
+                // Web names the field from the visible label; native reads the label text directly.
+                aria-labelledby={noteLabelId}
+                {...webFieldHook}
+                accessibilityLabel={`${note.label} ${note.optional}`}
+                value={note.value}
+                onChangeText={note.onChange}
+              />
+            </View>
           ) : null}
           {handOff && confirmSent ? (
             <View style={styles.actions}>
@@ -201,6 +209,8 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
   );
 }
 
+const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
+
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', justifyContent: 'flex-end' },
@@ -217,8 +227,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 16,
   },
+  field: { gap: spacing[1] },
+  optional: { color: colors['neutral-700'], fontWeight: '400' },
   list: { gap: spacing[2] },
   person: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

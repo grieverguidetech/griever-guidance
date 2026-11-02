@@ -28,6 +28,6 @@
   "sharedNoteFallback": "Shared for them.",
   "copiedNote": "Copied. Paste it wherever you reach them.",
   "shareError": "That didn't go through. You can try again.",
-  "addLine": "Add a line for {name}",
-  "copyError": "Could not copy the message. You can select and copy it yourself."
+  "copyError": "Could not copy the message. You can select and copy it yourself.",
+  "addLine": "Add a line for {name}"
 }

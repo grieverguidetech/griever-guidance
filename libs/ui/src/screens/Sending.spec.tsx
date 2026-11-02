@@ -42,16 +42,16 @@ describe('Sending', () => {
   it('shows a labelled line for the person only when the app gives a note, and passes typing on', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const view = render(<Sending {...base()} note={{ label: 'Add a line for Carol', value: '', onChange }} />);
-    await user.type(screen.getByLabelText('Add a line for Carol'), 'x');
+    const view = render(<Sending {...base()} note={{ label: 'Add a line for Carol', optional: '(optional)', value: '', onChange }} />);
+    await user.type(screen.getByLabelText('Add a line for Carol (optional)'), 'x');
     expect(onChange).toHaveBeenCalledWith('x');
     view.rerender(<Sending {...base()} />);
-    expect(screen.queryByLabelText('Add a line for Carol')).toBeNull();
+    expect(screen.queryByLabelText('Add a line for Carol (optional)')).toBeNull();
   });
 
   it('hides the line after the hand-off', () => {
-    render(<Sending {...base()} note={{ label: 'Add a line for Carol', value: '', onChange: vi.fn() }} handOff={{ note: 'n', again: 'Again', onAgain: vi.fn() }} />);
-    expect(screen.queryByLabelText('Add a line for Carol')).toBeNull();
+    render(<Sending {...base()} note={{ label: 'Add a line for Carol', optional: '(optional)', value: '', onChange: vi.fn() }} handOff={{ note: 'n', again: 'Again', onAgain: vi.fn() }} />);
+    expect(screen.queryByLabelText('Add a line for Carol (optional)')).toBeNull();
   });
 
   it('moves focus to Next after a hand-off', () => {

@@ -240,24 +240,41 @@ describe('Sending on the phone: asking on return from Messages', () => {
 });
 
 describe('Sending on the phone: a line for each person (thank-you)', () => {
+  const line = (name: string) => `Add a line for ${name} (optional)`;
+  const body = (open: { mock: { calls: unknown[][] } }, call: number) => decodeURIComponent(String(open.mock.calls[call][0]));
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('puts the note on the last line for that person only', async () => {
+  it('gives each person their own note on the last line', async () => {
     const { open } = setup(['c1', 'c2'], 'aftercare');
-    fireEvent.changeText(await screen.findByLabelText('Add a line for Dee'), 'Thank you for the lasagna');
+    fireEvent.changeText(await screen.findByLabelText(line('Dee')), 'Thank you for the lasagna');
+    // The card shows the message with the note before the hand-off.
+    expect(screen.getByText(/Thank you for the lasagna$/)).toBeTruthy();
     fireEvent.press(screen.getByText('Text Dee'));
-    expect(decodeURIComponent(String(open.mock.calls[0][0])).endsWith('\nThank you for the lasagna')).toBe(true);
+    expect(body(open, 0).endsWith('\nThank you for the lasagna')).toBe(true);
     fireEvent.press(screen.getByText('Next'));
-    expect(await screen.findByLabelText('Add a line for Eli')).toBeTruthy();
+    fireEvent.changeText(await screen.findByLabelText(line('Eli')), 'Thank you for the flowers');
     fireEvent.press(screen.getByText('Text Eli'));
-    expect(decodeURIComponent(String(open.mock.calls[1][0]))).not.toContain('lasagna');
+    expect(body(open, 1).endsWith('\nThank you for the flowers')).toBe(true);
+    expect(body(open, 1)).not.toContain('lasagna');
+  });
+
+  it('shows the input again after Not yet, and it is still editable', async () => {
+    const { change } = setup(['c1', 'c2'], 'aftercare');
+    fireEvent.press(await screen.findByText('Text Dee'));
+    expect(screen.queryByLabelText(line('Dee'))).toBeNull();
+    change('background');
+    change('active');
+    fireEvent.press(await screen.findByText('Not yet'));
+    fireEvent.changeText(screen.getByLabelText(line('Dee')), 'Thanks again');
+    expect(screen.getByDisplayValue('Thanks again')).toBeTruthy();
   });
 
   it('has no input on other moments', async () => {
     setup(['c1', 'c2']);
     await screen.findByText('Text Dee');
-    expect(screen.queryByLabelText('Add a line for Dee')).toBeNull();
+    expect(screen.queryByLabelText(line('Dee'))).toBeNull();
   });
 });

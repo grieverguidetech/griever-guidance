@@ -11,6 +11,7 @@ import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 
 const copy = screenCopy('sending');
+const copyOptional = screenCopy('announce').optional;
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -166,6 +167,7 @@ export function SendingScreen({ flow, contacts }: Props) {
           flow.templateCategory === 'aftercare' && activeContact
             ? {
                 label: fill(copy.addLine, { name: activeContact.name }),
+                optional: copyOptional,
                 value: flow.recipientNotes[activeContact.contactId] ?? '',
                 onChange: (value) => flow.setRecipientNote(activeContact.contactId, value),
               }
