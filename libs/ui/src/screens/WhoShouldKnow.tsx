@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import {
   AccessibilityInfo,
+  FlatList,
   Platform,
   Pressable,
   StyleSheet,
@@ -58,6 +59,19 @@ export interface WhoShouldKnowCopy {
   searchEmpty: string;
   /** The accessible name of Select all while a search is active. */
   selectAllShown: string;
+  /** Contacts are blocked for good: only Settings can turn them on. */
+  blockedLine: string;
+  openSettings: string;
+  /** Shown instead of the bring-across label while the import runs. */
+  bringAcrossBusy: string;
+  /** A muted line while the saved people load. */
+  loadingPeople: string;
+  /** A muted tag on a row already sent this moment. */
+  told: string;
+  /** Add by hand did not save. */
+  saveFailed: string;
+  /** Shown on Add while it saves. */
+  saving: string;
 }
 
 export interface WhoPerson {
@@ -96,6 +110,8 @@ export interface WhoShouldKnowProps {
     busy?: boolean;
     /** A calm line when it did not work. */
     notice?: string;
+    /** Contacts are turned off for good: shows the calm line and an Open Settings button. */
+    blocked?: { onOpenSettings: () => void };
     buttonRef?: Ref<ButtonNode>;
   };
   /** Mobile: the contacts are still loading, so the empty line is not shown yet. */
@@ -115,6 +131,14 @@ export interface WhoShouldKnowProps {
   shortcuts?: { label: string; accessibilityName?: string; onPress: () => void }[];
   /** Mobile: Continue works with no one ticked (service and obituary can be shared without a text). Leave unset on web. */
   allowNone?: boolean;
+  /** Mobile: ids of the people already sent this moment. Their rows get a muted "Told" tag. Leave unset on web. */
+  toldIds?: string[];
+  /**
+   * Mobile: the list is a FlatList that scrolls by itself, and the count and Continue stay pinned below it.
+   * The parent must give this screen a height (flex 1) and must not wrap it in a ScrollView. The list is
+   * flat (not grouped). Leave unset on web.
+   */
+  scrollList?: boolean;
 }
 
 /**
@@ -142,6 +166,8 @@ export function WhoShouldKnow({
   search = false,
   shortcuts,
   allowNone = false,
+  toldIds,
+  scrollList = false,
 }: WhoShouldKnowProps) {
   const [query, setQuery] = useState('');
   const needle = search ? query.trim().toLowerCase() : '';
@@ -166,113 +192,118 @@ export function WhoShouldKnow({
   const noneNote = allowNone && selectedIds.length === 0;
   const reasonId = useId();
   const noteId = useId();
-  return (
-    <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
-        {onWhatYoullNeed ? (
-          <Button
-            label={copy.checklist}
-            variant="header"
-            opensDialog
-            onPress={onWhatYoullNeed}
-            buttonRef={checklistRef}
-          />
-        ) : null}
-      </View>
-      <View style={styles.head}>
-        <Heading level={1} headingRef={headingRef}>
-          {copy.heading}
-        </Heading>
-        <Body tone="muted">
-          {grouped ? copy.introGrouped : copy.introUngrouped}
-        </Body>
-      </View>
-      {search && people.length > 0 ? (
-        <Field
-          label={copy.searchLabel}
-          value={query}
-          onChangeText={setQuery}
-          search
+  const told = new Set(toldIds ?? []);
+  const row = (person: WhoPerson) => (
+    <PersonRow
+      person={person}
+      selected={selectedIds.includes(person.id)}
+      onToggle={() => onToggle(person.id)}
+      toldLabel={told.has(person.id) ? copy.told : undefined}
+    />
+  );
+
+  const topBar = (
+    <View style={styles.topBar}>
+      <Button label={copy.back} variant="header" onPress={onBack} />
+      {onWhatYoullNeed ? (
+        <Button
+          label={copy.checklist}
+          variant="header"
+          opensDialog
+          onPress={onWhatYoullNeed}
+          buttonRef={checklistRef}
         />
       ) : null}
-      {shortcuts && shortcuts.length > 0 && people.length > 0 ? (
-        <View style={styles.shortcuts}>
-          {shortcuts.map((shortcut) => (
-            <Button
-              key={shortcut.label}
-              label={shortcut.label}
-              accessibilityName={shortcut.accessibilityName}
-              variant="secondary"
-              onPress={shortcut.onPress}
-            />
-          ))}
-        </View>
-      ) : null}
-      {search && !grouped && shown.length > 0 ? (
-        <View style={styles.sectionHead}>
+    </View>
+  );
+  const head = (
+    <View style={styles.head}>
+      <Heading level={1} headingRef={headingRef}>
+        {copy.heading}
+      </Heading>
+      <Body tone="muted">
+        {grouped ? copy.introGrouped : copy.introUngrouped}
+      </Body>
+    </View>
+  );
+  const searchField =
+    search && people.length > 0 ? (
+      <Field
+        label={copy.searchLabel}
+        value={query}
+        onChangeText={setQuery}
+        search
+      />
+    ) : null;
+  const shortcutRow =
+    shortcuts && shortcuts.length > 0 && people.length > 0 ? (
+      <View style={styles.shortcuts}>
+        {shortcuts.map((shortcut) => (
           <Button
-            label={copy.selectAll}
-            accessibilityName={needle ? copy.selectAllShown : undefined}
-            variant="tertiary"
-            onPress={() => onSelectAll(shown.map((p) => p.id))}
+            key={shortcut.label}
+            label={shortcut.label}
+            accessibilityName={shortcut.accessibilityName}
+            variant="secondary"
+            onPress={shortcut.onPress}
           />
-        </View>
-      ) : null}
-      {sections.map((section) => (
-        <View key={section.key} style={styles.section}>
-          {section.label ? (
-            <View style={styles.sectionHead}>
-              <Heading level={2}>{section.label}</Heading>
-              <Button
-                label={copy.selectAll}
-                accessibilityName={copy.selectAllFor.replace(
-                  '{group}',
-                  section.label,
-                )}
-                variant="tertiary"
-                onPress={() => onSelectAll(section.items.map((p) => p.id))}
-              />
-            </View>
-          ) : null}
-          {section.items.length > 0 ? (
-            <View role="list" style={styles.list}>
-              {section.items.map((person) => (
-                <View key={person.id} role="listitem">
-                  <PersonRow
-                    person={person}
-                    selected={selectedIds.includes(person.id)}
-                    onToggle={() => onToggle(person.id)}
-                  />
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ))}
+        ))}
+      </View>
+    ) : null;
+  const selectAllShownRow =
+    search && !grouped && shown.length > 0 ? (
+      <View style={styles.sectionHead}>
+        <Button
+          label={copy.selectAll}
+          accessibilityName={needle ? copy.selectAllShown : undefined}
+          variant="tertiary"
+          onPress={() => onSelectAll(shown.map((p) => p.id))}
+        />
+      </View>
+    ) : null;
+  const lines = (
+    <>
       {search && people.length > 0 && shown.length === 0 ? (
         <LiveLine label={copy.searchEmpty} />
       ) : null}
+      {loading ? <Body tone="muted">{copy.loadingPeople}</Body> : null}
       {people.length === 0 && !loading ? (
         <Body tone="muted">{copy.empty}</Body>
       ) : null}
-      {bringAcross ? (
-        <View style={styles.bringAcross}>
+    </>
+  );
+  const bringAcrossRow = bringAcross ? (
+    <View style={styles.bringAcross}>
+      {bringAcross.blocked ? (
+        <>
+          <LiveLine label={copy.blockedLine} />
           <Button
-            label={copy.bringAcross}
+            label={copy.openSettings}
             variant="secondary"
-            busy={bringAcross.busy}
-            buttonRef={bringAcross.buttonRef}
-            onPress={() => {
-              if (!bringAcross.busy) {
-                bringAcross.onPress();
-              }
-            }}
+            onPress={bringAcross.blocked.onOpenSettings}
           />
-          <Alert message={bringAcross.notice} />
-        </View>
-      ) : null}
-      <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} />
+        </>
+      ) : (
+        <Button
+          label={copy.bringAcross}
+          busyLabel={copy.bringAcrossBusy}
+          variant="secondary"
+          busy={bringAcross.busy}
+          buttonRef={bringAcross.buttonRef}
+          onPress={() => {
+            if (!bringAcross.busy) {
+              bringAcross.onPress();
+            }
+          }}
+        />
+      )}
+      <Alert message={bringAcross.notice} />
+    </View>
+  ) : null;
+  const addByHand = (
+    <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} />
+  );
+  const bottom = (
+    <>
       {noneChosen ? (
         <Body id={reasonId} hidden small tone="muted">
           {copy.chooseOne}
@@ -298,10 +329,87 @@ export function WhoShouldKnow({
           }}
         />
       </View>
+    </>
+  );
+
+  if (scrollList) {
+    return (
+      <View style={styles.fill}>
+        <FlatList
+          style={styles.fill}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          data={shown}
+          keyExtractor={(person) => person.id}
+          renderItem={({ item }) => row(item)}
+          ItemSeparatorComponent={RowGap}
+          ListHeaderComponent={
+            <View style={[styles.screen, styles.listEdge]}>
+              {topBar}
+              {head}
+              {searchField}
+              {shortcutRow}
+              {selectAllShownRow}
+            </View>
+          }
+          ListEmptyComponent={<View style={styles.screen}>{lines}</View>}
+          ListFooterComponent={
+            <View style={[styles.screen, styles.listEdge]}>
+              {bringAcrossRow}
+              {addByHand}
+              {footer}
+            </View>
+          }
+        />
+        <View style={styles.sticky}>{bottom}</View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.screen}>
+      {topBar}
+      {head}
+      {searchField}
+      {shortcutRow}
+      {selectAllShownRow}
+      {sections.map((section) => (
+        <View key={section.key} style={styles.section}>
+          {section.label ? (
+            <View style={styles.sectionHead}>
+              <Heading level={2}>{section.label}</Heading>
+              <Button
+                label={copy.selectAll}
+                accessibilityName={copy.selectAllFor.replace(
+                  '{group}',
+                  section.label,
+                )}
+                variant="tertiary"
+                onPress={() => onSelectAll(section.items.map((p) => p.id))}
+              />
+            </View>
+          ) : null}
+          {section.items.length > 0 ? (
+            <View role="list" style={styles.list}>
+              {section.items.map((person) => (
+                <View key={person.id} role="listitem">
+                  {row(person)}
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ))}
+      {lines}
+      {bringAcrossRow}
+      {addByHand}
+      {bottom}
       {footer}
     </View>
   );
 }
+
+const RowGap = () => <View style={styles.rowGap} />;
 
 const DANGER = '#b91c1c';
 
@@ -316,6 +424,8 @@ function AddByHand({
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [returnFocus, setReturnFocus] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
   const nameRef = useRef<TextInputNode>(null);
   const addAnotherRef = useRef<ButtonNode>(null);
   const reasonId = useId();
@@ -340,7 +450,7 @@ function AddByHand({
   };
   const empty = !name.trim() || !phone.trim();
   const submit = async () => {
-    if (empty) {
+    if (empty || inFlight.current) {
       return;
     }
     const e164 = toE164(phone);
@@ -348,8 +458,19 @@ function AddByHand({
       setError(copy.badNumber);
       return;
     }
-    await onAddPerson({ name: name.trim(), phone: e164 });
-    close();
+    inFlight.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      await onAddPerson({ name: name.trim(), phone: e164 });
+      close();
+    } catch {
+      // What was typed stays, so nothing has to be typed again.
+      setError(copy.saveFailed);
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
   };
 
   if (!open) {
@@ -386,6 +507,8 @@ function AddByHand({
       <View style={styles.formButtons}>
         <Button
           label={copy.add}
+          busy={saving}
+          busyLabel={copy.saving}
           ariaDisabled={empty}
           announceDisabled
           describedBy={empty ? reasonId : undefined}
@@ -521,10 +644,13 @@ export function PersonRow({
   person,
   selected,
   onToggle,
+  toldLabel,
 }: {
   person: WhoPerson;
   selected: boolean;
   onToggle: () => void;
+  /** A muted tag under the number, for a person already sent this moment (for example "Told"). */
+  toldLabel?: string;
 }) {
   // react-native-web only presses a role=button on Space; a checkbox needs Space too.
   const spaceKey: Record<string, unknown> = {
@@ -549,6 +675,11 @@ export function PersonRow({
         <Body tone="muted" small>
           {person.phone}
         </Body>
+        {toldLabel ? (
+          <Body tone="muted" small>
+            {toldLabel}
+          </Body>
+        ) : null}
       </Phrasing>
       <View
         style={[styles.box, selected && styles.boxSelected]}
@@ -629,6 +760,17 @@ const styles = StyleSheet.create({
   },
   tick: { color: colors.white, fontSize: 12, fontWeight: '700' },
   screen: { gap: spacing[3] },
+  fill: { flex: 1, backgroundColor: colors.bg },
+  scrollContent: { padding: spacing[3], paddingTop: spacing[4] },
+  listEdge: { paddingVertical: spacing[2] },
+  rowGap: { height: spacing[2] },
+  sticky: {
+    gap: spacing[1],
+    padding: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors['neutral-300'],
+    backgroundColor: colors.bg,
+  },
   head: { gap: spacing[1] },
   sectionHead: {
     flexDirection: 'row',

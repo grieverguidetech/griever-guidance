@@ -38,7 +38,15 @@
     "everyoneYouTold",
     "notSentYet",
     "everyoneYouToldName",
-    "notSentYetName"
+    "notSentYetName",
+    "blockedLine",
+    "openSettings",
+    "bringAcrossBusy",
+    "loadingPeople",
+    "told",
+    "saveFailed",
+    "saving",
+    "doneForNow"
   ],
   "properties": {
     "heading": {
@@ -148,6 +156,30 @@
     "chosen": {
       "type": "string",
       "pattern": "\\{count\\}"
+    },
+    "blockedLine": {
+      "$ref": "#/$defs/text"
+    },
+    "openSettings": {
+      "$ref": "#/$defs/text"
+    },
+    "bringAcrossBusy": {
+      "$ref": "#/$defs/text"
+    },
+    "loadingPeople": {
+      "$ref": "#/$defs/text"
+    },
+    "told": {
+      "$ref": "#/$defs/text"
+    },
+    "saveFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "saving": {
+      "$ref": "#/$defs/text"
+    },
+    "doneForNow": {
+      "$ref": "#/$defs/text"
     }
   },
   "$defs": {

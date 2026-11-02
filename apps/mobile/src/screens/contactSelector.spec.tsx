@@ -1,8 +1,9 @@
-import { describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { AccessibilityInfo, Linking } from 'react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
+import { Cancelled } from '@griever/contacts';
 import { screenCopy } from '@griever/copy';
 import { ContactSelectorScreen } from './ContactSelectorScreen';
 
@@ -12,17 +13,23 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   findNodeHandle: () => 1,
 }));
 
+const mockFetch = jest.fn<() => Promise<unknown[]>>();
+const twoPeople = async () => [
+  { key: 'x', displayName: 'Starred Sam', phones: ['+16175550111'], emails: [], starred: true },
+  { key: 'y', displayName: 'Plain Pat', phones: ['+16175550112'], emails: [] },
+];
 jest.mock('../lib/expoContactsSource', () => ({
   expoContactsSource: {
     id: 'native',
     preselected: false,
     isAvailable: async () => true,
-    fetch: async () => [
-      { key: 'x', displayName: 'Starred Sam', phones: ['+16175550111'], emails: [], starred: true },
-      { key: 'y', displayName: 'Plain Pat', phones: ['+16175550112'], emails: [] },
-    ],
+    fetch: () => mockFetch(),
   },
 }));
+
+beforeEach(() => {
+  mockFetch.mockReset().mockImplementation(twoPeople);
+});
 
 const make = (id: string, name: string, tier: Contact['tier']): Contact => ({
   contactId: id,
@@ -47,6 +54,7 @@ function renderScreen(
   templateCategory: string | null = 'announcement',
   selectedContactIds: string[] = [],
   notified: Record<string, string[]> = {},
+  contactsOver: Partial<UseContactsResult> = {},
 ) {
   const toggleContact = jest.fn();
   const selectContacts = jest.fn();
@@ -58,12 +66,12 @@ function renderScreen(
     prevStep: jest.fn(),
     templateCategory,
   };
-  const contacts = { contacts: contactList, loading: false } as unknown as UseContactsResult;
+  const contacts = { contacts: contactList, loading: false, ...contactsOver } as unknown as UseContactsResult;
   const ui = (ids: string[]) => (
     <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} notified={notified} />
   );
   const { rerender } = render(ui(selectedContactIds));
-  return { toggleContact, selectContacts, nextStep: flow.nextStep, rerender: (ids: string[]) => rerender(ui(ids)) };
+  return { toggleContact, selectContacts, contacts, nextStep: flow.nextStep, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
 // The screen's own title is a heading too; the tier headings are the rest.
@@ -160,13 +168,13 @@ describe('ContactSelectorScreen grouping', () => {
   it('gives the Add from your contacts rows the checkbox role and checked state', async () => {
     renderScreen();
     fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
-    expect(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: true })).toBeTruthy();
+    expect(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: false })).toBeTruthy();
     expect(screen.getByText('Choose only the ones you want — the rest stay where they are.')).toBeTruthy();
     const plain = screen.getByRole('checkbox', { name: /Plain Pat/, checked: false });
     fireEvent.press(plain);
     expect(screen.getByRole('checkbox', { name: /Plain Pat/, checked: true })).toBeTruthy();
     const ticks = screen.getAllByText('✓', { includeHiddenElements: true });
-    expect(ticks).toHaveLength(2);
+    expect(ticks).toHaveLength(1);
     ticks.forEach((t) => expect(t.props.accessibilityElementsHidden).toBe(true));
   });
 
@@ -196,8 +204,9 @@ describe('ContactSelectorScreen grouping', () => {
     renderScreen();
     fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     await screen.findByRole('heading', { name: 'Add from your contacts' });
-    fireEvent.press(screen.getByRole('checkbox', { name: /Starred Sam/, checked: true }));
     expect(screen.getByText('Choose at least one person', { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: false }));
+    fireEvent.press(screen.getByRole('checkbox', { name: /Starred Sam/, checked: true }));
     expect(screen.getByRole('button', { name: 'Add' }).props.accessibilityHint).toBe('Choose at least one person');
   });
 
@@ -275,10 +284,24 @@ describe('ContactSelectorScreen shortcuts', () => {
     expect(selectContacts).toHaveBeenCalledWith(['2']);
   });
 
-  it('shows no shortcut on the announcement picker, or when no one was told', () => {
-    renderScreen(saved, 'announcement', [], { announcement: ['2'] });
+  it('gives the announcement picker Not sent yet only, never Everyone you told', () => {
+    const { selectContacts } = renderScreen(saved, 'announcement', [], { announcement: ['2'] });
     expect(screen.queryByRole('button', { name: copy.everyoneYouToldName })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: copy.notSentYetName }));
+    expect(selectContacts).toHaveBeenCalledWith(['1', '3', '4']);
+  });
+
+  it('shows no shortcut on the announcement picker before anyone was told', () => {
+    renderScreen(saved, 'announcement', [], {});
     expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+  });
+
+  it('starts each shortcut name with its visible label', () => {
+    renderScreen(saved, 'service', [], { announcement: ['2'], service: ['2'] });
+    expect(copy.everyoneYouToldName.startsWith(copy.everyoneYouTold)).toBe(true);
+    expect(copy.notSentYetName.startsWith(copy.notSentYet)).toBe(true);
+    expect(screen.getByRole('button', { name: copy.everyoneYouToldName })).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.notSentYetName })).toBeTruthy();
   });
 
   it('shows no Everyone you told when the announcement list is empty', () => {
@@ -295,5 +318,139 @@ describe('ContactSelectorScreen shortcuts', () => {
   it('shows no Not sent yet when this moment has reached every saved contact', () => {
     renderScreen(saved, 'service', [], { announcement: ['2'], service: ['1', '2', '3', '4'] });
     expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+  });
+});
+
+describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
+  const copy = screenCopy('whoShouldKnow');
+  const openImport = () => fireEvent.press(screen.getByRole('button', { name: copy.bringAcross }));
+
+  it('refused for good: shows the calm line and Open Settings, and the button opens Settings', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    renderScreen();
+    openImport();
+    expect(await screen.findByText(copy.blockedLine)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: copy.bringAcross })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: copy.openSettings }));
+    expect(openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('a plain no, or a refusal the system can ask about again, shows nothing', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('denied'));
+    renderScreen();
+    openImport();
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: copy.bringAcross })).toBeTruthy());
+    expect(screen.queryByText(copy.blockedLine)).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.openSettings })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows a busy spinner and "Reading your contacts..." while the read runs, and ignores a second tap', async () => {
+    let finish: (value: unknown[]) => void = () => undefined;
+    mockFetch.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    renderScreen();
+    openImport();
+    const busy = await screen.findByRole('button', { name: copy.bringAcrossBusy });
+    expect(busy.props.accessibilityState).toEqual(expect.objectContaining({ busy: true }));
+    expect(screen.UNSAFE_queryByType(require('react-native').ActivityIndicator)).toBeTruthy();
+    fireEvent.press(busy);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish([]);
+    });
+  });
+
+  it('brings people in unticked, then ticks the ones added', async () => {
+    const importContacts = jest.fn(async () => [{ ...make('9', 'Plain Pat', 'family') }]);
+    const { selectContacts } = renderScreen(saved, 'announcement', [], {}, { importContacts } as never);
+    openImport();
+    expect(await screen.findByRole('checkbox', { name: /Starred Sam/, checked: false })).toBeTruthy();
+    fireEvent.press(screen.getByRole('checkbox', { name: /Plain Pat/ }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(selectContacts).toHaveBeenCalledWith(['9']));
+    expect(importContacts).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Who should know?')).toBeTruthy();
+  });
+
+  it('searches the review by name', async () => {
+    renderScreen();
+    openImport();
+    await screen.findByText('Starred Sam');
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'pat');
+    expect(screen.queryByText('Starred Sam')).toBeNull();
+    expect(screen.getByText('Plain Pat')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'zzz');
+    expect(screen.getByText(copy.searchEmpty)).toBeTruthy();
+  });
+
+  it('a double tap on Add saves once, and Add reads as saving', async () => {
+    let finish: (value: unknown[]) => void = () => undefined;
+    const importContacts = jest
+      .fn<() => Promise<unknown[]>>()
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderScreen(saved, 'announcement', [], {}, { importContacts } as never);
+    openImport();
+    fireEvent.press(await screen.findByRole('checkbox', { name: /Plain Pat/ }));
+    const add = screen.getByRole('button', { name: 'Add' });
+    fireEvent.press(add);
+    fireEvent.press(add);
+    expect(importContacts).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: copy.saving })).toBeTruthy();
+    await act(async () => {
+      finish([]);
+    });
+  });
+
+  it('a failed save shows the error and keeps the ticks', async () => {
+    const importContacts = jest.fn(async () => {
+      throw new Error('disk');
+    });
+    renderScreen(saved, 'announcement', [], {}, { importContacts } as never);
+    openImport();
+    fireEvent.press(await screen.findByRole('checkbox', { name: /Plain Pat/ }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByText(copy.saveFailed)).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Plain Pat/, checked: true })).toBeTruthy();
+    expect(screen.getByText('1 chosen')).toBeTruthy();
+  });
+});
+
+describe('ContactSelectorScreen people list (#652)', () => {
+  const copy = screenCopy('whoShouldKnow');
+
+  it('tags rows already sent this moment as Told, and no others', () => {
+    renderScreen(saved, 'service', [], { service: ['2'], announcement: ['2'] });
+    expect(screen.getAllByText(copy.told)).toHaveLength(1);
+    expect(within(screen.getByRole('checkbox', { name: /Mum/ })).getByText(copy.told)).toBeTruthy();
+    expect(within(screen.getByRole('checkbox', { name: /Dad/ })).queryByText(copy.told)).toBeNull();
+  });
+
+  it('shows no Told tag when no one was sent', () => {
+    renderScreen(saved, 'service');
+    expect(screen.queryByText(copy.told)).toBeNull();
+  });
+
+  it('shows a muted loading line while the saved people load', () => {
+    renderScreen([], 'announcement', [], {}, { loading: true });
+    expect(screen.getByText(copy.loadingPeople)).toBeTruthy();
+    expect(screen.queryByText(copy.empty)).toBeNull();
+  });
+
+  it('keeps the count and Continue outside the list, and renders the list as a FlatList', () => {
+    renderScreen();
+    const { FlatList } = require('react-native');
+    expect(screen.UNSAFE_queryAllByType(FlatList)).toHaveLength(1);
+    const list = screen.UNSAFE_getByType(FlatList);
+    expect(() => within(list).getByRole('button', { name: 'Continue' })).toThrow();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+  });
+
+  it('copes with a big address book', () => {
+    const many = Array.from({ length: 300 }, (_, i) => make(String(i + 1), `Person ${i + 1}`, 'family'));
+    renderScreen(many);
+    expect(screen.getByText('Person 1')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
   });
 });

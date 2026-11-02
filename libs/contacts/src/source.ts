@@ -28,10 +28,19 @@ export interface ContactSource {
   preselected: boolean;
 }
 
+/**
+ * Why a fetch ended with nothing chosen. `cancelled`: the person backed out. `denied`: permission was
+ * refused but the system can ask again. `blocked`: refused for good, so only Settings can turn it on.
+ */
+export type CancelReason = "cancelled" | "denied" | "blocked";
+
 /** Thrown by a `fetch()` the user backed out of — not an error, just "nothing chosen." */
 export class Cancelled extends Error {
-  constructor() {
+  readonly reason: CancelReason;
+
+  constructor(reason: CancelReason = "cancelled") {
     super("Cancelled");
     this.name = "Cancelled";
+    this.reason = reason;
   }
 }

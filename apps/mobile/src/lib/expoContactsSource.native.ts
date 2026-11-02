@@ -26,9 +26,9 @@ export const expoContactsSource: ContactSource = {
   async fetch() {
     const response = await requestPermissionsAsync();
     if (!response.granted) {
-      // A denial is "nothing chosen," same as backing out of a picker —
-      // not a scary error to surface (source.ts's Cancelled contract).
-      throw new Cancelled();
+      // A denial is "nothing chosen," same as backing out of a picker, not a scary error.
+      // The reason says whether the system will ask again; if not, the screen offers Settings.
+      throw new Cancelled(response.canAskAgain ? 'denied' : 'blocked');
     }
 
     const { data } = await getContactsAsync({ fields: [Fields.Name, Fields.PhoneNumbers, Fields.Emails] });

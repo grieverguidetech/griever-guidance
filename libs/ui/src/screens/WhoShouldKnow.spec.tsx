@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WhoShouldKnow } from './WhoShouldKnow';
 import type { WhoShouldKnowCopy, WhoShouldKnowProps } from './WhoShouldKnow';
@@ -30,6 +30,13 @@ const copy: WhoShouldKnowCopy = {
   searchLabel: 'Search by name',
   searchEmpty: 'No one matches that name.',
   selectAllShown: 'Select all shown',
+  blockedLine: 'Contacts are turned off for this app. You can add people yourself, or turn them on in Settings.',
+  openSettings: 'Open Settings',
+  bringAcrossBusy: 'Reading your contacts...',
+  loadingPeople: 'Getting your people...',
+  told: 'Told',
+  saveFailed: 'We could not save that. Please try again.',
+  saving: 'Saving...',
 };
 
 const people = [
@@ -289,6 +296,86 @@ describe('WhoShouldKnow', () => {
     it('renders no shortcut when there are no people', () => {
       setup({ grouped: false, people: [], shortcuts: [{ label: 'Everyone you told', onPress: vi.fn() }] });
       expect(screen.queryByRole('button', { name: 'Everyone you told' })).toBeNull();
+    });
+  });
+
+  describe('mobile-only props (#652)', () => {
+    it('tags the people already told, and nobody else', () => {
+      setup({ grouped: false, toldIds: ['b'] });
+      expect(screen.getAllByText('Told')).toHaveLength(1);
+      expect(within(screen.getByRole('checkbox', { name: /Bob Smith/ })).getByText('Told')).toBeInTheDocument();
+    });
+
+    it('shows no Told tag when the prop is not passed (web)', () => {
+      setup({ grouped: false });
+      expect(screen.queryByText('Told')).toBeNull();
+    });
+
+    it('shows a muted loading line while the saved people load, and no empty line', () => {
+      setup({ grouped: false, people: [], loading: true });
+      expect(screen.getByText('Getting your people...')).toBeInTheDocument();
+      expect(screen.queryByText('No one saved yet. Add someone below.')).toBeNull();
+    });
+
+    it('shows the blocked line and Open Settings instead of the import button', async () => {
+      const user = userEvent.setup();
+      const onOpenSettings = vi.fn();
+      setup({ grouped: false, bringAcross: { onPress: vi.fn(), blocked: { onOpenSettings } } });
+      expect(screen.getByText(copy.blockedLine)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add from your contacts' })).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Open Settings' }));
+      expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads "Reading your contacts..." with a busy state while the import runs, and does not press again', async () => {
+      const user = userEvent.setup();
+      const onPress = vi.fn();
+      setup({ grouped: false, bringAcross: { onPress, busy: true } });
+      const button = screen.getByRole('button', { name: 'Reading your contacts...' });
+      await user.click(button);
+      expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it('with scrollList, the count and Continue sit outside the list', () => {
+      setup({ grouped: false, scrollList: true, selectedIds: ['a'] });
+      expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+      expect(screen.getByText('1 selected')).toBeInTheDocument();
+    });
+  });
+
+  describe('add by hand (#652)', () => {
+    const fill = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(screen.getByRole('button', { name: 'Add another person' }));
+      await user.type(screen.getByLabelText('Name'), 'Dee');
+      await user.type(screen.getByLabelText('Mobile number'), '6175550148');
+    };
+
+    it('shows the calm error and keeps the typed text when saving fails', async () => {
+      const user = userEvent.setup();
+      const onAddPerson = vi.fn(async () => {
+        throw new Error('disk');
+      });
+      setup({ grouped: false, onAddPerson });
+      await fill(user);
+      await user.click(screen.getByRole('button', { name: 'Add' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('We could not save that. Please try again.');
+      expect(screen.getByLabelText('Name')).toHaveValue('Dee');
+      expect(screen.getByLabelText('Mobile number')).toHaveValue('6175550148');
+    });
+
+    it('saves once on a double press and reads as saving meanwhile', async () => {
+      const user = userEvent.setup();
+      let finish: () => void = () => undefined;
+      const onAddPerson = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+      setup({ grouped: false, onAddPerson });
+      await fill(user);
+      const add = screen.getByRole('button', { name: 'Add' });
+      await user.click(add);
+      await user.click(screen.getByRole('button', { name: 'Saving...' }));
+      expect(onAddPerson).toHaveBeenCalledTimes(1);
+      finish();
+      await screen.findByRole('button', { name: 'Add another person' });
     });
   });
 });
