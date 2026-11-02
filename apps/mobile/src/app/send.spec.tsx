@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, Linking, Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,6 +31,18 @@ const contacts = [
   { contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' },
   { contactId: 'c2', name: 'Eli', phone: '+15555550101', tier: 'family' },
 ];
+
+// A tap this soon after opening Messages is ignored (the double-tap guard), so a test waits like a person would.
+// The test moves a clock by hand instead of waiting.
+let clock = 1_700_000_000_000;
+const afterMessages = async () => {
+  clock += 1500;
+};
+
+beforeEach(() => {
+  clock = 1_700_000_000_000;
+  jest.spyOn(Date, 'now').mockImplementation(() => clock);
+});
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -266,8 +278,10 @@ describe('the end of a send', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Text Eli'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
@@ -294,6 +308,7 @@ describe('the end of a send', () => {
     expect(screen.getByText('Dee')).toBeTruthy();
     fireEvent.press(screen.getByText('Text Dee'));
     expect(await screen.findByText('Send it in Messages, then come back and tap Next.')).toBeTruthy();
+    await afterMessages();
     fireEvent.press(screen.getByText('Next'));
     expect(await screen.findByText('2 of 2')).toBeTruthy();
     expect(screen.getByText('Sent')).toBeTruthy();
@@ -303,6 +318,7 @@ describe('the end of a send', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
     expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
@@ -328,6 +344,7 @@ describe('the end of a send', () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     await new Promise((r) => setTimeout(r, 300));
@@ -347,6 +364,7 @@ describe('the end of a send', () => {
     // Clear what earlier steps (or a slow earlier test) announced; only the hub's note is counted.
     announce.mockClear();
     focus.mockClear();
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     const spoken = announce.mock.calls.filter(([text]) => String(text).startsWith('Everyone has been told.'));
@@ -361,6 +379,7 @@ describe('the end of a send', () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
@@ -381,6 +400,7 @@ describe('the end of a send', () => {
     await screen.findByRole('heading', { name: 'Review your message' });
     fireEvent.press(screen.getByText('Text these people'));
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
@@ -409,6 +429,7 @@ describe('Edit person from the hub', () => {
     fireEvent.press(screen.getByText('Continue'));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
     fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));

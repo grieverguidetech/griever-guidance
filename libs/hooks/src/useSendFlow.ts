@@ -53,7 +53,14 @@ export interface SendFlowState {
 }
 
 /** The persisted subset of the flow state (everything but the live send job). */
-export type SendFlowDraft = Omit<SendFlowState, 'sendJob'>;
+export type SendFlowDraft = Omit<SendFlowState, 'sendJob'> & {
+  /**
+   * Contact ids confirmed in the send under way, saved only while the draft is on 'sending'
+   * (otherwise empty). A resume drops exactly these, so a re-send to people told before still
+   * reaches them. Ids only, local to the device (C2; `drafts` is never synced).
+   */
+  toldIds: string[];
+};
 
 export interface SendFlowActions {
   setTemplateCategory: (category: TemplateCategory) => void;
@@ -77,6 +84,8 @@ export interface SendFlowActions {
   nextStep: () => void;
   prevStep: () => void;
   reset: () => void;
+  /** Ends the send for now. Who was told stays told; the people not yet reached are left out. */
+  stopSending: () => void;
   /** Empties this moment's draft and returns to its first form. The person, contacts and sent record are not touched. */
   startAgain: () => void;
 }
@@ -129,17 +138,26 @@ const initialState: SendFlowState = {
 /** A fresh draft, for callers that need to hand a session a pre-set starting step (e.g. C4 → C5). */
 export function freshDraft(patch: Partial<SendFlowDraft>): SendFlowDraft {
   const { sendJob: _sendJob, ...draft } = initialState;
-  return { ...draft, ...patch };
+  return { ...draft, toldIds: [], ...patch };
 }
 
 /**
  * True when a saved draft has a message under way (a template chosen, nothing being sent), so
  * reopening the app should put the person back in it rather than start the message over.
- * 'sending' is never resumed: the send job isn't saved, and resuming would offer the whole list
- * again. 'sent' is finished.
+ * 'sending' is not resumed by default: the send job isn't saved, and resuming would offer the whole
+ * list again. Mobile keeps who was told, so it passes `resumeSending`: a 'sending' draft then
+ * reopens on review without the people already told (see fromDraft). 'sent' is finished.
  */
-export function hasDraftInProgress(draft: SendFlowDraft | null | undefined): draft is SendFlowDraft {
-  return !!draft && draft.templateCategory !== null && draft.step !== 'sending' && draft.step !== 'sent';
+export function hasDraftInProgress(
+  draft: SendFlowDraft | null | undefined,
+  resumeSending = false,
+): draft is SendFlowDraft {
+  return (
+    !!draft &&
+    draft.templateCategory !== null &&
+    (draft.step !== 'sending' || resumeSending) &&
+    draft.step !== 'sent'
+  );
 }
 
 /** The first step after the picker, for moments that do not start on the details form. */
@@ -153,7 +171,9 @@ const FIRST_STEP: Partial<Record<TemplateCategory, SendFlowStep>> = {
  * form, so the picker can't be reached and overwrite what was typed. Fields are left untouched.
  */
 export function resumeDraft(draft: SendFlowDraft, skipDetails = false): SendFlowDraft {
-  if (draft.step !== 'template') return draft;
+  if (draft.step !== 'template') {
+    return draft;
+  }
   const first = draft.templateCategory ? FIRST_STEP[draft.templateCategory] : undefined;
   return { ...draft, step: first ?? (skipDetails ? 'contacts' : 'details') };
 }
@@ -177,21 +197,39 @@ export function draftHasContent(
  * True when a moment has something to resume: the first form shows typed words or a hand-edited
  * message, or the draft has moved past that form. A draft only opened (nothing typed) is not started.
  */
-export function isDraftStarted(draft: SendFlowDraft | null | undefined, skipDetails = false): boolean {
-  if (!hasDraftInProgress(draft) || !draft.templateCategory) return false;
+export function isDraftStarted(
+  draft: SendFlowDraft | null | undefined,
+  skipDetails = false,
+  resumeSending = false,
+): boolean {
+  if (!hasDraftInProgress(draft, resumeSending) || !draft.templateCategory) {
+    return false;
+  }
   const first = FIRST_STEP[draft.templateCategory] ?? (skipDetails ? 'contacts' : 'details');
   return draftHasContent(draft) || (draft.step !== 'template' && draft.step !== first);
 }
 
+/** Contact ids already told, per moment, kept on this device. Ids only (C2). */
+export type ToldIds = Partial<Record<TemplateCategory, string[]>>;
+
 function fromDraft(draft: SendFlowDraft, skipDetails = false): SendFlowState {
   // Drafts saved before the made-up venue and florist lists were removed carry `place` and
   // `floristId`. Drop them so only the typed place and florist are ever sent.
-  const { place: _place, floristId: _floristId, ...kept } = draft as SendFlowDraft & {
+  const { place: _place, floristId: _floristId, toldIds, ...kept } = draft as SendFlowDraft & {
     place?: unknown;
     floristId?: unknown;
   };
   const restored: SendFlowState = { ...initialState, ...kept, sendJob: null };
-  if (restored.step === 'sending') restored.step = 'review';
+  if (restored.step === 'sending') {
+    // The send job is not saved, so the whole selection would come back. The people confirmed in
+    // this send are dropped from it, so a restart never texts them twice (section 4, Reliability).
+    // Only this send's ids count: people told in an earlier send of the moment must hear again.
+    const already = new Set(toldIds ?? []);
+    const left = restored.selectedContactIds.filter((id) => !already.has(id));
+    // Everyone had been told: nothing to review, so it opens on the people.
+    restored.step = left.length === 0 && restored.selectedContactIds.length > 0 ? 'contacts' : 'review';
+    restored.selectedContactIds = left;
+  }
   // The announcement no longer asks whether the service is known (or collects its details on a
   // step of its own); a draft saved on either of those carries on to the people. What was typed
   // stays in `fields` and still reaches the message.
@@ -205,8 +243,12 @@ function fromDraft(draft: SendFlowDraft, skipDetails = false): SendFlowState {
 }
 
 function toDraft(state: SendFlowState): SendFlowDraft {
-  const { sendJob: _sendJob, ...draft } = state;
-  return draft;
+  const { sendJob, ...draft } = state;
+  const toldIds =
+    state.step === 'sending' && sendJob
+      ? sendJob.recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId)
+      : [];
+  return { ...draft, toldIds };
 }
 
 function loadState(storage: SendFlowStorage | undefined, skipDetails: boolean): SendFlowState {
@@ -325,12 +367,19 @@ export interface UseSendFlowOptions {
    * are edited on the send screen). Off by default, so the web step order is unchanged.
    */
   skipDetails?: boolean;
+  /**
+   * Set by a caller that keeps who was told (mobile): a draft saved mid-send then resumes, without
+   * the people confirmed in that send (the draft's own `toldIds`). Leave unset where nothing is kept.
+   */
+  told?: ToldIds;
 }
 
 export function useSendFlow(
   options: UseSendFlowOptions = {},
 ): SendFlowState & SendFlowActions & SendFlowDerived {
-  const { session = null, draft = null, drafts, onDraftChange, storage, skipDetails = false } = options;
+  const { session = null, draft = null, drafts, onDraftChange, storage, skipDetails = false, told } = options;
+  // Only a caller that keeps who was told (mobile) can resume a draft saved mid-send.
+  const resumeSending = told !== undefined;
   const draftsRef = useRef(drafts);
   draftsRef.current = drafts;
 
@@ -378,13 +427,16 @@ export function useSendFlow(
 
   // A moment already under way comes back as it was, not blank. It stays on the picker step, so
   // the picker's own nextStep lands on the moment's first form with everything typed still there.
+  // A draft saved mid-send is the exception: it keeps the step it resumes on (see fromDraft).
   const startedState = useCallback((category: TemplateCategory, templateOverrideId: string | null): SendFlowState => {
     const saved = draftsRef.current?.[category];
-    if (hasDraftInProgress(saved) && saved.templateOverrideId === templateOverrideId) {
-      return { ...fromDraft(saved, skipDetails), step: 'template' };
+    if (hasDraftInProgress(saved, resumeSending) && saved.templateOverrideId === templateOverrideId) {
+      const restored = fromDraft(saved, skipDetails);
+      // A half-sent moment keeps the step it resumes on (review, or the people if all were told).
+      return saved.step === 'sending' ? restored : { ...restored, step: 'template' };
     }
     return { ...initialState, step: 'template', templateCategory: category, templateOverrideId };
-  }, [skipDetails]);
+  }, [skipDetails, resumeSending]);
 
   const setTemplateCategory = useCallback((category: TemplateCategory) => {
     setState((s) => {
@@ -486,6 +538,10 @@ export function useSendFlow(
   const markActiveSent = useCallback(() => advanceActive('delivered'), [advanceActive]);
   const markActiveSkipped = useCallback(() => advanceActive('skipped'), [advanceActive]);
 
+  const stopSending = useCallback(() => {
+    setState((s) => (s.step === 'sending' ? { ...s, step: 'sent', recipientNotes: {} } : s));
+  }, []);
+
   const nextStep = useCallback(() => {
     setState((s) => {
       const order = stepsFor(s, resolveTemplate(s), skipDetails);
@@ -550,6 +606,7 @@ export function useSendFlow(
     startSendJob,
     markActiveSent,
     markActiveSkipped,
+    stopSending,
     nextStep,
     prevStep,
     reset,
