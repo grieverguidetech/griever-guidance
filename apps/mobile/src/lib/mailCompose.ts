@@ -9,10 +9,12 @@ export type MailResult = 'mail' | 'share' | 'failed';
 
 /**
  * A `mailto:` link with no recipient (the user fills in To). Subject and body are percent-encoded;
- * encodeURIComponent writes a space as %20 and a new line as %0A, which mail apps read back correctly.
+ * encodeURIComponent writes a space as %20 and a line break as %0D%0A.
  */
 export function buildMailto({ subject, body }: MailDraft): string {
-  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Mail apps expect CRLF (RFC 6068) for a line break in the body.
+  const crlfBody = body.replace(/\r?\n/g, '\r\n');
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(crlfBody)}`;
 }
 
 /**
@@ -30,7 +32,7 @@ export async function openMailDraft(draft: MailDraft): Promise<MailResult> {
     return 'mail';
   } catch {
     try {
-      await Share.share({ message: draft.body, title: draft.subject });
+      await Share.share({ message: draft.body, title: draft.subject }, { subject: draft.subject });
       return 'share';
     } catch {
       return 'failed';

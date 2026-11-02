@@ -10,7 +10,19 @@ afterEach(() => {
 
 describe('buildMailto', () => {
   it('has no recipient and encodes the subject and body', () => {
-    expect(buildMailto(draft)).toBe('mailto:?subject=Obituary%20for%20Anna&body=Anna%2C%201950%20%26%20more.%0ALine%20two%3F');
+    expect(buildMailto(draft)).toBe('mailto:?subject=Obituary%20for%20Anna&body=Anna%2C%201950%20%26%20more.%0D%0ALine%20two%3F');
+  });
+});
+
+describe('buildMailto edge cases', () => {
+  it('writes every line break as CRLF, including ones already CRLF', () => {
+    expect(buildMailto({ subject: 's', body: 'a\nb\r\nc' })).toBe('mailto:?subject=s&body=a%0D%0Ab%0D%0Ac');
+  });
+
+  it('encodes non-ASCII text as UTF-8', () => {
+    expect(buildMailto({ subject: 'Obituary for José', body: 'José — 1950' })).toBe(
+      'mailto:?subject=Obituary%20for%20Jos%C3%A9&body=Jos%C3%A9%20%E2%80%94%201950',
+    );
   });
 });
 
@@ -27,7 +39,7 @@ describe('openMailDraft', () => {
     jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail app'));
     const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.sharedAction, activityType: undefined });
     await expect(openMailDraft(draft)).resolves.toBe('share');
-    expect(share).toHaveBeenCalledWith({ message: draft.body, title: draft.subject });
+    expect(share).toHaveBeenCalledWith({ message: draft.body, title: draft.subject }, { subject: draft.subject });
   });
 
   it('reports failed when mail and sharing both fail', async () => {

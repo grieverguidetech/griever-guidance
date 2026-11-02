@@ -50,6 +50,8 @@ export interface PublisherEmail {
   onPress: () => void;
   /** true after mail and sharing both failed. */
   failed?: boolean;
+  /** true while the press is running: the button reads as busy and a second tap does nothing. */
+  busy?: boolean;
 }
 
 export interface ShareObituaryProps {
@@ -111,11 +113,11 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
       </View>
       {publisherEmail && copy.emailButton ? (
         <Card>
-          {copy.emailTitle ? <Body tone="strong">{copy.emailTitle}</Body> : null}
+          {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
           {publisherEmail.hasText ? (
             <>
               {copy.emailBody ? <Body tone="muted">{copy.emailBody}</Body> : null}
-              <Button label={copy.emailButton} variant="secondary" describedBy={publisherEmail.failed ? emailFailedId : undefined} onPress={publisherEmail.onPress} />
+              <Button label={copy.emailButton} variant="secondary" busy={publisherEmail.busy} describedBy={publisherEmail.failed ? emailFailedId : undefined} onPress={publisherEmail.onPress} />
               <Status id={emailFailedId} message={publisherEmail.failed ? copy.emailFailed : undefined} tone="danger" />
             </>
           ) : copy.emailNoText ? (
@@ -174,7 +176,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
       </Body>
       {onDraft ? (
         <Card>
-          <Body tone="strong">{copy.draftTitle}</Body>
+          <Heading level={2}>{copy.draftTitle}</Heading>
           <Body tone="muted">{copy.draftBody}</Body>
           <Button
             label={copy.draftButton}
