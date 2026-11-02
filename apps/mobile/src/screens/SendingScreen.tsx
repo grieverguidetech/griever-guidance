@@ -70,7 +70,7 @@ export function SendingScreen({ flow, contacts }: Props) {
     if (!active || !activeContact) {
       return;
     }
-    const link = buildSmsLink(activeContact.phone, flow.composedMessage, Platform.OS === 'ios');
+    const link = buildSmsLink(activeContact.phone, flow.messageFor(activeContact.name), Platform.OS === 'ios');
     setHandedOff(true);
     void Linking.openURL(link);
   }
@@ -86,7 +86,7 @@ export function SendingScreen({ flow, contacts }: Props) {
             ? {
                 position: fill(copy.position, { n: activeIndex + 1, total }),
                 name: activeContact.name,
-                message: flow.composedMessage,
+                message: flow.messageFor(activeContact.name),
                 isLast,
               }
             : undefined

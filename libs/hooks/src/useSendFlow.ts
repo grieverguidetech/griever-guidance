@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { templates, composeMessage } from '@griever/shared';
+import { templates, composeMessage, firstName, withGreeting } from '@griever/shared';
 import type {
   Template,
   TemplateCategory,
@@ -45,6 +45,8 @@ export interface SendFlowState {
   tone: MessageTone;
   /** Set when the griever hand-edits the wording; pins the draft. */
   messageOverride: string | null;
+  /** Start each text with the recipient's first name. On by default; the griever can turn it off. */
+  greeting: boolean;
   sendJob: SendJob | null;
 }
 
@@ -62,6 +64,7 @@ export interface SendFlowActions {
   setFlowerDeliveryTarget: (target: 'service' | 'home') => void;
   setTone: (tone: MessageTone) => void;
   setMessageOverride: (value: string | null) => void;
+  setGreeting: (value: boolean) => void;
   startSendJob: () => void;
   /** The active recipient's own Messages app was opened and (we assume) sent — advance the queue. */
   markActiveSent: () => void;
@@ -80,6 +83,8 @@ export interface SendFlowDerived {
   session: SessionDetails | null;
   composedFields: Record<string, string>;
   composedMessage: string;
+  /** The message for one person: `composedMessage` with their first name on top when `greeting` is on. */
+  messageFor: (name: string) => string;
   /** True when the first form shows something typed, a hand-edited message or (obituary) chosen contacts. */
   hasDraftContent: boolean;
 }
@@ -109,6 +114,7 @@ const initialState: SendFlowState = {
   flowerDeliveryTarget: 'service',
   tone: 'plain',
   messageOverride: null,
+  greeting: true,
   sendJob: null,
 };
 
@@ -340,6 +346,11 @@ export function useSendFlow(
       ? state.messageOverride
       : composeMessage(selectedTemplate, composedFields);
 
+  const messageFor = useCallback(
+    (name: string) => (state.greeting ? withGreeting(firstName(name), composedMessage) : composedMessage),
+    [state.greeting, composedMessage],
+  );
+
   // A moment already under way comes back as it was, not blank. It stays on the picker step, so
   // the picker's own nextStep lands on the moment's first form with everything typed still there.
   const startedState = useCallback((category: TemplateCategory, templateOverrideId: string | null): SendFlowState => {
@@ -405,6 +416,10 @@ export function useSendFlow(
 
   const setMessageOverride = useCallback((value: string | null) => {
     setState((s) => ({ ...s, messageOverride: value }));
+  }, []);
+
+  const setGreeting = useCallback((value: boolean) => {
+    setState((s) => ({ ...s, greeting: value }));
   }, []);
 
   const startSendJob = useCallback(() => {
@@ -491,6 +506,7 @@ export function useSendFlow(
     session,
     composedFields,
     composedMessage,
+    messageFor,
     setTemplateCategory,
     setTemplate,
     setField,
@@ -501,6 +517,7 @@ export function useSendFlow(
     setFlowerDeliveryTarget,
     setTone,
     setMessageOverride,
+    setGreeting,
     startSendJob,
     markActiveSent,
     markActiveSkipped,
