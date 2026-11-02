@@ -60,8 +60,7 @@ export function ConfirmScreen({ flow, contacts }: Props) {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Review
-          // Send's reason line is the "choose who" slot; a missing required detail reuses it with its own words.
-          copy={detailsMissing ? { ...copy, noRecipients: copy.detailsHint } : copy}
+          copy={copy}
           kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}
           intro={fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
           message={composedMessage}
@@ -71,7 +70,8 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           tone={flow.tone}
           onToneChange={flow.setTone}
           sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
-          hasRecipients={recipientCount > 0 && !detailsMissing}
+          hasRecipients={recipientCount > 0}
+          blockedReason={detailsMissing ? copy.detailsHint : undefined}
           onBack={prevStep}
           onSend={startSendJob}
           onWhatYoullNeed={() => setChecklistOpen(true)}
@@ -95,7 +95,9 @@ export function ConfirmScreen({ flow, contacts }: Props) {
               accessibilityElementsHidden
             />
           </Pressable>
-          {showDetails && <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} />}
+          {showDetails && (
+            <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} />
+          )}
           {preview !== '' && <Text style={styles.sample}>{preview}</Text>}
           {isService && (
             <>

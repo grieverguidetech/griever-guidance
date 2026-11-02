@@ -10,6 +10,12 @@ const fields = [
 ];
 
 describe('DetailsRow', () => {
+  it('chains the keyboard: next on all but the last input, done on the last', () => {
+    render(<DetailsRow copy={copy} fields={fields} values={{}} onChange={() => undefined} />);
+    expect(screen.getByLabelText('Service date, Needed').props.returnKeyType).toBe('next');
+    expect(screen.getByLabelText('Notes').props.returnKeyType).toBe('done');
+  });
+
   it('names each input by its visible label, at least 44 high, and reports typing', () => {
     const onChange = jest.fn();
     render(<DetailsRow copy={copy} fields={fields} values={{ a: 'June 1' }} onChange={onChange} />);
@@ -18,12 +24,15 @@ describe('DetailsRow', () => {
     expect(StyleSheet.flatten(input.props.style).minHeight).toBeGreaterThanOrEqual(44);
     fireEvent.changeText(input, 'June 2');
     expect(onChange).toHaveBeenCalledWith('a', 'June 2');
-    expect(screen.getByText('Notes')).toBeTruthy();
+    expect(screen.getByText('Notes', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText('Notes')).toBeNull();
   });
 
   it('marks only empty required fields', () => {
     render(<DetailsRow copy={copy} fields={fields} values={{}} onChange={() => undefined} />);
-    expect(screen.getAllByText('Needed')).toHaveLength(1);
+    expect(screen.getAllByText('Needed', { includeHiddenElements: true })).toHaveLength(1);
+    expect(screen.getByLabelText('Service date, Needed')).toBeTruthy();
+    expect(screen.getByLabelText('Notes')).toBeTruthy();
     expect(isMissing(fields[0], {})).toBe(true);
     expect(isMissing(fields[0], { a: '  ' })).toBe(true);
     expect(isMissing(fields[1], {})).toBe(false);
