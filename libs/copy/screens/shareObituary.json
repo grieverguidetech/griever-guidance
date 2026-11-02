@@ -24,5 +24,5 @@
   "emailButton": "Email it to the paper or funeral home",
   "emailSubject": "Obituary for {name}",
   "emailFailed": "We couldn't open email or sharing on this phone. You can copy the text from the web and send it from there.",
-  "emailNoText": "The obituary hasn't been written yet. You can write it on the web, then come back here. Nothing is blocked."
+  "emailNoText": "The obituary hasn't been written yet. You can write it on the web, then come back here."
 }
