@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import type { Text as NativeText } from 'react-native';
 import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SerifText as Text, Button, LiveLine } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
@@ -40,7 +41,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
   const [blocked, setBlocked] = useState(false);
   // Counts each time the refusal is shown, so the line is read and Open Settings takes focus every time.
   const [blockedShown, setBlockedShown] = useState(0);
-  const settingsButton = useRef<ButtonNode>(null);
+  const blockedLine = useRef<ComponentRef<typeof NativeText>>(null);
   const importButton = useRef<ButtonNode>(null);
   // At least one person came in from the phone's contacts.
   const [imported, setImported] = useState(false);
@@ -58,7 +59,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
     announce(message);
   };
 
-  const focusButton = (node: ButtonNode | null) => {
+  const focusButton = (node: ButtonNode | ComponentRef<typeof NativeText> | null) => {
     const handle = node ? findNodeHandle(node) : null;
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
@@ -66,8 +67,9 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
   };
   useEffect(() => {
     if (blockedShown > 0) {
-      announce(copy.blockedLine);
-      focusButton(settingsButton.current);
+      // Focus on the line itself, so it is read in full (focus on the button would cut it off on iOS).
+      // Open Settings is the next swipe.
+      focusButton(blockedLine.current);
     }
   }, [blockedShown]);
   // Back from Settings: if contacts can be read (or asked about) now, drop the line and go to the import button.
@@ -333,11 +335,9 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
       <View style={styles.gap}>
         {blocked ? (
           <>
-            <View accessibilityLiveRegion="polite">
-              <Text style={styles.status}>{copy.blockedLine}</Text>
-            </View>
+            <Text ref={blockedLine} style={styles.status}>{copy.blockedLine}</Text>
             <View style={styles.gap}>
-              <Button label={copy.openSettings} buttonRef={settingsButton} onPress={() => void Linking.openSettings()} />
+              <Button label={copy.openSettings} onPress={() => void Linking.openSettings()} />
             </View>
           </>
         ) : null}

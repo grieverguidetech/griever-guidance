@@ -39,6 +39,8 @@
     "notSentYet",
     "everyoneYouToldName",
     "notSentYetName",
+    "everyoneYouToldSelectAll",
+    "notSentYetSelectAll",
     "blockedLine",
     "openSettings",
     "bringAcrossBusy",
@@ -156,6 +158,12 @@
     "chosen": {
       "type": "string",
       "pattern": "\\{count\\}"
+    },
+    "everyoneYouToldSelectAll": {
+      "$ref": "#/$defs/text"
+    },
+    "notSentYetSelectAll": {
+      "$ref": "#/$defs/text"
     },
     "blockedLine": {
       "$ref": "#/$defs/text"

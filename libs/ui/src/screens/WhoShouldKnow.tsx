@@ -142,6 +142,11 @@ export interface WhoShouldKnowProps {
    * flat (not grouped). Leave unset on web.
    */
   scrollList?: boolean;
+  /**
+   * Mobile: Add another person ignores a second press while it saves, shows "Saving…", and says so calmly
+   * if the save fails (what was typed stays). Leave unset on web, where Add works as it always did.
+   */
+  guardedAdd?: boolean;
 }
 
 /**
@@ -171,6 +176,7 @@ export function WhoShouldKnow({
   allowNone = false,
   toldIds,
   scrollList = false,
+  guardedAdd = false,
 }: WhoShouldKnowProps) {
   const [query, setQuery] = useState('');
   const needle = search ? query.trim().toLowerCase() : '';
@@ -196,11 +202,13 @@ export function WhoShouldKnow({
   const reasonId = useId();
   const noteId = useId();
   const settingsRef = useRef<ButtonNode>(null);
+  const blockedLineRef = useRef<ComponentRef<typeof Text>>(null);
   const isBlocked = Boolean(bringAcross?.blocked);
-  // The calm line appears with Open Settings: put the screen reader there.
+  // The calm line appears with Open Settings: put the screen reader on the line, so it is read in full.
+  // Open Settings is the next swipe. (Focusing the button would cut the line off on iOS.)
   useEffect(() => {
     if (isBlocked) {
-      focusNode(settingsRef.current);
+      focusNode(blockedLineRef.current);
     }
   }, [isBlocked]);
   const told = new Set(toldIds ?? []);
@@ -286,7 +294,9 @@ export function WhoShouldKnow({
     <View style={styles.bringAcross}>
       {bringAcross.blocked ? (
         <>
-          <LiveLine label={copy.blockedLine} />
+          <Body tone="muted" textRef={blockedLineRef}>
+            {copy.blockedLine}
+          </Body>
           <Button
             label={copy.openSettings}
             variant="secondary"
@@ -311,7 +321,7 @@ export function WhoShouldKnow({
     </View>
   ) : null;
   const addByHand = (
-    <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} />
+    <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} guarded={guardedAdd} />
   );
   const bottom = (
     <>
@@ -325,10 +335,14 @@ export function WhoShouldKnow({
           {copy.noneYet}
         </Body>
       ) : null}
-      <View style={styles.footerRow}>
-        <View style={styles.countBox}>
+      <View style={[styles.footerRow, scrollList && styles.footerRowWrap]}>
+        {scrollList ? (
+          <View style={styles.countBox}>
+            <SelectedCount label={selectedLabel} />
+          </View>
+        ) : (
           <SelectedCount label={selectedLabel} />
-        </View>
+        )}
         <Button
           label={copy.continue}
           ariaDisabled={noneChosen}
@@ -352,10 +366,9 @@ export function WhoShouldKnow({
           style={styles.fill}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          role="list"
           data={shown}
           keyExtractor={(person) => person.id}
-          renderItem={({ item }) => <View role="listitem">{row(item)}</View>}
+          renderItem={({ item }) => row(item)}
           ItemSeparatorComponent={RowGap}
           ListHeaderComponent={
             <View style={[styles.screen, styles.listEdge]}>
@@ -432,7 +445,8 @@ function AddByHand({
   copy,
   toE164,
   onAddPerson,
-}: Pick<WhoShouldKnowProps, 'copy' | 'toE164' | 'onAddPerson'>) {
+  guarded,
+}: Pick<WhoShouldKnowProps, 'copy' | 'toE164' | 'onAddPerson'> & { guarded: boolean }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -470,6 +484,12 @@ function AddByHand({
     const e164 = toE164(phone);
     if (!e164) {
       setError(copy.badNumber);
+      return;
+    }
+    if (!guarded) {
+      // Web: as it always was.
+      await onAddPerson({ name: name.trim(), phone: e164 });
+      close();
       return;
     }
     inFlight.current = true;
@@ -521,7 +541,7 @@ function AddByHand({
       <View style={styles.formButtons}>
         <Button
           label={copy.add}
-          busy={saving}
+          busy={guarded && saving}
           busyLabel={copy.saving}
           ariaDisabled={empty}
           announceDisabled
@@ -725,12 +745,12 @@ const styles = StyleSheet.create({
   bringAcross: { gap: spacing[1] },
   footerRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: spacing[2],
     paddingTop: spacing[1],
   },
+  // Mobile list only: a long count wraps above Continue instead of squeezing it.
+  footerRowWrap: { flexWrap: 'wrap', gap: spacing[2] },
   countBox: { flexShrink: 1 },
   field: { gap: spacing[1] },
   input: {

@@ -288,51 +288,51 @@ describe('ContactSelectorScreen shortcuts', () => {
 
   it('Everyone you told ticks the saved announcement recipients on the service picker', () => {
     const { selectContacts } = renderScreen(saved, 'service', [], { announcement: ['2', '4'] });
-    fireEvent.press(screen.getByRole('button', { name: copy.everyoneYouToldName }));
+    fireEvent.press(screen.getByRole('button', { name: copy.everyoneYouToldSelectAll }));
     expect(selectContacts).toHaveBeenCalledWith(['2', '4']);
-    expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.notSentYetSelectAll })).toBeNull();
   });
 
   it('ignores a deleted contact', () => {
     const { selectContacts } = renderScreen(saved, 'obituary', [], { announcement: ['2', '99'] });
-    fireEvent.press(screen.getByRole('button', { name: copy.everyoneYouToldName }));
+    fireEvent.press(screen.getByRole('button', { name: copy.everyoneYouToldSelectAll }));
     expect(selectContacts).toHaveBeenCalledWith(['2']);
   });
 
   it('gives the announcement picker Not sent yet only, never Everyone you told', () => {
     const { selectContacts } = renderScreen(saved, 'announcement', [], { announcement: ['2'] });
-    expect(screen.queryByRole('button', { name: copy.everyoneYouToldName })).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: copy.notSentYetName }));
+    expect(screen.queryByRole('button', { name: copy.everyoneYouToldSelectAll })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: copy.notSentYetSelectAll }));
     expect(selectContacts).toHaveBeenCalledWith(['1', '3', '4']);
   });
 
   it('shows no shortcut on the announcement picker before anyone was told', () => {
     renderScreen(saved, 'announcement', [], {});
-    expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.notSentYetSelectAll })).toBeNull();
   });
 
   it('starts each shortcut name with its visible label', () => {
     renderScreen(saved, 'service', [], { announcement: ['2'], service: ['2'] });
-    expect(copy.everyoneYouToldName.startsWith(copy.everyoneYouTold)).toBe(true);
-    expect(copy.notSentYetName.startsWith(copy.notSentYet)).toBe(true);
-    expect(screen.getByRole('button', { name: copy.everyoneYouToldName })).toBeTruthy();
-    expect(screen.getByRole('button', { name: copy.notSentYetName })).toBeTruthy();
+    expect(copy.everyoneYouToldSelectAll.startsWith(copy.everyoneYouTold)).toBe(true);
+    expect(copy.notSentYetSelectAll.startsWith(copy.notSentYet)).toBe(true);
+    expect(screen.getByRole('button', { name: copy.everyoneYouToldSelectAll })).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.notSentYetSelectAll })).toBeTruthy();
   });
 
   it('shows no Everyone you told when the announcement list is empty', () => {
     renderScreen(saved, 'aftercare', [], {});
-    expect(screen.queryByRole('button', { name: copy.everyoneYouToldName })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.everyoneYouToldSelectAll })).toBeNull();
   });
 
   it('Not sent yet ticks the saved contacts this moment has not reached', () => {
     const { selectContacts } = renderScreen(saved, 'service', [], { announcement: ['2'], service: ['2', '4'] });
-    fireEvent.press(screen.getByRole('button', { name: copy.notSentYetName }));
+    fireEvent.press(screen.getByRole('button', { name: copy.notSentYetSelectAll }));
     expect(selectContacts).toHaveBeenCalledWith(['1', '3']);
   });
 
   it('shows no Not sent yet when this moment has reached every saved contact', () => {
     renderScreen(saved, 'service', [], { announcement: ['2'], service: ['1', '2', '3', '4'] });
-    expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.notSentYetSelectAll })).toBeNull();
   });
 });
 
@@ -352,7 +352,7 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     expect(openSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('refused for good: announces the line and moves focus to Open Settings', async () => {
+  it('refused for good: moves focus to the line itself, not Open Settings, and does not announce it separately', async () => {
     mockFetch.mockRejectedValue(new Cancelled('blocked'));
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
@@ -360,12 +360,13 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     focus.mockClear();
     openImport();
     await screen.findByText(copy.blockedLine);
-    expect(announce).toHaveBeenCalledWith(copy.blockedLine);
+    // The line is read by the focus move. A separate announcement would be cut off by it on iOS.
+    expect(announce).not.toHaveBeenCalledWith(copy.blockedLine);
     expect(focus).toHaveBeenCalledTimes(1);
-    // Focus went to the Open Settings button itself.
-    const target = focus.mock.calls[0]?.[0] as unknown as { props: { role: string; children: unknown } };
-    expect(target.props.role).toBe('button');
-    expect(textOf(target.props.children)).toBe(copy.openSettings);
+    // Focus went to the line (a text), and Open Settings is the next swipe.
+    const target = focus.mock.calls[0]?.[0] as unknown as { props: { role?: string; children: unknown } };
+    expect(target.props.role).not.toBe('button');
+    expect(textOf(target.props.children)).toBe(copy.blockedLine);
   });
 
   it('pressing the import button again after a refusal asks again and goes on if allowed', async () => {

@@ -330,7 +330,7 @@ describe('ContactsStepScreen contacts never fail silently (#652)', () => {
     expect(openSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('refused for good: announces the line and moves focus to Open Settings', async () => {
+  it('refused for good: moves focus to the line itself, not Open Settings, and does not announce it separately', async () => {
     mockFetch.mockRejectedValue(new Cancelled('blocked'));
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
@@ -338,12 +338,13 @@ describe('ContactsStepScreen contacts never fail silently (#652)', () => {
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
     await screen.findByText(copy.blockedLine);
-    expect(announce).toHaveBeenCalledWith(copy.blockedLine);
+    // The line is read by the focus move. A separate announcement would be cut off by it on iOS.
+    expect(announce).not.toHaveBeenCalledWith(copy.blockedLine);
     expect(focus).toHaveBeenCalledTimes(1);
-    // Focus went to the Open Settings button itself.
-    const target = focus.mock.calls[0]?.[0] as unknown as { props: { role: string; children: unknown } };
-    expect(target.props.role).toBe('button');
-    expect(textOf(target.props.children)).toBe(copy.openSettings);
+    // Focus went to the line (a text), and Open Settings is the next swipe.
+    const target = focus.mock.calls[0]?.[0] as unknown as { props: { role?: string; children: unknown } };
+    expect(target.props.role).not.toBe('button');
+    expect(textOf(target.props.children)).toBe(copy.blockedLine);
   });
 
   it('pressing the import button again after a refusal asks again and goes on if allowed', async () => {

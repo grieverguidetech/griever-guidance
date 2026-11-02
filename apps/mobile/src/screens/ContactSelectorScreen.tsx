@@ -229,6 +229,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         grouped={false}
         search
         scrollList
+        guardedAdd
         toldIds={toldIds}
         shortcuts={shortcuts}
         selectedIds={selectedContactIds}
@@ -279,14 +280,14 @@ function buildShortcuts(
   const list: { label: string; accessibilityName: string; onPress: () => void }[] = [];
   // The announcement is what "told" means, so it has no such shortcut of its own.
   if (category !== 'announcement' && told.length > 0) {
-    list.push({ label: copy.everyoneYouTold, accessibilityName: copy.everyoneYouToldName, onPress: () => select(told) });
+    list.push({ label: copy.everyoneYouTold, accessibilityName: copy.everyoneYouToldSelectAll, onPress: () => select(told) });
   }
   const notSent = savedIds.filter((id) => !thisMoment.has(id));
   const reached = savedIds.some((id) => thisMoment.has(id));
   if (reached && notSent.length > 0) {
     list.push({
       label: copy.notSentYet,
-      accessibilityName: copy.notSentYetName,
+      accessibilityName: copy.notSentYetSelectAll,
       onPress: () => select(notSent),
     });
   }

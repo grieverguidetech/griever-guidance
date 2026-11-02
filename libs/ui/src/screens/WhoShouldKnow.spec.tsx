@@ -319,13 +319,13 @@ describe('WhoShouldKnow', () => {
       expect(screen.queryByText('No one saved yet. Add someone below.')).toBeNull();
     });
 
-    it('shows the blocked line and Open Settings, keeps the import button, and focuses Open Settings', async () => {
+    it('shows the blocked line and Open Settings, and keeps the import button', async () => {
       const user = userEvent.setup();
       const onOpenSettings = vi.fn();
       const onPress = vi.fn();
       setup({ grouped: false, bringAcross: { onPress, blocked: { onOpenSettings } } });
       expect(screen.getByText(copy.blockedLine)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Open Settings' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Open Settings' })).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Open Settings' }));
       expect(onOpenSettings).toHaveBeenCalledTimes(1);
       await user.click(screen.getByRole('button', { name: 'Add from your contacts' }));
@@ -337,23 +337,37 @@ describe('WhoShouldKnow', () => {
       expect(screen.queryByRole('button', { name: 'Open Settings' })).toBeNull();
     });
 
-    it('reads "Reading your contacts…" with a busy state while the import runs, and does not press again', async () => {
+    it('on web a busy import button looks and reads as it always did: same name, no aria-busy, no spinner, no second press', async () => {
       const user = userEvent.setup();
       const onPress = vi.fn();
       setup({ grouped: false, bringAcross: { onPress, busy: true } });
-      const button = screen.getByRole('button', { name: 'Reading your contacts…' });
+      const button = screen.getByRole('button', { name: 'Add from your contacts' });
+      expect(button).not.toHaveAttribute('aria-busy');
+      expect(screen.queryByText('Reading your contacts…')).toBeNull();
+      expect(screen.queryByRole('progressbar')).toBeNull();
       await user.click(button);
       expect(onPress).not.toHaveBeenCalled();
     });
 
-    it('marks a busy button aria-busy on web', () => {
-      setup({ grouped: false, bringAcross: { onPress: vi.fn(), busy: true } });
-      expect(screen.getByRole('button', { name: 'Reading your contacts…' })).toHaveAttribute('aria-busy', 'true');
+    it('with scrollList, the rows are not wrapped in a list (the header and footer controls sit in the same scroller)', () => {
+      setup({ grouped: false, scrollList: true });
+      expect(screen.queryByRole('list')).toBeNull();
+      expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+      expect(screen.getAllByRole('checkbox')).toHaveLength(3);
     });
 
-    it('with scrollList, the rows keep list and listitem roles', () => {
-      setup({ grouped: false, scrollList: true });
+    it('without scrollList (web), the rows keep their list and listitem roles', () => {
+      setup({ grouped: false });
       expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(3);
+    });
+
+    it('web keeps its own picker: no shortcuts, no search, no Sent tag, no Open Settings, no loading line', () => {
+      setup({ grouped: false });
+      expect(screen.queryByText('Sent')).toBeNull();
+      expect(screen.queryByText('Getting your people…')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Open Settings' })).toBeNull();
+      expect(screen.queryByRole('searchbox')).toBeNull();
+      expect(screen.queryByRole('button', { name: /everyone you told|not sent yet/i })).toBeNull();
     });
 
     it('with scrollList, the count and Continue sit outside the list', () => {
@@ -376,7 +390,7 @@ describe('WhoShouldKnow', () => {
       const onAddPerson = vi.fn(async () => {
         throw new Error('disk');
       });
-      setup({ grouped: false, onAddPerson });
+      setup({ grouped: false, onAddPerson, guardedAdd: true });
       await fill(user);
       await user.click(screen.getByRole('button', { name: 'Add' }));
       expect(await screen.findByRole('alert')).toHaveTextContent('We could not save that. Please try again.');
@@ -384,15 +398,15 @@ describe('WhoShouldKnow', () => {
       expect(screen.getByLabelText('Mobile number')).toHaveValue('6175550148');
     });
 
-    it('saves once on a double press and reads as saving meanwhile', async () => {
+    it('saves once on a double press', async () => {
       const user = userEvent.setup();
       let finish: () => void = () => undefined;
       const onAddPerson = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
-      setup({ grouped: false, onAddPerson });
+      setup({ grouped: false, onAddPerson, guardedAdd: true });
       await fill(user);
       const add = screen.getByRole('button', { name: 'Add' });
       await user.click(add);
-      await user.click(screen.getByRole('button', { name: 'Saving…' }));
+      await user.click(add);
       expect(onAddPerson).toHaveBeenCalledTimes(1);
       finish();
       await screen.findByRole('button', { name: 'Add another person' });

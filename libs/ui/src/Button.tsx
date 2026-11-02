@@ -44,7 +44,8 @@ export interface ButtonProps {
   busy?: boolean;
   /**
    * While `busy`, the words shown instead of the label, for example "Reading your contacts…". They are
-   * announced once when the work starts (iOS). A busy button always shows a small spinner too.
+   * announced once when the work starts (iOS). A busy button shows a small spinner too. Native only: on web
+   * a busy button looks and reads as it always did.
    */
   busyLabel?: string;
   /**
@@ -87,6 +88,8 @@ export function Button({
     [ariaDisabled, buttonRef],
   );
 
+  // The busy look (spinner, busy words, aria-busy) is native only: web buttons stay as they were (#659).
+  const showBusy = Boolean(busy) && Platform.OS !== 'web';
   const extra: Record<string, unknown> = {};
   if (describedBy) {
     extra['aria-describedby'] = describedBy;
@@ -98,7 +101,7 @@ export function Button({
   if (pressed !== undefined) {
     extra['aria-pressed'] = pressed;
   }
-  if (busy) {
+  if (showBusy) {
     extra['aria-busy'] = true;
   }
   if (opensDialog) {
@@ -107,7 +110,7 @@ export function Button({
 
   const font = useSerifStyle('semibold');
   // Said once when the work starts. On native, a state change alone is not spoken.
-  const working = Boolean(busy);
+  const working = showBusy;
   useEffect(() => {
     // Only with busyLabel: a screen that already announces its own busy text is left alone.
     // iOS only, like the other announcements here (iOS ignores the busy state change).
