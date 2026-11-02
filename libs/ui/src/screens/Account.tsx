@@ -85,6 +85,13 @@ export function Account({
   // A ref, not state: two fast taps can both run before a re-render shows `primaryBusy`.
   const inFlight = useRef(false);
   const submit = () => {
+    // Web keeps its original behaviour exactly; the ref guard is for the phone apps.
+    if (Platform.OS === 'web') {
+      if (!primaryBusy) {
+        onPrimary();
+      }
+      return;
+    }
     if (primaryBusy || inFlight.current) {
       return;
     }
@@ -92,7 +99,13 @@ export function Account({
     const release = () => {
       inFlight.current = false;
     };
-    const result = onPrimary();
+    let result: void | Promise<void>;
+    try {
+      result = onPrimary();
+    } catch (error) {
+      release();
+      throw error;
+    }
     if (result && typeof result.then === 'function') {
       // Held until the save settles. A handler that returns nothing finishes at once.
       void result.then(release, release);

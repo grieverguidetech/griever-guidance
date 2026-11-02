@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe('deviceCache persisting state', () => {
   it('is persisting after a clean hydrate and a good write', async () => {
-    const cache = createDeviceCache([{ key: 'k', json: false }]);
+    const cache = createDeviceCache([{ key: 'k', json: false }], { reportsPersisting: true });
     await cache.hydrate();
     cache.setItem('k', 'v');
     await Promise.resolve();
@@ -24,7 +24,7 @@ describe('deviceCache persisting state', () => {
   it('is not persisting when a read fails, and writes stay in memory only', async () => {
     jest.spyOn(AsyncStorage, 'getItem').mockRejectedValue(new Error('unreadable'));
     const setItem = jest.spyOn(AsyncStorage, 'setItem');
-    const cache = createDeviceCache([{ key: 'k', json: false }]);
+    const cache = createDeviceCache([{ key: 'k', json: false }], { reportsPersisting: true });
     const heard = jest.fn();
     subscribePersisting(heard);
     await cache.hydrate();
@@ -37,13 +37,13 @@ describe('deviceCache persisting state', () => {
 
   it('is not persisting when saved JSON does not parse', async () => {
     await AsyncStorage.setItem('k', '{broken');
-    const cache = createDeviceCache([{ key: 'k', json: true }]);
+    const cache = createDeviceCache([{ key: 'k', json: true }], { reportsPersisting: true });
     await cache.hydrate();
     expect(isPersisting()).toBe(false);
   });
 
   it('is not persisting after a write fails, and recovers after a good write', async () => {
-    const cache = createDeviceCache([{ key: 'k', json: false }]);
+    const cache = createDeviceCache([{ key: 'k', json: false }], { reportsPersisting: true });
     await cache.hydrate();
     jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
     cache.setItem('k', 'one');

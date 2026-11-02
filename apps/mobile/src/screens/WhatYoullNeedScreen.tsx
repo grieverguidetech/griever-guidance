@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { SerifText as Text, Button } from '@griever/ui';
@@ -7,7 +7,6 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/App';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
-import { reportPersisting, usePersisting } from '../lib/deviceCache';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
 
 const checklistCopy = screenCopy('cmsChecklist');
@@ -49,27 +48,40 @@ export function ChecklistRows({ tipOpen, onTipChange }: { tipOpen: string | null
     };
   }, []);
 
+  // Local: a failed tick is shown here only. The global store is for device caches.
+  const [saveFailed, setSaveFailed] = useState(false);
+  // The latest ticks and failure flag in refs, so the write and the announce happen once per tap
+  // (outside a state updater, which React may run twice).
+  const latest = useRef<string[]>([]);
+  const failedRef = useRef(false);
+  latest.current = ticked;
   const toggle = (id: string) => {
-    // Computed from the latest ticks, so two quick taps both count.
     onTipChange(null);
-    setTicked((prev) => {
-      const next = prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id];
-      AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).then(
-        () => reportPersisting('checklist', true),
-        () => reportPersisting('checklist', false),
-      );
-      return next;
-    });
+    const prev = latest.current;
+    const next = prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id];
+    latest.current = next; // a second quick tap builds on this one
+    setTicked(next);
+    AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).then(
+      () => {
+        failedRef.current = false;
+        setSaveFailed(false);
+      },
+      () => {
+        if (!failedRef.current) {
+          AccessibilityInfo.announceForAccessibility(NOT_SAVED_NOTE_TEXT);
+        }
+        failedRef.current = true;
+        setSaveFailed(true);
+      },
+    );
   };
 
-  const persisting = usePersisting();
   return (
     <>
-      {!persisting ? (
-        <Text style={styles.saveFailed} accessibilityLiveRegion="polite">
-          {NOT_SAVED_NOTE_TEXT}
-        </Text>
-      ) : null}
+      {/* Always mounted so Android reads the line when it appears; iOS gets the announce above. */}
+      <View accessibilityLiveRegion="polite">
+        {saveFailed ? <Text style={styles.saveFailed}>{NOT_SAVED_NOTE_TEXT}</Text> : null}
+      </View>
       {loaded && CHECKLIST.map((item) => {
         const checked = ticked.includes(item.id);
         return (

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SendFlowStorage } from '@griever/hooks';
 
@@ -9,8 +10,12 @@ export type CacheKey = { key: string; json: boolean };
 
 export const HYDRATE_TIMEOUT_MS = 3000;
 
-// Whether this phone is keeping what we write. Each writer (a cache, the checklist) reports in; the
-// phone is "not saving" while any writer is failing. A later good write clears that writer.
+/** Shown (and announced) when the phone is not keeping saves. Honest, and says what to do. */
+export const NOT_SAVED_NOTE_TEXT = 'This phone could not save just now. Keep this screen open.';
+
+// Whether this phone is keeping the user's saved work. Only a cache made with `reportsPersisting`
+// (the session cache) reports in; the phone is "not saving" while it is failing. A later good write
+// clears it. Other writers keep their own local state (the checklist does).
 const failing = new Set<string>();
 const listeners = new Set<() => void>();
 
@@ -20,15 +25,20 @@ export function reportPersisting(source: string, ok: boolean): void {
   if (ok === !wasFailing) {
     return;
   }
+  const wasPersisting = failing.size === 0;
   if (ok) {
     failing.delete(source);
   } else {
     failing.add(source);
   }
+  // Once, here, when saving changes from working to failing: not once per mounted SavedNote.
+  if (wasPersisting && failing.size > 0) {
+    AccessibilityInfo.announceForAccessibility(NOT_SAVED_NOTE_TEXT);
+  }
   listeners.forEach((listener) => listener());
 }
 
-/** True unless a save has failed or a cache is memory-only. */
+/** False while the session cache (the only reporting cache) has a failed save or is memory-only. */
 export function isPersisting(): boolean {
   return failing.size === 0;
 }
@@ -64,13 +74,19 @@ let nextCacheId = 0;
  * bad key means the keys no longer agree): nothing saved on the phone is overwritten, so a later
  * launch can still read it.
  */
-export function createDeviceCache(keys: CacheKey[]): DeviceCache {
+export function createDeviceCache(keys: CacheKey[], options: { reportsPersisting?: boolean } = {}): DeviceCache {
+  const reports = options.reportsPersisting === true;
   const memory = new Map<string, string>();
   const memoryOnly = new Set<string>();
   const source = `deviceCache:${nextCacheId++}`;
+  const report = (ok: boolean) => {
+    if (reports) {
+      reportPersisting(source, ok);
+    }
+  };
   const markMemoryOnly = (key: string) => {
     memoryOnly.add(key);
-    reportPersisting(source, false);
+    report(false);
   };
   return {
     async hydrate() {
@@ -108,8 +124,8 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
         return;
       }
       AsyncStorage.setItem(key, value).then(
-        () => reportPersisting(source, true),
-        () => reportPersisting(source, false),
+        () => report(true),
+        () => report(false),
       );
     },
     removeItem(key) {
@@ -118,8 +134,8 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
         return;
       }
       AsyncStorage.removeItem(key).then(
-        () => reportPersisting(source, true),
-        () => reportPersisting(source, false),
+        () => report(true),
+        () => report(false),
       );
     },
   };

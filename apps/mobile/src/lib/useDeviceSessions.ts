@@ -8,10 +8,13 @@ export const SESSIONS_KEY = 'gg.sessions.v1';
 export const ACTIVE_KEY = 'gg.activeSession.v1';
 
 export const createSessionCache = () =>
-  createDeviceCache([
-    { key: SESSIONS_KEY, json: true },
-    { key: ACTIVE_KEY, json: false },
-  ]);
+  createDeviceCache(
+    [
+      { key: SESSIONS_KEY, json: true },
+      { key: ACTIVE_KEY, json: false },
+    ],
+    { reportsPersisting: true },
+  );
 
 // Nothing typed, nothing chosen: a person who has not been filled in yet.
 export const isBlank = (s: Session) => !s.personName.trim() && Object.keys(s.drafts).length === 0;

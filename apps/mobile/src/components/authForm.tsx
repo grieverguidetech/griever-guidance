@@ -121,9 +121,9 @@ export function Field({
 }
 
 /**
- * Shows the message with the alert role (read when it appears on Android and web) and announces it
- * on iOS, which does not read the role on its own. No live region wraps it: a polite region around
- * an alert would be two mechanisms for one message.
+ * One mechanism per platform. Android: an assertive live region on the always-mounted box (React
+ * Native 0.88 maps the alert role to a role description only there, and `announce` is iOS-only).
+ * iOS: `announce`. Web: the alert role on the message (web has no live region).
  */
 export function ErrorText({ message }: { message: string | null }) {
   const font = useSerifStyle('regular');
@@ -133,7 +133,7 @@ export function ErrorText({ message }: { message: string | null }) {
     }
   }, [message]);
   return (
-    <View style={styles.errorBox}>
+    <View style={styles.errorBox} accessibilityLiveRegion={Platform.OS === 'android' ? 'assertive' : undefined}>
       {message ? (
         <Text accessibilityRole="alert" style={[styles.error, font]}>
           {message}

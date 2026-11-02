@@ -1,14 +1,17 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AccountAuth } from '@griever/shared';
 import { HomeScreen } from './HomeScreen';
 import { AccountScreen } from './AccountScreen';
 import { AccountStateProvider } from '../lib/AccountProvider';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
-import { resetPersisting } from '../lib/deviceCache';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 const mockGoBack = jest.fn();
 jest.mock('@griever/api-client', () => ({
@@ -194,16 +197,24 @@ describe('the list on Your account and the checklist screen share their ticks (#
     expect(row('Military discharge papers').props.accessibilityState).toEqual({ checked: true });
   });
 
-  it('says so, calmly, when the tick could not be saved', async () => {
-    resetPersisting();
+  it('says so, calmly, when the tick could not be saved, and clears after a good tick', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    announce.mockClear();
     jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
     render(<WhatYoullNeedScreen />);
     await screen.findAllByRole('checkbox');
     expect(screen.queryByText(NOT_SAVED_NOTE_TEXT)).toBeNull();
-    fireEvent.press(row('Life insurance policies'));
+    await act(async () => {
+      fireEvent.press(row('Life insurance policies'));
+    });
     expect(await screen.findByText(NOT_SAVED_NOTE_TEXT)).toBeTruthy();
     expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
-    jest.restoreAllMocks();
-    resetPersisting();
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith(NOT_SAVED_NOTE_TEXT);
+    expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' }).length).toBeGreaterThan(0);
+    await act(async () => {
+      fireEvent.press(row('Any will or written wishes'));
+    });
+    await waitFor(() => expect(screen.queryByText(NOT_SAVED_NOTE_TEXT)).toBeNull());
   });
 });

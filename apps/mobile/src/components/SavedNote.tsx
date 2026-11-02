@@ -1,13 +1,12 @@
 import { StyleSheet } from 'react-native';
 import { SerifText as Text } from '@griever/ui';
-import { usePersisting } from '../lib/deviceCache';
+import { NOT_SAVED_NOTE_TEXT, usePersisting } from '../lib/deviceCache';
 import { MUTED } from './colors';
 
 /** The one reassurance line (DS-3). Same words as web's SavedNote in apps/web/src/lib/ui.tsx. */
 export const SAVED_NOTE_TEXT = 'Everything is saved on this phone as you go. You can stop and come back.';
 
-/** Shown instead when the phone is not keeping saves (storage failed). Honest, and says what to do. */
-export const NOT_SAVED_NOTE_TEXT = 'This phone could not save just now. Keep this screen open.';
+export { NOT_SAVED_NOTE_TEXT };
 
 /** Plain text under a flow step's content: not a live region, so a screen reader reads it in order. */
 export function SavedNote() {

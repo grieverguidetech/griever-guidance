@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
@@ -327,6 +327,26 @@ describe('sign in', () => {
     });
   });
 
+  it.each([
+    ['android', 'assertive', 0],
+    ['ios', undefined, 1],
+  ] as const)('announces the error one way on %s', async (os, region, announced) => {
+    jest.replaceProperty(Platform, 'OS', os);
+    const announceSpy = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    announceSpy.mockClear();
+    mockSignIn.password.mockImplementation(fail('form_password_incorrect'));
+    renderSignIn();
+    type('Email', 'a@b.co');
+    type('Password', 'wrong');
+    press('Sign in');
+    await screen.findByRole('alert');
+    const regions = screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'assertive' }).filter((n) => typeof n.type === 'string');
+    expect(regions).toHaveLength(region ? 1 : 0);
+    const message = screen.getByRole('alert').props.children;
+    expect(announceSpy.mock.calls.filter(([text]) => text === message)).toHaveLength(announced);
+    jest.restoreAllMocks();
+  });
+
   it('uses the shared look: error in the app danger red, focus ring in the accent, serif heading', async () => {
     mockSignIn.password.mockImplementation(fail('form_password_incorrect'));
     renderSignIn();
@@ -337,7 +357,7 @@ describe('sign in', () => {
     press('Sign in');
     const alert = await screen.findByRole('alert');
     expect(StyleSheet.flatten(alert.props.style).color).toBe('#b91c1c');
-    // One live mechanism: the alert role, with no polite live region around or inside it.
+    // No polite live region around or inside the alert.
     expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' })).toHaveLength(0);
     expect(StyleSheet.flatten(screen.getByRole('heading', { name: 'Sign in' }).props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
   });
