@@ -25,5 +25,8 @@
   "importError": "We could not read your contacts. You can add people by hand instead.",
   "importIntro": "Choose only the ones you want — the rest stay where they are.",
   "importEmpty": "No new contacts with a mobile number found.",
-  "chosen": "{count} chosen"
+  "chosen": "{count} chosen",
+  "searchLabel": "Search by name",
+  "searchEmpty": "No one matches that name.",
+  "selectAllShown": "Select all shown"
 }

@@ -164,6 +164,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           copy={copy}
           people={contacts.contacts.map((c) => ({ id: c.contactId, name: c.name, phone: c.phone, tier: c.tier }))}
           grouped={false}
+          search
           selectedIds={selectedContactIds}
           selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
           loading={contacts.loading}

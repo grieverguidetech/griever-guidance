@@ -26,6 +26,9 @@ const copy: WhoShouldKnowCopy = {
   continue: 'Continue',
   empty: 'No one saved yet. Add someone below.',
   bringAcross: 'Add from your contacts',
+  searchLabel: 'Search by name',
+  searchEmpty: 'No one matches that name.',
+  selectAllShown: 'Select all shown',
 };
 
 const people = [
@@ -223,5 +226,48 @@ describe('WhoShouldKnow', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toHaveAccessibleDescription('Choose at least one person');
     await user.click(screen.getByRole('button', { name: 'Add another person' }));
     expect(screen.getByRole('button', { name: 'Add' })).toHaveAccessibleDescription('Enter a name and a mobile number');
+  });
+
+  it('wraps the rows in a list (web screen readers then say how many; native does not)', () => {
+    setup({ grouped: false });
+    expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  describe('search', () => {
+    it('is off by default: no field and no Select all on the single list', () => {
+      setup({ grouped: false });
+      expect(screen.queryByLabelText('Search by name')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Select all' })).toBeNull();
+    });
+
+    it('filters by name, ignoring case, and keeps ticks and the count', async () => {
+      const user = userEvent.setup();
+      setup({ grouped: false, search: true, selectedIds: ['a'] });
+      await user.type(screen.getByLabelText('Search by name'), 'BOB');
+      expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+      expect(screen.getByRole('checkbox', { name: /Bob Smith/ })).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('1 selected');
+      await user.clear(screen.getByLabelText('Search by name'));
+      expect(screen.getByRole('checkbox', { name: /Aunt Carol/ })).toBeChecked();
+    });
+
+    it('selects only the people shown', async () => {
+      const user = userEvent.setup();
+      const h = setup({ grouped: false, search: true });
+      await user.type(screen.getByLabelText('Search by name'), 'ca');
+      await user.click(screen.getByRole('button', { name: 'Select all shown' }));
+      expect(h.onSelectAll).toHaveBeenLastCalledWith(['a', 'c']);
+    });
+
+    it('shows a calm line when no one matches, and hides Select all', async () => {
+      const user = userEvent.setup();
+      setup({ grouped: false, search: true });
+      await user.type(screen.getByLabelText('Search by name'), 'zzz');
+      expect(screen.getByText('No one matches that name.')).toBeInTheDocument();
+      expect(screen.queryByRole('checkbox')).toBeNull();
+      expect(screen.queryByRole('list')).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Select all/ })).toBeNull();
+    });
   });
 });

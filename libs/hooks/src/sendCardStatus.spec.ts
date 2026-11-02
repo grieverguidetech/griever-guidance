@@ -49,6 +49,13 @@ describe('sendCardStatus', () => {
     expect(sendCardStatus(session({ obituaryUrl: 'https://example.com/o' }), 'obituary')).toBe('ready');
   });
 
+  it('obituary with written text and no link is waiting for the link, not needing a detail', () => {
+    expect(sendCardStatus(session({ obituaryText: 'Anna loved the garden.' }), 'obituary')).toBe('waitingForLink');
+    expect(sendCardStatus(session({ obituaryText: '   ' }), 'obituary')).toBe('needsDetail');
+    expect(sendCardStatus(session({ obituaryText: 'Text', obituaryUrl: 'https://example.com/o' }), 'obituary')).toBe('ready');
+    expect(sendCardStatus(session({ obituaryText: 'Text', recipientsNotified: { obituary: ['c1'] } }), 'obituary')).toBe('waitingForLink');
+  });
+
   it('obituary is not sent without a link, even if people were messaged', () => {
     expect(sendCardStatus(session({ recipientsNotified: { obituary: ['c1'] } }), 'obituary')).toBe('needsDetail');
     const withLink = session({ recipientsNotified: { obituary: ['c1', 'c2', 'c3'] }, obituaryUrl: 'https://example.com/o' });
