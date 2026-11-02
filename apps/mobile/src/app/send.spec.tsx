@@ -135,11 +135,19 @@ describe('picking an announcement', () => {
   it.each([['Share the service'], ['Send thank-yous']])(
     '%s opens Who should know? with a real header, and Back returns to the hub',
     async (moment) => {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
       await openAnna();
       await screen.findByText('One thing at a time.');
+      focus.mockClear();
       await startMoment(moment);
       expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
       expect(screen.queryByPlaceholderText('e.g. 2:00 PM')).toBeNull();
+      // Screen-reader focus went to the title itself, once.
+      const heading = screen.getByRole('heading', { name: 'Who should know?' });
+      const handle = focus.mock.calls.map(([h]) => h);
+      expect(handle.length).toBeGreaterThan(0);
+      expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();
+      expect(heading).toBeTruthy();
       fireEvent.press(screen.getByRole('button', { name: 'Back' }));
       expect(await screen.findByText('One thing at a time.')).toBeTruthy();
     },

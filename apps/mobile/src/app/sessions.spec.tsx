@@ -9,7 +9,7 @@ import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 // Service and thank-you open on Who should know?; their planned fields are kept in the saved draft.
 const findPicker = () => screen.findByRole('heading', { name: 'Who should know?' });
 async function savedAftercare(personName: string) {
-  const people = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { step: string; fields: Record<string, string> }> }[];
+  const people = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { step: string; fields: Record<string, string>; selectedContactIds: string[] }> }[];
   return people.find((p) => p.personName === personName)?.drafts?.['aftercare'];
 }
 
@@ -91,14 +91,17 @@ describe('people kept on the phone', () => {
     await openThankYous();
     await findPicker();
     fireEvent.press(await screen.findByText('Dee'));
-    await waitFor(async () => expect((await savedAftercare('Anna'))?.step).toBe('contacts'));
+    await waitFor(async () => expect((await savedAftercare('Anna'))?.selectedContactIds).toEqual(['c1']));
+    expect((await savedAftercare('Anna'))?.step).toBe('contacts');
     first.unmount();
 
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await openThankYous();
     await findPicker();
+    expect(await screen.findByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
     expect((await savedAftercare('Anna'))?.step).toBe('contacts');
+    expect((await savedAftercare('Anna'))?.selectedContactIds).toEqual(['c1']);
   });
 
   it('does not keep a finished send as a draft', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
@@ -93,5 +93,26 @@ describe('send flow starts from the planned details', () => {
     await toConfirm();
     expect(await screen.findByDisplayValue('')).toBeTruthy();
     expect(screen.queryByDisplayValue('2:00 PM')).toBeNull();
+  });
+
+  it('saves a service date typed on Confirm to the person', async () => {
+    await openService({ ...base } as Session);
+    await screen.findByRole('heading', { name: 'Who should know?' });
+    await toConfirm();
+    fireEvent.changeText(await screen.findByLabelText(/Service date/), 'July 3');
+    await waitFor(async () => {
+      const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { serviceDate?: string }[];
+      expect(saved?.serviceDate).toBe('July 3');
+    });
+  });
+
+  it('leaves the saved service date alone when nothing is changed on Confirm', async () => {
+    await openService({ ...base, serviceDate: 'June 14' } as Session);
+    await screen.findByRole('heading', { name: 'Who should know?' });
+    await toConfirm();
+    expect((await screen.findByLabelText('Service date')).props.value).toBe('June 14');
+    await new Promise((r) => setTimeout(r, 100));
+    const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { serviceDate?: string }[];
+    expect(saved?.serviceDate).toBe('June 14');
   });
 });

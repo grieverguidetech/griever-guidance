@@ -169,9 +169,9 @@ export function draftHasContent(
  * True when a moment has something to resume: the first form shows typed words or a hand-edited
  * message, or the draft has moved past that form. A draft only opened (nothing typed) is not started.
  */
-export function isDraftStarted(draft: SendFlowDraft | null | undefined): boolean {
+export function isDraftStarted(draft: SendFlowDraft | null | undefined, skipDetails = false): boolean {
   if (!hasDraftInProgress(draft) || !draft.templateCategory) return false;
-  const first = FIRST_STEP[draft.templateCategory] ?? 'details';
+  const first = FIRST_STEP[draft.templateCategory] ?? (skipDetails ? 'contacts' : 'details');
   return draftHasContent(draft) || (draft.step !== 'template' && draft.step !== first);
 }
 
@@ -499,8 +499,10 @@ export function useSendFlow(
         step: FIRST_STEP[category] ?? (skipDetails ? 'contacts' : 'details'),
         templateCategory: category,
         templateOverrideId: s.templateOverrideId,
-        // People chosen elsewhere (e.g. carried in by "Add service details") are not on this form,
-        // so they are not ours to drop. The obituary's first form is the contacts list itself.
+        // People chosen elsewhere (e.g. carried in by "Add service details") are not ours to drop.
+        // Only the obituary clears them: its first form is the contacts list. With skipDetails the
+        // service and thank-you first form is the list too, but its people are kept, so mobile's
+        // Start again leaves them ticked.
         selectedContactIds: category === 'obituary' ? [] : s.selectedContactIds,
       };
     });

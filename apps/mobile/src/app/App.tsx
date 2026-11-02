@@ -171,7 +171,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const seen = useRef<Details | null>(null);
   const { setField, selectedTemplate } = flow;
   useEffect(() => {
-    if (flow.step !== 'announce') {
+    if (flow.step !== 'announce' && flow.step !== 'review') {
       seen.current = null;
       return;
     }
@@ -192,7 +192,10 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // For every other moment the first form is Who should know? (the contacts step), so it counts as a form too.
   const onForm =
     flow.step === 'announce' ||
-    (flow.step === 'contacts' && flow.templateCategory !== 'announcement');
+    (flow.step === 'contacts' &&
+      (flow.templateCategory === 'obituary' ||
+        flow.templateCategory === 'service' ||
+        flow.templateCategory === 'aftercare'));
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
   const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;

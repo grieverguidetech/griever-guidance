@@ -379,3 +379,32 @@ describe('useSendFlow — skipDetails (mobile)', () => {
     expect(result.current.steps).toEqual(['template', 'announce', 'contacts', 'review', 'sending', 'sent']);
   });
 });
+
+describe('useSendFlow — skipDetails: start again and started drafts', () => {
+  it('startAgain reopens service on contacts with the typed words cleared and the people kept', () => {
+    const { result } = renderHook(() =>
+      useSendFlow({
+        session,
+        skipDetails: true,
+        draft: freshDraft({ templateCategory: 'service', step: 'review', fields: { serviceDate: 'June 14' }, selectedContactIds: ['c1'] }),
+      }),
+    );
+    act(() => result.current.startAgain());
+    expect(result.current).toMatchObject({ step: 'contacts', fields: {}, selectedContactIds: ['c1'] });
+  });
+
+  it('startAgain goes to details without the option', () => {
+    const { result } = renderHook(() =>
+      useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', step: 'review', fields: { serviceDate: 'x' } }) }),
+    );
+    act(() => result.current.startAgain());
+    expect(result.current.step).toBe('details');
+  });
+
+  it('isDraftStarted treats contacts as the first form with skipDetails', () => {
+    const onContacts = freshDraft({ templateCategory: 'service', step: 'contacts' });
+    expect(isDraftStarted(onContacts, true)).toBe(false);
+    expect(isDraftStarted(onContacts)).toBe(true);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'service', step: 'review' }), true)).toBe(true);
+  });
+});
