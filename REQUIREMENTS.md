@@ -36,7 +36,7 @@ These are not features; breaking one is a defect regardless of what it enables.
 
 | # | Constraint | Source |
 |---|---|---|
-| C1 | Messages are sent from the user's own phone via an `sms:` deep link, one contact at a time. Service and obituary may also use the OS share sheet and email compose (2026-11-01, #559, Decision 1). Each send is still the user's own action: no server send and no bulk text. `sms:` stays one contact at a time. Sending is mobile-only: the web has no send path. Transition (2026-10-30, #385): the old web send flow stays only in the flag-off build (`VITE_FEATURE_CMS` off) until a later round removes it. No backend SMS path, no bulk send, no business number. Account emails (confirmation, reset, invites) come from the backend. They never carry message content, contacts, or the deceased person's details. | §6 rule 3 |
+| C1 | Messages are sent from the user's own phone via an `sms:` deep link, one contact at a time. Service and obituary may also use the OS share sheet and email compose (2026-11-01, #559, Decision 1). Email compose is to the publisher only (MOB-9), and `sms:` links never carry several recipients. Each send is still the user's own action: no server send and no bulk text. `sms:` stays one contact at a time. Sending is mobile-only: the web has no send path. Transition (2026-10-30, #385): the old web send flow stays only in the flag-off build (`VITE_FEATURE_CMS` off) until a later round removes it. No backend SMS path, no bulk send, no business number. Account emails (confirmation, reset, invites) come from the backend. They never carry message content, contacts, or the deceased person's details. | §6 rule 3 |
 | C2 | Dropped 2026-10-30 (#385): web planning text is stored on the device so it can be sent from the phone later; nothing is sent from web. The old rule, kept for the record and still in force in the flag-off build: message content is never stored — not local state after send, not logs, not a history. Person details are not message content, and they sync to the AWS data function. Drafts, the send flow's edited wording (`messageOverride`) and who was messaged stay on the device. The four planning messages (service, announcement, obituary text, thank-you) sync under DS-7 (ADR 0001). | §6 "What not to do" |
 | C3 | Contact data never reaches the gateway. Contact data **and contact ids** never reach the gateway or the data function in flow sync. An invitee's email is typed by the owner and never picked from contacts. | §6 "Contacts" |
 | C4 | Only the 7 `Contact` fields (`contactId`, `name`, `phone`, `email`, `tier`, `source`, `createdAt`) survive past the import screen. `createdAt` is a timestamp, not personal data. | §6 "Contacts" |
@@ -98,10 +98,10 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| SF-1 | Mobile: Template picker → Details → Contacts → Confirm → Sending → Sent. Web: Path → first form → Contacts → Confirm → Sending → Path with a quiet note. Both driven by `useSendFlow()` | Done; removed when `VITE_FEATURE_CMS` is on | Done | #176: web has no picker and no Sent screen. The hook keeps its `template` step; the web flow treats it, and Back on a moment's first form, as "exit to the path" |
+| SF-1 | Mobile: Template picker → Details → Contacts → Confirm → Sending → Sent. Web: Path → first form → Contacts → Confirm → Sending → Path with a quiet note. Both driven by `useSendFlow()` | Done; removed when `VITE_FEATURE_CMS` is on | Done | #176: web has no picker and no Sent screen. The hook keeps its `template` step; the web flow treats it, and Back on a moment's first form, as "exit to the path". The #559 target for mobile is Hub cards → people → send screen → sending → hub (§6); until #628 lands, mobile still runs the line shown here |
 | SF-2 | Close family hears first, from a small hand-picked group; wider circle later | Done; removed when `VITE_FEATURE_CMS` is on | Superseded by MOB-1 | `WhoHearsFirst`, `WideningCircle`. Mobile now has one people list (MOB-1, #620) |
 | SF-3 | Sending steps through contacts one at a time with a pre-filled `sms:` link | Done; removed when `VITE_FEATURE_CMS` is on | Done | `buildSmsLink()` |
-| SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact. On web, Done on the last person opens the path at once with a `role="status"` note that stays until the next navigation or a Close tap (no timer, no motion): "Everyone has been told." / "The service details have been shared." / "The obituary has been shared." / "Your thank-yous have been sent."; if anyone was skipped, "You told N of M. You can text the others from your own Messages app any time." The note also says "We don't keep a copy of what was sent" (C2, flag-off build). | Done; removed when `VITE_FEATURE_CMS` is on | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop). Web note: #176; mobile still shows its Sent screen. Mobile changes under MOB-5 (2026-11-01, #559): on return from Messages, the app asks "Sent to {name}? Next: {name}" (§5 item 5). Web is unchanged |
+| SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact. On web, Done on the last person opens the path at once with a `role="status"` note that stays until the next navigation or a Close tap (no timer, no motion): "Everyone has been told." / "The service details have been shared." / "The obituary has been shared." / "Your thank-yous have been sent."; if anyone was skipped, "You told N of M. You can text the others from your own Messages app any time." The note also says "We don't keep a copy of what was sent" (C2, flag-off build). | Done; removed when `VITE_FEATURE_CMS` is on | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop). Web note: #176; mobile still shows its Sent screen. Mobile changes under MOB-4 (2026-11-01, #559): on return from Messages, the app asks "Sent to {name}? Next: {name}" (§5 item 5). Web is unchanged |
 | SF-5 | Share button (OS share sheet) with clipboard fallback, same undo toast | Done; removed when `VITE_FEATURE_CMS` is on | Not started | |
 | SF-6 | AI-drafted obituary, reached from "Has the obituary been published?" ("Help me write it"); name and date of passing prefilled from the session; the draft is copied or shared to the funeral home or paper, never published or stored by the app | Partial — UI built; flagged off (`VITE_FEATURE_OBITUARY_DRAFTING`), so "Help me write it" shows disabled with an "in beta" tooltip. Turning it on needs a valid `ANTHROPIC_API_KEY` on the Worker. Removed when `VITE_FEATURE_CMS` is on. | Not started | `libs/gateway-messages` |
 | SF-7 | Announcement form has no required fields — read-only session recap + optional note. Continue goes straight to "Who should know?": no service question. The message says "details to follow", or carries the service line if the session has a service date. A saved draft on the retired service step resumes on contacts. | Done; removed when `VITE_FEATURE_CMS` is on | Not started | #176. The separate "Have the arrangements been made?" gate for the service moment stays (C2 in the flag-off build, C10) |
@@ -158,13 +158,13 @@ by the closing ticket #633.
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
 | MOB-1 | One people list on the phone. The tier split is gone from the UI; `tier` stays in the data and every contact is `family`. Import from the phone's contacts and tick people | n/a | Not started | #620. Supersedes SF-2 (mobile) |
-| MOB-2 | Four send cards on the person screen: Announcement, Service, Obituary, Thank-you. Each shows Ready, Needs a detail, or send status. The status reads "Sent to {n}", with no "of M" | n/a | Not started | #624 |
-| MOB-3 | The phone records who was messaged, on the device only, so the cards and shortcuts can read it | n/a | Not started | #621. C2 and C3 hold: no message content, no contact ids in sync |
-| MOB-4 | Each message starts with the first name: "{First name}," on its own first line. No greeting when the name is empty or has digits. A per-message switch turns it off. On by default (Decision 2) | n/a | Not started | #622 |
-| MOB-5 | On return from Messages, the app shows "Sent to {name}? Next: {name}". One tap confirms and opens the next. Skip and Not yet stay. A send is never assumed (Decision 3, §5 item 5) | n/a | Not started | #623. Changes SF-4 on mobile |
+| MOB-2 | The phone records who was messaged, on the device only, so the cards and shortcuts can read it | n/a | Not started | #621. C2 and C3 hold: no message content, no contact ids in sync |
+| MOB-3 | Each message starts with the first name: "{First name}," on its own first line. No greeting when the name is empty or has digits. A per-message switch turns it off. On by default (Decision 2) | n/a | Not started | #622 |
+| MOB-4 | On return from Messages, the app shows "Sent to {name}? Next: {name}". One tap confirms and opens the next. Skip and Not yet stay. A send is never assumed. Next stays as the fallback when no return is detected (Decision 3, §5 item 5) | n/a | Not started | #623. Changes SF-4 on mobile |
+| MOB-5 | Four send cards on the person screen: Announcement, Service, Obituary, Thank-you. Each shows Ready, Needs a detail, or send status. The status reads "Sent to {n} people" ("person" for 1), with no "of M" | n/a | Not started | #624 |
 | MOB-6 | Search in the people picker | n/a | Not started | #625 |
 | MOB-7 | Picker shortcuts: "Everyone you told" (people who got the announcement) and "Not sent yet" | n/a | Not started | #626 |
-| MOB-8 | A short Details row on the send screen (date, time, place) with small inputs that re-compose the message. When the text was hand-edited, the Details inputs are hidden. Service and thank-you open on the people, not the full form. The thank-you note, if any, is the last line | n/a | Not started | #627, #628 |
+| MOB-8 | A short Details row on the send screen, with small inputs for the template's fields (for example date, time, place) that re-compose the message. When the text was hand-edited, the Details inputs are hidden. Service and thank-you open on the people, not the full form. The thank-you note, if any, is the last line | n/a | Not started | #627, #628 |
 | MOB-9 | Obituary in two steps (Decision 4). Step 1: email the text to the publisher with mail compose. Step 2: once it is published, the user pastes the link on the phone and texts the link message. The link is added only on the phone; it is never asked for at setup (C10) | n/a | Not started | #629, #630 |
 | MOB-10 | "Share elsewhere" (OS share sheet) for service and obituary. Allowed with zero people picked (Decision 1, C1) | n/a | Not started | #631 |
 | MOB-11 | Thank-yous: an optional one-line note per person. The note is the last line of that person's message | n/a | Not started | #632 |
@@ -212,10 +212,12 @@ them in code by assumption — raise them.
    about every person.
    **Reversed on mobile 2026-11-01 (Peter, G1 of #559, Decision 3).** On return from Messages the app
    shows "Sent to {name}? Next: {name}". One tap confirms and opens the next person; it replaces the
-   Next tap, so the user taps no more than before. It differs from `039e459`: that was a 3-way
+   Next tap when a return is detected, so the user taps no more than before. It differs from `039e459`: that was a 3-way
    question (Yes / Not yet / Try again); this is one tap, with Skip and Not yet kept. The reason it
    works now is that the native app state change fires reliably on the phone, unlike the web tab.
-   The send job itself is not persisted; only the existing on-device `recipientsNotified` id list is (MOB-3). Web is unchanged: it keeps the single Next tap.
+   The send job itself is not persisted; only the existing on-device `recipientsNotified` id list is
+   (MOB-2). Next stays as the fallback when no return is detected. Web is unchanged: it keeps the
+   single Next tap.
 
 6. **Obituary editor (round 2)** — built from the obituary template's parts, with a full text and a short form. Both stay editable. Not in round 1 (WEB-6).
 
@@ -351,10 +353,13 @@ No screen-level `useState` duplicating send flow logic. One hook owns it.
 ### The send flow
 
 ```
-Mobile: Hub cards → people → send screen → sending → hub
+Mobile: Hub cards → people → send screen → sending → hub   (#559 target)
 Web:    Path → first form → Contact selector → Confirm → Sending → Path (with a quiet note)
         (flag-off build only: with VITE_FEATURE_CMS on, web plans and does not send)
 ```
+
+Until #628 lands, mobile still runs Template picker → Details form → Contact selector → Confirm →
+Sending → Sent; the first line above is the #559 target.
 
 On web the path is the hub (#176): there is no picker and no Sent screen. Back on a moment's first
 form returns to the path; the hook's `template` step is kept for mobile and is treated by the web
@@ -378,12 +383,14 @@ inferred from the tab going to the background and coming back: that signal is un
 desktop, where Messages opens beside the browser, it never fires. On mobile (2026-11-01, #559,
 Decision 3), return from Messages shows "Sent to {name}? Next: {name}". One tap confirms and opens
 the next person. Skip and Not yet stay. A send is never assumed. The native app state change fires
-reliably on the phone, so this replaces the Next tap and is not a 3-way question (§5 item 5). Web is
-unchanged. Nothing is
+reliably on the phone, so this replaces the Next tap and is not a 3-way question (§5 item 5). Next
+stays as the fallback when no return is detected. Web is unchanged. "Share elsewhere" (service and
+obituary, MOB-10) hands the message once to the OS share sheet; the user picks where it goes and taps
+send, and the app sends nothing and records no one. Nothing is
 recorded as sent to a backend, and there is no delivery receipt — the user's own Messages thread
 with that contact is the only record, which is *more* trustworthy to a grieving person than an
 opaque "delivered ✓" from a service they've never heard of. The app itself keeps no history of what
-was sent (see "What not to do").
+was sent (only who was messaged, on the device; not the text) (see "What not to do").
 
 ---
 
