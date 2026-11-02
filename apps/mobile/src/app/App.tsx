@@ -221,7 +221,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
         }
       }
       // Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
-      if (planned.messageOverride !== null) {
+      // The obituary send texts the link template (name, link, optional note). Its obituaryText is
+      // the email to the publisher (MOB-9, #559 Decision 4) and is never the text message.
+      if (planned.messageOverride !== null && category !== 'obituary') {
         setMessageOverride(planned.messageOverride);
       }
     }

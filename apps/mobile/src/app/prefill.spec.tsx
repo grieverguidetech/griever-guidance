@@ -73,13 +73,18 @@ describe('send flow starts from the planned details', () => {
     expect(await screen.findByText('Thank you all.')).toBeTruthy();
   });
 
-  it('applies the edited obituary text on its first step', async () => {
+  // Rewritten on purpose (#630, MOB-9, #559 Decision 4). It used to pin that the full obituaryText
+  // was the text message. Now the obituary text is emailed to the publisher, and the text message
+  // is the obituary-link template: the name and the link.
+  it('texts the obituary link template, not the edited obituary text', async () => {
     await openMoment({ ...base, obituaryText: 'Anna loved the garden.' } as Session, /Share the obituary/);
     fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    expect(await screen.findByText('Anna loved the garden.')).toBeTruthy();
+    await screen.findByRole('heading', { name: 'Review your message' });
+    expect(screen.getByText('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
+    expect(screen.queryByText(/Anna loved the garden/)).toBeNull();
   });
 
   it('leaves a draft with an emptied message alone', async () => {
