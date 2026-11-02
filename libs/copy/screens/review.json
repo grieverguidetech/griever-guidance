@@ -20,6 +20,8 @@
   "noRecipients": "Choose who should get this message first.",
   "privacy": "You'll text each person from your own number, one at a time.",
   "sample": "Sample message",
+  "greetingSwitch": "Start with their first name",
+  "greetingPreview": "For example: {greeting}",
   "flowers": {
     "heading": "Include a way to send flowers",
     "note": "For people who can't be there in person.",
