@@ -2,7 +2,9 @@ import { describe, expect, it } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/react-native';
-import { SavedNote, SAVED_NOTE_TEXT } from '../components/SavedNote';
+import { act } from '@testing-library/react-native';
+import { reportPersisting, resetPersisting } from '../lib/deviceCache';
+import { SavedNote, SAVED_NOTE_TEXT, NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
 import { SetupScreen } from '../screens/SetupScreen';
 
 describe('saved-on-this-phone line (DS-3)', () => {
@@ -20,5 +22,17 @@ describe('saved-on-this-phone line (DS-3)', () => {
     expect(webText).toBe(SAVED_NOTE_TEXT);
     render(<SavedNote />);
     expect(screen.getByText(webText as string)).toBeTruthy();
+  });
+
+  it('says the phone could not save while storage is failing, and goes back when it works', () => {
+    resetPersisting();
+    render(<SavedNote />);
+    expect(screen.getByText(SAVED_NOTE_TEXT)).toBeTruthy();
+    act(() => reportPersisting('test', false));
+    expect(screen.queryByText(SAVED_NOTE_TEXT)).toBeNull();
+    expect(screen.getByText('This phone could not save just now. Keep this screen open.')).toBeTruthy();
+    expect(NOT_SAVED_NOTE_TEXT).not.toContain('!');
+    act(() => reportPersisting('test', true));
+    expect(screen.getByText(SAVED_NOTE_TEXT)).toBeTruthy();
   });
 });

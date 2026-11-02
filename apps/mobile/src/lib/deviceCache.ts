@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SendFlowStorage } from '@griever/hooks';
 
@@ -7,6 +8,50 @@ export type DeviceCache = SendFlowStorage & { hydrate(): Promise<void> };
 export type CacheKey = { key: string; json: boolean };
 
 export const HYDRATE_TIMEOUT_MS = 3000;
+
+// Whether this phone is keeping what we write. Each writer (a cache, the checklist) reports in; the
+// phone is "not saving" while any writer is failing. A later good write clears that writer.
+const failing = new Set<string>();
+const listeners = new Set<() => void>();
+
+/** Records that a writer's last save worked (`true`) or did not (`false`). */
+export function reportPersisting(source: string, ok: boolean): void {
+  const wasFailing = failing.has(source);
+  if (ok === !wasFailing) {
+    return;
+  }
+  if (ok) {
+    failing.delete(source);
+  } else {
+    failing.add(source);
+  }
+  listeners.forEach((listener) => listener());
+}
+
+/** True unless a save has failed or a cache is memory-only. */
+export function isPersisting(): boolean {
+  return failing.size === 0;
+}
+
+export function subscribePersisting(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Re-renders when the phone starts or stops keeping saves. */
+export function usePersisting(): boolean {
+  return useSyncExternalStore(subscribePersisting, isPersisting, isPersisting);
+}
+
+/** For tests: forget every reported failure. */
+export function resetPersisting(): void {
+  failing.clear();
+  listeners.forEach((listener) => listener());
+}
+
+let nextCacheId = 0;
 
 /**
  * `useSessions` reads its storage synchronously, but AsyncStorage is async. So this is a small
@@ -22,6 +67,11 @@ export const HYDRATE_TIMEOUT_MS = 3000;
 export function createDeviceCache(keys: CacheKey[]): DeviceCache {
   const memory = new Map<string, string>();
   const memoryOnly = new Set<string>();
+  const source = `deviceCache:${nextCacheId++}`;
+  const markMemoryOnly = (key: string) => {
+    memoryOnly.add(key);
+    reportPersisting(source, false);
+  };
   return {
     async hydrate() {
       const unresolved = new Set(keys.map((k) => k.key));
@@ -35,7 +85,7 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
               if (json) JSON.parse(raw);
             }
           } catch {
-            memoryOnly.add(key);
+            markMemoryOnly(key);
           }
           unresolved.delete(key);
         }),
@@ -43,7 +93,7 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<void>((resolve) => {
         timer = setTimeout(() => {
-          unresolved.forEach((key) => memoryOnly.add(key));
+          unresolved.forEach(markMemoryOnly);
           unresolved.clear();
           resolve();
         }, HYDRATE_TIMEOUT_MS);
@@ -54,13 +104,23 @@ export function createDeviceCache(keys: CacheKey[]): DeviceCache {
     getItem: (key) => memory.get(key) ?? null,
     setItem(key, value) {
       memory.set(key, value);
-      if (memoryOnly.size > 0) return;
-      void AsyncStorage.setItem(key, value).catch(() => undefined);
+      if (memoryOnly.size > 0) {
+        return;
+      }
+      AsyncStorage.setItem(key, value).then(
+        () => reportPersisting(source, true),
+        () => reportPersisting(source, false),
+      );
     },
     removeItem(key) {
       memory.delete(key);
-      if (memoryOnly.size > 0) return;
-      void AsyncStorage.removeItem(key).catch(() => undefined);
+      if (memoryOnly.size > 0) {
+        return;
+      }
+      AsyncStorage.removeItem(key).then(
+        () => reportPersisting(source, true),
+        () => reportPersisting(source, false),
+      );
     },
   };
 }

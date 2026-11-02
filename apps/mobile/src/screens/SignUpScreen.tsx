@@ -27,17 +27,20 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'form' | 'code'>('form');
   const [pending, setPending] = useState(false);
+  // The ref is the guard (one fast double tap can beat state); `pending` only shows the busy look.
+  const inFlight = useRef(false);
   // A Google or Facebook flow is open in the browser; the form's own buttons wait for it.
-  const [socialPending, setSocialPending] = useState(false);
+  const socialPending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const emailRef = useRef<ComponentRef<typeof TextInput>>(null);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   async function run(busyText: string, action: () => Promise<void>) {
-    if (pending || socialPending) {
+    if (inFlight.current || socialPending.current) {
       return;
     }
+    inFlight.current = true;
     setPending(true);
     setError(null);
     setNotice(null);
@@ -47,6 +50,7 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
     } catch (thrown) {
       setError(clerkMessage(thrown, step === 'code' ? 'code' : 'password'));
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }
@@ -122,7 +126,7 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
         <LinkButton
           label={copy.code.differentEmail}
           onPress={() => {
-            if (socialPending) {
+            if (socialPending.current) {
               return;
             }
             setCode('');
@@ -177,7 +181,7 @@ export function SignUpScreen({ onSwitchToSignIn, onCreated }: Props) {
       />
       <ErrorText message={error} />
       <PrimaryButton label={pending ? copy.submitBusy : copy.submit} pending={pending} onPress={submit} />
-      <SocialButtons onStart={() => setError(null)} onError={setError} onPendingChange={setSocialPending} blocked={pending} />
+      <SocialButtons onStart={() => setError(null)} onError={setError} onPendingChange={(on) => (socialPending.current = on)} isBlocked={() => inFlight.current} />
       <LinkButton label={copy.haveAccount} onPress={onSwitchToSignIn} />
     </View>
   );

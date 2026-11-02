@@ -28,14 +28,17 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // The ref is the guard (one fast double tap can beat state); `pending` only shows the busy look.
+  const inFlight = useRef(false);
   // A Google or Facebook flow is open in the browser; the form's own buttons wait for it.
-  const [socialPending, setSocialPending] = useState(false);
+  const socialPending = useRef(false);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   async function run(busyText: string, action: () => Promise<void>) {
-    if (pending || socialPending) {
+    if (inFlight.current || socialPending.current) {
       return;
     }
+    inFlight.current = true;
     setPending(true);
     setError(null);
     setNotice(null);
@@ -45,6 +48,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
     } catch (thrown) {
       setError(clerkMessage(thrown, step === 'code' ? 'code' : 'password'));
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }
@@ -110,7 +114,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
     });
 
   async function startOver() {
-    if (socialPending) {
+    if (socialPending.current) {
       return;
     }
     await signIn.reset();
@@ -178,7 +182,7 @@ export function SignInScreen({ onSwitchToSignUp, onAttempt }: Props) {
       <ErrorText message={error} />
       <PrimaryButton label={pending ? copy.submitBusy : copy.submit} pending={pending} onPress={signInWithPassword} />
       <LinkButton label={copy.emailCode} pending={pending} onPress={() => void sendCode()} />
-      <SocialButtons onStart={() => setError(null)} onError={setError} onPendingChange={setSocialPending} blocked={pending} />
+      <SocialButtons onStart={() => setError(null)} onError={setError} onPendingChange={(on) => (socialPending.current = on)} isBlocked={() => inFlight.current} />
       <LinkButton label={copy.createAccount} onPress={onSwitchToSignUp} />
     </View>
   );

@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/App';
+import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
+import { reportPersisting, usePersisting } from '../lib/deviceCache';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
 
 const checklistCopy = screenCopy('cmsChecklist');
@@ -52,13 +54,22 @@ export function ChecklistRows({ tipOpen, onTipChange }: { tipOpen: string | null
     onTipChange(null);
     setTicked((prev) => {
       const next = prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id];
-      void AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).catch(() => undefined);
+      AsyncStorage.setItem(CHECKLIST_KEY, JSON.stringify(next)).then(
+        () => reportPersisting('checklist', true),
+        () => reportPersisting('checklist', false),
+      );
       return next;
     });
   };
 
+  const persisting = usePersisting();
   return (
     <>
+      {!persisting ? (
+        <Text style={styles.saveFailed} accessibilityLiveRegion="polite">
+          {NOT_SAVED_NOTE_TEXT}
+        </Text>
+      ) : null}
       {loaded && CHECKLIST.map((item) => {
         const checked = ticked.includes(item.id);
         return (
@@ -166,6 +177,7 @@ const styles = StyleSheet.create({
   tip: { fontSize: 12, color: MUTED, lineHeight: 18, marginLeft: 36, marginBottom: 8 },
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: FIELD_BORDER, marginRight: 12, marginTop: 1, alignItems: 'center', justifyContent: 'center' },
   checkmark: { fontSize: 14, color: '#ffffff', fontWeight: '700' },
+  saveFailed: { fontSize: 13, color: MUTED, marginBottom: 12 },
   pressed: { opacity: 0.7 },
   struck: { textDecorationLine: 'line-through', color: MUTED },
   checkboxChecked: { borderColor: ACCENT, backgroundColor: ACCENT },

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Account } from './Account';
 import type { AccountCopy, AccountProps } from './Account';
@@ -53,6 +53,21 @@ describe('Account', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await userEvent.type(screen.getByLabelText('Your name'), '{Enter}');
     expect(props.onPrimary).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a second press while the first save is still running, even before primaryBusy shows', async () => {
+    let finish: () => void = () => undefined;
+    const onPrimary = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    setup({ onPrimary });
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.type(screen.getByLabelText('Your name'), '{Enter}');
+    expect(onPrimary).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(onPrimary).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('Sign out fires and is the outline (header) style, not a filled button', async () => {

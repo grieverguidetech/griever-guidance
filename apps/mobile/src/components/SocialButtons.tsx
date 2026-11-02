@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSSO } from '@clerk/expo';
 import { screenCopy } from '@griever/copy';
 import * as AuthSession from 'expo-auth-session';
@@ -18,22 +18,25 @@ export function SocialButtons({
   onError,
   onStart,
   onPendingChange,
-  blocked = false,
+  isBlocked,
 }: {
   onError: (message: string | null) => void;
   onStart: () => void;
   /** Tells the screen a browser flow is running, so it can ignore its own buttons meanwhile. */
   onPendingChange?: (pending: boolean) => void;
-  /** The screen has a request running; presses here are ignored. */
-  blocked?: boolean;
+  /** Asks the screen whether it has a request running; presses here are ignored then. Reads a ref. */
+  isBlocked?: () => boolean;
 }) {
   const { startSSOFlow } = useSSO();
   const [pending, setPending] = useState(false);
+  // The ref is the guard (a fast double tap can beat state); `pending` only dims the buttons.
+  const inFlight = useRef(false);
 
   async function start(strategy: Strategy) {
-    if (pending || blocked) {
+    if (inFlight.current || isBlocked?.()) {
       return;
     }
+    inFlight.current = true;
     setPending(true);
     onPendingChange?.(true);
     onStart();
@@ -56,6 +59,7 @@ export function SocialButtons({
     } catch (error) {
       onError(clerkMessage(error));
     } finally {
+      inFlight.current = false;
       setPending(false);
       onPendingChange?.(false);
     }

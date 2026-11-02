@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ComponentRef, ReactNode, Ref } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View } from 'react-native';
 import { colors, minTouchTarget } from '@griever/tokens';
+import { ERROR } from './colors';
 import { Body, Button, Heading, useSerifStyle, SerifText as Text, SerifTextInput as TextInput } from '@griever/ui';
 
-/** Errors use the same pink as web's Clerk appearance (colorDanger); 7:1 on white. */
-const DANGER = colors['accent-2-700'];
+/** Errors use the app's one danger red (also libs/ui Status and Body tone="danger"); 6.47:1 on white. */
+const DANGER = ERROR;
 /** Focus ring, as web's Clerk colorRing. */
 const RING = colors['accent-700'];
 const FIELD_BORDER = colors['neutral-600'];
@@ -119,7 +120,11 @@ export function Field({
   );
 }
 
-/** Shows the message in a polite live region and announces it on iOS. */
+/**
+ * Shows the message with the alert role (read when it appears on Android and web) and announces it
+ * on iOS, which does not read the role on its own. No live region wraps it: a polite region around
+ * an alert would be two mechanisms for one message.
+ */
 export function ErrorText({ message }: { message: string | null }) {
   const font = useSerifStyle('regular');
   useEffect(() => {
@@ -128,7 +133,7 @@ export function ErrorText({ message }: { message: string | null }) {
     }
   }, [message]);
   return (
-    <View accessibilityLiveRegion="polite" style={styles.errorBox}>
+    <View style={styles.errorBox}>
       {message ? (
         <Text accessibilityRole="alert" style={[styles.error, font]}>
           {message}

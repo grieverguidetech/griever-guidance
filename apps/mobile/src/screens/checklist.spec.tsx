@@ -6,6 +6,8 @@ import type { AccountAuth } from '@griever/shared';
 import { HomeScreen } from './HomeScreen';
 import { AccountScreen } from './AccountScreen';
 import { AccountStateProvider } from '../lib/AccountProvider';
+import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
+import { resetPersisting } from '../lib/deviceCache';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
 
 const mockGoBack = jest.fn();
@@ -190,5 +192,18 @@ describe('the list on Your account and the checklist screen share their ticks (#
     render(accountScreen);
     await screen.findAllByRole('checkbox');
     expect(row('Military discharge papers').props.accessibilityState).toEqual({ checked: true });
+  });
+
+  it('says so, calmly, when the tick could not be saved', async () => {
+    resetPersisting();
+    jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    render(<WhatYoullNeedScreen />);
+    await screen.findAllByRole('checkbox');
+    expect(screen.queryByText(NOT_SAVED_NOTE_TEXT)).toBeNull();
+    fireEvent.press(row('Life insurance policies'));
+    expect(await screen.findByText(NOT_SAVED_NOTE_TEXT)).toBeTruthy();
+    expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
+    jest.restoreAllMocks();
+    resetPersisting();
   });
 });
