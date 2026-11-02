@@ -6,7 +6,7 @@ import { MarkReady } from './MarkReady';
 const copy = screenCopy('cmsObituary');
 const draftCopy = screenCopy('obituaryDraft');
 
-type ObituaryValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing' | 'obituaryUrl' | 'obituaryPublisher'>> &
+type ObituaryValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
   Pick<
     SectionFields,
     'birthDate' | 'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote' | 'sectionStatus'
@@ -16,7 +16,7 @@ type ObituaryValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing
 export type ObituaryPatch = Partial<
   Pick<
     ObituaryValues,
-    'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote' | 'obituaryUrl' | 'obituaryPublisher'
+    'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote'
   >
 >;
 
