@@ -19,12 +19,7 @@
     "textLabel",
     "textHint",
     "textHintEdited",
-    "useDetails",
-    "publishedHeading",
-    "publishedHint",
-    "urlLabel",
-    "publisherLabel",
-    "publisherPlaceholder"
+    "useDetails"
   ],
   "properties": {
     "intro": {
@@ -73,21 +68,6 @@
       "$ref": "#/$defs/text"
     },
     "useDetails": {
-      "$ref": "#/$defs/text"
-    },
-    "publishedHeading": {
-      "$ref": "#/$defs/text"
-    },
-    "publishedHint": {
-      "$ref": "#/$defs/text"
-    },
-    "urlLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "publisherLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "publisherPlaceholder": {
       "$ref": "#/$defs/text"
     }
   },

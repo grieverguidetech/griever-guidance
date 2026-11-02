@@ -72,11 +72,10 @@ describe('ObituarySection', () => {
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
 
-  it('saves where it is published', async () => {
-    const { patches } = setup();
-    await userEvent.type(screen.getByLabelText(/Link to the obituary/), 'a');
-    await userEvent.type(screen.getByLabelText(/Where it is published \(optional\)/), 'b');
-    expect(patches).toEqual([{ obituaryUrl: 'a' }, { obituaryPublisher: 'b' }]);
+  it('has no where-it-is-published inputs', () => {
+    setup();
+    expect(screen.queryByLabelText(/Link to the obituary/)).toBeNull();
+    expect(screen.queryByLabelText(/Where it is published/)).toBeNull();
   });
 
   it('marks ready through MarkReady', async () => {
