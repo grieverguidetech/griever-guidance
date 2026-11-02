@@ -3,6 +3,7 @@ import { AccessibilityInfo } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
+import { screenCopy } from '@griever/copy';
 import { ContactSelectorScreen } from './ContactSelectorScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
@@ -33,7 +34,7 @@ const make = (id: string, name: string, tier: Contact['tier']): Contact => ({
   createdAt: 0,
 });
 
-// Saved order puts a friend first, so the screen has to do the reordering.
+// The fixture mixes tiers, so the tests prove the saved order is kept.
 const saved = [
   make('1', 'Neighbour Ned', 'family'),
   make('2', 'Mum', 'first'),
@@ -70,13 +71,18 @@ const headers = () =>
     .filter((text) => text !== 'Who should know?');
 
 describe('ContactSelectorScreen grouping', () => {
-  it('for an announcement, lists Close family before Friends & family, with headings as headers', () => {
+  it('for an announcement with mixed tiers, shows one list in saved order, with no tier headings', () => {
     renderScreen();
-    expect(headers()).toEqual(['Close family', 'Friends & family']);
-    const rendered = screen
-      .getAllByText(/^(Close family|Friends & family|Mum|Dad|Neighbour Ned|Cousin Cat)$/)
-      .map((n) => n.props.children);
-    expect(rendered).toEqual(['Close family', 'Mum', 'Dad', 'Friends & family', 'Neighbour Ned', 'Cousin Cat']);
+    expect(headers()).toEqual([]);
+    expect(screen.queryByText('Close family')).toBeNull();
+    expect(screen.queryByText('Friends & family')).toBeNull();
+    const copy = screenCopy('whoShouldKnow');
+    expect(screen.getByText(copy.introUngrouped)).toBeTruthy();
+    expect(screen.queryByText(copy.introGrouped)).toBeNull();
+    const rendered = screen.getAllByText(/^(Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
+    expect(rendered).toEqual(['Neighbour Ned', 'Mum', 'Cousin Cat', 'Dad']);
+    // The shared list only draws Select all under a tier heading, so the one list has none.
+    expect(screen.queryByRole('button', { name: /^Select all/ })).toBeNull();
   });
 
   it('shows a plain list in saved order, with no headings, for other templates', () => {
@@ -86,7 +92,7 @@ describe('ContactSelectorScreen grouping', () => {
     expect(rendered).toEqual(['Neighbour Ned', 'Mum', 'Cousin Cat', 'Dad']);
   });
 
-  it('hides the heading when only one group has people', () => {
+  it('shows no headings when all contacts are family', () => {
     renderScreen([make('1', 'Neighbour Ned', 'family'), make('3', 'Cousin Cat', 'family')]);
     expect(headers()).toEqual([]);
     expect(screen.getByText('Neighbour Ned')).toBeTruthy();
