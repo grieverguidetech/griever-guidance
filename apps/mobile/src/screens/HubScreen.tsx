@@ -190,5 +190,5 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   note: { marginBottom: 16 },
-  content: { padding: spacing[3], paddingTop: 64 },
+  content: { padding: spacing[3], paddingTop: spacing[4] },
 });

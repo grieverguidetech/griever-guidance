@@ -1,3 +1,4 @@
+import { colors } from '@griever/tokens';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import type { Text as NativeText } from 'react-native';
 import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -386,9 +387,9 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  header: { paddingHorizontal: 24, paddingTop: 60 },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 24, paddingTop: 20, paddingBottom: 40 },
+  header: { paddingHorizontal: 24, paddingTop: 20 },
   backRow: { alignSelf: 'flex-start', marginBottom: 16 },
   list: { paddingHorizontal: 24, paddingTop: 12, flexGrow: 1 },
   empty: { fontSize: 15, color: MUTED, textAlign: 'center', marginTop: 24 },

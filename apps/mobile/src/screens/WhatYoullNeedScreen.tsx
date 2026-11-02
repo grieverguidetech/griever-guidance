@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { SerifText as Text, Button } from '../ui';
+import { SerifText as Text, Button, Heading } from '../ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/App';
+import { colors } from '@griever/tokens';
+import { ScreenHeader } from '../components/authForm';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
 
@@ -146,29 +148,30 @@ export function WhatYoullNeedScreen() {
         <Button label="Back" variant="header" onPress={() => navigation.goBack()} />
       </View>
 
-      <Text style={styles.title}>What you'll need</Text>
+      <ScreenHeader>What you'll need</ScreenHeader>
       <Text style={styles.subtitle}>Not today. Just so none of it surprises you.</Text>
 
       <View style={styles.card}>
         <Text style={styles.cardKicker}>The one people get wrong</Text>
-        <Text style={styles.cardTitle}>Certified death certificates</Text>
+        <View style={styles.cardTitle}>
+          <Heading level={2}>Certified death certificates</Heading>
+        </View>
         <Text style={styles.cardBody}>
           Ask the funeral home for 8 to 10 certified copies. Banks, insurers and Social Security each
           keep an original — photocopies are usually refused.
         </Text>
       </View>
 
-      <Text style={styles.gatherHeading}>{checklistCopy.gatherHeading}</Text>
+      <Text style={styles.gatherHeading} accessibilityRole="header">{checklistCopy.gatherHeading}</Text>
       <ChecklistRows tipOpen={tipOpen} onTipChange={setTipOpen} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 24, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 24, paddingTop: 20 },
   backRow: { alignSelf: 'flex-start', marginBottom: 24 },
-  title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
   subtitle: { fontSize: 13, color: MUTED, marginBottom: 24 },
   card: {
     borderWidth: 1,
@@ -178,7 +181,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardKicker: { fontSize: 11, fontWeight: '500', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  cardTitle: { fontSize: 15, fontWeight: '500', color: '#111827', marginBottom: 8 },
+  cardTitle: { marginBottom: 8 },
   cardBody: { fontSize: 14, color: '#374151', lineHeight: 20 },
   gatherHeading: { fontSize: 11, fontWeight: '500', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
   checklistItem: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 44, paddingVertical: 8, marginBottom: 8 },

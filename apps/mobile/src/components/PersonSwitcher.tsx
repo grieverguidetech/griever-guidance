@@ -26,7 +26,7 @@ export function PersonBar({
   arrived: boolean;
   onArrived: () => void;
 }) {
-  // Android's back button means Home here, not leaving the app.
+  // Android's back button does what `onHardwareBack` says (Home by default), not leaving the app.
   // Only while this screen is showing, and only when there is nothing to pop (e.g. the checklist
   // opened from here goes back to here first).
   const navigation = useNavigation();
