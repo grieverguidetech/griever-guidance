@@ -261,7 +261,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       }
     },
   };
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} notified={session.recipientsNotified} />;
 };
 
 // The announcement path has a "do you know the service details" step that mobile has no screen
@@ -583,11 +583,13 @@ const Navigation = ({
   contacts,
   bar,
   onEditPerson,
+  notified,
 }: {
   flow: ReturnType<typeof useSendFlow>;
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
   onEditPerson: () => void;
+  notified: Session['recipientsNotified'];
 }) => {
   return (
     <NavigationContainer>
@@ -606,7 +608,7 @@ const Navigation = ({
         )}
         {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
-            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} />)}
+            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} notified={notified} />)}
           </Stack.Screen>
         )}
         {flow.step === 'review' && (

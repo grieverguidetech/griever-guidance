@@ -28,5 +28,9 @@
   "chosen": "{count} chosen",
   "searchLabel": "Search by name",
   "searchEmpty": "No one matches that name.",
-  "selectAllShown": "Select all shown"
+  "selectAllShown": "Select all shown",
+  "everyoneYouTold": "Everyone you told",
+  "notSentYet": "Not sent yet",
+  "everyoneYouToldName": "Choose everyone you told",
+  "notSentYetName": "Choose everyone not sent yet"
 }

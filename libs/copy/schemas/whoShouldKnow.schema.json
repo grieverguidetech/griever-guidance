@@ -33,7 +33,11 @@
     "chosen",
     "searchLabel",
     "searchEmpty",
-    "selectAllShown"
+    "selectAllShown",
+    "everyoneYouTold",
+    "notSentYet",
+    "everyoneYouToldName",
+    "notSentYetName"
   ],
   "properties": {
     "heading": {
@@ -120,6 +124,18 @@
       "$ref": "#/$defs/text"
     },
     "selectAllShown": {
+      "$ref": "#/$defs/text"
+    },
+    "everyoneYouTold": {
+      "$ref": "#/$defs/text"
+    },
+    "notSentYet": {
+      "$ref": "#/$defs/text"
+    },
+    "everyoneYouToldName": {
+      "$ref": "#/$defs/text"
+    },
+    "notSentYetName": {
       "$ref": "#/$defs/text"
     },
     "searchEmpty": {

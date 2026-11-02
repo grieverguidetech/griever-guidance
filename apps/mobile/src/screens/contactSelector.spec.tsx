@@ -46,6 +46,7 @@ function renderScreen(
   contactList: Contact[] = saved,
   templateCategory: string | null = 'announcement',
   selectedContactIds: string[] = [],
+  notified: Record<string, string[]> = {},
 ) {
   const toggleContact = jest.fn();
   const selectContacts = jest.fn();
@@ -59,7 +60,7 @@ function renderScreen(
   };
   const contacts = { contacts: contactList, loading: false } as unknown as UseContactsResult;
   const ui = (ids: string[]) => (
-    <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} />
+    <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} notified={notified} />
   );
   const { rerender } = render(ui(selectedContactIds));
   return { toggleContact, selectContacts, rerender: (ids: string[]) => rerender(ui(ids)) };
@@ -213,5 +214,45 @@ describe('ContactSelectorScreen grouping', () => {
     announce.mockClear();
     rerender(['2']);
     expect(announce).toHaveBeenCalledWith('1 selected');
+  });
+});
+
+describe('ContactSelectorScreen shortcuts', () => {
+  // The merge (never unticking) is covered in useSendFlow.spec.ts.
+  const copy = screenCopy('whoShouldKnow');
+
+  it('Everyone you told ticks the saved announcement recipients on the service picker', () => {
+    const { selectContacts } = renderScreen(saved, 'service', [], { announcement: ['2', '4'] });
+    fireEvent.press(screen.getByRole('button', { name: copy.everyoneYouToldName }));
+    expect(selectContacts).toHaveBeenCalledWith(['2', '4']);
+    expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+  });
+
+  it('ignores a deleted contact', () => {
+    const { selectContacts } = renderScreen(saved, 'obituary', [], { announcement: ['2', '99'] });
+    fireEvent.press(screen.getByRole('button', { name: copy.everyoneYouToldName }));
+    expect(selectContacts).toHaveBeenCalledWith(['2']);
+  });
+
+  it('shows no shortcut on the announcement picker, or when no one was told', () => {
+    renderScreen(saved, 'announcement', [], { announcement: ['2'] });
+    expect(screen.queryByRole('button', { name: copy.everyoneYouToldName })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
+  });
+
+  it('shows no Everyone you told when the announcement list is empty', () => {
+    renderScreen(saved, 'aftercare', [], {});
+    expect(screen.queryByRole('button', { name: copy.everyoneYouToldName })).toBeNull();
+  });
+
+  it('Not sent yet ticks the saved contacts this moment has not reached', () => {
+    const { selectContacts } = renderScreen(saved, 'service', [], { announcement: ['2'], service: ['2', '4'] });
+    fireEvent.press(screen.getByRole('button', { name: copy.notSentYetName }));
+    expect(selectContacts).toHaveBeenCalledWith(['1', '3']);
+  });
+
+  it('shows no Not sent yet when this moment has reached every saved contact', () => {
+    renderScreen(saved, 'service', [], { announcement: ['2'], service: ['1', '2', '3', '4'] });
+    expect(screen.queryByRole('button', { name: copy.notSentYetName })).toBeNull();
   });
 });

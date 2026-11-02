@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, FlatList, Text, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
+import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
@@ -14,6 +15,8 @@ import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
+  /** Who each moment was sent to. Stays on this phone. */
+  notified: Partial<Record<TemplateCategory, string[]>>;
 }
 
 type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
@@ -24,8 +27,9 @@ const copy = screenCopy('whoShouldKnow');
  * The list is the shared WhoShouldKnow in libs/ui. This holds what is mobile only: Bring people
  * across (import from the phone's contacts) and its review list.
  */
-export function ContactSelectorScreen({ flow, contacts }: Props) {
-  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep } = flow;
+export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
+  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep, templateCategory } = flow;
+  const shortcuts = buildShortcuts(templateCategory, notified, contacts.contacts.map((c) => c.contactId), selectContacts);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -165,6 +169,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
           people={contacts.contacts.map((c) => ({ id: c.contactId, name: c.name, phone: c.phone, tier: c.tier }))}
           grouped={false}
           search
+          shortcuts={shortcuts}
           selectedIds={selectedContactIds}
           selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
           loading={contacts.loading}
@@ -186,6 +191,38 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </KeyboardAvoidingView>
   );
+}
+
+/**
+ * The two shortcut buttons for the later moments (copy: everyoneYouTold, notSentYet). They only add ticks, and they
+ * skip anyone who is no longer saved.
+ */
+function buildShortcuts(
+  category: TemplateCategory | null,
+  notified: Props['notified'],
+  savedIds: string[],
+  select: (ids: string[]) => void,
+) {
+  if (!category || category === 'announcement') {
+    return undefined;
+  }
+  const saved = new Set(savedIds);
+  const told = (notified?.announcement ?? []).filter((id) => saved.has(id));
+  const thisMoment = new Set(notified?.[category] ?? []);
+  const list: { label: string; accessibilityName: string; onPress: () => void }[] = [];
+  if (told.length > 0) {
+    list.push({ label: copy.everyoneYouTold, accessibilityName: copy.everyoneYouToldName, onPress: () => select(told) });
+  }
+  const notSent = savedIds.filter((id) => !thisMoment.has(id));
+  const reached = savedIds.some((id) => thisMoment.has(id));
+  if (reached && notSent.length > 0) {
+    list.push({
+      label: copy.notSentYet,
+      accessibilityName: copy.notSentYetName,
+      onPress: () => select(notSent),
+    });
+  }
+  return list;
 }
 
 const Gap = () => <View style={styles.gap} />;
