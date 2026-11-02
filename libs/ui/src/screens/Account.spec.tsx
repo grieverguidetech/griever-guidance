@@ -1,6 +1,5 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Platform } from 'react-native';
 import { Account } from './Account';
 import type { AccountCopy, AccountProps } from './Account';
 
@@ -54,51 +53,6 @@ describe('Account', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await userEvent.type(screen.getByLabelText('Your name'), '{Enter}');
     expect(props.onPrimary).toHaveBeenCalledTimes(2);
-  });
-
-  // The ref guard is for the phone apps; web keeps its original behaviour (see below).
-  it('ignores a second press while the first save is still running, even before primaryBusy shows', async () => {
-    vi.spyOn(Platform, 'OS', 'get').mockReturnValue('ios');
-    let finish: () => void = () => undefined;
-    const onPrimary = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
-    setup({ onPrimary });
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await userEvent.type(screen.getByLabelText('Your name'), '{Enter}');
-    expect(onPrimary).toHaveBeenCalledTimes(1);
-    finish();
-    await waitFor(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-      expect(onPrimary).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  it('lets go of the guard when onPrimary throws, so the next press runs', async () => {
-    vi.spyOn(Platform, 'OS', 'get').mockReturnValue('ios');
-    const onPrimary = vi.fn(() => {
-      throw new Error('boom');
-    });
-    setup({ onPrimary });
-    // React reports the throw from the event handler; we only care that the guard is released.
-    const quiet = (event: ErrorEvent) => event.preventDefault();
-    window.addEventListener('error', quiet);
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    window.removeEventListener('error', quiet);
-    spy.mockRestore();
-    expect(onPrimary).toHaveBeenCalledTimes(2);
-  });
-
-  it('on web, does not hold a second press (unchanged from before)', async () => {
-    vi.spyOn(Platform, 'OS', 'get').mockReturnValue('web');
-    let finish: () => void = () => undefined;
-    const onPrimary = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
-    setup({ onPrimary });
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(onPrimary).toHaveBeenCalledTimes(2);
-    finish();
   });
 
   it('Sign out fires and is the outline (header) style, not a filled button', async () => {

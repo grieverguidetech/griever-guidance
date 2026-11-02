@@ -5,8 +5,8 @@ import { fill, screenCopy } from '@griever/copy';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import { colors, spacing } from '@griever/tokens';
-import { Sending } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Sending } from '../ui';
+import type { ButtonNode } from '../ui';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 
@@ -21,7 +21,7 @@ interface Props extends FlowProps {
 }
 
 /**
- * The screen is the shared Sending in libs/ui; this holds what is mobile only: the sms: link,
+ * The screen is the Sending in apps/mobile/src/ui; this holds what is mobile only: the sms: link,
  * screen-reader focus and the return from Messages.
  *
  * One contact at a time, texted from the griever's own number, not a bulk send. The first button

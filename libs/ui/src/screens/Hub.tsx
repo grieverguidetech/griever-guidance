@@ -136,8 +136,7 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
   }
 
   if (row.status === 'done') {
-    // Opens this step's message: a draft still under way (a re-send left half-way) comes back,
-    // otherwise it is new and empty, because a finished send keeps no wording (C2).
+    // Opens a new, empty message for this step (C2: no old wording is kept).
     return (
       <Row onPress={() => onStart(row.key)}>
         <Body tone="muted">{text.doneLabel}</Body>

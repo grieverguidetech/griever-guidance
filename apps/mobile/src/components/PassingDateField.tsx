@@ -3,7 +3,7 @@ import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/d
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { formatPassingDate, passingDateFromText } from '@griever/shared';
-import { Button, SerifText as Text } from '@griever/ui';
+import { Button, SerifText as Text } from '../ui';
 import { colors, radius, spacing } from '@griever/tokens';
 
 export interface PassingDateCopy {

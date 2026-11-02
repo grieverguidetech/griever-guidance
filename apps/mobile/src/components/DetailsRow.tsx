@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { SerifText as Text } from '@griever/ui';
+import { SerifText as Text } from '../ui';
 import { colors, radius, spacing } from '@griever/tokens';
 
 export interface DetailsField {

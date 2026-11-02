@@ -1,10 +1,8 @@
-import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native';
-import type { Text } from 'react-native';
 import type { ButtonNode } from './Button';
 
-/** Moves focus to a button or a text line: the DOM on web, the screen reader's cursor on native. */
-export function focusNode(node: ButtonNode | ComponentRef<typeof Text> | null) {
+/** Moves focus to a button: the DOM on web, the screen reader's cursor on native. */
+export function focusNode(node: ButtonNode | null) {
   if (!node) {
     return;
   }

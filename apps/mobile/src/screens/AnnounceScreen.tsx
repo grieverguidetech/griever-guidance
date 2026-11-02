@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { announceRecap, fill, screenCopy } from '@griever/copy';
-import { Announce } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Announce } from '../ui';
+import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
@@ -13,7 +13,7 @@ const copy = screenCopy('announce');
 
 type Props = FlowProps & { onEditPerson: () => void };
 
-/** The screen is the shared Announce in libs/ui; this holds what is mobile only: routing and focus. */
+/** The screen is the Announce in apps/mobile/src/ui; this holds what is mobile only: routing and focus. */
 export function AnnounceScreen({ flow, onEditPerson }: Props) {
   const { fields, setField, nextStep, prevStep, session } = flow;
   const heading = useRef<ComponentRef<typeof Text>>(null);

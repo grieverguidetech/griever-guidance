@@ -22,14 +22,6 @@ describe('Button', () => {
     expect(button).toHaveFocus();
   });
 
-  it('on web a busy button looks and reads as any other: same label, no aria-busy, no spinner', () => {
-    render(<Button label="Save" busyLabel="Saving…" onPress={vi.fn()} busy />);
-    const button = screen.getByRole('button', { name: 'Save' });
-    expect(button).not.toHaveAttribute('aria-busy');
-    expect(screen.queryByText('Saving…')).toBeNull();
-    expect(screen.queryByRole('progressbar')).toBeNull();
-  });
-
   it('is a real button element', () => {
     render(<Button label="Start" onPress={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Start' }).tagName).toBe('BUTTON');

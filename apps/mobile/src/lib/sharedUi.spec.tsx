@@ -1,10 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { Button, Heading, SerifReadyContext } from '@griever/ui';
+import { Button, Heading, SerifReadyContext } from '../ui';
 
-/** libs/ui is written for React Native; this runs it on the native renderer. */
-describe('shared UI on native', () => {
+/** Mobile's own UI (apps/mobile/src/ui) on the native renderer. */
+describe('mobile UI on native', () => {
   it('renders a heading as a heading', () => {
     render(<Heading level={1}>One thing at a time.</Heading>);
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();

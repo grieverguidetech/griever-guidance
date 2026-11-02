@@ -234,6 +234,12 @@ Grievers Guidance helps people who have just lost a loved one send funeral and s
 
 ---
 
+### UI is per app
+
+Hooks (`libs/hooks`), shared logic (`libs/shared` and the other logic libs), copy (`libs/copy`) and tokens (`libs/tokens`) are shared by web and mobile. UI is per app: mobile owns `apps/mobile/src/ui` and must not import `@griever/ui`; web uses `libs/ui`. A spec in `apps/mobile` fails if mobile imports `@griever/ui`.
+
+---
+
 ### Monorepo structure
 
 ```

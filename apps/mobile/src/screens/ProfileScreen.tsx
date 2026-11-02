@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { Account } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Account } from '../ui';
+import type { ButtonNode } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
@@ -24,7 +24,7 @@ type Props = {
   onSignInAgain: () => void;
 };
 
-/** The screen is the shared Account in libs/ui; this holds what is mobile only: saving, focus and the sheet. */
+/** The screen is the Account in apps/mobile/src/ui; this holds what is mobile only: saving, focus and the sheet. */
 export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
   const savedName = identity.profile?.senderName?.trim() ?? '';
   const source = initialName ?? savedName;

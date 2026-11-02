@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import type { ButtonNode } from '@griever/ui';
-import { Body, Button, focusNode, SerifText as Text } from '@griever/ui';
+import type { ButtonNode } from '../ui';
+import { Body, Button, focusNode, SerifText as Text } from '../ui';
 import { colors } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';

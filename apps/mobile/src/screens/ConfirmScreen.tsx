@@ -3,8 +3,8 @@ import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, Pres
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import type { UseContactsResult } from '@griever/hooks';
 import { firstName, SHARE_SERVICE_SAMPLE } from '@griever/shared';
-import { Review, SerifText as Text } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Review, SerifText as Text } from '../ui';
+import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
@@ -20,7 +20,7 @@ interface Props extends FlowProps {
   contacts?: UseContactsResult;
 }
 
-/** The screen is the shared Review in libs/ui; this holds what is mobile only: scrolling and the sample. */
+/** The screen is the Review in apps/mobile/src/ui; this holds what is mobile only: scrolling and the sample. */
 export function ConfirmScreen({ flow, contacts }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [sampleOpen, setSampleOpen] = useState(false);

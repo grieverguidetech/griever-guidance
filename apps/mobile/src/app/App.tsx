@@ -31,7 +31,7 @@ import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
-import { SerifReadyContext, SerifText as Text } from '@griever/ui';
+import { SerifReadyContext, SerifText as Text } from '../ui';
 import { useSerifFonts } from '../lib/serifFonts';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
@@ -672,7 +672,7 @@ const SendAppWhenReady = () => {
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
   const fontsSettled = useSerifFonts();
-  // Shared components (libs/ui) switch from the system font to the serif when it arrives.
+  // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
     <SerifReadyContext.Provider value={fontsSettled}>
       {AUTH_ENABLED ? (

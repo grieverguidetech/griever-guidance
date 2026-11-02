@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { Sheet, SerifText as Text } from '@griever/ui';
+import { Sheet, SerifText as Text } from '../ui';
 import { ChecklistRows } from '../screens/WhatYoullNeedScreen';
 import { MUTED } from './colors';
 

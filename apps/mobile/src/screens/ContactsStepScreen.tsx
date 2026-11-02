@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import type { Text as NativeText } from 'react-native';
 import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SerifText as Text, Button, LiveLine } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { SerifText as Text, Button, LiveLine } from '../ui';
+import type { ButtonNode } from '../ui';
 import type { UseContactsResult } from '@griever/hooks';
 import { Cancelled, detectDeviceRegion, runImport, toE164 } from '@griever/contacts';
 import type { NormalizedContact } from '@griever/contacts';

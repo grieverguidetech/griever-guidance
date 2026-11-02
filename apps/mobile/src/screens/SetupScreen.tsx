@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { PersonSetup } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { PersonSetup } from '../ui';
+import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { PassingDateField } from '../components/PassingDateField';
 import { SavedNote } from '../components/SavedNote';
@@ -24,7 +24,7 @@ type Props = {
 
 /**
  * Asked once, before the first message, so the name and date are not typed again in every moment.
- * The screen is the shared PersonSetup in libs/ui; this holds what is mobile only: the native date
+ * The screen is the PersonSetup in apps/mobile/src/ui; this holds what is mobile only: the native date
  * picker, focus, Android Back and the sheet. Only the name is required. There is deliberately no
  * obituary field here (C10).
  */

@@ -4,8 +4,8 @@ import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, P
 import { fill, screenCopy } from '@griever/copy';
 import { isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { Session } from '@griever/hooks';
-import { ShareObituary } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { ShareObituary } from '../ui';
+import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { copyText, pasteText } from '../lib/clipboard';
@@ -28,7 +28,7 @@ type Props = {
 };
 
 /**
- * The screen is the shared ShareObituary in libs/ui; this holds what is mobile only: focus, Android
+ * The screen is the ShareObituary in apps/mobile/src/ui; this holds what is mobile only: focus, Android
  * Back and the sheet. It passes no drafting handler, so the drafting card is not shown.
  */
 export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: Props) {

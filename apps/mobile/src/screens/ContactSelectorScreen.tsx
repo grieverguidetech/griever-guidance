@@ -6,8 +6,8 @@ import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, WhoShouldKnow } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, WhoShouldKnow } from '../ui';
+import type { ButtonNode } from '../ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
 import { ErrorText, Field } from '../components/authForm';
@@ -26,7 +26,7 @@ type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] }
 const copy = screenCopy('whoShouldKnow');
 
 /**
- * The list is the shared WhoShouldKnow in libs/ui. This holds what is mobile only: Bring people
+ * The list is WhoShouldKnow in apps/mobile/src/ui. This holds what is mobile only: Bring people
  * across (import from the phone's contacts) and its review list.
  */
 export function ContactSelectorScreen({ flow, contacts, notified }: Props) {

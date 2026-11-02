@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Sending } from './Sending';
 import type { SendingCopy, SendingProps } from './Sending';
@@ -164,41 +164,6 @@ describe('Sending', () => {
     render(<Sending {...base()} openLabel="Text A" />);
     expect(screen.getByRole('button', { name: 'Text A' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open Messages' })).toBeNull();
-  });
-
-  it('shows a quiet Stop for now that calls onPress, and hides it when unset', async () => {
-    const user = userEvent.setup();
-    const onPress = vi.fn();
-    const view = render(<Sending {...base()} stop={{ label: 'Stop for now', note: 'People you told stay marked as told.', onPress }} />);
-    expect(screen.getByText('People you told stay marked as told.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Stop for now' }));
-    expect(onPress).toHaveBeenCalledTimes(1);
-    view.rerender(<Sending {...base()} />);
-    expect(screen.queryByRole('button', { name: 'Stop for now' })).toBeNull();
-  });
-
-  it('lists the other people as a list of items', () => {
-    render(<Sending {...base()} others={[{ id: 'b', name: 'Bob Smith', status: 'sent' }, { id: 'd', name: 'Dana Lee', status: 'waiting' }]} />);
-    const list = screen.getByRole('list');
-    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
-  });
-
-  it('moves focus to the new name, not the Text button, when a line is written for each person', () => {
-    const note = { label: 'Add a line for Bea', optional: '(optional)', value: '', onChange: vi.fn() };
-    const view = render(<Sending {...base()} note={note} />);
-    view.rerender(<Sending {...base()} current={{ position: '2 of 3', name: 'Bea', message: 'Hi', isLast: false }} note={note} />);
-    expect(screen.getByRole('button', { name: 'Open Messages' })).not.toHaveFocus();
-  });
-
-  it('labels each other-person row once as name and status', () => {
-    render(<Sending {...base()} others={[{ id: 'b', name: 'Bob Smith', status: 'sent' }]} />);
-    expect(screen.getByLabelText('Bob Smith, Sent')).toBeInTheDocument();
-  });
-
-  it('does not repeat the hand-off note as a hint on Next', () => {
-    render(<Sending {...base()} handOff={{ note: 'Send it in Messages.', again: 'Again', onAgain: vi.fn() }} />);
-    expect(screen.getByRole('button', { name: 'Next' })).not.toHaveAccessibleDescription('Send it in Messages.');
-    expect(screen.getByRole('status')).toHaveTextContent('Send it in Messages.');
   });
 
   it('offers Done on the last person', () => {

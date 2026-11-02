@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import type { TextStyle } from 'react-native';
-import { SerifReadyContext, SerifText } from '@griever/ui';
+import { SerifReadyContext, SerifText } from '../ui';
 
 function styleOf(style: TextStyle, ready = true) {
   render(
