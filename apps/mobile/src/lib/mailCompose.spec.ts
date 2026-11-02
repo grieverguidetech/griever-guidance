@@ -42,6 +42,12 @@ describe('openMailDraft', () => {
     expect(share).toHaveBeenCalledWith({ message: draft.body, title: draft.subject }, { subject: draft.subject });
   });
 
+  it('reports dismissed, not shared, when the user closes the share sheet', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail app'));
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction, activityType: undefined });
+    await expect(openMailDraft(draft)).resolves.toBe('dismissed');
+  });
+
   it('reports failed when mail and sharing both fail', async () => {
     jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail app'));
     jest.spyOn(Share, 'share').mockRejectedValue(new Error('no share'));

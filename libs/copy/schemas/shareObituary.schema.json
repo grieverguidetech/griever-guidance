@@ -30,12 +30,20 @@
     "emailSubject",
     "emailFailed",
     "emailNoText",
+    "mobileEmailTitle",
+    "mobileEmailFailed",
+    "mobileEmailNoText",
     "mobileHeading",
     "linkStepLabel",
     "emailOpened",
     "pasteButton",
     "copyButton",
-    "copied"
+    "copied",
+    "copyFailed",
+    "emailShared",
+    "pasteNotLink",
+    "pasteEmpty",
+    "pasted"
   ],
   "properties": {
     "heading": {
@@ -118,6 +126,15 @@
     "emailNoText": {
       "$ref": "#/$defs/text"
     },
+    "mobileEmailTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "mobileEmailFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "mobileEmailNoText": {
+      "$ref": "#/$defs/text"
+    },
     "mobileHeading": {
       "$ref": "#/$defs/text"
     },
@@ -134,6 +151,21 @@
       "$ref": "#/$defs/text"
     },
     "copied": {
+      "$ref": "#/$defs/text"
+    },
+    "copyFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "emailShared": {
+      "$ref": "#/$defs/text"
+    },
+    "pasteNotLink": {
+      "$ref": "#/$defs/text"
+    },
+    "pasteEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "pasted": {
       "$ref": "#/$defs/text"
     }
   },

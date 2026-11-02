@@ -21,6 +21,7 @@ const base = {
 
 const BUTTON = 'Email it to the paper or funeral home';
 const OPENED = "Opened in your email app. Come back when it's published.";
+const SHARED = "Shared from your phone. Come back when it's published.";
 
 function setup(session: Session, onChange = jest.fn()) {
   render(
@@ -48,7 +49,8 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
   it('with no text, says it can be written on the web and still lets the user continue to the link field', () => {
     setup(base);
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
-    expect(screen.getByText(/can write it on the web/)).toBeTruthy();
+    expect(screen.getByText("Once it's written, come back here.")).toBeTruthy();
+    expect(screen.queryByText(/the web/)).toBeNull();
     expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
   });
 
@@ -123,12 +125,25 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
     expect(await screen.findByText(OPENED)).toBeTruthy();
   });
 
-  it('shows the opened line after the share sheet opens', async () => {
+  it('shows the shared line, not the opened line, after the share sheet completes', async () => {
     jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
     jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.sharedAction, activityType: undefined });
     setup({ ...base, obituaryText: 'Text' } as Session);
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
-    expect(await screen.findByText(OPENED)).toBeTruthy();
+    expect(await screen.findByText(SHARED)).toBeTruthy();
+    expect(screen.queryByText(OPENED)).toBeNull();
+  });
+
+  it('shows no line when the share sheet was dismissed', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction, activityType: undefined });
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).not.toMatchObject({ busy: true }));
+    expect(screen.queryByText(OPENED)).toBeNull();
+    expect(screen.queryByText(SHARED)).toBeNull();
+    expect(screen.queryByText(/couldn't open email/)).toBeNull();
   });
 
   it('paste fills the link field from the clipboard', async () => {
@@ -139,12 +154,28 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ obituaryUrl: 'https://paper.example/anna' }));
   });
 
-  it('paste leaves the field alone when the clipboard is empty', async () => {
+  it('paste says "Link pasted." after a good link', async () => {
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('https://paper.example/anna');
+    setup(base);
+    fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
+    expect(await screen.findByText('Link pasted.')).toBeTruthy();
+  });
+
+  it('paste leaves the field alone and says so when the clipboard is empty', async () => {
     jest.mocked(Clipboard.getStringAsync).mockResolvedValue('');
     const onChange = jest.fn();
     setup(base, onChange);
     fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
-    await waitFor(() => expect(Clipboard.getStringAsync).toHaveBeenCalled());
+    expect(await screen.findByText("There's nothing to paste yet.")).toBeTruthy();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('paste leaves the field alone and says so when the clipboard is not a link', async () => {
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('see you at 3pm');
+    const onChange = jest.fn();
+    setup(base, onChange);
+    fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
+    expect(await screen.findByText(/doesn't look like a link/)).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -156,10 +187,26 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
     expect(await screen.findByText('Copied.')).toBeTruthy();
   });
 
+  it('says the copy failed when the phone refuses, and clears Copied when the email flow runs again', async () => {
+    jest.mocked(Clipboard.setStringAsync).mockResolvedValueOnce(true).mockRejectedValueOnce(new Error('no'));
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
+    expect(await screen.findByText('Copied.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(OPENED);
+    expect(screen.queryByText('Copied.')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
+    expect(await screen.findByText("We couldn't copy the text on this phone.")).toBeTruthy();
+    expect(screen.queryByText('Copied.')).toBeNull();
+  });
+
   it('when mail and sharing fail, the message stays calm, no opened line shows, and Copy the text is offered', async () => {
     jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
     jest.spyOn(Share, 'share').mockRejectedValue(new Error('no share'));
     setup({ ...base, obituaryText: 'Text' } as Session);
+    // Copy the text is there before the press and after the failure.
+    expect(screen.getByRole('button', { name: 'Copy the text' })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     expect(await screen.findByText(/couldn't open email or sharing/)).toBeTruthy();
     expect(screen.queryByText(OPENED)).toBeNull();

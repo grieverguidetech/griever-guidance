@@ -11,7 +11,14 @@ import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { openMailDraft } from '../lib/mailCompose';
 
-const copy = { ...screenCopy('shareObituary'), heading: screenCopy('shareObituary').mobileHeading };
+const shareCopy = screenCopy('shareObituary');
+const copy = {
+  ...shareCopy,
+  heading: shareCopy.mobileHeading,
+  emailTitle: shareCopy.mobileEmailTitle,
+  emailFailed: shareCopy.mobileEmailFailed,
+  emailNoText: shareCopy.mobileEmailNoText,
+};
 
 type Props = {
   session: Session;
@@ -29,8 +36,10 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
   const checklistButton = useRef<ButtonNode>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
-  const [emailOpened, setEmailOpened] = useState(false);
+  const [emailNote, setEmailNote] = useState<'opened' | 'shared' | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const [pasteMessage, setPasteMessage] = useState<string | undefined>(undefined);
   const emailRunning = useRef(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const sheetOpen = useRef(false);
@@ -77,23 +86,40 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
     emailRunning.current = true;
     // Cleared first, so a second failure changes the message again and is announced again.
     setEmailFailed(false);
+    setEmailNote(undefined);
+    setCopied(false);
+    setCopyFailed(false);
     setEmailBusy(true);
     const result = await openMailDraft({ subject: fill(copy.emailSubject, { name }), body: obituaryText });
     emailRunning.current = false;
     setEmailBusy(false);
     setEmailFailed(result === 'failed');
-    setEmailOpened(result !== 'failed');
+    // A dismissed share sheet means nothing was sent or opened, so no line is shown.
+    setEmailNote(result === 'mail' ? 'opened' : result === 'share' ? 'shared' : undefined);
   };
 
   const copyObituary = async () => {
-    setCopied(await copyText(obituaryText));
+    // Cleared first, so a repeat is a change the screen reader announces.
+    setCopied(false);
+    setCopyFailed(false);
+    const ok = await copyText(obituaryText);
+    setCopied(ok);
+    setCopyFailed(!ok);
   };
 
   const pasteLink = async () => {
+    setPasteMessage(undefined);
     const pasted = await pasteText();
-    if (pasted !== '') {
-      onChange({ obituaryUrl: pasted });
+    if (pasted === '') {
+      setPasteMessage(copy.pasteEmpty);
+      return;
     }
+    if (!isValidObituaryLink(pasted)) {
+      setPasteMessage(copy.pasteNotLink);
+      return;
+    }
+    onChange({ obituaryUrl: pasted });
+    setPasteMessage(copy.pasted);
   };
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -113,7 +139,8 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
           onWhatYoullNeed={() => setChecklistOpen(true)}
           onContinue={onContinue}
           onPasteLink={pasteLink}
-          publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, opened: emailOpened, onCopyText: copyObituary, copied }}
+          pasteMessage={pasteMessage}
+          publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
           headingRef={heading}
           checklistRef={checklistButton}
         />

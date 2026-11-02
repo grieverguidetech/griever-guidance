@@ -5,7 +5,7 @@ export interface MailDraft {
   body: string;
 }
 
-export type MailResult = 'mail' | 'share' | 'failed';
+export type MailResult = 'mail' | 'share' | 'dismissed' | 'failed';
 
 /**
  * A `mailto:` link with no recipient (the user fills in To). Subject and body are percent-encoded;
@@ -32,8 +32,9 @@ export async function openMailDraft(draft: MailDraft): Promise<MailResult> {
     return 'mail';
   } catch {
     try {
-      await Share.share({ message: draft.body, title: draft.subject }, { subject: draft.subject });
-      return 'share';
+      const shared = await Share.share({ message: draft.body, title: draft.subject }, { subject: draft.subject });
+      // iOS says when the user closed the sheet without sharing; then nothing happened and nothing should be claimed.
+      return shared.action === Share.dismissedAction ? 'dismissed' : 'share';
     } catch {
       return 'failed';
     }
