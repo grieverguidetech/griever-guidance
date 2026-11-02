@@ -35,6 +35,8 @@ export function SendingScreen({ flow, contacts }: Props) {
   const [handedOffId, setHandedOffId] = useState<string | null>(null);
   const [askingId, setAskingId] = useState<string | null>(null);
   const wentAway = useRef(false);
+  // The contact whose question was already answered Yes, so a second tap cannot mark the next one.
+  const confirmedFor = useRef<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof Text>>(null);
@@ -52,15 +54,21 @@ export function SendingScreen({ flow, contacts }: Props) {
       return;
     }
     wentAway.current = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Only 'background' counts. 'inactive' also fires for Control Center and the notification shade.
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background' || state === 'inactive') {
+      if (state === 'background') {
         wentAway.current = true;
       } else if (state === 'active' && wentAway.current) {
         wentAway.current = false;
-        setAskingId(activeId);
+        // A moment after the app is active, so the screen reader is ready to move focus to the question.
+        timer = setTimeout(() => setAskingId(activeId), 100);
       }
     });
-    return () => subscription.remove();
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
   }, [handedOff, activeId]);
 
   // The heading takes screen-reader focus when the screen opens.
@@ -97,7 +105,10 @@ export function SendingScreen({ flow, contacts }: Props) {
     const link = buildSmsLink(contact.phone, flow.messageFor(contact.name), Platform.OS === 'ios');
     setHandedOffId(contactId);
     setAskingId(null);
-    void Linking.openURL(link);
+    // If Messages cannot open, this person goes back to the Text button rather than waiting on a hand-off that never happened.
+    Linking.openURL(link).catch(() => {
+      setHandedOffId((current) => (current === contactId ? null : current));
+    });
   }
 
   function openMessages() {
@@ -108,6 +119,10 @@ export function SendingScreen({ flow, contacts }: Props) {
 
   // One tap: this person is sent, and Messages opens for the next, if there is one.
   function confirmSent() {
+    if (!activeId || confirmedFor.current === activeId) {
+      return;
+    }
+    confirmedFor.current = activeId;
     const next = isLast ? undefined : sendJob?.recipients[activeIndex + 1];
     markActiveSent();
     if (next) {
@@ -150,6 +165,9 @@ export function SendingScreen({ flow, contacts }: Props) {
                 yes: isLast
                   ? fill(copy.sentPromptDone, { name: activeContact.name })
                   : fill(copy.sentPromptNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
+                hint: isLast
+                  ? fill(copy.sentHintDone, { name: activeContact.name })
+                  : fill(copy.sentHintNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
                 notYet: copy.notYet,
                 onYes: confirmSent,
                 onNotYet: () => setHandedOffId(null),

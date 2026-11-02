@@ -117,13 +117,23 @@ describe('Sending', () => {
     const view = render(<Sending {...base()} handOff={handOff} />);
     expect(screen.queryByRole('button', { name: 'Sent to A? Next: B' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Not yet' })).toBeNull();
-    view.rerender(<Sending {...base()} handOff={handOff} confirmSent={{ yes: 'Sent to A? Next: B', notYet: 'Not yet', onYes, onNotYet }} />);
+    view.rerender(<Sending {...base()} handOff={handOff} confirmSent={{ yes: 'Sent to A? Next: B', hint: 'Marks A sent and opens Messages for B', notYet: 'Not yet', onYes, onNotYet }} />);
     expect(screen.getByRole('button', { name: 'Sent to A? Next: B' })).toHaveFocus();
+    // The stale "tap Next" note is gone while the question shows.
+    expect(screen.getByRole('status')).toHaveTextContent('');
     await user.click(screen.getByRole('button', { name: 'Sent to A? Next: B' }));
     await user.click(screen.getByRole('button', { name: 'Not yet' }));
     expect(onYes).toHaveBeenCalledTimes(1);
     expect(onNotYet).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+  });
+
+  it('moves focus back to the hand-off button when the question closes', () => {
+    const handOff = { note: 'n', again: 'Open Messages again', onAgain: vi.fn() };
+    const ask = { yes: 'Sent to A? Next: B', hint: 'h', notYet: 'Not yet', onYes: vi.fn(), onNotYet: vi.fn() };
+    const view = render(<Sending {...base()} handOff={handOff} confirmSent={ask} />);
+    view.rerender(<Sending {...base()} handOff={null} />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveFocus();
   });
 
   it('uses openLabel for the hand-off button when given', () => {

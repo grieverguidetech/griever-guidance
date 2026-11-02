@@ -14,6 +14,8 @@
     "textPerson",
     "sentPromptNext",
     "sentPromptDone",
+    "sentHintDone",
+    "sentHintNext",
     "notYet",
     "openMessagesAgain",
     "share",
@@ -57,16 +59,59 @@
       "$ref": "#/$defs/text"
     },
     "textPerson": {
-      "type": "string",
-      "pattern": "\\{name\\}"
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}",
+          "type": "string"
+        }
+      ]
     },
     "sentPromptNext": {
-      "type": "string",
-      "pattern": "\\{name\\}.*\\{next\\}"
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}.*\\{next\\}",
+          "type": "string"
+        }
+      ]
     },
     "sentPromptDone": {
-      "type": "string",
-      "pattern": "\\{name\\}"
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "sentHintNext": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}.*\\{next\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "sentHintDone": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}",
+          "type": "string"
+        }
+      ]
     },
     "notYet": {
       "$ref": "#/$defs/text"

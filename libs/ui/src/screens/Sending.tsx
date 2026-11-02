@@ -56,7 +56,7 @@ export interface SendingProps {
    * the whole question as one button ("Sent to Ana? Next: Ben"); one tap confirms. The web never
    * sets it, so it keeps the single Next tap.
    */
-  confirmSent?: { yes: string; notYet: string; onYes: () => void; onNotYet: () => void };
+  confirmSent?: { yes: string; hint: string; notYet: string; onYes: () => void; onNotYet: () => void };
   /** Replaces the hand-off button's label, for example "Text Ana". Unset keeps `copy.openMessages`. */
   openLabel?: string;
   /** A calm error line, for example when sharing did not go through. */
@@ -96,10 +96,15 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
 
   // The question takes the screen reader's focus when it shows, so it is read out.
   const asking = confirmSent !== undefined;
+  // When it closes without a new person ("Not yet"), focus goes back to the hand-off button.
+  const wasAsking = useRef(false);
   useEffect(() => {
     if (asking) {
       focusNode(yesRef.current);
+    } else if (wasAsking.current) {
+      focusNode(openRef.current);
     }
+    wasAsking.current = asking;
   }, [asking]);
 
   // After Next or Skip the pressed button is gone, so focus goes to the new person's first action.
@@ -139,7 +144,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
           <Body>{current.message}</Body>
           {handOff && confirmSent ? (
             <View style={styles.actions}>
-              <Button label={confirmSent.yes} buttonRef={yesRef} onPress={confirmSent.onYes} />
+              <Button label={confirmSent.yes} hint={confirmSent.hint} buttonRef={yesRef} onPress={confirmSent.onYes} />
               <Button label={confirmSent.notYet} variant="secondary" onPress={confirmSent.onNotYet} />
               <Button label={copy.skip} variant="ghost" onPress={onSkip} />
             </View>
@@ -155,7 +160,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
               <Button label={copy.skip} variant="ghost" onPress={onSkip} />
             </View>
           )}
-          <Status id={statusId} message={error ?? handOff?.note} tone={error ? 'danger' : 'muted'} />
+          <Status id={statusId} message={error ?? (confirmSent ? undefined : handOff?.note)} tone={error ? 'danger' : 'muted'} />
         </Card>
       ) : null}
       <View style={styles.list}>
