@@ -123,7 +123,8 @@ fi
 
 echo "dev:local: starting $TARGET. Press Ctrl+C to stop everything."
 if [ "$TARGET" = "mobile" ]; then
-  pnpm nx start mobile
+  # Tunnel so the phone loads the bundle even when the local network blocks it (Peter, 2026-11-01).
+  pnpm nx start mobile --args="--tunnel"
 else
   pnpm nx serve web
 fi
