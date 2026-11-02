@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { AccessibilityInfo, Linking } from 'react-native';
+import { AccessibilityInfo, Linking, Share } from 'react-native';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
@@ -12,16 +12,18 @@ import { SendingScreen } from './SendingScreen';
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '' } as SessionDetails;
 const contacts = { contacts: [{ contactId: 'c0', name: 'Dee', phone: '+15555550100' }] } as never;
 
-function Harness({ fields, thanks, senderName }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string } = {}) {
+function Harness({ fields, thanks, senderName, category, ids = ['c0'] }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[] } = {}) {
   const flow = useSendFlow({
     session: { ...session, ...(senderName === undefined ? {} : { senderName }) },
     draft: freshDraft({
-      templateCategory: thanks ? 'aftercare' : 'service', templateOverrideId: thanks ? 'thank-you-note' : 'share-service', step: 'review',
+      templateCategory: category ?? (thanks ? 'aftercare' : 'service'),
+      templateOverrideId: category ? undefined : thanks ? 'thank-you-note' : 'share-service',
+      step: 'review',
       fields: fields ?? { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' },
     }),
   });
   const { selectContacts } = flow;
-  useEffect(() => { selectContacts(['c0']); }, [selectContacts]);
+  useEffect(() => { selectContacts(ids); }, [selectContacts]); // eslint-disable-line react-hooks/exhaustive-deps
   return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ConfirmScreen flow={flow} contacts={contacts} />;
 }
 
@@ -147,5 +149,58 @@ describe('Review your message (Share the service)', () => {
       fireEvent.changeText(screen.getByLabelText('Personal note (optional)'), 'Your flowers meant a lot.');
       expect(screen.getByText(/Your flowers meant a lot\./)).toBeTruthy();
     });
+  });
+});
+
+describe('Share elsewhere', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const shared = { action: Share.sharedAction, activityType: undefined };
+
+  it('shows on the service next to Send, and shares the message without a greeting', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
+    render(<Harness />);
+    expect(screen.getByText('Text these people')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    fireEvent.press(screen.getByText('Share elsewhere'));
+    await screen.findByText('Share elsewhere');
+    expect(share).toHaveBeenCalledWith({ message: 'Come as you are.' });
+  });
+
+  it('with no one picked is the only action, and records nothing', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    open.mockClear();
+    render(<Harness ids={[]} />);
+    expect(screen.queryByText('Text these people')).toBeNull();
+    expect(screen.queryByText(/^Text /)).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    fireEvent.press(screen.getByText('Share elsewhere'));
+    await screen.findByText('Share elsewhere');
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Sending|sent/i)).toBeNull();
+  });
+
+  it('shows the calm error when the share sheet fails', async () => {
+    jest.spyOn(Share, 'share').mockRejectedValue(new Error('no'));
+    render(<Harness ids={[]} />);
+    fireEvent.press(screen.getByText('Share elsewhere'));
+    expect(await screen.findByText("That didn't go through. You can try again.")).toBeTruthy();
+  });
+
+  it('shows on the obituary', () => {
+    render(<Harness category="obituary" ids={[]} />);
+    expect(screen.getByText('Share elsewhere')).toBeTruthy();
+  });
+
+  it('is not on the announcement or the thank-you', () => {
+    const { unmount } = render(<Harness category="announcement" />);
+    expect(screen.queryByText('Share elsewhere')).toBeNull();
+    unmount();
+    render(<Harness thanks senderName="The Hayes Family" fields={{}} />);
+    expect(screen.queryByText('Share elsewhere')).toBeNull();
   });
 });

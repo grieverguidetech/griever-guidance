@@ -65,6 +65,18 @@ export interface ReviewProps {
   /** Between the message and the buttons, for example the sample and the flowers choice. */
   children?: ReactNode;
   headingRef?: HeadingProps['headingRef'];
+  /**
+   * Mobile: "Share elsewhere" for the service and obituary. Leave unset on web and for the announcement
+   * and thank-you, and the button is not drawn.
+   */
+  share?: {
+    label: string;
+    onPress: () => void;
+    /** A calm line when the share sheet did not open. */
+    error?: string;
+    /** No one is picked, so Share elsewhere is the only action: Send and the texting note are not drawn. */
+    only?: boolean;
+  };
 }
 
 /**
@@ -72,7 +84,7 @@ export interface ReviewProps {
  * libs/ui so web (through react-native-web) and mobile show the same screen. The message and tone
  * live in the app; only whether the field is open lives here.
  */
-export function Review({ copy, kind, intro, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, sendLabel, hasRecipients, blockedReason, onBack, onSend, onWhatYoullNeed, checklistRef, children, headingRef }: ReviewProps) {
+export function Review({ copy, kind, intro, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, sendLabel, hasRecipients, blockedReason, onBack, onSend, onWhatYoullNeed, checklistRef, children, headingRef, share }: ReviewProps) {
   const announcement = kind === 'announcement';
   const [editing, setEditing] = useState(false);
   const [returnFocus, setReturnFocus] = useState(false);
@@ -81,6 +93,8 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   const reasonId = useId();
   const toneReasonId = useId();
   const blank = message.trim() === '';
+  const shareReasonId = useId();
+  const shareReason = blank ? copy.blank : blockedReason;
   const reason = blank ? copy.blank : !hasRecipients ? copy.noRecipients : blockedReason;
 
   // Focus follows the field: into it when Edit wording opens, back to the toggle when it closes.
@@ -148,22 +162,46 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
         </View>
       ) : null}
       {edited ? <Button label={copy.useSuggested} variant="ghost" onPress={onUseSuggested} /> : null}
-      <Button
-        label={sendLabel}
-        ariaDisabled={reason !== undefined}
-        announceDisabled
-        describedBy={reason ? reasonId : undefined}
-        hint={reason}
-        onPress={() => {
-          if (!reason) {
-            onSend();
-          }
-        }}
-      />
-      <Status id={reasonId} message={reason} />
-      <Body tone="muted" small>
-        {copy.privacy}
-      </Body>
+      {share ? (
+        <>
+          <Button
+            label={share.label}
+            variant={share.only ? 'primary' : 'secondary'}
+            ariaDisabled={shareReason !== undefined}
+            announceDisabled
+            describedBy={shareReason ? reasonId : undefined}
+            hint={shareReason}
+            onPress={() => {
+              if (!shareReason) {
+                share.onPress();
+              }
+            }}
+          />
+          <Status id={shareReasonId} message={share.error} tone="danger" />
+        </>
+      ) : null}
+      {share?.only ? (
+        <Status id={reasonId} message={shareReason} />
+      ) : (
+        <>
+          <Button
+            label={sendLabel}
+            ariaDisabled={reason !== undefined}
+            announceDisabled
+            describedBy={reason ? reasonId : undefined}
+            hint={reason}
+            onPress={() => {
+              if (!reason) {
+                onSend();
+              }
+            }}
+          />
+          <Status id={reasonId} message={reason} />
+          <Body tone="muted" small>
+            {copy.privacy}
+          </Body>
+        </>
+      )}
     </View>
   );
 }

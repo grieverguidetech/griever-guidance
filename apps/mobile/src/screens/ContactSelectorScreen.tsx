@@ -194,6 +194,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           onWhatYoullNeed={() => setChecklistOpen(true)}
           checklistRef={checklistButton}
           onContinue={nextStep}
+          allowNone={templateCategory === 'service' || templateCategory === 'obituary'}
           bringAcross={{ buttonRef: importButton, onPress: handleImport, busy: importing, notice: importError ?? undefined }}
           footer={<SavedNote />}
         />
