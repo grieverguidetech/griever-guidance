@@ -144,10 +144,10 @@ const FIRST_STEP: Partial<Record<TemplateCategory, SendFlowStep>> = {
  * The draft to resume with. A draft sitting on the template picker moves on to the moment's first
  * form, so the picker can't be reached and overwrite what was typed. Fields are left untouched.
  */
-export function resumeDraft(draft: SendFlowDraft): SendFlowDraft {
+export function resumeDraft(draft: SendFlowDraft, skipDetails = false): SendFlowDraft {
   if (draft.step !== 'template') return draft;
   const first = draft.templateCategory ? FIRST_STEP[draft.templateCategory] : undefined;
-  return { ...draft, step: first ?? 'details' };
+  return { ...draft, step: first ?? (skipDetails ? 'contacts' : 'details') };
 }
 
 /**
@@ -169,13 +169,13 @@ export function draftHasContent(
  * True when a moment has something to resume: the first form shows typed words or a hand-edited
  * message, or the draft has moved past that form. A draft only opened (nothing typed) is not started.
  */
-export function isDraftStarted(draft: SendFlowDraft | null | undefined): boolean {
+export function isDraftStarted(draft: SendFlowDraft | null | undefined, skipDetails = false): boolean {
   if (!hasDraftInProgress(draft) || !draft.templateCategory) return false;
-  const first = FIRST_STEP[draft.templateCategory] ?? 'details';
+  const first = FIRST_STEP[draft.templateCategory] ?? (skipDetails ? 'contacts' : 'details');
   return draftHasContent(draft) || (draft.step !== 'template' && draft.step !== first);
 }
 
-function fromDraft(draft: SendFlowDraft): SendFlowState {
+function fromDraft(draft: SendFlowDraft, skipDetails = false): SendFlowState {
   // Drafts saved before the made-up venue and florist lists were removed carry `place` and
   // `floristId`. Drop them so only the typed place and florist are ever sent.
   const { place: _place, floristId: _floristId, ...kept } = draft as SendFlowDraft & {
@@ -189,7 +189,7 @@ function fromDraft(draft: SendFlowDraft): SendFlowState {
   // stays in `fields` and still reaches the message.
   if (
     restored.step === 'serviceKnown' ||
-    (restored.step === 'details' && restored.templateCategory === 'announcement')
+    (restored.step === 'details' && (restored.templateCategory === 'announcement' || skipDetails))
   ) {
     restored.step = 'contacts';
   }
@@ -201,12 +201,12 @@ function toDraft(state: SendFlowState): SendFlowDraft {
   return draft;
 }
 
-function loadState(storage: SendFlowStorage | undefined): SendFlowState {
+function loadState(storage: SendFlowStorage | undefined, skipDetails: boolean): SendFlowState {
   if (!storage) return initialState;
   try {
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return initialState;
-    return fromDraft(JSON.parse(raw) as SendFlowDraft);
+    return fromDraft(JSON.parse(raw) as SendFlowDraft, skipDetails);
   } catch {
     return initialState;
   }
@@ -238,7 +238,7 @@ function resolveTemplate(state: SendFlowState): Template | null {
   return templates.find((t) => t.category === state.templateCategory) ?? null;
 }
 
-function stepsFor(state: SendFlowState, template: Template | null): SendFlowStep[] {
+function stepsFor(state: SendFlowState, template: Template | null, skipDetails: boolean): SendFlowStep[] {
   const category = template?.category ?? state.templateCategory;
   if (category === 'announcement') {
     return ['template', 'announce', 'contacts', 'review', 'sending', 'sent'];
@@ -246,6 +246,9 @@ function stepsFor(state: SendFlowState, template: Template | null): SendFlowStep
   if (category === 'obituary') {
     // The one required field (the link) is gathered on the session in C4,
     // not a per-flow details form — skip straight to recipients.
+    return ['template', 'contacts', 'review', 'sending', 'sent'];
+  }
+  if (skipDetails) {
     return ['template', 'contacts', 'review', 'sending', 'sent'];
   }
   return ['template', 'details', 'contacts', 'review', 'sending', 'sent'];
@@ -308,17 +311,23 @@ export interface UseSendFlowOptions {
   onDraftChange?: (draft: SendFlowDraft) => void;
   /** Fallback persistence when there is no session (standalone / mobile). */
   storage?: SendFlowStorage;
+  /**
+   * Leave out the details form: the service and thank-you steps go template, contacts, review,
+   * sending, sent, and a saved draft on 'details' resumes on 'contacts'. Mobile sets it (details
+   * are edited on the send screen). Off by default, so the web step order is unchanged.
+   */
+  skipDetails?: boolean;
 }
 
 export function useSendFlow(
   options: UseSendFlowOptions = {},
 ): SendFlowState & SendFlowActions & SendFlowDerived {
-  const { session = null, draft = null, drafts, onDraftChange, storage } = options;
+  const { session = null, draft = null, drafts, onDraftChange, storage, skipDetails = false } = options;
   const draftsRef = useRef(drafts);
   draftsRef.current = drafts;
 
   const [state, setState] = useState<SendFlowState>(() =>
-    draft ? fromDraft(draft) : loadState(storage),
+    draft ? fromDraft(draft, skipDetails) : loadState(storage, skipDetails),
   );
 
   useEffect(() => {
@@ -331,8 +340,8 @@ export function useSendFlow(
 
   const selectedTemplate = useMemo(() => resolveTemplate(state), [state]);
   const steps = useMemo(
-    () => stepsFor(state, selectedTemplate),
-    [state, selectedTemplate],
+    () => stepsFor(state, selectedTemplate, skipDetails),
+    [state, selectedTemplate, skipDetails],
   );
 
   const composedFields = useMemo(
@@ -356,10 +365,10 @@ export function useSendFlow(
   const startedState = useCallback((category: TemplateCategory, templateOverrideId: string | null): SendFlowState => {
     const saved = draftsRef.current?.[category];
     if (hasDraftInProgress(saved) && saved.templateOverrideId === templateOverrideId) {
-      return { ...fromDraft(saved), step: 'template' };
+      return { ...fromDraft(saved, skipDetails), step: 'template' };
     }
     return { ...initialState, step: 'template', templateCategory: category, templateOverrideId };
-  }, []);
+  }, [skipDetails]);
 
   const setTemplateCategory = useCallback((category: TemplateCategory) => {
     setState((s) => {
@@ -462,19 +471,19 @@ export function useSendFlow(
 
   const nextStep = useCallback(() => {
     setState((s) => {
-      const order = stepsFor(s, resolveTemplate(s));
+      const order = stepsFor(s, resolveTemplate(s), skipDetails);
       const next = order[order.indexOf(s.step) + 1];
       return next ? { ...s, step: next } : s;
     });
-  }, []);
+  }, [skipDetails]);
 
   const prevStep = useCallback(() => {
     setState((s) => {
-      const order = stepsFor(s, resolveTemplate(s));
+      const order = stepsFor(s, resolveTemplate(s), skipDetails);
       const prev = order[order.indexOf(s.step) - 1];
       return prev ? { ...s, step: prev } : s;
     });
-  }, []);
+  }, [skipDetails]);
 
   const reset = useCallback(() => {
     clearPersisted(storage);
@@ -487,15 +496,17 @@ export function useSendFlow(
       if (!category) return s;
       return {
         ...initialState,
-        step: FIRST_STEP[category] ?? 'details',
+        step: FIRST_STEP[category] ?? (skipDetails ? 'contacts' : 'details'),
         templateCategory: category,
         templateOverrideId: s.templateOverrideId,
-        // People chosen elsewhere (e.g. carried in by "Add service details") are not on this form,
-        // so they are not ours to drop. The obituary's first form is the contacts list itself.
+        // People chosen elsewhere (e.g. carried in by "Add service details") are not ours to drop.
+        // Only the obituary clears them: its first form is the contacts list. With skipDetails the
+        // service and thank-you first form is the list too, but its people are kept, so mobile's
+        // Start again leaves them ticked.
         selectedContactIds: category === 'obituary' ? [] : s.selectedContactIds,
       };
     });
-  }, []);
+  }, [skipDetails]);
 
   return {
     ...state,

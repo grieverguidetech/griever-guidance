@@ -135,7 +135,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   };
 
   const rows: HubRow[] = moments.map((moment) => {
-    const started = isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]]);
+    const started = isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]], true);
     return {
       key: moment.key,
       status: moment.status,

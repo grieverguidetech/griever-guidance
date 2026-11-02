@@ -334,3 +334,77 @@ describe('useSendFlow — a draft saved with a made-up place (#247)', () => {
     expect(saved.at(-1)).not.toHaveProperty('floristId');
   });
 });
+
+describe('useSendFlow — skipDetails (mobile)', () => {
+  const service = (options: { skipDetails?: boolean } = {}, patch: Partial<SendFlowDraft> = {}) =>
+    renderHook(() =>
+      useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', step: 'template', ...patch }), ...options }),
+    );
+
+  it('goes template, contacts, review, sending, sent for service and thank-you', () => {
+    for (const templateCategory of ['service', 'aftercare'] as const) {
+      const { result } = renderHook(() =>
+        useSendFlow({ session, skipDetails: true, draft: freshDraft({ templateCategory, step: 'template' }) }),
+      );
+      expect(result.current.steps).toEqual(['template', 'contacts', 'review', 'sending', 'sent']);
+      act(() => result.current.nextStep());
+      expect(result.current.step).toBe('contacts');
+      act(() => result.current.prevStep());
+      expect(result.current.step).toBe('template');
+    }
+  });
+
+  it('keeps the details step without the option (web order unchanged)', () => {
+    const { result } = service();
+    expect(result.current.steps).toEqual(['template', 'details', 'contacts', 'review', 'sending', 'sent']);
+    act(() => result.current.nextStep());
+    expect(result.current.step).toBe('details');
+  });
+
+  it('resumes a draft saved on details at contacts, only with the option', () => {
+    expect(service({ skipDetails: true }, { step: 'details' }).result.current.step).toBe('contacts');
+    expect(service({}, { step: 'details' }).result.current.step).toBe('details');
+  });
+
+  it('resumeDraft moves a draft off the picker to contacts with the option', () => {
+    const draft = freshDraft({ templateCategory: 'service', step: 'template' });
+    expect(resumeDraft(draft, true).step).toBe('contacts');
+    expect(resumeDraft(draft).step).toBe('details');
+  });
+
+  it('leaves the announcement and obituary steps as they were', () => {
+    const { result } = renderHook(() =>
+      useSendFlow({ session, skipDetails: true, draft: freshDraft({ templateCategory: 'announcement', step: 'template' }) }),
+    );
+    expect(result.current.steps).toEqual(['template', 'announce', 'contacts', 'review', 'sending', 'sent']);
+  });
+});
+
+describe('useSendFlow — skipDetails: start again and started drafts', () => {
+  it('startAgain reopens service on contacts with the typed words cleared and the people kept', () => {
+    const { result } = renderHook(() =>
+      useSendFlow({
+        session,
+        skipDetails: true,
+        draft: freshDraft({ templateCategory: 'service', step: 'review', fields: { serviceDate: 'June 14' }, selectedContactIds: ['c1'] }),
+      }),
+    );
+    act(() => result.current.startAgain());
+    expect(result.current).toMatchObject({ step: 'contacts', fields: {}, selectedContactIds: ['c1'] });
+  });
+
+  it('startAgain goes to details without the option', () => {
+    const { result } = renderHook(() =>
+      useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', step: 'review', fields: { serviceDate: 'x' } }) }),
+    );
+    act(() => result.current.startAgain());
+    expect(result.current.step).toBe('details');
+  });
+
+  it('isDraftStarted treats contacts as the first form with skipDetails', () => {
+    const onContacts = freshDraft({ templateCategory: 'service', step: 'contacts' });
+    expect(isDraftStarted(onContacts, true)).toBe(false);
+    expect(isDraftStarted(onContacts)).toBe(true);
+    expect(isDraftStarted(freshDraft({ templateCategory: 'service', step: 'review' }), true)).toBe(true);
+  });
+});

@@ -6,7 +6,12 @@ import { createSessionCache, SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSe
 import { freshDraft } from '@griever/hooks';
 import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 
-const NAME_PLACEHOLDER = 'e.g. Margaret Ellen Hayes';
+// Service and thank-you open on Who should know?; their planned fields are kept in the saved draft.
+const findPicker = () => screen.findByRole('heading', { name: 'Who should know?' });
+async function savedAftercare(personName: string) {
+  const people = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { step: string; fields: Record<string, string>; selectedContactIds: string[] }> }[];
+  return people.find((p) => p.personName === personName)?.drafts?.['aftercare'];
+}
 
 const START = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
@@ -73,8 +78,10 @@ describe('people kept on the phone', () => {
     expect(screen.getByLabelText('Their name, required').props.value).toBe('');
     await startWith('Ben');
     await openThankYous();
-    // Only the new person's own name is there; nothing carries over from Anna.
-    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Ben');
+    await findPicker();
+    // Only the new person's own name is in the draft; nothing carries over from Anna.
+    await waitFor(async () => expect((await savedAftercare('Ben'))?.fields['deceasedName']).toBe('Ben'));
+    expect((await savedAftercare('Anna'))?.fields['deceasedName']).not.toBe('Ben');
   });
 
   it('restores a half-finished draft, not just the names', async () => {
@@ -82,14 +89,19 @@ describe('people kept on the phone', () => {
     await begin();
     await startWith('Anna');
     await openThankYous();
-    fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Lee');
-    await waitFor(async () => expect((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '').toContain('Anna Lee'));
+    await findPicker();
+    fireEvent.press(await screen.findByText('Dee'));
+    await waitFor(async () => expect((await savedAftercare('Anna'))?.selectedContactIds).toEqual(['c1']));
+    expect((await savedAftercare('Anna'))?.step).toBe('contacts');
     first.unmount();
 
     render(<App />);
-    fireEvent.press(await screen.findByLabelText('Anna Lee')); // typing the name renamed the person
+    fireEvent.press(await screen.findByLabelText('Anna'));
     await openThankYous();
-    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
+    await findPicker();
+    expect(await screen.findByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
+    expect((await savedAftercare('Anna'))?.step).toBe('contacts');
+    expect((await savedAftercare('Anna'))?.selectedContactIds).toEqual(['c1']);
   });
 
   it('does not keep a finished send as a draft', async () => {
@@ -126,10 +138,12 @@ describe('people kept on the phone', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await openThankYous();
-    fireEvent.changeText(await screen.findByPlaceholderText(NAME_PLACEHOLDER), 'Anna Marie');
+    // A draft saved on the retired details step resumes on Who should know?, fields kept.
+    await findPicker();
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
-      expect(saved.drafts.aftercare.fields.deceasedName).toBe('Anna Marie');
+      expect(saved.drafts.aftercare.step).toBe('contacts');
+      expect(saved.drafts.aftercare.fields.deceasedName).toBe('Anna Lee');
       expect(saved.drafts.announcement).toEqual(announcement);
     });
   });
@@ -146,7 +160,8 @@ describe('people kept on the phone', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await openThankYous();
-    expect((await screen.findByPlaceholderText(NAME_PLACEHOLDER)).props.value).toBe('Anna Lee');
+    await findPicker();
+    await waitFor(async () => expect((await savedAftercare('Anna'))?.fields['deceasedName']).toBe('Anna Lee'));
   });
 
   describe('the hub hands over to a moment (no picker, never a blank screen)', () => {

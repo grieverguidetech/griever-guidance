@@ -132,15 +132,26 @@ describe('picking an announcement', () => {
     expect(focus).toHaveBeenCalled();
   });
 
-  it('moves screen-reader focus to the title when a details form opens', async () => {
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-    await openAnna();
-    await screen.findByText('One thing at a time.');
-    focus.mockClear();
-    await startMoment('Send thank-yous');
-    await screen.findByPlaceholderText('e.g. Margaret Ellen Hayes');
-    expect(focus).toHaveBeenCalled();
-  });
+  it.each([['Share the service'], ['Send thank-yous']])(
+    '%s opens Who should know? with a real header, and Back returns to the hub',
+    async (moment) => {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      await openAnna();
+      await screen.findByText('One thing at a time.');
+      focus.mockClear();
+      await startMoment(moment);
+      expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+      expect(screen.queryByPlaceholderText('e.g. 2:00 PM')).toBeNull();
+      // Screen-reader focus went to the title itself, once.
+      const heading = screen.getByRole('heading', { name: 'Who should know?' });
+      const handle = focus.mock.calls.map(([h]) => h);
+      expect(handle.length).toBeGreaterThan(0);
+      expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();
+      expect(heading).toBeTruthy();
+      fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    },
+  );
 
   it('says who is open when the person arrives from Home', async () => {
     const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
@@ -324,9 +335,8 @@ describe('the end of a send', () => {
     // The announcement is now recorded as done, so the next step (Share the service) carries Start.
     fireEvent.press(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
-    // The service form opened (not the hub, not 'sent').
-    expect(await screen.findByText('Service date')).toBeTruthy();
-    expect(screen.getByText('Share the service')).toBeTruthy();
+    // The service moment opened on its people (not the hub, not 'sent').
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
   });
 
   it('announces the note once, and focuses the hub heading as it opens', async () => {

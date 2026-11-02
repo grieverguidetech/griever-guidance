@@ -44,6 +44,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
   };
   const importButton = useRef<ButtonNode>(null);
   const reviewHeading = useRef<ComponentRef<typeof Text>>(null);
+  const listHeading = useRef<ComponentRef<typeof Text>>(null);
   const wasReviewing = useRef(false);
   const reviewing = mode.kind === 'reviewing';
   const focusNode = (node: unknown) => {
@@ -52,6 +53,14 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
+  // Service and thank-you open here as their first screen, so the title takes focus once on mount.
+  const opensHere = templateCategory === 'service' || templateCategory === 'aftercare';
+  useEffect(() => {
+    if (opensHere) {
+      focusNode(listHeading.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Focus follows the view: the review heading on the way in, the import button on the way back.
   useEffect(() => {
     if (reviewing) {
@@ -166,6 +175,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <WhoShouldKnow
           copy={copy}
+          headingRef={listHeading}
           people={contacts.contacts.map((c) => ({ id: c.contactId, name: c.name, phone: c.phone, tier: c.tier }))}
           grouped={false}
           search
