@@ -59,8 +59,7 @@ export interface PersonSetupProps {
 
 /**
  * "Who are we writing about?": the name (required), the date (optional, in the app's own control)
- * and optionally the sender. Built from libs/ui so web (through react-native-web) and mobile show
- * the same screen. It owns no state.
+ * and optionally the sender. Mobile's own screen (apps/mobile/src/ui). It owns no state.
  */
 export function PersonSetup({ copy, editing, backName, name, onNameChange, renderDate, sender, onSenderChange, onBack, onWhatYoullNeed, onContinue, footer, headingRef, checklistRef }: PersonSetupProps) {
   const dateLabelId = useId();

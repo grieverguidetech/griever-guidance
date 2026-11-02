@@ -45,6 +45,11 @@ const people = [
   { id: 'c', name: 'Cat Jones', phone: '(617) 555-0150', tier: 'family' as const },
 ];
 
+/** Only host nodes: a wrapper component passes the same prop down and would be counted twice. */
+function hostsWithRole(role: string) {
+  return screen.UNSAFE_queryAllByProps({ role }).filter((node) => typeof node.type === 'string');
+}
+
 function setup(over: Partial<WhoShouldKnowProps> = {}) {
   const handlers = {
     onBack: jest.fn(),
@@ -108,16 +113,16 @@ describe('WhoShouldKnow (mobile props, #652)', () => {
 
   it('with scrollList, the rows are not wrapped in a list', () => {
     setup({ grouped: false, scrollList: true });
-    expect(screen.UNSAFE_queryAllByProps({ role: 'list' })).toHaveLength(0);
-    expect(screen.UNSAFE_queryAllByProps({ role: 'listitem' })).toHaveLength(0);
+    expect(hostsWithRole('list')).toHaveLength(0);
+    expect(hostsWithRole('listitem')).toHaveLength(0);
     expect(screen.getAllByRole('checkbox')).toHaveLength(3);
   });
 
   it('without scrollList, the rows keep their list and listitem roles', () => {
     setup({ grouped: false });
     // Plain views with a role are not accessible elements, so they are found by prop.
-    expect(screen.UNSAFE_getAllByProps({ role: 'list' }).length).toBeGreaterThan(0);
-    expect(screen.UNSAFE_getAllByProps({ role: 'listitem' }).length).toBeGreaterThanOrEqual(3);
+    expect(hostsWithRole('list')).toHaveLength(1);
+    expect(hostsWithRole('listitem')).toHaveLength(3);
   });
 
   it('with scrollList, the count and Continue are still on the screen', () => {

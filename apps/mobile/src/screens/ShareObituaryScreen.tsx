@@ -28,7 +28,7 @@ type Props = {
 };
 
 /**
- * The screen is the shared ShareObituary in libs/ui; this holds what is mobile only: focus, Android
+ * The screen is the ShareObituary in apps/mobile/src/ui; this holds what is mobile only: focus, Android
  * Back and the sheet. It passes no drafting handler, so the drafting card is not shown.
  */
 export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: Props) {

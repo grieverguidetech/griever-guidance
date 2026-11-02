@@ -88,8 +88,8 @@ export interface SendingProps {
 
 /**
  * "Reaching people, one at a time": one person's message at a time, handed off to Messages (or the
- * share sheet) and then Next. Built from libs/ui so web (through react-native-web) and mobile show
- * the same screen. It owns no state; the app holds the hand-off and does the platform work.
+ * share sheet) and then Next. Mobile's own screen
+ * (apps/mobile/src/ui). It owns no state; the app holds the hand-off and does the platform work.
  */
 export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, note, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, stop, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();

@@ -150,8 +150,8 @@ export interface WhoShouldKnowProps {
 }
 
 /**
- * "Who should know?": pick the people who get the message. Built from libs/ui so web (through
- * react-native-web) and mobile show the same screen.
+ * "Who should know?": pick the people who get the message. Mobile's own screen
+ * (apps/mobile/src/ui).
  */
 export function WhoShouldKnow({
   copy,

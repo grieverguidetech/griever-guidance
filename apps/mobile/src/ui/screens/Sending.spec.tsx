@@ -48,7 +48,7 @@ describe('Sending (mobile)', () => {
 
   it('lists the other people as a list of items', () => {
     render(<Sending {...base({ others: [{ id: 'b', name: 'Bob Smith', status: 'sent' }, { id: 'd', name: 'Dana Lee', status: 'waiting' }] })} />);
-    expect(screen.UNSAFE_getAllByProps({ role: 'list' }).length).toBeGreaterThan(0);
+    expect(screen.UNSAFE_getAllByProps({ role: 'list' }).filter((node) => typeof node.type === 'string')).toHaveLength(1);
     expect(screen.UNSAFE_getAllByProps({ role: 'listitem' }).filter((node) => typeof node.type === 'string')).toHaveLength(2);
   });
 
@@ -61,6 +61,9 @@ describe('Sending (mobile)', () => {
     render(<Sending {...base({ handOff: { note: 'Send it in Messages.', again: 'Again', onAgain: jest.fn() } })} />);
     expect(screen.getByRole('button', { name: 'Next' }).props.accessibilityHint).toBeUndefined();
     expect(screen.getAllByText('Send it in Messages.')).toHaveLength(1);
+    const status = screen.UNSAFE_getAllByProps({ role: 'status' }).filter((node) => typeof node.type === 'string');
+    expect(status).toHaveLength(1);
+    expect(status[0].props.accessibilityLiveRegion).toBe('polite');
   });
 
   it('shows a labelled line for the person only when the app gives a note, and passes typing on', () => {

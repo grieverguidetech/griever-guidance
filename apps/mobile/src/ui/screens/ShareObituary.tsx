@@ -112,8 +112,8 @@ export interface ShareObituaryProps {
 
 /**
  * "Has the obituary been published?": takes the link (and where it ran), checks it, and moves on to
- * "Who should know?". Built from libs/ui so web (through react-native-web) and mobile show the same
- * screen. The link lives in the app; only whether the field has been left or Continue pressed lives here.
+ * "Who should know?". Mobile's own screen
+ * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
 export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, headingRef, checklistRef }: ShareObituaryProps) {
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.

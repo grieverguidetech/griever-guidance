@@ -164,7 +164,7 @@ function AccountBody({
   );
 }
 
-/** Back for the screens that are not the shared Account (which has its own). */
+/** Back for the screens that are not the Account (which has its own). */
 function BackRow({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.backRow}>

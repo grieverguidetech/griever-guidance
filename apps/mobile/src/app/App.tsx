@@ -672,7 +672,7 @@ const SendAppWhenReady = () => {
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
   const fontsSettled = useSerifFonts();
-  // Shared components (libs/ui) switch from the system font to the serif when it arrives.
+  // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
     <SerifReadyContext.Provider value={fontsSettled}>
       {AUTH_ENABLED ? (

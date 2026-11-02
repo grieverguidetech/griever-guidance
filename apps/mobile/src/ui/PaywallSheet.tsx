@@ -16,8 +16,8 @@ export type PaywallSheetProps = Pick<SheetProps, 'visible' | 'onClose' | 'onDism
 };
 
 /**
- * Demo stand-in for the payment step (#292), shared by web and mobile. No payment code runs and no
- * request is made; the Stripe step (#200) replaces the white box. Web hosts pass `returnFocusRef`
+ * Demo stand-in for the payment step (#292). No payment code runs and no
+ * request is made; the Stripe step (#200) replaces the white box. Hosts pass `returnFocusRef`
  * (the locked row); native hosts send screen-reader focus back in `onDismiss` and on close.
  */
 export function PaywallSheet({ copy, visible, onClose, onDismiss, returnFocusRef }: PaywallSheetProps) {

@@ -46,8 +46,8 @@ export interface AnnounceProps {
 }
 
 /**
- * "Announce the passing": confirms the person's details and takes an optional note. Built from
- * libs/ui so web (through react-native-web) and mobile show the same screen. It owns no state.
+ * "Announce the passing": confirms the person's details and takes an optional note. Mobile's own
+ * screen (apps/mobile/src/ui). It owns no state.
  */
 export function Announce({ copy, eyebrow, eyebrowTone, recap, onBack, onWhatYoullNeed, onEdit, onContinue, note, onNoteChange, footer, headingRef, checklistRef }: AnnounceProps) {
   const inputFont = useSerifStyle('regular');

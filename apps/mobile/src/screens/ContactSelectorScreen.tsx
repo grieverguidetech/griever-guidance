@@ -26,7 +26,7 @@ type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] }
 const copy = screenCopy('whoShouldKnow');
 
 /**
- * The list is the shared WhoShouldKnow in libs/ui. This holds what is mobile only: Bring people
+ * The list is WhoShouldKnow in apps/mobile/src/ui. This holds what is mobile only: Bring people
  * across (import from the phone's contacts) and its review list.
  */
 export function ContactSelectorScreen({ flow, contacts, notified }: Props) {

@@ -24,7 +24,7 @@ type Props = {
   onSignInAgain: () => void;
 };
 
-/** The screen is the shared Account in libs/ui; this holds what is mobile only: saving, focus and the sheet. */
+/** The screen is the Account in apps/mobile/src/ui; this holds what is mobile only: saving, focus and the sheet. */
 export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
   const savedName = identity.profile?.senderName?.trim() ?? '';
   const source = initialName ?? savedName;

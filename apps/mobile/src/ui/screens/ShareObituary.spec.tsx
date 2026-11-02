@@ -37,6 +37,18 @@ const copy: ShareObituaryCopy = {
   pasteButton: 'Paste link',
 };
 
+/** Every string in the rendered host tree, depth first, so the order is the reading order. */
+type Json = NonNullable<ReturnType<typeof screen.toJSON>>;
+function textsInOrder(node: Json | null): string[] {
+  if (node === null) {
+    return [];
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap((child: Json) => textsInOrder(child));
+  }
+  return (node.children ?? []).flatMap((child: string | Json) => (typeof child === 'string' ? [child] : textsInOrder(child)));
+}
+
 function setup(over: Partial<ShareObituaryProps> = {}) {
   render(
     <ShareObituary
@@ -97,10 +109,12 @@ describe('ShareObituary (mobile steps, #650)', () => {
 
   it('shows the paste line after the Paste link button, in reading order', () => {
     setup({ onPasteLink: jest.fn(), pasteMessage: 'Link pasted.' });
-    const order = screen.toJSON();
-    const text = JSON.stringify(order);
-    expect(text.indexOf('Link to the obituary')).toBeLessThan(text.indexOf('Paste link'));
-    expect(text.indexOf('Paste link')).toBeLessThan(text.indexOf('Link pasted.'));
+    const texts = textsInOrder(screen.toJSON());
+    const at = (s: string) => texts.findIndex((t) => t.includes(s));
+    expect(at('Link to the obituary')).toBeGreaterThanOrEqual(0);
+    expect(at('Link to the obituary')).toBeLessThan(at('Paste link'));
+    expect(at('Paste link')).toBeLessThan(at('Link pasted.'));
+    expect(at('Link pasted.')).toBeGreaterThanOrEqual(0);
   });
 
   it('offers Copy the text, and says Copied after it worked', () => {

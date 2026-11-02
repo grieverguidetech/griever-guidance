@@ -21,7 +21,7 @@ interface Props extends FlowProps {
 }
 
 /**
- * The screen is the shared Sending in libs/ui; this holds what is mobile only: the sms: link,
+ * The screen is the Sending in apps/mobile/src/ui; this holds what is mobile only: the sms: link,
  * screen-reader focus and the return from Messages.
  *
  * One contact at a time, texted from the griever's own number, not a bulk send. The first button

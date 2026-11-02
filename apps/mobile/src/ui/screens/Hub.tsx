@@ -70,8 +70,8 @@ export interface HubProps {
 }
 
 /**
- * The hub, "One thing at a time.": the steps of the plan for one person. Built from libs/ui so web
- * (through react-native-web) and mobile show the same screen. It owns no state; the host passes
+ * The hub, "One thing at a time.": the steps of the plan for one person. Mobile's own
+ * screen (apps/mobile/src/ui). It owns no state; the host passes
  * the data and answers the callbacks.
  */
 export function Hub(props: HubProps) {

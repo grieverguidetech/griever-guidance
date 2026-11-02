@@ -84,8 +84,8 @@ export interface ReviewProps {
 }
 
 /**
- * "Review your message": read the text once, change the wording or tone, then send. Built from
- * libs/ui so web (through react-native-web) and mobile show the same screen. The message and tone
+ * "Review your message": read the text once, change the wording or tone, then send. Mobile's own
+ * screen (apps/mobile/src/ui). The message and tone
  * live in the app; only whether the field is open lives here.
  */
 export function Review({ copy, kind, intro, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, sendLabel, hasRecipients, blockedReason, onBack, onSend, onWhatYoullNeed, checklistRef, children, headingRef, share }: ReviewProps) {

@@ -24,7 +24,7 @@ type Props = {
 
 /**
  * Asked once, before the first message, so the name and date are not typed again in every moment.
- * The screen is the shared PersonSetup in libs/ui; this holds what is mobile only: the native date
+ * The screen is the PersonSetup in apps/mobile/src/ui; this holds what is mobile only: the native date
  * picker, focus, Android Back and the sheet. Only the name is required. There is deliberately no
  * obituary field here (C10).
  */

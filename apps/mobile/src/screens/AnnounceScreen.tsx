@@ -13,7 +13,7 @@ const copy = screenCopy('announce');
 
 type Props = FlowProps & { onEditPerson: () => void };
 
-/** The screen is the shared Announce in libs/ui; this holds what is mobile only: routing and focus. */
+/** The screen is the Announce in apps/mobile/src/ui; this holds what is mobile only: routing and focus. */
 export function AnnounceScreen({ flow, onEditPerson }: Props) {
   const { fields, setField, nextStep, prevStep, session } = flow;
   const heading = useRef<ComponentRef<typeof Text>>(null);

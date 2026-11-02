@@ -5,7 +5,7 @@ import { colors, minTouchTarget } from '@griever/tokens';
 import { ERROR } from './colors';
 import { Body, Button, Heading, useSerifStyle, SerifText as Text, SerifTextInput as TextInput } from '../ui';
 
-/** Errors use the app's one danger red (also libs/ui Status and Body tone="danger"); 6.47:1 on white. */
+/** Errors use the app's one danger red (also the ui Status and Body tone="danger"); 6.47:1 on white. */
 const DANGER = ERROR;
 /** Focus ring, as web's Clerk colorRing. */
 const RING = colors['accent-700'];

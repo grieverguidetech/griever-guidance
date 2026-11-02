@@ -20,7 +20,7 @@ interface Props extends FlowProps {
   contacts?: UseContactsResult;
 }
 
-/** The screen is the shared Review in libs/ui; this holds what is mobile only: scrolling and the sample. */
+/** The screen is the Review in apps/mobile/src/ui; this holds what is mobile only: scrolling and the sample. */
 export function ConfirmScreen({ flow, contacts }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [sampleOpen, setSampleOpen] = useState(false);
