@@ -207,6 +207,11 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (prefilled.current) return;
     prefilled.current = true;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    // Older drafts saved obituaryText as the message. The obituary send texts the link template now
+    // (MOB-9, #559 Decision 4), so drop that copy; a hand-edited message stays.
+    if (category === 'obituary' && messageOverride && messageOverride === session.obituaryText) {
+      setMessageOverride(null);
+    }
     const fresh = !hasDraftContent && messageOverride === null;
     if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
     if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
@@ -221,9 +226,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
         }
       }
       // Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
-      // The obituary send texts the link template (name, link, optional note). Its obituaryText is
-      // the email to the publisher (MOB-9, #559 Decision 4) and is never the text message.
-      if (planned.messageOverride !== null && category !== 'obituary') {
+      if (planned.messageOverride !== null) {
         setMessageOverride(planned.messageOverride);
       }
     }

@@ -49,10 +49,13 @@ describe('sendPrefill message', () => {
   it.each([
     ['service', 'S'],
     ['announcement', 'A'],
-    ['obituary', 'O'],
     ['aftercare', 'T'],
   ] as const)('%s uses its own section message', (category, expected) => {
     expect(sendPrefill({ ...planned, ...messages }, category).messageOverride).toBe(expected);
+  });
+
+  it('gives no message for the obituary, whose text is the publisher email', () => {
+    expect(sendPrefill({ ...planned, ...messages }, 'obituary').messageOverride).toBeNull();
   });
 
   it('gives no override when the message is undefined or null', () => {

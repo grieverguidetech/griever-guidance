@@ -87,6 +87,40 @@ describe('send flow starts from the planned details', () => {
     expect(screen.queryByText(/Anna loved the garden/)).toBeNull();
   });
 
+  // The obituary moment opens on its own screen (the link is on the person), then the contacts step.
+  const toConfirmFromObituary = async () => {
+    fireEvent.press(await screen.findByRole('button', { name: 'Choose who to send it to' }));
+    await toConfirm();
+  };
+
+  const obituaryDraft = (messageOverride: string) => ({
+    step: 'contacts', templateCategory: 'obituary', templateOverrideId: null,
+    fields: { deceasedName: 'Anna', obituaryUrl: 'https://legacy.com/anna' },
+    serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
+    flowerDeliveryTarget: 'service', tone: 'plain', messageOverride,
+  });
+
+  it('drops an old obituary draft whose message is the obituary text', async () => {
+    await openMoment(
+      { ...base, obituaryUrl: 'https://legacy.com/anna', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
+      /Share the obituary/,
+    );
+    await toConfirmFromObituary();
+    await screen.findByRole('heading', { name: 'Review your message' });
+    expect(screen.getByText('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
+    expect(screen.queryByText('Anna loved the garden.')).toBeNull();
+  });
+
+  it('keeps a hand edit on the obituary message through to Confirm', async () => {
+    await openMoment(
+      { ...base, obituaryUrl: 'https://legacy.com/anna', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
+      /Share the obituary/,
+    );
+    await toConfirmFromObituary();
+    await screen.findByRole('heading', { name: 'Review your message' });
+    expect(screen.getByText('Here is her obituary, with love.')).toBeTruthy();
+  });
+
   it('leaves a draft with an emptied message alone', async () => {
     const draft = {
       step: 'contacts', templateCategory: 'service', templateOverrideId: null, fields: {},
