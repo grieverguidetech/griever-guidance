@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentRef, ReactNode, Ref } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { colors } from '@griever/tokens';
 import { useSerifStyle } from './typography';
@@ -31,10 +31,12 @@ export interface BodyProps {
   live?: boolean;
   /** Makes the text tappable, for example a field label that focuses its field. */
   onPress?: () => void;
+  /** Native: lets a screen move the screen reader's focus to this line. */
+  textRef?: Ref<ComponentRef<typeof Text>>;
 }
 
 /** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
-export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false, onPress }: BodyProps) {
+export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false, onPress, textRef }: BodyProps) {
   const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};
   if (id) {
@@ -49,7 +51,7 @@ export function Body({ children, tone = 'default', small = false, id, hidden = f
     extra['role'] = 'status';
     extra['accessibilityLiveRegion'] = 'polite';
   }
-  return <Text style={[styles.body, font, styles[tone], small && styles.small]} onPress={onPress} {...extra}>{children}</Text>;
+  return <Text ref={textRef} style={[styles.body, font, styles[tone], small && styles.small]} onPress={onPress} {...extra}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({

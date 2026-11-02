@@ -33,5 +33,15 @@
   "everyoneYouTold": "Everyone you told",
   "notSentYet": "Not sent yet",
   "everyoneYouToldName": "Choose everyone you told",
-  "notSentYetName": "Choose everyone not sent yet"
+  "notSentYetName": "Choose everyone not sent yet",
+  "everyoneYouToldSelectAll": "Everyone you told: select all",
+  "notSentYetSelectAll": "Not sent yet: select all",
+  "blockedLine": "Contacts are turned off for this app. You can add people yourself, or turn them on in Settings.",
+  "openSettings": "Open Settings",
+  "bringAcrossBusy": "Reading your contacts…",
+  "loadingPeople": "Getting your people…",
+  "sent": "Sent",
+  "saveFailed": "We could not save that. Please try again.",
+  "saving": "Saving…",
+  "doneForNow": "Done for now"
 }

@@ -58,8 +58,19 @@ describe('expoContactsSource.fetch', () => {
   });
 
   it('treats a denied permission as cancelled and reads nothing', async () => {
-    mocked.requestPermissionsAsync.mockResolvedValue({ granted: false });
+    mocked.requestPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
     await expect(expoContactsSource.fetch()).rejects.toBeInstanceOf(Cancelled);
+    expect(mocked.getContactsAsync).not.toHaveBeenCalled();
+  });
+
+  it('says "denied" when the system can ask again', async () => {
+    mocked.requestPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
+    await expect(expoContactsSource.fetch()).rejects.toMatchObject({ reason: 'denied' });
+  });
+
+  it('says "blocked" when the refusal is for good', async () => {
+    mocked.requestPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
+    await expect(expoContactsSource.fetch()).rejects.toMatchObject({ reason: 'blocked' });
     expect(mocked.getContactsAsync).not.toHaveBeenCalled();
   });
 });

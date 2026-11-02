@@ -1,20 +1,28 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { BackHandler } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, AppState, BackHandler, Linking } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
+import { screenCopy } from '@griever/copy';
 import { App, CONTACTS_CHECK_FALLBACK_MS } from '../app/App';
 import { SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
 import { mobileContactStore } from '../lib/contactStore';
 import { ContactsStepScreen } from './ContactsStepScreen';
 
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: (node: unknown) => node ?? null,
+}));
+
 const mockFetch = jest.fn<() => Promise<unknown[]>>();
+const mockAvailable = jest.fn<() => Promise<boolean>>();
 jest.mock('../lib/expoContactsSource', () => ({
   expoContactsSource: {
     id: 'native',
     preselected: false,
-    isAvailable: async () => true,
+    isAvailable: () => mockAvailable(),
     fetch: () => mockFetch(),
   },
 }));
@@ -29,10 +37,23 @@ const anna = {
 };
 const dee = { contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' };
 
+// The words inside a rendered node, to tell which button took focus.
+const textOf = (node: unknown): string => {
+  if (typeof node === 'string') {
+    return node;
+  }
+  if (Array.isArray(node)) {
+    return node.map(textOf).join('');
+  }
+  const props = (node as { props?: { children?: unknown } } | null)?.props;
+  return props ? textOf(props.children) : '';
+};
+
 afterEach(() => {
   jest.restoreAllMocks();
   jest.useRealTimers();
   mockFetch.mockReset();
+  mockAvailable.mockReset().mockResolvedValue(true);
 });
 
 // Home -> Create -> setup -> Continue.
@@ -273,5 +294,220 @@ describe('ContactsStepScreen opened from Home (#379)', () => {
     view.rerender(ui({ ...contacts, contacts: kept, loading: false } as UseContactsResult));
     expect(await screen.findByText('Pat')).toBeTruthy();
     expect(screen.queryByText('Sam')).toBeNull();
+  });
+});
+
+describe('ContactsStepScreen contacts never fail silently (#652)', () => {
+  const copy = screenCopy('whoShouldKnow');
+  const sam = { key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [] };
+  const pat = { key: 'y', displayName: 'Pat', phones: ['+16175550112'], emails: [] };
+  const { Cancelled } = jest.requireActual<typeof import('@griever/contacts')>('@griever/contacts');
+  const mount = (over: Partial<UseContactsResult> = {}, startWithImport = false) => {
+    const contacts = {
+      contacts: [],
+      loading: false,
+      addContact: jest.fn(async (c: unknown) => c),
+      importContacts: jest.fn(async () => []),
+      ...over,
+    } as unknown as UseContactsResult;
+    const onContinue = jest.fn();
+    const onBack = jest.fn();
+    render(<ContactsStepScreen contacts={contacts} onContinue={onContinue} onBack={onBack} startWithImport={startWithImport} />);
+    return { contacts, onContinue, onBack };
+  };
+
+  it('refused for good: shows the calm line and Open Settings, which opens Settings', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    mount();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    expect(await screen.findByText(copy.blockedLine)).toBeTruthy();
+    // The import button stays, so a press can ask again.
+    expect(screen.getByRole('button', { name: 'Bring in from my phone' })).toBeTruthy();
+    // Adding by hand is still there.
+    expect(screen.getByRole('button', { name: 'Add someone myself' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: copy.openSettings }));
+    expect(openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('refused for good: moves focus to the line itself, not Open Settings, and does not announce it separately', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    mount();
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    await screen.findByText(copy.blockedLine);
+    // The line is read by the focus move. A separate announcement would be cut off by it on iOS.
+    expect(announce).not.toHaveBeenCalledWith(copy.blockedLine);
+    expect(focus).toHaveBeenCalledTimes(1);
+    // Focus went to the line (a text), and Open Settings is the next swipe.
+    const target = focus.mock.calls[0]?.[0] as unknown as { props: { role?: string; children: unknown } };
+    expect(target.props.role).not.toBe('button');
+    expect(textOf(target.props.children)).toBe(copy.blockedLine);
+  });
+
+  it('pressing the import button again after a refusal asks again and goes on if allowed', async () => {
+    mockFetch.mockRejectedValueOnce(new Cancelled('blocked')).mockResolvedValue([sam]);
+    mount();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    await screen.findByText(copy.blockedLine);
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    expect(await screen.findByText('Sam')).toBeTruthy();
+  });
+
+  it('coming back from Settings with contacts allowed clears the line and focuses the import button', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    let onChange: (state: string) => void = () => undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (state: string) => void) => {
+      onChange = cb;
+      return { remove: () => undefined };
+    }) as never);
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    mount();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    await screen.findByText(copy.blockedLine);
+    // Still refused: nothing changes.
+    mockAvailable.mockResolvedValue(false);
+    await act(async () => {
+      onChange('active');
+    });
+    expect(screen.getByText(copy.blockedLine)).toBeTruthy();
+    mockAvailable.mockResolvedValue(true);
+    focus.mockClear();
+    await act(async () => {
+      onChange('active');
+    });
+    await waitFor(() => expect(screen.queryByText(copy.blockedLine)).toBeNull());
+    expect(screen.queryByRole('button', { name: copy.openSettings })).toBeNull();
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(textOf((focus.mock.calls[0]?.[0] as unknown as { props: { children: unknown } }).props.children)).toBe('Bring in from my phone');
+  });
+
+  it('refused for good on the Home import path shows the same line and button', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('blocked'));
+    mount({}, true);
+    expect(await screen.findByText(copy.blockedLine)).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.openSettings })).toBeTruthy();
+  });
+
+  it('a refusal the system can ask about again shows no line', async () => {
+    mockFetch.mockRejectedValue(new Cancelled('denied'));
+    mount();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: 'Bring in from my phone' })).toBeTruthy();
+    expect(screen.queryByText(copy.blockedLine)).toBeNull();
+  });
+
+  it('shows a spinner and "Reading your contacts…" while reading, and a second tap reads once', async () => {
+    let finish: (value: unknown[]) => void = () => undefined;
+    mockFetch.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    mount();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    const busy = await screen.findByRole('button', { name: copy.bringAcrossBusy });
+    expect(busy.props.accessibilityState).toEqual(expect.objectContaining({ busy: true }));
+    expect(screen.UNSAFE_queryByType(ActivityIndicator)).toBeTruthy();
+    fireEvent.press(busy);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish([]);
+    });
+  });
+
+  it('adds by hand once on a double tap, and Add reads as saving', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    const addContact = jest.fn(() => new Promise((resolve) => { finish = resolve; }));
+    mount({ addContact } as never);
+    fireEvent.press(screen.getByRole('button', { name: 'Add someone myself' }));
+    fireEvent.changeText(screen.getByLabelText('Name'), 'Dee');
+    fireEvent.changeText(screen.getByLabelText('Mobile number'), '(617) 555-0148');
+    const add = screen.getByRole('button', { name: 'Add' });
+    fireEvent.press(add);
+    fireEvent.press(add);
+    expect(addContact).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: copy.saving })).toBeTruthy();
+    await act(async () => {
+      finish({});
+    });
+    expect(await screen.findByText('Added Dee')).toBeTruthy();
+  });
+
+  it('keeps the typed name and number when saving fails', async () => {
+    const addContact = jest.fn(async () => {
+      throw new Error('disk');
+    });
+    mount({ addContact } as never);
+    fireEvent.press(screen.getByRole('button', { name: 'Add someone myself' }));
+    fireEvent.changeText(screen.getByLabelText('Name'), 'Dee');
+    fireEvent.changeText(screen.getByLabelText('Mobile number'), '(617) 555-0148');
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect((await screen.findByRole('alert')).props.children).toBe(copy.saveFailed);
+    expect(screen.getByLabelText('Name').props.value).toBe('Dee');
+    expect(screen.getByLabelText('Mobile number').props.value).toBe('(617) 555-0148');
+    expect(screen.getByRole('button', { name: 'Add' })).toBeTruthy();
+  });
+
+  it('review: Add uses the shared button, reads as unavailable with a hint, and has no faded style', async () => {
+    mockFetch.mockResolvedValue([sam]);
+    mount();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    await screen.findByText('Sam');
+    const add = screen.getByRole('button', { name: 'Add' });
+    expect(add.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(add.props.accessibilityHint).toBe(copy.chooseOne);
+    // The reason is also on screen as text.
+    expect(screen.getByText(copy.chooseOne)).toBeTruthy();
+    expect(JSON.stringify(add.props.style)).not.toContain('"opacity":0.4');
+  });
+
+  it('review: searches by name and saves once on a double tap', async () => {
+    mockFetch.mockResolvedValue([sam, pat]);
+    let finish: (value: unknown[]) => void = () => undefined;
+    const importContacts = jest.fn(() => new Promise<unknown[]>((resolve) => { finish = resolve; }));
+    mount({ importContacts } as never);
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    await screen.findByText('Sam');
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'pat');
+    expect(screen.queryByText('Sam')).toBeNull();
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'zzz');
+    expect(screen.getByText(copy.searchEmpty)).toBeTruthy();
+    expect(screen.getByText(copy.searchEmpty).props.accessibilityLiveRegion).toBe('polite');
+    fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'pat');
+    fireEvent.press(screen.getByRole('checkbox', { name: 'Pat, +16175550112' }));
+    const add = screen.getByRole('button', { name: 'Add' });
+    fireEvent.press(add);
+    fireEvent.press(add);
+    expect(importContacts).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish([]);
+    });
+  });
+
+  it('review: a failed save shows the error and keeps the ticks', async () => {
+    mockFetch.mockResolvedValue([sam]);
+    const importContacts = jest.fn(async () => {
+      throw new Error('disk');
+    });
+    mount({ importContacts } as never);
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    fireEvent.press(await screen.findByRole('checkbox', { name: 'Sam, +16175550111' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect((await screen.findByRole('alert')).props.children).toBe(copy.saveFailed);
+    expect(announce).toHaveBeenCalledWith(copy.saveFailed);
+    expect(screen.getByText('1 chosen')).toBeTruthy();
+  });
+
+  it('after a successful import the last button reads Continue instead of Done for now', async () => {
+    mockFetch.mockResolvedValue([sam]);
+    const { onContinue } = mount();
+    expect(screen.getByRole('button', { name: copy.doneForNow })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Bring in from my phone' }));
+    fireEvent.press(await screen.findByRole('checkbox', { name: 'Sam, +16175550111' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.press(await screen.findByRole('button', { name: copy.continue }));
+    expect(screen.queryByRole('button', { name: copy.doneForNow })).toBeNull();
+    expect(onContinue).toHaveBeenCalledTimes(1);
   });
 });

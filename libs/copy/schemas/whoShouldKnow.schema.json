@@ -38,7 +38,17 @@
     "everyoneYouTold",
     "notSentYet",
     "everyoneYouToldName",
-    "notSentYetName"
+    "notSentYetName",
+    "everyoneYouToldSelectAll",
+    "notSentYetSelectAll",
+    "blockedLine",
+    "openSettings",
+    "bringAcrossBusy",
+    "loadingPeople",
+    "sent",
+    "saveFailed",
+    "saving",
+    "doneForNow"
   ],
   "properties": {
     "heading": {
@@ -148,6 +158,36 @@
     "chosen": {
       "type": "string",
       "pattern": "\\{count\\}"
+    },
+    "everyoneYouToldSelectAll": {
+      "$ref": "#/$defs/text"
+    },
+    "notSentYetSelectAll": {
+      "$ref": "#/$defs/text"
+    },
+    "blockedLine": {
+      "$ref": "#/$defs/text"
+    },
+    "openSettings": {
+      "$ref": "#/$defs/text"
+    },
+    "bringAcrossBusy": {
+      "$ref": "#/$defs/text"
+    },
+    "loadingPeople": {
+      "$ref": "#/$defs/text"
+    },
+    "sent": {
+      "$ref": "#/$defs/text"
+    },
+    "saveFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "saving": {
+      "$ref": "#/$defs/text"
+    },
+    "doneForNow": {
+      "$ref": "#/$defs/text"
     }
   },
   "$defs": {
