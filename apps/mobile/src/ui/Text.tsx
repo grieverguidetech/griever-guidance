@@ -21,7 +21,7 @@ export type BodyTone = 'default' | 'strong' | 'muted' | 'danger';
 export interface BodyProps {
   children: ReactNode;
   tone?: BodyTone;
-  /** Smaller grey line for details such as a date. */
+  /** Marks a secondary line (a date, a status). Same size as body since #654 (15 pt is the floor); pair with tone="muted". */
   small?: boolean;
   /** Web: gives the text an id so a control can point to it with aria-describedby. */
   id?: string;
@@ -63,12 +63,12 @@ const styles = StyleSheet.create({
   },
   accent2: { color: colors['accent-2-700'] },
   body: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   default: { color: colors['neutral-800'] },
   strong: { color: colors.ink },
   muted: { color: colors['neutral-700'] },
   danger: { color: '#b91c1c' },
-  small: { fontSize: 12, lineHeight: 18 },
+  small: { fontSize: 15, lineHeight: 22 },
 });

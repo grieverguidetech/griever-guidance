@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
+import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
@@ -14,6 +14,8 @@ import type { SentNoteText } from '../lib/sendNote';
 
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
+// Mobile uses its own label on the done announcement row (announcedLabel); web keeps doneLabel.
+const hubCopy = { ...copy, moments: { ...copy.moments, announce: { ...copy.moments.announce, doneLabel: copy.announcedLabel } } };
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -22,12 +24,12 @@ const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 export { MOMENT_CATEGORY as CATEGORY_BY_MOMENT } from '@griever/hooks';
 
 /** The status line for a card, from the copy file. */
-function statusLine(status: SendCardStatus): string {
+function statusLine(status: SendCardStatus, session: Session, key: MomentKey): string {
   if (status === 'ready') {
     return copy.statusReady;
   }
   if (status === 'needsDetail') {
-    return copy.statusNeedsDetail;
+    return needsLine(session, key);
   }
   if (status === 'waitingForLink') {
     return copy.statusWaitingForLink;
@@ -35,9 +37,19 @@ function statusLine(status: SendCardStatus): string {
   return fill(copy.statusSent, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
 }
 
+/** "Needs the service date": names the first missing required field. Falls back to the plain line. */
+function needsLine(session: Session, key: MomentKey): string {
+  const field = firstMissingField(session, key);
+  const name = field ? (copy.statusFieldNames as Record<string, string>)[field.key] : undefined;
+  if (!name) {
+    return copy.statusNeedsDetail;
+  }
+  return fill(copy.statusNeedsField, { field: name });
+}
+
 /** A finished card adds its date and the send-again hint; the others show the status line alone. */
-function rowMeta(status: SendCardStatus, done: boolean, completedAt: string | undefined, started: boolean): string {
-  const line = statusLine(status);
+function rowMeta(session: Session, key: MomentKey, done: boolean, completedAt: string | undefined, started: boolean): string {
+  const line = statusLine(sendCardStatus(session, key), session, key);
   if (!done) {
     return line;
   }
@@ -141,14 +153,14 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
       status: moment.status,
       started,
       locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
-      meta: rowMeta(sendCardStatus(session, moment.key), moment.status === 'done', moment.completedAt, started),
+      meta: rowMeta(session, moment.key, moment.status === 'done', moment.completedAt, started),
     };
   });
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Hub
-        copy={copy}
+        copy={hubCopy}
         eyebrow={fill(copy.forName, { name: session.personName })}
         rows={rows}
         onBack={onBack}

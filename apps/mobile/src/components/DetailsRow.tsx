@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   row: { gap: spacing[2] },
   heading: { fontSize: 16, color: colors.ink },
   field: { gap: spacing[1] },
-  label: { fontSize: 14, color: colors.ink },
+  label: { fontSize: 15, color: colors.ink },
   input: {
     minHeight: 44,
     paddingHorizontal: spacing[2],
@@ -97,10 +97,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 14,
+    fontSize: 15,
   },
   // Missing: dashed border plus the "Needed" text. Focus: a solid 2px accent border, so the two never look alike.
   inputMissing: { borderStyle: 'dashed', borderColor: colors.ink },
   inputFocused: { borderStyle: 'solid', borderColor: colors['accent-700'], borderWidth: 2 },
-  needed: { fontSize: 13, color: colors.ink },
+  needed: { fontSize: 15, color: colors.ink },
 });

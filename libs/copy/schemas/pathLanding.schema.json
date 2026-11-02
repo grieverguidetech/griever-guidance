@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": [
     "heading", "intro", "forName", "back", "checklist", "editPerson", "start", "continue",
-    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "statusReady", "statusNeedsDetail", "statusWaitingForLink", "statusSent", "lockedReason", "notInAppYet", "finishNote", "moments"
+    "tagStarted", "tagNext", "person", "people", "metaStarted", "metaSendAgain", "statusReady", "statusNeedsDetail", "statusWaitingForLink", "statusNeedsField", "statusFieldNames", "statusSent", "lockedReason", "announcedLabel", "notInAppYet", "finishNote", "moments"
   ],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
@@ -25,8 +25,11 @@
     "statusReady": { "$ref": "#/$defs/text" },
     "statusNeedsDetail": { "$ref": "#/$defs/text" },
     "statusWaitingForLink": { "$ref": "#/$defs/text" },
+    "statusNeedsField": { "type": "string", "pattern": "\\{field\\}" },
+    "statusFieldNames": { "type": "object", "additionalProperties": { "$ref": "#/$defs/text" } },
     "statusSent": { "type": "string", "pattern": "\\{n\\}.*\\{noun\\}" },
     "lockedReason": { "$ref": "#/$defs/text" },
+    "announcedLabel": { "$ref": "#/$defs/text" },
     "notInAppYet": { "$ref": "#/$defs/text" },
     "finishNote": {
       "type": "object",

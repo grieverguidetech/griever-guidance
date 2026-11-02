@@ -252,5 +252,5 @@ const styles = StyleSheet.create({
   optional: { color: colors['neutral-700'], fontWeight: '400' },
   stop: { gap: spacing[1] },
   list: { gap: spacing[2] },
-  person: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  person: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
 });

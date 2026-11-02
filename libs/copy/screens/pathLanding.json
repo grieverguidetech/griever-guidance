@@ -16,8 +16,20 @@
   "statusReady": "Ready",
   "statusNeedsDetail": "Needs a detail",
   "statusWaitingForLink": "Waiting for the link",
+  "statusNeedsField": "Needs {field}",
+  "statusFieldNames": {
+    "deceasedName": "their name",
+    "serviceDate": "the service date",
+    "serviceTime": "the service time",
+    "serviceLocation": "the place",
+    "eventDate": "the date",
+    "eventLocation": "the place",
+    "senderName": "your name",
+    "obituaryUrl": "the obituary link"
+  },
   "statusSent": "Sent to {n} {noun}",
   "lockedReason": "Included with the full plan",
+  "announcedLabel": "Announced the passing",
   "notInAppYet": "Not in the app yet. You can do this one on the web.",
   "moments": {
     "announce": { "title": "Announce the passing", "body": "A gentle note letting people know.", "doneLabel": "Told close family" },

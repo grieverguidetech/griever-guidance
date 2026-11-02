@@ -28,6 +28,12 @@ export interface ReviewCopy {
   /** Why the tone button is unavailable once the words are edited. */
   toneKept: string;
   useSuggested: string;
+  /** Restores the words that "Use the suggested wording" just dropped. */
+  bringBack: string;
+  /** Said politely after "Use the suggested wording". */
+  suggestedInPlace: string;
+  /** Said politely after "Bring back my words". */
+  wordsBack: string;
   checklist: string;
   /** Why Send is unavailable when the message is empty. */
   blank: string;
@@ -96,6 +102,14 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   const editRef = useRef<ButtonNode>(null);
   const reasonId = useId();
   const toneReasonId = useId();
+  // The words dropped by "Use the suggested wording", kept until the next edit.
+  const [dropped, setDropped] = useState<string | null>(null);
+  // The swap removes the button that was pressed, so focus moves on to its replacement once it is drawn.
+  const [focusNext, setFocusNext] = useState<'bringBack' | 'useSuggested' | null>(null);
+  const [swapNote, setSwapNote] = useState<string | undefined>(undefined);
+  const useSuggestedRef = useRef<ButtonNode>(null);
+  const bringBackRef = useRef<ButtonNode>(null);
+  const swapNoteId = useId();
   const blank = message.trim() === '';
   const shareReasonId = useId();
   const shareErrorId = useId();
@@ -111,6 +125,43 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
       setReturnFocus(false);
     }
   }, [editing, returnFocus]);
+
+  useEffect(() => {
+    if (focusNext === 'bringBack') {
+      focusNode(bringBackRef.current);
+    } else if (focusNext === 'useSuggested') {
+      if (editing) {
+        fieldRef.current?.focus();
+      } else {
+        focusNode(useSuggestedRef.current);
+      }
+    }
+    if (focusNext) {
+      setFocusNext(null);
+    }
+  }, [focusNext, editing]);
+
+  const changeMessage = (next: string) => {
+    setDropped(null);
+    setSwapNote(undefined);
+    onMessageChange(next);
+  };
+
+  const useSuggestedWording = () => {
+    setDropped(message);
+    onUseSuggested();
+    setSwapNote(copy.suggestedInPlace);
+    setFocusNext('bringBack');
+  };
+
+  const bringBackWords = () => {
+    if (dropped !== null) {
+      onMessageChange(dropped);
+      setDropped(null);
+      setSwapNote(copy.wordsBack);
+      setFocusNext('useSuggested');
+    }
+  };
 
   const toggleEditing = () => {
     if (editing) {
@@ -140,7 +191,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           </View>
         ) : null}
         {editing || kind === 'service' ? (
-          <MessageField label={copy.messageLabel} value={message} onChangeText={onMessageChange} inputRef={fieldRef} />
+          <MessageField label={copy.messageLabel} value={message} onChangeText={changeMessage} inputRef={fieldRef} />
         ) : (
           <Body>{message}</Body>
         )}
@@ -166,7 +217,9 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           <Status id={toneReasonId} message={edited ? copy.toneKept : undefined} />
         </View>
       ) : null}
-      {edited ? <Button label={copy.useSuggested} variant="ghost" onPress={onUseSuggested} /> : null}
+      {edited ? <Button label={copy.useSuggested} variant="ghost" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}
+      {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
+      <Status id={swapNoteId} message={swapNote} />
       {share?.only ? null : (
         <>
           <Button
@@ -250,7 +303,7 @@ function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProp
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   tag: { alignSelf: 'flex-start', backgroundColor: colors['accent-2-100'], borderRadius: radius.md, paddingHorizontal: spacing[2], paddingVertical: 2 },
   tagText: { color: colors['accent-2-800'], fontSize: 12 },
@@ -264,7 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 14,
+    fontSize: 15,
     textAlignVertical: 'top',
   },
   // Native focus cue (web draws its own ring through data-gg-field).

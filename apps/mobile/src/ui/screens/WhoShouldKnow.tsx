@@ -725,6 +725,7 @@ export function PersonRow({
         {selected ? (
           <Text
             style={styles.tick}
+            allowFontScaling={false}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
@@ -739,12 +740,16 @@ export function PersonRow({
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[1],
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   bringAcross: { gap: spacing[1] },
   footerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: spacing[1],
@@ -761,9 +766,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     color: colors.ink,
-    fontSize: 14,
+    fontSize: 15,
   },
-  error: { fontSize: 12, color: DANGER },
+  error: { fontSize: 15, color: DANGER },
   formButtons: { flexDirection: 'row', gap: spacing[2], alignItems: 'center' },
   row: {
     minHeight: minTouchTarget,
@@ -775,9 +780,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 2,
-    borderColor: colors['neutral-300'],
+    borderColor: colors['neutral-600'],
   },
-  rowSelected: { borderColor: colors.accent },
+  // Selected: accent-700 edge and a pale accent fill, so it differs from an unselected row by more than a thin line (see colors.spec).
+  rowSelected: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
   box: {
     position: 'absolute',
     right: spacing[3],
@@ -811,6 +817,8 @@ const styles = StyleSheet.create({
   head: { gap: spacing[1] },
   sectionHead: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[1],
     justifyContent: 'space-between',
     alignItems: 'center',
   },

@@ -15,5 +15,5 @@ export function SavedNote() {
 }
 
 const styles = StyleSheet.create({
-  note: { fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 16, marginBottom: 8 },
+  note: { fontSize: 15, color: MUTED, textAlign: 'center', marginTop: 16, marginBottom: 8 },
 });

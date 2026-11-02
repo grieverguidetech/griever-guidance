@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing[3], paddingTop: spacing[4] },
   review: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   sticky: { gap: spacing[1], padding: spacing[3], borderTopWidth: 1, borderTopColor: colors['neutral-300'], backgroundColor: colors.bg },
   footerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: spacing[2], paddingTop: spacing[1] },

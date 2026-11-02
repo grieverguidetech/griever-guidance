@@ -60,6 +60,26 @@ describe('the hub back button', () => {
   });
 });
 
+describe('mobile-only hub copy (#654)', () => {
+  it('keeps the web done label and adds the mobile one beside it', () => {
+    const hub = screenCopy('pathLanding');
+    expect(hub.moments.announce.doneLabel).toBe('Told close family');
+    expect(hub.announcedLabel).toBe('Announced the passing');
+  });
+
+  it('names a missing field, with and without "the"', () => {
+    const hub = screenCopy('pathLanding');
+    expect(fill(hub.statusNeedsField, { field: hub.statusFieldNames['serviceTime'] })).toBe('Needs the service time');
+    expect(fill(hub.statusNeedsField, { field: hub.statusFieldNames['senderName'] })).toBe('Needs your name');
+  });
+
+  it('has the Bring back my words button for the review screen', () => {
+    expect(screenCopy('review').bringBack).toBe('Bring back my words');
+    expect(screenCopy('review').suggestedInPlace).toBe('Suggested wording in place.');
+    expect(screenCopy('review').wordsBack).toBe('Your words are back.');
+  });
+});
+
 describe('fill', () => {
   it('fills {name} placeholders', () => {
     expect(fill(screenCopy('pathLanding').forName, { name: 'Margaret' })).toBe('For Margaret');

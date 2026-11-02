@@ -1,4 +1,4 @@
-import { sendCardStatus } from './sendCardStatus';
+import { firstMissingField, sendCardStatus } from './sendCardStatus';
 import type { Session } from './useSessions';
 
 function session(over: Partial<Session> = {}): Session {
@@ -69,5 +69,40 @@ describe('sendCardStatus', () => {
 
   it('a blank person name still counts as missing', () => {
     expect(sendCardStatus(session({ personName: ' ', senderName: 'Me' }), 'thanks')).toBe('needsDetail');
+  });
+});
+
+describe('firstMissingField', () => {
+  const planned = { serviceDate: 'June 14, 2026', serviceTime: '2:00 PM', servicePlace: 'St Mary' };
+
+  it('names each required service field in turn as the earlier ones are filled', () => {
+    expect(firstMissingField(session(), 'service')?.key).toBe('serviceDate');
+    expect(firstMissingField(session({ serviceDate: planned.serviceDate }), 'service')?.key).toBe('serviceTime');
+    expect(firstMissingField(session({ serviceDate: planned.serviceDate, serviceTime: planned.serviceTime }), 'service')?.key).toBe('serviceLocation');
+    expect(firstMissingField(session(planned), 'service')).toBeNull();
+  });
+
+  it('names the sender for the thank-yous and the link for the obituary', () => {
+    expect(firstMissingField(session(), 'thanks')?.key).toBe('senderName');
+    expect(firstMissingField(session({ senderName: 'Sam' }), 'thanks')).toBeNull();
+    expect(firstMissingField(session(), 'obituary')?.key).toBe('obituaryUrl');
+    expect(firstMissingField(session({ obituaryUrl: 'https://example.com/anna' }), 'obituary')).toBeNull();
+  });
+
+  it('never has a missing field for the announcement', () => {
+    expect(firstMissingField(session(), 'announce')).toBeNull();
+  });
+
+  it('agrees with sendCardStatus for every moment, empty and filled', () => {
+    const sessions = [session(), session(planned), session({ senderName: 'Sam', obituaryUrl: 'https://example.com/anna' })];
+    for (const s of sessions) {
+      for (const key of ['announce', 'service', 'obituary', 'thanks'] as const) {
+        const status = sendCardStatus(s, key);
+        const missing = firstMissingField(s, key) !== null;
+        if (typeof status === 'string') {
+          expect(missing).toBe(status === 'needsDetail' || status === 'waitingForLink');
+        }
+      }
+    }
   });
 });
