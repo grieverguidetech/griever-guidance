@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/mobile && NX_DAEMON=false pnpm nx run-many -t build -p shared api-client hooks contacts copy tokens ui"
+    "eas-build-post-install": "cd ../../ && node tools/scripts/eas-build-post-install.mjs . apps/mobile && NX_DAEMON=false pnpm nx run-many -t build -p shared api-client hooks contacts copy tokens"
   },
   "nx": {
     "name": "mobile",
@@ -51,7 +51,6 @@
     "@griever/contacts": "workspace:*",
     "@griever/copy": "workspace:*",
     "@griever/tokens": "workspace:*",
-    "@griever/ui": "workspace:*",
     "@expo-google-fonts/source-serif-4": "0.4.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.2.1",

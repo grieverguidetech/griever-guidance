@@ -263,9 +263,6 @@ importers:
       '@griever/tokens':
         specifier: workspace:*
         version: link:../../libs/tokens
-      '@griever/ui':
-        specifier: workspace:*
-        version: link:../../libs/ui
       '@react-native-async-storage/async-storage':
         specifier: 2.2.0
         version: 2.2.0(react-native@0.88.0(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))

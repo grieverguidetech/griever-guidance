@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { Button, Heading, SerifReadyContext } from '@griever/ui';
+import { Button, Heading, SerifReadyContext } from '../ui';
 
 /** libs/ui is written for React Native; this runs it on the native renderer. */
 describe('shared UI on native', () => {

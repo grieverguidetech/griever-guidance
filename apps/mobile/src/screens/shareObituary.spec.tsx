@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { Linking, Share } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
-import { SerifReadyContext } from '@griever/ui';
+import { SerifReadyContext } from '../ui';
 import * as Clipboard from 'expo-clipboard';
 import { ShareObituaryScreen } from './ShareObituaryScreen';
 

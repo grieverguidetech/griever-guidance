@@ -94,7 +94,7 @@ is no hub screen, no gate and no obituary screen.
 | Screen (heading users see) | File | Reached from | Goes to | Feature flag |
 |---|---|---|---|---|
 | "The people you're writing about" | `HomeScreen.tsx` | App start. "Back" on the hub (there is no Home link in the send steps; Back from a first form goes to the hub, and Back there goes Home). End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
-| "One thing at a time." (hub, shared with web from libs/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | The chosen step's first form (Who should know? for service and thank-you). "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
+| "One thing at a time." (hub, built from apps/mobile/src/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | The chosen step's first form (Who should know? for service and thank-you). "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
 | "Announce the passing" (announcement form; service and thank-you have none on mobile and open on "Who should know?") | `AnnounceScreen.tsx` | Hub. Used for the `announce` step. | Contact selector | None |
 | "Who should know?", "Add from your contacts" | `ContactSelectorScreen.tsx` | Announce form. For service and thank-you: the hub. | Confirm | None |
 | "Review your message" | `ConfirmScreen.tsx` | Contact selector | Sending | None |

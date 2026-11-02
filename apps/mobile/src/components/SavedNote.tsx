@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { SerifText as Text } from '@griever/ui';
+import { SerifText as Text } from '../ui';
 import { NOT_SAVED_NOTE_TEXT, usePersisting } from '../lib/deviceCache';
 import { MUTED } from './colors';
 

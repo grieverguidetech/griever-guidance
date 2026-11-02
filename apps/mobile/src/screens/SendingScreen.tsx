@@ -5,8 +5,8 @@ import { fill, screenCopy } from '@griever/copy';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import { colors, spacing } from '@griever/tokens';
-import { Sending } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Sending } from '../ui';
+import type { ButtonNode } from '../ui';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 

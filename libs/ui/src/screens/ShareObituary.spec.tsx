@@ -25,17 +25,8 @@ const copy: ShareObituaryCopy = {
   emailTitle: 'Step 1',
   emailBody: 'Your email app opens.',
   emailButton: 'Email it to the paper or funeral home',
-  emailNoText: "Once it's written, come back here.",
+  emailNoText: 'Write it on the web first.',
   emailFailed: "We couldn't open email.",
-  emailOpened: "Opened in your email app. Come back when it's published.",
-  copyButton: 'Copy the text',
-  copied: 'Copied.',
-  copyFailed: "We couldn't copy the text on this phone.",
-  emailShared: "Shared from your phone. Come back when it's published.",
-  pasteNotLink: "That doesn't look like a link.",
-  pasted: 'Link pasted.',
-  linkStepLabel: "Step 2: once it's published, paste the link",
-  pasteButton: 'Paste link',
 };
 
 function setup(over: Partial<ShareObituaryProps> = {}) {
@@ -204,7 +195,7 @@ describe('ShareObituary', () => {
 
   it('says the obituary is not written, with no button, when there is no text', () => {
     setup({ publisherEmail: { hasText: false, onPress: vi.fn() } });
-    expect(screen.getByText("Once it's written, come back here.")).toBeInTheDocument();
+    expect(screen.getByText('Write it on the web first.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Email it to the paper or funeral home' })).not.toBeInTheDocument();
     expect(continueButton()).toBeInTheDocument();
   });
@@ -217,67 +208,5 @@ describe('ShareObituary', () => {
   it('draws the eyebrow in the second accent when asked', () => {
     setup();
     expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(170, 11, 86)');
-  });
-
-  it('shows the step 2 label when Step 1 shows', () => {
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn() } });
-    expect(screen.getByRole('heading', { name: "Step 2: once it's published, paste the link" })).toBeInTheDocument();
-  });
-
-  it('shows no Step 2 heading without publisherEmail, even when the copy has the label', () => {
-    setup();
-    expect(screen.queryByRole('heading', { name: /Step 2/ })).not.toBeInTheDocument();
-  });
-
-  it('shows no opened line before mail opens', () => {
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn() } });
-    expect(screen.queryByText(/Opened in your email app/)).not.toBeInTheDocument();
-  });
-
-  it('shows the opened line once mail opened', () => {
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), note: 'opened' } });
-    expect(screen.getByText("Opened in your email app. Come back when it's published.")).toBeInTheDocument();
-  });
-
-  it('shows the shared line, not the opened line, after the share sheet completed', () => {
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), note: 'shared' } });
-    expect(screen.getByText("Shared from your phone. Come back when it's published.")).toBeInTheDocument();
-    expect(screen.queryByText(/Opened in your email app/)).not.toBeInTheDocument();
-  });
-
-  it('says the copy failed, and not Copied', () => {
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), onCopyText: vi.fn(), copyFailed: true } });
-    expect(screen.getByText("We couldn't copy the text on this phone.")).toBeInTheDocument();
-    expect(screen.queryByText('Copied.')).not.toBeInTheDocument();
-  });
-
-  it('shows the paste line after the Paste link button, in reading order', () => {
-    setup({ onPasteLink: vi.fn(), pasteMessage: 'Link pasted.' });
-    const field = screen.getByLabelText('Link to the obituary');
-    const button = screen.getByRole('button', { name: 'Paste link' });
-    const line = screen.getByText('Link pasted.');
-    expect(field.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(button.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('offers Copy the text, and says Copied after it worked', async () => {
-    const onCopyText = vi.fn();
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), failed: true, onCopyText, copied: true } });
-    await userEvent.click(screen.getByRole('button', { name: 'Copy the text' }));
-    expect(onCopyText).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Copied.')).toBeInTheDocument();
-  });
-
-  it('shows Paste link only when a handler is given, and calls it', async () => {
-    const onPasteLink = vi.fn();
-    setup({ onPasteLink });
-    await userEvent.click(screen.getByRole('button', { name: 'Paste link' }));
-    expect(onPasteLink).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides Paste link and Copy the text on the web (no handlers)', () => {
-    setup({ publisherEmail: { hasText: true, onPress: vi.fn() } });
-    expect(screen.queryByRole('button', { name: 'Paste link' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Copy the text' })).not.toBeInTheDocument();
   });
 });

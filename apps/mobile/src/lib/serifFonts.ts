@@ -7,7 +7,7 @@ import { fonts } from '@griever/tokens';
 
 /**
  * Source Serif 4, the face the web app uses. The family names come from @griever/tokens, so shared
- * components (libs/ui) ask for the same names this registers. Regular and semibold, each with an italic (the italics are for later screens).
+ * components (apps/mobile/src/ui) ask for the same names this registers. Regular and semibold, each with an italic (the italics are for later screens).
  * The font files ship inside the app binary (no network at launch, C5), under the SIL Open Font
  * License 1.1; the licence text is committed at apps/mobile/assets/fonts/SourceSerif4-OFL.txt.
  */
@@ -23,7 +23,7 @@ export const serifFontFiles = {
  * system font. Waiting would put a blank screen in front of someone who needs the app now.
  *
  * Returns true once the fonts have loaded (or failed). React Native does not re-read a font family
- * for text that already drew in the system font, so libs/ui changes its font style when this turns true
+ * for text that already drew in the system font, so apps/mobile/src/ui changes its font style when this turns true
  * (SerifReadyContext).
  */
 export function useSerifFonts(): boolean {

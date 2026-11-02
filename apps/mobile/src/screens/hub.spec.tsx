@@ -3,7 +3,7 @@ import { AccessibilityInfo, BackHandler, Modal, Platform, StyleSheet } from 'rea
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
-import { SerifReadyContext } from '@griever/ui';
+import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.

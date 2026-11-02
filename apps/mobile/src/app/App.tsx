@@ -31,7 +31,7 @@ import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
-import { SerifReadyContext, SerifText as Text } from '@griever/ui';
+import { SerifReadyContext, SerifText as Text } from '../ui';
 import { useSerifFonts } from '../lib/serifFonts';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */

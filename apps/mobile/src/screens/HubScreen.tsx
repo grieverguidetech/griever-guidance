@@ -5,8 +5,8 @@ import { isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from 
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
-import { Hub, PaywallSheet, SentNote } from '@griever/ui';
-import type { ButtonNode, HubRow } from '@griever/ui';
+import { Hub, PaywallSheet, SentNote } from '../ui';
+import type { ButtonNode, HubRow } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';

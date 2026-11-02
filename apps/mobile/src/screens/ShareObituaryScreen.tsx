@@ -4,8 +4,8 @@ import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, P
 import { fill, screenCopy } from '@griever/copy';
 import { isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { Session } from '@griever/hooks';
-import { ShareObituary } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { ShareObituary } from '../ui';
+import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { copyText, pasteText } from '../lib/clipboard';

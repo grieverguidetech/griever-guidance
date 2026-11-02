@@ -1,7 +1,7 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
-import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, minTouchTarget, spacing } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
@@ -43,12 +43,6 @@ export interface ButtonProps {
    */
   busy?: boolean;
   /**
-   * While `busy`, the words shown instead of the label, for example "Reading your contacts…". They are
-   * announced once when the work starts (iOS). A busy button shows a small spinner too. Native only: on web
-   * a busy button looks and reads as it always did.
-   */
-  busyLabel?: string;
-  /**
    * With `ariaDisabled`, native also reads the button as disabled. Only for a button whose press does
    * nothing: native swallows the tap of a disabled button (#292), so a button that explains itself
    * on press (the paywall) must leave this off.
@@ -70,7 +64,6 @@ export function Button({
   hint,
   opensDialog = false,
   busy,
-  busyLabel,
   accessibilityName,
   announceDisabled = false,
   pressed,
@@ -88,8 +81,6 @@ export function Button({
     [ariaDisabled, buttonRef],
   );
 
-  // The busy look (spinner, busy words, aria-busy) is native only: web buttons stay as they were (#659).
-  const showBusy = Boolean(busy) && Platform.OS !== 'web';
   const extra: Record<string, unknown> = {};
   if (describedBy) {
     extra['aria-describedby'] = describedBy;
@@ -101,33 +92,12 @@ export function Button({
   if (pressed !== undefined) {
     extra['aria-pressed'] = pressed;
   }
-  if (showBusy) {
-    extra['aria-busy'] = true;
-  }
   if (opensDialog) {
     extra['aria-haspopup'] = 'dialog';
   }
 
   const font = useSerifStyle('semibold');
-  // Said once when the work starts. On native, a state change alone is not spoken.
-  const working = showBusy;
-  useEffect(() => {
-    // Only with busyLabel: a screen that already announces its own busy text is left alone.
-    // iOS only, like the other announcements here (iOS ignores the busy state change).
-    if (working && busyLabel && Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibility(busyLabel);
-    }
-    // Only when the work starts, not when the words change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [working]);
   const unavailableFill = ariaDisabled && variant === 'primary';
-  const text = (
-    <Phrasing>
-      <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), variant === 'tertiary' && styles.labelTertiary]}>
-        {working && busyLabel ? busyLabel : label}
-      </Text>
-    </Phrasing>
-  );
   return (
     <Pressable
       ref={setRef}
@@ -143,19 +113,11 @@ export function Button({
       ]}
       {...extra}
     >
-      {working ? (
-        <View style={styles.content}>
-          <ActivityIndicator
-            size="small"
-            color={variant === 'primary' ? colors.bg : colors['accent-700']}
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-          />
-          {text}
-        </View>
-      ) : (
-        text
-      )}
+      <Phrasing>
+        <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), variant === 'tertiary' && styles.labelTertiary]}>
+          {label}
+        </Text>
+      </Phrasing>
     </Pressable>
   );
 }
@@ -206,7 +168,6 @@ const styles = StyleSheet.create({
   // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
   // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
   unavailableFill: { backgroundColor: colors['neutral-700'] },
-  content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] },
   label: {
   },
   labelPrimary: { fontSize: 15 },

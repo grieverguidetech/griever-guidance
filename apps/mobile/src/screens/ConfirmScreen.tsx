@@ -3,8 +3,8 @@ import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, Pres
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import type { UseContactsResult } from '@griever/hooks';
 import { firstName, SHARE_SERVICE_SAMPLE } from '@griever/shared';
-import { Review, SerifText as Text } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Review, SerifText as Text } from '../ui';
+import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import type { FlowProps } from '../app/App';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';

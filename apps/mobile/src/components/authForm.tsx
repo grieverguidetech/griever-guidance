@@ -3,7 +3,7 @@ import type { ComponentProps, ComponentRef, ReactNode, Ref } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View } from 'react-native';
 import { colors, minTouchTarget } from '@griever/tokens';
 import { ERROR } from './colors';
-import { Body, Button, Heading, useSerifStyle, SerifText as Text, SerifTextInput as TextInput } from '@griever/ui';
+import { Body, Button, Heading, useSerifStyle, SerifText as Text, SerifTextInput as TextInput } from '../ui';
 
 /** Errors use the app's one danger red (also libs/ui Status and Body tone="danger"); 6.47:1 on white. */
 const DANGER = ERROR;

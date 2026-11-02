@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { Account } from '@griever/ui';
-import type { ButtonNode } from '@griever/ui';
+import { Account } from '../ui';
+import type { ButtonNode } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
