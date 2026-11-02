@@ -69,7 +69,7 @@ export const useFirstScreen = (): { first: 'pending' | 'home' | 'signIn'; leaveF
 
 const Opening = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
-    <Text accessibilityLiveRegion="polite">Opening…</Text>
+    <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>Opening…</Text>
   </View>
 );
 
@@ -122,7 +122,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
   // left on the picker reopens at its first form, so the picker can't overwrite it (#99, as web).
-  const latest = latestInProgressDraft(session);
+  // A draft saved mid-send reopens on review without the people already told.
+  const latest = latestInProgressDraft(session, true);
   const flow = useSendFlow({
     session,
     draft: latest && resumeDraft(latest, true),
@@ -260,18 +261,22 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     onFinished(sendNote(templateCategory, recipients), { id, category: templateCategory, deliveredIds });
   }, [step, templateCategory, sendJob, onFinished]);
 
+  // Each confirmed person is written to the phone before the next hand-off, so a force-quit
+  // mid-send never forgets who was told. Read from the send job itself, not from a render's
+  // closure, so two quick taps record the right two people. Repeats merge. Ids only (C2).
+  useEffect(() => {
+    if (!templateCategory || !sendJob) {
+      return;
+    }
+    const delivered = sendJob.recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId);
+    if (delivered.length > 0) {
+      onTold(id, templateCategory, delivered);
+    }
+  }, [sendJob, templateCategory, id, onTold]);
+
   const stepped = withoutServiceKnown(flow);
   const flowWithHub = {
     ...stepped,
-    // Each confirmed person is written to the phone before the next hand-off, so a force-quit
-    // mid-send never forgets who was told. Ids only: no wording, no job (C2).
-    markActiveSent: () => {
-      const active = sendJob?.recipients.find((r) => r.status === 'sending');
-      if (active && templateCategory) {
-        onTold(id, templateCategory, [active.contactId]);
-      }
-      stepped.markActiveSent();
-    },
     prevStep: () => {
       // The step before this one is the picker: go to the hub instead.
       if (onFirstForm) {

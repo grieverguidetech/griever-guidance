@@ -137,11 +137,20 @@ export function freshDraft(patch: Partial<SendFlowDraft>): SendFlowDraft {
 /**
  * True when a saved draft has a message under way (a template chosen, nothing being sent), so
  * reopening the app should put the person back in it rather than start the message over.
- * 'sending' is never resumed: the send job isn't saved, and resuming would offer the whole list
- * again. 'sent' is finished.
+ * 'sending' is not resumed by default: the send job isn't saved, and resuming would offer the whole
+ * list again. Mobile keeps who was told, so it passes `resumeSending`: a 'sending' draft then
+ * reopens on review without the people already told (see fromDraft). 'sent' is finished.
  */
-export function hasDraftInProgress(draft: SendFlowDraft | null | undefined): draft is SendFlowDraft {
-  return !!draft && draft.templateCategory !== null && draft.step !== 'sending' && draft.step !== 'sent';
+export function hasDraftInProgress(
+  draft: SendFlowDraft | null | undefined,
+  resumeSending = false,
+): draft is SendFlowDraft {
+  return (
+    !!draft &&
+    draft.templateCategory !== null &&
+    (draft.step !== 'sending' || resumeSending) &&
+    draft.step !== 'sent'
+  );
 }
 
 /** The first step after the picker, for moments that do not start on the details form. */
@@ -179,8 +188,12 @@ export function draftHasContent(
  * True when a moment has something to resume: the first form shows typed words or a hand-edited
  * message, or the draft has moved past that form. A draft only opened (nothing typed) is not started.
  */
-export function isDraftStarted(draft: SendFlowDraft | null | undefined, skipDetails = false): boolean {
-  if (!hasDraftInProgress(draft) || !draft.templateCategory) return false;
+export function isDraftStarted(
+  draft: SendFlowDraft | null | undefined,
+  skipDetails = false,
+  resumeSending = false,
+): boolean {
+  if (!hasDraftInProgress(draft, resumeSending) || !draft.templateCategory) return false;
   const first = FIRST_STEP[draft.templateCategory] ?? (skipDetails ? 'contacts' : 'details');
   return draftHasContent(draft) || (draft.step !== 'template' && draft.step !== first);
 }
@@ -351,6 +364,8 @@ export function useSendFlow(
   const { session = null, draft = null, drafts, onDraftChange, storage, skipDetails = false, told } = options;
   const toldRef = useRef<ToldIds>(told ?? {});
   toldRef.current = told ?? {};
+  // Only a caller that keeps who was told (mobile) can resume a draft saved mid-send.
+  const resumeSending = told !== undefined;
   const draftsRef = useRef(drafts);
   draftsRef.current = drafts;
 
@@ -400,11 +415,11 @@ export function useSendFlow(
   // the picker's own nextStep lands on the moment's first form with everything typed still there.
   const startedState = useCallback((category: TemplateCategory, templateOverrideId: string | null): SendFlowState => {
     const saved = draftsRef.current?.[category];
-    if (hasDraftInProgress(saved) && saved.templateOverrideId === templateOverrideId) {
+    if (hasDraftInProgress(saved, resumeSending) && saved.templateOverrideId === templateOverrideId) {
       return { ...fromDraft(saved, skipDetails, toldRef.current), step: 'template' };
     }
     return { ...initialState, step: 'template', templateCategory: category, templateOverrideId };
-  }, [skipDetails]);
+  }, [skipDetails, resumeSending]);
 
   const setTemplateCategory = useCallback((category: TemplateCategory) => {
     setState((s) => {

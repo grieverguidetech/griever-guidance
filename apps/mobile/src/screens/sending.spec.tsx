@@ -31,6 +31,21 @@ const handleForButton = (name: string): number => {
   throw new Error(`No focus handle for button ${name}`);
 };
 
+// The handle of the node a text's ref points at (a name heading), found by its own children.
+// The newest match wins: earlier tests leave their nodes in the map.
+const handleForText = (text: string): number => {
+  let found: number | undefined;
+  for (const [node, handle] of mockHandles) {
+    if ((node as { props?: { children?: unknown } }).props?.children === text) {
+      found = handle;
+    }
+  }
+  if (found === undefined) {
+    throw new Error(`No focus handle for text ${text}`);
+  }
+  return found;
+};
+
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '' } as SessionDetails;
 const all = [
   { contactId: 'c1', name: 'Dee', phone: '+15555550100' },
@@ -344,6 +359,48 @@ describe('Sending on the phone: a send is never lost or repeated', () => {
     change('active');
     await screen.findByText(PROMPT);
     expect(screen.getByRole('button', { name: PROMPT }).props.accessibilityHint).toBe('Marks Dee sent. Then you can add a line for Eli');
+  });
+
+  it('thank-you: moving to the next card focuses the name, so the line is heard before Text', async () => {
+    const { change, focus } = setup(['c1', 'c2'], 'aftercare');
+    fireEvent.press(await screen.findByText('Text Dee'));
+    change('background');
+    change('active');
+    fireEvent.press(await screen.findByText(PROMPT));
+    await screen.findByText('Text Eli');
+    await waitFor(() => expect(focus).toHaveBeenLastCalledWith(handleForText('Eli')));
+    expect(focus).not.toHaveBeenLastCalledWith(handleForButton('Text Eli'));
+  });
+
+  it('thank-you: a tap on Text Eli right after confirming Dee does not open Messages', async () => {
+    const { change, open, tick } = setup(['c1', 'c2'], 'aftercare');
+    fireEvent.press(await screen.findByText('Text Dee'));
+    change('background');
+    change('active');
+    fireEvent.press(await screen.findByText(PROMPT));
+    // The same double tap lands on the Text button that took the question's place.
+    fireEvent.press(await screen.findByText('Text Eli'));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Add a line for Eli (optional)')).toBeTruthy();
+    tick();
+    fireEvent.press(screen.getByText('Text Eli'));
+    expect(open).toHaveBeenCalledTimes(2);
+  });
+
+  it('puts the Messages error in the Text button hint so focus does not cut it off', async () => {
+    const { open } = setup(['c1', 'c2']);
+    open.mockRejectedValueOnce(new Error('no handler'));
+    fireEvent.press(await screen.findByText('Text Dee'));
+    const error = "Messages didn't open on this phone. You can skip Dee and text them yourself later.";
+    expect(await screen.findByText(error)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Text Dee' }).props.accessibilityHint).toBe(error);
+  });
+
+  it('Stop for now has a hint and a short muted line', async () => {
+    setup(['c1', 'c2']);
+    await screen.findByText('Text Dee');
+    expect(screen.getByRole('button', { name: 'Stop for now' }).props.accessibilityHint).toBe('People you told stay marked as told.');
+    expect(screen.getByText('People you told stay marked as told.', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('Stop for now ends the send for this flow', async () => {

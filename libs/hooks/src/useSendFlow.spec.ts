@@ -220,6 +220,9 @@ describe('hasDraftInProgress', () => {
 
   it('is false while sending, because the send job is not saved', () => {
     expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sending' }))).toBe(false);
+    // Only a caller that keeps who was told (mobile) asks for 'sending' to count.
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sending' }), true)).toBe(true);
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sent' }), true)).toBe(false);
   });
 });
 

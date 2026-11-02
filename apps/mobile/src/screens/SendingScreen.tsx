@@ -46,6 +46,8 @@ export function SendingScreen({ flow, contacts }: Props) {
   const handedOffAt = useRef(0);
   // The contact whose question was already answered Yes, so a second tap cannot mark the next one.
   const confirmedFor = useRef<string | null>(null);
+  // When a thank-you card moved on without opening Messages. A tap this soon lands on the Text button that took the Yes button's place.
+  const confirmedAt = useRef(0);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof Text>>(null);
@@ -136,6 +138,9 @@ export function SendingScreen({ flow, contacts }: Props) {
   }
 
   function openMessages() {
+    if (Date.now() - confirmedAt.current < HAND_OFF_GUARD_MS) {
+      return;
+    }
     if (active) {
       handOffTo(active.contactId);
     }
@@ -147,6 +152,7 @@ export function SendingScreen({ flow, contacts }: Props) {
       return;
     }
     confirmedFor.current = activeId;
+    confirmedAt.current = Date.now();
     const next = isLast ? undefined : sendJob?.recipients[activeIndex + 1];
     markActiveSent();
     // The thank-you moves to the next card without opening Messages, so the note for that person can be written first.
@@ -215,7 +221,7 @@ export function SendingScreen({ flow, contacts }: Props) {
         onOpenMessages={openMessages}
         onNext={markNext}
         onSkip={markActiveSkipped}
-        stop={{ label: copy.stopForNow, onPress: stopSending }}
+        stop={{ label: copy.stopForNow, note: copy.stopNote, onPress: stopSending }}
         headingRef={heading}
         onWhatYoullNeed={() => setChecklistOpen(true)}
         checklistRef={checklistButton}

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, BackHandler, Linking } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,7 +28,16 @@ const savedAnna = async (): Promise<Session> => {
 };
 
 // A tap this soon after opening Messages is ignored (the double-tap guard), so a test waits like a person would.
-const afterMessages = () => new Promise((resolve) => setTimeout(resolve, 1100));
+// The test moves a clock by hand instead of waiting.
+let clock = 1_700_000_000_000;
+const afterMessages = async () => {
+  clock += 1500;
+};
+
+beforeEach(() => {
+  clock = 1_700_000_000_000;
+  jest.spyOn(Date, 'now').mockImplementation(() => clock);
+});
 
 const NOTE = 'She was peaceful at home.';
 
@@ -111,10 +120,44 @@ describe('recording who was messaged (#621)', () => {
     await waitFor(async () => {
       expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
     });
-    // Ids only: no message text and no job is stored (C2).
+    // The record holds contact ids only, and the live send job is not stored (C2).
     const raw = (await AsyncStorage.getItem(SESSIONS_KEY)) ?? '';
     expect(raw).not.toContain('sendJob');
-    expect(raw).not.toContain('Hello Dee');
+    const saved = await savedAnna();
+    expect(saved.recipientsNotified).toEqual({ announcement: ['c1'] });
+    expect(saved.recipientsNotified.announcement?.every((value) => /^c\d$/.test(value))).toBe(true);
+  });
+
+  it('records the right two people after two Next taps in a row', async () => {
+    await toSending(['Dee', 'Eli', 'Fay']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    fireEvent.press(await screen.findByText('Text Eli'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    await screen.findByText('Text Fay');
+    await waitFor(async () => {
+      expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1', 'c2']);
+    });
+  });
+
+  it('Android Back mid-send, then reopening the moment, selects only the people not yet told', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    await toSending(['Dee', 'Eli', 'Fay']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    await screen.findByText('Text Eli');
+    act(() => void [...handlers].reverse().some((h) => h()));
+    fireEvent.press(await screen.findByText(/^Sent to 1 person · /));
+    // The flow reopens on review with Eli and Fay, not all three and not a blank form.
+    expect(await screen.findByText('Text 2 people')).toBeTruthy();
+    expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
   });
 
   it('Android Back on the send screen goes to the hub and keeps who was told', async () => {

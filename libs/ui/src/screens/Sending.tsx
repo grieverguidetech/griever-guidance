@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
-import type { Ref } from 'react';
+import type { ComponentRef, Ref } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
@@ -74,8 +74,11 @@ export interface SendingProps {
   share?: { label: string; onPress: () => void };
   onNext: () => void;
   onSkip: () => void;
-  /** A quiet "Stop for now" under the card. Leave unset to hide it. */
-  stop?: { label: string; onPress: () => void };
+  /**
+   * A quiet "Stop for now" under the card, with a short muted line under it that the button also
+   * reads as its hint. Leave unset to hide it.
+   */
+  stop?: { label: string; note: string; onPress: () => void };
   headingRef?: HeadingProps['headingRef'];
   /** Opens "What you'll need". Leave unset to hide the button. There is no Back: going back to Review could start the send again. */
   onWhatYoullNeed?: () => void;
@@ -95,6 +98,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
   const nextRef = useRef<ButtonNode>(null);
   const openRef = useRef<ButtonNode>(null);
   const yesRef = useRef<ButtonNode>(null);
+  const nameRef = useRef<ComponentRef<typeof Text>>(null);
   const handedOff = handOff !== null;
   const personKey = current?.position;
   const lastPerson = useRef(personKey);
@@ -128,15 +132,17 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
   }, [failed]);
 
   // After Next or Skip the pressed button is gone, so focus goes to the new person's first action.
-  // The first person is skipped: the heading has the focus on arrival.
+  // With a line to write for them (the thank-you), it goes to their name instead, so the field is
+  // heard before the Text button. The first person is skipped: the heading has the focus on arrival.
+  const hasNote = note !== undefined;
   useEffect(() => {
     if (personKey !== lastPerson.current) {
       lastPerson.current = personKey;
       if (personKey !== undefined) {
-        focusNode(openRef.current);
+        focusNode((hasNote ? nameRef.current : openRef.current) as ButtonNode | null);
       }
     }
-  }, [personKey]);
+  }, [personKey, hasNote]);
 
   return (
     <View style={styles.screen}>
@@ -159,7 +165,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
         <Card>
           <View style={styles.who}>
             <Eyebrow>{current.position}</Eyebrow>
-            <Heading level={2}>{current.name}</Heading>
+            <Heading level={2} headingRef={nameRef}>{current.name}</Heading>
           </View>
           <Body>{current.message}</Body>
           {note && !handOff ? (
@@ -192,7 +198,8 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
             </View>
           ) : (
             <View style={styles.actions}>
-              <Button label={openLabel ?? copy.openMessages} buttonRef={openRef} onPress={onOpenMessages} />
+              {/* On the phone the error is also the hint: focus moves here at once, and would cut the line off. */}
+              <Button label={openLabel ?? copy.openMessages} hint={focusOpenOnError ? error : undefined} buttonRef={openRef} onPress={onOpenMessages} />
               {share ? <Button label={share.label} variant="secondary" onPress={share.onPress} /> : null}
               <Button label={copy.skip} variant="ghost" onPress={onSkip} />
             </View>
@@ -200,11 +207,19 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
           <Status id={statusId} message={error ?? (confirmSent ? undefined : handOff?.note)} tone={error ? 'danger' : 'muted'} />
         </Card>
       ) : null}
-      {current && stop ? <Button label={stop.label} variant="ghost" onPress={stop.onPress} /> : null}
-      <View style={styles.list}>
+      {current && stop ? (
+        <View style={styles.stop}>
+          <Button label={stop.label} hint={stop.note} variant="ghost" onPress={stop.onPress} />
+          {/* The button reads the same words as its hint, so the line is not read twice. */}
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <Body tone="muted">{stop.note}</Body>
+          </View>
+        </View>
+      ) : null}
+      <View style={styles.list} role="list">
         {others.map((person) => (
           // One element per row, read as "Name, status".
-          <View key={person.id} style={styles.person} accessible accessibilityLabel={`${person.name}, ${copy[person.status]}`}>
+          <View key={person.id} style={styles.person} role="listitem" accessible accessibilityLabel={`${person.name}, ${copy[person.status]}`}>
             <Body>{person.name}</Body>
             <Body tone="muted">{copy[person.status]}</Body>
           </View>
@@ -235,6 +250,7 @@ const styles = StyleSheet.create({
   },
   field: { gap: spacing[1] },
   optional: { color: colors['neutral-700'], fontWeight: '400' },
+  stop: { gap: spacing[1] },
   list: { gap: spacing[2] },
   person: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

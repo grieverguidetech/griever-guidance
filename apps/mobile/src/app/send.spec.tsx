@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, Linking, Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,7 +33,16 @@ const contacts = [
 ];
 
 // A tap this soon after opening Messages is ignored (the double-tap guard), so a test waits like a person would.
-const afterMessages = () => new Promise((resolve) => setTimeout(resolve, 1100));
+// The test moves a clock by hand instead of waiting.
+let clock = 1_700_000_000_000;
+const afterMessages = async () => {
+  clock += 1500;
+};
+
+beforeEach(() => {
+  clock = 1_700_000_000_000;
+  jest.spyOn(Date, 'now').mockImplementation(() => clock);
+});
 
 afterEach(() => {
   jest.restoreAllMocks();

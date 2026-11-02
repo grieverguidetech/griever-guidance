@@ -37,6 +37,7 @@
     "addLine",
     "sentHintNextNote",
     "stopForNow",
+    "stopNote",
     "smsError"
   ],
   "properties": {
@@ -180,6 +181,9 @@
       "$ref": "#/$defs/text"
     },
     "stopForNow": {
+      "$ref": "#/$defs/text"
+    },
+    "stopNote": {
       "$ref": "#/$defs/text"
     },
     "smsError": {

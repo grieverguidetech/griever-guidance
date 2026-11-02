@@ -32,5 +32,6 @@
   "addLine": "Add a line for {name}",
   "sentHintNextNote": "Marks {name} sent. Then you can add a line for {next}",
   "stopForNow": "Stop for now",
+  "stopNote": "People you told stay marked as told.",
   "smsError": "Messages didn't open on this phone. You can skip {name} and text them yourself later."
 }
