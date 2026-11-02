@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, BackHandler, Modal, Platform, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
 import { SerifReadyContext } from '@griever/ui';
@@ -126,9 +126,44 @@ describe('HubScreen', () => {
     } as unknown as Session;
     setup(done);
     expect(screen.getByRole('button', { name: /Told close family/ })).toBeTruthy();
-    expect(screen.getByText(/2 people · October 2, 2026 · Send again/)).toBeTruthy();
+    expect(screen.getByText(/Sent to 2 people · October 2, 2026 · Send again/)).toBeTruthy();
     expect(screen.getByText('Started')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+  });
+
+  it('shows the four status lines in order, in each row\'s name', () => {
+    const mixed = {
+      ...anna,
+      serviceDate: 'June 14, 2026',
+      serviceTime: '2:00 PM',
+      servicePlace: 'St Mary',
+      recipientsNotified: { announcement: ['c1'] },
+      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
+    } as unknown as Session;
+    setup(mixed);
+    expect(within(screen.getByRole('button', { name: /Told close family/ })).getByText(/Sent to 1 person/)).toBeTruthy();
+    // The service is the next step, so it is a card; its status sits in the card.
+    expect(screen.getByText('Ready')).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs a detail/)).toBeTruthy();
+    expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs a detail/)).toBeTruthy();
+    const titles = screen.getAllByText(/Told close family|Share the service|Share the obituary|Send thank-yous/).map((n) => n.props.children);
+    expect(titles).toEqual(['Told close family', 'Share the service', 'Share the obituary', 'Send thank-yous']);
+  });
+
+  it('shows Ready on the announcement card when it is next, in the Start button name', () => {
+    setup();
+    expect(screen.getByText('Ready')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start, Announce the passing, Ready' })).toBeTruthy();
+  });
+
+  it('keeps the status line on locked rows when payments are on', () => {
+    setup(anna, true);
+    const service = screen.getByRole('button', { name: /Share the service/ });
+    expect(service.props.accessibilityHint).toBe('Included with the full plan');
+    expect(within(screen.getByRole('button', { name: /Share the service/ })).getByText(/Needs a detail/)).toBeTruthy();
+    const thanks = screen.getByRole('button', { name: /Send thank-yous/ });
+    expect(thanks.props.accessibilityHint).toBe('Included with the full plan');
+    expect(within(thanks).getByText(/Needs a detail/)).toBeTruthy();
   });
 
   it('opens What you will need in a sheet', () => {
