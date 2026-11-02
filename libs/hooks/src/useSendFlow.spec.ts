@@ -140,6 +140,68 @@ describe('useSendFlow — sending one contact at a time', () => {
     expect(result.current.sendJob).toBeNull();
   });
 
+  it('drops people already told from a draft saved mid-send', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a', 'b', 'c'], toldIds: ['a', 'b'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft, told: {} }));
+    expect(result.current.step).toBe('review');
+    expect(result.current.selectedContactIds).toEqual(['c']);
+  });
+
+  it('opens on the people when everyone in the saved send was already told', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a'], toldIds: ['a'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft, told: {} }));
+    expect(result.current.step).toBe('contacts');
+    expect(result.current.selectedContactIds).toEqual([]);
+  });
+
+  it('does not drop people told in an earlier send of the moment', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a', 'b', 'c'], toldIds: ['a'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft, told: { announcement: ['a', 'b', 'c'] } }));
+    expect(result.current.selectedContactIds).toEqual(['b', 'c']);
+  });
+
+  it('saves the confirmed ids on the draft only while sending', () => {
+    const onDraftChange = vi.fn();
+    const { result } = renderHook(() => useSendFlow({ session, onDraftChange, told: {} }));
+    act(() => result.current.setTemplateCategory('announcement'));
+    act(() => result.current.selectContacts(['a', 'b']));
+    act(() => result.current.nextStep());
+    expect(onDraftChange.mock.calls.at(-1)?.[0].toldIds).toEqual([]);
+    act(() => result.current.setField('x', 'y'));
+    act(() => result.current.startSendJob());
+    act(() => result.current.markActiveSent());
+    expect(onDraftChange.mock.calls.at(-1)?.[0].step).toBe('sending');
+    expect(onDraftChange.mock.calls.at(-1)?.[0].toldIds).toEqual(['a']);
+  });
+
+  it('a half-sent moment keeps its resume step when chosen again from the drafts', () => {
+    const saved = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a', 'b'], toldIds: ['a'] });
+    const { result } = renderHook(() => useSendFlow({ session, drafts: { announcement: saved }, told: {} }));
+    act(() => result.current.setTemplateCategory('announcement'));
+    expect(result.current.step).toBe('review');
+    expect(result.current.selectedContactIds).toEqual(['b']);
+  });
+
+  it('keeps the whole selection when told is not given', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'sending', selectedContactIds: ['a', 'b'] });
+    const { result } = renderHook(() => useSendFlow({ session, draft }));
+    expect(result.current.selectedContactIds).toEqual(['a', 'b']);
+  });
+
+  it('stopSending ends the job at sent and leaves the queued people unmarked', () => {
+    const { result } = readyToSend();
+    act(() => result.current.markActiveSent());
+    act(() => result.current.stopSending());
+    expect(result.current.step).toBe('sent');
+    expect(result.current.sendJob?.recipients.map((r) => r.status)).toEqual(['delivered', 'sending', 'queued']);
+  });
+
+  it('stopSending does nothing outside a send', () => {
+    const { result } = announcement({ step: 'review' });
+    act(() => result.current.stopSending());
+    expect(result.current.step).toBe('review');
+  });
+
   it('reports drafts without the send job', () => {
     const onDraftChange = vi.fn();
     const { result } = renderHook(() =>
@@ -186,6 +248,9 @@ describe('hasDraftInProgress', () => {
 
   it('is false while sending, because the send job is not saved', () => {
     expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sending' }))).toBe(false);
+    // Only a caller that keeps who was told (mobile) asks for 'sending' to count.
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sending' }), true)).toBe(true);
+    expect(hasDraftInProgress(freshDraft({ templateCategory: 'announcement', step: 'sent' }), true)).toBe(false);
   });
 });
 
