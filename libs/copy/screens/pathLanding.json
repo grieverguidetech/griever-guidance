@@ -13,6 +13,9 @@
   "people": "people",
   "metaStarted": "Started",
   "metaSendAgain": "Send again",
+  "statusReady": "Ready",
+  "statusNeedsDetail": "Needs a detail",
+  "statusSent": "Sent to {n} {noun}",
   "lockedReason": "Included with the full plan",
   "notInAppYet": "Not in the app yet. You can do this one on the web.",
   "moments": {
