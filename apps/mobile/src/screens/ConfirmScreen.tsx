@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import type { UseContactsResult } from '@griever/hooks';
 import { firstName, SHARE_SERVICE_SAMPLE } from '@griever/shared';
@@ -42,6 +42,15 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const recipients = recipientsPhrase(recipientCount, copy);
   const firstPicked = contacts?.contacts.find((c) => c.contactId === selectedContactIds[0]);
   const greeting = firstPicked ? firstName(firstPicked.name) : '';
+  const preview = flow.greeting && greeting !== '' ? fill(copy.greetingPreview, { greeting: `${greeting},` }) : '';
+
+  function toggleGreeting() {
+    const next = !flow.greeting;
+    flow.setGreeting(next);
+    if (next && greeting !== '') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(fill(copy.greetingPreview, { greeting: `${greeting},` }), { queue: true });
+    }
+  }
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -63,17 +72,25 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           onWhatYoullNeed={() => setChecklistOpen(true)}
           checklistRef={checklistButton}
         >
-          <View style={styles.greetingRow}>
-            <Text style={styles.greetingLabel}>{copy.greetingSwitch}</Text>
+          <Pressable
+            style={styles.greetingRow}
+            onPress={toggleGreeting}
+            accessibilityRole="switch"
+            accessibilityLabel={copy.greetingSwitch}
+            accessibilityState={{ checked: flow.greeting }}
+          >
+            <Text style={styles.greetingLabel} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              {copy.greetingSwitch}
+            </Text>
             <Switch
               value={flow.greeting}
-              onValueChange={flow.setGreeting}
-              accessibilityRole="switch"
-              accessibilityLabel={copy.greetingSwitch}
-              accessibilityState={{ checked: flow.greeting }}
+              onValueChange={toggleGreeting}
+              trackColor={{ true: ACCENT }}
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden
             />
-          </View>
-          {flow.greeting && greeting !== '' && <Text style={styles.sample}>{fill(copy.greetingPreview, { greeting: `${greeting},` })}</Text>}
+          </Pressable>
+          {preview !== '' && <Text style={styles.sample}>{preview}</Text>}
           {isService && (
             <>
               <TouchableOpacity
@@ -106,6 +123,6 @@ const styles = StyleSheet.create({
   sampleToggle: { minHeight: 44, minWidth: 44, justifyContent: 'center' },
   sampleToggleText: { fontSize: 14, color: ACCENT },
   greetingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
-  greetingLabel: { fontSize: 16, flexShrink: 1 },
+  greetingLabel: { fontSize: 16, flexShrink: 1, color: colors.ink },
   sample: { fontSize: 14, color: MUTED, lineHeight: 22 },
 });
