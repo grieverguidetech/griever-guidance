@@ -41,14 +41,16 @@ beforeEach(() => {
 
 const NOTE = 'She was peaceful at home.';
 
-const toSending = async (pick: string[], note = '') => {
+const toSending = async (pick: string[], note = '', told: string[] = []) => {
   jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
-  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+  const seeded = told.length > 0 ? { ...anna, recipientsNotified: { announcement: told } } : anna;
+  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([seeded]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
-  fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+  // A moment already sent to people shows its done row; a new one shows Start.
+  fireEvent.press(told.length > 0 ? await screen.findByText(/^Sent to \d+ (person|people) · /) : await screen.findByRole('button', { name: 'Start' }));
   if (note) {
     fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
   }
@@ -186,5 +188,23 @@ describe('recording who was messaged (#621)', () => {
     expect(await screen.findByText('You told 1 of 3.')).toBeTruthy();
     expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
     expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
+  });
+
+  it('a re-send to people told before still reaches those not yet confirmed in this send', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    // All three were told by an earlier send. A new send goes to the same three.
+    await toSending(['Dee', 'Eli', 'Fay'], '', ['c1', 'c2', 'c3']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Next'));
+    await screen.findByText('Text Eli');
+    act(() => void [...handlers].reverse().some((h) => h()));
+    fireEvent.press(await screen.findByText(/^Sent to \d+ (person|people) · /));
+    // Only Dee was confirmed in this send, so Eli and Fay are offered again.
+    expect(await screen.findByText('Text 2 people')).toBeTruthy();
   });
 });

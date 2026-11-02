@@ -129,7 +129,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     draft: latest && resumeDraft(latest, true),
     // Service and thank-you open on Who should know?; their details are edited on the send screen.
     skipDetails: true,
-    // A draft saved mid-send comes back without the people already told.
+    // Marks that a draft saved mid-send can resume (it drops the people confirmed in that send).
+    // The hub's told count still comes from onTold below.
     told: session.recipientsNotified,
     drafts: session.drafts,
     onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
@@ -261,9 +262,10 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     onFinished(sendNote(templateCategory, recipients), { id, category: templateCategory, deliveredIds });
   }, [step, templateCategory, sendJob, onFinished]);
 
-  // Each confirmed person is written to the phone before the next hand-off, so a force-quit
-  // mid-send never forgets who was told. Read from the send job itself, not from a render's
-  // closure, so two quick taps record the right two people. Repeats merge. Ids only (C2).
+  // Each confirmed person is written to the phone right after each confirm (this effect runs when
+  // the send job changes), so a force-quit mid-send never forgets who was told. Read from the send
+  // job itself, not from a render's closure, so two quick taps record the right two people.
+  // Repeats merge. Ids only (C2).
   useEffect(() => {
     if (!templateCategory || !sendJob) {
       return;
