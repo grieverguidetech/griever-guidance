@@ -18,5 +18,11 @@
   "draftTitle": "Not written yet?",
   "draftBody": "We can help you draft it. You review it, then send it to the funeral home or the paper.",
   "draftButton": "Help me write it",
-  "draftBeta": "in beta"
+  "draftBeta": "in beta",
+  "emailTitle": "Step 1: send the text to the paper or funeral home",
+  "emailBody": "Your email app opens with the obituary filled in. You choose who it goes to, and you press Send yourself.",
+  "emailButton": "Email it to the paper or funeral home",
+  "emailSubject": "Obituary for {name}",
+  "emailFailed": "We couldn't open email or sharing on this phone. You can copy the text from the web and send it from there.",
+  "emailNoText": "The obituary hasn't been written yet. You can write it on the web, then come back here."
 }

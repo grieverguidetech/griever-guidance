@@ -8,6 +8,7 @@ import { ShareObituary } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
+import { openMailDraft } from '../lib/mailCompose';
 
 const copy = screenCopy('shareObituary');
 
@@ -26,6 +27,9 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const checklistButton = useRef<ButtonNode>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
+  const [emailFailed, setEmailFailed] = useState(false);
+  const emailRunning = useRef(false);
+  const [emailBusy, setEmailBusy] = useState(false);
   const sheetOpen = useRef(false);
   sheetOpen.current = checklistOpen;
 
@@ -59,6 +63,23 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
 
   const linkValid = isValidObituaryLink(session.obituaryUrl);
   const name = session.personName.trim() || copy.nameFallback;
+  const obituaryText = session.obituaryText?.trim() ?? '';
+
+  // Step 1: the user's own mail app (or the share sheet) gets the text; they pick who it goes to (C1).
+  const emailPublisher = async () => {
+    // A ref, not state: a second tap in the same moment must see the first.
+    if (emailRunning.current) {
+      return;
+    }
+    emailRunning.current = true;
+    // Cleared first, so a second failure changes the message again and is announced again.
+    setEmailFailed(false);
+    setEmailBusy(true);
+    const result = await openMailDraft({ subject: fill(copy.emailSubject, { name }), body: obituaryText });
+    emailRunning.current = false;
+    setEmailBusy(false);
+    setEmailFailed(result === 'failed');
+  };
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -76,6 +97,7 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
           onBack={onBack}
           onWhatYoullNeed={() => setChecklistOpen(true)}
           onContinue={onContinue}
+          publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy }}
           headingRef={heading}
           checklistRef={checklistButton}
         />

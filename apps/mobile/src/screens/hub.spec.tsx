@@ -150,6 +150,11 @@ describe('HubScreen', () => {
     expect(titles).toEqual(['Told close family', 'Share the service', 'Share the obituary', 'Send thank-yous']);
   });
 
+  it('the obituary card reads "Waiting for the link" once its text is written and the link is not', () => {
+    setup({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
+    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Waiting for the link/)).toBeTruthy();
+  });
+
   it('shows Ready on the announcement card when it is next, in the Start button name', () => {
     setup();
     expect(screen.getByText('Ready')).toBeTruthy();

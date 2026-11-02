@@ -30,7 +30,10 @@
     "importError",
     "importIntro",
     "importEmpty",
-    "chosen"
+    "chosen",
+    "searchLabel",
+    "searchEmpty",
+    "selectAllShown"
   ],
   "properties": {
     "heading": {
@@ -111,6 +114,15 @@
       "$ref": "#/$defs/text"
     },
     "importEmpty": {
+      "$ref": "#/$defs/text"
+    },
+    "searchLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "selectAllShown": {
+      "$ref": "#/$defs/text"
+    },
+    "searchEmpty": {
       "$ref": "#/$defs/text"
     },
     "chosen": {
