@@ -34,7 +34,11 @@
     "copiedNote",
     "shareError",
     "copyError",
-    "addLine"
+    "addLine",
+    "sentHintNextNote",
+    "stopForNow",
+    "stopNote",
+    "smsError"
   ],
   "properties": {
     "heading": {
@@ -171,6 +175,18 @@
       "$ref": "#/$defs/text"
     },
     "addLine": {
+      "$ref": "#/$defs/text"
+    },
+    "sentHintNextNote": {
+      "$ref": "#/$defs/text"
+    },
+    "stopForNow": {
+      "$ref": "#/$defs/text"
+    },
+    "stopNote": {
+      "$ref": "#/$defs/text"
+    },
+    "smsError": {
       "$ref": "#/$defs/text"
     }
   },

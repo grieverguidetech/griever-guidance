@@ -68,8 +68,8 @@ export const useFirstScreen = (): { first: 'pending' | 'home' | 'signIn'; leaveF
 };
 
 const Opening = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-    <Text accessibilityLiveRegion="polite">Opening…</Text>
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
+    <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>Opening…</Text>
   </View>
 );
 
@@ -108,6 +108,8 @@ type SessionProps = {
   onHome: () => void;
   /** The last person has been dealt with: go to the hub and show this calm line. */
   onFinished: (note: SentNoteText, sent: SentRecord) => void;
+  /** One person was marked sent: write them to this phone now (ids only), before the next hand-off. */
+  onTold: (id: string, category: TemplateCategory, contactIds: string[]) => void;
 };
 
 /** What a finished send hands up: who it was for, which moment, and the contact ids marked sent (never text). */
@@ -115,17 +117,21 @@ type SentRecord = { id: string; category: TemplateCategory | null; deliveredIds:
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShareObituary, onEditPerson, onDraftChange, onDetails, onHome, onFinished }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShareObituary, onEditPerson, onDraftChange, onDetails, onHome, onFinished, onTold }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
   // left on the picker reopens at its first form, so the picker can't overwrite it (#99, as web).
-  const latest = latestInProgressDraft(session);
+  // A draft saved mid-send reopens on review without the people already told.
+  const latest = latestInProgressDraft(session, true);
   const flow = useSendFlow({
     session,
     draft: latest && resumeDraft(latest, true),
     // Service and thank-you open on Who should know?; their details are edited on the send screen.
     skipDetails: true,
+    // Marks that a draft saved mid-send can resume (it drops the people confirmed in that send).
+    // The hub's told count still comes from onTold below.
+    told: session.recipientsNotified,
     drafts: session.drafts,
     onDraftChange: useCallback((draft: SendFlowDraft) => onDraftChange(id, draft), [id, onDraftChange]),
   });
@@ -238,7 +244,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     <PersonBar
       active={session}
       onOpen={onHome}
-      onHardwareBack={onFirstForm ? backToStart : undefined}
+      onHardwareBack={onFirstForm ? backToStart : flow.step === 'sending' ? onHub : undefined}
       arrived={pendingArrival}
       onArrived={clearArrival}
     />
@@ -255,6 +261,20 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     const deliveredIds = recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId);
     onFinished(sendNote(templateCategory, recipients), { id, category: templateCategory, deliveredIds });
   }, [step, templateCategory, sendJob, onFinished]);
+
+  // Each confirmed person is written to the phone right after each confirm (this effect runs when
+  // the send job changes), so a force-quit mid-send never forgets who was told. Read from the send
+  // job itself, not from a render's closure, so two quick taps record the right two people.
+  // Repeats merge. Ids only (C2).
+  useEffect(() => {
+    if (!templateCategory || !sendJob) {
+      return;
+    }
+    const delivered = sendJob.recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId);
+    if (delivered.length > 0) {
+      onTold(id, templateCategory, delivered);
+    }
+  }, [sendJob, templateCategory, id, onTold]);
 
   const stepped = withoutServiceKnown(flow);
   const flowWithHub = {
@@ -516,6 +536,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       onDetails={updateSession}
       onHome={goHome}
       onFinished={finish}
+      onTold={recordMomentComplete}
     />
   );
 };
@@ -603,7 +624,7 @@ const Navigation = ({
       <Stack.Navigator screenOptions={screenOptions}>
         {flow.step === 'template' && (
           // Only for the moment between choosing a step on the hub and its first form opening.
-          <Stack.Screen name="Starting">{() => <View style={{ flex: 1, backgroundColor: '#ffffff' }} />}</Stack.Screen>
+          <Stack.Screen name="Starting">{() => <Opening />}</Stack.Screen>
         )}
         {flow.step === 'announce' && (
           <Stack.Screen name="Announce">
@@ -619,10 +640,12 @@ const Navigation = ({
           <Stack.Screen name="Confirm">{() => withPersonContext(bar, <ConfirmScreen flow={flow} contacts={contacts} />)}</Stack.Screen>
         )}
         {flow.step === 'sending' && (
-          <Stack.Screen name="Sending">{() => <SendingScreen flow={flow} contacts={contacts} />}</Stack.Screen>
+          <Stack.Screen name="Sending">
+            {() => withPersonContext(bar, <SendingScreen flow={flow} contacts={contacts} />)}
+          </Stack.Screen>
         )}
         {flow.step === 'sent' && (
-          <Stack.Screen name="Sent">{() => <View style={{ flex: 1, backgroundColor: '#ffffff' }} />}</Stack.Screen>
+          <Stack.Screen name="Sent">{() => <Opening />}</Stack.Screen>
         )}
         {sharedScreens()}
       </Stack.Navigator>

@@ -220,13 +220,16 @@ export function writeRemovedFlows(storage: SendFlowStorage | undefined, marks: r
 }
 
 /**
- * The draft that reopens: the in-progress one (never 'sending' or 'sent') that changed most
- * recently, or null when nothing is under way.
+ * The draft that reopens: the in-progress one that changed most recently, or null when nothing is
+ * under way. Never 'sent'; 'sending' only when `resumeSending` is set (mobile).
  */
-export function latestInProgressDraft(session: Pick<Session, 'drafts' | 'draftsUpdatedAt'>): SendFlowDraft | null {
+export function latestInProgressDraft(
+  session: Pick<Session, 'drafts' | 'draftsUpdatedAt'>,
+  resumeSending = false,
+): SendFlowDraft | null {
   const stamp = (category: string) => session.draftsUpdatedAt?.[category as TemplateCategory] ?? '';
   const [latest] = (Object.keys(session.drafts) as TemplateCategory[])
-    .filter((category) => hasDraftInProgress(session.drafts[category]))
+    .filter((category) => hasDraftInProgress(session.drafts[category], resumeSending))
     .sort((a, b) => stamp(b).localeCompare(stamp(a)));
   return latest ? (session.drafts[latest] ?? null) : null;
 }
