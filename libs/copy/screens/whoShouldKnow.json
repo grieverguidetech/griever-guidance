@@ -21,6 +21,7 @@
   "empty": "No one saved yet. Add someone below.",
   "bringAcross": "Add from your contacts",
   "chooseOne": "Choose at least one person",
+  "noneYet": "No one picked? You can share it to a group or by email next.",
   "fillBoth": "Enter a name and a mobile number",
   "importError": "We could not read your contacts. You can add people by hand instead.",
   "importIntro": "Choose only the ones you want — the rest stay where they are.",

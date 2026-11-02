@@ -17,6 +17,7 @@ const copy: ReviewCopy = {
   useSuggested: 'Use the suggested wording',
   checklist: "What you'll need",
   blank: 'Add a message before you send it.',
+  shareBlank: 'Add a message before you share it.',
   noRecipients: 'Choose who should get this message first.',
   privacy: "You'll text each person from your own number, one at a time.",
 };

@@ -37,6 +37,8 @@ export interface WhoShouldKnowCopy {
   selectAllFor: string;
   /** Why Continue is unavailable. */
   chooseOne: string;
+  /** A muted line when Continue works with no one ticked. */
+  noneYet: string;
   /** Why Add is unavailable. */
   fillBoth: string;
   addAnother: string;
@@ -161,7 +163,9 @@ export function WhoShouldKnow({
       ].filter((s) => s.items.length > 0)
     : [{ key: 'all', label: null, items: shown }];
   const noneChosen = selectedIds.length === 0 && !allowNone;
+  const noneNote = allowNone && selectedIds.length === 0;
   const reasonId = useId();
+  const noteId = useId();
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
@@ -274,14 +278,19 @@ export function WhoShouldKnow({
           {copy.chooseOne}
         </Body>
       ) : null}
+      {noneNote ? (
+        <Body id={noteId} small tone="muted">
+          {copy.noneYet}
+        </Body>
+      ) : null}
       <View style={styles.footerRow}>
         <SelectedCount label={selectedLabel} />
         <Button
           label={copy.continue}
           ariaDisabled={noneChosen}
           announceDisabled
-          describedBy={noneChosen ? reasonId : undefined}
-          hint={noneChosen ? copy.chooseOne : undefined}
+          describedBy={noneChosen ? reasonId : noneNote ? noteId : undefined}
+          hint={noneChosen ? copy.chooseOne : noneNote ? copy.noneYet : undefined}
           onPress={() => {
             if (!noneChosen) {
               onContinue();

@@ -231,6 +231,24 @@ describe('ContactSelectorScreen with no one picked', () => {
     expect(nextStep).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['service', 'obituary'])('shows one muted line on %s while no one is ticked', (category) => {
+    renderScreen(saved, category);
+    expect(screen.getAllByText('No one picked? You can share it to a group or by email next.')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Continue' }).props.accessibilityHint).toBe(
+      'No one picked? You can share it to a group or by email next.',
+    );
+  });
+
+  it('drops the line once someone is ticked', () => {
+    renderScreen(saved, 'service', ['1']);
+    expect(screen.queryByText(/No one picked/)).toBeNull();
+  });
+
+  it.each(['announcement', 'aftercare'])('does not show the line on %s', (category) => {
+    renderScreen(saved, category);
+    expect(screen.queryByText(/No one picked/, { includeHiddenElements: true })).toBeNull();
+  });
+
   it.each(['announcement', 'aftercare'])('still blocks Continue on %s', (category) => {
     const { nextStep } = renderScreen(saved, category);
     const cont = screen.getByRole('button', { name: 'Continue' });

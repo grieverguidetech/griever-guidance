@@ -27,14 +27,15 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
+  const shareButton = useRef<ButtonNode>(null);
 
   if (!selectedTemplate) {
     return null;
   }
 
   // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
-  const focusChecklistButton = () => {
-    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+  const focusButton = (button: { current: ButtonNode | null }) => {
+    const handle = button.current ? findNodeHandle(button.current) : null;
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
@@ -59,6 +60,13 @@ export function ConfirmScreen({ flow, contacts }: Props) {
     setShareFailed(false);
     const result = await shareMessage(composedMessage);
     setShareFailed(result === 'failed');
+    // The sheet takes the screen reader's cursor; bring it back to the button that opened it.
+    focusButton(shareButton);
+  }
+
+  function changeMessage(message: string | null) {
+    setShareFailed(false);
+    setMessageOverride(message);
   }
 
   function toggleGreeting() {
@@ -77,9 +85,9 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}
           intro={shareOnly ? copy.introShareOnly : fill(isAnnouncement ? copy.introAnnouncement : copy.intro, { recipients })}
           message={composedMessage}
-          onMessageChange={setMessageOverride}
+          onMessageChange={changeMessage}
           edited={flow.messageOverride !== null}
-          onUseSuggested={() => setMessageOverride(null)}
+          onUseSuggested={() => changeMessage(null)}
           tone={flow.tone}
           onToneChange={flow.setTone}
           sendLabel={sendLabel(isAnnouncement ? recipientCount : undefined, copy)}
@@ -93,6 +101,7 @@ export function ConfirmScreen({ flow, contacts }: Props) {
             canShare
               ? {
                   label: copy.shareElsewhere,
+                  buttonRef: shareButton,
                   onPress: () => void shareElsewhere(),
                   error: shareFailed ? sendingCopy.shareError : undefined,
                   only: shareOnly,
@@ -145,7 +154,7 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           )}
         </Review>
       </ScrollView>
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={() => focusButton(checklistButton)} />
     </KeyboardAvoidingView>
   );
 }

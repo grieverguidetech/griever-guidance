@@ -31,6 +31,8 @@ export interface ReviewCopy {
   checklist: string;
   /** Why Send is unavailable when the message is empty. */
   blank: string;
+  /** Why Share elsewhere is unavailable when the message is empty. */
+  shareBlank: string;
   /** Why Send is unavailable when no one is chosen. Both apps only reach this screen with someone chosen, so it guards a state that should not happen. */
   noRecipients: string;
   privacy: string;
@@ -72,6 +74,8 @@ export interface ReviewProps {
   share?: {
     label: string;
     onPress: () => void;
+    /** For returning focus to the button once the share sheet has closed. */
+    buttonRef?: Ref<ButtonNode>;
     /** A calm line when the share sheet did not open. */
     error?: string;
     /** No one is picked, so Share elsewhere is the only action: Send and the texting note are not drawn. */
@@ -94,7 +98,8 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   const toneReasonId = useId();
   const blank = message.trim() === '';
   const shareReasonId = useId();
-  const shareReason = blank ? copy.blank : blockedReason;
+  const shareErrorId = useId();
+  const shareReason = blank ? copy.shareBlank : blockedReason;
   const reason = blank ? copy.blank : !hasRecipients ? copy.noRecipients : blockedReason;
 
   // Focus follows the field: into it when Edit wording opens, back to the toggle when it closes.
@@ -162,27 +167,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
         </View>
       ) : null}
       {edited ? <Button label={copy.useSuggested} variant="ghost" onPress={onUseSuggested} /> : null}
-      {share ? (
-        <>
-          <Button
-            label={share.label}
-            variant={share.only ? 'primary' : 'secondary'}
-            ariaDisabled={shareReason !== undefined}
-            announceDisabled
-            describedBy={shareReason ? reasonId : undefined}
-            hint={shareReason}
-            onPress={() => {
-              if (!shareReason) {
-                share.onPress();
-              }
-            }}
-          />
-          <Status id={shareReasonId} message={share.error} tone="danger" />
-        </>
-      ) : null}
-      {share?.only ? (
-        <Status id={reasonId} message={shareReason} />
-      ) : (
+      {share?.only ? null : (
         <>
           <Button
             label={sendLabel}
@@ -202,6 +187,26 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           </Body>
         </>
       )}
+      {share ? (
+        <>
+          <Button
+            label={share.label}
+            variant={share.only ? 'primary' : 'secondary'}
+            buttonRef={share.buttonRef}
+            ariaDisabled={shareReason !== undefined}
+            announceDisabled
+            describedBy={shareReason ? shareReasonId : undefined}
+            hint={shareReason}
+            onPress={() => {
+              if (!shareReason) {
+                share.onPress();
+              }
+            }}
+          />
+          <Status id={shareReasonId} message={shareReason} />
+          <Status id={shareErrorId} message={share.error} tone="danger" />
+        </>
+      ) : null}
     </View>
   );
 }

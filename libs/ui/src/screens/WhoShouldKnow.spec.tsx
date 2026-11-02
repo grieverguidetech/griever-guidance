@@ -14,6 +14,7 @@ const copy: WhoShouldKnowCopy = {
   selectAll: 'Select all',
   selectAllFor: 'Select all, {group}',
   chooseOne: 'Choose at least one person',
+  noneYet: 'No one picked? You can share it to a group or by email next.',
   fillBoth: 'Enter a name and a mobile number',
   addAnother: 'Add another person',
   nameLabel: 'Name',
