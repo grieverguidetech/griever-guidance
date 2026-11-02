@@ -27,7 +27,9 @@ const savedAnna = async (): Promise<Session> => {
   return list.find((s) => s.id === 'a') as Session;
 };
 
-const toSending = async (pick: string[]) => {
+const NOTE = 'She was peaceful at home.';
+
+const toSending = async (pick: string[], note = '') => {
   jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
@@ -35,6 +37,9 @@ const toSending = async (pick: string[]) => {
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
   fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+  if (note) {
+    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
+  }
   fireEvent.press(await screen.findByText('Continue'));
   for (const name of pick) {
     fireEvent.press(await screen.findByText(name));
@@ -45,7 +50,9 @@ const toSending = async (pick: string[]) => {
 
 describe('recording who was messaged (#621)', () => {
   it('records the two sent ids, not the skipped one, and the hub shows the row done', async () => {
-    await toSending(['Dee', 'Eli', 'Fay']);
+    await toSending(['Dee', 'Eli', 'Fay'], NOTE);
+    // The composed message really carries the note, so the check below means something.
+    expect(await screen.findByText(new RegExp(NOTE))).toBeTruthy();
     fireEvent.press(await screen.findByText('Open Messages'));
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
@@ -57,10 +64,11 @@ describe('recording who was messaged (#621)', () => {
       expect(saved.recipientsNotified.announcement).toEqual(['c1', 'c3']);
       expect(saved.momentCompletedAt.announce).toEqual(expect.any(String));
     });
-    // Contact ids only: no message text is stored with the record.
-    const raw = (await AsyncStorage.getItem(SESSIONS_KEY)) ?? '';
-    expect(JSON.stringify((await savedAnna()).recipientsNotified)).not.toMatch(/Anna|Dee/);
-    expect(raw).toContain('recipientsNotified');
+    // C2: the finished send keeps no wording. The draft is empty and the raw store has no message text.
+    const draft = (await savedAnna()).drafts.announcement;
+    expect(draft?.messageOverride ?? null).toBeNull();
+    expect(draft?.fields ?? {}).toEqual({});
+    expect(await AsyncStorage.getItem(SESSIONS_KEY)).not.toContain(NOTE);
   });
 
   it('records nothing when everyone is skipped, and the row is not done', async () => {
@@ -72,5 +80,18 @@ describe('recording who was messaged (#621)', () => {
     expect(saved.recipientsNotified).toEqual({});
     expect(saved.momentCompletedAt).toEqual({});
     expect(screen.queryByText(/^\d+ (person|people) · /)).toBeNull();
+  });
+
+  it('opens the flow again from the done row, without bouncing back to the hub', async () => {
+    await toSending(['Dee']);
+    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Done'));
+    expect(await screen.findByText(/^1 person · /)).toBeTruthy();
+    // Start the announcement again from its done row.
+    fireEvent.press(screen.getByText(/^1 person · /));
+    expect(await screen.findByLabelText(/Anything you'd like to add/)).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByLabelText(/Anything you'd like to add/)).toBeTruthy();
+    expect(screen.queryByText('One thing at a time.')).toBeNull();
   });
 });

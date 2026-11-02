@@ -109,8 +109,11 @@ type SessionProps = {
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
   /** The last person has been dealt with: go to the hub and show this calm line. */
-  onFinished: (note: SentNoteText, sent: { category: TemplateCategory | null; deliveredIds: string[] }) => void;
+  onFinished: (note: SentNoteText, sent: SentRecord) => void;
 };
+
+/** What a finished send hands up: who it was for, which moment, and the contact ids marked sent (never text). */
+type SentRecord = { id: string; category: TemplateCategory | null; deliveredIds: string[] };
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
@@ -243,7 +246,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     const recipients = sendJob?.recipients ?? [];
     // Only contact ids go up to the hub, never the message text (C2).
     const deliveredIds = recipients.filter((r) => r.status === 'delivered').map((r) => r.contactId);
-    onFinished(sendNote(templateCategory, recipients), { category: templateCategory, deliveredIds });
+    onFinished(sendNote(templateCategory, recipients), { id, category: templateCategory, deliveredIds });
   }, [step, templateCategory, sendJob, onFinished]);
 
   const stepped = withoutServiceKnown(flow);
@@ -305,12 +308,11 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setBackFromImport(false);
     setAtHome(true);
   }, []);
-  const activeId = active?.id;
   const finish = useCallback(
-    (text: SentNoteText, sent: { category: TemplateCategory | null; deliveredIds: string[] }) => {
+    (text: SentNoteText, sent: SentRecord) => {
       // An all-skipped send records nothing. The record stays on this phone (recipientsNotified is never synced).
-      if (activeId && sent.category && sent.deliveredIds.length > 0) {
-        recordMomentComplete(activeId, sent.category, sent.deliveredIds);
+      if (sent.category && sent.deliveredIds.length > 0) {
+        recordMomentComplete(sent.id, sent.category, sent.deliveredIds);
       }
       setArrived(false);
       setAtHub(true);
@@ -319,7 +321,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       setBackFromImport(false);
       setAtHome(false);
     },
-    [activeId, recordMomentComplete],
+    [recordMomentComplete],
   );
 
   // Setup is over: open the path. The one place the last setup step hands over (#227 changes this).

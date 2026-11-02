@@ -324,6 +324,9 @@ describe('the end of a send', () => {
     // The announcement is now recorded as done, so the next step (Share the service) carries Start.
     fireEvent.press(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
+    // The service form opened (not the hub, not 'sent').
+    expect(await screen.findByText('Service date')).toBeTruthy();
+    expect(screen.getByText('Share the service')).toBeTruthy();
   });
 
   it('announces the note once, and focuses the hub heading as it opens', async () => {
