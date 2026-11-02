@@ -70,13 +70,15 @@ const headers = () =>
     .filter((text) => text !== 'Who should know?');
 
 describe('ContactSelectorScreen grouping', () => {
-  it('for an announcement, lists Close family before Friends & family, with headings as headers', () => {
+  it('for an announcement with mixed tiers, shows one list in saved order, with no tier headings', () => {
     renderScreen();
-    expect(headers()).toEqual(['Close family', 'Friends & family']);
-    const rendered = screen
-      .getAllByText(/^(Close family|Friends & family|Mum|Dad|Neighbour Ned|Cousin Cat)$/)
-      .map((n) => n.props.children);
-    expect(rendered).toEqual(['Close family', 'Mum', 'Dad', 'Friends & family', 'Neighbour Ned', 'Cousin Cat']);
+    expect(headers()).toEqual([]);
+    expect(screen.queryByText('Close family')).toBeNull();
+    expect(screen.queryByText('Friends & family')).toBeNull();
+    const rendered = screen.getAllByText(/^(Mum|Dad|Neighbour Ned|Cousin Cat)$/).map((n) => n.props.children);
+    expect(rendered).toEqual(['Neighbour Ned', 'Mum', 'Cousin Cat', 'Dad']);
+    // The shared list only draws Select all under a tier heading, so the one list has none.
+    expect(screen.queryByRole('button', { name: /^Select all/ })).toBeNull();
   });
 
   it('shows a plain list in saved order, with no headings, for other templates', () => {
