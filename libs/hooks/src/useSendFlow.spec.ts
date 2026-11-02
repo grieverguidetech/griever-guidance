@@ -99,6 +99,15 @@ describe('useSendFlow — an edited message', () => {
   });
 });
 
+describe('useSendFlow — selectContacts', () => {
+  it('adds to what is already chosen, so a filtered Select all keeps earlier ticks', () => {
+    const { result } = announcement();
+    act(() => result.current.toggleContact('x'));
+    act(() => result.current.selectContacts(['a']));
+    expect(result.current.selectedContactIds).toEqual(['x', 'a']);
+  });
+});
+
 describe('useSendFlow — sending one contact at a time', () => {
   function readyToSend() {
     const hook = announcement({ step: 'review' });
