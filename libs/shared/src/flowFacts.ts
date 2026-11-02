@@ -39,6 +39,7 @@ export const FORBIDDEN_SYNC_KEYS = [
   'drafts',
   'draftsUpdatedAt',
   'messageOverride',
+  'recipientNotes',
   'recipientsNotified',
   'selectedContactIds',
   'hearsFirstIds',

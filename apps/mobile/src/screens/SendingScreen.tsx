@@ -11,6 +11,7 @@ import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 
 const copy = screenCopy('sending');
+const copyOptional = screenCopy('announce').optional;
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -104,7 +105,7 @@ export function SendingScreen({ flow, contacts }: Props) {
     if (!contact) {
       return;
     }
-    const link = buildSmsLink(contact.phone, flow.messageFor(contact.name), Platform.OS === 'ios');
+    const link = buildSmsLink(contact.phone, flow.messageFor(contact.name, contactId), Platform.OS === 'ios');
     setHandedOffId(contactId);
     setAskingId(null);
     setFailedId(null);
@@ -145,7 +146,7 @@ export function SendingScreen({ flow, contacts }: Props) {
             ? {
                 position: fill(copy.position, { n: activeIndex + 1, total }),
                 name: activeContact.name,
-                message: flow.messageFor(activeContact.name),
+                message: flow.messageFor(activeContact.name, activeContact.contactId),
                 isLast,
               }
             : undefined
@@ -161,6 +162,16 @@ export function SendingScreen({ flow, contacts }: Props) {
           handedOff
             ? { note: fill(copy.messagesNote, { action: isLast ? copy.done : copy.next }), again: copy.openMessagesAgain, onAgain: openMessages }
             : null
+        }
+        note={
+          flow.templateCategory === 'aftercare' && activeContact
+            ? {
+                label: fill(copy.addLine, { name: activeContact.name }),
+                optional: copyOptional,
+                value: flow.recipientNotes[activeContact.contactId] ?? '',
+                onChange: (value) => flow.setRecipientNote(activeContact.contactId, value),
+              }
+            : undefined
         }
         openLabel={activeContact ? fill(copy.textPerson, { name: activeContact.name }) : undefined}
         confirmSent={

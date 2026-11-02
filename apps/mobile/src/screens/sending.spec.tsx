@@ -38,8 +38,8 @@ const all = [
   { contactId: 'c3', name: 'Fay', phone: '+15555550102' },
 ];
 
-function Harness({ ids }: { ids: string[] }) {
-  const flow = useSendFlow({ session, draft: freshDraft({ templateCategory: 'announcement', step: 'review', fields: {} }) });
+function Harness({ ids, category = 'announcement' }: { ids: string[]; category?: 'announcement' | 'aftercare' }) {
+  const flow = useSendFlow({ session, draft: freshDraft({ templateCategory: category, step: 'review', fields: {} }) });
   const { selectContacts, startSendJob, sendJob } = flow;
   useEffect(() => {
     selectContacts(ids);
@@ -52,7 +52,7 @@ function Harness({ ids }: { ids: string[] }) {
   return <SendingScreen flow={flow} contacts={{ contacts: all } as never} />;
 }
 
-function setup(ids: string[]) {
+function setup(ids: string[], category: 'announcement' | 'aftercare' = 'announcement') {
   const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   open.mockClear();
   const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
@@ -62,7 +62,7 @@ function setup(ids: string[]) {
     listener = cb;
     return { remove };
   }) as never);
-  const view = render(<Harness ids={ids} />);
+  const view = render(<Harness ids={ids} category={category} />);
   const change = (state: string) => act(() => listener(state));
   return { open, change, focus, remove, unmount: view.unmount };
 }
@@ -236,5 +236,45 @@ describe('Sending on the phone: asking on return from Messages', () => {
     change('active');
     await screen.findByText(PROMPT);
     expect(screen.queryByText('Send it in Messages, then come back and tap Next.')).toBeNull();
+  });
+});
+
+describe('Sending on the phone: a line for each person (thank-you)', () => {
+  const line = (name: string) => `Add a line for ${name} (optional)`;
+  const body = (open: { mock: { calls: unknown[][] } }, call: number) => decodeURIComponent(String(open.mock.calls[call][0]));
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('gives each person their own note on the last line', async () => {
+    const { open } = setup(['c1', 'c2'], 'aftercare');
+    fireEvent.changeText(await screen.findByLabelText(line('Dee')), 'Thank you for the lasagna');
+    // The card shows the message with the note before the hand-off.
+    expect(screen.getByText(/Thank you for the lasagna$/)).toBeTruthy();
+    fireEvent.press(screen.getByText('Text Dee'));
+    expect(body(open, 0).endsWith('\nThank you for the lasagna')).toBe(true);
+    fireEvent.press(screen.getByText('Next'));
+    fireEvent.changeText(await screen.findByLabelText(line('Eli')), 'Thank you for the flowers');
+    fireEvent.press(screen.getByText('Text Eli'));
+    expect(body(open, 1).endsWith('\nThank you for the flowers')).toBe(true);
+    expect(body(open, 1)).not.toContain('lasagna');
+  });
+
+  it('shows the input again after Not yet, and it is still editable', async () => {
+    const { change } = setup(['c1', 'c2'], 'aftercare');
+    fireEvent.press(await screen.findByText('Text Dee'));
+    expect(screen.queryByLabelText(line('Dee'))).toBeNull();
+    change('background');
+    change('active');
+    fireEvent.press(await screen.findByText('Not yet'));
+    fireEvent.changeText(screen.getByLabelText(line('Dee')), 'Thanks again');
+    expect(screen.getByDisplayValue('Thanks again')).toBeTruthy();
+  });
+
+  it('has no input on other moments', async () => {
+    setup(['c1', 'c2']);
+    await screen.findByText('Text Dee');
+    expect(screen.queryByLabelText(line('Dee'))).toBeNull();
   });
 });

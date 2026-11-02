@@ -1,6 +1,8 @@
 import {
   FLOW_FACT_KEYS,
   FLOW_FACT_MAX_LENGTH,
+  FORBIDDEN_SYNC_KEYS,
+  hasForbiddenSyncKey,
   isValidObituaryLink,
   coalesceFlowPatches,
   diffFlowFacts,
@@ -93,6 +95,13 @@ describe('C2/C3 whitelist', () => {
     for (const secret of ['my own words', 'c1', 'c2', 'Anna']) {
       expect(json).not.toContain(secret);
     }
+  });
+});
+
+describe('recipientNotes', () => {
+  it('is a forbidden sync key', () => {
+    expect(FORBIDDEN_SYNC_KEYS).toContain('recipientNotes');
+    expect(hasForbiddenSyncKey({ recipientNotes: { c1: 'Thank you for the lasagna' } })).toBe(true);
   });
 });
 

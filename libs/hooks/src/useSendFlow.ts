@@ -47,6 +47,8 @@ export interface SendFlowState {
   messageOverride: string | null;
   /** Start each text with the recipient's first name. On by default; the griever can turn it off. */
   greeting: boolean;
+  /** Thank-you only: one optional line per person, by contact id. Never synced (C2). Cleared when the send finishes. */
+  recipientNotes: Record<string, string>;
   sendJob: SendJob | null;
 }
 
@@ -65,6 +67,8 @@ export interface SendFlowActions {
   setTone: (tone: MessageTone) => void;
   setMessageOverride: (value: string | null) => void;
   setGreeting: (value: boolean) => void;
+  /** Sets or clears (empty text) the line for one person. Only the thank-you adds it to the message. */
+  setRecipientNote: (contactId: string, value: string) => void;
   startSendJob: () => void;
   /** The active recipient's own Messages app was opened and (we assume) sent — advance the queue. */
   markActiveSent: () => void;
@@ -83,8 +87,11 @@ export interface SendFlowDerived {
   session: SessionDetails | null;
   composedFields: Record<string, string>;
   composedMessage: string;
-  /** The message for one person: `composedMessage` with their first name on top when `greeting` is on. */
-  messageFor: (name: string) => string;
+  /**
+   * The message for one person: `composedMessage` with their first name on top when `greeting` is on.
+   * With a `contactId`, a thank-you also gets that person's note as the last line.
+   */
+  messageFor: (name: string, contactId?: string) => string;
   /** True when the first form shows something typed, a hand-edited message or (obituary) chosen contacts. */
   hasDraftContent: boolean;
 }
@@ -115,6 +122,7 @@ const initialState: SendFlowState = {
   tone: 'plain',
   messageOverride: null,
   greeting: true,
+  recipientNotes: {},
   sendJob: null,
 };
 
@@ -356,9 +364,17 @@ export function useSendFlow(
       : composeMessage(selectedTemplate, composedFields);
 
   const messageFor = useCallback(
-    (name: string) => (state.greeting ? withGreeting(firstName(name), composedMessage) : composedMessage),
-    [state.greeting, composedMessage],
+    (name: string, contactId?: string) => {
+      const greeted = state.greeting ? withGreeting(firstName(name), composedMessage) : composedMessage;
+      const note = contactId !== undefined && state.templateCategory === 'aftercare' ? (state.recipientNotes[contactId] ?? '').trim() : '';
+      return note === '' ? greeted : `${greeted}\n${note}`;
+    },
+    [state.greeting, state.templateCategory, state.recipientNotes, composedMessage],
   );
+
+  const setRecipientNote = useCallback((contactId: string, value: string) => {
+    setState((s) => ({ ...s, recipientNotes: { ...s.recipientNotes, [contactId]: value } }));
+  }, []);
 
   // A moment already under way comes back as it was, not blank. It stays on the picker step, so
   // the picker's own nextStep lands on the moment's first form with everything typed still there.
@@ -462,6 +478,7 @@ export function useSendFlow(
         ...s,
         sendJob: { ...s.sendJob, recipients },
         step: allDone ? 'sent' : s.step,
+        recipientNotes: allDone ? {} : s.recipientNotes,
       };
     });
   }, []);
@@ -518,6 +535,7 @@ export function useSendFlow(
     composedFields,
     composedMessage,
     messageFor,
+    setRecipientNote,
     setTemplateCategory,
     setTemplate,
     setField,
