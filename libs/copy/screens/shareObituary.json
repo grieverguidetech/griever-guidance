@@ -24,5 +24,19 @@
   "emailButton": "Email it to the paper or funeral home",
   "emailSubject": "Obituary for {name}",
   "emailFailed": "We couldn't open email or sharing on this phone. You can copy the text from the web and send it from there.",
-  "emailNoText": "The obituary hasn't been written yet. You can write it on the web, then come back here."
+  "emailNoText": "The obituary hasn't been written yet. You can write it on the web, then come back here.",
+  "mobileEmailTitle": "Step 1: email it to the publisher",
+  "mobileEmailFailed": "We couldn't open email or sharing on this phone. You can copy the text and send it another way.",
+  "mobileEmailNoText": "Once it's written, come back here.",
+  "mobileHeading": "Share the obituary",
+  "linkStepLabel": "Step 2: once it's published, paste the link",
+  "emailOpened": "Opened in your email app. Come back when it's published.",
+  "pasteButton": "Paste link",
+  "copyButton": "Copy the text",
+  "copied": "Copied.",
+  "copyFailed": "We couldn't copy the text on this phone.",
+  "emailShared": "Shared from your phone. Come back when it's published.",
+  "pasteNotLink": "That doesn't look like a link. Copy the obituary's web address, then try again.",
+  "pasteEmpty": "There's nothing to paste yet.",
+  "pasted": "Link pasted."
 }

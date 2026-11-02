@@ -20,4 +20,21 @@ describe('ShareObituary (web)', () => {
     expect(screen.queryByText('Not written yet?')).not.toBeInTheDocument();
     expect(screen.queryByText('in beta')).not.toBeInTheDocument();
   });
+
+  it('shows no mobile-only Step 2 heading', () => {
+    render(<ShareObituary session={session} onBack={vi.fn()} onChange={vi.fn()} onContinue={vi.fn()} onDraft={vi.fn()} />);
+    expect(screen.queryByRole('heading', { name: /Step 2/ })).toBeNull();
+  });
+});
+
+describe('ShareObituary (web) is unchanged by the mobile obituary steps (#655)', () => {
+  it('shows no mobile-only controls or lines', () => {
+    render(<ShareObituary session={session} onBack={vi.fn()} onChange={vi.fn()} onContinue={vi.fn()} onDraft={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Paste link' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy the text' })).toBeNull();
+    expect(screen.queryByText(/Step 1|Step 2/)).toBeNull();
+    expect(screen.queryByText('Share the obituary')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Has the obituary been published?' })).toBeInTheDocument();
+    expect(screen.getByText('Choose who to send it to')).toBeInTheDocument();
+  });
 });

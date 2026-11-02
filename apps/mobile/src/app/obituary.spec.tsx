@@ -29,7 +29,7 @@ const openObituary = async () => {
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna'));
   fireEvent.press(await screen.findByRole('button', { name: /Share the obituary/ }));
-  await screen.findByRole('heading', { name: 'Has the obituary been published?' });
+  await screen.findByRole('heading', { name: 'Share the obituary' });
 };
 
 describe('sharing the obituary on mobile', () => {
@@ -47,7 +47,7 @@ describe('sharing the obituary on mobile', () => {
     expect(screen.queryByText('Who should know?')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('button', { name: /Share the obituary/ })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Has the obituary been published?' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Share the obituary' })).toBeNull();
   });
 
   it('gives the link field the error as its hint, and announces the error but not the starting reason (iOS)', async () => {
