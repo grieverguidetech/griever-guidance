@@ -197,7 +197,7 @@ describe('Home from every step', () => {
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
-  it('Android back: the hub goes Home; a first form goes to the hub; a later step goes Home', async () => {
+  it('Android back: the hub goes Home; a first form goes to the hub; a later step goes back one step', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
       handlers.push(h as () => boolean);
@@ -220,13 +220,14 @@ describe('Home from every step', () => {
     act(() => void pressBack());
     expect(await screen.findByText('One thing at a time.')).toBeTruthy();
 
-    // A later step still goes Home.
+    // A later step steps back one step, like the on-screen Back (#653), never Home.
     fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
     await screen.findByPlaceholderText('She was peaceful, and we were with her.');
     fireEvent.press(await screen.findByText('Continue'));
     await screen.findByText('Who should know?');
     act(() => void pressBack());
-    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    expect(await screen.findByPlaceholderText('She was peaceful, and we were with her.')).toBeTruthy();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 });
 

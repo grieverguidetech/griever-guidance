@@ -152,5 +152,5 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing[3], paddingTop: 64 },
+  content: { padding: spacing[3], paddingTop: spacing[4] },
 });

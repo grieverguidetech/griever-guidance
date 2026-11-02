@@ -68,6 +68,7 @@ export function SetupScreen({ initial, onContinue, onBack, returnsToPlace = fals
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <PersonSetup
           copy={copy}
+          editing={returnsToPlace}
           backName={returnsToPlace ? undefined : copy.backName}
           name={name}
           onNameChange={setName}
@@ -87,5 +88,5 @@ export function SetupScreen({ initial, onContinue, onBack, returnsToPlace = fals
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing[3], paddingTop: 64 },
+  content: { padding: spacing[3], paddingTop: spacing[4] },
 });

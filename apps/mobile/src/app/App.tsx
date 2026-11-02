@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@griever/tokens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -33,6 +33,8 @@ import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
 import { SerifReadyContext, SerifText as Text } from '../ui';
 import { useSerifFonts } from '../lib/serifFonts';
+import { screenTransition, useReduceMotion } from '../lib/useReduceMotion';
+import { FadeIn, ScreenFrame } from '../components/ScreenFrame';
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
 export const CONTACTS_CHECK_FALLBACK_MS = 1500;
@@ -240,15 +242,6 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   const onFirstForm = flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template';
-  const bar = (
-    <PersonBar
-      active={session}
-      onOpen={onHome}
-      onHardwareBack={onFirstForm ? backToStart : flow.step === 'sending' ? onHub : undefined}
-      arrived={pendingArrival}
-      onArrived={clearArrival}
-    />
-  );
 
   // Done on the last person ends the send. The hub keeps no wording of it (C2) and sets no timer.
   const { step, templateCategory, sendJob } = flow;
@@ -288,6 +281,17 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       }
     },
   };
+  // Android's Back does what the Back on the screen does, one step at a time. While sending, the
+  // on-screen way out is "Stop for now", so Back leaves to the hub (the job is kept).
+  const bar = (
+    <PersonBar
+      active={session}
+      onOpen={onHome}
+      onHardwareBack={flow.step === 'sending' ? onHub : flowWithHub.prevStep}
+      arrived={pendingArrival}
+      onArrived={clearArrival}
+    />
+  );
   return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} notified={session.recipientsNotified} />;
 };
 
@@ -406,10 +410,17 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       setBackFromImport(true);
       setImporting(false);
     };
-    return <ContactsStepScreen contacts={contacts} onBack={leaveImport} onContinue={leaveImport} startWithImport />;
+    return (
+      <FadeIn key="import">
+        <ScreenFrame>
+          <ContactsStepScreen contacts={contacts} onBack={leaveImport} onContinue={leaveImport} startWithImport />
+        </ScreenFrame>
+      </FadeIn>
+    );
   }
   if (atHome) {
     return (
+      <FadeIn key="home">
       <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
         {(navigation) => (
           <HomeScreen
@@ -437,6 +448,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           />
         )}
       </HomeNavigation>
+      </FadeIn>
     );
   }
   if (stage === 'checkContacts') {
@@ -444,57 +456,76 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   }
   if (stage === 'contacts') {
     return (
-      <ContactsStepScreen
-        key={active.id}
-        contacts={contacts}
-        onBack={() => setStage('setup')}
-        onContinue={finishSetup}
-      />
+      <FadeIn key="contacts">
+        <ScreenFrame>
+          <ContactsStepScreen
+            key={active.id}
+            contacts={contacts}
+            onBack={() => setStage('setup')}
+            onContinue={finishSetup}
+          />
+        </ScreenFrame>
+      </FadeIn>
     );
   }
   if (stage === 'setup') {
+    // Edit returns to where it was pressed (a step or the hub), for Back and for Continue alike.
+    const leaveEdit = () => {
+      setAtHub(editFrom === 'hub');
+      setEditFrom(null);
+      setStage(null);
+    };
     return (
-      <SetupScreen
-        key={active.id}
-        initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
-        returnsToPlace={editFrom !== null}
-        onBack={
-          editFrom
-            ? () => {
-                setAtHub(editFrom === 'hub');
-                setEditFrom(null);
-                setStage(null);
+      <FadeIn key="setup">
+        <ScreenFrame>
+          <SetupScreen
+            key={active.id}
+            initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
+            returnsToPlace={editFrom !== null}
+            onBack={editFrom ? leaveEdit : goHome}
+            onContinue={(details) => {
+              updateSession(active.id, details);
+              if (editFrom) {
+                // The person is already set up and has been through the contacts check: skip it.
+                leaveEdit();
+                return;
               }
-            : goHome
-        }
-        onContinue={(details) => {
-          setEditFrom(null);
-          updateSession(active.id, details);
-          if (contactsLoading) setStage('checkContacts');
-          else afterSetup();
-        }}
-      />
+              if (contactsLoading) {
+                setStage('checkContacts');
+              } else {
+                afterSetup();
+              }
+            }}
+          />
+        </ScreenFrame>
+      </FadeIn>
     );
   }
   if (atShareObituary) {
     return (
-      <ShareObituaryScreen
-        key={active.id}
-        session={active}
-        onChange={(patch) => updateSession(active.id, patch)}
-        onBack={() => {
-          setAtShareObituary(false);
-          setAtHub(true);
-        }}
-        onContinue={() => {
-          setStartCategory('obituary');
-          setAtShareObituary(false);
-        }}
-      />
+      <FadeIn key="obituary">
+        <ScreenFrame>
+          <ShareObituaryScreen
+            key={active.id}
+            session={active}
+            onChange={(patch) => updateSession(active.id, patch)}
+            onBack={() => {
+              setAtShareObituary(false);
+              setAtHub(true);
+            }}
+            onContinue={() => {
+              setStartCategory('obituary');
+              setAtShareObituary(false);
+            }}
+          />
+        </ScreenFrame>
+      </FadeIn>
     );
   }
   if (atHub) {
     return (
+      <FadeIn key="hub">
+      <ScreenFrame>
       <HubScreen
         key={active.id}
         session={active}
@@ -517,9 +548,12 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           setStage('setup');
         }}
       />
+      </ScreenFrame>
+      </FadeIn>
     );
   }
   return (
+    <FadeIn key="flow">
     <SendSession
       key={active.id}
       session={active}
@@ -538,6 +572,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       onFinished={finish}
       onTold={recordMomentComplete}
     />
+    </FadeIn>
   );
 };
 
@@ -547,11 +582,16 @@ type StackNavigation = NativeStackNavigationProp<RootStackParamList>;
 const sharedScreens = (leaveFirst?: () => void) => (
   <>
     <Stack.Screen name="WhatYoullNeed" options={{ title: '' }}>
-      {() => <WhatYoullNeedScreen />}
+      {() => (
+        <ScreenFrame>
+          <WhatYoullNeedScreen />
+        </ScreenFrame>
+      )}
     </Stack.Screen>
     {AUTH_ENABLED && (
       <Stack.Screen name="Account">
         {({ navigation }) => (
+          <ScreenFrame>
           <AccountScreen
             onBack={() => {
               leaveFirst?.();
@@ -568,13 +608,19 @@ const sharedScreens = (leaveFirst?: () => void) => (
                 : undefined
             }
           />
+          </ScreenFrame>
         )}
       </Stack.Screen>
     )}
   </>
 );
 
-const screenOptions = { headerShown: false, contentStyle: { backgroundColor: '#ffffff' } } as const;
+// One calm fade between screens, none with Reduce Motion on. The page colour shows between screens.
+const useScreenOptions = () => ({
+  headerShown: false,
+  contentStyle: { backgroundColor: colors.bg },
+  ...screenTransition(useReduceMotion()),
+});
 
 const HomeNavigation = ({
   children,
@@ -584,26 +630,26 @@ const HomeNavigation = ({
   children: (navigation: StackNavigation) => ReactNode;
   initialRoute?: 'Home' | 'Account';
   onLeaveFirst?: () => void;
-}) => (
-  <NavigationContainer>
-    <Stack.Navigator screenOptions={screenOptions} initialRouteName={initialRoute}>
-      <Stack.Screen name="Home">{({ navigation }) => children(navigation)}</Stack.Screen>
-      {sharedScreens(initialRoute === 'Account' ? onLeaveFirst : undefined)}
-    </Stack.Navigator>
-  </NavigationContainer>
-);
-
-// The person bar draws nothing now; it still carries Android back and the arrival announcement on
-// every step. This wrapper gives the step the top safe-area inset the old bar used to supply.
-const PersonContext = ({ bar, children }: { bar: ReactNode; children: ReactNode }) => {
-  const insets = useSafeAreaInsets();
+}) => {
+  const screenOptions = useScreenOptions();
   return (
-    <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.bg }}>
-      {bar}
-      {children}
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={screenOptions} initialRouteName={initialRoute}>
+        <Stack.Screen name="Home">{({ navigation }) => <ScreenFrame>{children(navigation)}</ScreenFrame>}</Stack.Screen>
+        {sharedScreens(initialRoute === 'Account' ? onLeaveFirst : undefined)}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 };
+
+// The person bar draws nothing now; it still carries Android back and the arrival announcement on
+// every step. This wrapper gives the step the shared safe-area frame.
+const PersonContext = ({ bar, children }: { bar: ReactNode; children: ReactNode }) => (
+  <ScreenFrame>
+    {bar}
+    {children}
+  </ScreenFrame>
+);
 const withPersonContext = (bar: ReactNode, screen: ReactNode) => <PersonContext bar={bar}>{screen}</PersonContext>;
 
 const Navigation = ({
@@ -619,6 +665,7 @@ const Navigation = ({
   onEditPerson: () => void;
   notified: Session['recipientsNotified'];
 }) => {
+  const screenOptions = useScreenOptions();
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={screenOptions}>
@@ -674,15 +721,17 @@ export const App = () => {
   const fontsSettled = useSerifFonts();
   // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
-    <SerifReadyContext.Provider value={fontsSettled}>
-      {AUTH_ENABLED ? (
-        <AccountProvider>
+    <SafeAreaProvider>
+      <SerifReadyContext.Provider value={fontsSettled}>
+        {AUTH_ENABLED ? (
+          <AccountProvider>
+            <SendAppWhenReady />
+          </AccountProvider>
+        ) : (
           <SendAppWhenReady />
-        </AccountProvider>
-      ) : (
-        <SendAppWhenReady />
-      )}
-    </SerifReadyContext.Provider>
+        )}
+      </SerifReadyContext.Provider>
+    </SafeAreaProvider>
   );
 };
 

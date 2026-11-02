@@ -62,12 +62,9 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
-  // Service and thank-you open here as their first screen, so the title takes focus once on mount.
-  const opensHere = templateCategory === 'service' || templateCategory === 'aftercare';
+  // The title takes focus once on mount, whichever moment this is.
   useEffect(() => {
-    if (opensHere) {
-      focusNode(listHeading.current);
-    }
+    focusNode(listHeading.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Focus follows the view: the review heading on the way in, the import button on the way back.

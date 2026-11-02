@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/App';
+import { colors } from '@griever/tokens';
+import { ScreenHeader } from '../components/authForm';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
 
@@ -146,11 +148,11 @@ export function WhatYoullNeedScreen() {
         <Button label="Back" variant="header" onPress={() => navigation.goBack()} />
       </View>
 
-      <Text style={styles.title}>What you'll need</Text>
+      <ScreenHeader>What you'll need</ScreenHeader>
       <Text style={styles.subtitle}>Not today. Just so none of it surprises you.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardKicker}>The one people get wrong</Text>
+        <Text style={styles.cardKicker} accessibilityRole="header">The one people get wrong</Text>
         <Text style={styles.cardTitle}>Certified death certificates</Text>
         <Text style={styles.cardBody}>
           Ask the funeral home for 8 to 10 certified copies. Banks, insurers and Social Security each
@@ -158,17 +160,16 @@ export function WhatYoullNeedScreen() {
         </Text>
       </View>
 
-      <Text style={styles.gatherHeading}>{checklistCopy.gatherHeading}</Text>
+      <Text style={styles.gatherHeading} accessibilityRole="header">{checklistCopy.gatherHeading}</Text>
       <ChecklistRows tipOpen={tipOpen} onTipChange={setTipOpen} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 24, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 24, paddingTop: 20 },
   backRow: { alignSelf: 'flex-start', marginBottom: 24 },
-  title: { fontSize: 20, fontWeight: '600', color: '#111827', marginBottom: 4 },
   subtitle: { fontSize: 13, color: MUTED, marginBottom: 24 },
   card: {
     borderWidth: 1,

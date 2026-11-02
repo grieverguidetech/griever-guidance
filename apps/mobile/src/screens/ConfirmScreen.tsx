@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
+import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text as RNText, TouchableOpacity } from 'react-native';
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import type { UseContactsResult } from '@griever/hooks';
 import { firstName, SHARE_SERVICE_SAMPLE } from '@griever/shared';
@@ -28,6 +29,15 @@ export function ConfirmScreen({ flow, contacts }: Props) {
   const [shareFailed, setShareFailed] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
   const shareButton = useRef<ButtonNode>(null);
+  const heading = useRef<ComponentRef<typeof RNText>>(null);
+
+  // The heading takes screen-reader focus when the screen opens.
+  useEffect(() => {
+    const handle = heading.current ? findNodeHandle(heading.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  }, []);
 
   if (!selectedTemplate) {
     return null;
@@ -97,6 +107,7 @@ export function ConfirmScreen({ flow, contacts }: Props) {
           onSend={startSendJob}
           onWhatYoullNeed={() => setChecklistOpen(true)}
           checklistRef={checklistButton}
+          headingRef={heading}
           share={
             canShare
               ? {

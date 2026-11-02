@@ -1,3 +1,4 @@
+import { colors } from '@griever/tokens';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
@@ -219,8 +220,8 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 24, paddingTop: 20, paddingBottom: 40 },
   backRow: { alignSelf: 'flex-start', marginBottom: 16 },
   checklist: { marginTop: 32 },
   checklistTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 4 },

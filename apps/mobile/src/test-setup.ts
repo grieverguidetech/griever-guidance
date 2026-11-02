@@ -24,6 +24,10 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   return { __esModule: true, default: asyncStorage, ...asyncStorage };
 });
 
+// The safe-area provider waits for a native measurement that never comes under Jest; the package ships
+// a mock with fixed zero insets (a spec can still override useSafeAreaInsets).
+jest.mock('react-native-safe-area-context', () => (jest.requireActual('react-native-safe-area-context/jest/mock') as { default: object }).default);
+
 // Native-only module: its real entry fails to load outside a device. Mirrors expo-contacts 58:
 // the package root keeps only stubs that throw (build/legacyWarnings.js); the working
 // module-level API is under `expo-contacts/legacy`. Keep these shapes in step with the package.

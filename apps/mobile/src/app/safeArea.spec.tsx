@@ -8,8 +8,8 @@ import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 jest.mock('react-native-safe-area-context', () => ({
-  ...jest.requireActual<object>('react-native-safe-area-context'),
-  useSafeAreaInsets: () => ({ top: 47, bottom: 0, left: 0, right: 0 }),
+  ...jest.requireActual<{ default: object }>('react-native-safe-area-context/jest/mock').default,
+  useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
 }));
 
 const anna = {
@@ -28,6 +28,18 @@ describe('send steps and the top safe area', () => {
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
       return style.paddingTop === 47 && style.backgroundColor === colors.bg;
+    });
+    expect(padded).toBe(true);
+  });
+
+  it('pads every screen by the bottom inset too, so the last button clears the home indicator', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByText('One thing at a time.');
+    const padded = screen.UNSAFE_getAllByType(View).some((v) => {
+      const style = StyleSheet.flatten(v.props.style) ?? {};
+      return style.paddingTop === 47 && style.paddingBottom === 34 && style.backgroundColor === colors.bg;
     });
     expect(padded).toBe(true);
   });
