@@ -62,6 +62,8 @@ export interface HubProps {
   children?: ReactNode;
   /** After the steps. */
   footer?: ReactNode;
+  /** Show `meta` on locked rows too. Web leaves this off and keeps its locked rows plain. */
+  metaOnAllRows?: boolean;
   headingRef?: HeadingProps['headingRef'];
   /** For the sheet that "What you'll need" opens to return focus to. */
   checklistRef?: Ref<ButtonNode>;
@@ -111,7 +113,7 @@ export function Hub(props: HubProps) {
   );
 }
 
-function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
+function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { row: HubRow }) {
   const text = copy.moments[row.key];
 
   if (row.unavailable) {
@@ -130,7 +132,7 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
   }
 
   if (row.locked) {
-    return <LockedStep title={text.title} body={text.body} meta={row.meta} reason={copy.lockedReason} onLocked={onLocked} />;
+    return <LockedStep title={text.title} body={text.body} meta={metaOnAllRows ? row.meta : undefined} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
   if (row.status === 'done') {
@@ -144,6 +146,7 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
   }
 
   if (row.status === 'next') {
+    const buttonLabel = row.started ? copy.continue : copy.start;
     return (
       <Card selected>
         <Body tone="muted" small>
@@ -152,7 +155,11 @@ function HubStep({ row, copy, onStart, onLocked }: HubProps & { row: HubRow }) {
         <Body tone="strong">{text.title}</Body>
         <Body>{text.body}</Body>
         <Meta meta={row.meta} />
-        <Button label={row.started ? copy.continue : copy.start} onPress={() => onStart(row.key)} />
+        <Button
+          label={buttonLabel}
+          accessibilityName={row.meta ? `${buttonLabel}, ${text.title}, ${row.meta}` : undefined}
+          onPress={() => onStart(row.key)}
+        />
       </Card>
     );
   }

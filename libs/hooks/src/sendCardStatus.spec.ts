@@ -36,6 +36,10 @@ describe('sendCardStatus', () => {
     expect(sendCardStatus(planned, 'service')).toBe('ready');
   });
 
+  it('service needs a detail with date and place but no time', () => {
+    expect(sendCardStatus(session({ serviceDate: 'June 14, 2026', servicePlace: 'St Mary' }), 'service')).toBe('needsDetail');
+  });
+
   it('service is sent when people were messaged, even with no date', () => {
     expect(sendCardStatus(session({ recipientsNotified: { service: ['c1'] } }), 'service')).toEqual({ sent: 1 });
   });

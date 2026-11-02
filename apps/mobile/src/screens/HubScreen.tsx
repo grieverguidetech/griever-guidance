@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { isDraftStarted, sendCardStatus, usePathMoments } from '@griever/hooks';
+import { isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
@@ -18,13 +18,8 @@ const paywallCopy = screenCopy('paywall');
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 
-/** Where a moment's drafts are kept. */
-export const CATEGORY_BY_MOMENT: Record<MomentKey, TemplateCategory> = {
-  announce: 'announcement',
-  service: 'service',
-  obituary: 'obituary',
-  thanks: 'aftercare',
-};
+/** Where a moment's drafts are kept (one map, shared with the hooks). */
+export { MOMENT_CATEGORY as CATEGORY_BY_MOMENT } from '@griever/hooks';
 
 /** The status line for a card, from the copy file. */
 function statusLine(status: SendCardStatus): string {
@@ -137,7 +132,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   };
 
   const rows: HubRow[] = moments.map((moment) => {
-    const started = isDraftStarted(session.drafts[CATEGORY_BY_MOMENT[moment.key]]);
+    const started = isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]]);
     return {
       key: moment.key,
       status: moment.status,
@@ -161,6 +156,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
           opener.current = row;
           setPaywallOpen(true);
         }}
+        metaOnAllRows
         headingRef={heading}
         checklistRef={checklistButton}
       >

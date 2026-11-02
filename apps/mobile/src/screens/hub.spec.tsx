@@ -150,9 +150,10 @@ describe('HubScreen', () => {
     expect(titles).toEqual(['Told close family', 'Share the service', 'Share the obituary', 'Send thank-yous']);
   });
 
-  it('shows Ready on the announcement card when it is next', () => {
+  it('shows Ready on the announcement card when it is next, in the Start button name', () => {
     setup();
     expect(screen.getByText('Ready')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start, Announce the passing, Ready' })).toBeTruthy();
   });
 
   it('keeps the status line on locked rows when payments are on', () => {
@@ -160,6 +161,9 @@ describe('HubScreen', () => {
     const service = screen.getByRole('button', { name: /Share the service/ });
     expect(service.props.accessibilityHint).toBe('Included with the full plan');
     expect(within(screen.getByRole('button', { name: /Share the service/ })).getByText(/Needs a detail/)).toBeTruthy();
+    const thanks = screen.getByRole('button', { name: /Send thank-yous/ });
+    expect(thanks.props.accessibilityHint).toBe('Included with the full plan');
+    expect(within(thanks).getByText(/Needs a detail/)).toBeTruthy();
   });
 
   it('opens What you will need in a sheet', () => {

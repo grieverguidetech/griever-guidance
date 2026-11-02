@@ -51,11 +51,29 @@ describe('Hub meta on any row', () => {
       { key: 'obituary', status: 'later', started: false, locked: false, meta: 'Needs a detail' },
       { key: 'thanks', status: 'later', started: false, locked: true, meta: 'Needs a detail' },
     ];
-    setup({ rows: withMeta });
+    setup({ rows: withMeta, metaOnAllRows: true });
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Share the service[\s\S]*Needs a detail/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Share the obituary[\s\S]*Needs a detail/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Send thank-yous[\s\S]*Needs a detail/ })).toBeInTheDocument();
+  });
+
+  it('keeps a locked done row plain on web (no metaOnAllRows)', () => {
+    const lockedDone: HubRow[] = [{ key: 'service', status: 'done', started: false, locked: true, meta: '2 people · Send again' }];
+    setup({ rows: lockedDone });
+    expect(screen.queryByText('2 people · Send again')).not.toBeInTheDocument();
+  });
+
+  it('shows meta on a locked row when the host opts in', () => {
+    const lockedDone: HubRow[] = [{ key: 'service', status: 'later', started: false, locked: true, meta: 'Needs a detail' }];
+    setup({ rows: lockedDone, metaOnAllRows: true });
+    expect(screen.getByText('Needs a detail')).toBeInTheDocument();
+  });
+
+  it('names the Start button with the title and meta when meta is set', () => {
+    const next: HubRow[] = [{ key: 'announce', status: 'next', started: false, locked: false, meta: 'Ready' }];
+    setup({ rows: next });
+    expect(screen.getByRole('button', { name: 'Start, Announce the passing, Ready' })).toBeInTheDocument();
   });
 
   it('shows no meta line when a row has none', () => {

@@ -5,16 +5,22 @@ import type { Session } from './useSessions.js';
 /** Fixed real-world order — never reordered by the user. */
 export const MOMENT_ORDER: MomentKey[] = ['announce', 'service', 'obituary', 'thanks'];
 
-const MOMENT_CATEGORY: Record<MomentKey, TemplateCategory> = {
+/** Where each moment's drafts and recipients are kept. */
+export const MOMENT_CATEGORY: Record<MomentKey, TemplateCategory> = {
   announce: 'announcement',
   service: 'service',
   obituary: 'obituary',
   thanks: 'aftercare',
 };
 
+/** One rule for "has a link": the obituary link is set and not blank. */
+export function hasObituaryLink(session: Pick<Session, 'obituaryUrl'>): boolean {
+  return Boolean(session.obituaryUrl?.trim());
+}
+
 function isMomentDone(session: Session, key: MomentKey): boolean {
   const recipients = session.recipientsNotified?.[MOMENT_CATEGORY[key]] ?? [];
-  if (key === 'obituary') return recipients.length > 0 && Boolean(session.obituaryUrl);
+  if (key === 'obituary') return recipients.length > 0 && hasObituaryLink(session);
   return recipients.length > 0;
 }
 
