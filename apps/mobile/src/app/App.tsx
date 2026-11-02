@@ -207,6 +207,11 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (prefilled.current) return;
     prefilled.current = true;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    // Older drafts saved obituaryText as the message. The obituary send texts the link template now
+    // (MOB-9, #559 Decision 4), so drop that copy; a hand-edited message stays.
+    if (category === 'obituary' && messageOverride && messageOverride === session.obituaryText) {
+      setMessageOverride(null);
+    }
     const fresh = !hasDraftContent && messageOverride === null;
     if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
     if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);

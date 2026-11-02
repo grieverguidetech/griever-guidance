@@ -28,10 +28,10 @@ export type SendPrefill = {
   messageOverride: string | null;
 };
 
-const MESSAGE_KEY: Record<TemplateCategory, keyof SendPrefillSource> = {
+// No entry for obituary: obituaryText is the email to the publisher, never the text message (#630).
+const MESSAGE_KEY: Partial<Record<TemplateCategory, keyof SendPrefillSource>> = {
   service: 'serviceMessage',
   announcement: 'announcementMessage',
-  obituary: 'obituaryText',
   aftercare: 'thanksMessage',
 };
 
@@ -62,6 +62,7 @@ export function sendPrefill(
       fields[key] = value;
     }
   }
-  const message = source[MESSAGE_KEY[category]];
+  const key = MESSAGE_KEY[category];
+  const message = key ? source[key] : null;
   return { fields, messageOverride: message ?? null };
 }
