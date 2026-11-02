@@ -215,7 +215,7 @@ them in code by assumption — raise them.
    Next tap, so the user taps no more than before. It differs from `039e459`: that was a 3-way
    question (Yes / Not yet / Try again); this is one tap, with Skip and Not yet kept. The reason it
    works now is that the native app state change fires reliably on the phone, unlike the web tab.
-   No persisted send log. Web is unchanged: it keeps the single Next tap.
+   The send job itself is not persisted; only the existing on-device `recipientsNotified` id list is (MOB-3). Web is unchanged: it keeps the single Next tap.
 
 6. **Obituary editor (round 2)** — built from the obituary template's parts, with a full text and a short form. Both stay editable. Not in round 1 (WEB-6).
 
