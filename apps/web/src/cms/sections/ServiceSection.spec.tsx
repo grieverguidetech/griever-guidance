@@ -362,7 +362,8 @@ describe('ServiceSection place suggestions', () => {
     const suggest = vi.fn<PlacesClient['suggest']>().mockResolvedValue([
       { id: 'x', text: 'Rest Hill Cemetery, 5 Oak Rd', mainText: 'Rest Hill Cemetery', secondaryText: '5 Oak Rd' },
     ]);
-    const client: PlacesClient = { suggest, newToken: () => ({}), details: () => Promise.reject(new Error('x')) };
+    const details = vi.fn<PlacesClient['details']>().mockRejectedValue(new Error('x'));
+    const client: PlacesClient = { suggest, newToken: () => ({}), details };
     function Harness() {
       const [values, setValues] = useState<Values>({ visitationDate: 'May 1', burialDate: 'May 2', receptionDate: 'May 3' });
       return (
@@ -386,10 +387,14 @@ describe('ServiceSection place suggestions', () => {
     await userEvent.type(visitation, '12 elm');
     await screen.findByRole('listbox');
     expect(suggest).toHaveBeenLastCalledWith('12 elm', [], expect.any(Object));
+    details.mockClear();
+    await userEvent.click(screen.getByRole('option', { name: /Rest Hill Cemetery/ }));
+    // No address field to fill, so the pick saves the line as shown and makes no paid details call.
+    await waitFor(() => expect(visitation).toHaveValue('Rest Hill Cemetery, 5 Oak Rd'));
+    expect(details).not.toHaveBeenCalled();
 
     await userEvent.type(screen.getByRole('combobox', { name: 'Reception Place' }), '9 pine');
     await waitFor(() => expect(suggest).toHaveBeenLastCalledWith('9 pine', [], expect.any(Object)));
-
   });
 });
 
