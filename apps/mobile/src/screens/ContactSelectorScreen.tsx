@@ -25,7 +25,7 @@ const copy = screenCopy('whoShouldKnow');
  * across (import from the phone's contacts) and its review list.
  */
 export function ContactSelectorScreen({ flow, contacts }: Props) {
-  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep, templateCategory } = flow;
+  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep } = flow;
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -59,10 +59,6 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
     }
   }, [reviewing]);
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
-
-  // Same rule as web: group only for announcements, and only when both groups have people.
-  const tiers = new Set(contacts.contacts.map((c) => c.tier ?? 'family'));
-  const grouped = templateCategory === 'announcement' && tiers.size > 1;
 
   async function handleImport() {
     setImporting(true);
@@ -167,7 +163,7 @@ export function ContactSelectorScreen({ flow, contacts }: Props) {
         <WhoShouldKnow
           copy={copy}
           people={contacts.contacts.map((c) => ({ id: c.contactId, name: c.name, phone: c.phone, tier: c.tier }))}
-          grouped={grouped}
+          grouped={false}
           selectedIds={selectedContactIds}
           selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
           loading={contacts.loading}
