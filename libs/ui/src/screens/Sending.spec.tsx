@@ -136,6 +136,15 @@ describe('Sending', () => {
     expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveFocus();
   });
 
+  it('moves focus to the hand-off button on an error only when asked to', () => {
+    const view = render(<Sending {...base()} />);
+    view.rerender(<Sending {...base()} error="x" />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).not.toHaveFocus();
+    view.rerender(<Sending {...base()} error={undefined} />);
+    view.rerender(<Sending {...base()} error="x" focusOpenOnError />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveFocus();
+  });
+
   it('uses openLabel for the hand-off button when given', () => {
     render(<Sending {...base()} openLabel="Text A" />);
     expect(screen.getByRole('button', { name: 'Text A' })).toBeInTheDocument();

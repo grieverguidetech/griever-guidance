@@ -34,6 +34,8 @@ export function SendingScreen({ flow, contacts }: Props) {
   // person starts clean without a reset.
   const [handedOffId, setHandedOffId] = useState<string | null>(null);
   const [askingId, setAskingId] = useState<string | null>(null);
+  // Whose hand-off failed to open Messages; shows a calm line and puts them back on the Text button.
+  const [failedId, setFailedId] = useState<string | null>(null);
   const wentAway = useRef(false);
   // The contact whose question was already answered Yes, so a second tap cannot mark the next one.
   const confirmedFor = useRef<string | null>(null);
@@ -105,9 +107,11 @@ export function SendingScreen({ flow, contacts }: Props) {
     const link = buildSmsLink(contact.phone, flow.messageFor(contact.name), Platform.OS === 'ios');
     setHandedOffId(contactId);
     setAskingId(null);
+    setFailedId(null);
     // If Messages cannot open, this person goes back to the Text button rather than waiting on a hand-off that never happened.
     Linking.openURL(link).catch(() => {
       setHandedOffId((current) => (current === contactId ? null : current));
+      setFailedId(contactId);
     });
   }
 
@@ -174,6 +178,8 @@ export function SendingScreen({ flow, contacts }: Props) {
               }
             : undefined
         }
+        error={activeId !== null && failedId === activeId ? copy.shareError : undefined}
+        focusOpenOnError
         onOpenMessages={openMessages}
         onNext={markActiveSent}
         onSkip={markActiveSkipped}

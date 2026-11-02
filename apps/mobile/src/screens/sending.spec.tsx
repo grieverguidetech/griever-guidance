@@ -1,16 +1,35 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo, AppState, Linking } from 'react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SessionDetails } from '@griever/shared';
 import { SendingScreen } from './SendingScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+// Each node gets its own handle, so a test can tell which node focus was sent to.
+const mockHandles = new Map<unknown, number>();
+const mockHandleFor = (node: unknown) => {
+  if (!mockHandles.has(node)) {
+    mockHandles.set(node, mockHandles.size + 1);
+  }
+  return mockHandles.get(node);
+};
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: (node: unknown) => (node ? 1 : null),
+  findNodeHandle: (node: unknown) => (node ? mockHandleFor(node) : null),
 }));
+
+// The handle of the node a button's ref points at, found by matching the button's own children.
+const handleForButton = (name: string): number => {
+  const { children } = screen.getByRole('button', { name }).props;
+  for (const [node, handle] of mockHandles) {
+    if ((node as { props?: { children?: unknown } }).props?.children === children) {
+      return handle;
+    }
+  }
+  throw new Error(`No focus handle for button ${name}`);
+};
 
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '' } as SessionDetails;
 const all = [
@@ -143,7 +162,7 @@ describe('Sending on the phone: asking on return from Messages', () => {
   });
 
   it('falls back to Text Eli when Messages will not open for the next person', async () => {
-    const { open, change } = setup(['c1', 'c2']);
+    const { open, change, focus } = setup(['c1', 'c2']);
     open.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('no handler'));
     fireEvent.press(await screen.findByText('Text Dee'));
     change('background');
@@ -151,6 +170,8 @@ describe('Sending on the phone: asking on return from Messages', () => {
     fireEvent.press(await screen.findByText(PROMPT));
     expect(await screen.findByText('Text Eli')).toBeTruthy();
     expect(screen.queryByText('Done')).toBeNull();
+    expect(screen.getByText("That didn't go through. You can try again.")).toBeTruthy();
+    await waitFor(() => expect(focus).toHaveBeenLastCalledWith(handleForButton('Text Eli')));
   });
 
   it('a second press in the same moment cannot mark the next person', async () => {
@@ -194,14 +215,17 @@ describe('Sending on the phone: asking on return from Messages', () => {
     const { change, focus } = setup(['c1', 'c2']);
     fireEvent.press(await screen.findByText('Text Dee'));
     const before = focus.mock.calls.length;
+    const handleOf = (name: string) => handleForButton(name);
     change('background');
     change('active');
     expect(focus.mock.calls.length).toBe(before);
     await screen.findByText(PROMPT);
     expect(focus.mock.calls.length).toBe(before + 1);
+    expect(focus).toHaveBeenLastCalledWith(handleOf(PROMPT));
     expect(screen.getByRole('button', { name: PROMPT }).props.accessibilityHint).toBe('Marks Dee sent and opens Messages for Eli');
     fireEvent.press(screen.getByText('Not yet'));
     expect(focus.mock.calls.length).toBe(before + 2);
+    expect(focus).toHaveBeenLastCalledWith(handleOf('Text Dee'));
   });
 
   it('clears the old tap-Next note while the question shows', async () => {

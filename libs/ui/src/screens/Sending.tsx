@@ -59,6 +59,8 @@ export interface SendingProps {
   confirmSent?: { yes: string; hint: string; notYet: string; onYes: () => void; onNotYet: () => void };
   /** Replaces the hand-off button's label, for example "Text Ana". Unset keeps `copy.openMessages`. */
   openLabel?: string;
+  /** Mobile only. Moves focus to the hand-off button when `error` shows. Web leaves it unset. */
+  focusOpenOnError?: boolean;
   /** A calm error line, for example when sharing did not go through. */
   error?: string;
   onOpenMessages: () => void;
@@ -78,7 +80,7 @@ export interface SendingProps {
  * share sheet) and then Next. Built from libs/ui so web (through react-native-web) and mobile show
  * the same screen. It owns no state; the app holds the hand-off and does the platform work.
  */
-export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, openLabel, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
+export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();
   const nextRef = useRef<ButtonNode>(null);
   const openRef = useRef<ButtonNode>(null);
@@ -106,6 +108,14 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
     }
     wasAsking.current = asking;
   }, [asking]);
+
+  // A failed hand-off puts the person back on the hand-off button; focus goes there too.
+  const failed = focusOpenOnError === true && error !== undefined;
+  useEffect(() => {
+    if (failed) {
+      focusNode(openRef.current);
+    }
+  }, [failed]);
 
   // After Next or Skip the pressed button is gone, so focus goes to the new person's first action.
   // The first person is skipped: the heading has the focus on arrival.
