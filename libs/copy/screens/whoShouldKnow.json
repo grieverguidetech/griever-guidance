@@ -27,5 +27,6 @@
   "importEmpty": "No new contacts with a mobile number found.",
   "chosen": "{count} chosen",
   "searchLabel": "Search by name",
-  "searchEmpty": "No one matches that name."
+  "searchEmpty": "No one matches that name.",
+  "selectAllShown": "Select all shown"
 }

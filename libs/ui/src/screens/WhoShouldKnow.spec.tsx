@@ -28,6 +28,7 @@ const copy: WhoShouldKnowCopy = {
   bringAcross: 'Add from your contacts',
   searchLabel: 'Search by name',
   searchEmpty: 'No one matches that name.',
+  selectAllShown: 'Select all shown',
 };
 
 const people = [
@@ -227,7 +228,7 @@ describe('WhoShouldKnow', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toHaveAccessibleDescription('Enter a name and a mobile number');
   });
 
-  it('wraps the rows in a list so screen readers say how many', () => {
+  it('wraps the rows in a list (web screen readers then say how many; native does not)', () => {
     setup({ grouped: false });
     expect(screen.getByRole('list')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
@@ -255,7 +256,7 @@ describe('WhoShouldKnow', () => {
       const user = userEvent.setup();
       const h = setup({ grouped: false, search: true });
       await user.type(screen.getByLabelText('Search by name'), 'ca');
-      await user.click(screen.getByRole('button', { name: 'Select all' }));
+      await user.click(screen.getByRole('button', { name: 'Select all shown' }));
       expect(h.onSelectAll).toHaveBeenLastCalledWith(['a', 'c']);
     });
 
@@ -265,7 +266,8 @@ describe('WhoShouldKnow', () => {
       await user.type(screen.getByLabelText('Search by name'), 'zzz');
       expect(screen.getByText('No one matches that name.')).toBeInTheDocument();
       expect(screen.queryByRole('checkbox')).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Select all' })).toBeNull();
+      expect(screen.queryByRole('list')).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Select all/ })).toBeNull();
     });
   });
 });

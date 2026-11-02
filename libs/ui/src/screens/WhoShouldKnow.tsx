@@ -1,6 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { SerifText } from '../SerifText';
@@ -42,10 +50,12 @@ export interface WhoShouldKnowCopy {
   continue: string;
   empty: string;
   bringAcross: string;
-  /** Only used when `search` is set. */
-  searchLabel?: string;
+  /** The search field's label. Only shown when `search` is set. */
+  searchLabel: string;
   /** Shown when the search matches no one. Only used when `search` is set. */
-  searchEmpty?: string;
+  searchEmpty: string;
+  /** The accessible name of Select all while a search is active. */
+  selectAllShown: string;
 }
 
 export interface WhoPerson {
@@ -102,14 +112,43 @@ export interface WhoShouldKnowProps {
  * "Who should know?": pick the people who get the message. Built from libs/ui so web (through
  * react-native-web) and mobile show the same screen.
  */
-export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabel, onToggle, onSelectAll, toE164, onAddPerson, onBack, onContinue, onWhatYoullNeed, checklistRef, bringAcross, loading, footer, headingRef, search = false }: WhoShouldKnowProps) {
+export function WhoShouldKnow({
+  copy,
+  people,
+  grouped,
+  selectedIds,
+  selectedLabel,
+  onToggle,
+  onSelectAll,
+  toE164,
+  onAddPerson,
+  onBack,
+  onContinue,
+  onWhatYoullNeed,
+  checklistRef,
+  bringAcross,
+  loading,
+  footer,
+  headingRef,
+  search = false,
+}: WhoShouldKnowProps) {
   const [query, setQuery] = useState('');
   const needle = search ? query.trim().toLowerCase() : '';
-  const shown = needle ? people.filter((p) => p.name.toLowerCase().includes(needle)) : people;
+  const shown = needle
+    ? people.filter((p) => p.name.toLowerCase().includes(needle))
+    : people;
   const sections = grouped
     ? [
-        { key: 'first', label: copy.tierFirst, items: shown.filter((p) => (p.tier ?? 'family') === 'first') },
-        { key: 'family', label: copy.tierFamily, items: shown.filter((p) => (p.tier ?? 'family') === 'family') },
+        {
+          key: 'first',
+          label: copy.tierFirst,
+          items: shown.filter((p) => (p.tier ?? 'family') === 'first'),
+        },
+        {
+          key: 'family',
+          label: copy.tierFamily,
+          items: shown.filter((p) => (p.tier ?? 'family') === 'family'),
+        },
       ].filter((s) => s.items.length > 0)
     : [{ key: 'all', label: null, items: shown }];
   const noneChosen = selectedIds.length === 0;
@@ -119,19 +158,39 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
       <View style={styles.topBar}>
         <Button label={copy.back} variant="header" onPress={onBack} />
         {onWhatYoullNeed ? (
-          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button
+            label={copy.checklist}
+            variant="header"
+            opensDialog
+            onPress={onWhatYoullNeed}
+            buttonRef={checklistRef}
+          />
         ) : null}
       </View>
       <View style={styles.head}>
-        <Heading level={1} headingRef={headingRef}>{copy.heading}</Heading>
-        <Body tone="muted">{grouped ? copy.introGrouped : copy.introUngrouped}</Body>
+        <Heading level={1} headingRef={headingRef}>
+          {copy.heading}
+        </Heading>
+        <Body tone="muted">
+          {grouped ? copy.introGrouped : copy.introUngrouped}
+        </Body>
       </View>
       {search && people.length > 0 ? (
-        <Field label={copy.searchLabel ?? ''} placeholder="" value={query} onChangeText={setQuery} />
+        <Field
+          label={copy.searchLabel}
+          value={query}
+          onChangeText={setQuery}
+          search
+        />
       ) : null}
       {search && !grouped && shown.length > 0 ? (
         <View style={styles.sectionHead}>
-          <Button label={copy.selectAll} variant="tertiary" onPress={() => onSelectAll(shown.map((p) => p.id))} />
+          <Button
+            label={copy.selectAll}
+            accessibilityName={needle ? copy.selectAllShown : undefined}
+            variant="tertiary"
+            onPress={() => onSelectAll(shown.map((p) => p.id))}
+          />
         </View>
       ) : null}
       {sections.map((section) => (
@@ -141,27 +200,36 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
               <Heading level={2}>{section.label}</Heading>
               <Button
                 label={copy.selectAll}
-                accessibilityName={copy.selectAllFor.replace('{group}', section.label)}
+                accessibilityName={copy.selectAllFor.replace(
+                  '{group}',
+                  section.label,
+                )}
                 variant="tertiary"
                 onPress={() => onSelectAll(section.items.map((p) => p.id))}
               />
             </View>
           ) : null}
-          <View role="list" style={styles.list}>
-            {section.items.map((person) => (
-              <View key={person.id} role="listitem">
-                <PersonRow
-                  person={person}
-                  selected={selectedIds.includes(person.id)}
-                  onToggle={() => onToggle(person.id)}
-                />
-              </View>
-            ))}
-          </View>
+          {section.items.length > 0 ? (
+            <View role="list" style={styles.list}>
+              {section.items.map((person) => (
+                <View key={person.id} role="listitem">
+                  <PersonRow
+                    person={person}
+                    selected={selectedIds.includes(person.id)}
+                    onToggle={() => onToggle(person.id)}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       ))}
-      {search && people.length > 0 && shown.length === 0 ? <Body tone="muted">{copy.searchEmpty}</Body> : null}
-      {people.length === 0 && !loading ? <Body tone="muted">{copy.empty}</Body> : null}
+      {search && people.length > 0 && shown.length === 0 ? (
+        <LiveLine label={copy.searchEmpty} />
+      ) : null}
+      {people.length === 0 && !loading ? (
+        <Body tone="muted">{copy.empty}</Body>
+      ) : null}
       {bringAcross ? (
         <View style={styles.bringAcross}>
           <Button
@@ -207,7 +275,11 @@ export function WhoShouldKnow({ copy, people, grouped, selectedIds, selectedLabe
 const DANGER = '#b91c1c';
 
 /** "Add another person": a button that opens a small form. Holds only what is typed. */
-function AddByHand({ copy, toE164, onAddPerson }: Pick<WhoShouldKnowProps, 'copy' | 'toE164' | 'onAddPerson'>) {
+function AddByHand({
+  copy,
+  toE164,
+  onAddPerson,
+}: Pick<WhoShouldKnowProps, 'copy' | 'toE164' | 'onAddPerson'>) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -250,11 +322,24 @@ function AddByHand({ copy, toE164, onAddPerson }: Pick<WhoShouldKnowProps, 'copy
   };
 
   if (!open) {
-    return <Button label={copy.addAnother} variant="tertiary" buttonRef={addAnotherRef} onPress={() => setOpen(true)} />;
+    return (
+      <Button
+        label={copy.addAnother}
+        variant="tertiary"
+        buttonRef={addAnotherRef}
+        onPress={() => setOpen(true)}
+      />
+    );
   }
   return (
     <Card>
-      <Field label={copy.nameLabel} placeholder={copy.namePlaceholder} value={name} onChangeText={setName} inputRef={nameRef} />
+      <Field
+        label={copy.nameLabel}
+        placeholder={copy.namePlaceholder}
+        value={name}
+        onChangeText={setName}
+        inputRef={nameRef}
+      />
       <Field
         label={copy.phoneLabel}
         placeholder={copy.phonePlaceholder}
@@ -289,7 +374,9 @@ function AddByHand({ copy, toE164, onAddPerson }: Pick<WhoShouldKnowProps, 'copy
 
 interface FieldProps {
   label: string;
-  placeholder: string;
+  placeholder?: string;
+  /** A search box: search key, a clear button, no autocorrect or capitals. */
+  search?: boolean;
   value: string;
   onChangeText: (v: string) => void;
   phone?: boolean;
@@ -319,6 +406,20 @@ function Alert({ message, id }: { message?: string; id?: string }) {
   );
 }
 
+/** A calm line that is read out when it first shows (iOS ignores live regions, so it is announced too). */
+function LiveLine({ label }: { label: string }) {
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibility(label);
+    }
+  }, [label]);
+  return (
+    <Body tone="muted" live>
+      {label}
+    </Body>
+  );
+}
+
 /** The "2 selected" line: a polite live region, and announced on iOS when it changes (iOS ignores live regions). */
 export function SelectedCount({ label }: { label: string }) {
   const first = useRef(true);
@@ -338,7 +439,16 @@ export function SelectedCount({ label }: { label: string }) {
   );
 }
 
-function Field({ label, placeholder, value, onChangeText, phone = false, inputRef, errorId }: FieldProps) {
+function Field({
+  label,
+  placeholder,
+  value,
+  onChangeText,
+  phone = false,
+  search = false,
+  inputRef,
+  errorId,
+}: FieldProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
   return (
@@ -362,13 +472,29 @@ function Field({ label, placeholder, value, onChangeText, phone = false, inputRe
         keyboardType={phone ? 'phone-pad' : 'default'}
         inputMode={phone ? 'tel' : 'text'}
         autoComplete={phone ? 'tel' : 'off'}
+        {...(search
+          ? {
+              returnKeyType: 'search' as const,
+              clearButtonMode: 'while-editing' as const,
+              autoCorrect: false,
+              autoCapitalize: 'none' as const,
+            }
+          : {})}
       />
     </View>
   );
 }
 
 /** One person: a whole-line checkbox. The tick is drawn, and hidden from screen readers (the state is read once). */
-export function PersonRow({ person, selected, onToggle }: { person: WhoPerson; selected: boolean; onToggle: () => void }) {
+export function PersonRow({
+  person,
+  selected,
+  onToggle,
+}: {
+  person: WhoPerson;
+  selected: boolean;
+  onToggle: () => void;
+}) {
   // react-native-web only presses a role=button on Space; a checkbox needs Space too.
   const spaceKey: Record<string, unknown> = {
     onKeyDown: (event: { key: string; preventDefault: () => void }) => {
@@ -401,7 +527,11 @@ export function PersonRow({ person, selected, onToggle }: { person: WhoPerson; s
         aria-hidden
       >
         {selected ? (
-          <Text style={styles.tick} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Text
+            style={styles.tick}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             ✓
           </Text>
         ) : null}
@@ -411,9 +541,18 @@ export function PersonRow({ person, selected, onToggle }: { person: WhoPerson; s
 }
 
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   bringAcross: { gap: spacing[1] },
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing[1] },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing[1],
+  },
   field: { gap: spacing[1] },
   input: {
     minHeight: minTouchTarget,
@@ -453,11 +592,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxSelected: { backgroundColor: colors['accent-700'], borderColor: colors['accent-700'] },
+  boxSelected: {
+    backgroundColor: colors['accent-700'],
+    borderColor: colors['accent-700'],
+  },
   tick: { color: colors.white, fontSize: 12, fontWeight: '700' },
   screen: { gap: spacing[3] },
   head: { gap: spacing[1] },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   section: { gap: spacing[2] },
   list: { gap: spacing[2] },
 });

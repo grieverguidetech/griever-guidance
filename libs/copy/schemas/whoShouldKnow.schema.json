@@ -32,7 +32,8 @@
     "importEmpty",
     "chosen",
     "searchLabel",
-    "searchEmpty"
+    "searchEmpty",
+    "selectAllShown"
   ],
   "properties": {
     "heading": {
@@ -116,6 +117,9 @@
       "$ref": "#/$defs/text"
     },
     "searchLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "selectAllShown": {
       "$ref": "#/$defs/text"
     },
     "searchEmpty": {

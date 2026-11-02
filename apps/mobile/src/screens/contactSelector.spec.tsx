@@ -76,20 +76,21 @@ describe('ContactSelectorScreen search', () => {
   const copy = screenCopy('whoShouldKnow');
 
   it('keeps a tick when the search hides the person, and the count stays right', () => {
-    const { rerender } = renderScreen(saved, 'announcement', ['2']);
+    const { toggleContact, selectContacts } = renderScreen(saved, 'announcement', ['2']);
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'cat');
     expect(screen.queryByText('Mum')).toBeNull();
     expect(screen.getByText('1 selected')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), '');
     expect(screen.getByText('Mum')).toBeTruthy();
-    rerender(['2']);
+    expect(toggleContact).not.toHaveBeenCalled();
+    expect(selectContacts).not.toHaveBeenCalled();
     expect(screen.getByRole('checkbox', { name: /Mum/ }).props.accessibilityState.checked).toBe(true);
   });
 
   it('selects only the people shown, and says so when no one matches', () => {
     const { selectContacts } = renderScreen();
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'CAT');
-    fireEvent.press(screen.getByRole('button', { name: 'Select all' }));
+    fireEvent.press(screen.getByRole('button', { name: copy.selectAllShown }));
     expect(selectContacts).toHaveBeenCalledWith(['3']);
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'zzz');
     expect(screen.getByText(copy.searchEmpty)).toBeTruthy();
