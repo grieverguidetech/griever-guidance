@@ -27,6 +27,11 @@ const copy: ShareObituaryCopy = {
   emailButton: 'Email it to the paper or funeral home',
   emailNoText: 'Write it on the web first.',
   emailFailed: "We couldn't open email.",
+  emailOpened: "Opened in your email app. Come back when it's published.",
+  copyButton: 'Copy the text',
+  copied: 'Copied.',
+  linkStepLabel: "Step 2: once it's published, paste the link",
+  pasteButton: 'Paste link',
 };
 
 function setup(over: Partial<ShareObituaryProps> = {}) {
@@ -208,5 +213,41 @@ describe('ShareObituary', () => {
   it('draws the eyebrow in the second accent when asked', () => {
     setup();
     expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(170, 11, 86)');
+  });
+
+  it('shows the step 2 label above the link field and no label when the copy has none', () => {
+    setup();
+    expect(screen.getByRole('heading', { name: "Step 2: once it's published, paste the link" })).toBeInTheDocument();
+  });
+
+  it('shows no opened line before mail opens', () => {
+    setup({ publisherEmail: { hasText: true, onPress: vi.fn() } });
+    expect(screen.queryByText(/Opened in your email app/)).not.toBeInTheDocument();
+  });
+
+  it('shows the opened line once mail opened', () => {
+    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), opened: true } });
+    expect(screen.getByText("Opened in your email app. Come back when it's published.")).toBeInTheDocument();
+  });
+
+  it('offers Copy the text, and says Copied after it worked', async () => {
+    const onCopyText = vi.fn();
+    setup({ publisherEmail: { hasText: true, onPress: vi.fn(), failed: true, onCopyText, copied: true } });
+    await userEvent.click(screen.getByRole('button', { name: 'Copy the text' }));
+    expect(onCopyText).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Copied.')).toBeInTheDocument();
+  });
+
+  it('shows Paste link only when a handler is given, and calls it', async () => {
+    const onPasteLink = vi.fn();
+    setup({ onPasteLink });
+    await userEvent.click(screen.getByRole('button', { name: 'Paste link' }));
+    expect(onPasteLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Paste link and Copy the text on the web (no handlers)', () => {
+    setup({ publisherEmail: { hasText: true, onPress: vi.fn() } });
+    expect(screen.queryByRole('button', { name: 'Paste link' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy the text' })).not.toBeInTheDocument();
   });
 });

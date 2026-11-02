@@ -8,9 +8,10 @@ import { ShareObituary } from '@griever/ui';
 import type { ButtonNode } from '@griever/ui';
 import { colors, spacing } from '@griever/tokens';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
+import { copyText, pasteText } from '../lib/clipboard';
 import { openMailDraft } from '../lib/mailCompose';
 
-const copy = screenCopy('shareObituary');
+const copy = { ...screenCopy('shareObituary'), heading: screenCopy('shareObituary').mobileHeading };
 
 type Props = {
   session: Session;
@@ -28,6 +29,8 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
   const checklistButton = useRef<ButtonNode>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
+  const [emailOpened, setEmailOpened] = useState(false);
+  const [copied, setCopied] = useState(false);
   const emailRunning = useRef(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const sheetOpen = useRef(false);
@@ -79,6 +82,18 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
     emailRunning.current = false;
     setEmailBusy(false);
     setEmailFailed(result === 'failed');
+    setEmailOpened(result !== 'failed');
+  };
+
+  const copyObituary = async () => {
+    setCopied(await copyText(obituaryText));
+  };
+
+  const pasteLink = async () => {
+    const pasted = await pasteText();
+    if (pasted !== '') {
+      onChange({ obituaryUrl: pasted });
+    }
   };
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -97,7 +112,8 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
           onBack={onBack}
           onWhatYoullNeed={() => setChecklistOpen(true)}
           onContinue={onContinue}
-          publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy }}
+          onPasteLink={pasteLink}
+          publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, opened: emailOpened, onCopyText: copyObituary, copied }}
           headingRef={heading}
           checklistRef={checklistButton}
         />

@@ -3,7 +3,10 @@ import { Linking, Share } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { SerifReadyContext } from '@griever/ui';
+import * as Clipboard from 'expo-clipboard';
 import { ShareObituaryScreen } from './ShareObituaryScreen';
+
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
@@ -17,11 +20,12 @@ const base = {
 } as unknown as Session;
 
 const BUTTON = 'Email it to the paper or funeral home';
+const OPENED = "Opened in your email app. Come back when it's published.";
 
-function setup(session: Session) {
+function setup(session: Session, onChange = jest.fn()) {
   render(
     <SerifReadyContext.Provider value>
-      <ShareObituaryScreen session={session} onChange={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} />
+      <ShareObituaryScreen session={session} onChange={onChange} onBack={jest.fn()} onContinue={jest.fn()} />
     </SerifReadyContext.Provider>,
   );
 }
@@ -100,5 +104,76 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
     // A repeat press clears the message first, so a repeat failure is announced again.
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     expect(await screen.findByText(/couldn't open email or sharing/)).toBeTruthy();
+  });
+});
+
+describe('ShareObituaryScreen two steps, paste and copy', () => {
+  it('names the screen and both steps', () => {
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
+    expect(screen.getByText('Step 1: email it to the publisher')).toBeTruthy();
+    expect(screen.getByText("Step 2: once it's published, paste the link")).toBeTruthy();
+  });
+
+  it('shows no opened line until mail opens, then shows it', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    expect(screen.queryByText(OPENED)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    expect(await screen.findByText(OPENED)).toBeTruthy();
+  });
+
+  it('shows the opened line after the share sheet opens', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.sharedAction, activityType: undefined });
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    expect(await screen.findByText(OPENED)).toBeTruthy();
+  });
+
+  it('paste fills the link field from the clipboard', async () => {
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('  https://paper.example/anna  ');
+    const onChange = jest.fn();
+    setup(base, onChange);
+    fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ obituaryUrl: 'https://paper.example/anna' }));
+  });
+
+  it('paste leaves the field alone when the clipboard is empty', async () => {
+    jest.mocked(Clipboard.getStringAsync).mockResolvedValue('');
+    const onChange = jest.fn();
+    setup(base, onChange);
+    fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
+    await waitFor(() => expect(Clipboard.getStringAsync).toHaveBeenCalled());
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Copy the text puts the obituary on the clipboard', async () => {
+    jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
+    await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith('Anna loved the garden.'));
+    expect(await screen.findByText('Copied.')).toBeTruthy();
+  });
+
+  it('when mail and sharing fail, the message stays calm, no opened line shows, and Copy the text is offered', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    jest.spyOn(Share, 'share').mockRejectedValue(new Error('no share'));
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    expect(await screen.findByText(/couldn't open email or sharing/)).toBeTruthy();
+    expect(screen.queryByText(OPENED)).toBeNull();
+    expect(screen.queryByText(/web/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copy the text' })).toBeTruthy();
+  });
+
+  it('marks the email button busy while mail is opening', async () => {
+    let finish: () => void = () => undefined;
+    jest.spyOn(Linking, 'openURL').mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    setup({ ...base, obituaryText: 'Text' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).toMatchObject({ busy: true });
+    finish();
+    await screen.findByText(OPENED);
   });
 });

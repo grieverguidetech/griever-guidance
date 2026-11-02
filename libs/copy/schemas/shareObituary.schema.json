@@ -29,7 +29,13 @@
     "emailButton",
     "emailSubject",
     "emailFailed",
-    "emailNoText"
+    "emailNoText",
+    "mobileHeading",
+    "linkStepLabel",
+    "emailOpened",
+    "pasteButton",
+    "copyButton",
+    "copied"
   ],
   "properties": {
     "heading": {
@@ -110,6 +116,24 @@
       "$ref": "#/$defs/text"
     },
     "emailNoText": {
+      "$ref": "#/$defs/text"
+    },
+    "mobileHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "linkStepLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "emailOpened": {
+      "$ref": "#/$defs/text"
+    },
+    "pasteButton": {
+      "$ref": "#/$defs/text"
+    },
+    "copyButton": {
+      "$ref": "#/$defs/text"
+    },
+    "copied": {
       "$ref": "#/$defs/text"
     }
   },

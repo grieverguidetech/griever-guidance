@@ -41,6 +41,15 @@ export interface ShareObituaryCopy {
   emailNoText?: string;
   /** Shown under the button when neither mail nor sharing could open. */
   emailFailed?: string;
+  /** Muted line after mail or the share sheet opened. */
+  emailOpened?: string;
+  /** Step 1 "Copy the text" button, and the line after it worked. */
+  copyButton?: string;
+  copied?: string;
+  /** Label above the link field (mobile "Step 2: ..."). */
+  linkStepLabel?: string;
+  /** "Paste link" beside the link field. */
+  pasteButton?: string;
 }
 
 /** Step 1 of the obituary on the phone: email the text to the paper or funeral home. */
@@ -52,6 +61,12 @@ export interface PublisherEmail {
   failed?: boolean;
   /** true while the press is running: the button reads as busy and a second tap does nothing. */
   busy?: boolean;
+  /** true after mail or the share sheet opened: a muted line says to come back. */
+  opened?: boolean;
+  /** Copies the obituary text. Leave unset to hide "Copy the text". */
+  onCopyText?: () => void;
+  /** true after the text was copied. */
+  copied?: boolean;
 }
 
 export interface ShareObituaryProps {
@@ -72,6 +87,8 @@ export interface ShareObituaryProps {
   onContinue: () => void;
   /** Opens drafting. Leave unset to hide the "Not written yet?" card. */
   onDraft?: () => void;
+  /** Fills the link field from the clipboard (mobile). Leave unset to hide "Paste link". */
+  onPasteLink?: () => void;
   /** With `onDraft`: the draft button is unavailable, for this reason (already worded). */
   draftUnavailable?: string;
   /** Step 1 (mobile). Leave unset to hide the card, as the web does. */
@@ -86,13 +103,14 @@ export interface ShareObituaryProps {
  * "Who should know?". Built from libs/ui so web (through react-native-web) and mobile show the same
  * screen. The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, draftUnavailable, publisherEmail, headingRef, checklistRef }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, draftUnavailable, publisherEmail, headingRef, checklistRef }: ShareObituaryProps) {
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
   const errorId = useId();
   const reasonId = useId();
   const draftReasonId = useId();
   const emailFailedId = useId();
+  const copiedId = useId();
   const empty = link.trim() === '';
   const showError = touched && !empty && !linkValid;
   const reason = empty ? copy.needLink : undefined;
@@ -119,12 +137,20 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
               {copy.emailBody ? <Body tone="muted">{copy.emailBody}</Body> : null}
               <Button label={copy.emailButton} variant="secondary" busy={publisherEmail.busy} describedBy={publisherEmail.failed ? emailFailedId : undefined} onPress={publisherEmail.onPress} />
               <Status id={emailFailedId} message={publisherEmail.failed ? copy.emailFailed : undefined} tone="danger" />
+              {publisherEmail.opened && !publisherEmail.failed && copy.emailOpened ? <Body tone="muted">{copy.emailOpened}</Body> : null}
+              {publisherEmail.onCopyText && copy.copyButton ? (
+                <>
+                  <Button label={copy.copyButton} variant="secondary" onPress={publisherEmail.onCopyText} />
+                  <Status id={copiedId} message={publisherEmail.copied ? copy.copied : undefined} />
+                </>
+              ) : null}
             </>
           ) : copy.emailNoText ? (
             <Body tone="muted">{copy.emailNoText}</Body>
           ) : null}
         </Card>
       ) : null}
+      {copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
       <Field
         label={copy.linkLabel}
         accessibleName={copy.linkLabel}
@@ -138,6 +164,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         url
         returnKeyType="next"
       />
+      {onPasteLink && copy.pasteButton ? <Button label={copy.pasteButton} variant="secondary" onPress={onPasteLink} /> : null}
       <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
       <Field
         label={copy.publisherLabel}

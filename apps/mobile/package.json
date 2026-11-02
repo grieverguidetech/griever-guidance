@@ -60,6 +60,7 @@
     "@testing-library/react-native": "13.3.3",
     "expo": "58.0.14",
     "expo-auth-session": "58.0.13",
+    "expo-clipboard": "~58.0.4",
     "expo-contacts": "58.0.7",
     "expo-crypto": "58.0.7",
     "expo-font": "58.0.8",
