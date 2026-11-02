@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { Ref } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -59,6 +59,11 @@ export interface SendingProps {
   confirmSent?: { yes: string; hint: string; notYet: string; onYes: () => void; onNotYet: () => void };
   /** Replaces the hand-off button's label, for example "Text Ana". Unset keeps `copy.openMessages`. */
   openLabel?: string;
+  /**
+   * Mobile thank-you only. An optional line for this person, added as the last line of their text.
+   * Shown before the hand-off. The web never sets it.
+   */
+  note?: { label: string; value: string; onChange: (value: string) => void };
   /** Mobile only. Moves focus to the hand-off button when `error` shows. Web leaves it unset. */
   focusOpenOnError?: boolean;
   /** A calm error line, for example when sharing did not go through. */
@@ -80,7 +85,7 @@ export interface SendingProps {
  * share sheet) and then Next. Built from libs/ui so web (through react-native-web) and mobile show
  * the same screen. It owns no state; the app holds the hand-off and does the platform work.
  */
-export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
+export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, note, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();
   const nextRef = useRef<ButtonNode>(null);
   const openRef = useRef<ButtonNode>(null);
@@ -152,6 +157,17 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
             <Heading level={2}>{current.name}</Heading>
           </View>
           <Body>{current.message}</Body>
+          {note && !handOff ? (
+            <TextInput
+              style={styles.input}
+              accessibilityLabel={note.label}
+              aria-label={note.label}
+              placeholder={note.label}
+              placeholderTextColor={colors['neutral-600']}
+              value={note.value}
+              onChangeText={note.onChange}
+            />
+          ) : null}
           {handOff && confirmSent ? (
             <View style={styles.actions}>
               <Button label={confirmSent.yes} hint={confirmSent.hint} buttonRef={yesRef} onPress={confirmSent.onYes} />
@@ -193,6 +209,16 @@ const styles = StyleSheet.create({
   fill: { height: '100%', backgroundColor: colors['accent-700'] },
   who: { gap: spacing[1] },
   actions: { gap: spacing[1] },
+  input: {
+    minHeight: 48,
+    paddingHorizontal: spacing[2],
+    borderWidth: 1,
+    borderColor: colors['neutral-600'],
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    color: colors.ink,
+    fontSize: 16,
+  },
   list: { gap: spacing[2] },
   person: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });
