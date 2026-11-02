@@ -597,7 +597,7 @@ const Navigation = ({
           </Stack.Screen>
         )}
         {flow.step === 'review' && (
-          <Stack.Screen name="Confirm">{() => withPersonContext(bar, <ConfirmScreen flow={flow} />)}</Stack.Screen>
+          <Stack.Screen name="Confirm">{() => withPersonContext(bar, <ConfirmScreen flow={flow} contacts={contacts} />)}</Stack.Screen>
         )}
         {flow.step === 'sending' && (
           <Stack.Screen name="Sending">{() => <SendingScreen flow={flow} contacts={contacts} />}</Stack.Screen>

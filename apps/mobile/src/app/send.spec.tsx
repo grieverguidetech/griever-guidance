@@ -220,7 +220,7 @@ describe('Review your message (announcement)', () => {
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
     fireEvent.press(await screen.findByText('Open Messages'));
-    expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=My own words.');
+    expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=Dee,\nMy own words.');
   });
 
   it('opens What you will need in a sheet', async () => {

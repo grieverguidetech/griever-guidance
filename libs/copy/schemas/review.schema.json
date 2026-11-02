@@ -25,6 +25,8 @@
     "noRecipients",
     "privacy",
     "sample",
+    "greetingSwitch",
+    "greetingPreview",
     "flowers"
   ],
   "properties": {
@@ -49,6 +51,8 @@
     "noRecipients": { "$ref": "#/$defs/text" },
     "privacy": { "$ref": "#/$defs/text" },
     "sample": { "$ref": "#/$defs/text" },
+    "greetingSwitch": { "$ref": "#/$defs/text" },
+    "greetingPreview": { "type": "string", "pattern": "\\{greeting\\}" },
     "flowers": {
       "type": "object",
       "additionalProperties": false,

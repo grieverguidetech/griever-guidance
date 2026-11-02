@@ -22,7 +22,7 @@ function Harness() {
   });
   const { selectContacts } = flow;
   useEffect(() => { selectContacts(['c0']); }, [selectContacts]);
-  return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ConfirmScreen flow={flow} />;
+  return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ConfirmScreen flow={flow} contacts={contacts} />;
 }
 
 describe('Review your message (Share the service)', () => {
@@ -36,7 +36,37 @@ describe('Review your message (Share the service)', () => {
     fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are, 2 PM at Oak Chapel.');
     fireEvent.press(screen.getByText('Text these people'));
     fireEvent.press(await screen.findByText('Open Messages'));
-    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Come as you are, 2 PM at Oak Chapel.');
+    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Dee,\nCome as you are, 2 PM at Oak Chapel.');
+  });
+
+  it('starts the sms: body with the first name on its own line', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    open.mockClear();
+    render(<Harness />);
+    fireEvent.press(screen.getByText('Text these people'));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toMatch(/body=Dee,\n/);
+  });
+
+  it('sends the plain message with the switch off', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    open.mockClear();
+    render(<Harness />);
+    fireEvent(screen.getByRole('switch', { name: 'Start with their first name' }), 'valueChange', false);
+    fireEvent.press(screen.getByText('Text these people'));
+    fireEvent.press(await screen.findByText('Open Messages'));
+    const body = decodeURIComponent(String(open.mock.calls[0][0])).split('body=')[1];
+    expect(body.startsWith('Dee')).toBe(false);
+  });
+
+  it('has a switch with an accessible name and state, and previews the greeting', () => {
+    render(<Harness />);
+    const toggle = screen.getByRole('switch', { name: 'Start with their first name' });
+    expect(toggle.props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByText('Each text will start with: Dee,')).toBeTruthy();
+    fireEvent(toggle, 'valueChange', false);
+    expect(screen.getByRole('switch', { name: 'Start with their first name' }).props.accessibilityState).toEqual({ checked: false });
+    expect(screen.queryByText(/Each text will start with/)).toBeNull();
   });
 
   it('opens and closes the sample with accessibilityState.expanded and a 44 point target', () => {
