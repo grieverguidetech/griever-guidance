@@ -219,7 +219,7 @@ describe('Review your message (announcement)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=Dee,\nMy own words.');
   });
 
@@ -232,7 +232,7 @@ describe('Review your message (announcement)', () => {
   it('sends on to the sending step', async () => {
     await toReview();
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
-    expect(await screen.findByText('Open Messages')).toBeTruthy();
+    expect(await screen.findByText('Text Dee')).toBeTruthy();
   });
 });
 
@@ -254,9 +254,9 @@ describe('the end of a send', () => {
   it('returns to the hub with a calm note, announced, once the last person is done', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Next'));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Eli'));
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
@@ -281,7 +281,7 @@ describe('the end of a send', () => {
     expect(await screen.findByRole('heading', { name: 'Reaching people, one at a time' })).toBeTruthy();
     expect(screen.getByText('1 of 2')).toBeTruthy();
     expect(screen.getByText('Dee')).toBeTruthy();
-    fireEvent.press(screen.getByText('Open Messages'));
+    fireEvent.press(screen.getByText('Text Dee'));
     expect(await screen.findByText('Send it in Messages, then come back and tap Next.')).toBeTruthy();
     fireEvent.press(screen.getByText('Next'));
     expect(await screen.findByText('2 of 2')).toBeTruthy();
@@ -291,7 +291,7 @@ describe('the end of a send', () => {
   it('says how many were told when someone was skipped', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Skip'));
     expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
@@ -316,7 +316,7 @@ describe('the end of a send', () => {
   it('stays on the hub with no timer, and the note goes when a step is started', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     await new Promise((r) => setTimeout(r, 300));
@@ -333,7 +333,7 @@ describe('the end of a send', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await toSending(['Dee']);
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     // Clear what earlier steps (or a slow earlier test) announced; only the hub's note is counted.
     announce.mockClear();
     focus.mockClear();
@@ -350,7 +350,7 @@ describe('the end of a send', () => {
   it('the hub Back button reads Home and returns to Home, with no note there', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
@@ -370,7 +370,7 @@ describe('the end of a send', () => {
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByRole('heading', { name: 'Review your message' });
     fireEvent.press(screen.getByText('Text these people'));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
@@ -398,7 +398,7 @@ describe('Edit person from the hub', () => {
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));

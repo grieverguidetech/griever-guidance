@@ -51,6 +51,16 @@ export interface SendingProps {
    * read out; `again` names the button that repeats the hand-off.
    */
   handOff: { note: string; again: string; onAgain: () => void } | null;
+  /**
+   * Mobile only. The app saw the person come back from Messages and asks if it was sent. `yes` is
+   * the whole question as one button ("Sent to Ana? Next: Ben"); one tap confirms. The web never
+   * sets it, so it keeps the single Next tap.
+   */
+  confirmSent?: { yes: string; hint: string; notYet: string; onYes: () => void; onNotYet: () => void };
+  /** Replaces the hand-off button's label, for example "Text Ana". Unset keeps `copy.openMessages`. */
+  openLabel?: string;
+  /** Mobile only. Moves focus to the hand-off button when `error` shows. Web leaves it unset. */
+  focusOpenOnError?: boolean;
   /** A calm error line, for example when sharing did not go through. */
   error?: string;
   onOpenMessages: () => void;
@@ -70,10 +80,11 @@ export interface SendingProps {
  * share sheet) and then Next. Built from libs/ui so web (through react-native-web) and mobile show
  * the same screen. It owns no state; the app holds the hand-off and does the platform work.
  */
-export function Sending({ copy, intro, progress, current, others, handOff, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
+export function Sending({ copy, intro, progress, current, others, handOff, confirmSent, openLabel, focusOpenOnError, error, onOpenMessages, share, onNext, onSkip, headingRef, onWhatYoullNeed, checklistRef }: SendingProps) {
   const statusId = useId();
   const nextRef = useRef<ButtonNode>(null);
   const openRef = useRef<ButtonNode>(null);
+  const yesRef = useRef<ButtonNode>(null);
   const handedOff = handOff !== null;
   const personKey = current?.position;
   const lastPerson = useRef(personKey);
@@ -84,6 +95,27 @@ export function Sending({ copy, intro, progress, current, others, handOff, error
       focusNode(nextRef.current);
     }
   }, [handedOff]);
+
+  // The question takes the screen reader's focus when it shows, so it is read out.
+  const asking = confirmSent !== undefined;
+  // When it closes without a new person ("Not yet"), focus goes back to the hand-off button.
+  const wasAsking = useRef(false);
+  useEffect(() => {
+    if (asking) {
+      focusNode(yesRef.current);
+    } else if (wasAsking.current) {
+      focusNode(openRef.current);
+    }
+    wasAsking.current = asking;
+  }, [asking]);
+
+  // A failed hand-off puts the person back on the hand-off button; focus goes there too.
+  const failed = focusOpenOnError === true && error !== undefined;
+  useEffect(() => {
+    if (failed) {
+      focusNode(openRef.current);
+    }
+  }, [failed]);
 
   // After Next or Skip the pressed button is gone, so focus goes to the new person's first action.
   // The first person is skipped: the heading has the focus on arrival.
@@ -120,19 +152,25 @@ export function Sending({ copy, intro, progress, current, others, handOff, error
             <Heading level={2}>{current.name}</Heading>
           </View>
           <Body>{current.message}</Body>
-          {handOff ? (
+          {handOff && confirmSent ? (
+            <View style={styles.actions}>
+              <Button label={confirmSent.yes} hint={confirmSent.hint} buttonRef={yesRef} onPress={confirmSent.onYes} />
+              <Button label={confirmSent.notYet} variant="secondary" onPress={confirmSent.onNotYet} />
+              <Button label={copy.skip} variant="ghost" onPress={onSkip} />
+            </View>
+          ) : handOff ? (
             <View style={styles.actions}>
               <Button label={current.isLast ? copy.done : copy.next} buttonRef={nextRef} hint={handOff.note} onPress={onNext} />
               <Button label={handOff.again} variant="ghost" onPress={handOff.onAgain} />
             </View>
           ) : (
             <View style={styles.actions}>
-              <Button label={copy.openMessages} buttonRef={openRef} onPress={onOpenMessages} />
+              <Button label={openLabel ?? copy.openMessages} buttonRef={openRef} onPress={onOpenMessages} />
               {share ? <Button label={share.label} variant="secondary" onPress={share.onPress} /> : null}
               <Button label={copy.skip} variant="ghost" onPress={onSkip} />
             </View>
           )}
-          <Status id={statusId} message={error ?? handOff?.note} tone={error ? 'danger' : 'muted'} />
+          <Status id={statusId} message={error ?? (confirmSent ? undefined : handOff?.note)} tone={error ? 'danger' : 'muted'} />
         </Card>
       ) : null}
       <View style={styles.list}>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Linking, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, AppState, findNodeHandle, Linking, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
@@ -17,17 +17,28 @@ interface Props extends FlowProps {
 }
 
 /**
- * The screen is the shared Sending in libs/ui; this holds what is mobile only: the sms: link and
- * screen-reader focus.
+ * The screen is the shared Sending in libs/ui; this holds what is mobile only: the sms: link,
+ * screen-reader focus and the return from Messages.
  *
  * One contact at a time, texted from the griever's own number, not a bulk send. The first button
  * hands off to the device's native Messages app (an sms: link) with the contact and message
- * pre-filled; the griever taps Send there, comes back, and taps Next. Nothing is inferred from
- * the app going to the background and coming back.
+ * pre-filled; the griever taps Send there themselves. When the app goes to the background and
+ * comes back active, it asks whether that person was sent (REQUIREMENTS.md section 6, Decision 3).
+ * One tap marks them sent and opens Messages for the next; Not yet keeps the person; Skip stays.
+ * Nothing is marked sent without a tap. If no return is detected, Next works as before.
+ * The send job is not saved.
  */
 export function SendingScreen({ flow, contacts }: Props) {
   const { sendJob, markActiveSent, markActiveSkipped } = flow;
-  const [handedOff, setHandedOff] = useState(false);
+  // Who the last hand-off was for, and whose "Sent?" question is showing. Ids, so a new active
+  // person starts clean without a reset.
+  const [handedOffId, setHandedOffId] = useState<string | null>(null);
+  const [askingId, setAskingId] = useState<string | null>(null);
+  // Whose hand-off failed to open Messages; shows a calm line and puts them back on the Text button.
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const wentAway = useRef(false);
+  // The contact whose question was already answered Yes, so a second tap cannot mark the next one.
+  const confirmedFor = useRef<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const checklistButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof Text>>(null);
@@ -35,10 +46,32 @@ export function SendingScreen({ flow, contacts }: Props) {
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
   const activeContact = active ? contacts.contacts.find((c) => c.contactId === active.contactId) : null;
 
-  // A fresh recipient became active: the hand-off belonged to the last person.
+  const activeId = active?.contactId ?? null;
+  const handedOff = activeId !== null && handedOffId === activeId;
+  const asking = handedOff && askingId === activeId;
+
+  // After a hand-off, leaving the app and coming back asks the question. No change, no question.
   useEffect(() => {
-    setHandedOff(false);
-  }, [active?.contactId]);
+    if (!handedOff) {
+      return;
+    }
+    wentAway.current = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Only 'background' counts. 'inactive' also fires for Control Center and the notification shade.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background') {
+        wentAway.current = true;
+      } else if (state === 'active' && wentAway.current) {
+        wentAway.current = false;
+        // A moment after the app is active, so the screen reader is ready to move focus to the question.
+        timer = setTimeout(() => setAskingId(activeId), 100);
+      }
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [handedOff, activeId]);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -66,13 +99,39 @@ export function SendingScreen({ flow, contacts }: Props) {
   const isLast = activeIndex === total - 1;
   const nameFor = (id: string) => contacts.contacts.find((c) => c.contactId === id)?.name ?? copy.recipientFallback;
 
-  function openMessages() {
-    if (!active || !activeContact) {
+  function handOffTo(contactId: string) {
+    const contact = contacts.contacts.find((c) => c.contactId === contactId);
+    if (!contact) {
       return;
     }
-    const link = buildSmsLink(activeContact.phone, flow.messageFor(activeContact.name), Platform.OS === 'ios');
-    setHandedOff(true);
-    void Linking.openURL(link);
+    const link = buildSmsLink(contact.phone, flow.messageFor(contact.name), Platform.OS === 'ios');
+    setHandedOffId(contactId);
+    setAskingId(null);
+    setFailedId(null);
+    // If Messages cannot open, this person goes back to the Text button rather than waiting on a hand-off that never happened.
+    Linking.openURL(link).catch(() => {
+      setHandedOffId((current) => (current === contactId ? null : current));
+      setFailedId(contactId);
+    });
+  }
+
+  function openMessages() {
+    if (active) {
+      handOffTo(active.contactId);
+    }
+  }
+
+  // One tap: this person is sent, and Messages opens for the next, if there is one.
+  function confirmSent() {
+    if (!activeId || confirmedFor.current === activeId) {
+      return;
+    }
+    confirmedFor.current = activeId;
+    const next = isLast ? undefined : sendJob?.recipients[activeIndex + 1];
+    markActiveSent();
+    if (next) {
+      handOffTo(next.contactId);
+    }
   }
 
   return (
@@ -103,6 +162,24 @@ export function SendingScreen({ flow, contacts }: Props) {
             ? { note: fill(copy.messagesNote, { action: isLast ? copy.done : copy.next }), again: copy.openMessagesAgain, onAgain: openMessages }
             : null
         }
+        openLabel={activeContact ? fill(copy.textPerson, { name: activeContact.name }) : undefined}
+        confirmSent={
+          asking && activeContact
+            ? {
+                yes: isLast
+                  ? fill(copy.sentPromptDone, { name: activeContact.name })
+                  : fill(copy.sentPromptNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
+                hint: isLast
+                  ? fill(copy.sentHintDone, { name: activeContact.name })
+                  : fill(copy.sentHintNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
+                notYet: copy.notYet,
+                onYes: confirmSent,
+                onNotYet: () => setHandedOffId(null),
+              }
+            : undefined
+        }
+        error={activeId !== null && failedId === activeId ? copy.shareError : undefined}
+        focusOpenOnError
         onOpenMessages={openMessages}
         onNext={markActiveSent}
         onSkip={markActiveSkipped}

@@ -109,6 +109,48 @@ describe('Sending', () => {
     expect(onAgain).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the question only when confirmSent is set, and one tap calls onYes', async () => {
+    const user = userEvent.setup();
+    const onYes = vi.fn();
+    const onNotYet = vi.fn();
+    const handOff = { note: 'n', again: 'Open Messages again', onAgain: vi.fn() };
+    const view = render(<Sending {...base()} handOff={handOff} />);
+    expect(screen.queryByRole('button', { name: 'Sent to A? Next: B' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Not yet' })).toBeNull();
+    view.rerender(<Sending {...base()} handOff={handOff} confirmSent={{ yes: 'Sent to A? Next: B', hint: 'Marks A sent and opens Messages for B', notYet: 'Not yet', onYes, onNotYet }} />);
+    expect(screen.getByRole('button', { name: 'Sent to A? Next: B' })).toHaveFocus();
+    // The stale "tap Next" note is gone while the question shows.
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    await user.click(screen.getByRole('button', { name: 'Sent to A? Next: B' }));
+    await user.click(screen.getByRole('button', { name: 'Not yet' }));
+    expect(onYes).toHaveBeenCalledTimes(1);
+    expect(onNotYet).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+  });
+
+  it('moves focus back to the hand-off button when the question closes', () => {
+    const handOff = { note: 'n', again: 'Open Messages again', onAgain: vi.fn() };
+    const ask = { yes: 'Sent to A? Next: B', hint: 'h', notYet: 'Not yet', onYes: vi.fn(), onNotYet: vi.fn() };
+    const view = render(<Sending {...base()} handOff={handOff} confirmSent={ask} />);
+    view.rerender(<Sending {...base()} handOff={null} />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveFocus();
+  });
+
+  it('moves focus to the hand-off button on an error only when asked to', () => {
+    const view = render(<Sending {...base()} />);
+    view.rerender(<Sending {...base()} error="x" />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).not.toHaveFocus();
+    view.rerender(<Sending {...base()} error={undefined} />);
+    view.rerender(<Sending {...base()} error="x" focusOpenOnError />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveFocus();
+  });
+
+  it('uses openLabel for the hand-off button when given', () => {
+    render(<Sending {...base()} openLabel="Text A" />);
+    expect(screen.getByRole('button', { name: 'Text A' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open Messages' })).toBeNull();
+  });
+
   it('offers Done on the last person', () => {
     setup({
       current: { position: '3 of 3', name: 'Dana Lee', message: 'Hi', isLast: true },

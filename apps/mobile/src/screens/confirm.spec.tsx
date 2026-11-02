@@ -35,7 +35,7 @@ describe('Review your message (Share the service)', () => {
     render(<Harness />);
     fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are, 2 PM at Oak Chapel.');
     fireEvent.press(screen.getByText('Text these people'));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Dee,\nCome as you are, 2 PM at Oak Chapel.');
   });
 
@@ -45,7 +45,7 @@ describe('Review your message (Share the service)', () => {
     render(<Harness />);
     fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
     fireEvent.press(screen.getByText('Text these people'));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     const body = decodeURIComponent(String(open.mock.calls[0][0])).split('body=')[1];
     expect(body).toBe('Dee,\nCome as you are.');
     expect(screen.getByText(body)).toBeTruthy();
@@ -58,7 +58,7 @@ describe('Review your message (Share the service)', () => {
     fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
     fireEvent.press(screen.getByRole('switch', { name: 'Start with their first name' }));
     fireEvent.press(screen.getByText('Text these people'));
-    fireEvent.press(await screen.findByText('Open Messages'));
+    fireEvent.press(await screen.findByText('Text Dee'));
     const body = decodeURIComponent(String(open.mock.calls[0][0])).split('body=')[1];
     expect(body).toBe('Come as you are.');
   });

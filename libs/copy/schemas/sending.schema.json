@@ -11,6 +11,12 @@
     "position",
     "recipientFallback",
     "openMessages",
+    "textPerson",
+    "sentPromptNext",
+    "sentPromptDone",
+    "sentHintDone",
+    "sentHintNext",
+    "notYet",
     "openMessagesAgain",
     "share",
     "shareAgain",
@@ -50,6 +56,64 @@
       "$ref": "#/$defs/text"
     },
     "openMessages": {
+      "$ref": "#/$defs/text"
+    },
+    "textPerson": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "sentPromptNext": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}.*\\{next\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "sentPromptDone": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "sentHintNext": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}.*\\{next\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "sentHintDone": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/text"
+        },
+        {
+          "pattern": "\\{name\\}",
+          "type": "string"
+        }
+      ]
+    },
+    "notYet": {
       "$ref": "#/$defs/text"
     },
     "openMessagesAgain": {
