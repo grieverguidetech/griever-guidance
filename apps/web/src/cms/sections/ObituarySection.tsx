@@ -32,7 +32,7 @@ interface Props {
   onOpenPerson?: () => void;
 }
 
-/** The obituary template fields, the obituary text and where it is published. The text follows the fields until edited. */
+/** The obituary template fields, and the obituary text. The text follows the fields until edited. */
 export function ObituarySection({ values, onChange, onReadyChange, nextSection, onNext, onOpenPerson }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -153,34 +153,6 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
             {copy.useDetails}
           </button>
         )}
-      </div>
-      <div className="gg-panel flex flex-col gap-4">
-        <p className="font-semibold">{copy.publishedHeading}</p>
-        <p className="gg-hint">{copy.publishedHint}</p>
-        <div className="gg-field">
-          <label htmlFor={`${id}-url`}>{copy.urlLabel}</label>
-          <input
-            id={`${id}-url`}
-            type="url"
-            inputMode="url"
-            className="gg-input"
-            autoComplete="off"
-            value={values.obituaryUrl ?? ''}
-            onChange={(e) => onChange({ obituaryUrl: e.target.value })}
-          />
-        </div>
-        <div className="gg-field">
-          <label htmlFor={`${id}-publisher`}>{copy.publisherLabel}</label>
-          <input
-            id={`${id}-publisher`}
-            type="text"
-            className="gg-input"
-            autoComplete="off"
-            placeholder={copy.publisherPlaceholder}
-            value={values.obituaryPublisher ?? ''}
-            onChange={(e) => onChange({ obituaryPublisher: e.target.value })}
-          />
-        </div>
       </div>
       <MarkReady
         ready={values.sectionStatus?.obituary === 'ready'}
