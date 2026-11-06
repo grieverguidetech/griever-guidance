@@ -10,6 +10,8 @@ describe('sendNote', () => {
       lead: 'Everyone has been told.',
       rest: NO_COPY,
       spoken: `Everyone has been told. ${NO_COPY}`,
+      category: 'announcement',
+      partial: false,
     });
     expect(sendNote('service', r('delivered')).lead).toBe('The service details have been shared.');
     expect(sendNote('obituary', r('delivered')).lead).toBe('The obituary has been shared.');
@@ -22,6 +24,8 @@ describe('sendNote', () => {
       lead: 'You told 2 of 3.',
       rest: `You can text the others from your own Messages app any time. ${NO_COPY}`,
       spoken: `You told 2 of 3. You can text the others from your own Messages app any time. ${NO_COPY}`,
+      category: 'announcement',
+      partial: true,
     });
   });
 
@@ -30,7 +34,17 @@ describe('sendNote', () => {
       lead: 'No one was texted this time.',
       rest: 'You can come back to this any time.',
       spoken: 'No one was texted this time. You can come back to this any time.',
+      category: 'announcement',
+      partial: false,
     });
+  });
+
+  it('carries the moment, and marks only a stopped send as partial', () => {
+    const stopped = sendNote('service', r('delivered', 'skipped'));
+    expect(stopped.category).toBe('service');
+    expect(stopped.partial).toBe(true);
+    expect(sendNote('aftercare', r('delivered', 'delivered')).partial).toBe(false);
+    expect(sendNote(null, r('delivered')).category).toBeNull();
   });
 
   it('does not say "0 of 0" when there are no recipients', () => {

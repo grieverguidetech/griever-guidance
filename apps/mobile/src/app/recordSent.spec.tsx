@@ -49,8 +49,8 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
-  // A moment already sent to people shows its done row; a new one shows Start.
-  fireEvent.press(told.length > 0 ? await screen.findByText(/^Sent to \d+ (person|people) · /) : await screen.findByRole('button', { name: 'Start' }));
+  // A moment already sent to people shows its compact done row; a new one is the lit card.
+  fireEvent.press(told.length > 0 ? await screen.findByText(/Sent to \d+ (person|people)/) : await screen.findByRole('button', { name: /Next/ }));
   if (note) {
     fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
   }
@@ -74,7 +74,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Text Fay'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByText(/^Sent to 2 people · /)).toBeTruthy();
+    expect(await screen.findByText(/Sent to 2 people/)).toBeTruthy();
     await waitFor(async () => {
       const saved = await savedAnna();
       expect(saved.recipientsNotified.announcement).toEqual(['c1', 'c3']);
@@ -95,7 +95,7 @@ describe('recording who was messaged (#621)', () => {
     const saved = await savedAnna();
     expect(saved.recipientsNotified).toEqual({});
     expect(saved.momentCompletedAt).toEqual({});
-    expect(screen.queryByText(/^Sent to \d+ (person|people) · /)).toBeNull();
+    expect(screen.queryByText(/Sent to \d+ (person|people)/)).toBeNull();
   });
 
   it('opens the flow again from the done row, without bouncing back to the hub', async () => {
@@ -103,13 +103,13 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
+    expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
     // Start the announcement again from its done row.
-    fireEvent.press(screen.getByText(/^Sent to 1 person · /));
+    fireEvent.press(screen.getByText(/Sent to 1 person/));
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByLabelText(/Anything you'd like to add/)).toBeTruthy();
-    expect(screen.queryByText('One thing at a time.')).toBeNull();
+    expect(screen.queryByText('Ready to send')).toBeNull();
   });
 
   it('writes each person to the phone when confirmed, before the send ends', async () => {
@@ -156,7 +156,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     await screen.findByText('Text Eli');
     act(() => void [...handlers].reverse().some((h) => h()));
-    fireEvent.press(await screen.findByText(/^Sent to 1 person · /));
+    fireEvent.press(await screen.findByText(/Sent to 1 person/));
     // The flow reopens on review with Eli and Fay, not all three and not a blank form.
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
     expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
@@ -174,8 +174,8 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     await screen.findByText('Text Eli');
     act(() => void [...handlers].reverse().some((h) => h()));
-    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
-    expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
     expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
   });
 
@@ -186,7 +186,9 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Stop for now'));
     expect(await screen.findByText('You told 1 of 3.')).toBeTruthy();
-    expect(await screen.findByText(/^Sent to 1 person · /)).toBeTruthy();
+    // The stopped card is the lit card and says what is left; leaving the person screen clears this.
+    expect(await screen.findByText('Sent to 1 person · text the rest')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
     expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
   });
 
@@ -203,7 +205,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     await screen.findByText('Text Eli');
     act(() => void [...handlers].reverse().some((h) => h()));
-    fireEvent.press(await screen.findByText(/^Sent to \d+ (person|people) · /));
+    fireEvent.press(await screen.findByText(/Sent to \d+ (person|people)/));
     // Only Dee was confirmed in this send, so Eli and Fay are offered again.
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
   });

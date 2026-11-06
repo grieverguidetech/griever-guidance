@@ -1,11 +1,11 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
-import { Card } from '../Card';
+import { Phrasing } from '../phrasing';
 import { Heading } from '../Heading';
 import { Row } from '../Row';
 import { Body, Eyebrow } from '../Text';
@@ -36,6 +36,8 @@ export interface HubRow {
   status: 'done' | 'next' | 'later';
   /** Something was written for this step but not sent. */
   started: boolean;
+  /** The one card to do now. Exactly one row has this. It reads "Next" and its press starts the step. */
+  lit?: boolean;
   /** In the full plan: stays focusable and opens the paywall placeholder. */
   locked: boolean;
   /** This host cannot do this step yet: shown with a calm reason, and not pressable. */
@@ -135,33 +137,31 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     return <LockedStep title={text.title} body={text.body} meta={metaOnAllRows ? row.meta : undefined} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
-  if (row.status === 'done') {
-    // Opens this step's message: a draft still under way (a re-send left half-way) comes back,
-    // otherwise it is new and empty, because a finished send keeps no wording (C2).
+  if (row.lit) {
+    // The one lit card: a single press target. "Next" is in its name; the bottom button does the same.
+    const tag = row.started ? `${copy.tagNext} · ${copy.tagStarted}` : copy.tagNext;
     return (
-      <Row bordered onPress={() => onStart(row.key)}>
-        <Body tone="strong">{text.doneLabel}</Body>
-        <Meta meta={row.meta} />
-      </Row>
+      // The pressable is the whole visible card: border and padding sit on it, so there is no dead band.
+      <Pressable role="button" onPress={() => onStart(row.key)} style={styles.lit}>
+        <Phrasing>
+          <Body tone="muted" small>
+            {tag}
+          </Body>
+          <Body tone="strong">{text.title}</Body>
+          <Body>{text.body}</Body>
+          <Meta meta={row.meta} />
+        </Phrasing>
+      </Pressable>
     );
   }
 
-  if (row.status === 'next') {
-    const buttonLabel = row.started ? copy.continue : copy.start;
+  if (row.status === 'done') {
+    // Compact: the title and what was sent, on one row. Opens this step's message: a draft still
+    // under way comes back, otherwise it is new and empty, because a finished send keeps no wording (C2).
     return (
-      <Card selected>
-        <Body tone="muted" small>
-          {row.started ? copy.tagStarted : copy.tagNext}
-        </Body>
-        <Body tone="strong">{text.title}</Body>
-        <Body>{text.body}</Body>
-        <Meta meta={row.meta} />
-        <Button
-          label={buttonLabel}
-          accessibilityName={row.meta ? `${buttonLabel}, ${text.title}, ${row.meta}` : undefined}
-          onPress={() => onStart(row.key)}
-        />
-      </Card>
+      <Row bordered onPress={() => onStart(row.key)}>
+        <Body tone="strong">{[text.title, row.meta, row.started ? copy.metaStarted : ''].filter(Boolean).join(' · ')}</Body>
+      </Row>
     );
   }
 
@@ -194,6 +194,8 @@ const styles = StyleSheet.create({
   // The name may be long; it wraps, and the Edit person button keeps its full width.
   eyebrowText: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
+  // Must match the selected style of Card (ui/Card.tsx): border 2, accent, radius md, surface, padding spacing[3].
+  lit: { gap: spacing[2], padding: spacing[3], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 

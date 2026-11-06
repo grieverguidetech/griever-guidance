@@ -11,9 +11,9 @@ import { useNoFade } from '../lib/useScreenReader';
  * clears the status bar at the top and the home indicator at the bottom. Screens add no inset padding
  * of their own.
  */
-export function ScreenFrame({ children }: { children: ReactNode }) {
+export function ScreenFrame({ children, bottomInset = true }: { children: ReactNode; /** Off when the screen's own bottom bar pads by the inset (the hub's ActionBar). */ bottomInset?: boolean }) {
   const insets = useSafeAreaInsets();
-  return <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: colors.bg }}>{children}</View>;
+  return <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: bottomInset ? insets.bottom : 0, backgroundColor: colors.bg }}>{children}</View>;
 }
 
 /**

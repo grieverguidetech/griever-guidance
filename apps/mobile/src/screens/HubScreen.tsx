@@ -3,19 +3,21 @@ import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session, SendCardStatus } from '@griever/hooks';
-import type { MomentKey, TemplateCategory } from '@griever/shared';
+import type { MomentKey } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
-import { Hub, PaywallSheet, SentNote } from '../ui';
+import { ActionBar, Hub, PaywallSheet, SentNote } from '../ui';
 import type { ButtonNode, HubRow } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { SentNoteText } from '../lib/sendNote';
+import { barMoment, nextMoment } from '../lib/nextMoment';
 
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
-// Mobile uses its own label on the done announcement row (announcedLabel); web keeps doneLabel.
-const hubCopy = { ...copy, moments: { ...copy.moments, announce: { ...copy.moments.announce, doneLabel: copy.announcedLabel } } };
+const phoneCopy = screenCopy('phoneHub');
+// The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
+const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro };
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -47,18 +49,17 @@ function needsLine(session: Session, key: MomentKey): string {
   return fill(copy.statusNeedsField, { field: name });
 }
 
-/** A finished card adds its date and the send-again hint; the others show the status line alone. */
-function rowMeta(session: Session, key: MomentKey, done: boolean, completedAt: string | undefined, started: boolean): string {
-  const line = statusLine(sendCardStatus(session, key), session, key);
-  if (!done) {
-    return line;
+/** The sent line of a finished card. A send stopped part-way adds what is left to do. */
+function sentLine(session: Session, key: MomentKey, stopped: boolean): string {
+  const status = sendCardStatus(session, key);
+  if (stopped && typeof status === 'object') {
+    return fill(phoneCopy.sentPartial, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
   }
-  const date = completedAt ? ` · ${formatDate(completedAt)}` : '';
-  return `${line}${date} · ${started ? copy.metaStarted : copy.metaSendAgain}`;
+  return statusLine(status, session, key);
 }
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const momentOfCategory = (category: SentNoteText['category']): MomentKey | null =>
+  (Object.keys(MOMENT_CATEGORY) as MomentKey[]).find((key) => MOMENT_CATEGORY[key] === category) ?? null;
 
 export type HubScreenProps = {
   session: Session;
@@ -146,19 +147,30 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
     }
   };
 
-  const rows: HubRow[] = moments.map((moment) => {
-    const started = isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]], true, true);
-    return {
-      key: moment.key,
-      status: moment.status,
-      started,
-      locked: paymentsEnabled && PAID_MOMENTS.includes(moment.key),
-      meta: rowMeta(session, moment.key, moment.status === 'done', moment.completedAt, started),
-    };
-  });
+  const locked = paymentsEnabled ? PAID_MOMENTS : [];
+  // "Stop for now" leaves the note; its card stays lit until the person leaves this screen.
+  const stopped = note?.partial ? momentOfCategory(note.category) : null;
+  const lit = nextMoment({ session, locked, partial: stopped });
+
+  const rows: HubRow[] = moments.map((moment) => ({
+    key: moment.key,
+    status: moment.status,
+    started: isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]], true, true),
+    lit: moment.key === lit,
+    locked: locked.includes(moment.key),
+    meta:
+      moment.status === 'done'
+        ? sentLine(session, moment.key, moment.key === stopped)
+        : statusLine(sendCardStatus(session, moment.key), session, moment.key),
+  }));
+
+  // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.
+  const target: MomentKey = barMoment({ session, locked, partial: stopped });
+  const primaryLabel = copy.moments[target].title;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <View style={styles.screen}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Hub
         copy={hubCopy}
         eyebrow={fill(copy.forName, { name: session.personName })}
@@ -181,14 +193,18 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
           </View>
         ) : null}
       </Hub>
+      </ScrollView>
+      <ActionBar testID="hub-action-bar" label={primaryLabel} onPress={() => onStart(target)} />
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
       {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  // Takes the room the bar leaves, and scrolls: at the largest text size every card is still reachable.
+  scroll: { flex: 1 },
   note: { marginBottom: 16 },
   content: { padding: spacing[3], paddingTop: spacing[4] },
 });

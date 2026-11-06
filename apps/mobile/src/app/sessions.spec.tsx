@@ -190,7 +190,7 @@ describe('people kept on the phone', () => {
       await withDrafts({ aftercare: kept });
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna'));
-      fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+      fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
       expect(await screen.findByPlaceholderText('She was peaceful, and we were with her.')).toBeTruthy();
       await waitFor(async () => {
         const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');

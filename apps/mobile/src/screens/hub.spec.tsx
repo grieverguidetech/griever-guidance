@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, BackHandler, Modal, Platform, StyleSheet } from 'react-native';
+import { AccessibilityInfo, BackHandler, Modal, Platform, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
@@ -40,12 +40,18 @@ function setup(session: Session = anna, paymentsEnabled = false) {
   return handlers;
 }
 
+// The button in the bottom bar, found by the bar's test id.
+const bottomButton = () => within(screen.getByTestId('hub-action-bar')).getByRole('button');
+
 describe('HubScreen', () => {
-  it('shows the person, the heading and the four steps with one Start', () => {
+  it('shows the person, the heading and the four steps, with the bottom button naming the announcement', () => {
     setup();
-    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Ready to send' })).toBeTruthy();
+    expect(screen.getByText("Send when you're ready.")).toBeTruthy();
+    expect(screen.queryByText(/Planned on the web/)).toBeNull();
     expect(screen.getByText('For Anna')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'Start' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Start' })).toBeNull();
+    expect(within(bottomButton()).getByText('Announce the passing')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Share the service/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Send thank-yous/ })).toBeTruthy();
   });
@@ -63,9 +69,9 @@ describe('HubScreen', () => {
     expect(focus).toHaveBeenCalledWith(1);
   });
 
-  it('starts the announcement from Start, and a later step from its row', () => {
+  it('starts the announcement from the bottom button, and a later step from its row', () => {
     const { onStart } = setup();
-    fireEvent.press(screen.getByRole('button', { name: 'Start' }));
+    fireEvent.press(bottomButton());
     expect(onStart).toHaveBeenLastCalledWith('announce');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
     expect(onStart).toHaveBeenLastCalledWith('thanks');
@@ -83,7 +89,7 @@ describe('HubScreen', () => {
     const original = Platform.OS;
     Platform.OS = 'ios';
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
-    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.' };
+    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.', category: 'announcement' as const, partial: false };
     render(<HubScreen session={anna} paymentsEnabled={false} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
     Platform.OS = original;
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
@@ -97,7 +103,7 @@ describe('HubScreen', () => {
     const original = Platform.OS;
     Platform.OS = 'android';
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
-    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.' };
+    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.', category: 'announcement' as const, partial: false };
     render(<HubScreen session={anna} paymentsEnabled={false} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
     Platform.OS = original;
     expect(announce).not.toHaveBeenCalled();
@@ -120,7 +126,7 @@ describe('HubScreen', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a finished step with its count, and a started step as Continue', () => {
+  it('shows a finished step as one compact row, and a started step as Started', () => {
     const done = {
       ...anna,
       recipientsNotified: { announcement: ['c1', 'c2'] },
@@ -128,13 +134,13 @@ describe('HubScreen', () => {
       drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
     } as unknown as Session;
     setup(done);
-    expect(screen.getByRole('button', { name: /Announced the passing/ })).toBeTruthy();
-    expect(screen.getByText(/Sent to 2 people · October 2, 2026 · Send again/)).toBeTruthy();
-    expect(screen.getByText('Started')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Announce the passing · Sent to 2 people' })).toBeTruthy();
+    expect(screen.queryByText(/October 2, 2026|Send again/)).toBeNull();
+    expect(screen.getByText(/Share the service · Started/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
   });
 
-  it('shows the four status lines in order, in each row\'s name', () => {
+  it('shows the status lines in the real order, in each row\'s name', () => {
     const mixed = {
       ...anna,
       serviceDate: 'June 14, 2026',
@@ -144,13 +150,15 @@ describe('HubScreen', () => {
       momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
     } as unknown as Session;
     setup(mixed);
-    expect(within(screen.getByRole('button', { name: /Announced the passing/ })).getByText(/Sent to 1 person/)).toBeTruthy();
-    // The service is the next step, so it is a card; its status sits in the card.
+    expect(screen.getByRole('button', { name: 'Announce the passing · Sent to 1 person' })).toBeTruthy();
+    // The service is the lit card; its status sits in the card.
     expect(screen.getByText('Ready')).toBeTruthy();
     expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs the obituary link/)).toBeTruthy();
     expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs your name/)).toBeTruthy();
-    const titles = screen.getAllByText(/Announced the passing|Share the service|Share the obituary|Send thank-yous/).map((n) => n.props.children);
-    expect(titles).toEqual(['Announced the passing', 'Share the service', 'Share the obituary', 'Send thank-yous']);
+    const tree = JSON.stringify(screen.toJSON());
+    const at = ['Announce the passing', 'Share the service', 'Share the obituary', 'Send thank-yous'].map((t) => tree.indexOf(t));
+    expect([...at].sort((x, y) => x - y)).toEqual(at);
+    expect(at.every((i) => i >= 0)).toBe(true);
   });
 
   it('the obituary card reads "Waiting for the link" once its text is written and the link is not', () => {
@@ -158,10 +166,17 @@ describe('HubScreen', () => {
     expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Waiting for the link/)).toBeTruthy();
   });
 
-  it('shows Ready on the announcement card when it is next, in the Start button name', () => {
-    setup();
-    expect(screen.getByText('Ready')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Start, Announce the passing, Ready' })).toBeTruthy();
+  it('lights exactly one card, names it Next, and a press on it starts that step', () => {
+    const { onStart } = setup();
+    const lit = screen.getAllByRole('button', { name: /Next/ });
+    expect(lit).toHaveLength(1);
+    expect(within(lit[0]).getByText('Ready')).toBeTruthy();
+    expect(within(lit[0]).getByText('Announce the passing')).toBeTruthy();
+    const style = StyleSheet.flatten(typeof lit[0].props.style === 'function' ? lit[0].props.style({ pressed: false }) : lit[0].props.style);
+    expect(style.borderWidth).toBe(2);
+    expect(style.borderColor).toBe(colors.accent);
+    fireEvent.press(lit[0]);
+    expect(onStart).toHaveBeenLastCalledWith('announce');
   });
 
   it('keeps the status line on locked rows when payments are on', () => {
@@ -284,9 +299,9 @@ describe('HubScreen', () => {
         <HubScreen session={anna} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
-    const heading = screen.getByRole('heading', { name: 'One thing at a time.' });
+    const heading = screen.getByRole('heading', { name: 'Ready to send' });
     expect(StyleSheet.flatten(heading.props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
-    expect(StyleSheet.flatten(screen.getByText("Here's what usually comes next.").props.style).fontFamily).toBe('SourceSerif4_400Regular');
+    expect(StyleSheet.flatten(screen.getByText("Send when you're ready.").props.style).fontFamily).toBe('SourceSerif4_400Regular');
   });
 
   it('keeps the system font until the serif is ready', () => {
@@ -295,7 +310,7 @@ describe('HubScreen', () => {
         <HubScreen session={anna} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
-    const heading = screen.getByRole('heading', { name: 'One thing at a time.' });
+    const heading = screen.getByRole('heading', { name: 'Ready to send' });
     expect(StyleSheet.flatten(heading.props.style).fontFamily).toBeUndefined();
   });
 
@@ -345,7 +360,7 @@ describe('HubScreen', () => {
       momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
     } as unknown as Session;
     setup(done);
-    for (const name of [/Announced the passing/, /Share the obituary/]) {
+    for (const name of [/Announce the passing · Sent/, /Share the obituary/]) {
       let box = screen.getByRole('button', { name }).parent;
       while (box && !StyleSheet.flatten(box.props.style)?.borderWidth) {
         box = box.parent;
@@ -354,5 +369,110 @@ describe('HubScreen', () => {
       expect(flat.borderWidth).toBe(1);
       expect(flat.borderColor).toBe(colors['neutral-600']);
     }
+  });
+});
+
+describe('HubScreen: the next card and the bottom button', () => {
+  const announced = { recipientsNotified: { announcement: ['c1'] } };
+  const ready = { senderName: 'Sam', serviceDate: 'November 8, 2026', serviceTime: '2:00 PM', servicePlace: 'St Mary' };
+  const sess = (extra: object) => ({ ...anna, ...extra }) as unknown as Session;
+  const props = { paymentsEnabled: false, onBack: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
+
+  it('lights the service once the announcement is done, and the bottom button names it', () => {
+    const { onStart } = setup(sess({ ...announced, ...ready }));
+    expect(within(screen.getAllByRole('button', { name: /Next/ })[0]).getByText('Share the service')).toBeTruthy();
+    fireEvent.press(bottomButton());
+    expect(onStart).toHaveBeenLastCalledWith('service');
+  });
+
+  it.each([
+    ['the link is set', { obituaryUrl: 'https://paper.test/anna' }],
+    ['the text is written and the link is missing', { obituaryText: 'Anna loved the garden.' }],
+  ])('names the obituary button "Share the obituary" and starts it when %s', (_state, extra) => {
+    const { onStart } = setup(sess({ ...ready, recipientsNotified: { announcement: ['a'], service: ['b'] }, ...extra }));
+    expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
+    expect(within(bottomButton()).getByText('Share the obituary')).toBeTruthy();
+    fireEvent.press(bottomButton());
+    expect(onStart).toHaveBeenLastCalledWith('obituary');
+  });
+
+  it('names the first open card when none is lit', () => {
+    const { onStart } = setup(sess(announced));
+    expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+    // The announcement is done, so the button names the first card still open: the service.
+    expect(within(bottomButton()).getByText('Share the service')).toBeTruthy();
+    fireEvent.press(bottomButton());
+    expect(onStart).toHaveBeenLastCalledWith('service');
+  });
+
+  it('falls back to the announcement only when no card is left', () => {
+    const sent = { announcement: ['a'], service: ['b'], obituary: ['c'] };
+    setup(sess({ ...ready, obituaryUrl: 'https://paper.test/anna', recipientsNotified: sent, serviceDate: 'January 2, 2999' }));
+    expect(within(bottomButton()).getByText('Announce the passing')).toBeTruthy();
+  });
+
+  it('keeps Started on a compact done row with a re-send draft in progress', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'details', fields: { senderName: 'Sam' } });
+    setup(sess({ ...announced, drafts: { announcement: draft } }));
+    expect(screen.getByText('Announce the passing · Sent to 1 person · Started')).toBeTruthy();
+  });
+
+  it('lights the thank-yous only after a service date that parses and is past', () => {
+    const everything = { ...ready, obituaryUrl: 'https://paper.test/anna', recipientsNotified: { announcement: ['a'], service: ['b'], obituary: ['c'] } };
+    const past = render(<HubScreen session={sess({ ...everything, serviceDate: 'January 2, 2020' })} {...props} />);
+    expect(within(bottomButton()).getByText('Send thank-yous')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
+    past.unmount();
+    for (const serviceDate of ['next Saturday', '', 'January 2, 2999']) {
+      const view = render(<HubScreen session={sess({ ...everything, serviceDate })} {...props} />);
+      expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it('never lights a locked card, and the bar names the first open card that is not locked', () => {
+    setup(sess({ ...announced, ...ready }), true);
+    expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+    expect(within(bottomButton()).getByText('Share the obituary')).toBeTruthy();
+  });
+
+  it('after a stopped send, the card reads "text the rest" and is the lit card', () => {
+    const note = { lead: 'You told 1 of 3.', rest: 'You can text the others.', spoken: 'You told 1 of 3.', category: 'announcement' as const, partial: true };
+    const onStart = jest.fn();
+    render(<HubScreen session={sess({ ...announced, ...ready })} {...props} onStart={onStart} note={note} />);
+    const lit = screen.getAllByRole('button', { name: /Next/ });
+    expect(lit).toHaveLength(1);
+    expect(within(lit[0]).getByText('Sent to 1 person · text the rest')).toBeTruthy();
+    fireEvent.press(bottomButton());
+    expect(onStart).toHaveBeenLastCalledWith('announce');
+  });
+
+  it('a note that is not a stopped send does not light its card', () => {
+    const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'x', category: 'announcement' as const, partial: false };
+    render(<HubScreen session={sess(announced)} {...props} note={note} />);
+    expect(screen.queryByText(/text the rest/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+  });
+
+  it('keeps the bar outside the scrolling area, so the cards stay reachable at the largest text size', () => {
+    setup();
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(StyleSheet.flatten(scroll.props.style).flex).toBe(1);
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).height).toBeUndefined();
+    expect(within(scroll).getAllByRole('button')).not.toContain(bottomButton());
+  });
+
+  it('does not announce when the bottom button changes, and the bar has no live region', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const ios = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    // The spies may carry calls from an earlier test in this file.
+    announce.mockClear();
+    ios.mockClear();
+    const view = render(<HubScreen session={anna} {...props} />);
+    view.rerender(<HubScreen session={sess({ ...announced, ...ready })} {...props} />);
+    expect(within(bottomButton()).getByText('Share the service')).toBeTruthy();
+    expect(announce).not.toHaveBeenCalled();
+    expect(ios).not.toHaveBeenCalled();
+    expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' })).toHaveLength(0);
   });
 });

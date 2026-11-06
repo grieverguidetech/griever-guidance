@@ -40,7 +40,7 @@ describe('App with the account feature on', () => {
     await AsyncStorage.setItem('gg.sessions.v1', JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByText('Your account')).toBeTruthy();
   });

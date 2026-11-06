@@ -21,18 +21,19 @@ export interface ActionBarProps {
    * hint, shows it as the line under it, and a press does nothing.
    */
   disabledReason?: string;
+  testID?: string;
 }
 
 /**
  * The bar fixed at the bottom of a phone screen. Put it after the scrolling content, outside it. Its
  * bottom padding includes the safe-area inset, so the button clears the home indicator.
  */
-export function ActionBar({ label, onPress, note, above, disabledReason }: ActionBarProps) {
+export function ActionBar({ label, onPress, note, above, disabledReason, testID }: ActionBarProps) {
   const insets = useSafeAreaInsets();
   const disabled = Boolean(disabledReason);
   const line = disabled ? disabledReason : note;
   return (
-    <View style={[styles.bar, { paddingBottom: insets.bottom + spacing[2] }]}>
+    <View testID={testID} style={[styles.bar, { paddingBottom: insets.bottom + spacing[2] }]}>
       {above ? <View style={styles.above}>{above}</View> : null}
       <Button
         label={label}

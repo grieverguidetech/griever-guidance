@@ -28,7 +28,7 @@ jest.mock('../lib/expoContactsSource', () => ({
 }));
 
 const CONTACTS_TITLE = 'Who should we be able to reach?';
-const PATH_TITLE = 'One thing at a time.';
+const PATH_TITLE = 'Ready to send';
 
 const anna = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '',
