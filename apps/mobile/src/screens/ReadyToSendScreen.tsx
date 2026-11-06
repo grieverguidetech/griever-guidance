@@ -117,7 +117,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
         details={
           showDetails
             ? {
-                label: isService ? ready.changeService : ready.changeThanks,
+                label: isService ? ready.changeService : isAnnouncement ? ready.addNote : ready.changeThanks,
                 startOpen: detailsMissing,
                 render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} headingRef={headingRef} />,
               }
@@ -161,8 +161,9 @@ function detailsFieldsFor(flow: FlowProps['flow']) {
       {
         key: 'personalNote',
         label: `${announceCopy.noteLabel} ${announceCopy.optional}`,
-        placeholder: announceCopy.placeholder,
+        placeholder: ready.notePlaceholder,
         required: false,
+        multiline: true,
       },
     ];
   }

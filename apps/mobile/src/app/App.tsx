@@ -114,6 +114,26 @@ type SessionProps = {
 /** What a finished send hands up: who it was for, which moment, and the contact ids marked sent (never text). */
 type SentRecord = { id: string; category: TemplateCategory | null; deliveredIds: string[] };
 
+/**
+ * Steps past the announcement's old intro once per arrival on it. The ref keeps a changed
+ * `nextStep` (or a second effect run under StrictMode) from stepping twice; it resets when the
+ * step leaves 'announce'.
+ */
+export const useSkipAnnounce = (onAnnounce: boolean, nextStep: () => void) => {
+  const skipped = useRef(false);
+  useEffect(() => {
+    if (!onAnnounce) {
+      skipped.current = false;
+      return;
+    }
+    if (skipped.current) {
+      return;
+    }
+    skipped.current = true;
+    nextStep();
+  }, [onAnnounce, nextStep]);
+};
+
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
 const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShareObituary, onDraftChange, onDetails, onHome, onFinished, onTold }: SessionProps) => {
@@ -157,12 +177,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   }, [pendingStart, flow.templateCategory, flow.step, nextStep]);
   // The announcement has no intro screen: the flow steps past 'announce' to the people (the same
   // pattern as pendingStart above). A draft saved on 'announce' before this change does the same.
-  const onAnnounceStep = flow.step === 'announce';
-  useEffect(() => {
-    if (onAnnounceStep) {
-      nextStep();
-    }
-  }, [onAnnounceStep, nextStep]);
+  useSkipAnnounce(flow.step === 'announce', nextStep);
   // The picker is gone. If the flow is ever on it with nothing chosen, go back to the hub rather than stay blank.
   const stuckOnPicker = flow.step === 'template' && !pendingStart;
   useEffect(() => {
@@ -175,9 +190,10 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
-  // What is typed on the announcement form becomes this person's details, so Home can list
-  // them and retention can use the service date. Compared with what was there when the form
-  // opened, so opening it (its fields start empty) never wipes the saved name.
+  // What is typed on the send screen (the service date, the name when setup has none) becomes this
+  // person's details, so Home can list them and retention can use the service date. Compared with
+  // what was there when the screen opened, so opening it never wipes the saved name. 'announce' is
+  // only a pass-through step now; it stays listed so a draft that rests there behaves as before.
   const name = flow.fields['deceasedName'] ?? '';
   const passed = flow.fields['dateOfPassing'] ?? '';
   const service = flow.fields['serviceDate'] ?? '';
@@ -279,16 +295,15 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
   }, [sendJob, templateCategory, id, onTold]);
 
-  const stepped = withoutServiceKnown(flow);
   const flowWithHub = {
-    ...stepped,
+    ...flow,
     prevStep: () => {
       // The step before this one is the picker: go to the hub instead. Ready to send also goes
       // straight back to the person screen (the obituary: its link screen); "Change" is the way to the people.
       if (onFirstForm || flow.step === 'review') {
         backToStart();
       } else {
-        stepped.prevStep();
+        flow.prevStep();
       }
     },
   };
@@ -303,22 +318,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={stepped.prevStep} notified={session.recipientsNotified} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={flow.prevStep} notified={session.recipientsNotified} />;
 };
-
-// The announcement path has a "do you know the service details" step that mobile has no screen
-// for. Forward and back step over it, so the flow only ever lands on a screen that exists.
-export const withoutServiceKnown = (flow: ReturnType<typeof useSendFlow>): ReturnType<typeof useSendFlow> => ({
-  ...flow,
-  nextStep: () => {
-    flow.nextStep();
-    if (flow.step === 'announce' && flow.steps.includes('serviceKnown')) flow.nextStep();
-  },
-  prevStep: () => {
-    flow.prevStep();
-    if (flow.step === 'contacts' && flow.steps.includes('serviceKnown')) flow.prevStep();
-  },
-});
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
   const { sessions, active, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);

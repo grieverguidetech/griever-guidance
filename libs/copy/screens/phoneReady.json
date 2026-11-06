@@ -1,6 +1,8 @@
 {
   "changeService": "Change date, time or place",
   "changeThanks": "Change details",
+  "addNote": "Add a personal note",
+  "notePlaceholder": "For example: It was peaceful, and we were with them.",
   "to": "To {names} · {count}",
   "and": "and",
   "andMore": "and {more} more",

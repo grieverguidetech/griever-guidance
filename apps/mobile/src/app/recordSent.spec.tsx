@@ -55,9 +55,9 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
     fireEvent.press(await screen.findByText(name));
   }
   fireEvent.press(screen.getByText('Continue'));
-  // The optional note is under Change details on Ready to send.
+  // The optional note is under Add a personal note on Ready to send.
   if (note) {
-    fireEvent.press(await screen.findByRole('button', { name: 'Change details' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Add a personal note' }));
     fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
   }
   fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));

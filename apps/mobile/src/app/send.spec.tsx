@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Linking, Modal, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { AccessibilityInfo, BackHandler, Linking, Modal, StyleSheet } from 'react-native';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
-import { App, withoutServiceKnown } from './App';
+import { App, useSkipAnnounce } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
@@ -73,14 +73,14 @@ describe('picking an announcement', () => {
     expect(screen.queryByText('Gather when you can')).toBeNull();
   });
 
-  it('puts the note typed under Change details in the message, and keeps it on Change', async () => {
+  it('puts the note typed under Add a personal note in the message, and keeps it on Change', async () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByRole('heading', { name: 'Announce the passing' });
     expect(screen.queryByText(/She was peaceful\./)).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add a personal note' }));
     fireEvent.changeText(await screen.findByLabelText("Anything you'd like to add (optional)"), 'She was peaceful.');
     expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
     // Going to the people and back keeps the note.
@@ -123,7 +123,7 @@ describe('picking an announcement', () => {
     expect(focus).toHaveBeenCalled();
   });
 
-  it.each([['Share the service'], ['Send thank-yous']])(
+  it.each([['Announce the passing'], ['Share the service'], ['Send thank-yous']])(
     '%s opens Who should know? with a real header, and Back returns to the hub',
     async (moment) => {
       const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
@@ -143,6 +143,22 @@ describe('picking an announcement', () => {
       expect(await screen.findByText('Ready to send')).toBeTruthy();
     },
   );
+
+  it('Android Back on the announcement people step returns to the person screen once', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    await openAnna();
+    await startMoment('Announce the passing');
+    await screen.findByRole('heading', { name: 'Who should know?' });
+    act(() => void [...handlers].reverse().some((h) => h()));
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.getByText('Ready to send')).toBeTruthy();
+    expect(screen.queryByText('Who should know?')).toBeNull();
+  });
 
   it('says who is open when the person arrives from Home', async () => {
     const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
@@ -433,32 +449,19 @@ describe('Edit person from the hub', () => {
   });
 });
 
-describe('stepping over serviceKnown', () => {
-  const fake = (step: string, steps: string[]) => {
-    const nextStep = jest.fn();
-    const prevStep = jest.fn();
-    const flow = { step, steps, nextStep, prevStep } as unknown as Parameters<typeof withoutServiceKnown>[0];
-    return { wrapped: withoutServiceKnown(flow), nextStep, prevStep };
-  };
-
-  it('steps twice from announce while serviceKnown is in the path', () => {
-    const { wrapped, nextStep } = fake('announce', ['template', 'announce', 'serviceKnown', 'contacts']);
-    wrapped.nextStep();
-    expect(nextStep).toHaveBeenCalledTimes(2);
-  });
-
-  it('steps once from announce when the path has no serviceKnown, so contacts is not skipped', () => {
-    const { wrapped, nextStep } = fake('announce', ['template', 'announce', 'contacts', 'review']);
-    wrapped.nextStep();
-    expect(nextStep).toHaveBeenCalledTimes(1);
-  });
-
-  it('steps back twice from contacts only when serviceKnown is in the path', () => {
-    const withIt = fake('contacts', ['template', 'announce', 'serviceKnown', 'contacts']);
-    withIt.wrapped.prevStep();
-    expect(withIt.prevStep).toHaveBeenCalledTimes(2);
-    const without = fake('contacts', ['template', 'announce', 'contacts']);
-    without.wrapped.prevStep();
-    expect(without.prevStep).toHaveBeenCalledTimes(1);
+describe('stepping past the announcement intro (#671)', () => {
+  it('steps once per arrival on announce, even when nextStep changes while it stays there', () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    const { rerender } = renderHook(({ on, next }: { on: boolean; next: () => void }) => useSkipAnnounce(on, next), {
+      initialProps: { on: true, next: first },
+    });
+    rerender({ on: true, next: second });
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).not.toHaveBeenCalled();
+    // Leaving and arriving again steps again.
+    rerender({ on: false, next: second });
+    rerender({ on: true, next: second });
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });
