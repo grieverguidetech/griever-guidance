@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AccessibilityInfo, AppState, Linking, Text } from 'react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SessionDetails } from '@griever/shared';
-import { ActionBar } from '../ui';
 import { SendingScreen } from './SendingScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
@@ -124,24 +123,25 @@ describe('Sending on the phone: asking on return from Messages', () => {
     expect(screen.getByText('Skip Dee')).toBeTruthy();
   });
 
-  it('puts the question on the bottom bar button, with Not yet and Skip above it as links', async () => {
+  it('puts the question on the bottom bar button, with Not yet and Skip above it inside the bar', async () => {
     const { change } = setup(['c1', 'c2']);
     fireEvent.press(await screen.findByText('Text Dee'));
     change('background');
     change('active');
     await screen.findByText(PROMPT);
-    const bar = screen.UNSAFE_getByType(ActionBar);
-    expect(bar.props.label).toBe(PROMPT);
-    const links = bar.props.above.props.children.map((link: { props: { label: string; variant: string } }) => [link.props.label, link.props.variant]);
-    expect(links).toEqual([['Not yet, open Messages again', 'tertiary'], ['Skip Dee', 'tertiary']]);
+    const bar = within(screen.getByTestId('sending-action-bar'));
+    expect(bar.getByRole('button', { name: PROMPT })).toBeTruthy();
+    expect(bar.getByRole('button', { name: 'Not yet, open Messages again' })).toBeTruthy();
+    expect(bar.getByRole('button', { name: 'Skip Dee' })).toBeTruthy();
   });
 
-  it('puts only Skip above the bar before the hand-off, and the bar reads Text Dee', async () => {
+  it('puts only Skip beside the bar button before the hand-off, and the bar reads Text Dee', async () => {
     setup(['c1', 'c2']);
     await screen.findByText('Text Dee');
-    const bar = screen.UNSAFE_getByType(ActionBar);
-    expect(bar.props.label).toBe('Text Dee');
-    expect(bar.props.above.props.label).toBe('Skip Dee');
+    const bar = within(screen.getByTestId('sending-action-bar'));
+    expect(bar.getByRole('button', { name: 'Text Dee' })).toBeTruthy();
+    expect(bar.getByRole('button', { name: 'Skip Dee' })).toBeTruthy();
+    expect(bar.getAllByRole('button')).toHaveLength(2);
     expect(screen.queryByText("What you'll need")).toBeNull();
   });
 
@@ -323,16 +323,24 @@ describe('Sending on the phone: a line for each person (thank-you)', () => {
     expect(body(open, 1)).not.toContain('lasagna');
   });
 
-  it('Not yet opens Messages again with the same line for the same person', async () => {
+  it('keeps the line editable on return and after Not yet, and Not yet reopens Messages with the edited line', async () => {
     const { change, open } = setup(['c1', 'c2'], 'aftercare');
-    fireEvent.changeText(await screen.findByLabelText(line('Dee')), 'Thanks again');
+    fireEvent.changeText(await screen.findByLabelText(line('Dee')), 'Thanks');
     fireEvent.press(screen.getByText('Text Dee'));
+    expect(screen.getByLabelText(line('Dee'))).toBeTruthy();
     change('background');
     change('active');
-    fireEvent.press(await screen.findByText('Not yet, open Messages again'));
+    await screen.findByText(PROMPT);
+    // Still editable while the Sent question shows.
+    fireEvent.changeText(screen.getByLabelText(line('Dee')), 'Thanks again');
+    fireEvent.press(screen.getByText('Not yet, open Messages again'));
     expect(open).toHaveBeenCalledTimes(2);
+    expect(body(open, 0).endsWith('\nThanks')).toBe(true);
     expect(body(open, 1).endsWith('\nThanks again')).toBe(true);
     expect(body(open, 1)).toContain('+15555550100');
+    // Still editable after Not yet.
+    fireEvent.changeText(screen.getByLabelText(line('Dee')), 'Thanks once more');
+    expect(screen.getByDisplayValue('Thanks once more')).toBeTruthy();
   });
 
   it('has no input on other moments', async () => {
@@ -426,11 +434,13 @@ describe('Sending on the phone: a send is never lost or repeated', () => {
     expect(screen.getByRole('button', { name: 'Text Dee' }).props.accessibilityHint).toBe(error);
   });
 
-  it('Stop for now sits in the top bar with the note as its hint, and the note is not drawn', async () => {
+  it('Stop for now sits in the top bar with the note as its hint, and a visible line says it too', async () => {
     setup(['c1', 'c2']);
     await screen.findByText('Text Dee');
     expect(screen.getByRole('button', { name: 'Stop for now' }).props.accessibilityHint).toBe('People you told stay marked as told.');
-    expect(screen.queryByText('People you told stay marked as told.', { includeHiddenElements: true })).toBeNull();
+    // The visible line sits under the progress strip and is hidden from screen readers (the hint says the rest).
+    expect(screen.getByText('You can stop any time. People you told stay marked as told.', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText('You can stop any time. People you told stay marked as told.')).toBeNull();
     expect(screen.getByText('1 of 2')).toBeTruthy();
   });
 
@@ -453,5 +463,41 @@ describe('Sending on the phone: a send is never lost or repeated', () => {
     expect(screen.getByTestId('step').props.children).toBe('sending');
     fireEvent.press(screen.getByText('Stop for now'));
     expect(screen.getByTestId('step').props.children).toBe('sent');
+  });
+
+  it('on iOS the question is also announced when it shows, and not when it is absent', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const { change } = setup(['c1', 'c2']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    announce.mockClear();
+    change('background');
+    change('active');
+    await screen.findByText(PROMPT);
+    expect(announce.mock.calls.filter(([text]) => text === PROMPT)).toHaveLength(1);
+  });
+
+  it('after Yes only the new name takes focus, not the bar first', async () => {
+    const { change, focus } = setup(['c1', 'c2']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    change('background');
+    change('active');
+    await screen.findByText(PROMPT);
+    const before = focus.mock.calls.length;
+    fireEvent.press(screen.getByText(PROMPT));
+    await screen.findByText('2 of 2');
+    // The whole sequence after the tap: one move, to Eli's name.
+    expect(focus.mock.calls.slice(before)).toEqual([[handleForText('Eli')]]);
+  });
+
+  it('after Skip from the question only the new name takes focus', async () => {
+    const { change, focus } = setup(['c1', 'c2']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    change('background');
+    change('active');
+    await screen.findByText(PROMPT);
+    const before = focus.mock.calls.length;
+    fireEvent.press(screen.getByText('Skip Dee'));
+    await screen.findByText('Text Eli');
+    expect(focus.mock.calls.slice(before)).toEqual([[handleForText('Eli')]]);
   });
 });

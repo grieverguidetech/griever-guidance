@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ComponentRef, RefObject } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
@@ -29,6 +29,8 @@ export interface SendingPerson {
 
 /** One segment of the progress strip per person. */
 export type SendingSegment = 'done' | 'current' | 'waiting';
+
+export const BAR_TEST_ID = 'sending-action-bar';
 
 /** The name is the biggest text on the screen (28 points or more). */
 export const NAME_FONT_SIZE = 30;
@@ -77,7 +79,7 @@ export interface SendingProps {
   onNext: () => void;
   onSkip: () => void;
   /** "Stop for now" in the top bar; its note is read as the button's hint. Leave unset to hide it. */
-  stop?: { label: string; note: string; onPress: () => void };
+  stop?: { label: string; note: string; line: string; onPress: () => void };
   /** The name is the page heading. The app holds the ref to move focus to it when the screen opens. */
   nameRef?: RefObject<ComponentRef<typeof Text> | null>;
 }
@@ -107,16 +109,23 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
     }
   }, [handedOff]);
 
-  // The question takes the screen reader's focus when it shows, so it is read out.
+  // The question takes the screen reader's focus when it shows, so it is read out. Focus is on the
+  // bar button already, so iOS is also told the new words.
   const asking = confirmSent !== undefined;
-  // When it closes without a new person ("Not yet"), focus goes back to the bar.
+  const question = confirmSent?.yes;
+  // When it closes without a new person ("Not yet"), focus goes back to the bar. When a new person
+  // took over (Yes or Skip), the name takes focus instead, so the bar is left alone.
   const wasAsking = useRef(false);
   useEffect(() => {
-    if (asking || wasAsking.current) {
+    const personChanged = personKey !== lastPerson.current;
+    if (asking || (wasAsking.current && !personChanged)) {
       focusNode(barRef.current);
     }
+    if (asking && question && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibility(question);
+    }
     wasAsking.current = asking;
-  }, [asking]);
+  }, [asking, question, personKey]);
 
   // A failed hand-off puts the person back on the Text button; focus goes there too.
   const failed = focusOpenOnError === true && error !== undefined;
@@ -140,6 +149,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
   const skip = <Button variant="tertiary" label={skipLabel} onPress={onSkip} />;
   const bar = !current ? null : handOff && confirmSent ? (
     <ActionBar
+      testID={BAR_TEST_ID}
       label={confirmSent.yes}
       hint={confirmSent.hint}
       buttonRef={barRef}
@@ -153,6 +163,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
     />
   ) : handOff ? (
     <ActionBar
+      testID={BAR_TEST_ID}
       label={current.isLast ? copy.done : copy.next}
       buttonRef={barRef}
       onPress={onNext}
@@ -165,6 +176,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
     />
   ) : (
     <ActionBar
+      testID={BAR_TEST_ID}
       label={openLabel ?? copy.openMessages}
       // On the phone the error is also the hint: focus moves here at once, and would cut the line off.
       hint={focusOpenOnError ? error : undefined}
@@ -182,6 +194,11 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
             {current && stop ? <Button label={stop.label} hint={stop.note} variant="header" onPress={stop.onPress} /> : <View />}
             {current ? <Body tone="muted">{current.position}</Body> : null}
           </View>
+          {current && stop ? (
+            <Body tone="muted" hidden>
+              {stop.line}
+            </Body>
+          ) : null}
           {/* Hidden from assistive tech: "N of M" in the top bar already says how far along it is. */}
           <View style={styles.track} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             {segments.map((state, index) => (
@@ -199,7 +216,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
           {current ? (
             <Card>
               <Body>{current.message}</Body>
-              {note && !handOff ? (
+              {note ? (
                 <View style={styles.field}>
                   <Body tone="strong" id={noteLabelId}>
                     {note.label} <Text style={styles.optional}>{note.optional}</Text>
@@ -240,11 +257,11 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing[3], paddingTop: spacing[4] },
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'space-between', alignItems: 'center' },
   track: { flexDirection: 'row', gap: spacing[1] },
   segment: { flex: 1, height: 6, borderRadius: radius.sm, backgroundColor: colors['neutral-200'] },
   segmentDone: { backgroundColor: colors['accent-700'] },
-  segmentCurrent: { backgroundColor: colors['accent-600'] },
+  segmentCurrent: { backgroundColor: colors['accent-500'] },
   who: { gap: spacing[1] },
   name: { fontSize: NAME_FONT_SIZE, color: colors.ink },
   input: {

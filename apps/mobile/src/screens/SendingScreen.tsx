@@ -211,7 +211,7 @@ export function SendingScreen({ flow, contacts }: Props) {
         onOpenMessages={openMessages}
         onNext={markNext}
         onSkip={markActiveSkipped}
-        stop={{ label: copy.stopForNow, note: copy.stopNote, onPress: stopSending }}
+        stop={{ label: copy.stopForNow, note: copy.stopNote, line: texting.stopAnyTime, onPress: stopSending }}
         nameRef={heading}
       />
     </KeyboardAvoidingView>

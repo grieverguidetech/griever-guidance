@@ -3,10 +3,11 @@
   "title": "Copy for the phone-only Texting screen: the links above the bottom bar (the rest comes from sending.json)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["notYetOpenAgain", "skipPerson"],
+  "required": ["notYetOpenAgain", "skipPerson", "stopAnyTime"],
   "properties": {
     "notYetOpenAgain": { "$ref": "#/$defs/text" },
-    "skipPerson": { "$ref": "#/$defs/text" }
+    "skipPerson": { "$ref": "#/$defs/text" },
+    "stopAnyTime": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }

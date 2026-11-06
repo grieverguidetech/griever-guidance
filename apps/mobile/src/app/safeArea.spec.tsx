@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
@@ -53,5 +53,23 @@ describe('send steps and the top safe area', () => {
       return style.paddingTop === 47 && style.paddingBottom === 34 && style.backgroundColor === colors.bg;
     });
     expect(padded).toBe(true);
+  });
+
+  it('pads the Sending bottom once, on its bar, and the frame leaves the bottom to the bar', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByText('Continue'));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
+    await screen.findByText('Text Dee');
+    const bar = StyleSheet.flatten(screen.getByTestId('sending-action-bar').props.style);
+    expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    expect(frame?.paddingBottom).toBe(0);
   });
 });
