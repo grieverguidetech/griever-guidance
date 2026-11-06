@@ -3,7 +3,7 @@ import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, StyleSheet, Text as RNText } from 'react-native';
 import { fill, recipientsPhrase, screenCopy, sendLabel } from '@griever/copy';
 import { MOMENT_CATEGORY } from '@griever/hooks';
-import type { UseContactsResult } from '@griever/hooks';
+import type { Session, UseContactsResult } from '@griever/hooks';
 import { firstName } from '@griever/shared';
 import type { MomentKey } from '@griever/shared';
 import { colors } from '@griever/tokens';
@@ -11,6 +11,7 @@ import { ReadyToSend } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
+import { defaultPicked } from '../lib/defaultRecipients';
 import { shareMessage } from '../lib/shareSheet';
 
 const copy = screenCopy('review');
@@ -25,6 +26,8 @@ const NAMES_SHOWN = 3;
 interface Props extends FlowProps {
   /** Used to name the people picked and the first one's greeting. */
   contacts?: UseContactsResult;
+  /** Who each moment already reached, kept on this phone. Only used to tell whether the picked people are the default. */
+  notified?: Session['recipientsNotified'];
   /** Opens the people step: the To row link, or the button when nobody is picked. */
   onChoosePeople: () => void;
   /** Set to a function that focuses the button that opens the people sheet; the sheet's onDismiss (iOS) calls it. */
@@ -46,7 +49,7 @@ function namesPhrase(names: string[]): string {
 }
 
 /** The screen is the ReadyToSend in apps/mobile/src/ui; this holds what is mobile only: the share sheet and focus. */
-export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleButton }: Props) {
+export function ReadyToSendScreen({ flow, contacts, notified, onChoosePeople, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
   const shareButton = useRef<ButtonNode>(null);
@@ -107,6 +110,9 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
   const picked = selectedContactIds.map((id) => contacts?.contacts.find((c) => c.contactId === id)).filter((c) => c !== undefined);
   const names = picked.map((c) => firstName(c.name) || c.name);
   const greeting = picked[0] ? firstName(picked[0].name) : '';
+  // Picked people who are exactly the default for this moment are named as a group.
+  const defaults = flow.templateCategory ? defaultPicked(flow.templateCategory, notified, contacts?.contacts.map((c) => c.contactId) ?? []) : [];
+  const isDefaultSet = defaults.length > 0 && defaults.length === selectedContactIds.length && defaults.every((id) => selectedContactIds.includes(id));
   const detailsFields = detailsFieldsFor(flow);
   const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
   const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
@@ -166,7 +172,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
             : undefined
         }
         to={{
-          text: fill(ready.to, { names: namesPhrase(names) || recipientsPhrase(recipientCount, copy), count: String(recipientCount) }),
+          text: fill(ready.to, { names: (isDefaultSet ? ready.everyoneYouTold : namesPhrase(names)) || recipientsPhrase(recipientCount, copy), count: String(recipientCount) }),
           changeLabel: ready.change,
           changeName: ready.changeName,
           onChange: choosePeople,
