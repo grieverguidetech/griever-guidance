@@ -19,6 +19,10 @@ interface Props extends FlowProps {
   contacts: UseContactsResult;
   /** Who each moment was sent to. Stays on this phone. */
   notified: Partial<Record<TemplateCategory, string[]>>;
+  /** The sheet is shown. Default true. The app keeps this mounted and closes it, so iOS can report the dismiss. */
+  open?: boolean;
+  /** iOS: the sheet has finished closing. */
+  onDismiss?: () => void;
 }
 
 type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
@@ -30,7 +34,7 @@ const copy = { ...screenCopy('whoShouldKnow'), ...screenCopy('phonePeople') };
  * The list is WhoShouldKnow in apps/mobile/src/ui. This holds what is mobile only: Bring people
  * across (import from the phone's contacts) and its review list.
  */
-export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
+export function ContactSelectorScreen({ flow, contacts, notified, open = true, onDismiss }: Props) {
   const { selectedContactIds, toggleContact, selectContacts, nextStep, templateCategory } = flow;
   const toldIds = templateCategory ? (notified?.[templateCategory] ?? []) : [];
   const shortcuts = buildShortcuts(templateCategory, notified, contacts.contacts.map((c) => c.contactId), selectContacts);
@@ -54,11 +58,14 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
-  // The title takes focus once on mount, whichever moment this is.
+  // The title takes focus each time the sheet opens. The Modal's onShow does it on a device; this is the fallback.
   useEffect(() => {
-    focusNode(listHeading.current);
+    if (open) {
+      focusNode(listHeading.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [open]);
+  // A safety net: a visible Modal takes Android Back through its onRequestClose (leave), which also steps back to the list.
   // Android Back in the review does what the on-screen Back does: back to the list.
   useEffect(() => {
     if (!reviewing) {
@@ -97,7 +104,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
     }
   };
   const inSheet = (content: ReactNode) => (
-    <Sheet bare swipeToClose title={copy.heading} closeLabel={copy.close} onClose={leave}>
+    <Sheet bare swipeToClose visible={open} title={copy.heading} closeLabel={copy.close} onClose={leave} onShow={() => focusNode(listHeading.current)} onDismiss={onDismiss}>
       {content}
     </Sheet>
   );

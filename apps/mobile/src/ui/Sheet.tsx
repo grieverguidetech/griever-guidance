@@ -17,6 +17,8 @@ export interface SheetExtras {
   swipeToClose?: boolean;
   /** The children bring their own title and Close button and scroll by themselves, so the sheet draws neither. */
   bare?: boolean;
+  /** Runs when the sheet has opened. With `bare` the caller uses it to focus its own title. */
+  onShow?: () => void;
 }
 
 /**
@@ -24,7 +26,7 @@ export interface SheetExtras {
  * button and Android's Back both shut it. The screen underneath stays mounted, so nothing typed
  * there is lost. Screen-reader focus starts on the title; the caller sends it back on dismiss.
  */
-export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClose, onDismiss, onBodyTouch, swipeToClose = false, bare = false, children }: SheetProps & SheetExtras) {
+export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClose, onDismiss, onBodyTouch, swipeToClose = false, bare = false, onShow, children }: SheetProps & SheetExtras) {
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
@@ -40,6 +42,9 @@ export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClo
   const swipe = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      // A list underneath may take the gesture (scrolling wins); a taken gesture closes nothing.
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderTerminate: () => undefined,
       onPanResponderRelease: (_event, gesture) => {
         if (gesture.dy > SWIPE_CLOSE_DISTANCE) {
           closeRef.current();
@@ -59,7 +64,10 @@ export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClo
       animationType={reduceMotion ? 'none' : 'slide'}
       transparent
       onRequestClose={onRequestClose ?? onClose}
-      onShow={focusHeading}
+      onShow={() => {
+        focusHeading();
+        onShow?.();
+      }}
       onDismiss={onDismiss}
     >
       <View style={styles.backdrop}>
@@ -105,7 +113,7 @@ const styles = StyleSheet.create({
     padding: spacing[4],
   },
   bare: { height: '85%', padding: 0 },
-  grab: { alignItems: 'center', paddingVertical: spacing[2] },
+  grab: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
   grabBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors['neutral-300'] },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2], marginBottom: spacing[2] },
   title: { flex: 1 },

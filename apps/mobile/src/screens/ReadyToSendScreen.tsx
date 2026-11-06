@@ -27,6 +27,8 @@ interface Props extends FlowProps {
   contacts?: UseContactsResult;
   /** Opens the people step: the To row link, or the button when nobody is picked. */
   onChoosePeople: () => void;
+  /** Set to a function that focuses the button that opens the people sheet; the sheet's onDismiss (iOS) calls it. */
+  focusPeopleButton?: { current: (() => void) | null };
 }
 
 const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
@@ -44,7 +46,7 @@ function namesPhrase(names: string[]): string {
 }
 
 /** The screen is the ReadyToSend in apps/mobile/src/ui; this holds what is mobile only: the share sheet and focus. */
-export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
+export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
   const shareButton = useRef<ButtonNode>(null);
@@ -61,16 +63,27 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
     }
   }, []);
 
-  // The people sheet is open while the step is 'contacts'. When it closes, focus returns to the button that opened it.
+  // The people sheet is open while the step is 'contacts'. When it is gone, focus returns to the button that opened it.
+  // iOS: from the sheet's onDismiss (focus set earlier is lost to the closing animation). Elsewhere: when the step changes.
+  const focusPeople = () => {
+    if (!openedSheet.current) {
+      return;
+    }
+    openedSheet.current = false;
+    const handle = peopleButton.current ? findNodeHandle(peopleButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+  if (focusPeopleButton) {
+    focusPeopleButton.current = focusPeople;
+  }
   const sheetOpen = flow.step === 'contacts';
   useEffect(() => {
-    if (!sheetOpen && openedSheet.current) {
-      openedSheet.current = false;
-      const handle = peopleButton.current ? findNodeHandle(peopleButton.current) : null;
-      if (handle) {
-        AccessibilityInfo.setAccessibilityFocus(handle);
-      }
+    if (!sheetOpen && Platform.OS !== 'ios') {
+      focusPeople();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetOpen]);
 
   if (!selectedTemplate) {

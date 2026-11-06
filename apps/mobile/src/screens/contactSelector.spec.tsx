@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, AppState, Linking, Modal, Platform } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Modal, Platform, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
@@ -129,6 +129,27 @@ describe('ContactSelectorScreen as a list to close (#672)', () => {
     expect(prevStep).not.toHaveBeenCalled();
     expect(toggleContact).not.toHaveBeenCalled();
     expect(selectContacts).not.toHaveBeenCalled();
+  });
+
+  it('the grab area is at least 44 points tall, and a taken gesture closes nothing', () => {
+    const { nextStep } = renderScreen();
+    const grab = screen.getByTestId('sheet-grab-bar');
+    expect(StyleSheet.flatten(grab.props.style).minHeight).toBeGreaterThanOrEqual(44);
+    expect(grab.props.onResponderTerminationRequest()).toBe(true);
+    act(() => {
+      grab.props.onResponderGrant(dragEvent(0));
+      grab.props.onResponderMove(dragEvent(120));
+      grab.props.onResponderTerminate(dragEvent(120));
+    });
+    expect(nextStep).not.toHaveBeenCalled();
+  });
+
+  it('focuses its title when the sheet has opened (onShow)', () => {
+    renderScreen();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    focus.mockClear();
+    act(() => screen.UNSAFE_getByType(Modal).props.onShow());
+    expect(focus).toHaveBeenCalled();
   });
 
   it('a tap on the dim area shuts the sheet with nextStep', () => {

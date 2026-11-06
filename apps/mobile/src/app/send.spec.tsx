@@ -151,7 +151,9 @@ describe('picking an announcement', () => {
       focus.mockClear();
       fireEvent.press(screen.getByRole('button', { name: 'Close' }));
       await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
-      // Focus goes back to the button that opened the sheet.
+      // iOS: focus goes back to the button that opened the sheet once the sheet reports it is gone.
+      expect(focus).not.toHaveBeenCalled();
+      act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
       expect(focus).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('button', { name: 'Choose who to tell' })).toBeTruthy();
     },
@@ -276,6 +278,17 @@ describe('Ready to send (announcement)', () => {
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText('To Dee and Eli · 2')).toBeTruthy();
     expect(screen.getByText('Text 2 people')).toBeTruthy();
+  });
+
+  it('keeps hand-edited wording when Change opens the people sheet and Close shuts it', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    await screen.findByRole('heading', { name: 'Who should get this?' });
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
   });
 
   it('sends on to the sending step', async () => {
