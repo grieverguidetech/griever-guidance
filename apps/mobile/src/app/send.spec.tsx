@@ -101,7 +101,7 @@ describe('picking an announcement', () => {
     expect(screen.getByText('2 selected')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
-    expect(screen.getByText('This will go to 2 people as a text message.')).toBeTruthy();
+    expect(screen.getByText('To Dee and Eli · 2')).toBeTruthy();
   });
 
   it('Edit opens setup, and Back there returns to Announce with the note kept', async () => {
@@ -203,21 +203,23 @@ describe('picking an announcement', () => {
   });
 });
 
-describe('Review your message (announcement)', () => {
+describe('Ready to send (announcement)', () => {
   const toReview = async () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Read it once before it goes' });
+    await screen.findByRole('heading', { name: 'Announce the passing' });
   };
 
   it('changes the message when the tone changes', async () => {
     await toReview();
     const plain = screen.getByText(/passed away/).props.children;
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     expect(screen.queryByText(plain)).toBeNull();
   });
 
@@ -225,13 +227,12 @@ describe('Review your message (announcement)', () => {
     await toReview();
     fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
-    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByText('My own words.')).toBeTruthy();
+    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
     expect(screen.getByText('Your own words are kept. Undo your edit to change the tone.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
-    expect(screen.queryByText('My own words.')).toBeNull();
+    expect(screen.getByLabelText('Your message').props.value).not.toBe('My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
   });
@@ -246,10 +247,21 @@ describe('Review your message (announcement)', () => {
     expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=Dee,\nMy own words.');
   });
 
-  it('opens What you will need in a sheet', async () => {
+  it('Back returns to the person screen', async () => {
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
-    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
+  });
+
+  it('Change opens the people step with the ticks kept, and Continue returns to the message', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Change' }));
+    expect(await screen.findByText('1 selected')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
+    fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('To Dee and Eli · 2')).toBeTruthy();
+    expect(screen.getByText('Text 2 people')).toBeTruthy();
   });
 
   it('sends on to the sending step', async () => {
@@ -398,8 +410,8 @@ describe('the end of a send', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Review your message' });
-    fireEvent.press(screen.getByText('Text these people'));
+    await screen.findByRole('heading', { name: 'Share the obituary' });
+    fireEvent.press(screen.getByText('Text 1 person'));
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));

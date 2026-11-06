@@ -20,7 +20,7 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['ui/screens/WhoShouldKnow.tsx', 'topBar'],
   ['ui/screens/WhoShouldKnow.tsx', 'footerRow'],
   ['ui/screens/WhoShouldKnow.tsx', 'sectionHead'],
-  ['ui/screens/Review.tsx', 'topBar'],
+  ['ui/screens/ReadyToSend.tsx', 'topBar'],
   ['ui/screens/Account.tsx', 'topBar'],
   ['ui/screens/Sending.tsx', 'topBar'],
   ['ui/screens/Sending.tsx', 'person'],
@@ -41,7 +41,7 @@ describe('rows that hold two controls wrap and keep a gap (#654)', () => {
 describe('inputs are at least 15 pt (#654)', () => {
   it.each([
     ['ui/screens/WhoShouldKnow.tsx', 'input'],
-    ['ui/screens/Review.tsx', 'input'],
+    ['ui/screens/ReadyToSend.tsx', 'input'],
     ['ui/screens/Account.tsx', 'input'],
     ['ui/screens/Announce.tsx', 'input'],
     ['components/DetailsRow.tsx', 'input'],

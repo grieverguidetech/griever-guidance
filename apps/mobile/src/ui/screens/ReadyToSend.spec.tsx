@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { Review } from './Review';
+import { ReadyToSend } from './ReadyToSend';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle per node shows where focus went.
 const mockHandles = new Map<unknown, number>();
@@ -43,25 +43,29 @@ function Harness() {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
-    <Review
+    <ReadyToSend
       copy={copy}
+      heading="Announce the passing"
       kind="announcement"
-      intro="This will go to 2 people."
       message={message}
       onMessageChange={setOverride}
       edited={override !== null}
       onUseSuggested={() => setOverride(null)}
       tone="plain"
       onToneChange={jest.fn()}
+      to={{ text: 'To Dee and Ana · 2', changeLabel: 'Change', onChange: jest.fn() }}
       sendLabel="Text 2 people"
+      chooseLabel="Choose who to tell"
+      note="One at a time, from your own number."
       hasRecipients
+      onChoose={jest.fn()}
       onBack={jest.fn()}
       onSend={jest.fn()}
     />
   );
 }
 
-describe('Review: Bring back my words (#654)', () => {
+describe('ReadyToSend: Bring back my words (#654)', () => {
   it('is not shown before the suggested wording has been used', () => {
     render(<Harness />);
     expect(screen.queryByRole('button', { name: 'Bring back my words' })).toBeNull();
@@ -93,7 +97,6 @@ describe('Review: Bring back my words (#654)', () => {
     render(<Harness />);
     fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
-    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
     expect(focus).toHaveBeenLastCalledWith(handleForButton('Bring back my words'));
