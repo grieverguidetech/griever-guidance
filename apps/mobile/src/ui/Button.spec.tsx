@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { minTouchTarget } from '@griever/tokens';
 import { Button } from './Button';
 
 describe('Button (mobile)', () => {
@@ -24,5 +25,14 @@ describe('Button (mobile)', () => {
     render(<Button label="Save" onPress={onPress} />);
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps its own minimum height unless minHeight is given', () => {
+    const heightOf = (node: { props: { style?: unknown } }) =>
+      StyleSheet.flatten(typeof node.props.style === 'function' ? node.props.style({ pressed: false }) : node.props.style).minHeight;
+    const { rerender } = render(<Button label="Save" onPress={jest.fn()} />);
+    expect(heightOf(screen.getByRole('button', { name: 'Save' }))).toBe(minTouchTarget);
+    rerender(<Button label="Save" onPress={jest.fn()} minHeight={52} />);
+    expect(heightOf(screen.getByRole('button', { name: 'Save' }))).toBe(52);
   });
 });

@@ -2,6 +2,8 @@ export { Heading } from './Heading';
 export type { HeadingLevel, HeadingProps } from './Heading';
 export { Button } from './Button';
 export type { ButtonNode, ButtonProps, ButtonVariant } from './Button';
+export { ActionBar } from './ActionBar';
+export type { ActionBarProps } from './ActionBar';
 export { Eyebrow, Body } from './Text';
 export type { EyebrowProps, BodyProps, BodyTone } from './Text';
 export { SentNote } from './SentNote';

@@ -58,6 +58,8 @@ export interface ButtonProps {
   accessibilityName?: string;
   /** A toggle: on or off. Web: aria-pressed. Native: accessibilityState selected. Leave unset for a plain button. */
   pressed?: boolean;
+  /** Opt-in: a taller minimum for the button itself, in points (for example the bottom action bar's 52). */
+  minHeight?: number;
   buttonRef?: Ref<ButtonNode>;
 }
 
@@ -74,6 +76,7 @@ export function Button({
   accessibilityName,
   announceDisabled = false,
   pressed,
+  minHeight,
   buttonRef,
 }: ButtonProps) {
   const setRef = useCallback(
@@ -139,6 +142,7 @@ export function Button({
         styles.base,
         styles[variant],
         unavailableFill && styles.unavailableFill,
+        minHeight !== undefined && { minHeight },
         pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
       ]}
       {...extra}
