@@ -102,6 +102,11 @@ jobs:
   e2e:
     name: Playwright e2e (desktop)
     runs-on: ubuntu-latest
+    # Official Playwright image: browsers and system packages are baked in (#689). Keep the tag
+    # equal to the @playwright/test version in pnpm-lock.yaml; a step below enforces it.
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      options: --ipc=host
     # A hung browser install once held this job for 47 minutes; fail fast instead.
     timeout-minutes: 25
     steps:
@@ -116,27 +121,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Key the browser cache on the Playwright version, not the whole lockfile, so an unrelated
-      # dependency change does not force a slow browser download.
-      - name: Playwright version
-        id: pw-version
-        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-
-      - if: steps.pw-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium
-
-      # apt mirrors sometimes hang; fail in minutes instead of holding the job (2026-10-27, 24 min hang).
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        timeout-minutes: 8
-        run: pnpm exec playwright install-deps chromium
+      # The image carries Chromium and its system packages, so nothing is downloaded from apt.
+      # Its tag must equal the installed @playwright/test, or Playwright looks for a browser build
+      # the image does not have. The tag is read from the `image:` line above (one source).
+      - name: Check Playwright image matches installed version
+        run: |
+          installed="$(pnpm exec playwright --version | awk '{print $2}')"
+          image="$(sed -n 's/^ *image: mcr.microsoft.com\/playwright:v\([0-9.]*\)-.*/\1/p' .github/workflows/ci.yml)"
+          if [ "$installed" != "$image" ]; then
+            echo "::error::Playwright image is v${image} but @playwright/test is ${installed}. Update the e2e job image in .github/workflows/ci.yml to mcr.microsoft.com/playwright:v${installed}-noble."
+            exit 1
+          fi
 
       # Always runs (not `affected`): it is the only check that the whole
       # journey works in a real browser, and it takes about a minute.
