@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, BackHandler, Modal, Platform, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
@@ -13,7 +13,15 @@ import { HubScreen } from './HubScreen';
 // This path is specific to this react-native version. Re-check it when react-native is upgraded.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  // A distinct handle per node, so a test can tell which node got screen-reader focus.
+  findNodeHandle: (node: unknown) => {
+    const g = globalThis as unknown as { nodeHandles?: Map<unknown, number> };
+    g.nodeHandles ??= new Map();
+    if (!g.nodeHandles.has(node)) {
+      g.nodeHandles.set(node, g.nodeHandles.size + 1);
+    }
+    return g.nodeHandles.get(node);
+  },
 }));
 
 const anna = {
@@ -40,14 +48,34 @@ function setup(session: Session = anna, paymentsEnabled = false) {
   return handlers;
 }
 
-// The button in the bottom bar, found by the bar's test id.
 // The More sheet is the first Modal on the screen, the checklist the second.
 const moreModal = () => screen.UNSAFE_getAllByType(Modal)[0];
 const morePanel = () => within(moreModal());
 
+// The handle the fake findNodeHandle gave the node that was focused last.
+const handleOf = (predicate: (node: any) => boolean) => {
+  const handles = (globalThis as unknown as { nodeHandles: Map<unknown, number> }).nodeHandles;
+  return [...handles].find(([node]) => predicate(node))?.[1];
+};
+
+// The handle the fake gave the More button (found by its hint), so a test sees focus go to More and nowhere else.
+const moreHandle = () => handleOf((node) => node?.props?.accessibilityHint === 'Opens a list of more options') ?? -1;
+
+// The node that got the last screen-reader focus call.
+const focusedNode = (focus: jest.SpiedFunction<typeof AccessibilityInfo.setAccessibilityFocus>) => {
+  const handle = focus.mock.calls.at(-1)?.[0];
+  const handles = (globalThis as unknown as { nodeHandles: Map<any, number> }).nodeHandles;
+  return [...handles].find(([, h]) => h === handle)?.[0];
+};
+
+// The button in the bottom bar, found by the bar's test id.
 const bottomButton = () => within(screen.getByTestId('hub-action-bar')).getByRole('button');
 
 describe('HubScreen', () => {
+  beforeEach(() => {
+    (globalThis as unknown as { nodeHandles?: Map<unknown, number> }).nodeHandles?.clear();
+  });
+
   it('shows the person, the heading and the four steps, with the bottom button naming the announcement', () => {
     setup();
     expect(screen.getByRole('heading', { name: 'Ready to send' })).toBeTruthy();
@@ -123,6 +151,21 @@ describe('HubScreen', () => {
     expect(screen.getByText('Not today. Just so none of it surprises you.')).toBeTruthy();
   });
 
+  it('a second close while More slides out does not drop the chosen item', () => {
+    const { onEditPerson } = setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: 'Edit person' }));
+    // Close or the backdrop while the sheet slides out (both call onRequestClose or onClose).
+    act(() => moreModal().props.onRequestClose());
+    act(() => moreModal().props.onDismiss());
+    expect(onEditPerson).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives More a hint on native', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'More' }).props.accessibilityHint).toBe('Opens a list of more options');
+  });
+
   it('closing More with Close sends screen-reader focus back to More', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     const { onEditPerson } = setup();
@@ -131,7 +174,8 @@ describe('HubScreen', () => {
     fireEvent.press(morePanel().getByRole('button', { name: 'Close' }));
     expect(moreModal().props.visible).toBe(false);
     act(() => moreModal().props.onDismiss());
-    expect(focus).toHaveBeenCalledWith(1);
+    expect(focus).toHaveBeenCalledWith(moreHandle());
+    expect(moreHandle()).toBeDefined();
     expect(onEditPerson).not.toHaveBeenCalled();
   });
 
@@ -154,7 +198,8 @@ describe('HubScreen', () => {
       act(() => {
         jest.runAllTimers();
       });
-      expect(focus).toHaveBeenCalledWith(1);
+      expect(focus).toHaveBeenCalledWith(moreHandle());
+      expect(moreHandle()).toBeDefined();
     } finally {
       Platform.OS = original;
       jest.useRealTimers();
@@ -265,7 +310,6 @@ describe('HubScreen', () => {
     expect(within(thanks).getByText(/Needs your name/)).toBeTruthy();
   });
 
-
   it('Android Back goes Home, but not while a sheet is open', () => {
     let handler: (() => boolean) | undefined;
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, h) => {
@@ -299,8 +343,8 @@ describe('HubScreen', () => {
     setup(anna, true);
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
-    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
-    expect(focus).toHaveBeenCalledWith(1);
+    act(() => screen.UNSAFE_getAllByType(Modal)[2].props.onDismiss());
+    expect(focusedNode(focus)?.props.accessibilityHint).toBe('Included with the full plan');
   });
 
   it('on Android, closing the placeholder sends focus back to the locked row (onDismiss is iOS only)', () => {
@@ -316,7 +360,7 @@ describe('HubScreen', () => {
       act(() => {
         jest.runAllTimers();
       });
-      expect(focus).toHaveBeenCalledWith(1);
+      expect(focusedNode(focus)?.props.accessibilityHint).toBe('Included with the full plan');
     } finally {
       Platform.OS = original;
       jest.useRealTimers();
@@ -362,7 +406,8 @@ describe('HubScreen', () => {
     act(() => moreModal().props.onDismiss());
     focus.mockClear();
     act(() => screen.UNSAFE_getAllByType(Modal)[1].props.onDismiss());
-    expect(focus).toHaveBeenCalledWith(1);
+    expect(focus).toHaveBeenCalledWith(moreHandle());
+    expect(moreHandle()).toBeDefined();
   });
 
   it('draws the heading in Source Serif once the app has loaded the font (the provider App.tsx supplies)', () => {

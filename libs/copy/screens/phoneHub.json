@@ -2,5 +2,7 @@
   "heading": "Ready to send",
   "intro": "Send when you're ready.",
   "more": "More",
+  "moreHint": "Opens a list of more options",
+  "close": "Close",
   "sentPartial": "Sent to {n} {noun} · text the rest"
 }

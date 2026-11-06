@@ -20,6 +20,8 @@ export interface HubCopy {
   back: string;
   /** The top-bar button that opens the sheet with the less common actions. */
   more: string;
+  /** Native hint read after the More button's name. */
+  moreHint: string;
   start: string;
   continue: string;
   tagStarted: string;
@@ -82,7 +84,7 @@ export function Hub(props: HubProps) {
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="header" onPress={props.onBack} />
-        <Button label={copy.more} variant="header" opensDialog onPress={props.onMore} buttonRef={props.moreRef} />
+        <Button label={copy.more} hint={copy.moreHint} variant="header" opensDialog onPress={props.onMore} buttonRef={props.moreRef} />
       </View>
       <View style={styles.head}>
         <Eyebrow>{props.eyebrow}</Eyebrow>

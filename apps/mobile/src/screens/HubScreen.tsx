@@ -17,7 +17,7 @@ const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
 const phoneCopy = screenCopy('phoneHub');
 // The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
-const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, more: phoneCopy.more };
+const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, more: phoneCopy.more, moreHint: phoneCopy.moreHint };
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -162,7 +162,10 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   };
 
   const closeMore = (next?: () => void) => {
-    afterMore.current = next ?? null;
+    // A second close while the sheet slides out (Close, backdrop) must not clear the item already chosen.
+    if (next) {
+      afterMore.current = next;
+    }
     setMoreOpen(false);
     if (Platform.OS !== 'ios') {
       setTimeout(finishMore, 0);
@@ -223,7 +226,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
       </Hub>
       </ScrollView>
       <ActionBar testID="hub-action-bar" label={primaryLabel} onPress={() => onStart(target)} />
-      <Sheet title={phoneCopy.more} closeLabel={paywallCopy.close} visible={moreOpen} onClose={() => closeMore()} onDismiss={finishMore}>
+      <Sheet title={phoneCopy.more} closeLabel={phoneCopy.close} visible={moreOpen} onClose={() => closeMore()} onDismiss={finishMore}>
         <Button label={copy.checklist} variant="secondary" onPress={() => closeMore(() => setChecklistOpen(true))} />
         <Button label={copy.editPerson} variant="secondary" onPress={() => closeMore(onEditPerson)} />
       </Sheet>
