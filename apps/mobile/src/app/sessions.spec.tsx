@@ -124,7 +124,6 @@ describe('people kept on the phone', () => {
     first.unmount();
     render(<App />);
     expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
-
   });
 
   it("opens the person's latest moment and leaves their other moment's draft alone (#83)", async () => {
@@ -308,6 +307,10 @@ describe('session cache', () => {
 });
 
 describe('opening the app on the last person', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   const person = (id: string, personName: string) => ({
     id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing: '', senderName: '', obituaryUrl: '',
     createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
@@ -315,13 +318,18 @@ describe('opening the app on the last person', () => {
   });
 
   it('opens the saved person and says who is open', async () => {
-    const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna'), person('b', 'Ben')]));
     await AsyncStorage.setItem(ACTIVE_KEY, 'b');
     render(<App />);
     expect(await screen.findByText('For Ben')).toBeTruthy();
     expect(screen.queryByText(START)).toBeNull();
-    expect(say).toHaveBeenCalledWith('Now writing about Ben');
+    expect(say).toHaveBeenCalledTimes(1);
+    expect(say).toHaveBeenCalledWith('Now writing about Ben', { queue: true });
+    // Opening the first moment does not say it again.
+    await openThankYous();
+    await findPicker();
+    expect(say).toHaveBeenCalledTimes(1);
   });
 
   it('Back on that person goes Home', async () => {

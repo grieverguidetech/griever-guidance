@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
-import { View } from 'react-native';
+import { AccessibilityInfo, Platform, View } from 'react-native';
 import { colors } from '@griever/tokens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
 import { sendNote } from '../lib/sendNote';
 import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDeviceSessions';
+import { personLabel } from '../components/PersonSwitcher';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
@@ -403,6 +404,28 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       setAtHome(true);
     }
   }, [first]);
+  // A resumed launch says who is open once, from the hub (the person bar is not mounted there yet).
+  // It is queued on iOS so the heading focus does not cut it off; Android waits a moment, as the hub's
+  // note does. Then the arrival is spent, so the first moment does not say it again.
+  const announcedResume = useRef(false);
+  const resumedName = lastOpened ? personLabel(lastOpened) : '';
+  useEffect(() => {
+    if (!resume || announcedResume.current || first === 'pending') {
+      return;
+    }
+    if (first === 'signIn') {
+      announcedResume.current = true; // sign-in came first: this launch lands on Home, so nothing is said
+      return;
+    }
+    announcedResume.current = true;
+    setArrived(false);
+    const spoken = `Now writing about ${resumedName}`;
+    if (Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(spoken, { queue: true });
+      return;
+    }
+    setTimeout(() => AccessibilityInfo.announceForAccessibility(spoken), 100);
+  }, [resume, first, resumedName]);
   const goHome = useCallback(() => {
     setStage(null);
     setEditFrom(null);
