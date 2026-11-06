@@ -17,7 +17,6 @@ export type HubMomentKey = 'announce' | 'service' | 'obituary' | 'thanks';
 export interface HubCopy {
   heading: string;
   intro: string;
-  back: string;
   /** The top-bar button that opens the sheet with the less common actions. */
   more: string;
   /** Native hint read after the More button's name. */
@@ -56,8 +55,9 @@ export interface HubProps {
   /** The eyebrow line, for example "For Margaret". */
   eyebrow: string;
   rows: HubRow[];
-  onBack: () => void;
-  /** Opens the More sheet (What you'll need, Edit person). The host draws the sheet. */
+  /** The open person's name, top-left of the bar. The host draws it (plain text, or a button that opens the switcher). */
+  name: ReactNode;
+  /** Opens the More sheet (What you'll need, Edit person and more). The host draws the sheet. */
   onMore: () => void;
   onStart: (key: HubMomentKey) => void;
   /** `opener` is the row's node (DOM node on web, host instance on native), so focus can go back to it. */
@@ -83,7 +83,7 @@ export function Hub(props: HubProps) {
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={props.onBack} />
+        {props.name}
         <Button label={copy.more} hint={copy.moreHint} variant="header" opensDialog onPress={props.onMore} buttonRef={props.moreRef} />
       </View>
       <View style={styles.head}>

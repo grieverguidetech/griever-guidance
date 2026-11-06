@@ -4,5 +4,7 @@
   "more": "More",
   "moreHint": "Opens a list of more options",
   "close": "Close",
-  "sentPartial": "Sent to {n} {noun} · text the rest"
+  "sentPartial": "Sent to {n} {noun} · text the rest",
+  "account": "Your account",
+  "importContacts": "Add from your contacts"
 }

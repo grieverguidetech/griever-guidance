@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, BackHandler, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey } from '@griever/shared';
@@ -9,6 +9,8 @@ import { ActionBar, Button, Hub, PaywallSheet, SentNote, Sheet } from '../ui';
 import type { ButtonNode, HubRow } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
+import { NameSwitcher } from '../components/NameSwitcher';
+import { personLabel } from '../components/PersonSwitcher';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { SentNoteText } from '../lib/sendNote';
 import { barMoment, nextMoment } from '../lib/nextMoment';
@@ -16,6 +18,7 @@ import { barMoment, nextMoment } from '../lib/nextMoment';
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
 const phoneCopy = screenCopy('phoneHub');
+const switcherCopy = screenCopy('phoneSwitcher');
 // The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
 const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, more: phoneCopy.more, moreHint: phoneCopy.moreHint };
 
@@ -63,7 +66,14 @@ const momentOfCategory = (category: SentNoteText['category']): MomentKey | null 
 
 export type HubScreenProps = {
   session: Session;
-  onBack: () => void;
+  /** The other people kept on this phone. With none, the name is plain text. */
+  others: Session[];
+  onSwitch: (id: string) => void;
+  /** Absent when the user cannot add a person (C11): the add button is then not drawn anywhere. */
+  onAddSomeone?: () => void;
+  /** Only given when accounts are on. */
+  onAccount?: () => void;
+  onImportContacts?: () => void;
   onStart: (key: MomentKey) => void;
   onEditPerson: () => void;
   /** A calm line after the last person of a send was dealt with. Stays until the person leaves the hub. */
@@ -76,7 +86,7 @@ export type HubScreenProps = {
  * The person's plan. The screen itself is the Hub in
  * apps/mobile/src/ui; this holds what is mobile only: the sheets, and reading the person's moments.
  */
-export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
+export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, onImportContacts, onStart, onEditPerson, note, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
   const moments = usePathMoments(session);
   const [moreOpen, setMoreOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -87,8 +97,6 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   const afterMore = useRef<(() => void) | null>(null);
   // The locked row that opened the placeholder, so screen-reader focus can go back to it.
   const opener = useRef<unknown>(null);
-  const sheetOpen = useRef(false);
-  sheetOpen.current = moreOpen || checklistOpen || paywallOpen;
 
   // The heading takes screen-reader focus when the hub opens (after a screen swap).
   useEffect(() => {
@@ -114,17 +122,8 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
     return () => clearTimeout(timer);
   }, [note]);
 
-  // Android Back goes Home, as the Back button does. A sheet that is open takes Back first.
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (sheetOpen.current) {
-        return false;
-      }
-      onBack();
-      return true;
-    });
-    return () => sub.remove();
-  }, [onBack]);
+  // Android Back: an open sheet closes through its own onRequestClose. With none open there is no
+  // listener here, so Back leaves the app (there is no Home to go to).
 
   // The placeholder's onDismiss runs on iOS only, so on Android focus goes back when it is closed
   // (the Close button, or the Back gesture).
@@ -207,7 +206,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
         copy={hubCopy}
         eyebrow={fill(copy.forName, { name: session.personName })}
         rows={rows}
-        onBack={onBack}
+        name={<NameSwitcher name={personLabel(session)} others={others} onPick={onSwitch} onAdd={onAddSomeone} />}
         onMore={() => setMoreOpen(true)}
         onStart={onStart}
         onLocked={(row) => {
@@ -229,6 +228,9 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
       <Sheet title={phoneCopy.more} closeLabel={phoneCopy.close} visible={moreOpen} onClose={() => closeMore()} onDismiss={finishMore}>
         <Button label={copy.checklist} variant="secondary" onPress={() => closeMore(() => setChecklistOpen(true))} />
         <Button label={copy.editPerson} variant="secondary" onPress={() => closeMore(onEditPerson)} />
+        {onAddSomeone && others.length === 0 ? <Button label={switcherCopy.addSomeone} variant="secondary" onPress={() => closeMore(onAddSomeone)} /> : null}
+        {onAccount ? <Button label={phoneCopy.account} variant="secondary" onPress={() => closeMore(onAccount)} /> : null}
+        {onImportContacts ? <Button label={phoneCopy.importContacts} variant="secondary" onPress={() => closeMore(onImportContacts)} /> : null}
       </Sheet>
       <WhatYoullNeedSheet visible={checklistOpen} onClose={closeChecklist} onDismiss={focusMoreButton} />
       {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}

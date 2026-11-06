@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Modal } from 'react-native';
 import { App } from './App';
 import { createSessionCache, SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
 import { freshDraft } from '@griever/hooks';
@@ -18,7 +18,6 @@ async function savedAftercare(personName: string) {
 }
 
 const START = "Start with someone I've lost";
-const ANOTHER = "Someone else I've lost";
 const SETUP_TITLE = 'Who are we writing about?';
 
 // Create opens setup first (#213, behavior approved in #110). Type the name there and continue to the path.
@@ -28,7 +27,9 @@ async function startWith(name: string) {
   await screen.findByText(`For ${name}`); // the hub: the person's plan
 }
 
-const backFromHub = () => fireEvent.press(screen.getByRole('button', { name: 'Home' }));
+// Home is only the first screen now. On the person screen the name opens the switcher (2 or more
+// people); with one person, "Add someone" is under More.
+const openSwitcher = () => fireEvent.press(screen.getByRole('button', { name: /^Writing about / }));
 const openThankYous = async () => fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
 
 // Home is where every launch lands; the first person is begun from there.
@@ -37,9 +38,18 @@ async function begin() {
   await screen.findByText(SETUP_TITLE);
 }
 
+// A sheet's onDismiss does not fire in Jest; the More sheet runs its chosen item from it on iOS.
+const finishSheets = () => act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
+
 async function addPerson() {
-  backFromHub();
-  fireEvent.press(await screen.findByText(ANOTHER));
+  const inMore = !screen.queryByRole('button', { name: /^Writing about / });
+  if (inMore) {
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+  } else {
+    openSwitcher();
+  }
+  fireEvent.press(await screen.findByRole('button', { name: 'Add someone' }));
+  finishSheets();
   await screen.findByText(SETUP_TITLE);
 }
 
@@ -61,10 +71,10 @@ describe('people kept on the phone', () => {
     expect((screen.getByLabelText('Their name, required')).props.value).toBe('');
     await startWith('Ben');
 
-    backFromHub();
-    expect(await screen.findByLabelText('Anna')).toBeTruthy();
-    expect(screen.getByLabelText('Ben')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Anna'));
+    // Ben is open; the switcher lists Anna, and picking her opens her screen.
+    openSwitcher();
+    fireEvent.press(await screen.findByRole('button', { name: 'Anna' }));
+    finishSheets();
     expect(await screen.findByText('For Anna')).toBeTruthy();
 
     // Each person is a separate record on the phone, holding only their own details.
@@ -222,9 +232,8 @@ describe('people kept on the phone', () => {
 
     render(<App />); // a new App, a new in-memory cache, the same AsyncStorage
     expect(await screen.findByText('For Ben')).toBeTruthy(); // the one open when it closed
-    backFromHub();
-    expect(await screen.findByLabelText('Anna')).toBeTruthy();
-    expect(screen.getByLabelText('Ben')).toBeTruthy();
+    openSwitcher();
+    expect(await screen.findByRole('button', { name: 'Anna' })).toBeTruthy();
   });
 
   it('makes no network calls', async () => {
@@ -241,8 +250,10 @@ describe('people kept on the phone', () => {
     render(<App />);
     await begin();
     await startWith('Anna');
-    backFromHub();
-    await screen.findByLabelText('Anna');
+    await addPerson();
+    await startWith('Ben');
+    openSwitcher();
+    await screen.findByRole('button', { name: 'Anna' });
     expect(screen.queryByText(/delete|remove/i)).toBeNull();
     expect(screen.queryByLabelText(/delete|remove/i)).toBeNull();
   });
@@ -333,13 +344,13 @@ describe('opening the app on the last person', () => {
     expect(say).toHaveBeenCalledTimes(1);
   });
 
-  it('Back on that person goes Home', async () => {
+  it('has no Home button on that person, and no way back to Home', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna')]));
     await AsyncStorage.setItem(ACTIVE_KEY, 'a');
     render(<App />);
     await screen.findByText('For Anna');
-    backFromHub();
-    expect(await screen.findByLabelText('Anna')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 
   it('opens Home when the saved person is blank', async () => {

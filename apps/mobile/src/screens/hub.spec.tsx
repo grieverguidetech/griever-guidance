@@ -8,6 +8,7 @@ import { templates } from '@griever/shared';
 import { colors } from '@griever/tokens';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
+import type { HubScreenProps } from './HubScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 // This path is specific to this react-native version. Re-check it when react-native is upgraded.
@@ -42,14 +43,15 @@ const anna = {
   remindersScheduled: [],
 } as unknown as Session;
 
-function setup(session: Session = anna, paymentsEnabled = false) {
-  const handlers = { onBack: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
-  render(<HubScreen session={session} paymentsEnabled={paymentsEnabled} {...handlers} />);
+function setup(session: Session = anna, paymentsEnabled = false, extra: Partial<HubScreenProps> = {}) {
+  const handlers = { others: [] as Session[], onSwitch: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
+  render(<HubScreen session={session} paymentsEnabled={paymentsEnabled} {...handlers} {...extra} />);
   return handlers;
 }
 
 // The More sheet is the first Modal on the screen, the checklist the second.
 const moreModal = () => screen.UNSAFE_getAllByType(Modal)[0];
+const moreModalFirst = () => screen.UNSAFE_getAllByType(Modal)[0];
 const morePanel = () => within(moreModal());
 
 // The handle the fake findNodeHandle gave the node that was focused last.
@@ -109,10 +111,73 @@ describe('HubScreen', () => {
     expect(onStart).toHaveBeenLastCalledWith('thanks');
   });
 
-  it('answers Home', () => {
-    const { onBack } = setup();
-    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+  it('has no Home button, and no delete or remove anywhere on the screen', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /delete|remove/i })).toBeNull();
+  });
+
+  it('shows the name top-left with the label, as plain text while it is the only person', () => {
+    setup();
+    expect(screen.getByLabelText('Writing about Anna')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Writing about Anna' })).toBeNull();
+  });
+
+  it('shows the name as a button with 2 or more people, and picking another person calls onSwitch', () => {
+    const ben = { ...anna, id: 'b', personName: 'Ben' } as Session;
+    const { onSwitch } = setup(anna, false, { others: [ben] });
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Ben' }));
+    // The switcher sheet is the first Modal; it runs the choice once it is gone.
+    act(() => moreModalFirst().props.onDismiss());
+    expect(onSwitch).toHaveBeenCalledWith('b');
+  });
+
+  it('puts Add someone in More when this is the only person, and runs it once the sheet is gone', () => {
+    const onAddSomeone = jest.fn();
+    setup(anna, false, { onAddSomeone });
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: 'Add someone' }));
+    act(() => moreModal().props.onDismiss());
+    expect(onAddSomeone).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves Add someone out of More with 2 or more people (it is in the switcher)', () => {
+    const ben = { ...anna, id: 'b', personName: 'Ben' } as Session;
+    setup(anna, false, { others: [ben], onAddSomeone: jest.fn() });
+    // The switcher sheet is the first Modal when it exists; More is the second.
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    expect(within(screen.UNSAFE_getAllByType(Modal)[1]).queryByRole('button', { name: 'Add someone' })).toBeNull();
+  });
+
+  it('draws no Add someone anywhere when the user cannot create a person (C11)', () => {
+    const ben = { ...anna, id: 'b', personName: 'Ben' } as Session;
+    setup(anna, false, { others: [ben] });
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    expect(screen.queryByRole('button', { name: 'Add someone' })).toBeNull();
+  });
+
+  it('adds Your account and Add from your contacts to More only when they are given', () => {
+    setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add from your contacts' })).toBeNull();
+  });
+
+  it('opens Your account and the contacts import from More, each once the sheet is gone', () => {
+    const onAccount = jest.fn();
+    const onImportContacts = jest.fn();
+    setup(anna, false, { onAccount, onImportContacts });
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: 'Your account' }));
+    act(() => moreModal().props.onDismiss());
+    expect(onAccount).toHaveBeenCalledTimes(1);
+    expect(onImportContacts).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: 'Add from your contacts' }));
+    act(() => moreModal().props.onDismiss());
+    expect(onImportContacts).toHaveBeenCalledTimes(1);
   });
 
   it('has More on the top bar, and no What you will need or Edit person button until More is opened', () => {
@@ -211,7 +276,7 @@ describe('HubScreen', () => {
     Platform.OS = 'ios';
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.', category: 'announcement' as const, partial: false };
-    render(<HubScreen session={anna} paymentsEnabled={false} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
+    render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
     Platform.OS = original;
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByLabelText('Everyone has been told. Kept private.').props.accessibilityLiveRegion).toBe('polite');
@@ -225,7 +290,7 @@ describe('HubScreen', () => {
     Platform.OS = 'android';
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.', category: 'announcement' as const, partial: false };
-    render(<HubScreen session={anna} paymentsEnabled={false} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
+    render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
     Platform.OS = original;
     expect(announce).not.toHaveBeenCalled();
     act(() => {
@@ -234,17 +299,6 @@ describe('HubScreen', () => {
     expect(announce).toHaveBeenCalledWith(note.spoken);
     expect(announce).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
-  });
-
-  it('Android Back goes Home', () => {
-    let handler: (() => boolean) | undefined;
-    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, h) => {
-      handler = h as () => boolean;
-      return { remove: () => undefined };
-    });
-    const { onBack } = setup();
-    act(() => void handler?.());
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it('shows a finished step as one compact row, and a started step as Started', () => {
@@ -310,20 +364,19 @@ describe('HubScreen', () => {
     expect(within(thanks).getByText(/Needs your name/)).toBeTruthy();
   });
 
-  it('Android Back goes Home, but not while a sheet is open', () => {
-    let handler: (() => boolean) | undefined;
+  it('Android Back is never taken by the screen: with no sheet it leaves the app, with one the sheet closes itself', () => {
+    const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, h) => {
-      handler = h as () => boolean;
+      handlers.push(h as () => boolean);
       return { remove: () => undefined };
     });
-    const { onBack } = setup();
+    setup();
+    expect(handlers.some((h) => h())).toBe(false);
     fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    let handled = true;
-    act(() => {
-      handled = handler?.() ?? true;
-    });
-    expect(handled).toBe(false);
-    expect(onBack).not.toHaveBeenCalled();
+    expect(handlers.some((h) => h())).toBe(false);
+    // The open sheet shuts through its own Back request.
+    act(() => moreModal().props.onRequestClose());
+    expect(moreModal().props.visible).toBe(false);
   });
 
   it('with payments on, locks the paid steps: focusable, not disabled, with the reason as a hint', () => {
@@ -413,7 +466,7 @@ describe('HubScreen', () => {
   it('draws the heading in Source Serif once the app has loaded the font (the provider App.tsx supplies)', () => {
     render(
       <SerifReadyContext.Provider value>
-        <HubScreen session={anna} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
+        <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
     const heading = screen.getByRole('heading', { name: 'Ready to send' });
@@ -424,7 +477,7 @@ describe('HubScreen', () => {
   it('keeps the system font until the serif is ready', () => {
     render(
       <SerifReadyContext.Provider value={false}>
-        <HubScreen session={anna} onBack={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
+        <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
     const heading = screen.getByRole('heading', { name: 'Ready to send' });
@@ -493,7 +546,7 @@ describe('HubScreen: the next card and the bottom button', () => {
   const announced = { recipientsNotified: { announcement: ['c1'] } };
   const ready = { senderName: 'Sam', serviceDate: 'November 8, 2026', serviceTime: '2:00 PM', servicePlace: 'St Mary' };
   const sess = (extra: object) => ({ ...anna, ...extra }) as unknown as Session;
-  const props = { paymentsEnabled: false, onBack: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
+  const props = { paymentsEnabled: false, others: [] as Session[], onSwitch: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
 
   it('lights the service once the announcement is done, and the bottom button names it', () => {
     const { onStart } = setup(sess({ ...announced, ...ready }));

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, Modal } from 'react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { App } from './App';
-import { SESSIONS_KEY } from '../lib/useDeviceSessions';
+import { ACTIVE_KEY, SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Jest has no native view tree, so findNodeHandle returns null. This gives each node its own handle,
 // so a test can see which button focus went to.
@@ -68,22 +68,22 @@ describe('Import contacts from Home (#379)', () => {
     expect(focused).not.toContain('Your account');
   });
 
-  it('focus returns once only: after opening a person and coming Home it is not on the import button', async () => {
+  it('from the person screen: More, Add from your contacts, import review, Back returns to that person', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
     mockFetch.mockResolvedValue([{ key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [] }]);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<App />);
-    fireEvent.press(await screen.findByRole('button', { name: 'Add from your contacts' }));
-    await screen.findByText('Sam');
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    await screen.findByText("Who you're writing about");
-    await waitFor(() => expect(focus).toHaveBeenCalled());
-    fireEvent.press(screen.getByRole('button', { name: 'Anna' }));
     await screen.findByText('Ready to send');
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Add from your contacts' }));
+    // A sheet's onDismiss does not fire in Jest; the More sheet runs its chosen item from it on iOS.
+    act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
+    expect(await screen.findByText('Sam')).toBeTruthy();
     focus.mockClear();
-    // The hub's way back reads "Home" (#380).
-    fireEvent.press(await screen.findByRole('button', { name: 'Home' }));
-    await screen.findByText("Who you're writing about");
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
     await new Promise((resolve) => setTimeout(resolve, 50));
     const calls = focus.mock.calls.map((c) => textUnder(mockNodes[(c[0] as number) - 1]));
     expect(calls.some((t) => t.includes('Add from your contacts'))).toBe(false);
