@@ -10,6 +10,7 @@ import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, WhoShouldKno
 import type { ButtonNode } from '../ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
+import { everyoneYouTold, notSentYet } from '../lib/defaultRecipients';
 import { ErrorText, Field } from '../components/authForm';
 import { useRecheckWhenBlocked } from '../lib/useRecheckWhenBlocked';
 import { SavedNote } from '../components/SavedNote';
@@ -282,17 +283,13 @@ function buildShortcuts(
   if (!category) {
     return undefined;
   }
-  const saved = new Set(savedIds);
-  const told = (notified?.announcement ?? []).filter((id) => saved.has(id));
-  const thisMoment = new Set(notified?.[category] ?? []);
+  const told = everyoneYouTold(category, notified, savedIds);
+  const notSent = notSentYet(category, notified, savedIds);
   const list: { label: string; accessibilityName: string; onPress: () => void }[] = [];
-  // The announcement is what "told" means, so it has no such shortcut of its own.
-  if (category !== 'announcement' && told.length > 0) {
+  if (told.length > 0) {
     list.push({ label: copy.everyoneYouTold, accessibilityName: copy.everyoneYouToldSelectAll, onPress: () => select(told) });
   }
-  const notSent = savedIds.filter((id) => !thisMoment.has(id));
-  const reached = savedIds.some((id) => thisMoment.has(id));
-  if (reached && notSent.length > 0) {
+  if (notSent.length > 0) {
     list.push({
       label: copy.notSentYet,
       accessibilityName: copy.notSentYetSelectAll,
