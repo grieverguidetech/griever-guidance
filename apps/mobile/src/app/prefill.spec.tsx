@@ -145,6 +145,22 @@ describe('send flow starts from the planned details', () => {
     expect(screen.queryByDisplayValue('2:00 PM')).toBeNull();
   });
 
+  it('keeps hand-edited wording when Change opens the people sheet on a draft resumed on Ready to send', async () => {
+    // The name is not in the draft's fields yet, so a prefill on opening the sheet would set it and clear the wording.
+    const draft = {
+      step: 'review', templateCategory: 'aftercare', templateOverrideId: 'thank-you-note', fields: {},
+      serviceDetailsKnown: null, selectedContactIds: ['c1'], includeFlowers: false, customFlorist: '',
+      flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: 'Our own words.',
+    };
+    await openMoment({ ...base, drafts: { aftercare: draft } } as unknown as Session, /Send thank-yous/);
+    expect(await screen.findByText('Our own words.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    await screen.findByRole('heading', { name: 'Who should get this?' });
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+    expect(screen.getByText('Our own words.')).toBeTruthy();
+  });
+
   it('saves a service date typed on Confirm to the person', async () => {
     await openService({ ...base } as Session);
     await openPeople();
