@@ -168,6 +168,7 @@ by the closing ticket #633.
 | MOB-9 | Obituary in two steps (Decision 4). Step 1: email the text to the publisher with mail compose. Step 2: once it is published, the user pastes the link on the phone and texts the link message. The link is added only on the phone; it is never asked for at setup (C10) | n/a | Done | #629, #630, PRs #641, #646. Device: a long obituary in mail compose, HUMAN TODO. VoiceOver and TalkBack pass, HUMAN TODO. |
 | MOB-10 | "Share elsewhere" (OS share sheet) for service and obituary. Allowed with zero people picked (Decision 1, C1) | n/a | Done | #631, PR #648. Device: the share sheet lists Facebook and WhatsApp; closing it on Android shows no error, HUMAN TODO. VoiceOver and TalkBack pass, HUMAN TODO. |
 | MOB-11 | Thank-yous: an optional one-line note per person. The note is the last line of that person's message | n/a | Done | #632, PR #647. VoiceOver and TalkBack pass, HUMAN TODO. |
+| MOB-12 | A fixed bottom bar on the phone's send screens: one primary button that names the next thing, at least 52 points tall, clear of the home indicator. Secondary actions sit above it as links | n/a | Partial | #665: the component (`ui/ActionBar.tsx`); screens adopt it in #667, #669, #670, #672. |
 
 ---
 

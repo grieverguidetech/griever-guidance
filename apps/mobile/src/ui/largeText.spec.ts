@@ -27,6 +27,7 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['screens/ContactSelectorScreen.tsx', 'topBar'],
   ['ui/screens/PersonSetup.tsx', 'topBar'],
   ['ui/screens/ShareObituary.tsx', 'topBar'],
+  ['ui/ActionBar.tsx', 'above'],
 ];
 
 describe('rows that hold two controls wrap and keep a gap (#654)', () => {
