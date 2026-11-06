@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { AccessibilityInfo, AppState, Linking, Text } from 'react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SessionDetails } from '@griever/shared';
+import { ActionBar } from '../ui';
 import { SendingScreen } from './SendingScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
@@ -67,6 +68,7 @@ function Harness({ ids, category = 'announcement' }: { ids: string[]; category?:
   return (
     <>
       <Text testID="step">{flow.step}</Text>
+      <Text testID="statuses">{(sendJob?.recipients ?? []).map((r) => r.status).join(',')}</Text>
       <SendingScreen flow={flow} contacts={{ contacts: all } as never} />
     </>
   );
@@ -118,8 +120,29 @@ describe('Sending on the phone: asking on return from Messages', () => {
     expect(screen.queryByText(PROMPT)).toBeNull();
     change('active');
     expect(await screen.findByText(PROMPT)).toBeTruthy();
-    expect(screen.getByText('Not yet')).toBeTruthy();
-    expect(screen.getByText('Skip')).toBeTruthy();
+    expect(screen.getByText('Not yet, open Messages again')).toBeTruthy();
+    expect(screen.getByText('Skip Dee')).toBeTruthy();
+  });
+
+  it('puts the question on the bottom bar button, with Not yet and Skip above it as links', async () => {
+    const { change } = setup(['c1', 'c2']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    change('background');
+    change('active');
+    await screen.findByText(PROMPT);
+    const bar = screen.UNSAFE_getByType(ActionBar);
+    expect(bar.props.label).toBe(PROMPT);
+    const links = bar.props.above.props.children.map((link: { props: { label: string; variant: string } }) => [link.props.label, link.props.variant]);
+    expect(links).toEqual([['Not yet, open Messages again', 'tertiary'], ['Skip Dee', 'tertiary']]);
+  });
+
+  it('puts only Skip above the bar before the hand-off, and the bar reads Text Dee', async () => {
+    setup(['c1', 'c2']);
+    await screen.findByText('Text Dee');
+    const bar = screen.UNSAFE_getByType(ActionBar);
+    expect(bar.props.label).toBe('Text Dee');
+    expect(bar.props.above.props.label).toBe('Skip Dee');
+    expect(screen.queryByText("What you'll need")).toBeNull();
   });
 
   it('does not ask after inactive then active (Control Center, notification shade)', async () => {
@@ -150,7 +173,9 @@ describe('Sending on the phone: asking on return from Messages', () => {
     expect(open).toHaveBeenCalledTimes(2);
     const link = decodeURIComponent(String(open.mock.calls[1][0]));
     expect(link).toContain('+15555550101');
+    expect(link).not.toContain('+15555550100');
     expect(link).toContain('Eli,');
+    expect(decodeURIComponent(String(open.mock.calls[0][0]))).not.toContain('+15555550101');
     expect(await screen.findByText('2 of 2')).toBeTruthy();
     expect(screen.getByText('Sent')).toBeTruthy();
     // Eli is handed off already: Done shows, not Text Eli.
@@ -158,16 +183,20 @@ describe('Sending on the phone: asking on return from Messages', () => {
     expect(screen.queryByText('Text Eli')).toBeNull();
   });
 
-  it('Not yet closes the prompt and keeps Dee active with Text Dee', async () => {
+  it('Not yet closes the prompt, keeps Dee active and opens Messages for Dee again', async () => {
     const { open, change } = setup(['c1', 'c2']);
     fireEvent.press(await screen.findByText('Text Dee'));
     change('background');
     change('active');
-    fireEvent.press(await screen.findByText('Not yet'));
+    fireEvent.press(await screen.findByText('Not yet, open Messages again'));
     expect(screen.queryByText(PROMPT)).toBeNull();
-    expect(screen.getByText('Text Dee')).toBeTruthy();
     expect(screen.getByText('1 of 2')).toBeTruthy();
-    expect(open).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('statuses').props.children).toBe('sending,queued');
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(decodeURIComponent(String(open.mock.calls[1][0]))).toContain('+15555550100');
+    // Back to the hand-off state: Next is the fallback, and the note is read again.
+    expect(screen.getByText('Next')).toBeTruthy();
+    expect(screen.getByText('Send it in Messages, then come back and tap Next.')).toBeTruthy();
   });
 
   it('Skip still works from the prompt', async () => {
@@ -176,7 +205,7 @@ describe('Sending on the phone: asking on return from Messages', () => {
     change('background');
     change('active');
     await screen.findByText(PROMPT);
-    fireEvent.press(screen.getByText('Skip'));
+    fireEvent.press(screen.getByText('Skip Dee'));
     expect(await screen.findByText('Text Eli')).toBeTruthy();
     expect(screen.getByText('Skipped')).toBeTruthy();
   });
@@ -189,7 +218,7 @@ describe('Sending on the phone: asking on return from Messages', () => {
     fireEvent.press(await screen.findByText('Sent to Dee? Done'));
     expect(open).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Sent to Dee? Done')).toBeNull();
-    expect(screen.queryByText('Not yet')).toBeNull();
+    expect(screen.queryByText('Not yet, open Messages again')).toBeNull();
     expect(screen.getByText('Sent')).toBeTruthy();
   });
 
@@ -255,9 +284,9 @@ describe('Sending on the phone: asking on return from Messages', () => {
     expect(focus.mock.calls.length).toBe(before + 1);
     expect(focus).toHaveBeenLastCalledWith(handleOf(PROMPT));
     expect(screen.getByRole('button', { name: PROMPT }).props.accessibilityHint).toBe('Marks Dee sent and opens Messages for Eli');
-    fireEvent.press(screen.getByText('Not yet'));
+    fireEvent.press(screen.getByText('Not yet, open Messages again'));
     expect(focus.mock.calls.length).toBe(before + 2);
-    expect(focus).toHaveBeenLastCalledWith(handleOf('Text Dee'));
+    expect(focus).toHaveBeenLastCalledWith(handleOf('Next'));
   });
 
   it('clears the old tap-Next note while the question shows', async () => {
@@ -294,15 +323,16 @@ describe('Sending on the phone: a line for each person (thank-you)', () => {
     expect(body(open, 1)).not.toContain('lasagna');
   });
 
-  it('shows the input again after Not yet, and it is still editable', async () => {
-    const { change } = setup(['c1', 'c2'], 'aftercare');
-    fireEvent.press(await screen.findByText('Text Dee'));
-    expect(screen.queryByLabelText(line('Dee'))).toBeNull();
+  it('Not yet opens Messages again with the same line for the same person', async () => {
+    const { change, open } = setup(['c1', 'c2'], 'aftercare');
+    fireEvent.changeText(await screen.findByLabelText(line('Dee')), 'Thanks again');
+    fireEvent.press(screen.getByText('Text Dee'));
     change('background');
     change('active');
-    fireEvent.press(await screen.findByText('Not yet'));
-    fireEvent.changeText(screen.getByLabelText(line('Dee')), 'Thanks again');
-    expect(screen.getByDisplayValue('Thanks again')).toBeTruthy();
+    fireEvent.press(await screen.findByText('Not yet, open Messages again'));
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(body(open, 1).endsWith('\nThanks again')).toBe(true);
+    expect(body(open, 1)).toContain('+15555550100');
   });
 
   it('has no input on other moments', async () => {
@@ -396,11 +426,25 @@ describe('Sending on the phone: a send is never lost or repeated', () => {
     expect(screen.getByRole('button', { name: 'Text Dee' }).props.accessibilityHint).toBe(error);
   });
 
-  it('Stop for now has a hint and a short muted line', async () => {
+  it('Stop for now sits in the top bar with the note as its hint, and the note is not drawn', async () => {
     setup(['c1', 'c2']);
     await screen.findByText('Text Dee');
     expect(screen.getByRole('button', { name: 'Stop for now' }).props.accessibilityHint).toBe('People you told stay marked as told.');
-    expect(screen.getByText('People you told stay marked as told.', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText('People you told stay marked as told.', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByText('1 of 2')).toBeTruthy();
+  });
+
+  it('Stop for now keeps only the people confirmed with a tap', async () => {
+    const { change } = setup(['c1', 'c2', 'c3']);
+    fireEvent.press(await screen.findByText('Text Dee'));
+    change('background');
+    change('active');
+    fireEvent.press(await screen.findByText(PROMPT));
+    await screen.findByText('2 of 3');
+    fireEvent.press(screen.getByText('Stop for now'));
+    expect(screen.getByTestId('step').props.children).toBe('sent');
+    // Eli was handed off but never confirmed, so Eli is not marked sent.
+    expect(screen.getByTestId('statuses').props.children).toBe('delivered,sending,queued');
   });
 
   it('Stop for now ends the send for this flow', async () => {

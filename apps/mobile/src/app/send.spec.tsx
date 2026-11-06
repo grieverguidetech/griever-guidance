@@ -305,9 +305,8 @@ describe('the end of a send', () => {
   it('shows the shared sending screen: heading, who is next, and the hand-off note', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
-    expect(await screen.findByRole('heading', { name: 'Reaching people, one at a time' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Dee' })).toBeTruthy();
     expect(screen.getByText('1 of 2')).toBeTruthy();
-    expect(screen.getByText('Dee')).toBeTruthy();
     fireEvent.press(screen.getByText('Text Dee'));
     expect(await screen.findByText('Send it in Messages, then come back and tap Next.')).toBeTruthy();
     await afterMessages();
@@ -322,7 +321,7 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Next'));
-    fireEvent.press(await screen.findByText('Skip'));
+    fireEvent.press(await screen.findByText('Skip Eli'));
     expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
     expect(screen.getByText(/You can text the others from your own Messages app any time\./)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith(
@@ -334,8 +333,8 @@ describe('the end of a send', () => {
   it('says no one was texted, with no privacy line, when everyone is skipped', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee', 'Eli']);
-    fireEvent.press(await screen.findByText('Skip'));
-    fireEvent.press(await screen.findByText('Skip'));
+    fireEvent.press(await screen.findByText('Skip Dee'));
+    fireEvent.press(await screen.findByText('Skip Eli'));
     expect(await screen.findByText('No one was texted this time.')).toBeTruthy();
     expect(screen.getByLabelText(/^No one was texted this time\./).props.accessibilityLabel).not.toContain("We don't keep a copy");
     expect(screen.queryByText(/We don't keep a copy/)).toBeNull();

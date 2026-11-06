@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@griever/tokens';
 import { Button } from './Button';
+import type { ButtonNode } from './Button';
 import { Body } from './Text';
 
 /** The primary button is never shorter than this, in points (MOB-12). */
@@ -21,6 +22,10 @@ export interface ActionBarProps {
    * hint, shows it as the line under it, and a press does nothing.
    */
   disabledReason?: string;
+  /** Read after the label when the button is available (for example what a tap will do). */
+  hint?: string;
+  /** For moving screen-reader focus to the button. */
+  buttonRef?: Ref<ButtonNode>;
   testID?: string;
 }
 
@@ -28,7 +33,7 @@ export interface ActionBarProps {
  * The bar fixed at the bottom of a phone screen. Put it after the scrolling content, outside it. Its
  * bottom padding includes the safe-area inset, so the button clears the home indicator.
  */
-export function ActionBar({ label, onPress, note, above, disabledReason, testID }: ActionBarProps) {
+export function ActionBar({ label, onPress, note, above, disabledReason, hint, buttonRef, testID }: ActionBarProps) {
   const insets = useSafeAreaInsets();
   const disabled = Boolean(disabledReason);
   const line = disabled ? disabledReason : note;
@@ -40,7 +45,8 @@ export function ActionBar({ label, onPress, note, above, disabledReason, testID 
         onPress={disabled ? noop : onPress}
         ariaDisabled={disabled}
         announceDisabled={disabled}
-        hint={disabled ? disabledReason : undefined}
+        hint={disabled ? disabledReason : hint}
+        buttonRef={buttonRef}
         minHeight={ACTION_BAR_BUTTON_HEIGHT}
       />
       {line ? (
