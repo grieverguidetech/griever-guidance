@@ -6,6 +6,10 @@ describe('everyoneYouTold', () => {
     expect(everyoneYouTold('service', { announcement: ['a', 'b'] }, ['a', 'b', 'c'])).toEqual(['a', 'b']);
   });
 
+  it('keeps the announcement order', () => {
+    expect(everyoneYouTold('service', { announcement: ['b', 'a'] }, ['a', 'b'])).toEqual(['b', 'a']);
+  });
+
   it('skips people who are no longer saved', () => {
     expect(everyoneYouTold('service', { announcement: ['a', 'gone', 'b'] }, ['a', 'b'])).toEqual(['a', 'b']);
   });
@@ -28,6 +32,10 @@ describe('everyoneYouTold', () => {
 describe('notSentYet', () => {
   it('leaves out the people this moment has reached', () => {
     expect(notSentYet('service', { service: ['a'] }, ['a', 'b', 'c'])).toEqual(['b', 'c']);
+  });
+
+  it('works for the announcement itself', () => {
+    expect(notSentYet('announcement', { announcement: ['a'] }, ['a', 'b'])).toEqual(['b']);
   });
 
   it('gives [] when this moment has reached nobody saved', () => {
