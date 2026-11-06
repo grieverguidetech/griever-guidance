@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { AccessibilityInfo, AppState, Linking, Text } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Platform, Text } from 'react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SessionDetails } from '@griever/shared';
 import { SendingScreen } from './SendingScreen';
@@ -465,7 +465,7 @@ describe('Sending on the phone: a send is never lost or repeated', () => {
     expect(screen.getByTestId('step').props.children).toBe('sent');
   });
 
-  it('on iOS the question is also announced when it shows, and not when it is absent', async () => {
+  it('on iOS the question is also announced once when it shows, and not again after Yes', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     const { change } = setup(['c1', 'c2']);
     fireEvent.press(await screen.findByText('Text Dee'));
@@ -474,6 +474,27 @@ describe('Sending on the phone: a send is never lost or repeated', () => {
     change('active');
     await screen.findByText(PROMPT);
     expect(announce.mock.calls.filter(([text]) => text === PROMPT)).toHaveLength(1);
+    announce.mockClear();
+    fireEvent.press(screen.getByText(PROMPT));
+    await screen.findByText('2 of 2');
+    expect(announce).not.toHaveBeenCalledWith(PROMPT);
+  });
+
+  it('on Android the question is not announced (focus reads it)', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      const { change } = setup(['c1', 'c2']);
+      fireEvent.press(await screen.findByText('Text Dee'));
+      announce.mockClear();
+      change('background');
+      change('active');
+      await screen.findByText(PROMPT);
+      expect(announce).not.toHaveBeenCalled();
+    } finally {
+      Platform.OS = original;
+    }
   });
 
   it('after Yes only the new name takes focus, not the bar first', async () => {

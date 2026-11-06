@@ -116,6 +116,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
   // When it closes without a new person ("Not yet"), focus goes back to the bar. When a new person
   // took over (Yes or Skip), the name takes focus instead, so the bar is left alone.
   const wasAsking = useRef(false);
+  // Keep this effect declared before the name effect below: it reads lastPerson.current before that effect updates it.
   useEffect(() => {
     const personChanged = personKey !== lastPerson.current;
     if (asking || (wasAsking.current && !personChanged)) {
