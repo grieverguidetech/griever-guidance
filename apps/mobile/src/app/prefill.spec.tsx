@@ -13,11 +13,11 @@ const base = {
 
 const contacts = [{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }];
 
-const openMoment = async (session: Session, moment: RegExp) => {
+const openMoment = async (session: Session, moment: RegExp, label: string = 'Anna') => {
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([session]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
-  fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+  fireEvent.press(await screen.findByLabelText(label, {}, { timeout: 10000 }));
   fireEvent.press(await screen.findByRole('button', { name: moment }));
 };
 const openService = (session: Session) => openMoment(session, /Share the service/);
@@ -155,5 +155,33 @@ describe('send flow starts from the planned details', () => {
     await new Promise((r) => setTimeout(r, 100));
     const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { serviceDate?: string }[];
     expect(saved?.serviceDate).toBe('June 14');
+  });
+
+  // The announcement has no intro (#671). Its first screen is the people step; the message still
+  // carries the name and date from setup, and the saved name is never wiped by opening it.
+  describe('the announcement without its intro (#671)', () => {
+    it('carries the name and date of passing from setup to Ready to send, and keeps them saved', async () => {
+      await openMoment({ ...base, dateOfPassing: 'May 2, 2026' } as Session, /Next/, 'Anna, passed May 2, 2026');
+      await screen.findByRole('heading', { name: 'Who should know?' });
+      await toConfirm();
+      expect(await screen.findByText(/Anna passed away on May 2, 2026/)).toBeTruthy();
+      await new Promise((r) => setTimeout(r, 100));
+      const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName?: string; dateOfPassing?: string }[];
+      expect(saved?.personName).toBe('Anna');
+      expect(saved?.dateOfPassing).toBe('May 2, 2026');
+    });
+
+    it.each(['announce', 'serviceKnown'])('resumes a draft saved on the old %s step, with its note', async (step) => {
+      const draft = {
+        step, templateCategory: 'announcement', templateOverrideId: null,
+        fields: { personalNote: 'She was at peace.' }, serviceDetailsKnown: null, selectedContactIds: [],
+        includeFlowers: false, customFlorist: '', flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
+      };
+      await openMoment({ ...base, drafts: { announcement: draft } } as unknown as Session, /Next|Continue/);
+      expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+      expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
+      await toConfirm();
+      expect(await screen.findByText(/She was at peace\./)).toBeTruthy();
+    });
   });
 });

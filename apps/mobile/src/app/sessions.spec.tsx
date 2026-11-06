@@ -191,7 +191,7 @@ describe('people kept on the phone', () => {
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna'));
       fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-      expect(await screen.findByPlaceholderText('She was peaceful, and we were with her.')).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
       await waitFor(async () => {
         const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
         expect(saved.drafts.aftercare).toEqual(kept);

@@ -111,12 +111,12 @@ describe('the order in the app', () => {
     expect(screen.queryByText('Who are we writing about?')).toBeNull();
   });
 
-  it('asks nothing about the name or date again on the announcement form', async () => {
+  it('asks nothing about the name or date again on the announcement people step', async () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z', 'May 2, 2026')]);
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByPlaceholderText('She was peaceful, and we were with her.');
+    await screen.findByRole('heading', { name: 'Who should know?' });
     expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
     expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
   });
@@ -197,7 +197,7 @@ describe('Home from every step', () => {
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
 
-  it('Android back: the hub goes Home; a first form goes to the hub; a later step goes back one step', async () => {
+  it('Android back: the hub goes Home; a first form goes to the hub, once', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
       handlers.push(h as () => boolean);
@@ -213,21 +213,15 @@ describe('Home from every step', () => {
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
 
-    // The first form: Android back is the same as the on-screen Back, to the hub.
+    // The announcement's first form is the people step: Android back is the same as the on-screen Back, to the hub, once.
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByPlaceholderText('She was peaceful, and we were with her.');
+    await screen.findByRole('heading', { name: 'Who should know?' });
     act(() => void pressBack());
     expect(await screen.findByText('Ready to send')).toBeTruthy();
-
-    // A later step steps back one step, like the on-screen Back (#653), never Home.
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByPlaceholderText('She was peaceful, and we were with her.');
-    fireEvent.press(await screen.findByText('Continue'));
-    await screen.findByText('Who should know?');
-    act(() => void pressBack());
-    expect(await screen.findByPlaceholderText('She was peaceful, and we were with her.')).toBeTruthy();
-    expect(screen.queryByText("Who you're writing about")).toBeNull();
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.getByText('Ready to send')).toBeTruthy();
+    expect(screen.queryByText('Who should know?')).toBeNull();
   });
 });
 

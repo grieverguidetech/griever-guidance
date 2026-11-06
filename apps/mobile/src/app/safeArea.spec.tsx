@@ -24,7 +24,7 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByLabelText(/Anything you'd like to add/);
+    await screen.findByRole('heading', { name: 'Who should know?' });
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
       return style.paddingTop === 47 && style.backgroundColor === colors.bg;
@@ -50,7 +50,6 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByText('Text 1 person');
@@ -78,7 +77,6 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));

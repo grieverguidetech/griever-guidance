@@ -10,6 +10,8 @@ export interface DetailsField {
   label: string;
   placeholder: string;
   required: boolean;
+  /** A longer free-text answer: a taller box that wraps. */
+  multiline?: boolean;
 }
 
 export interface DetailsCopy {
@@ -57,6 +59,7 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
               }}
               style={[
                 styles.input,
+                field.multiline && styles.inputMultiline,
                 missing && styles.inputMissing,
                 focusedKey === field.key && styles.inputFocused,
               ]}
@@ -67,6 +70,8 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
               onChangeText={(text) => onChange(field.key, text)}
               onFocus={() => setFocusedKey(field.key)}
               onBlur={() => setFocusedKey(null)}
+              multiline={field.multiline}
+              numberOfLines={field.multiline ? 3 : undefined}
               returnKeyType={last ? 'done' : 'next'}
               blurOnSubmit={last}
               onSubmitEditing={() => {
@@ -102,6 +107,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
   },
+  inputMultiline: { minHeight: 88, textAlignVertical: 'top', paddingVertical: spacing[2] },
   // Missing: dashed border plus the "Needed" text. Focus: a solid 2px accent border, so the two never look alike.
   inputMissing: { borderStyle: 'dashed', borderColor: colors.ink },
   inputFocused: { borderStyle: 'solid', borderColor: colors['accent-700'], borderWidth: 2 },

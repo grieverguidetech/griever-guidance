@@ -17,6 +17,7 @@ const copy = screenCopy('review');
 const ready = screenCopy('phoneReady');
 const moments = screenCopy('pathLanding').moments;
 const sendingCopy = screenCopy('sending');
+const announceCopy = screenCopy('announce');
 
 /** How many names the To row spells out before it says how many more. */
 const NAMES_SHOWN = 3;
@@ -116,7 +117,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
         details={
           showDetails
             ? {
-                label: isService ? ready.changeService : ready.changeThanks,
+                label: isService ? ready.changeService : isAnnouncement ? ready.addNote : ready.changeThanks,
                 startOpen: detailsMissing,
                 render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} headingRef={headingRef} />,
               }
@@ -154,6 +155,18 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
 /** The templates that get a Details row, and the fields the person has not already given in setup. */
 function detailsFieldsFor(flow: FlowProps['flow']) {
   const template = flow.selectedTemplate;
+  if (template?.id === 'announce-passing') {
+    // The old intro's optional note. Name and date already come from setup, so this is all it has.
+    return [
+      {
+        key: 'personalNote',
+        label: `${announceCopy.noteLabel} ${announceCopy.optional}`,
+        placeholder: ready.notePlaceholder,
+        required: false,
+        multiline: true,
+      },
+    ];
+  }
   if (!template || (template.id !== 'share-service' && template.id !== 'thank-you-note')) {
     return [];
   }

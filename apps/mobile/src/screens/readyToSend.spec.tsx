@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { AccessibilityInfo, Linking, Share } from 'react-native';
+import { AccessibilityInfo, Linking, Share, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SessionDetails } from '@griever/shared';
@@ -232,6 +232,35 @@ describe('Ready to send (Share the service)', () => {
       fireEvent.changeText(screen.getByLabelText('Personal note (optional)'), 'Your flowers meant a lot.');
       expect(screen.getByText(/Your flowers meant a lot\./)).toBeTruthy();
     });
+  });
+});
+
+describe('Details row (Announce the passing)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('has the optional note under Add a personal note, closed, and the message follows typing', () => {
+    render(<Harness category="announcement" fields={{}} />);
+    expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Add a personal note' }));
+    // Name and date come from setup, so the note is the only field; it never blocks the button.
+    expect(screen.queryByLabelText(/Full name of the deceased/)).toBeNull();
+    expect(primary().props.accessibilityState?.disabled).toBeFalsy();
+    const input = screen.getByLabelText("Anything you'd like to add (optional)");
+    expect(input.props.multiline).toBe(true);
+    expect(input.props.numberOfLines).toBe(3);
+    expect(input.props.placeholder).toBe('For example: It was peaceful, and we were with them.');
+    expect(StyleSheet.flatten(input.props.style)).toMatchObject({ minHeight: 88, textAlignVertical: 'top' });
+    fireEvent.changeText(input, 'She was peaceful.');
+    expect(screen.getByText(/She was peaceful\./)).toBeTruthy();
+  });
+
+  it('is hidden once the person edits the words themselves', () => {
+    render(<Harness category="announcement" fields={{}} />);
+    openEdit();
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    expect(screen.queryByRole('button', { name: 'Add a personal note' })).toBeNull();
   });
 });
 
