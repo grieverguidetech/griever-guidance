@@ -210,3 +210,12 @@ to read in a minute; it is a staging area, not an archive.
 - **Rule:** when a deploy fails at `supabase link`, check the token first (§2 "Asking for a
   secret"), and quote which jobs did deploy. The live gateway stays on the last good build until
   the job is re-run.
+
+### 2026-11-06 — the e2e job failed 4 times on a slow apt mirror (#689)
+- **What happened:** `playwright install-deps chromium` timed out four times (#686, #683) on a slow
+  Azure Ubuntu mirror. No test ran. The step ran on every job, even when the browser cache hit.
+- **Why:** the job installed system packages from the network on each run, so a mirror outage
+  became a CI outage.
+- **Rule:** CI must not download system packages per run. Run e2e in the official Playwright image
+  and keep its tag equal to the `@playwright/test` version; the "Check Playwright image" step fails
+  when they differ, so bump the tag in the same PR as any Playwright upgrade.
