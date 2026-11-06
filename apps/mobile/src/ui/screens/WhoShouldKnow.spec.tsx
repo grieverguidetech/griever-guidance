@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import whoShouldKnowJson from '../../../../../libs/copy/screens/whoShouldKnow.json';
+import phonePeopleJson from '../../../../../libs/copy/screens/phonePeople.json';
 import { WhoShouldKnow } from './WhoShouldKnow';
 import type { WhoShouldKnowCopy, WhoShouldKnowProps } from './WhoShouldKnow';
 
@@ -65,6 +67,13 @@ function setup(over: Partial<WhoShouldKnowProps> = {}) {
   );
   return handlers;
 }
+
+describe('phonePeople copy', () => {
+  it('shares only the heading key with whoShouldKnow.json, which web reads', () => {
+    const shared = Object.keys(whoShouldKnowJson).filter((key) => key in phonePeopleJson);
+    expect(shared).toEqual(['heading']);
+  });
+});
 
 describe('WhoShouldKnow (mobile props, #652)', () => {
   it('tags the people already sent, and nobody else, and the tag is part of the row name', () => {

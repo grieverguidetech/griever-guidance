@@ -89,8 +89,8 @@ export interface WhoShouldKnowProps {
   /** Show Close family and Friends & family headings. */
   grouped: boolean;
   selectedIds: string[];
-  /** The count line, already built (for example "2 selected"). It is read out when it changes. */
-  selectedLabel: string;
+  /** The count line, already built (for example "2 selected"). It is read out when it changes. Not used by the `scrollList` layout, whose count is in `doneLabel`. */
+  selectedLabel?: string;
   onToggle: (id: string) => void;
   /** Select all of one group's people. */
   onSelectAll: (ids: string[]) => void;
@@ -234,7 +234,8 @@ export function WhoShouldKnow({
     />
   );
 
-  // iOS ignores live regions: say the new count when the Done label changes (not on first show).
+  // Say the new count when the Done label changes (not on first show). iOS ignores live regions, and
+  // a button label change is not spoken on Android either.
   const firstDone = useRef(true);
   const doneText = doneLabel ?? copy.continue;
   useEffect(() => {
@@ -242,7 +243,7 @@ export function WhoShouldKnow({
       firstDone.current = false;
       return;
     }
-    if (scrollList && Platform.OS === 'ios') {
+    if (scrollList) {
       AccessibilityInfo.announceForAccessibility(doneText);
     }
   }, [doneText, scrollList]);
@@ -349,6 +350,7 @@ export function WhoShouldKnow({
   const addByHand = (
     <AddByHand copy={copy} toE164={toE164} onAddPerson={onAddPerson} guarded={guardedAdd} />
   );
+  // This footer (count and Continue) is the web layout; the mobile list uses the Done bar below instead.
   const bottom = (
     <>
       {noneChosen ? (
@@ -362,7 +364,7 @@ export function WhoShouldKnow({
         </Body>
       ) : null}
       <View style={[styles.footerRow, scrollList && styles.footerRowWrap]}>
-        {scrollList ? (
+        {selectedLabel === undefined ? null : scrollList ? (
           <View style={styles.countBox}>
             <SelectedCount label={selectedLabel} />
           </View>
@@ -419,6 +421,7 @@ export function WhoShouldKnow({
           label={doneText}
           onPress={onContinue}
           note={noneNote ? copy.noneYet : undefined}
+          hint={noneNote ? copy.noneYet : undefined}
         />
       </View>
     );

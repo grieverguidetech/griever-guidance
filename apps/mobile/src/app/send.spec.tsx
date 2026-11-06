@@ -121,6 +121,25 @@ describe('picking an announcement', () => {
     expect(await screen.findByText('Ready to send')).toBeTruthy();
   });
 
+  it.each([['Announce the passing'], ['Share the service'], ['Send thank-yous']])(
+    '%s opens Who should get this? with a real header, and Close returns to the hub',
+    async (moment) => {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      await openAnna();
+      await screen.findByText('Ready to send');
+      focus.mockClear();
+      await startMoment(moment);
+      expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+      expect(screen.queryByPlaceholderText('e.g. 2:00 PM')).toBeNull();
+      // Screen-reader focus went to the title itself.
+      const handle = focus.mock.calls.map(([h]) => h);
+      expect(handle.length).toBeGreaterThan(0);
+      expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();
+      fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+      expect(await screen.findByText('Ready to send')).toBeTruthy();
+    },
+  );
+
   it('Android Back on the announcement people step returns to the person screen once', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {

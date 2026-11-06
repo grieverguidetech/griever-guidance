@@ -233,7 +233,6 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         toldIds={toldIds}
         shortcuts={shortcuts}
         selectedIds={selectedContactIds}
-        selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
         loading={contacts.loading}
         onToggle={toggleContact}
         onSelectAll={selectContacts}

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, AppState, Linking } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
@@ -125,6 +125,13 @@ describe('ContactSelectorScreen as a list to close (#672)', () => {
   it('has no delete or swipe action on a row', () => {
     renderScreen();
     expect(screen.queryByRole('button', { name: /delete|remove/i })).toBeNull();
+    // No long press and no swipe on a row or the list.
+    for (const row of screen.getAllByRole('checkbox')) {
+      expect(row.props.onLongPress).toBeUndefined();
+    }
+    expect(screen.UNSAFE_queryAllByProps({ onLongPress: expect.any(Function) })).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByProps({ renderRightActions: expect.anything() })).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByProps({ renderLeftActions: expect.anything() })).toHaveLength(0);
   });
 });
 
@@ -265,12 +272,23 @@ describe('ContactSelectorScreen grouping', () => {
     expect(screen.queryByText('Choose at least one person', { includeHiddenElements: true })).toBeNull();
   });
 
-  it('announces the new count when the selection changes', () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
-    const { rerender } = renderScreen();
-    announce.mockClear();
-    rerender(['2']);
-    expect(announce).toHaveBeenCalledWith('Done · 1 chosen');
+  it.each(['ios', 'android'] as const)('announces the new count on %s when the selection changes, and not on first render', (os) => {
+    const original = Platform.OS;
+    Platform.OS = os;
+    try {
+      const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+      announce.mockClear();
+      const { rerender } = renderScreen();
+      expect(announce).not.toHaveBeenCalledWith('Done');
+      expect(announce).not.toHaveBeenCalledWith('Done · 1 chosen');
+      rerender(['2']);
+      expect(announce).toHaveBeenLastCalledWith('Done · 1 chosen');
+      rerender([]);
+      expect(announce).toHaveBeenLastCalledWith('Done');
+      expect(announce.mock.calls.filter(([text]) => String(text).startsWith('Done'))).toHaveLength(2);
+    } finally {
+      Platform.OS = original;
+    }
   });
 });
 
@@ -291,6 +309,9 @@ describe('ContactSelectorScreen with no one picked', () => {
   it.each(['service', 'obituary'])('shows one muted line on %s while no one is ticked', (category) => {
     renderScreen(saved, category);
     expect(screen.getAllByText('No one picked? You can share it to a group or by email next.')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Done' }).props.accessibilityHint).toBe(
+      'No one picked? You can share it to a group or by email next.',
+    );
   });
 
   it('drops the line once someone is ticked', () => {
