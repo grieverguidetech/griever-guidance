@@ -67,6 +67,7 @@ beforeEach(async () => {
   mockAccount = signedOut;
   mockLaunch = { hydrated: true, signedIn: false };
   say = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+  say.mockClear(); // the platform mock keeps calls from earlier tests
   jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
   await AsyncStorage.setItem('gg.sessions.v1', JSON.stringify([anna]));
   await AsyncStorage.setItem('gg.activeSession.v1', 'a');

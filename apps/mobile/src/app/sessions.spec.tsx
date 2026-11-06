@@ -319,6 +319,7 @@ describe('opening the app on the last person', () => {
 
   it('opens the saved person and says who is open', async () => {
     const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    say.mockClear(); // the platform mock keeps calls from earlier tests
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna'), person('b', 'Ben')]));
     await AsyncStorage.setItem(ACTIVE_KEY, 'b');
     render(<App />);
