@@ -253,6 +253,17 @@ describe('Ready to send (announcement)', () => {
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
   });
 
+  it('keeps the edited words and the people when Back leaves and the moment is started again', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
+    await startMoment('Announce the passing');
+    expect(await screen.findByText('My own words.')).toBeTruthy();
+    expect(screen.getByText('To Dee · 1')).toBeTruthy();
+  });
+
   it('Change opens the people step with the ticks kept, and Continue returns to the message', async () => {
     await toReview();
     fireEvent.press(screen.getByRole('button', { name: 'Change' }));

@@ -17,6 +17,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'paywall', file: 'screens/HubScreen.tsx' },
   { copy: 'announce', file: 'screens/AnnounceScreen.tsx' },
   { copy: 'whoShouldKnow', file: 'screens/ContactSelectorScreen.tsx' },
+  { copy: 'review', file: 'screens/ReadyToSendScreen.tsx' },
   { copy: 'phoneReady', file: 'screens/ReadyToSendScreen.tsx' },
   { copy: 'sending', file: 'screens/SendingScreen.tsx' },
   { copy: 'shareObituary', file: 'screens/ShareObituaryScreen.tsx' },

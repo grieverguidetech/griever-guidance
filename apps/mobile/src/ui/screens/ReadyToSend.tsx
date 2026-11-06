@@ -60,7 +60,7 @@ export interface ReadyToSendProps {
   /** The Details link and the row it opens in place. Leave unset to hide both (hand-edited text). */
   details?: { label: string; startOpen: boolean; children: ReactNode };
   /** The To row: its words, built by the app, and the link that opens the people step. */
-  to: { text: string; changeLabel: string; onChange: () => void };
+  to: { text: string; changeLabel: string; /** The button's fuller name. It starts with `changeLabel`. */ changeName: string; onChange: () => void };
   /** With no one picked the primary is `chooseLabel` and opens the people step. */
   hasRecipients: boolean;
   sendLabel: string;
@@ -94,6 +94,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const [editing, setEditing] = useState(false);
   const [returnFocus, setReturnFocus] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
+  const [focusDetails, setFocusDetails] = useState(false);
+  const detailsRef = useRef<ComponentRef<typeof View>>(null);
   const fieldRef = useRef<TextInputNode>(null);
   const editRef = useRef<ButtonNode>(null);
   const toneReasonId = useId();
@@ -120,6 +122,14 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
       setReturnFocus(false);
     }
   }, [editing, returnFocus]);
+
+  // Opening Change details moves the screen reader to the row, so the new inputs are found.
+  useEffect(() => {
+    if (focusDetails) {
+      focusNode(detailsRef.current as unknown as ButtonNode);
+      setFocusDetails(false);
+    }
+  }, [focusDetails]);
 
   useEffect(() => {
     if (focusNext === 'bringBack') {
@@ -161,34 +171,33 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
     setEditing(!editing);
   };
 
-  const above = (
-    <>
-      <View style={styles.to}>
-        <Body>{to.text}</Body>
-        <Button label={to.changeLabel} variant="tertiary" onPress={to.onChange} />
-      </View>
-      {share ? (
-        <View style={styles.share}>
-          <Button
-            label={share.label}
-            variant="tertiary"
-            buttonRef={share.buttonRef}
-            ariaDisabled={shareReason !== undefined}
-            announceDisabled
-            describedBy={shareReason ? shareReasonId : undefined}
-            hint={shareReason}
-            onPress={() => {
-              if (!shareReason) {
-                share.onPress();
-              }
-            }}
-          />
-          <Status id={shareReasonId} message={shareReason} />
-          <Status id={shareErrorId} message={share.error} tone="danger" />
-        </View>
-      ) : null}
-    </>
-  );
+  const toRow = hasRecipients ? (
+    <View style={styles.to}>
+      <Body>{to.text}</Body>
+      <Button label={to.changeLabel} accessibilityName={to.changeName} variant="tertiary" onPress={to.onChange} />
+    </View>
+  ) : null;
+  const shareRow = share ? (
+    <View style={styles.share}>
+      <Button
+        label={share.label}
+        variant="tertiary"
+        buttonRef={share.buttonRef}
+        ariaDisabled={shareReason !== undefined}
+        announceDisabled
+        describedBy={shareReason ? shareReasonId : undefined}
+        hint={shareReason}
+        onPress={() => {
+          if (!shareReason) {
+            share.onPress();
+          }
+        }}
+      />
+      {shareReason ? <Status id={shareReasonId} message={shareReason} /> : null}
+      {/* Always drawn: a status line is only read out when its text changes after it is on screen. */}
+      <Status id={shareErrorId} message={share.error} tone="danger" />
+    </View>
+  ) : null;
 
   return (
     <View style={styles.screen}>
@@ -208,8 +217,18 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           )}
         </Card>
         <View style={styles.links}>
-          <Button label={editing ? copy.doneEditing : copy.edit} variant="tertiary" buttonRef={editRef} onPress={toggleEditing} />
-          {details ? <Button label={details.label} variant="tertiary" onPress={() => setDetailsOpen(!detailsOpen)} /> : null}
+          <Button label={editing ? copy.doneEditing : copy.edit} variant="tertiary" expanded={editing} buttonRef={editRef} onPress={toggleEditing} />
+          {details ? (
+            <Button
+              label={details.label}
+              variant="tertiary"
+              expanded={detailsOpen}
+              onPress={() => {
+                setDetailsOpen(!detailsOpen);
+                setFocusDetails(!detailsOpen);
+              }}
+            />
+          ) : null}
         </View>
         {editing ? (
           <View style={styles.actions}>
@@ -249,7 +268,9 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             <Status id={swapNoteId} message={swapNote} />
           </View>
         ) : null}
-        {details && detailsOpen ? details.children : null}
+        {details && detailsOpen ? <View ref={detailsRef}>{details.children}</View> : null}
+        {toRow}
+        {shareRow}
       </ScrollView>
       <ActionBar
         testID={BAR_TEST_ID}
@@ -257,7 +278,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
         onPress={hasRecipients ? onSend : onChoose}
         note={hasRecipients ? note : undefined}
         disabledReason={reason}
-        above={above}
+        liveReason
       />
     </View>
   );

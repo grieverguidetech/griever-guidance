@@ -58,6 +58,8 @@ export interface ButtonProps {
   accessibilityName?: string;
   /** A toggle: on or off. Web: aria-pressed. Native: accessibilityState selected. Leave unset for a plain button. */
   pressed?: boolean;
+  /** A button that opens something in place: open or closed. Native: accessibilityState expanded. Leave unset for a plain button. */
+  expanded?: boolean;
   /** Opt-in: a taller minimum for the button itself, in points (for example the bottom action bar's 52). */
   minHeight?: number;
   buttonRef?: Ref<ButtonNode>;
@@ -76,6 +78,7 @@ export function Button({
   accessibilityName,
   announceDisabled = false,
   pressed,
+  expanded,
   minHeight,
   buttonRef,
 }: ButtonProps) {
@@ -103,6 +106,9 @@ export function Button({
   }
   if (pressed !== undefined) {
     extra['aria-pressed'] = pressed;
+  }
+  if (expanded !== undefined) {
+    extra['aria-expanded'] = expanded;
   }
   if (showBusy) {
     extra['aria-busy'] = true;
@@ -136,7 +142,7 @@ export function Button({
       ref={setRef}
       role="button"
       accessibilityHint={hint}
-      accessibilityState={buttonState(busy, ariaDisabled && announceDisabled, pressed)}
+      accessibilityState={buttonState(busy, ariaDisabled && announceDisabled, pressed, expanded)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
@@ -165,15 +171,22 @@ export function Button({
 }
 
 /** Native only: unavailable reads as disabled. (On web aria-disabled is set on the node, see ariaDisabled.ts.) */
-function buttonState(busy: boolean | undefined, ariaDisabled: boolean, pressed: boolean | undefined) {
+function buttonState(busy: boolean | undefined, ariaDisabled: boolean, pressed: boolean | undefined, expanded: boolean | undefined) {
   // On web a disabled state would also take the button out of the tab order, so only busy goes through.
   const unavailable = ariaDisabled && Platform.OS !== 'web';
   // On web a pressed toggle is aria-pressed (set above); `selected` would render aria-selected, which a button does not take.
   const selected = pressed !== undefined && Platform.OS !== 'web' ? pressed : undefined;
-  if (busy === undefined && !unavailable && selected === undefined) {
+  // On web an expanded button is aria-expanded (set above), not a native state.
+  const open = expanded !== undefined && Platform.OS !== 'web' ? expanded : undefined;
+  if (busy === undefined && !unavailable && selected === undefined && open === undefined) {
     return undefined;
   }
-  return { busy: busy ?? false, disabled: Boolean(busy) || unavailable, ...(selected === undefined ? {} : { selected }) };
+  return {
+    busy: busy ?? false,
+    disabled: Boolean(busy) || unavailable,
+    ...(selected === undefined ? {} : { selected }),
+    ...(open === undefined ? {} : { expanded: open }),
+  };
 }
 
 function labelStyle(variant: ButtonVariant, ariaDisabled: boolean) {

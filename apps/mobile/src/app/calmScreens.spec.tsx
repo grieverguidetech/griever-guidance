@@ -84,6 +84,7 @@ describe('Android Back inside the flow (#653)', () => {
     await screen.findByRole('heading', { name: 'Announce the passing' });
     act(() => void pressBack());
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
+    expect(screen.queryByText('Who should know?')).toBeNull();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
 import { AccessibilityInfo, Linking, Share } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SessionDetails } from '@griever/shared';
 import { ReadyToSendScreen } from './ReadyToSendScreen';
@@ -112,14 +112,16 @@ describe('Ready to send (Share the service)', () => {
     expect(screen.getByText('Dee,')).toBeTruthy();
   });
 
-  it('opens Edit wording in place with expanded state in its label, and closes it', () => {
+  it('opens Edit wording in place, reads expanded, and closes it', () => {
     render(<Harness />);
     expect(screen.queryByLabelText('Your message')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit wording' }).props.accessibilityState).toMatchObject({ expanded: false });
     openEdit();
     expect(screen.getByLabelText('Your message')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Edit wording' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Done editing' }).props.accessibilityState).toMatchObject({ expanded: true });
     fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     expect(screen.queryByLabelText('Your message')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit wording' }).props.accessibilityState).toMatchObject({ expanded: false });
   });
 
   it('blocks sending a blank message and says why', () => {
@@ -137,7 +139,13 @@ describe('Ready to send (Share the service)', () => {
       const tree = JSON.stringify(screen.toJSON());
       expect(tree.indexOf('To Dee and Ana · 2')).toBeGreaterThan(-1);
       expect(tree.indexOf('To Dee and Ana')).toBeLessThan(tree.indexOf('Text 2 people'));
-      expect(tree.indexOf('Change"')).toBeLessThan(tree.indexOf('Text 2 people'));
+      expect(tree.indexOf('Change who gets this')).toBeGreaterThan(-1);
+      expect(tree.indexOf('To Dee and Ana')).toBeLessThan(tree.indexOf('Change who gets this'));
+      expect(tree.indexOf('Change who gets this')).toBeLessThan(tree.indexOf('Text 2 people'));
+      // The To row is in the scrolling content, not in the bar.
+      const bar = within(screen.getByTestId('ready-action-bar'));
+      expect(bar.queryByText(/^To /)).toBeNull();
+      expect(bar.getByText('Text 2 people')).toBeTruthy();
       expect(screen.getByText('One at a time, from your own number.')).toBeTruthy();
     });
 
@@ -151,6 +159,8 @@ describe('Ready to send (Share the service)', () => {
       const onChoose = jest.fn();
       render(<Harness category="announcement" ids={NONE} onChoose={onChoose} />);
       expect(screen.queryByText(/^Text /)).toBeNull();
+      expect(screen.queryByText(/^To /)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Change who gets this' })).toBeNull();
       expect(screen.queryByText('One at a time, from your own number.')).toBeNull();
       fireEvent.press(screen.getByRole('button', { name: 'Choose who to tell' }));
       expect(onChoose).toHaveBeenCalledTimes(1);
@@ -159,7 +169,7 @@ describe('Ready to send (Share the service)', () => {
     it('Change opens the people step', () => {
       const onChoose = jest.fn();
       render(<Harness onChoose={onChoose} />);
-      fireEvent.press(screen.getByRole('button', { name: 'Change' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
       expect(onChoose).toHaveBeenCalledTimes(1);
     });
 
@@ -248,6 +258,7 @@ describe('Share elsewhere', () => {
     const tree = JSON.stringify(screen.toJSON());
     expect(tree.indexOf('To Dee')).toBeLessThan(tree.indexOf('Share elsewhere instead'));
     expect(tree.indexOf('Share elsewhere instead')).toBeLessThan(tree.indexOf('Text 1 person'));
+    expect(within(screen.getByTestId('ready-action-bar')).queryByText('Share elsewhere instead')).toBeNull();
   });
 
   it('works with no one picked, and records nothing', async () => {

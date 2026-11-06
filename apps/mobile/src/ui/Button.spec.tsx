@@ -20,6 +20,15 @@ describe('Button (mobile)', () => {
     expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState?.busy).toBeFalsy();
   });
 
+  it('reads open or closed when expanded is given, and says nothing otherwise', () => {
+    const { rerender } = render(<Button label="Edit" onPress={jest.fn()} expanded={false} />);
+    expect(screen.getByRole('button', { name: 'Edit' }).props.accessibilityState).toMatchObject({ expanded: false });
+    rerender(<Button label="Edit" onPress={jest.fn()} expanded />);
+    expect(screen.getByRole('button', { name: 'Edit' }).props.accessibilityState).toMatchObject({ expanded: true });
+    rerender(<Button label="Edit" onPress={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Edit' }).props.accessibilityState?.expanded).toBeUndefined();
+  });
+
   it('calls onPress when pressed', () => {
     const onPress = jest.fn();
     render(<Button label="Save" onPress={onPress} />);

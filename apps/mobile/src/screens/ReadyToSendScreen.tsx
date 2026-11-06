@@ -99,7 +99,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <ReadyToSend
         copy={copy}
         heading={moments[momentOf(flow.templateCategory)].title}
@@ -125,6 +125,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
         to={{
           text: fill(ready.to, { names: namesPhrase(names) || recipientsPhrase(recipientCount, copy), count: String(recipientCount) }),
           changeLabel: ready.change,
+          changeName: ready.changeName,
           onChange: onChoosePeople,
         }}
         hasRecipients={recipientCount > 0}
