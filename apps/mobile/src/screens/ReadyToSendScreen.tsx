@@ -78,6 +78,15 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
   if (focusPeopleButton) {
     focusPeopleButton.current = focusPeople;
   }
+  // A late iOS onDismiss must not call a closure from a screen that is gone.
+  useEffect(
+    () => () => {
+      if (focusPeopleButton) {
+        focusPeopleButton.current = null;
+      }
+    },
+    [focusPeopleButton],
+  );
   const sheetOpen = flow.step === 'contacts';
   useEffect(() => {
     if (!sheetOpen && Platform.OS !== 'ios') {

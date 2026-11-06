@@ -152,6 +152,39 @@ describe('ContactSelectorScreen as a list to close (#672)', () => {
     expect(focus).toHaveBeenCalled();
   });
 
+  it('does not also focus from the effect where onShow runs (iOS), so the title is read once', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    focus.mockClear();
+    renderScreen();
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the effect where onShow does not run (neither iOS nor Android)', () => {
+    const os = Platform.OS;
+    Platform.OS = 'windows';
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      focus.mockClear();
+      renderScreen();
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      Platform.OS = os;
+    }
+  });
+
+  it('opens clean: an import error, a close and a new opening leave no error behind', async () => {
+    mockFetch.mockRejectedValue(new Error('boom'));
+    const flow = { selectContacts: jest.fn(), selectedContactIds: [], toggleContact: jest.fn(), nextStep: jest.fn(), prevStep: jest.fn(), templateCategory: 'announcement' };
+    const contacts = { contacts: saved, loading: false } as unknown as UseContactsResult;
+    const ui = (open: boolean) => <ContactSelectorScreen flow={flow as never} contacts={contacts} notified={{}} open={open} />;
+    const { rerender } = render(ui(true));
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    expect(await screen.findByText(screenCopy('whoShouldKnow').importError)).toBeTruthy();
+    rerender(ui(false));
+    rerender(ui(true));
+    expect(screen.queryByText(screenCopy('whoShouldKnow').importError)).toBeNull();
+  });
+
   it('a tap on the dim area shuts the sheet with nextStep', () => {
     const { nextStep, prevStep } = renderScreen();
     fireEvent.press(screen.getByTestId('sheet-dim', { includeHiddenElements: true }));

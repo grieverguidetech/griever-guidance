@@ -144,7 +144,9 @@ describe('picking an announcement', () => {
       await screen.findByRole('button', { name: 'Choose who to tell' });
       focus.mockClear();
       expect(await openPeople()).toBeTruthy();
-      // Screen-reader focus went to the title itself.
+      // On a device the Modal's onShow sends screen-reader focus to the title itself.
+      expect(focus).not.toHaveBeenCalled();
+      act(() => screen.UNSAFE_getByType(Modal).props.onShow());
       const handle = focus.mock.calls.map(([h]) => h);
       expect(handle.length).toBeGreaterThan(0);
       expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();

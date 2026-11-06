@@ -58,9 +58,19 @@ export function ContactSelectorScreen({ flow, contacts, notified, open = true, o
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
-  // The title takes focus each time the sheet opens. The Modal's onShow does it on a device; this is the fallback.
+  // The screen stays mounted while the sheet is closed, so each opening starts clean: the list, no old errors.
+  // The title takes focus from the Modal's onShow on a device; this effect is only the fallback where onShow does not run.
   useEffect(() => {
-    if (open) {
+    if (!open) {
+      return;
+    }
+    setMode({ kind: 'list' });
+    setImportError(null);
+    setBlocked(false);
+    setAddError(null);
+    setReviewSelected(new Set());
+    setReviewQuery('');
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       focusNode(listHeading.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

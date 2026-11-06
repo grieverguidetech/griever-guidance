@@ -345,3 +345,17 @@ describe('Share elsewhere', () => {
     expect(screen.getByText('Text 1 person')).toBeTruthy();
   });
 });
+
+describe('the people-button focus hook (#673)', () => {
+  it('is cleared when the screen unmounts, so a late onDismiss finds nothing to call', () => {
+    const hook: { current: (() => void) | null } = { current: null };
+    const Host = () => {
+      const flow = useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
+      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} focusPeopleButton={hook} />;
+    };
+    const { unmount } = render(<Host />);
+    expect(hook.current).toEqual(expect.any(Function));
+    unmount();
+    expect(hook.current).toBeNull();
+  });
+});
