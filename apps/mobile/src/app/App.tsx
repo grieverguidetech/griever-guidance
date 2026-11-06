@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
-import { View } from 'react-native';
+import { AccessibilityInfo, Platform, View } from 'react-native';
 import { colors } from '@griever/tokens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -22,7 +22,8 @@ import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
 import { sendNote } from '../lib/sendNote';
 import type { SentNoteText } from '../lib/sendNote';
-import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
+import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDeviceSessions';
+import { personLabel } from '../components/PersonSwitcher';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
@@ -376,13 +377,16 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
-  const { sessions, active, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
+  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
   useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
-  const [atHome, setAtHome] = useState(true);
+  // A launch opens the last person's screen (the hub), unless they are still blank. Decided once,
+  // from the device cache SendAppWhenReady already read: nothing waits on the network.
+  const [resume] = useState(() => lastOpened !== null && !isBlank(lastOpened));
+  const [atHome, setAtHome] = useState(!resume);
   const [stage, setStage] = useState<SetupStage | null>(null);
-  const [arrived, setArrived] = useState(false);
-  const [atHub, setAtHub] = useState(false);
+  const [arrived, setArrived] = useState(resume);
+  const [atHub, setAtHub] = useState(resume);
   const [atShareObituary, setAtShareObituary] = useState(false);
   // Setup was opened with Edit, from a step or from the hub: Back there returns to where it was opened, as on web.
   const [editFrom, setEditFrom] = useState<'hub' | null>(null);
@@ -394,6 +398,34 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
+  // Sign-in comes first: Home hosts it, so a signed-out launch starts there, not on the person.
+  useEffect(() => {
+    if (first === 'signIn') {
+      setAtHome(true);
+    }
+  }, [first]);
+  // A resumed launch says who is open once, from the hub (the person bar is not mounted there yet).
+  // It is queued on iOS so the heading focus does not cut it off; Android waits a moment, as the hub's
+  // note does. Then the arrival is spent, so the first moment does not say it again.
+  const announcedResume = useRef(false);
+  const resumedName = lastOpened ? personLabel(lastOpened) : '';
+  useEffect(() => {
+    if (!resume || announcedResume.current || first === 'pending') {
+      return;
+    }
+    if (first === 'signIn') {
+      announcedResume.current = true; // sign-in came first: this launch lands on Home, so nothing is said
+      return;
+    }
+    announcedResume.current = true;
+    setArrived(false);
+    const spoken = `Now writing about ${resumedName}`;
+    if (Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(spoken, { queue: true });
+      return;
+    }
+    setTimeout(() => AccessibilityInfo.announceForAccessibility(spoken), 100);
+  }, [resume, first, resumedName]);
   const goHome = useCallback(() => {
     setStage(null);
     setEditFrom(null);
@@ -470,7 +502,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtHub(true);
     setAtHome(false);
   };
-  if (atHome && importing) {
+  const showHome = atHome || first === 'signIn';
+  if (showHome && importing) {
     const leaveImport = () => {
       leaveFirst();
       setBackFromImport(true);
@@ -484,7 +517,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       </FadeIn>
     );
   }
-  if (atHome) {
+  if (showHome) {
     return (
       <FadeIn key="home">
         <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>

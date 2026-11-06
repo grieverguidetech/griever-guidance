@@ -6,7 +6,7 @@ import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { App, CONTACTS_CHECK_FALLBACK_MS } from '../app/App';
-import { SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
+import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 import { mobileContactStore } from '../lib/contactStore';
 import { ContactsStepScreen } from './ContactsStepScreen';
 
@@ -65,7 +65,6 @@ async function createBen() {
 
 const seed = async (contacts: unknown[]) => {
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
-  await AsyncStorage.setItem(ACTIVE_KEY, 'a');
   if (contacts.length) await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
 };
 

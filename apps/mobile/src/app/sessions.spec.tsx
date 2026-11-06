@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AccessibilityInfo } from 'react-native';
 import { App } from './App';
 import { createSessionCache, SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
 import { freshDraft } from '@griever/hooks';
@@ -99,7 +100,7 @@ describe('people kept on the phone', () => {
     first.unmount();
 
     render(<App />);
-    fireEvent.press(await screen.findByLabelText('Anna'));
+    expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
     await openThankYous();
     await findPicker();
     expect(await screen.findByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
@@ -122,8 +123,7 @@ describe('people kept on the phone', () => {
     });
     first.unmount();
     render(<App />);
-    fireEvent.press(await screen.findByLabelText('Anna'));
-    expect(await screen.findByText('For Anna')).toBeTruthy();
+    expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
   });
 
   it("opens the person's latest moment and leaves their other moment's draft alone (#83)", async () => {
@@ -139,7 +139,7 @@ describe('people kept on the phone', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
     await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     render(<App />);
-    fireEvent.press(await screen.findByLabelText('Anna'));
+    expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
     await openThankYous();
     // A draft saved on the retired details step resumes on Who should get this?, fields kept.
     await findPicker();
@@ -161,7 +161,7 @@ describe('people kept on the phone', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
     await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     render(<App />);
-    fireEvent.press(await screen.findByLabelText('Anna'));
+    expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
     await openThankYous();
     await findPicker();
     await waitFor(async () => expect((await savedAftercare('Anna'))?.fields['deceasedName']).toBe('Anna Lee'));
@@ -183,7 +183,7 @@ describe('people kept on the phone', () => {
     it('Continue on a moment left past its first form reopens it where it was', async () => {
       await withDrafts({ aftercare: resumed('aftercare', 'review', { deceasedName: 'Anna Lee' }) });
       render(<App />);
-      fireEvent.press(await screen.findByLabelText('Anna'));
+      expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
       await openThankYous();
       expect(await screen.findByRole('heading', { name: 'Send thank-yous' })).toBeTruthy();
     });
@@ -192,7 +192,7 @@ describe('people kept on the phone', () => {
       const kept = resumed('aftercare', 'review', { deceasedName: 'Anna Lee' });
       await withDrafts({ aftercare: kept });
       render(<App />);
-      fireEvent.press(await screen.findByLabelText('Anna'));
+      expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
       fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
       expect(await findPicker()).toBeTruthy();
       await waitFor(async () => {
@@ -221,6 +221,8 @@ describe('people kept on the phone', () => {
     first.unmount();
 
     render(<App />); // a new App, a new in-memory cache, the same AsyncStorage
+    expect(await screen.findByText('For Ben')).toBeTruthy(); // the one open when it closed
+    backFromHub();
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
     expect(screen.getByLabelText('Ben')).toBeTruthy();
   });
@@ -301,5 +303,56 @@ describe('session cache', () => {
     expect(cache.getItem('other')).toBeNull();
     cache.setItem(SESSIONS_KEY, '[]');
     await waitFor(async () => expect(await AsyncStorage.getItem(SESSIONS_KEY)).toBe('[]'));
+  });
+});
+
+describe('opening the app on the last person', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const person = (id: string, personName: string) => ({
+    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing: '', senderName: '', obituaryUrl: '',
+    createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
+    drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+  });
+
+  it('opens the saved person and says who is open', async () => {
+    const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    say.mockClear(); // the platform mock keeps calls from earlier tests
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna'), person('b', 'Ben')]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 'b');
+    render(<App />);
+    expect(await screen.findByText('For Ben')).toBeTruthy();
+    expect(screen.queryByText(START)).toBeNull();
+    expect(say).toHaveBeenCalledTimes(1);
+    expect(say).toHaveBeenCalledWith('Now writing about Ben', { queue: true });
+    // Opening the first moment does not say it again.
+    await openThankYous();
+    await findPicker();
+    expect(say).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back on that person goes Home', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna')]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
+    render(<App />);
+    await screen.findByText('For Anna');
+    backFromHub();
+    expect(await screen.findByLabelText('Anna')).toBeTruthy();
+  });
+
+  it('opens Home when the saved person is blank', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', '')]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
+    render(<App />);
+    expect(await screen.findByText(START)).toBeTruthy();
+  });
+
+  it('opens Home when no person was saved as open', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person('a', 'Anna')]));
+    render(<App />);
+    expect(await screen.findByLabelText('Anna')).toBeTruthy();
+    expect(screen.queryByText('For Anna')).toBeNull();
   });
 });
