@@ -46,6 +46,19 @@ describe('ActionBar', () => {
     expect(style.borderTopWidth).toBeGreaterThan(0);
   });
 
+  it('with liveReason, the reason is a polite status line that is there before it has text', () => {
+    const { rerender } = render(<ActionBar label="Text 1 person" onPress={jest.fn()} liveReason />);
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status').props.accessibilityLiveRegion).toBe('polite');
+    rerender(<ActionBar label="Text 1 person" onPress={jest.fn()} liveReason disabledReason="Add a message first" />);
+    expect(screen.getByRole('status').props.children).toBe('Add a message first');
+  });
+
+  it('without liveReason there is no live region', () => {
+    render(<ActionBar label="Next" onPress={jest.fn()} note="Nothing is sent until you tap." />);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('shows the secondary slot above the button', () => {
     render(<ActionBar label="Next" onPress={jest.fn()} above={<Button variant="tertiary" label="Skip this one" onPress={jest.fn()} />} />);
     const order = screen.UNSAFE_getAllByType(Button).map((b) => b.props.label);

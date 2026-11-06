@@ -169,6 +169,7 @@ by the closing ticket #633.
 | MOB-10 | "Share elsewhere" (OS share sheet) for service and obituary. Allowed with zero people picked (Decision 1, C1) | n/a | Done | #631, PR #648. Device: the share sheet lists Facebook and WhatsApp; closing it on Android shows no error, HUMAN TODO. VoiceOver and TalkBack pass, HUMAN TODO. |
 | MOB-11 | Thank-yous: an optional one-line note per person. The note is the last line of that person's message | n/a | Done | #632, PR #647. VoiceOver and TalkBack pass, HUMAN TODO. |
 | MOB-12 | A fixed bottom bar on the phone's send screens: one primary button that names the next thing, at least 52 points tall, clear of the home indicator. Secondary actions sit above it as links | n/a | Partial | #665: the component (`ui/ActionBar.tsx`); screens adopt it in #667, #669, #670, #672. |
+| MOB-13 | Ready to send: one screen with the message, a To row with the count and names, Edit wording and Change details in place, Share elsewhere for service and obituary, and one button "Text {n} people". Replaces Review your message; no Sample message (dropped 2026-11-05) | n/a | Partial | #670: the screen, with Back to the person screen (the obituary: its link screen). The announcement still opens on its intro and people step (#671); the people list is not yet a sheet (#673). VoiceOver and TalkBack order (To row, then button), and the keyboard not covering the message box, HUMAN TODO |
 
 ---
 

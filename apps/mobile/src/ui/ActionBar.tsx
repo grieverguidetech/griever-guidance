@@ -1,9 +1,11 @@
+import { useId } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@griever/tokens';
 import { Button } from './Button';
 import type { ButtonNode } from './Button';
+import { Status } from './Status';
 import { Body } from './Text';
 
 /** The primary button is never shorter than this, in points (MOB-12). */
@@ -24,6 +26,11 @@ export interface ActionBarProps {
   disabledReason?: string;
   /** Read after the label when the button is available (for example what a tap will do). */
   hint?: string;
+  /**
+   * The reason is a polite live line, always drawn, so it is read when it appears. Leave unset where
+   * the button never becomes unavailable.
+   */
+  liveReason?: boolean;
   /** For moving screen-reader focus to the button. */
   buttonRef?: Ref<ButtonNode>;
   testID?: string;
@@ -33,9 +40,10 @@ export interface ActionBarProps {
  * The bar fixed at the bottom of a phone screen. Put it after the scrolling content, outside it. Its
  * bottom padding includes the safe-area inset, so the button clears the home indicator.
  */
-export function ActionBar({ label, onPress, note, above, disabledReason, hint, buttonRef, testID }: ActionBarProps) {
+export function ActionBar({ label, onPress, note, above, disabledReason, hint, liveReason, buttonRef, testID }: ActionBarProps) {
   const insets = useSafeAreaInsets();
   const disabled = Boolean(disabledReason);
+  const reasonId = useId();
   const line = disabled ? disabledReason : note;
   return (
     <View testID={testID} style={[styles.bar, { paddingBottom: insets.bottom + spacing[2] }]}>
@@ -49,7 +57,12 @@ export function ActionBar({ label, onPress, note, above, disabledReason, hint, b
         buttonRef={buttonRef}
         minHeight={ACTION_BAR_BUTTON_HEIGHT}
       />
-      {line ? (
+      {liveReason ? (
+        <View style={disabled || note ? styles.line : styles.lineEmpty}>
+          <Status id={reasonId} message={disabledReason} />
+          {!disabled && note ? <Body small tone="muted">{note}</Body> : null}
+        </View>
+      ) : line ? (
         <View style={styles.line}>
           <Body small tone="muted">{line}</Body>
         </View>
@@ -69,9 +82,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors['neutral-400'],
     paddingHorizontal: spacing[3],
     paddingTop: spacing[2],
-    gap: spacing[2],
   },
   // Links wrap and keep a gap, so they do not run off screen at the largest text size (#654).
-  above: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'center' },
-  line: { alignItems: 'center' },
+  above: { marginBottom: spacing[2], flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'center' },
+  line: { alignItems: 'center', marginTop: spacing[2] },
+  // Nothing to say: the live line stays drawn but takes no height, so the bar does not jump.
+  lineEmpty: { height: 0, overflow: 'hidden' },
 });

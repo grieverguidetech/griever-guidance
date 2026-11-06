@@ -44,6 +44,22 @@ describe('send steps and the top safe area', () => {
     expect(frame?.paddingBottom).toBe(0);
   });
 
+  it('pads the Ready to send bottom once, on its bar, and the frame leaves the bottom to the bar', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByText('Continue'));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    await screen.findByText('Text 1 person');
+    const bar = StyleSheet.flatten(screen.getByTestId('ready-action-bar').props.style);
+    expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    expect(frame?.paddingBottom).toBe(0);
+  });
+
   it('still pads every other screen by the bottom inset', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);

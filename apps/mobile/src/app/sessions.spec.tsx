@@ -182,7 +182,7 @@ describe('people kept on the phone', () => {
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna'));
       await openThankYous();
-      expect(await screen.findByText('Review your message')).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'Send thank-yous' })).toBeTruthy();
     });
 
     it("another moment's Start goes to that moment's first form, and the first moment's draft stays", async () => {

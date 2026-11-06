@@ -13,7 +13,7 @@ import { obituaryLink, sendPrefill } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { AnnounceScreen } from '../screens/AnnounceScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
-import { ConfirmScreen } from '../screens/ConfirmScreen';
+import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
@@ -274,8 +274,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const flowWithHub = {
     ...stepped,
     prevStep: () => {
-      // The step before this one is the picker: go to the hub instead.
-      if (onFirstForm) {
+      // The step before this one is the picker: go to the hub instead. Ready to send also goes
+      // straight back to the person screen (the obituary: its link screen); "Change" is the way to the people.
+      if (onFirstForm || flow.step === 'review') {
         backToStart();
       } else {
         stepped.prevStep();
@@ -293,7 +294,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} notified={session.recipientsNotified} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} onChoosePeople={stepped.prevStep} notified={session.recipientsNotified} />;
 };
 
 // The announcement path has a "do you know the service details" step that mobile has no screen
@@ -662,12 +663,14 @@ const Navigation = ({
   contacts,
   bar,
   onEditPerson,
+  onChoosePeople,
   notified,
 }: {
   flow: ReturnType<typeof useSendFlow>;
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
   onEditPerson: () => void;
+  onChoosePeople: () => void;
   notified: Session['recipientsNotified'];
 }) => {
   const screenOptions = useScreenOptions();
@@ -689,7 +692,9 @@ const Navigation = ({
           </Stack.Screen>
         )}
         {flow.step === 'review' && (
-          <Stack.Screen name="Confirm">{() => withPersonContext(bar, <ConfirmScreen flow={flow} contacts={contacts} />)}</Stack.Screen>
+          <Stack.Screen name="Confirm">
+            {() => withPersonContext(bar, <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} />, false)}
+          </Stack.Screen>
         )}
         {flow.step === 'sending' && (
           <Stack.Screen name="Sending">

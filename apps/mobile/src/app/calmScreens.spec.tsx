@@ -70,7 +70,7 @@ afterEach(() => {
 });
 
 describe('Android Back inside the flow (#653)', () => {
-  it('on Review steps back to Who should know?, as the on-screen Back does', async () => {
+  it('on Ready to send steps back to the person screen, as the on-screen Back does', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
       handlers.push(h as () => boolean);
@@ -81,9 +81,10 @@ describe('Android Back inside the flow (#653)', () => {
     fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Read it once before it goes' });
+    await screen.findByRole('heading', { name: 'Announce the passing' });
     act(() => void pressBack());
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
+    expect(screen.queryByText('Who should know?')).toBeNull();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 });
@@ -123,7 +124,7 @@ describe('Edit from a step (#653)', () => {
 });
 
 describe('Focus on arrival (#653)', () => {
-  it('moves to the heading on Confirm and on the picker', async () => {
+  it('moves to the heading on Ready to send and on the picker', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await startAnnouncement(true);
     fireEvent.press(await screen.findByText('Continue'));
@@ -132,7 +133,7 @@ describe('Focus on arrival (#653)', () => {
     fireEvent.press(await screen.findByText('Dee'));
     focus.mockClear();
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Read it once before it goes' });
+    await screen.findByRole('heading', { name: 'Announce the passing' });
     expect(focus).toHaveBeenCalledTimes(1);
   });
 });

@@ -72,7 +72,7 @@ describe('sharing the obituary on mobile', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Review your message' });
+    await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText(sent)).toBeTruthy();
   });
 
@@ -83,12 +83,23 @@ describe('sharing the obituary on mobile', () => {
     expect(await screen.findByText('Who should know?')).toBeTruthy();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Review your message' });
+    await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText(/https:\/\/legacy\.com\/anna/)).toBeTruthy();
     await waitFor(async () => {
       const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { obituaryUrl: string }[];
       expect(saved[0].obituaryUrl).toBe('https://legacy.com/anna');
     });
+  });
+
+  it('Back from Ready to send returns to the link screen with the link kept', async () => {
+    await openObituary();
+    fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'legacy.com/anna');
+    fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText('Continue'));
+    await screen.findByRole('heading', { name: 'Share the obituary' });
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
   });
 
   it('Back from Who should know? returns to the link screen with the link kept', async () => {

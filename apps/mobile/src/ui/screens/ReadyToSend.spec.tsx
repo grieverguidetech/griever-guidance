@@ -1,9 +1,12 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
+import type { ComponentRef, Ref } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { Review } from './Review';
+import { Text } from 'react-native';
+import { ReadyToSend } from './ReadyToSend';
+import type { ReadyToSendProps } from './ReadyToSend';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle per node shows where focus went.
 const mockHandles = new Map<unknown, number>();
@@ -35,33 +38,88 @@ const handleForButton = (name: string): number => {
   return found;
 };
 
+// The handle of the node a text line's ref points at, found by matching the line's own children.
+const handleForText = (text: string): number => {
+  let found: number | undefined;
+  for (const [node, handle] of mockHandles) {
+    if ((node as { props?: { children?: unknown } }).props?.children === text) {
+      found = handle;
+    }
+  }
+  if (found === undefined) {
+    throw new Error(`No focus handle for text ${text}`);
+  }
+  return found;
+};
+
 const copy = screenCopy('review');
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
-function Harness() {
+function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
-    <Review
+    <ReadyToSend
       copy={copy}
+      heading="Announce the passing"
       kind="announcement"
-      intro="This will go to 2 people."
+      details={details}
       message={message}
       onMessageChange={setOverride}
       edited={override !== null}
       onUseSuggested={() => setOverride(null)}
       tone="plain"
       onToneChange={jest.fn()}
+      to={{ text: 'To Dee and Ana · 2', changeLabel: 'Change', changeName: 'Change who gets this', onChange: jest.fn() }}
       sendLabel="Text 2 people"
+      chooseLabel="Choose who to tell"
+      note="One at a time, from your own number."
       hasRecipients
+      onChoose={jest.fn()}
       onBack={jest.fn()}
       onSend={jest.fn()}
     />
   );
 }
 
-describe('Review: Bring back my words (#654)', () => {
+describe('ReadyToSend: Change details', () => {
+  const details = {
+    label: 'Change details',
+    startOpen: false,
+    render: (headingRef: Ref<ComponentRef<typeof Text>>) => (
+      <Text ref={headingRef} accessibilityRole="header">
+        Details row
+      </Text>
+    ),
+  };
+
+  it('reads expanded or not, opens in place, and moves focus to the row', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<Harness details={details} />);
+    expect(screen.getByRole('button', { name: 'Change details' }).props.accessibilityState).toMatchObject({ expanded: false });
+    expect(screen.queryByText('Details row')).toBeNull();
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
+    expect(screen.getByText('Details row')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Change details' }).props.accessibilityState).toMatchObject({ expanded: true });
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenLastCalledWith(handleForText('Details row'));
+    fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
+    expect(screen.queryByText('Details row')).toBeNull();
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
+  });
+
+  it('Edit wording reads expanded or not', () => {
+    render(<Harness />);
+    expect(screen.getByRole('button', { name: 'Edit wording' }).props.accessibilityState).toMatchObject({ expanded: false });
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    expect(screen.getByRole('button', { name: 'Done editing' }).props.accessibilityState).toMatchObject({ expanded: true });
+  });
+});
+
+describe('ReadyToSend: Bring back my words (#654)', () => {
   it('is not shown before the suggested wording has been used', () => {
     render(<Harness />);
     expect(screen.queryByRole('button', { name: 'Bring back my words' })).toBeNull();
@@ -93,7 +151,6 @@ describe('Review: Bring back my words (#654)', () => {
     render(<Harness />);
     fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
-    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
     expect(focus).toHaveBeenLastCalledWith(handleForButton('Bring back my words'));

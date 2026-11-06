@@ -48,7 +48,7 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceDate: 'June 14', serviceTime: '2:00 PM', servicePlace: 'St. Mary', serviceMessage: 'Please join us at two.' } as Session);
     await screen.findByRole('heading', { name: 'Who should know?' });
     await toConfirm();
-    expect(await screen.findByDisplayValue('Please join us at two.')).toBeTruthy();
+    expect(await screen.findByText('Please join us at two.')).toBeTruthy();
   });
 
   it('never overwrites a draft in progress', async () => {
@@ -62,8 +62,9 @@ describe('send flow starts from the planned details', () => {
     } as unknown as Session);
     await screen.findByRole('heading', { name: 'Who should know?' });
     await toConfirm();
+    fireEvent.press(await screen.findByRole('button', { name: 'Change date, time or place' }));
     expect(await screen.findByDisplayValue('9:00 AM')).toBeTruthy();
-    expect(screen.queryByDisplayValue('Synced wording')).toBeNull();
+    expect(screen.queryByText('Synced wording')).toBeNull();
   });
 
   it('keeps the edited thank-you wording when the name is filled from the person', async () => {
@@ -82,7 +83,7 @@ describe('send flow starts from the planned details', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
-    await screen.findByRole('heading', { name: 'Review your message' });
+    await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
     expect(screen.queryByText(/Anna loved the garden/)).toBeNull();
   });
@@ -106,7 +107,7 @@ describe('send flow starts from the planned details', () => {
       /Share the obituary/,
     );
     await toConfirmFromObituary();
-    await screen.findByRole('heading', { name: 'Review your message' });
+    await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
     expect(screen.queryByText('Anna loved the garden.')).toBeNull();
   });
@@ -117,7 +118,7 @@ describe('send flow starts from the planned details', () => {
       /Share the obituary/,
     );
     await toConfirmFromObituary();
-    await screen.findByRole('heading', { name: 'Review your message' });
+    await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText('Here is her obituary, with love.')).toBeTruthy();
   });
 
@@ -130,6 +131,7 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceTime: '2:00 PM', drafts: { service: draft } } as unknown as Session);
     await screen.findByRole('heading', { name: 'Who should know?' });
     await toConfirm();
+    fireEvent.press(await screen.findByRole('button', { name: 'Edit wording' }));
     expect(await screen.findByDisplayValue('')).toBeTruthy();
     expect(screen.queryByDisplayValue('2:00 PM')).toBeNull();
   });
