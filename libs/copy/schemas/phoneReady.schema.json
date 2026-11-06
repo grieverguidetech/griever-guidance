@@ -3,7 +3,7 @@
   "title": "Copy for the phone-only Ready to send screen (the rest comes from review.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["changeService", "changeThanks", "addNote", "notePlaceholder", "to", "and", "andMore", "change", "changeName", "choose", "fine", "shareInstead"],
+  "required": ["changeService", "changeThanks", "addNote", "notePlaceholder", "to", "and", "everyoneYouTold", "andMore", "change", "changeName", "choose", "fine", "shareInstead"],
   "properties": {
     "changeService": { "$ref": "#/$defs/text" },
     "changeThanks": { "$ref": "#/$defs/text" },
@@ -11,6 +11,7 @@
     "notePlaceholder": { "$ref": "#/$defs/text" },
     "to": { "$ref": "#/$defs/text" },
     "and": { "$ref": "#/$defs/text" },
+    "everyoneYouTold": { "$ref": "#/$defs/text" },
     "andMore": { "$ref": "#/$defs/text" },
     "change": { "$ref": "#/$defs/text" },
     "changeName": { "$ref": "#/$defs/text" },

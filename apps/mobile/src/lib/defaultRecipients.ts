@@ -1,4 +1,5 @@
 import type { TemplateCategory } from '@griever/shared';
+import type { SendFlowDraft } from '@griever/hooks';
 
 /** The per-moment "who was already sent this" lists kept on the device (session.recipientsNotified). */
 export type Notified = Partial<Record<TemplateCategory, string[]>> | undefined;
@@ -29,4 +30,26 @@ export function notSentYet(category: TemplateCategory, notified: Notified, saved
 
 function unique(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+/**
+ * Who starts picked on a fresh draft (decided 2026-11-05). The service and the obituary link start with
+ * "Everyone you told", less anyone this moment has already reached. The announcement and the thank-yous
+ * start with nobody. Pure: the caller decides when a draft is fresh and applies this once.
+ */
+export function defaultPicked(category: TemplateCategory, notified: Notified, savedIds: string[]): string[] {
+  if (category !== 'service' && category !== 'obituary') {
+    return [];
+  }
+  const sent = new Set(notified?.[category] ?? []);
+  return everyoneYouTold(category, notified, savedIds).filter((id) => !sent.has(id));
+}
+
+/**
+ * True when no draft has moved past the picker for this moment, so the defaults may be applied. A saved
+ * draft (even one the family cleared by hand) or one resumed mid-send never gets them added.
+ * A moment finished earlier keeps no wording (C2), so it starts fresh again.
+ */
+export function startsFresh(saved: Pick<SendFlowDraft, 'step'> | null | undefined): boolean {
+  return !saved || saved.step === 'template' || saved.step === 'sent';
 }

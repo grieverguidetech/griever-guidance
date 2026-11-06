@@ -19,6 +19,7 @@ import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
+import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
 import { sendNote } from '../lib/sendNote';
 import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
@@ -187,6 +188,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   }, [stuckOnPicker, onHub]);
   // The obituary's first form is Who should know?; its Back returns to the link screen, not the hub.
   const backToStart = flow.templateCategory === 'obituary' ? onShareObituary : onHub;
+  // Chosen from the hub with no draft past the picker: the first arrival on the people picks the defaults.
+  // Read once, at mount (the draft saved by opening the moment must not count). A resumed draft never gets them.
+  const defaultsPending = useRef(startCategory !== null && startsFresh(session.drafts[startCategory]));
   const [pendingArrival, setPendingArrival] = useState(arrived);
   const clearArrival = useCallback(() => setPendingArrival(false), []);
 
@@ -305,6 +309,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // step on to Ready to send, once per arrival. The sheet opened by Change is left alone.
   const sheetAsked = useRef(false);
   const arrivalHandled = useRef(false);
+  const onPeople = useRef(false);
   const choosePeople = useCallback(() => {
     sheetAsked.current = true;
     flow.prevStep();
@@ -313,14 +318,28 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (flow.step !== 'contacts') {
       sheetAsked.current = false;
       arrivalHandled.current = false;
+      // Defaults apply at the first arrival or never: leaving the people once closes the chance.
+      if (onPeople.current) {
+        defaultsPending.current = false;
+      }
       return;
     }
+    onPeople.current = true;
     if (sheetAsked.current || arrivalHandled.current) {
       return;
     }
+    const category = flow.templateCategory;
+    if (defaultsPending.current && category) {
+      // The saved people are read from the phone; wait for them, so the defaults are not missed.
+      if (contacts.loading) {
+        return;
+      }
+      defaultsPending.current = false;
+      flow.selectContacts(defaultPicked(category, session.recipientsNotified, contacts.contacts.map((c) => c.contactId)));
+    }
     arrivalHandled.current = true;
     nextStep();
-  }, [flow.step, nextStep]);
+  }, [flow.step, flow.templateCategory, flow.selectContacts, nextStep, contacts.loading, contacts.contacts, session.recipientsNotified]);
 
   const flowWithHub = {
     ...flow,
@@ -730,7 +749,7 @@ const Navigation = ({
               withPersonContext(
                 bar,
                 <>
-                  <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} focusPeopleButton={focusPeopleButton} />
+                  <ReadyToSendScreen flow={flow} contacts={contacts} notified={notified} onChoosePeople={onChoosePeople} focusPeopleButton={focusPeopleButton} />
                   <ContactSelectorScreen
                     flow={flow}
                     contacts={contacts}

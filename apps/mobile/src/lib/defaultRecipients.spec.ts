@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { everyoneYouTold, notSentYet } from './defaultRecipients';
+import { defaultPicked, everyoneYouTold, notSentYet, startsFresh } from './defaultRecipients';
 
 describe('everyoneYouTold', () => {
   it('returns announcement recipients who are still saved', () => {
@@ -50,5 +50,45 @@ describe('notSentYet', () => {
 
   it('has no duplicates', () => {
     expect(notSentYet('service', { service: ['a'] }, ['a', 'b', 'b'])).toEqual(['b']);
+  });
+});
+
+describe('defaultPicked', () => {
+  const notified = { announcement: ['a', 'b', 'gone'] };
+  const saved = ['a', 'b', 'c'];
+
+  it('picks everyone you told for the service and the obituary link', () => {
+    expect(defaultPicked('service', notified, saved)).toEqual(['a', 'b']);
+    expect(defaultPicked('obituary', notified, saved)).toEqual(['a', 'b']);
+  });
+
+  it('picks nobody for the announcement and the thank-yous', () => {
+    expect(defaultPicked('announcement', notified, saved)).toEqual([]);
+    expect(defaultPicked('aftercare', notified, saved)).toEqual([]);
+  });
+
+  it('leaves out a person who is in both the announcement and the service', () => {
+    expect(defaultPicked('service', { announcement: ['a', 'b'], service: ['a'] }, saved)).toEqual(['b']);
+    expect(defaultPicked('obituary', { announcement: ['a', 'b'], obituary: ['b'] }, saved)).toEqual(['a']);
+  });
+
+  it('picks nobody when nobody qualifies', () => {
+    expect(defaultPicked('service', undefined, saved)).toEqual([]);
+    expect(defaultPicked('service', { announcement: ['gone'] }, saved)).toEqual([]);
+    expect(defaultPicked('service', { announcement: ['a'], service: ['a'] }, saved)).toEqual([]);
+  });
+});
+
+describe('startsFresh', () => {
+  it('is true with no draft, a draft only opened, or a finished send', () => {
+    expect(startsFresh(undefined)).toBe(true);
+    expect(startsFresh({ step: 'template' })).toBe(true);
+    expect(startsFresh({ step: 'sent' })).toBe(true);
+  });
+
+  it('is false once a draft has moved past the picker, including mid-send', () => {
+    expect(startsFresh({ step: 'review' })).toBe(false);
+    expect(startsFresh({ step: 'contacts' })).toBe(false);
+    expect(startsFresh({ step: 'sending' })).toBe(false);
   });
 });
