@@ -63,7 +63,7 @@ export interface ReadyToSendProps {
   /** Gets the button that opens the people step (Change, or the primary when nobody is picked) back its focus when the sheet closes. */
   peopleButtonRef?: Ref<ButtonNode>;
   /** The To row: its words, built by the app, and the link that opens the people step. */
-  to: { text: string; changeLabel: string; /** The button's fuller name. It starts with `changeLabel`. */ changeName: string; onChange: () => void };
+  to: { text: string; /** Who they are, on the next line, when `text` names a group. */ detail?: string; changeLabel: string; /** The button's fuller name. It starts with `changeLabel`. */ changeName: string; onChange: () => void };
   /** With no one picked the primary is `chooseLabel` and opens the people step. */
   hasRecipients: boolean;
   sendLabel: string;
@@ -176,7 +176,10 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
 
   const toRow = hasRecipients ? (
     <View style={styles.to}>
-      <Body>{to.text}</Body>
+      <View accessible accessibilityLabel={to.detail ? `${to.text}. ${to.detail}` : to.text} style={styles.toText}>
+        <Body>{to.text}</Body>
+        {to.detail ? <Body>{to.detail}</Body> : null}
+      </View>
       <Button label={to.changeLabel} accessibilityName={to.changeName} variant="tertiary" buttonRef={peopleButtonRef} onPress={to.onChange} />
     </View>
   ) : null;
@@ -334,6 +337,7 @@ const styles = StyleSheet.create({
   actions: { gap: spacing[1] },
   greetingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   to: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], alignItems: 'center', justifyContent: 'center' },
+  toText: { alignItems: 'center' },
   share: { alignItems: 'center' },
   field: { gap: spacing[1] },
   input: {

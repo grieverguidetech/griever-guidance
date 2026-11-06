@@ -112,7 +112,8 @@ export function ReadyToSendScreen({ flow, contacts, notified, onChoosePeople, fo
   const greeting = picked[0] ? firstName(picked[0].name) : '';
   // Picked people who are exactly the default for this moment are named as a group.
   const defaults = flow.templateCategory ? defaultPicked(flow.templateCategory, notified, contacts?.contacts.map((c) => c.contactId) ?? []) : [];
-  const isDefaultSet = defaults.length > 0 && defaults.length === selectedContactIds.length && defaults.every((id) => selectedContactIds.includes(id));
+  const pickedSet = new Set(selectedContactIds);
+  const isDefaultSet = defaults.length > 0 && defaults.length === pickedSet.size && defaults.every((id) => pickedSet.has(id));
   const detailsFields = detailsFieldsFor(flow);
   const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
   const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
@@ -173,6 +174,7 @@ export function ReadyToSendScreen({ flow, contacts, notified, onChoosePeople, fo
         }
         to={{
           text: fill(ready.to, { names: (isDefaultSet ? ready.everyoneYouTold : namesPhrase(names)) || recipientsPhrase(recipientCount, copy), count: String(recipientCount) }),
+          detail: isDefaultSet ? namesPhrase(names) : undefined,
           changeLabel: ready.change,
           changeName: ready.changeName,
           onChange: choosePeople,

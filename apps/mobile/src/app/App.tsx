@@ -309,6 +309,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // step on to Ready to send, once per arrival. The sheet opened by Change is left alone.
   const sheetAsked = useRef(false);
   const arrivalHandled = useRef(false);
+  const onPeople = useRef(false);
   const choosePeople = useCallback(() => {
     sheetAsked.current = true;
     flow.prevStep();
@@ -317,8 +318,13 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (flow.step !== 'contacts') {
       sheetAsked.current = false;
       arrivalHandled.current = false;
+      // Defaults apply at the first arrival or never: leaving the people once closes the chance.
+      if (onPeople.current) {
+        defaultsPending.current = false;
+      }
       return;
     }
+    onPeople.current = true;
     if (sheetAsked.current || arrivalHandled.current) {
       return;
     }
