@@ -19,6 +19,10 @@ export interface SentNoteText {
   rest: string;
   /** The same words as the visible note (lead and rest), for the iOS announcement. */
   spoken: string;
+  /** Which moment the send was for. */
+  category: Category;
+  /** Some people were told and some were not ("Stop for now"). The person screen lights that card. */
+  partial: boolean;
 }
 
 /** The calm note shown on Home when the last person has been dealt with. No exclamation points (C7). */
@@ -27,7 +31,7 @@ export function sendNote(category: Category, recipients: RecipientProgress[]): S
   const told = recipients.filter((r) => r.status === 'delivered').length;
   if (total > 0 && told === 0) {
     // Nothing was sent, so there is no privacy line (C2 applies only to what was sent).
-    return { ...finishNote.none, spoken: `${finishNote.none.lead} ${finishNote.none.rest}` };
+    return { ...finishNote.none, spoken: `${finishNote.none.lead} ${finishNote.none.rest}`, category, partial: false };
   }
   if (total > 0 && told < total) {
     const lead = fill(finishNote.partial.lead, { told, total });
@@ -35,8 +39,10 @@ export function sendNote(category: Category, recipients: RecipientProgress[]): S
       lead,
       rest: `${finishNote.partial.rest} ${finishNote.noCopy}`,
       spoken: `${lead} ${finishNote.partial.rest} ${finishNote.noCopy}`,
+      category,
+      partial: true,
     };
   }
   const lead = category ? finishNote.allTold[MOMENT_BY_CATEGORY[category]] : finishNote.sentGeneric;
-  return { lead, rest: finishNote.noCopy, spoken: `${lead} ${finishNote.noCopy}` };
+  return { lead, rest: finishNote.noCopy, spoken: `${lead} ${finishNote.noCopy}`, category, partial: false };
 }

@@ -81,7 +81,7 @@ describe('Import contacts from Home (#379)', () => {
     await screen.findByText("Who you're writing about");
     await waitFor(() => expect(focus).toHaveBeenCalled());
     fireEvent.press(screen.getByRole('button', { name: 'Anna' }));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     focus.mockClear();
     // The hub's way back reads "Home" (#380).
     fireEvent.press(await screen.findByRole('button', { name: 'Home' }));

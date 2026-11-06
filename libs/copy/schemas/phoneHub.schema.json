@@ -1,7 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only Hub screen (no words yet)",
+  "title": "Copy for the phone-only person screen: heading, intro, partial-send line",
   "type": "object",
   "additionalProperties": false,
-  "properties": {}
+  "required": ["heading", "intro", "sentPartial"],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "intro": { "$ref": "#/$defs/text" },
+    "sentPartial": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
 }

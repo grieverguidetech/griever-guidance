@@ -23,7 +23,7 @@ describe('send steps and the top safe area', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
     await screen.findByLabelText(/Anything you'd like to add/);
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
@@ -36,7 +36,7 @@ describe('send steps and the top safe area', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
       return style.paddingTop === 47 && style.paddingBottom === 34 && style.backgroundColor === colors.bg;

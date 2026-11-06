@@ -59,7 +59,7 @@ const openAnna = async () => {
 // The hub comes first: Start is the announcement; the other steps are rows named for the step.
 const startMoment = async (title: string) =>
   fireEvent.press(
-    await screen.findByRole('button', { name: title === 'Announce the passing' ? 'Start' : new RegExp(title) }),
+    await screen.findByRole('button', { name: title === 'Announce the passing' ? /Next/ : new RegExp(title) }),
   );
 
 describe('picking an announcement', () => {
@@ -116,7 +116,7 @@ describe('picking an announcement', () => {
   it('moves screen-reader focus to the heading when Announce opens', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await openAnna();
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     focus.mockClear();
     await startMoment('Announce the passing');
     await screen.findByLabelText(/Anything you'd like to add/);
@@ -149,7 +149,7 @@ describe('picking an announcement', () => {
     async (moment) => {
       const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
       await openAnna();
-      await screen.findByText('One thing at a time.');
+      await screen.findByText('Ready to send');
       focus.mockClear();
       await startMoment(moment);
       expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
@@ -161,7 +161,7 @@ describe('picking an announcement', () => {
       expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();
       expect(heading).toBeTruthy();
       fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-      expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+      expect(await screen.findByText('Ready to send')).toBeTruthy();
     },
   );
 
@@ -171,7 +171,7 @@ describe('picking an announcement', () => {
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     await startMoment('Announce the passing');
     await screen.findByLabelText(/Anything you'd like to add/);
     expect(say).toHaveBeenCalledWith('Now writing about Anna');
@@ -198,7 +198,7 @@ describe('picking an announcement', () => {
     expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     // The first form's Back returns to the hub, not a picker.
-    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
     expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
   });
 });
@@ -284,7 +284,7 @@ describe('the end of a send', () => {
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith(
@@ -349,8 +349,8 @@ describe('the end of a send', () => {
     await screen.findByText('Everyone has been told.');
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
-    // The announcement is now recorded as done, so the next step (Share the service) carries Start.
-    fireEvent.press(screen.getByRole('button', { name: 'Start' }));
+    // The announcement is now recorded as done; the service still needs its date, so it is a plain row.
+    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
     // The service moment opened on its people (not the hub, not 'sent').
     expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
@@ -371,7 +371,7 @@ describe('the end of a send', () => {
     expect(spoken).toHaveLength(1);
     // The handle belongs to the hub's heading node, not some other node.
     const focusedNodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
-    expect(focusedNodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'One thing at a time.')).toBe(true);
+    expect(focusedNodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'Ready to send')).toBe(true);
     expect(screen.getByLabelText(/Everyone has been told\./).props.accessibilityLiveRegion).toBe('polite');
   });
 
@@ -402,7 +402,7 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
   });
 });
@@ -410,12 +410,12 @@ describe('the end of a send', () => {
 describe('Edit person from the hub', () => {
   it('Back from setup returns to the hub, not Home', async () => {
     await openAnna();
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
     // Back returns to the hub, so it is named plain "Back", not "Back to home".
     expect(screen.queryByLabelText('Back to home')).toBeNull();
     fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
-    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 
@@ -434,7 +434,7 @@ describe('Edit person from the hub', () => {
     await screen.findByText('Everyone has been told.');
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
-    expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     expect(screen.queryByText('Everyone has been told.')).toBeNull();
   });
 });

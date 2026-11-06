@@ -86,7 +86,7 @@ describe('the order in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Date they passed (optional)' }));
     fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2025, 5, 7));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
     expect(screen.getByText('For Ben')).toBeTruthy();
     expect(screen.queryByText('Choose who to tell')).toBeNull();
     view.unmount();
@@ -107,7 +107,7 @@ describe('the order in the app', () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
     expect(screen.queryByText('Who are we writing about?')).toBeNull();
   });
 
@@ -115,7 +115,7 @@ describe('the order in the app', () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z', 'May 2, 2026')]);
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
-    fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
     await screen.findByPlaceholderText('She was peaceful, and we were with her.');
     expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
     expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
@@ -130,7 +130,7 @@ describe('the order in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Date they passed (optional)' }));
     fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2025, 5, 7));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
     expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
     await waitFor(async () => {
@@ -146,7 +146,7 @@ describe('the order in the app', () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
     expect(screen.getByText("Someone else I've lost")).toBeTruthy();
@@ -192,7 +192,7 @@ describe('Home from every step', () => {
     // No Home bar (#364): Back from the first form goes to the hub, and Back there goes Home.
     expect(screen.queryByLabelText('Back to home')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
   });
@@ -209,19 +209,19 @@ describe('Home from every step', () => {
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    await screen.findByText('One thing at a time.');
+    await screen.findByText('Ready to send');
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
 
     // The first form: Android back is the same as the on-screen Back, to the hub.
     fireEvent.press(await screen.findByLabelText('Anna'));
-    fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
     await screen.findByPlaceholderText('She was peaceful, and we were with her.');
     act(() => void pressBack());
-    expect(await screen.findByText('One thing at a time.')).toBeTruthy();
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
 
     // A later step steps back one step, like the on-screen Back (#653), never Home.
-    fireEvent.press(await screen.findByRole('button', { name: 'Start' }));
+    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
     await screen.findByPlaceholderText('She was peaceful, and we were with her.');
     fireEvent.press(await screen.findByText('Continue'));
     await screen.findByText('Who should know?');
