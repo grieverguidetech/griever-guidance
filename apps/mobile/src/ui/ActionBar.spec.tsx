@@ -55,8 +55,18 @@ describe('ActionBar', () => {
     expect(screen.queryByText('Not shown')).toBeNull();
     expect(button.props.accessibilityHint).toBe('Pick at least one person');
     expect(button.props.accessibilityState).toMatchObject({ disabled: true });
-    expect(button.props.focusable).not.toBe(false);
+    expect(button.props.accessible).not.toBe(false);
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('treats an empty disabledReason as enabled, with no hint', () => {
+    const onPress = jest.fn();
+    render(<ActionBar label="Next" onPress={onPress} disabledReason="" />);
+    const button = screen.getByRole('button', { name: 'Next' });
+    expect(button.props.accessibilityHint).toBeUndefined();
+    expect(button.props.accessibilityState?.disabled).toBeFalsy();
+    fireEvent.press(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

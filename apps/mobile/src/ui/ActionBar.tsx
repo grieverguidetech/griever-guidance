@@ -29,7 +29,7 @@ export interface ActionBarProps {
  */
 export function ActionBar({ label, onPress, note, above, disabledReason }: ActionBarProps) {
   const insets = useSafeAreaInsets();
-  const disabled = disabledReason !== undefined;
+  const disabled = Boolean(disabledReason);
   const line = disabled ? disabledReason : note;
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom + spacing[2] }]}>
