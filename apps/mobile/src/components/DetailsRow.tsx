@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import type { ComponentRef } from 'react';
+import type { ComponentRef, Ref } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
+import type { Text as RNText } from 'react-native';
 import { SerifText as Text } from '../ui';
 import { colors, radius, spacing } from '@griever/tokens';
 
@@ -21,6 +22,8 @@ interface Props {
   fields: DetailsField[];
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
+  /** For moving the screen reader to the heading when the row opens. */
+  headingRef?: Ref<ComponentRef<typeof RNText>>;
 }
 
 /** True when a required field has no text. The caller uses it to block Send. */
@@ -32,12 +35,12 @@ export function isMissing(field: DetailsField, values: Record<string, string>) {
  * Small single-line inputs for the template's fields. One screen-reader stop per field: the input
  * carries the label (plus "Needed" when empty and required); the visible label is hidden from it.
  */
-export function DetailsRow({ copy, fields, values, onChange }: Props) {
+export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props) {
   const inputs = useRef<Array<ComponentRef<typeof TextInput> | null>>([]);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   return (
     <View style={styles.row}>
-      <Text style={styles.heading} accessibilityRole="header">
+      <Text ref={headingRef} style={styles.heading} accessibilityRole="header">
         {copy.detailsHeading}
       </Text>
       {fields.map((field, index) => {

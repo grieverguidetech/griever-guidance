@@ -266,7 +266,7 @@ describe('Ready to send (announcement)', () => {
 
   it('Change opens the people step with the ticks kept, and Continue returns to the message', async () => {
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: 'Change' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
     expect(await screen.findByText('1 selected')).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));

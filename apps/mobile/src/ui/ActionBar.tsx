@@ -58,7 +58,7 @@ export function ActionBar({ label, onPress, note, above, disabledReason, hint, l
         minHeight={ACTION_BAR_BUTTON_HEIGHT}
       />
       {liveReason ? (
-        <View style={[styles.line, !disabled && !note && styles.lineEmpty]}>
+        <View style={disabled || note ? styles.line : styles.lineEmpty}>
           <Status id={reasonId} message={disabledReason} />
           {!disabled && note ? <Body small tone="muted">{note}</Body> : null}
         </View>
@@ -82,11 +82,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors['neutral-400'],
     paddingHorizontal: spacing[3],
     paddingTop: spacing[2],
-    gap: spacing[2],
   },
   // Links wrap and keep a gap, so they do not run off screen at the largest text size (#654).
-  above: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'center' },
-  line: { alignItems: 'center' },
-  // Nothing to say: the empty line takes no space from the gap.
-  lineEmpty: { marginTop: -spacing[2] },
+  above: { marginBottom: spacing[2], flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'center' },
+  line: { alignItems: 'center', marginTop: spacing[2] },
+  // Nothing to say: the live line stays drawn but takes no height, so the bar does not jump.
+  lineEmpty: { height: 0, overflow: 'hidden' },
 });

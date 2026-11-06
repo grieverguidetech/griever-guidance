@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import type { Text as RNText } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
@@ -58,7 +59,7 @@ export interface ReadyToSendProps {
   /** The first-name switch, inside Edit wording. Leave unset when no one is picked. */
   greeting?: { label: string; value: boolean; onChange: () => void };
   /** The Details link and the row it opens in place. Leave unset to hide both (hand-edited text). */
-  details?: { label: string; startOpen: boolean; children: ReactNode };
+  details?: { label: string; startOpen: boolean; /** Draws the row. `headingRef` goes on its heading, where focus lands when the row opens. */ render: (headingRef: Ref<ComponentRef<typeof RNText>>) => ReactNode };
   /** The To row: its words, built by the app, and the link that opens the people step. */
   to: { text: string; changeLabel: string; /** The button's fuller name. It starts with `changeLabel`. */ changeName: string; onChange: () => void };
   /** With no one picked the primary is `chooseLabel` and opens the people step. */
@@ -95,7 +96,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const [returnFocus, setReturnFocus] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
   const [focusDetails, setFocusDetails] = useState(false);
-  const detailsRef = useRef<ComponentRef<typeof View>>(null);
+  const detailsRef = useRef<ComponentRef<typeof RNText>>(null);
   const fieldRef = useRef<TextInputNode>(null);
   const editRef = useRef<ButtonNode>(null);
   const toneReasonId = useId();
@@ -126,7 +127,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   // Opening Change details moves the screen reader to the row, so the new inputs are found.
   useEffect(() => {
     if (focusDetails) {
-      focusNode(detailsRef.current as unknown as ButtonNode);
+      focusNode(detailsRef.current);
       setFocusDetails(false);
     }
   }, [focusDetails]);
@@ -193,7 +194,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           }
         }}
       />
-      {shareReason ? <Status id={shareReasonId} message={shareReason} /> : null}
+      <Status id={shareReasonId} message={shareReason} />
       {/* Always drawn: a status line is only read out when its text changes after it is on screen. */}
       <Status id={shareErrorId} message={share.error} tone="danger" />
     </View>
@@ -268,7 +269,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             <Status id={swapNoteId} message={swapNote} />
           </View>
         ) : null}
-        {details && detailsOpen ? <View ref={detailsRef}>{details.children}</View> : null}
+        {details && detailsOpen ? details.render(detailsRef) : null}
         {toRow}
         {shareRow}
       </ScrollView>

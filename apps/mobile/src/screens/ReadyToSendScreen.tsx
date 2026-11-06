@@ -118,7 +118,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
             ? {
                 label: isService ? ready.changeService : ready.changeThanks,
                 startOpen: detailsMissing,
-                children: <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} />,
+                render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} headingRef={headingRef} />,
               }
             : undefined
         }

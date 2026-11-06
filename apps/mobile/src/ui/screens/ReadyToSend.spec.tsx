@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
+import type { ComponentRef, Ref } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import { screenCopy } from '@griever/copy';
@@ -37,6 +38,20 @@ const handleForButton = (name: string): number => {
   return found;
 };
 
+// The handle of the node a text line's ref points at, found by matching the line's own children.
+const handleForText = (text: string): number => {
+  let found: number | undefined;
+  for (const [node, handle] of mockHandles) {
+    if ((node as { props?: { children?: unknown } }).props?.children === text) {
+      found = handle;
+    }
+  }
+  if (found === undefined) {
+    throw new Error(`No focus handle for text ${text}`);
+  }
+  return found;
+};
+
 const copy = screenCopy('review');
 const SUGGESTED = 'Anna has passed away.';
 
@@ -69,7 +84,15 @@ function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
 }
 
 describe('ReadyToSend: Change details', () => {
-  const details = { label: 'Change details', startOpen: false, children: <Text>Details row</Text> };
+  const details = {
+    label: 'Change details',
+    startOpen: false,
+    render: (headingRef: Ref<ComponentRef<typeof Text>>) => (
+      <Text ref={headingRef} accessibilityRole="header">
+        Details row
+      </Text>
+    ),
+  };
 
   it('reads expanded or not, opens in place, and moves focus to the row', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
@@ -81,6 +104,7 @@ describe('ReadyToSend: Change details', () => {
     expect(screen.getByText('Details row')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Change details' }).props.accessibilityState).toMatchObject({ expanded: true });
     expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenLastCalledWith(handleForText('Details row'));
     fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
     expect(screen.queryByText('Details row')).toBeNull();
     expect(focus).toHaveBeenCalledTimes(1);
