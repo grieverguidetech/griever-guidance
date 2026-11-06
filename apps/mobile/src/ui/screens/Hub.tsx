@@ -194,6 +194,7 @@ const styles = StyleSheet.create({
   // The name may be long; it wraps, and the Edit person button keeps its full width.
   eyebrowText: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
+  // Must match the selected style of Card (ui/Card.tsx): border 2, accent, radius md, surface, padding spacing[3].
   lit: { gap: spacing[2], padding: spacing[3], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });

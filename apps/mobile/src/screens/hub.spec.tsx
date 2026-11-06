@@ -172,6 +172,9 @@ describe('HubScreen', () => {
     expect(lit).toHaveLength(1);
     expect(within(lit[0]).getByText('Ready')).toBeTruthy();
     expect(within(lit[0]).getByText('Announce the passing')).toBeTruthy();
+    const style = StyleSheet.flatten(typeof lit[0].props.style === 'function' ? lit[0].props.style({ pressed: false }) : lit[0].props.style);
+    expect(style.borderWidth).toBe(2);
+    expect(style.borderColor).toBe(colors.accent);
     fireEvent.press(lit[0]);
     expect(onStart).toHaveBeenLastCalledWith('announce');
   });

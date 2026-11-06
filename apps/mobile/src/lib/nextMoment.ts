@@ -33,7 +33,7 @@ export function serviceIsOver(serviceDate: string | undefined, now: Date): boole
 
 /**
  * The one card to light: a stopped send first, else the first card in order that is not done, not
- * locked and Ready (the obituary also when waiting for its link). Null when none qualifies (the bottom button then offers the announcement).
+ * locked and Ready (the obituary also when waiting for its link). Null when none qualifies (the bottom button then uses `barMoment`).
  */
 export function nextMoment({ session, locked, partial = null, now = new Date() }: NextMomentInput): MomentKey | null {
   if (partial && !locked.includes(partial)) {

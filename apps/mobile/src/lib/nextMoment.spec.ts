@@ -114,6 +114,8 @@ describe('barMoment', () => {
     const sent = { announcement: ['a'], service: ['b'], obituary: ['c'] };
     const done = { recipientsNotified: sent, obituaryUrl: 'https://x.test/o' };
     expect(barMoment({ session: session({ ...done, serviceDate: 'November 8, 2026' }), locked: [], now: NOW })).toBe('announce');
-    expect(barMoment({ session: session({ ...done, serviceDate: 'November 8, 2026' }), locked: ['thanks'], now: NOW })).toBe('announce');
+    const past = session({ ...done, serviceDate: 'November 1, 2026' });
+    expect(barMoment({ session: past, locked: [], now: NOW })).toBe('thanks');
+    expect(barMoment({ session: past, locked: ['thanks'], now: NOW })).toBe('announce');
   });
 });

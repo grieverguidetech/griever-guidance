@@ -164,7 +164,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
         : statusLine(sendCardStatus(session, moment.key), session, moment.key),
   }));
 
-  // The bottom button names the lit card and does what tapping it does. With none lit it offers the announcement.
+  // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.
   const target: MomentKey = barMoment({ session, locked, partial: stopped });
   const primaryLabel = copy.moments[target].title;
 
