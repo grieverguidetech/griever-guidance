@@ -125,11 +125,25 @@ describe('WhoShouldKnow (mobile props, #652)', () => {
     expect(hostsWithRole('listitem')).toHaveLength(3);
   });
 
-  it('with scrollList, the count and Continue are still on the screen', () => {
-    setup({ grouped: false, scrollList: true, selectedIds: ['a'] });
+  it('with scrollList, the Done bar is on the screen with the label it is given', () => {
+    setup({ grouped: false, scrollList: true, selectedIds: ['a'], doneLabel: 'Done · 1 chosen' });
     expect(screen.getAllByRole('checkbox')).toHaveLength(3);
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
-    expect(screen.getByText('1 selected')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Done · 1 chosen' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+  });
+
+  it('with scrollList, Done works with no one chosen', () => {
+    const { onContinue } = setup({ grouped: false, scrollList: true, doneLabel: 'Done' });
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('with scrollList, Close does what Back did, and What you\'ll need is hidden', () => {
+    const { onBack } = setup({ grouped: false, scrollList: true, closeLabel: 'Close', onWhatYoullNeed: jest.fn() });
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -19,6 +19,7 @@ import type { HeadingProps } from '../Heading';
 import { Phrasing } from '../phrasing';
 import { Card } from '../Card';
 import { Body } from '../Text';
+import { ActionBar } from '../ActionBar';
 import { focusNode } from '../focusNode';
 import { useSerifStyle } from '../typography';
 
@@ -147,6 +148,16 @@ export interface WhoShouldKnowProps {
    * if the save fails (what was typed stays). Leave unset on web, where Add works as it always did.
    */
   guardedAdd?: boolean;
+  /**
+   * Mobile list (`scrollList`): the top-bar button that does what Back did, for example "Close". The list
+   * then has no "What you'll need". Falls back to `copy.back`.
+   */
+  closeLabel?: string;
+  /**
+   * Mobile list (`scrollList`): the label of the Done bar, with the count in it (for example "Done · 2 chosen").
+   * It is always available and does what Continue did, even with no one chosen. Falls back to `copy.continue`.
+   */
+  doneLabel?: string;
 }
 
 /**
@@ -177,6 +188,8 @@ export function WhoShouldKnow({
   toldIds,
   scrollList = false,
   guardedAdd = false,
+  closeLabel,
+  doneLabel,
 }: WhoShouldKnowProps) {
   const [query, setQuery] = useState('');
   const needle = search ? query.trim().toLowerCase() : '';
@@ -221,10 +234,23 @@ export function WhoShouldKnow({
     />
   );
 
+  // iOS ignores live regions: say the new count when the Done label changes (not on first show).
+  const firstDone = useRef(true);
+  const doneText = doneLabel ?? copy.continue;
+  useEffect(() => {
+    if (firstDone.current) {
+      firstDone.current = false;
+      return;
+    }
+    if (scrollList && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibility(doneText);
+    }
+  }, [doneText, scrollList]);
+
   const topBar = (
     <View style={styles.topBar}>
-      <Button label={copy.back} variant="header" onPress={onBack} />
-      {onWhatYoullNeed ? (
+      <Button label={scrollList ? (closeLabel ?? copy.back) : copy.back} variant="header" onPress={onBack} />
+      {onWhatYoullNeed && !scrollList ? (
         <Button
           label={copy.checklist}
           variant="header"
@@ -388,7 +414,12 @@ export function WhoShouldKnow({
             </View>
           }
         />
-        <View style={styles.sticky}>{bottom}</View>
+        <ActionBar
+          testID="people-action-bar"
+          label={doneText}
+          onPress={onContinue}
+          note={noneNote ? copy.noneYet : undefined}
+        />
       </View>
     );
   }
@@ -807,13 +838,6 @@ const styles = StyleSheet.create({
   scrollContent: { padding: spacing[3], paddingTop: spacing[4] },
   listEdge: { paddingVertical: spacing[2] },
   rowGap: { height: spacing[2] },
-  sticky: {
-    gap: spacing[1],
-    padding: spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: colors['neutral-300'],
-    backgroundColor: colors.bg,
-  },
   head: { gap: spacing[1] },
   sectionHead: {
     flexDirection: 'row',

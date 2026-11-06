@@ -688,7 +688,7 @@ const Navigation = ({
         )}
         {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
-            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} notified={notified} />)}
+            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} notified={notified} />, false)}
           </Stack.Screen>
         )}
         {flow.step === 'review' && (

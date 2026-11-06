@@ -44,7 +44,7 @@ describe('sharing the obituary on mobile', () => {
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'has space');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     expect(await screen.findByText("That link doesn't look right. Copy it again from the paper or funeral home.")).toBeTruthy();
-    expect(screen.queryByText('Who should know?')).toBeNull();
+    expect(screen.queryByText('Who should get this?')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('button', { name: /Share the obituary/ })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Share the obituary' })).toBeNull();
@@ -71,18 +71,18 @@ describe('sharing the obituary on mobile', () => {
     expect(screen.getByText(sent)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText(sent)).toBeTruthy();
   });
 
-  it('takes the link through Who should know? to Review, with the link in the message', async () => {
+  it('takes the link through Who should get this? to Review, with the link in the message', async () => {
     await openObituary();
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
-    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    expect(await screen.findByText('Who should get this?')).toBeTruthy();
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.getByText(/https:\/\/legacy\.com\/anna/)).toBeTruthy();
     await waitFor(async () => {
@@ -96,18 +96,18 @@ describe('sharing the obituary on mobile', () => {
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
   });
 
-  it('Back from Who should know? returns to the link screen with the link kept', async () => {
+  it('Back from Who should get this? returns to the link screen with the link kept', async () => {
     await openObituary();
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
-    await screen.findByText('Who should know?');
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByText('Who should get this?');
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
   });
 });

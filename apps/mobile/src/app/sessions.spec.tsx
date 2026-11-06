@@ -6,8 +6,8 @@ import { createSessionCache, SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSe
 import { freshDraft } from '@griever/hooks';
 import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 
-// Service and thank-you open on Who should know?; their planned fields are kept in the saved draft.
-const findPicker = () => screen.findByRole('heading', { name: 'Who should know?' });
+// Service and thank-you open on Who should get this?; their planned fields are kept in the saved draft.
+const findPicker = () => screen.findByRole('heading', { name: 'Who should get this?' });
 async function savedAftercare(personName: string) {
   const people = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { step: string; fields: Record<string, string>; selectedContactIds: string[] }> }[];
   return people.find((p) => p.personName === personName)?.drafts?.['aftercare'];
@@ -138,7 +138,7 @@ describe('people kept on the phone', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await openThankYous();
-    // A draft saved on the retired details step resumes on Who should know?, fields kept.
+    // A draft saved on the retired details step resumes on Who should get this?, fields kept.
     await findPicker();
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
@@ -191,7 +191,7 @@ describe('people kept on the phone', () => {
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna'));
       fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-      expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
       await waitFor(async () => {
         const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
         expect(saved.drafts.aftercare).toEqual(kept);

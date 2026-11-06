@@ -79,11 +79,11 @@ describe('Android Back inside the flow (#653)', () => {
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await startAnnouncement(true);
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
     act(() => void pressBack());
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
-    expect(screen.queryByText('Who should know?')).toBeNull();
+    expect(screen.queryByText('Who should get this?')).toBeNull();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
   });
 });
@@ -97,13 +97,13 @@ describe('Android Back in the import review (#653)', () => {
     });
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await startAnnouncement(true);
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     await screen.findByRole('heading', { name: 'Add from your contacts' });
     const handled = jest.fn();
     act(() => handled(pressBack()));
     expect(handled).toHaveBeenCalledWith(true);
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
     expect(screen.queryByText('Starred Sam')).toBeNull();
   });
 });
@@ -112,11 +112,11 @@ describe('Focus on arrival (#653)', () => {
   it('moves to the heading on Ready to send and on the picker', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await startAnnouncement(true);
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     expect(focus).toHaveBeenCalled();
     fireEvent.press(await screen.findByText('Dee'));
     focus.mockClear();
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
     expect(focus).toHaveBeenCalledTimes(1);
   });
@@ -126,7 +126,7 @@ describe('The stacks use the calm transition (#653)', () => {
   const lastOptions = () => mockScreenOptions[mockScreenOptions.length - 1];
   const settle = async () => {
     await startAnnouncement(true);
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     await act(async () => undefined);
   };
 

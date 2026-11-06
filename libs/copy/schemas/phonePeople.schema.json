@@ -1,7 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only People screen (no words yet)",
+  "title": "Copy for the phone-only People list (its words sit over whoShouldKnow.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "properties": {}
+  "required": ["heading", "close", "done", "doneCount"],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "close": { "$ref": "#/$defs/text" },
+    "done": { "$ref": "#/$defs/text" },
+    "doneCount": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
 }
