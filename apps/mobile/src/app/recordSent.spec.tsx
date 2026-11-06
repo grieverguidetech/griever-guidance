@@ -51,14 +51,15 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
   // A moment already sent to people shows its compact done row; a new one is the lit card.
   fireEvent.press(told.length > 0 ? await screen.findByText(/Sent to \d+ (person|people)/) : await screen.findByRole('button', { name: /Next/ }));
-  if (note) {
-    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
-  }
-  fireEvent.press(await screen.findByText('Continue'));
   for (const name of pick) {
     fireEvent.press(await screen.findByText(name));
   }
   fireEvent.press(screen.getByText('Continue'));
+  // The optional note is under Change details on Ready to send.
+  if (note) {
+    fireEvent.press(await screen.findByRole('button', { name: 'Change details' }));
+    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
+  }
   fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
 };
 
@@ -106,9 +107,9 @@ describe('recording who was messaged (#621)', () => {
     expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
     // Start the announcement again from its done row.
     fireEvent.press(screen.getByText(/Sent to 1 person/));
-    expect(await screen.findByLabelText(/Anything you'd like to add/)).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.getByLabelText(/Anything you'd like to add/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Who should know?' })).toBeTruthy();
     expect(screen.queryByText('Ready to send')).toBeNull();
   });
 

@@ -78,7 +78,6 @@ describe('Android Back inside the flow (#653)', () => {
     });
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await startAnnouncement(true);
-    fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByRole('heading', { name: 'Announce the passing' });
@@ -98,7 +97,6 @@ describe('Android Back in the import review (#653)', () => {
     });
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await startAnnouncement(true);
-    fireEvent.press(await screen.findByText('Continue'));
     await screen.findByRole('heading', { name: 'Who should know?' });
     fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     await screen.findByRole('heading', { name: 'Add from your contacts' });
@@ -110,24 +108,10 @@ describe('Android Back in the import review (#653)', () => {
   });
 });
 
-describe('Edit from a step (#653)', () => {
-  it('reads "Edit their details", and Continue returns to the step with no contacts check', async () => {
-    // No saved contacts: the old Continue went on to the contacts step.
-    await startAnnouncement(false);
-    await screen.findByLabelText(/Anything you'd like to add/);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit' }));
-    expect(await screen.findByRole('heading', { name: 'Edit their details' })).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByLabelText(/Anything you'd like to add/)).toBeTruthy();
-    expect(screen.queryByText("Who you're writing about")).toBeNull();
-  });
-});
-
 describe('Focus on arrival (#653)', () => {
   it('moves to the heading on Ready to send and on the picker', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await startAnnouncement(true);
-    fireEvent.press(await screen.findByText('Continue'));
     await screen.findByRole('heading', { name: 'Who should know?' });
     expect(focus).toHaveBeenCalled();
     fireEvent.press(await screen.findByText('Dee'));
@@ -142,7 +126,7 @@ describe('The stacks use the calm transition (#653)', () => {
   const lastOptions = () => mockScreenOptions[mockScreenOptions.length - 1];
   const settle = async () => {
     await startAnnouncement(true);
-    await screen.findByLabelText(/Anything you'd like to add/);
+    await screen.findByRole('heading', { name: 'Who should know?' });
     await act(async () => undefined);
   };
 

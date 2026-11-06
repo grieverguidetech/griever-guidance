@@ -63,37 +63,36 @@ const startMoment = async (title: string) =>
   );
 
 describe('picking an announcement', () => {
-  it('shows a real screen, not a blank one or the checklist', async () => {
+  it('opens on Who should know?, never the old intro or the checklist', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Announce the passing' })).toBeNull();
+    expect(screen.queryByText(/This is only if you'd like to say more/)).toBeNull();
+    expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
     expect(screen.queryByText('Gather when you can')).toBeNull();
   });
 
-  it('keeps the note typed on the announce screen, and Continue goes to Who should know?', async () => {
+  it('puts the note typed under Change details in the message, and keeps it on Change', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Who should know?')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
-  });
-
-  it('puts the typed note in the message on the confirm screen', async () => {
-    await openAnna();
-    await startMoment('Announce the passing');
-    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
+    await screen.findByRole('heading', { name: 'Announce the passing' });
+    expect(screen.queryByText(/She was peaceful\./)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
+    fireEvent.changeText(await screen.findByLabelText("Anything you'd like to add (optional)"), 'She was peaceful.');
+    expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
+    // Going to the people and back keeps the note.
+    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    await screen.findByText('1 selected');
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
   });
 
   it('lets people be picked on Who should know?, and the picked people reach Review', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('0 selected')).toBeTruthy();
     fireEvent.press(await screen.findByRole('checkbox', { name: /Dee/ }));
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
@@ -104,29 +103,10 @@ describe('picking an announcement', () => {
     expect(screen.getByText('To Dee and Eli · 2')).toBeTruthy();
   });
 
-  it('Edit opens setup, and Back there returns to Announce with the note kept', async () => {
+  it('has no "Writing about" / Home bar on the people step', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), 'She was peaceful.');
-    fireEvent.press(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
-    expect((await screen.findByLabelText(/Anything you'd like to add/)).props.value).toBe('She was peaceful.');
-  });
-
-  it('moves screen-reader focus to the heading when Announce opens', async () => {
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-    await openAnna();
-    await screen.findByText('Ready to send');
-    focus.mockClear();
-    await startMoment('Announce the passing');
-    await screen.findByLabelText(/Anything you'd like to add/);
-    expect(focus).toHaveBeenCalled();
-  });
-
-  it('has no "Writing about" / Home bar on Announce', async () => {
-    await openAnna();
-    await startMoment('Announce the passing');
-    await screen.findByLabelText(/Anything you'd like to add/);
+    await screen.findByRole('heading', { name: 'Who should know?' });
     expect(screen.queryByText(/Writing about/)).toBeNull();
     expect(screen.queryByLabelText('Back to home')).toBeNull();
   });
@@ -135,7 +115,6 @@ describe('picking an announcement', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await openAnna();
     await startMoment('Announce the passing');
-    fireEvent.press(await screen.findByRole('button', { name: 'Continue' }));
     await screen.findByText('Who should know?');
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
@@ -173,33 +152,22 @@ describe('picking an announcement', () => {
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('Ready to send');
     await startMoment('Announce the passing');
-    await screen.findByLabelText(/Anything you'd like to add/);
+    await screen.findByRole('heading', { name: 'Who should know?' });
     expect(say).toHaveBeenCalledWith('Now writing about Anna');
   });
 
-  it('opens What you will need in a sheet on Announce, and focus returns to the button when it closes', async () => {
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+  it('Back on the people step returns to the person screen once, with no bounce into the flow', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByLabelText(/Anything you'd like to add/);
-    focus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
-    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
-    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
-    expect(focus).toHaveBeenCalled();
-  });
-
-  it('steps over the service-known step in both directions', async () => {
-    await openAnna();
-    await startMoment('Announce the passing');
-    fireEvent.press(await screen.findByText('Continue'));
-    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    await screen.findByRole('heading', { name: 'Who should know?' });
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(await screen.findByLabelText("Anything you'd like to add (optional)")).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    // The first form's Back returns to the hub, not a picker.
     expect(await screen.findByText('Ready to send')).toBeTruthy();
-    expect(screen.queryByText('Choose the type of message you would like to send.')).toBeNull();
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.getByText('Ready to send')).toBeTruthy();
+    expect(screen.queryByText('Who should know?')).toBeNull();
+    // The moment can be started again from the person screen.
+    await startMoment('Announce the passing');
+    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
   });
 });
 
@@ -207,7 +175,6 @@ describe('Ready to send (announcement)', () => {
   const toReview = async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByRole('heading', { name: 'Announce the passing' });
@@ -287,9 +254,6 @@ describe('the end of a send', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
     await startMoment(template);
-    if (template !== 'Share the obituary') {
-      fireEvent.press(await screen.findByText('Continue'));
-    }
     for (const name of pick) {
       fireEvent.press(await screen.findByText(name));
     }
@@ -455,7 +419,6 @@ describe('Edit person from the hub', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
     await startMoment('Announce the passing');
-    fireEvent.press(await screen.findByText('Continue'));
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText('Continue'));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));

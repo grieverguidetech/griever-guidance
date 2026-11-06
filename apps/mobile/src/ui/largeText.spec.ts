@@ -16,7 +16,6 @@ function styleBlock(file: string, name: string): string {
 // A row that holds two controls must wrap at the largest text size (#654), or one runs off screen.
 const WRAPPING_ROWS: Array<[string, string]> = [
   ['ui/screens/Hub.tsx', 'topBar'],
-  ['ui/screens/Announce.tsx', 'topBar'],
   ['ui/screens/WhoShouldKnow.tsx', 'topBar'],
   ['ui/screens/WhoShouldKnow.tsx', 'footerRow'],
   ['ui/screens/WhoShouldKnow.tsx', 'sectionHead'],
@@ -43,7 +42,6 @@ describe('inputs are at least 15 pt (#654)', () => {
     ['ui/screens/WhoShouldKnow.tsx', 'input'],
     ['ui/screens/ReadyToSend.tsx', 'input'],
     ['ui/screens/Account.tsx', 'input'],
-    ['ui/screens/Announce.tsx', 'input'],
     ['components/DetailsRow.tsx', 'input'],
     ['components/SavedNote.tsx', 'note'],
     ['ui/screens/PersonSetup.tsx', 'input'],

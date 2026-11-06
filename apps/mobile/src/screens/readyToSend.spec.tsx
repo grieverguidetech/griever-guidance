@@ -235,6 +235,30 @@ describe('Ready to send (Share the service)', () => {
   });
 });
 
+describe('Details row (Announce the passing)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('has the optional note under Change details, closed, and the message follows typing', () => {
+    render(<Harness category="announcement" fields={{}} />);
+    expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
+    // Name and date come from setup, so the note is the only field; it never blocks the button.
+    expect(screen.queryByLabelText(/Full name of the deceased/)).toBeNull();
+    expect(primary().props.accessibilityState?.disabled).toBeFalsy();
+    fireEvent.changeText(screen.getByLabelText("Anything you'd like to add (optional)"), 'She was peaceful.');
+    expect(screen.getByText(/She was peaceful\./)).toBeTruthy();
+  });
+
+  it('is hidden once the person edits the words themselves', () => {
+    render(<Harness category="announcement" fields={{}} />);
+    openEdit();
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    expect(screen.queryByRole('button', { name: 'Change details' })).toBeNull();
+  });
+});
+
 describe('Share elsewhere', () => {
   afterEach(() => {
     jest.restoreAllMocks();

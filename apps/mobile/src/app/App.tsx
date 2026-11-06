@@ -11,7 +11,6 @@ import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressD
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import { obituaryLink, sendPrefill } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
-import { AnnounceScreen } from '../screens/AnnounceScreen';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
 import { SendingScreen } from '../screens/SendingScreen';
@@ -79,7 +78,6 @@ const Opening = () => (
 export type RootStackParamList = {
   Home: undefined;
   Starting: undefined;
-  Announce: undefined;
   ContactSelector: undefined;
   Confirm: undefined;
   Sending: undefined;
@@ -104,8 +102,6 @@ type SessionProps = {
   onHub: () => void;
   /** Back from the obituary's first form: return to the link screen. */
   onShareObituary: () => void;
-  /** Edit person on the announce step: back to the person's setup. */
-  onEditPerson: () => void;
   onDraftChange: (id: string, draft: SendFlowDraft) => void;
   onDetails: (id: string, details: Details) => void;
   onHome: () => void;
@@ -120,7 +116,7 @@ type SentRecord = { id: string; category: TemplateCategory | null; deliveredIds:
 
 // One person's send flow. Keyed by session id in SendApp, so opening another person starts the flow
 // from that person's own saved draft and nothing carries over from the previous person.
-const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShareObituary, onEditPerson, onDraftChange, onDetails, onHome, onFinished, onTold }: SessionProps) => {
+const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShareObituary, onDraftChange, onDetails, onHome, onFinished, onTold }: SessionProps) => {
   const { id } = session;
   // The flow opens on the moment changed most recently that is still under way. A finished send
   // keeps no wording (C2), and the next launch opens on a fresh start rather than "sent". A moment
@@ -159,6 +155,14 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       }
     }
   }, [pendingStart, flow.templateCategory, flow.step, nextStep]);
+  // The announcement has no intro screen: the flow steps past 'announce' to the people (the same
+  // pattern as pendingStart above). A draft saved on 'announce' before this change does the same.
+  const onAnnounceStep = flow.step === 'announce';
+  useEffect(() => {
+    if (onAnnounceStep) {
+      nextStep();
+    }
+  }, [onAnnounceStep, nextStep]);
   // The picker is gone. If the flow is ever on it with nothing chosen, go back to the hub rather than stay blank.
   const stuckOnPicker = flow.step === 'template' && !pendingStart;
   useEffect(() => {
@@ -202,7 +206,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const onForm =
     flow.step === 'announce' ||
     (flow.step === 'contacts' &&
-      (flow.templateCategory === 'obituary' ||
+      (flow.templateCategory === 'announcement' ||
+        flow.templateCategory === 'obituary' ||
         flow.templateCategory === 'service' ||
         flow.templateCategory === 'aftercare'));
   const prefilled = useRef(false);
@@ -242,7 +247,11 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
-  const onFirstForm = flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template';
+  // The announcement's first form is the people step (its intro is skipped), so Back there must not
+  // step onto 'announce', which would bounce straight back into the flow.
+  const onFirstForm =
+    flow.steps[flow.steps.indexOf(flow.step) - 1] === 'template' ||
+    (flow.templateCategory === 'announcement' && flow.step === 'contacts');
 
   // Done on the last person ends the send. The hub keeps no wording of it (C2) and sets no timer.
   const { step, templateCategory, sendJob } = flow;
@@ -294,7 +303,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onEditPerson={onEditPerson} onChoosePeople={stepped.prevStep} notified={session.recipientsNotified} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={stepped.prevStep} notified={session.recipientsNotified} />;
 };
 
 // The announcement path has a "do you know the service details" step that mobile has no screen
@@ -321,7 +330,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const [atHub, setAtHub] = useState(false);
   const [atShareObituary, setAtShareObituary] = useState(false);
   // Setup was opened with Edit, from a step or from the hub: Back there returns to where it was opened, as on web.
-  const [editFrom, setEditFrom] = useState<'flow' | 'hub' | null>(null);
+  const [editFrom, setEditFrom] = useState<'hub' | null>(null);
   const [startCategory, setStartCategory] = useState<TemplateCategory | null>(null);
   const [note, setNote] = useState<SentNoteText | null>(null);
   // Importing device contacts from Home; on return Home puts focus back on the import button.
@@ -564,10 +573,6 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
         startCategory={startCategory}
         onHub={() => setAtHub(true)}
         onShareObituary={() => setAtShareObituary(true)}
-        onEditPerson={() => {
-          setEditFrom('flow');
-          setStage('setup');
-        }}
         onDraftChange={updateDraft}
         onDetails={updateSession}
         onHome={goHome}
@@ -662,14 +667,12 @@ const Navigation = ({
   flow,
   contacts,
   bar,
-  onEditPerson,
   onChoosePeople,
   notified,
 }: {
   flow: ReturnType<typeof useSendFlow>;
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
-  onEditPerson: () => void;
   onChoosePeople: () => void;
   notified: Session['recipientsNotified'];
 }) => {
@@ -677,14 +680,10 @@ const Navigation = ({
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={screenOptions}>
-        {flow.step === 'template' && (
-          // Only for the moment between choosing a step on the hub and its first form opening.
+        {(flow.step === 'template' || flow.step === 'announce') && (
+          // Only for the moment between choosing a step on the hub and its first form opening
+          // (the announcement passes through 'announce' on the way).
           <Stack.Screen name="Starting">{() => <Opening />}</Stack.Screen>
-        )}
-        {flow.step === 'announce' && (
-          <Stack.Screen name="Announce">
-            {() => withPersonContext(bar, <AnnounceScreen flow={flow} onEditPerson={onEditPerson} />)}
-          </Stack.Screen>
         )}
         {flow.step === 'contacts' && (
           <Stack.Screen name="ContactSelector">
