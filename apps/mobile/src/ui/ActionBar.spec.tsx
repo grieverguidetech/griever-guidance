@@ -24,12 +24,12 @@ describe('ActionBar', () => {
     expect(screen.getByText('Nothing is sent until you tap.')).toBeTruthy();
   });
 
-  it('uses the primary button, in a slot at least 52 points tall', () => {
+  it('uses the primary button, and the tappable button itself is at least 52 points tall', () => {
     render(<ActionBar label="Next" onPress={jest.fn()} />);
-    const button = screen.UNSAFE_getByType(Button);
-    expect(button.props.variant ?? 'primary').toBe('primary');
-    const slot = button.parent as unknown as { props: { style?: unknown } };
-    expect(flat(slot).minHeight).toBeGreaterThanOrEqual(52);
+    expect(screen.UNSAFE_getByType(Button).props.variant ?? 'primary').toBe('primary');
+    const pressable = screen.getByRole('button', { name: 'Next' });
+    const style = StyleSheet.flatten(typeof pressable.props.style === 'function' ? pressable.props.style({ pressed: false }) : pressable.props.style);
+    expect(style.minHeight).toBeGreaterThanOrEqual(52);
   });
 
   it('pads the bottom by the safe-area inset (34) or more, on the page colour with a top border', () => {

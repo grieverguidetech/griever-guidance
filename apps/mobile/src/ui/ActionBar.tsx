@@ -5,7 +5,7 @@ import { colors, spacing } from '@griever/tokens';
 import { Button } from './Button';
 import { Body } from './Text';
 
-/** The primary button's slot is never shorter than this, in points (MOB-12). */
+/** The primary button is never shorter than this, in points (MOB-12). */
 export const ACTION_BAR_BUTTON_HEIGHT = 52;
 
 export interface ActionBarProps {
@@ -34,15 +34,14 @@ export function ActionBar({ label, onPress, note, above, disabledReason }: Actio
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom + spacing[2] }]}>
       {above ? <View style={styles.above}>{above}</View> : null}
-      <View style={styles.buttonSlot}>
-        <Button
-          label={label}
-          onPress={disabled ? noop : onPress}
-          ariaDisabled={disabled}
-          announceDisabled={disabled}
-          hint={disabled ? disabledReason : undefined}
-        />
-      </View>
+      <Button
+        label={label}
+        onPress={disabled ? noop : onPress}
+        ariaDisabled={disabled}
+        announceDisabled={disabled}
+        hint={disabled ? disabledReason : undefined}
+        minHeight={ACTION_BAR_BUTTON_HEIGHT}
+      />
       {line ? (
         <View style={styles.line}>
           <Body small tone="muted">{line}</Body>
@@ -67,6 +66,5 @@ const styles = StyleSheet.create({
   },
   // Links wrap and keep a gap, so they do not run off screen at the largest text size (#654).
   above: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'center' },
-  buttonSlot: { minHeight: ACTION_BAR_BUTTON_HEIGHT, justifyContent: 'center' },
   line: { alignItems: 'center' },
 });
