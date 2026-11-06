@@ -415,7 +415,7 @@ describe('the end of a send', () => {
     expect(screen.getByLabelText(/Everyone has been told\./).props.accessibilityLiveRegion).toBe('polite');
   });
 
-  it('the hub Back button reads Home and returns to Home, with no note there', async () => {
+  it('the hub has no Home button: the note stays and the name is the way to other people', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     await toSending(['Dee']);
     fireEvent.press(await screen.findByText('Text Dee'));
@@ -423,9 +423,9 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
-    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
-    expect(screen.queryByText('Everyone has been told.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
+    expect(screen.queryByText("Who you're writing about")).toBeNull();
+    expect(screen.getByText('Everyone has been told.')).toBeTruthy();
   });
 
   it('finishing the obituary lands on the hub with the note', async () => {

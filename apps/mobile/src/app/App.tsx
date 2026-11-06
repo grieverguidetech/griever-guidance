@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
 import { AccessibilityInfo, Platform, View } from 'react-native';
 import { colors } from '@griever/tokens';
+import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
@@ -37,6 +38,21 @@ import { useSerifFonts } from '../lib/serifFonts';
 import { screenTransition } from '../lib/useReduceMotion';
 import { useNoFade } from '../lib/useScreenReader';
 import { FadeIn, ScreenFrame } from '../components/ScreenFrame';
+
+const switcherCopy = screenCopy('phoneSwitcher');
+
+/** Says who is now open. Queued on iOS so the heading focus does not cut it off; Android waits a moment. */
+const announceOpen = (name: string) => {
+  const spoken = fill(switcherCopy.nowWriting, { name });
+  if (Platform.OS === 'ios') {
+    AccessibilityInfo.announceForAccessibilityWithOptions(spoken, { queue: true });
+    return;
+  }
+  setTimeout(() => AccessibilityInfo.announceForAccessibility(spoken), 100);
+};
+
+/** The person screen's "Add someone" and Home's start button show only when the user may add a person (C11). */
+const CAN_CREATE = true;
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
 export const CONTACTS_CHECK_FALLBACK_MS = 1500;
@@ -395,6 +411,10 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   // Importing device contacts from Home; on return Home puts focus back on the import button.
   const [importing, setImporting] = useState(false);
   const [backFromImport, setBackFromImport] = useState(false);
+  // "Your account" opened from the person screen (Home has its own route to it).
+  const [atAccount, setAtAccount] = useState(false);
+  // The person who was open when "Add someone" was pressed, so Back from setup returns to them.
+  const [addedFrom, setAddedFrom] = useState<string | null>(null);
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
@@ -419,12 +439,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     }
     announcedResume.current = true;
     setArrived(false);
-    const spoken = `Now writing about ${resumedName}`;
-    if (Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibilityWithOptions(spoken, { queue: true });
-      return;
-    }
-    setTimeout(() => AccessibilityInfo.announceForAccessibility(spoken), 100);
+    announceOpen(resumedName);
   }, [resume, first, resumedName]);
   const goHome = useCallback(() => {
     setStage(null);
@@ -435,6 +450,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setStartCategory(null);
     setNote(null);
     setBackFromImport(false);
+    setAddedFrom(null);
     setAtHome(true);
   }, []);
   const finish = useCallback(
@@ -459,6 +475,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setStartCategory(null);
     setAtHub(true);
     setStage(null);
+    setAddedFrom(null);
   }, []);
 
   // Contacts are asked for only when this phone has none. The check reads the local store only.
@@ -503,10 +520,11 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtHome(false);
   };
   const showHome = atHome || first === 'signIn';
-  if (showHome && importing) {
+  if (importing) {
     const leaveImport = () => {
       leaveFirst();
-      setBackFromImport(true);
+      // Home puts focus back on its import button; the person screen is drawn fresh and takes focus on its heading.
+      setBackFromImport(showHome);
       setImporting(false);
     };
     return (
@@ -524,7 +542,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           {(navigation) => (
             <HomeScreen
               sessions={sessions}
-              canCreate
+              canCreate={CAN_CREATE}
               onOpen={(id) => {
                 switchTo(id);
                 open();
@@ -547,6 +565,15 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             />
           )}
         </HomeNavigation>
+      </FadeIn>
+    );
+  }
+  if (atAccount) {
+    return (
+      <FadeIn key="account">
+        <ScreenFrame>
+          <AccountScreen onBack={() => setAtAccount(false)} />
+        </ScreenFrame>
       </FadeIn>
     );
   }
@@ -574,6 +601,17 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       setEditFrom(null);
       setStage(null);
     };
+    // Back from a person added from the person screen returns to the person who was open; from Home it returns to Home.
+    const leaveAdd = () => {
+      if (!addedFrom) {
+        goHome();
+        return;
+      }
+      switchTo(addedFrom);
+      setAddedFrom(null);
+      setStage(null);
+      setAtHub(true);
+    };
     return (
       <FadeIn key="setup">
         <ScreenFrame>
@@ -581,7 +619,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             key={active.id}
             initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
             returnsToPlace={editFrom !== null}
-            onBack={editFrom ? leaveEdit : goHome}
+            onBack={editFrom ? leaveEdit : leaveAdd}
             onContinue={(details) => {
               updateSession(active.id, details);
               if (editFrom) {
@@ -629,7 +667,31 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             key={active.id}
             session={active}
             note={note}
-            onBack={goHome}
+            others={sessions.filter((s) => s.id !== active.id && !isBlank(s))}
+            onSwitch={(id) => {
+              const picked = sessions.find((s) => s.id === id);
+              switchTo(id);
+              setNote(null);
+              setArrived(false);
+              announceOpen(picked ? personLabel(picked) : '');
+            }}
+            onAddSomeone={
+              CAN_CREATE
+                ? () => {
+                    setAddedFrom(active.id);
+                    addPerson();
+                    setNote(null);
+                    setAtHub(false);
+                    setStage('setup');
+                  }
+                : undefined
+            }
+            onAccount={AUTH_ENABLED ? () => setAtAccount(true) : undefined}
+            onImportContacts={() => {
+              setNote(null);
+              setBackFromImport(false);
+              setImporting(true);
+            }}
             onStart={(key: MomentKey) => {
               setNote(null);
               setAtHub(false);

@@ -1,7 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only Switcher screen (no words yet)",
+  "title": "Copy for the phone-only name switcher on the person screen",
   "type": "object",
   "additionalProperties": false,
-  "properties": {}
+  "required": ["nameLabel", "nameHint", "title", "addSomeone", "close", "nowWriting"],
+  "properties": {
+    "nameLabel": { "$ref": "#/$defs/text" },
+    "nameHint": { "$ref": "#/$defs/text" },
+    "title": { "$ref": "#/$defs/text" },
+    "addSomeone": { "$ref": "#/$defs/text" },
+    "close": { "$ref": "#/$defs/text" },
+    "nowWriting": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
 }

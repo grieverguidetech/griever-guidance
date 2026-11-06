@@ -148,14 +148,13 @@ describe('the order in the app', () => {
     expect(kept.find((p) => p.personName === "Ben Cole")?.dateOfPassing).toBe('June 7, 2025');
   });
 
-  it('returns to Home from the path with the person listed', async () => {
+  it('opening a person from Home lands on their screen, which has no way back to Home', async () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('Ready to send');
-    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
-    expect(await screen.findByLabelText('Anna')).toBeTruthy();
-    expect(screen.getByText("Someone else I've lost")).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
+    expect(screen.queryByText("Someone else I've lost")).toBeNull();
   });
 
   it('opens a draft in progress where it was left when the person is opened from Home', async () => {
@@ -189,22 +188,21 @@ describe('Home from every step', () => {
     jest.restoreAllMocks();
   });
 
-  it('Back from a resumed first step chains through the hub to Home', async () => {
+  it('Back from a resumed first step goes to the hub, which has no Home button', async () => {
     const anna = { ...person('a', 'Anna', '2026-10-01T00:00:00.000Z'), drafts: { aftercare: draftOf({ deceasedName: 'Anna' }) } };
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
     await screen.findByRole('button', { name: 'Choose who to tell' });
-    // No Home bar (#364): Back from Ready to send goes to the hub, and Back there goes Home.
+    // No Home bar (#364): Back from Ready to send goes to the hub, which has no Home button.
     expect(screen.queryByLabelText('Back to home')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     await screen.findByText('Ready to send');
-    fireEvent.press(screen.getByRole('button', { name: 'Home' }));
-    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
   });
 
-  it('Android back: the hub goes Home; a first form goes to the hub, once', async () => {
+  it('Android back: the hub leaves the app; a first form goes to the hub, once', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
       handlers.push(h as () => boolean);
@@ -217,11 +215,11 @@ describe('Home from every step', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('Ready to send');
-    act(() => void pressBack());
-    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+    // Nothing handles Back on the hub, so the app leaves (the system default).
+    expect(pressBack()).toBe(false);
+    expect(screen.getByText('Ready to send')).toBeTruthy();
 
     // The announcement opens on Ready to send: Android back is the same as the on-screen Back, to the hub, once.
-    fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
     await screen.findByRole('button', { name: 'Choose who to tell' });
     act(() => void pressBack());

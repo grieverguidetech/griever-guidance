@@ -1,1 +1,8 @@
-{}
+{
+  "nameLabel": "Writing about {name}",
+  "nameHint": "Opens a list of the people you can switch to",
+  "title": "Who you're writing about",
+  "addSomeone": "Add someone",
+  "close": "Close",
+  "nowWriting": "Now writing about {name}"
+}
