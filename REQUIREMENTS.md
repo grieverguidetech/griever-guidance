@@ -98,7 +98,7 @@ sharing (G1, 2026-10-11, reversing the read-only snapshot idea in #39).
 
 | ID | Requirement | Web | Mobile | Notes |
 |---|---|---|---|---|
-| SF-1 | Mobile: Template picker → Details → Contacts → Confirm → Sending → Sent. Web: Path → first form → Contacts → Confirm → Sending → Path with a quiet note. Both driven by `useSendFlow()` | Done; removed when `VITE_FEATURE_CMS` is on | Done | #176: web has no picker and no Sent screen. The hook keeps its `template` step; the web flow treats it, and Back on a moment's first form, as "exit to the path". The #559 target for mobile is Hub cards → people → send screen → sending → hub (§6); mobile runs it since PR #645 (#628) |
+| SF-1 | Mobile: Person → Ready to send, with the people sheet when needed → Texting → Person. Web: Path → first form → Contacts → Confirm → Sending → Path with a quiet note. Both driven by `useSendFlow()` | Done; removed when `VITE_FEATURE_CMS` is on | Done | #176: web has no picker and no Sent screen. The hook keeps its `template` step; the web flow treats it, and Back on a moment's first form, as "exit to the path". The #559 target for mobile is Hub cards → people → send screen → sending → hub (§6); mobile runs it since PR #645 (#628); the people list is a sheet over Ready to send (#673) |
 | SF-2 | Close family hears first, from a small hand-picked group; wider circle later | Done; removed when `VITE_FEATURE_CMS` is on | Superseded by MOB-1 | `WhoHearsFirst`, `WideningCircle`. Mobile now has one people list (MOB-1, #620, PR #635) |
 | SF-3 | Sending steps through contacts one at a time with a pre-filled `sms:` link | Done; removed when `VITE_FEATURE_CMS` is on | Done | `buildSmsLink()` |
 | SF-4 | After handing a message off, one "Next" tap moves to the next person ("Done" on the last), with no "did it send?" question per contact. On web, Done on the last person opens the path at once with a `role="status"` note that stays until the next navigation or a Close tap (no timer, no motion): "Everyone has been told." / "The service details have been shared." / "The obituary has been shared." / "Your thank-yous have been sent."; if anyone was skipped, "You told N of M. You can text the others from your own Messages app any time." The note also says "We don't keep a copy of what was sent" (C2, flag-off build). | Done; removed when `VITE_FEATURE_CMS` is on | Done | Replaced auto-advance on return, which never fired when the tab stayed visible (e.g. desktop). Web note: #176; mobile still shows its Sent screen. Mobile changes under MOB-4 (2026-11-01, #559): on return from Messages, the app asks "Sent to {name}? Next: {name}" (§5 item 5). Done in PR #642 (#623). Device: the prompt on return, HUMAN TODO. Web is unchanged. Phone note (2026-11-05, #669): the MOB-4 answer is the primary button in the bottom bar; Not yet and Skip sit above it |
@@ -169,7 +169,7 @@ by the closing ticket #633.
 | MOB-10 | "Share elsewhere" (OS share sheet) for service and obituary. Allowed with zero people picked (Decision 1, C1) | n/a | Done | #631, PR #648. Device: the share sheet lists Facebook and WhatsApp; closing it on Android shows no error, HUMAN TODO. VoiceOver and TalkBack pass, HUMAN TODO. |
 | MOB-11 | Thank-yous: an optional one-line note per person. The note is the last line of that person's message | n/a | Done | #632, PR #647. VoiceOver and TalkBack pass, HUMAN TODO. |
 | MOB-12 | A fixed bottom bar on the phone's send screens: one primary button that names the next thing, at least 52 points tall, clear of the home indicator. Secondary actions sit above it as links | n/a | Done | #665: the component (`ui/ActionBar.tsx`); the hub, texting, Ready to send and the people list (Done · {n} chosen, #672) use it. TalkBack reads the Done count, HUMAN TODO. |
-| MOB-13 | Ready to send: one screen with the message, a To row with the count and names, Edit wording and Change details in place, Share elsewhere for service and obituary, and one button "Text {n} people". Replaces Review your message; no Sample message (dropped 2026-11-05) | n/a | Partial | #670: the screen, with Back to the person screen (the obituary: its link screen). #671: the announcement opens on it; no intro screen. It steps past the old intro to the people step (until #673), and its optional note is under Change details. The people list is not yet a sheet (#673). VoiceOver and TalkBack order (To row, then button), and the keyboard not covering the message box, HUMAN TODO |
+| MOB-13 | Ready to send: one screen with the message, a To row with the count and names, Edit wording and Change details in place, Share elsewhere for service and obituary, and one button "Text {n} people". Replaces Review your message; no Sample message (dropped 2026-11-05) | n/a | Done | #670: the screen, with Back to the person screen (the obituary: its link screen). #671: the announcement opens on it; no intro screen. Its optional note is under Change details. #673: the people list is a sheet over this screen; arriving never opens it. VoiceOver and TalkBack order (To row, then button), the keyboard not covering the message box, swipe-down on iOS and Android, VoiceOver staying inside the sheet, and TalkBack Back closing the sheet: HUMAN TODO |
 
 ---
 
@@ -361,13 +361,15 @@ No screen-level `useState` duplicating send flow logic. One hook owns it.
 ### The send flow
 
 ```
-Mobile: Hub cards → people → send screen → sending → hub   (#559 target)
+Mobile: Person → Ready to send, with the people sheet when needed → Texting → Person
 Web:    Path → first form → Contact selector → Confirm → Sending → Path (with a quiet note)
         (flag-off build only: with VITE_FEATURE_CMS on, web plans and does not send)
 ```
 
-Until #628 lands, mobile still runs Template picker → Details form → Contact selector → Confirm →
-Sending → Sent; the first line above is the #559 target.
+On mobile the people list is a sheet over Ready to send, open only while the flow step is
+'contacts' (#673). Arriving from the person screen steps on to Ready to send, so the sheet opens
+only from "Change who gets this" or "Choose who to tell". Done, Close, a tap on the dim area, a
+swipe down and Android Back close the sheet and keep the ticks.
 
 On web the path is the hub (#176): there is no picker and no Sent screen. Back on a moment's first
 form returns to the path; the hook's `template` step is kept for mobile and is treated by the web

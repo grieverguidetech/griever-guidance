@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { MutableRefObject, ReactNode } from 'react';
 import { View } from 'react-native';
 import { colors } from '@griever/tokens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -226,16 +226,22 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
         flow.templateCategory === 'obituary' ||
         flow.templateCategory === 'service' ||
         flow.templateCategory === 'aftercare'));
+  // One prefill per visit to the form. The visit lasts while the step moves between the people sheet
+  // ('contacts') and Ready to send ('review'), so opening the sheet with Change never re-runs it and
+  // never throws away wording the family edited by hand.
+  const inVisit = onForm || flow.step === 'review';
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
   const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;
   useEffect(() => {
-    if (!onForm) {
+    if (!inVisit) {
       prefilled.current = false;
       return;
     }
     if (prefilled.current) return;
     prefilled.current = true;
+    // A draft resumed straight on Ready to send is not a first-form arrival: nothing to prefill.
+    if (!onForm) return;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
     // Older drafts saved obituaryText as the message. The obituary send texts the link template now
     // (MOB-9, #559 Decision 4), so drop that copy; a hand-edited message stays.
@@ -260,7 +266,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
         setMessageOverride(planned.messageOverride);
       }
     }
-  }, [onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session]);
+  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not
@@ -295,9 +301,36 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
   }, [sendJob, templateCategory, id, onTold]);
 
+  // The people sheet is open on 'contacts'. Arriving there from the person screen must not open it:
+  // step on to Ready to send, once per arrival. The sheet opened by Change is left alone.
+  const sheetAsked = useRef(false);
+  const arrivalHandled = useRef(false);
+  const choosePeople = useCallback(() => {
+    sheetAsked.current = true;
+    flow.prevStep();
+  }, [flow.prevStep]);
+  useEffect(() => {
+    if (flow.step !== 'contacts') {
+      sheetAsked.current = false;
+      arrivalHandled.current = false;
+      return;
+    }
+    if (sheetAsked.current || arrivalHandled.current) {
+      return;
+    }
+    arrivalHandled.current = true;
+    nextStep();
+  }, [flow.step, nextStep]);
+
   const flowWithHub = {
     ...flow,
     prevStep: () => {
+      // A safety net. A visible Modal takes Android Back through its onRequestClose, so this only runs if
+      // Back reaches the bar with the sheet open; then it closes the sheet and nothing else.
+      if (flow.step === 'contacts') {
+        flow.nextStep();
+        return;
+      }
       // The step before this one is the picker: go to the hub instead. Ready to send also goes
       // straight back to the person screen (the obituary: its link screen); "Change" is the way to the people.
       if (onFirstForm || flow.step === 'review') {
@@ -309,6 +342,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   };
   // Android's Back does what the Back on the screen does, one step at a time. While sending, the
   // on-screen way out is "Stop for now", so Back leaves to the hub (the job is kept).
+  // Lets the sheet's onDismiss (iOS) send focus to the button on Ready to send that opened it.
+  const focusPeopleButton = useRef<(() => void) | null>(null);
   const bar = (
     <PersonBar
       active={session}
@@ -318,7 +353,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={flow.prevStep} notified={session.recipientsNotified} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={choosePeople} notified={session.recipientsNotified} focusPeopleButton={focusPeopleButton} />;
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
@@ -670,12 +705,14 @@ const Navigation = ({
   bar,
   onChoosePeople,
   notified,
+  focusPeopleButton,
 }: {
   flow: ReturnType<typeof useSendFlow>;
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
   onChoosePeople: () => void;
   notified: Session['recipientsNotified'];
+  focusPeopleButton?: MutableRefObject<(() => void) | null>;
 }) => {
   const screenOptions = useScreenOptions();
   return (
@@ -686,14 +723,25 @@ const Navigation = ({
           // (the announcement passes through 'announce' on the way).
           <Stack.Screen name="Starting">{() => <Opening />}</Stack.Screen>
         )}
-        {flow.step === 'contacts' && (
-          <Stack.Screen name="ContactSelector">
-            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} notified={notified} />, false)}
-          </Stack.Screen>
-        )}
-        {flow.step === 'review' && (
+        {(flow.step === 'contacts' || flow.step === 'review') && (
+          // One route for both steps: the people list is a sheet over Ready to send, open on 'contacts'.
           <Stack.Screen name="Confirm">
-            {() => withPersonContext(bar, <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} />, false)}
+            {() =>
+              withPersonContext(
+                bar,
+                <>
+                  <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} focusPeopleButton={focusPeopleButton} />
+                  <ContactSelectorScreen
+                    flow={flow}
+                    contacts={contacts}
+                    notified={notified}
+                    open={flow.step === 'contacts'}
+                    onDismiss={() => focusPeopleButton?.current?.()}
+                  />
+                </>,
+                false,
+              )
+            }
           </Stack.Screen>
         )}
         {flow.step === 'sending' && (

@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, BackHandler } from 'react-native';
+import { AccessibilityInfo, BackHandler, Modal, Platform } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
+
+// Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
+// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+const openPeople = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 const mockHandles = new Map<unknown, number>();
@@ -78,6 +85,7 @@ describe('Android Back inside the flow (#653)', () => {
     });
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await startAnnouncement(true);
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
@@ -97,7 +105,7 @@ describe('Android Back in the import review (#653)', () => {
     });
     const pressBack = () => [...handlers].reverse().some((h) => h());
     await startAnnouncement(true);
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     await screen.findByRole('heading', { name: 'Add from your contacts' });
     const handled = jest.fn();
@@ -112,13 +120,34 @@ describe('Focus on arrival (#653)', () => {
   it('moves to the heading on Ready to send and on the picker', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     await startAnnouncement(true);
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     expect(focus).toHaveBeenCalled();
     fireEvent.press(await screen.findByText('Dee'));
     focus.mockClear();
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
+    // iOS: not until the sheet has gone. Android: as soon as the step changes (no onDismiss there).
+    expect(focus).not.toHaveBeenCalled();
+    act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
     expect(focus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Focus after the people sheet closes (#673)', () => {
+  it('on Android it returns to the opening button when the step changes, with no onDismiss', async () => {
+    const os = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      await startAnnouncement(true);
+      await openPeople();
+      focus.mockClear();
+      fireEvent.press(screen.getByText(/^Done/));
+      await screen.findByRole('heading', { name: 'Announce the passing' });
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      Platform.OS = os;
+    }
   });
 });
 
@@ -126,7 +155,7 @@ describe('The stacks use the calm transition (#653)', () => {
   const lastOptions = () => mockScreenOptions[mockScreenOptions.length - 1];
   const settle = async () => {
     await startAnnouncement(true);
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     await act(async () => undefined);
   };
 

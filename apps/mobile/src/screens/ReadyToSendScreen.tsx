@@ -27,6 +27,8 @@ interface Props extends FlowProps {
   contacts?: UseContactsResult;
   /** Opens the people step: the To row link, or the button when nobody is picked. */
   onChoosePeople: () => void;
+  /** Set to a function that focuses the button that opens the people sheet; the sheet's onDismiss (iOS) calls it. */
+  focusPeopleButton?: { current: (() => void) | null };
 }
 
 const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
@@ -44,11 +46,14 @@ function namesPhrase(names: string[]): string {
 }
 
 /** The screen is the ReadyToSend in apps/mobile/src/ui; this holds what is mobile only: the share sheet and focus. */
-export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
+export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
   const shareButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof RNText>>(null);
+  const peopleButton = useRef<ButtonNode>(null);
+  // Set when the person opens the people sheet, so focus goes back to the button they pressed.
+  const openedSheet = useRef(false);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -57,6 +62,38 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   }, []);
+
+  // The people sheet is open while the step is 'contacts'. When it is gone, focus returns to the button that opened it.
+  // iOS: from the sheet's onDismiss (focus set earlier is lost to the closing animation). Elsewhere: when the step changes.
+  const focusPeople = () => {
+    if (!openedSheet.current) {
+      return;
+    }
+    openedSheet.current = false;
+    const handle = peopleButton.current ? findNodeHandle(peopleButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+  if (focusPeopleButton) {
+    focusPeopleButton.current = focusPeople;
+  }
+  // A late iOS onDismiss must not call a closure from a screen that is gone.
+  useEffect(
+    () => () => {
+      if (focusPeopleButton) {
+        focusPeopleButton.current = null;
+      }
+    },
+    [focusPeopleButton],
+  );
+  const sheetOpen = flow.step === 'contacts';
+  useEffect(() => {
+    if (!sheetOpen && Platform.OS !== 'ios') {
+      focusPeople();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetOpen]);
 
   if (!selectedTemplate) {
     return null;
@@ -84,6 +121,11 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
+  }
+
+  function choosePeople() {
+    openedSheet.current = true;
+    onChoosePeople();
   }
 
   function changeMessage(message: string | null) {
@@ -127,7 +169,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
           text: fill(ready.to, { names: namesPhrase(names) || recipientsPhrase(recipientCount, copy), count: String(recipientCount) }),
           changeLabel: ready.change,
           changeName: ready.changeName,
-          onChange: onChoosePeople,
+          onChange: choosePeople,
         }}
         hasRecipients={recipientCount > 0}
         sendLabel={sendLabel(recipientCount, copy)}
@@ -136,7 +178,8 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
         blockedReason={detailsMissing ? copy.detailsHint : undefined}
         onBack={prevStep}
         onSend={startSendJob}
-        onChoose={onChoosePeople}
+        onChoose={choosePeople}
+        peopleButtonRef={peopleButton}
         share={
           canShare
             ? {

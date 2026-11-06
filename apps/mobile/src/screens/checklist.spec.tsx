@@ -8,6 +8,7 @@ import { AccountScreen } from './AccountScreen';
 import { AccountStateProvider } from '../lib/AccountProvider';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
+import { Sheet } from '../ui';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -216,5 +217,20 @@ describe('the list on Your account and the checklist screen share their ticks (#
       fireEvent.press(row('Any will or written wishes'));
     });
     await waitFor(() => expect(screen.queryByText(NOT_SAVED_NOTE_TEXT)).toBeNull());
+  });
+});
+
+describe('Sheet swipe-down is opt-in (#673)', () => {
+  it('has no grab bar unless asked, and keeps its own title and Close', () => {
+    const onClose = jest.fn();
+    render(
+      <Sheet title="More" closeLabel="Close" onClose={onClose}>
+        <></>
+      </Sheet>,
+    );
+    expect(screen.queryByTestId('sheet-grab-bar')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'More' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

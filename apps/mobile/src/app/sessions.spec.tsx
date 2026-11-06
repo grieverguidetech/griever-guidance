@@ -7,7 +7,10 @@ import { freshDraft } from '@griever/hooks';
 import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 
 // Service and thank-you open on Who should get this?; their planned fields are kept in the saved draft.
-const findPicker = () => screen.findByRole('heading', { name: 'Who should get this?' });
+const findPicker = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
 async function savedAftercare(personName: string) {
   const people = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { step: string; fields: Record<string, string>; selectedContactIds: string[] }> }[];
   return people.find((p) => p.personName === personName)?.drafts?.['aftercare'];
@@ -191,7 +194,7 @@ describe('people kept on the phone', () => {
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna'));
       fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-      expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+      expect(await findPicker()).toBeTruthy();
       await waitFor(async () => {
         const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');
         expect(saved.drafts.aftercare).toEqual(kept);

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ComponentRef } from 'react';
+import type { ComponentRef, ReactNode } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, Linking, Text, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, WhoShouldKnow } from '../ui';
+import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, Sheet, WhoShouldKnow } from '../ui';
 import type { ButtonNode } from '../ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
@@ -19,6 +19,10 @@ interface Props extends FlowProps {
   contacts: UseContactsResult;
   /** Who each moment was sent to. Stays on this phone. */
   notified: Partial<Record<TemplateCategory, string[]>>;
+  /** The sheet is shown. Default true. The app keeps this mounted and closes it, so iOS can report the dismiss. */
+  open?: boolean;
+  /** iOS: the sheet has finished closing. */
+  onDismiss?: () => void;
 }
 
 type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
@@ -30,8 +34,8 @@ const copy = { ...screenCopy('whoShouldKnow'), ...screenCopy('phonePeople') };
  * The list is WhoShouldKnow in apps/mobile/src/ui. This holds what is mobile only: Bring people
  * across (import from the phone's contacts) and its review list.
  */
-export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
-  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep, templateCategory } = flow;
+export function ContactSelectorScreen({ flow, contacts, notified, open = true, onDismiss }: Props) {
+  const { selectedContactIds, toggleContact, selectContacts, nextStep, templateCategory } = flow;
   const toldIds = templateCategory ? (notified?.[templateCategory] ?? []) : [];
   const shortcuts = buildShortcuts(templateCategory, notified, contacts.contacts.map((c) => c.contactId), selectContacts);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
@@ -54,11 +58,24 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
-  // The title takes focus once on mount, whichever moment this is.
+  // The screen stays mounted while the sheet is closed, so each opening starts clean: the list, no old errors.
+  // The title takes focus from the Modal's onShow on a device; this effect is only the fallback where onShow does not run.
   useEffect(() => {
-    focusNode(listHeading.current);
+    if (!open) {
+      return;
+    }
+    setMode({ kind: 'list' });
+    setImportError(null);
+    setBlocked(false);
+    setAddError(null);
+    setReviewSelected(new Set());
+    setReviewQuery('');
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      focusNode(listHeading.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [open]);
+  // A safety net: a visible Modal takes Android Back through its onRequestClose (leave), which also steps back to the list.
   // Android Back in the review does what the on-screen Back does: back to the list.
   useEffect(() => {
     if (!reviewing) {
@@ -86,6 +103,21 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
     focusNode(importButton.current);
   });
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
+
+  // Close, Done, a tap on the dim area, a swipe down and Android Back all end here: the ticks stay and the
+  // sheet closes. While the review of brought-in people is open, they step back to the list instead.
+  const leave = () => {
+    if (reviewing) {
+      setMode({ kind: 'list' });
+    } else {
+      nextStep();
+    }
+  };
+  const inSheet = (content: ReactNode) => (
+    <Sheet bare swipeToClose visible={open} title={copy.heading} closeLabel={copy.close} onClose={leave} onShow={() => focusNode(listHeading.current)} onDismiss={onDismiss}>
+      {content}
+    </Sheet>
+  );
 
   async function handleImport() {
     if (inFlight.current) {
@@ -156,7 +188,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       });
     const needle = reviewQuery.trim().toLowerCase();
     const shownFresh = needle ? mode.fresh.filter((c) => c.displayName.toLowerCase().includes(needle)) : mode.fresh;
-    return (
+    return inSheet(
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
         style={styles.flex}
@@ -216,11 +248,11 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           </Body>
         ) : null}
       </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingView>,
     );
   }
 
-  return (
+  return inSheet(
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <WhoShouldKnow
         copy={copy}
@@ -241,7 +273,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           const created = await contacts.addContact({ name, phone, tier: 'family' });
           toggleContact(created.contactId);
         }}
-        onBack={prevStep}
+        onBack={nextStep}
         closeLabel={copy.close}
         doneLabel={selectedContactIds.length > 0 ? fill(copy.doneCount, { count: selectedContactIds.length }) : copy.done}
         onContinue={nextStep}
@@ -255,7 +287,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         }}
         footer={<SavedNote />}
       />
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView>,
   );
 }
 

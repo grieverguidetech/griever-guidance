@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, AppState, Linking, Platform } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Modal, Platform, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
@@ -95,6 +95,17 @@ const headers = () =>
     .map((h) => h.props.children)
     .filter((text) => text !== 'Who should get this?');
 
+// PanResponder reads a touch history; this fakes one finger that moved down by `dy` and is still down.
+const dragEvent = (dy: number) => ({
+  nativeEvent: {},
+  touchHistory: {
+    indexOfSingleActiveTouch: 0,
+    mostRecentTimeStamp: 2,
+    numberActiveTouches: 1,
+    touchBank: [{ touchActive: true, startPageX: 0, startPageY: 0, startTimeStamp: 1, currentPageX: 0, currentPageY: dy, currentTimeStamp: 2, previousPageX: 0, previousPageY: 0, previousTimeStamp: 1 }],
+  },
+});
+
 describe('ContactSelectorScreen as a list to close (#672)', () => {
   it('reads "Who should get this?" and has no "What you\'ll need"', () => {
     renderScreen();
@@ -102,12 +113,99 @@ describe('ContactSelectorScreen as a list to close (#672)', () => {
     expect(screen.queryByText("What you'll need")).toBeNull();
   });
 
-  it('Close does what Back did, and there is no Back or Continue', () => {
-    const { prevStep } = renderScreen();
+  it('has no Back or Continue, and Close shuts the sheet with nextStep, never prevStep', () => {
+    const { nextStep, prevStep } = renderScreen();
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
-    expect(prevStep).toHaveBeenCalledTimes(1);
+    expect(nextStep).toHaveBeenCalledTimes(1);
+    expect(prevStep).not.toHaveBeenCalled();
+  });
+
+  it('Android Back (the modal request to close) shuts the sheet with nextStep and keeps the ticks', () => {
+    const { nextStep, prevStep, toggleContact, selectContacts } = renderScreen(saved, 'announcement', ['1']);
+    act(() => screen.UNSAFE_getByType(Modal).props.onRequestClose());
+    expect(nextStep).toHaveBeenCalledTimes(1);
+    expect(prevStep).not.toHaveBeenCalled();
+    expect(toggleContact).not.toHaveBeenCalled();
+    expect(selectContacts).not.toHaveBeenCalled();
+  });
+
+  it('the grab area is at least 44 points tall, and a taken gesture closes nothing', () => {
+    const { nextStep } = renderScreen();
+    const grab = screen.getByTestId('sheet-grab-bar');
+    expect(StyleSheet.flatten(grab.props.style).minHeight).toBeGreaterThanOrEqual(44);
+    expect(grab.props.onResponderTerminationRequest()).toBe(true);
+    act(() => {
+      grab.props.onResponderGrant(dragEvent(0));
+      grab.props.onResponderMove(dragEvent(120));
+      grab.props.onResponderTerminate(dragEvent(120));
+    });
+    expect(nextStep).not.toHaveBeenCalled();
+  });
+
+  it('focuses its title when the sheet has opened (onShow)', () => {
+    renderScreen();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    focus.mockClear();
+    act(() => screen.UNSAFE_getByType(Modal).props.onShow());
+    expect(focus).toHaveBeenCalled();
+  });
+
+  it('does not also focus from the effect where onShow runs (iOS), so the title is read once', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    focus.mockClear();
+    renderScreen();
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the effect where onShow does not run (neither iOS nor Android)', () => {
+    const os = Platform.OS;
+    Platform.OS = 'windows';
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      focus.mockClear();
+      renderScreen();
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      Platform.OS = os;
+    }
+  });
+
+  it('opens clean: an import error, a close and a new opening leave no error behind', async () => {
+    mockFetch.mockRejectedValue(new Error('boom'));
+    const flow = { selectContacts: jest.fn(), selectedContactIds: [], toggleContact: jest.fn(), nextStep: jest.fn(), prevStep: jest.fn(), templateCategory: 'announcement' };
+    const contacts = { contacts: saved, loading: false } as unknown as UseContactsResult;
+    const ui = (open: boolean) => <ContactSelectorScreen flow={flow as never} contacts={contacts} notified={{}} open={open} />;
+    const { rerender } = render(ui(true));
+    fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
+    expect(await screen.findByText(screenCopy('whoShouldKnow').importError)).toBeTruthy();
+    rerender(ui(false));
+    rerender(ui(true));
+    expect(screen.queryByText(screenCopy('whoShouldKnow').importError)).toBeNull();
+  });
+
+  it('a tap on the dim area shuts the sheet with nextStep', () => {
+    const { nextStep, prevStep } = renderScreen();
+    fireEvent.press(screen.getByTestId('sheet-dim', { includeHiddenElements: true }));
+    expect(nextStep).toHaveBeenCalledTimes(1);
+    expect(prevStep).not.toHaveBeenCalled();
+  });
+
+  it('a swipe down on the grab bar shuts the sheet with nextStep; a short drag does not', () => {
+    const { nextStep, prevStep } = renderScreen();
+    const handlers = screen.getByTestId('sheet-grab-bar').props;
+    const drag = (dy: number) =>
+      act(() => {
+        handlers.onResponderGrant(dragEvent(0));
+        handlers.onResponderMove(dragEvent(dy));
+        handlers.onResponderRelease(dragEvent(dy));
+      });
+    drag(20);
+    expect(nextStep).not.toHaveBeenCalled();
+    drag(120);
+    expect(nextStep).toHaveBeenCalledTimes(1);
+    expect(prevStep).not.toHaveBeenCalled();
   });
 
   it('counts the people chosen in the Done label, and moves on', () => {

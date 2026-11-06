@@ -7,6 +7,13 @@ import { colors } from '@griever/tokens';
 import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
+// Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
+// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+const openPeople = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
+
 jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual<{ default: object }>('react-native-safe-area-context/jest/mock').default,
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
@@ -24,7 +31,7 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
       return style.paddingTop === 47 && style.backgroundColor === colors.bg;
@@ -50,6 +57,7 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByText('Text 1 person');
@@ -64,7 +72,7 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     const bar = StyleSheet.flatten(screen.getByTestId('people-action-bar').props.style);
     expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
     const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
@@ -89,6 +97,7 @@ describe('send steps and the top safe area', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));

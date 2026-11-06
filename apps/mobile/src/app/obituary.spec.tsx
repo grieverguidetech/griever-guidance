@@ -6,6 +6,13 @@ import type { Session } from '@griever/hooks';
 import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
+// Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
+// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+const openPeople = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
+
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
   findNodeHandle: () => 1,
@@ -70,6 +77,7 @@ describe('sharing the obituary on mobile', () => {
     const sent = 'We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.';
     expect(screen.getByText(sent)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
@@ -80,7 +88,7 @@ describe('sharing the obituary on mobile', () => {
     await openObituary();
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
-    expect(await screen.findByText('Who should get this?')).toBeTruthy();
+    expect(await openPeople()).toBeTruthy();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
@@ -95,6 +103,7 @@ describe('sharing the obituary on mobile', () => {
     await openObituary();
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
@@ -102,12 +111,17 @@ describe('sharing the obituary on mobile', () => {
     expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
   });
 
-  it('Back from Who should get this? returns to the link screen with the link kept', async () => {
+  it('arrives on Ready to send without the people sheet; Close keeps it, and Back returns to the link screen with the link kept', async () => {
     await openObituary();
     fireEvent.changeText(screen.getByLabelText('Link to the obituary'), 'legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
-    await screen.findByText('Who should get this?');
+    await screen.findByRole('heading', { name: 'Share the obituary' });
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
+    await openPeople();
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
   });
 });

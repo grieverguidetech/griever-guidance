@@ -6,6 +6,13 @@ import type { Session } from '@griever/hooks';
 import { App, useSkipAnnounce } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
+// Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
+// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+const openPeople = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
+
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 // This path is specific to this react-native version. Re-check it when react-native is upgraded.
 // Each node gets its own handle, so a test can tell which node focus was sent to.
@@ -63,11 +70,14 @@ const startMoment = async (title: string) =>
   );
 
 describe('picking an announcement', () => {
-  it('opens on Who should get this?, never the old intro or the checklist', async () => {
+  it('opens on Ready to send with the people sheet closed, never the old intro or the checklist', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Announce the passing' })).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Announce the passing' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
+    expect(await openPeople()).toBeTruthy();
     expect(screen.queryByText(/This is only if you'd like to say more/)).toBeNull();
     expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
     expect(screen.queryByText('Gather when you can')).toBeNull();
@@ -76,6 +86,7 @@ describe('picking an announcement', () => {
   it('puts the note typed under Add a personal note in the message, and keeps it on Change', async () => {
     await openAnna();
     await startMoment('Announce the passing');
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
@@ -93,6 +104,7 @@ describe('picking an announcement', () => {
   it('lets people be picked on Who should get this?, and the picked people reach Review', async () => {
     await openAnna();
     await startMoment('Announce the passing');
+    await openPeople();
     expect(await screen.findByText('Done')).toBeTruthy();
     fireEvent.press(await screen.findByRole('checkbox', { name: /Dee/ }));
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
@@ -106,41 +118,50 @@ describe('picking an announcement', () => {
   it('has no "Writing about" / Home bar on the people step', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     expect(screen.queryByText(/Writing about/)).toBeNull();
     expect(screen.queryByLabelText('Back to home')).toBeNull();
   });
 
-  it('has Close and no "What you\'ll need" on the people step, and Close goes back to the hub', async () => {
+  it('has Close and no "What you\'ll need" on the people sheet, and Close lands on Ready to send', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     expect(screen.queryByText("What you'll need")).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Announce the passing' })).toBeTruthy();
   });
 
   it.each([['Announce the passing'], ['Share the service'], ['Send thank-yous']])(
-    '%s opens Who should get this? with a real header, and Close returns to the hub',
+    '%s: the people sheet has a real header, focus goes to it, and Close lands on Ready to send',
     async (moment) => {
       const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
       await openAnna();
       await screen.findByText('Ready to send');
       focus.mockClear();
       await startMoment(moment);
-      expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
-      expect(screen.queryByPlaceholderText('e.g. 2:00 PM')).toBeNull();
-      // Screen-reader focus went to the title itself.
+      await screen.findByRole('button', { name: 'Choose who to tell' });
+      focus.mockClear();
+      expect(await openPeople()).toBeTruthy();
+      // On a device the Modal's onShow sends screen-reader focus to the title itself.
+      expect(focus).not.toHaveBeenCalled();
+      act(() => screen.UNSAFE_getByType(Modal).props.onShow());
       const handle = focus.mock.calls.map(([h]) => h);
       expect(handle.length).toBeGreaterThan(0);
       expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();
+      focus.mockClear();
       fireEvent.press(screen.getByRole('button', { name: 'Close' }));
-      expect(await screen.findByText('Ready to send')).toBeTruthy();
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+      // iOS: focus goes back to the button that opened the sheet once the sheet reports it is gone.
+      expect(focus).not.toHaveBeenCalled();
+      act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'Choose who to tell' })).toBeTruthy();
     },
   );
 
-  it('Android Back on the announcement people step returns to the person screen once', async () => {
+  it('Android Back closes the people sheet only; with it closed, Back returns to the person screen once', async () => {
     const handlers: (() => boolean)[] = [];
     jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
       handlers.push(h as () => boolean);
@@ -148,7 +169,10 @@ describe('picking an announcement', () => {
     });
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
+    act(() => void [...handlers].reverse().some((h) => h()));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Announce the passing' })).toBeTruthy();
     act(() => void [...handlers].reverse().some((h) => h()));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
@@ -164,22 +188,25 @@ describe('picking an announcement', () => {
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('Ready to send');
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     expect(say).toHaveBeenCalledWith('Now writing about Anna');
   });
 
-  it('Close on the people step returns to the person screen once, with no bounce into the flow', async () => {
+  it('Close keeps the ticks and the sheet stays closed: it does not reopen, and Back still leaves for the hub', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
+    fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    expect(await screen.findByText('To Dee · 1')).toBeTruthy();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
-    expect(screen.getByText('Ready to send')).toBeTruthy();
-    expect(screen.queryByText('Who should get this?')).toBeNull();
-    // The moment can be started again from the person screen.
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    // The moment can be started again from the person screen, and it still does not open the sheet.
     await startMoment('Announce the passing');
-    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+    expect(await screen.findByText('To Dee · 1')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
   });
 });
 
@@ -187,6 +214,7 @@ describe('Ready to send (announcement)', () => {
   const toReview = async () => {
     await openAnna();
     await startMoment('Announce the passing');
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
@@ -254,6 +282,17 @@ describe('Ready to send (announcement)', () => {
     expect(screen.getByText('Text 2 people')).toBeTruthy();
   });
 
+  it('keeps hand-edited wording when Change opens the people sheet and Close shuts it', async () => {
+    await toReview();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    await screen.findByRole('heading', { name: 'Who should get this?' });
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
+    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+  });
+
   it('sends on to the sending step', async () => {
     await toReview();
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
@@ -266,6 +305,7 @@ describe('the end of a send', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
     await startMoment(template);
+    await openPeople();
     for (const name of pick) {
       fireEvent.press(await screen.findByText(name));
     }
@@ -353,7 +393,7 @@ describe('the end of a send', () => {
     fireEvent.press(within(screen.getByTestId('hub-action-bar')).getByRole('button'));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
     // The service moment opened on its people (not the hub, not 'sent').
-    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+    expect(await openPeople()).toBeTruthy();
   });
 
   it('announces the note once, and focuses the hub heading as it opens', async () => {
@@ -395,6 +435,7 @@ describe('the end of a send', () => {
     await startMoment('Share the obituary');
     fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
@@ -431,6 +472,7 @@ describe('Edit person from the hub', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await openAnna();
     await startMoment('Announce the passing');
+    await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));

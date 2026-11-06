@@ -60,6 +60,8 @@ export interface ReadyToSendProps {
   greeting?: { label: string; value: boolean; onChange: () => void };
   /** The Details link and the row it opens in place. Leave unset to hide both (hand-edited text). */
   details?: { label: string; startOpen: boolean; /** Draws the row. `headingRef` goes on its heading, where focus lands when the row opens. */ render: (headingRef: Ref<ComponentRef<typeof RNText>>) => ReactNode };
+  /** Gets the button that opens the people step (Change, or the primary when nobody is picked) back its focus when the sheet closes. */
+  peopleButtonRef?: Ref<ButtonNode>;
   /** The To row: its words, built by the app, and the link that opens the people step. */
   to: { text: string; changeLabel: string; /** The button's fuller name. It starts with `changeLabel`. */ changeName: string; onChange: () => void };
   /** With no one picked the primary is `chooseLabel` and opens the people step. */
@@ -91,7 +93,7 @@ export const BAR_TEST_ID = 'ready-action-bar';
  * button. Mobile's own screen (apps/mobile/src/ui). The message and tone live in the app; only
  * what is open lives here.
  */
-export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, to, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share }: ReadyToSendProps) {
+export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, to, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef }: ReadyToSendProps) {
   const [editing, setEditing] = useState(false);
   const [returnFocus, setReturnFocus] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
@@ -175,7 +177,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const toRow = hasRecipients ? (
     <View style={styles.to}>
       <Body>{to.text}</Body>
-      <Button label={to.changeLabel} accessibilityName={to.changeName} variant="tertiary" onPress={to.onChange} />
+      <Button label={to.changeLabel} accessibilityName={to.changeName} variant="tertiary" buttonRef={peopleButtonRef} onPress={to.onChange} />
     </View>
   ) : null;
   const shareRow = share ? (
@@ -278,6 +280,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
         label={hasRecipients ? sendLabel : chooseLabel}
         onPress={hasRecipients ? onSend : onChoose}
         note={hasRecipients ? note : undefined}
+        buttonRef={hasRecipients ? undefined : peopleButtonRef}
         disabledReason={reason}
         liveReason
       />

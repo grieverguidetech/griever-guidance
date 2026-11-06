@@ -2,9 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { AccessibilityInfo, BackHandler, Linking } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { freshDraft } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
+
+// Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
+// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+const openPeople = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
 
 const anna = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
@@ -51,6 +59,7 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
   // A moment already sent to people shows its compact done row; a new one is the lit card.
   fireEvent.press(told.length > 0 ? await screen.findByText(/Sent to \d+ (person|people)/) : await screen.findByRole('button', { name: /Next/ }));
+  await openPeople();
   for (const name of pick) {
     fireEvent.press(await screen.findByText(name));
   }
@@ -107,10 +116,11 @@ describe('recording who was messaged (#621)', () => {
     expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
     // Start the announcement again from its done row.
     fireEvent.press(screen.getByText(/Sent to 1 person/));
-    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+    // It opens on Ready to send, with the people sheet closed, and stays there.
+    expect(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.getByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
-    expect(screen.queryByText('Ready to send')).toBeNull();
+    expect(screen.getByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
   });
 
   it('writes each person to the phone when confirmed, before the send ends', async () => {
@@ -160,7 +170,32 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText(/Sent to 1 person/));
     // The flow reopens on review with Eli and Fay, not all three and not a blank form.
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
     expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
+  });
+
+  describe('a send stopped mid-way and reopened after a force-quit', () => {
+    const midSend = async (toldIds: string[]) => {
+      const draft = { ...freshDraft({}), templateCategory: 'announcement' as const, step: 'sending' as const, selectedContactIds: ['c1', 'c2', 'c3'], toldIds };
+      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, drafts: { announcement: draft }, recipientsNotified: { announcement: toldIds } }]));
+      await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+      render(<App />);
+      fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+      fireEvent.press(await screen.findByText(/Sent to \d+ (person|people)|Continue|Started/));
+    };
+
+    it('opens on Ready to send without the people already told, and the sheet closed', async () => {
+      await midSend(['c1']);
+      expect(await screen.findByText('Text 2 people')).toBeTruthy();
+      expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
+    });
+
+    it('opens with nobody picked and "Choose who to tell" when everyone was told', async () => {
+      await midSend(['c1', 'c2', 'c3']);
+      expect(await screen.findByRole('button', { name: 'Choose who to tell' })).toBeTruthy();
+      await act(async () => new Promise((r) => setTimeout(r, 300)));
+      expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
+    });
   });
 
   it('Android Back on the send screen goes to the hub and keeps who was told', async () => {
