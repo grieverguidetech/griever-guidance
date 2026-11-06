@@ -18,8 +18,8 @@ export interface HubCopy {
   heading: string;
   intro: string;
   back: string;
-  checklist: string;
-  editPerson: string;
+  /** The top-bar button that opens the sheet with the less common actions. */
+  more: string;
   start: string;
   continue: string;
   tagStarted: string;
@@ -55,8 +55,8 @@ export interface HubProps {
   eyebrow: string;
   rows: HubRow[];
   onBack: () => void;
-  onWhatYoullNeed: () => void;
-  onEdit: () => void;
+  /** Opens the More sheet (What you'll need, Edit person). The host draws the sheet. */
+  onMore: () => void;
   onStart: (key: HubMomentKey) => void;
   /** `opener` is the row's node (DOM node on web, host instance on native), so focus can go back to it. */
   onLocked: (opener: unknown) => void;
@@ -67,8 +67,8 @@ export interface HubProps {
   /** Show `meta` on locked rows too. Web leaves this off and keeps its locked rows plain. */
   metaOnAllRows?: boolean;
   headingRef?: HeadingProps['headingRef'];
-  /** For the sheet that "What you'll need" opens to return focus to. */
-  checklistRef?: Ref<ButtonNode>;
+  /** For the sheets that More opens to return screen-reader focus to. */
+  moreRef?: Ref<ButtonNode>;
 }
 
 /**
@@ -82,23 +82,10 @@ export function Hub(props: HubProps) {
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="header" onPress={props.onBack} />
-        <Button
-          label={copy.checklist}
-          variant="header"
-          opensDialog
-          onPress={props.onWhatYoullNeed}
-          buttonRef={props.checklistRef}
-        />
+        <Button label={copy.more} variant="header" opensDialog onPress={props.onMore} buttonRef={props.moreRef} />
       </View>
       <View style={styles.head}>
-        <View style={styles.eyebrowRow}>
-          <View style={styles.eyebrowText}>
-            <Eyebrow>{props.eyebrow}</Eyebrow>
-          </View>
-          <View style={styles.noShrink}>
-            <Button label={copy.editPerson} variant="header" onPress={props.onEdit} />
-          </View>
-        </View>
+        <Eyebrow>{props.eyebrow}</Eyebrow>
         <Heading level={1} headingRef={props.headingRef}>
           {copy.heading}
         </Heading>
@@ -189,11 +176,7 @@ const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
-  eyebrowRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   rows: { gap: spacing[2] },
-  // The name may be long; it wraps, and the Edit person button keeps its full width.
-  eyebrowText: { flexShrink: 1 },
-  noShrink: { flexShrink: 0 },
   // Must match the selected style of Card (ui/Card.tsx): border 2, accent, radius md, surface, padding spacing[3].
   lit: { gap: spacing[2], padding: spacing[3], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
   plain: { paddingVertical: spacing[2], gap: 2 },

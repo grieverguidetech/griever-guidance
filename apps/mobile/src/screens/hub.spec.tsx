@@ -41,6 +41,10 @@ function setup(session: Session = anna, paymentsEnabled = false) {
 }
 
 // The button in the bottom bar, found by the bar's test id.
+// The More sheet is the first Modal on the screen, the checklist the second.
+const moreModal = () => screen.UNSAFE_getAllByType(Modal)[0];
+const morePanel = () => within(moreModal());
+
 const bottomButton = () => within(screen.getByTestId('hub-action-bar')).getByRole('button');
 
 describe('HubScreen', () => {
@@ -77,12 +81,84 @@ describe('HubScreen', () => {
     expect(onStart).toHaveBeenLastCalledWith('thanks');
   });
 
-  it('answers Home and Edit person', () => {
-    const { onBack, onEditPerson } = setup();
+  it('answers Home', () => {
+    const { onBack } = setup();
     fireEvent.press(screen.getByRole('button', { name: 'Home' }));
-    fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('has More on the top bar, and no What you will need or Edit person button until More is opened', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'More' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit person' })).toBeNull();
+  });
+
+  it('More opens a sheet with What you will need and Edit person, and nothing that deletes or removes', () => {
+    setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    const sheet = morePanel();
+    expect(sheet.getAllByRole("button")).toHaveLength(3);
+    expect(sheet.getByRole("button", { name: "What you'll need" })).toBeTruthy();
+    expect(sheet.getByRole("button", { name: "Edit person" })).toBeTruthy();
+    expect(sheet.getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/delete|remove/i);
+  });
+
+  it('Edit person from More calls onEditPerson once the sheet has closed (iOS onDismiss)', () => {
+    const { onEditPerson } = setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: 'Edit person' }));
+    expect(onEditPerson).not.toHaveBeenCalled();
+    act(() => moreModal().props.onDismiss());
     expect(onEditPerson).toHaveBeenCalledTimes(1);
+  });
+
+  it('What you will need from More opens the checklist sheet once More has closed', () => {
+    setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: "What you'll need" }));
+    act(() => moreModal().props.onDismiss());
+    expect(screen.UNSAFE_getAllByType(Modal)[1].props.visible).toBe(true);
+    expect(screen.getByText('Not today. Just so none of it surprises you.')).toBeTruthy();
+  });
+
+  it('closing More with Close sends screen-reader focus back to More', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    const { onEditPerson } = setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    focus.mockClear();
+    fireEvent.press(morePanel().getByRole('button', { name: 'Close' }));
+    expect(moreModal().props.visible).toBe(false);
+    act(() => moreModal().props.onDismiss());
+    expect(focus).toHaveBeenCalledWith(1);
+    expect(onEditPerson).not.toHaveBeenCalled();
+  });
+
+  it('on Android, More does its item and returns focus without onDismiss', () => {
+    jest.useFakeTimers();
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      const { onEditPerson } = setup();
+      fireEvent.press(screen.getByRole('button', { name: 'More' }));
+      fireEvent.press(morePanel().getByRole('button', { name: 'Edit person' }));
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(onEditPerson).toHaveBeenCalledTimes(1);
+      fireEvent.press(screen.getByRole('button', { name: 'More' }));
+      focus.mockClear();
+      fireEvent.press(morePanel().getByRole('button', { name: 'Close' }));
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).toHaveBeenCalledWith(1);
+    } finally {
+      Platform.OS = original;
+      jest.useRealTimers();
+    }
   });
 
   it('shows the sent note as a polite live region, and announces it on iOS', () => {
@@ -189,12 +265,6 @@ describe('HubScreen', () => {
     expect(within(thanks).getByText(/Needs your name/)).toBeTruthy();
   });
 
-  it('opens What you will need in a sheet', () => {
-    setup();
-    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
-    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
-    expect(screen.getByText('Not today. Just so none of it surprises you.')).toBeTruthy();
-  });
 
   it('Android Back goes Home, but not while a sheet is open', () => {
     let handler: (() => boolean) | undefined;
@@ -203,7 +273,7 @@ describe('HubScreen', () => {
       return { remove: () => undefined };
     });
     const { onBack } = setup();
-    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
     let handled = true;
     act(() => {
       handled = handler?.() ?? true;
@@ -284,12 +354,14 @@ describe('HubScreen', () => {
     expect(screen.UNSAFE_getAllByType(Modal).every((m) => !m.props.visible)).toBe(true);
   });
 
-  it('after the checklist sheet is dismissed, screen-reader focus goes back to What you will need', () => {
+  it('after the checklist sheet is dismissed, screen-reader focus goes back to More', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     setup();
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(morePanel().getByRole('button', { name: "What you'll need" }));
+    act(() => moreModal().props.onDismiss());
     focus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
-    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
+    act(() => screen.UNSAFE_getAllByType(Modal)[1].props.onDismiss());
     expect(focus).toHaveBeenCalledWith(1);
   });
 
@@ -345,9 +417,9 @@ describe('HubScreen', () => {
     expect(screen.getByText('Needs the place')).toBeTruthy();
   });
 
-  it('uses the header variant for Edit person, so it is not the first strong button', () => {
+  it('uses the header variant for More, so it is not the first strong button', () => {
     setup();
-    const edit = screen.getByRole('button', { name: 'Edit person' });
+    const edit = screen.getByRole('button', { name: 'More' });
     const flat = StyleSheet.flatten(typeof edit.props.style === 'function' ? edit.props.style({ pressed: false }) : edit.props.style);
     expect(flat.backgroundColor).toBeUndefined();
     expect(flat.borderColor).toBe(colors['accent-600']);

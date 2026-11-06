@@ -5,7 +5,7 @@ import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, use
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
-import { ActionBar, Hub, PaywallSheet, SentNote } from '../ui';
+import { ActionBar, Button, Hub, PaywallSheet, SentNote, Sheet } from '../ui';
 import type { ButtonNode, HubRow } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
@@ -17,7 +17,7 @@ const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
 const phoneCopy = screenCopy('phoneHub');
 // The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
-const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro };
+const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, more: phoneCopy.more };
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -78,14 +78,17 @@ export type HubScreenProps = {
  */
 export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
   const moments = usePathMoments(session);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
-  const checklistButton = useRef<ButtonNode>(null);
+  const moreButton = useRef<ButtonNode>(null);
+  // What a More item asked for, run once the More sheet is gone (two sheets must not swap at once).
+  const afterMore = useRef<(() => void) | null>(null);
   // The locked row that opened the placeholder, so screen-reader focus can go back to it.
   const opener = useRef<unknown>(null);
   const sheetOpen = useRef(false);
-  sheetOpen.current = checklistOpen || paywallOpen;
+  sheetOpen.current = moreOpen || checklistOpen || paywallOpen;
 
   // The heading takes screen-reader focus when the hub opens (after a screen swap).
   useEffect(() => {
@@ -132,11 +135,37 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
     }
   };
 
-  // iOS tells us when the checklist sheet is gone; Android returns to the last focused view by itself.
-  const focusChecklistButton = () => {
-    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
+  const focusMoreButton = () => {
+    const handle = moreButton.current ? findNodeHandle(moreButton.current) : null;
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+
+  // iOS tells us when a sheet is gone (onDismiss); Android does not, so focus goes back when it is closed.
+  const closeChecklist = () => {
+    setChecklistOpen(false);
+    if (Platform.OS !== 'ios') {
+      setTimeout(focusMoreButton, 0);
+    }
+  };
+
+  // The More sheet is gone: run the item that was chosen, or put focus back on More if none was.
+  const finishMore = () => {
+    const next = afterMore.current;
+    afterMore.current = null;
+    if (next) {
+      next();
+      return;
+    }
+    focusMoreButton();
+  };
+
+  const closeMore = (next?: () => void) => {
+    afterMore.current = next ?? null;
+    setMoreOpen(false);
+    if (Platform.OS !== 'ios') {
+      setTimeout(finishMore, 0);
     }
   };
 
@@ -176,8 +205,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
         eyebrow={fill(copy.forName, { name: session.personName })}
         rows={rows}
         onBack={onBack}
-        onWhatYoullNeed={() => setChecklistOpen(true)}
-        onEdit={onEditPerson}
+        onMore={() => setMoreOpen(true)}
         onStart={onStart}
         onLocked={(row) => {
           opener.current = row;
@@ -185,7 +213,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
         }}
         metaOnAllRows
         headingRef={heading}
-        checklistRef={checklistButton}
+        moreRef={moreButton}
       >
         {note ? (
           <View style={styles.note} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${note.lead} ${note.rest}`}>
@@ -195,7 +223,11 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
       </Hub>
       </ScrollView>
       <ActionBar testID="hub-action-bar" label={primaryLabel} onPress={() => onStart(target)} />
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
+      <Sheet title={phoneCopy.more} closeLabel={paywallCopy.close} visible={moreOpen} onClose={() => closeMore()} onDismiss={finishMore}>
+        <Button label={copy.checklist} variant="secondary" onPress={() => closeMore(() => setChecklistOpen(true))} />
+        <Button label={copy.editPerson} variant="secondary" onPress={() => closeMore(onEditPerson)} />
+      </Sheet>
+      <WhatYoullNeedSheet visible={checklistOpen} onClose={closeChecklist} onDismiss={focusMoreButton} />
       {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
     </View>
   );
