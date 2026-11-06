@@ -1,6 +1,6 @@
 import { sendCardStatus } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
-import { parseLooseDate } from '@griever/shared';
+import { parseCompleteDate } from '@griever/shared';
 import type { MomentKey } from '@griever/shared';
 
 /** The real funeral order. Never reordered. */
@@ -12,25 +12,23 @@ export interface NextMomentInput {
   locked: MomentKey[];
   /** The card of a send that was stopped part-way: it is lit, even though some people were told. */
   partial?: MomentKey | null;
+  /** Read on each render. The hub re-renders when the app returns to the front, so a date passing overnight is picked up. */
   now?: Date;
 }
 
-/** A calendar day as a number. A date typed as 2026-11-05 is that day anywhere, so it is read as UTC. */
-function dayNumber(text: string, date: Date): number {
-  const isoOnly = /^\d{4}-\d{2}-\d{2}$/.test(text.trim());
-  const year = isoOnly ? date.getUTCFullYear() : date.getFullYear();
-  const month = isoOnly ? date.getUTCMonth() : date.getMonth();
-  const day = isoOnly ? date.getUTCDate() : date.getDate();
-  return Date.UTC(year, month, day);
-}
+/** A calendar day as a number, from the local year, month and day. */
+const dayNumber = (date: Date): number => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 
-/** Thank-yous wait until the service date is a real date before today. Missing or unreadable never counts. */
+/**
+ * Thank-yous wait until the service date is a complete date (with a four-digit year) before today.
+ * Text such as "Nov 8" or "11/8" has no year, so it never counts (C10).
+ */
 export function serviceIsOver(serviceDate: string | undefined, now: Date): boolean {
-  const parsed = parseLooseDate(serviceDate);
-  if (!parsed || !serviceDate) {
+  const parsed = parseCompleteDate(serviceDate);
+  if (!parsed) {
     return false;
   }
-  return dayNumber(serviceDate, parsed) < dayNumber('', now);
+  return dayNumber(parsed) < dayNumber(now);
 }
 
 /**
@@ -56,4 +54,27 @@ export function nextMoment({ session, locked, partial = null, now = new Date() }
     return key;
   }
   return null;
+}
+
+/**
+ * The card the bottom button names: the lit card, else the first card in order that is not done and
+ * not locked (the thank-you date rule still applies), else the announcement.
+ */
+export function barMoment(input: NextMomentInput): MomentKey {
+  const lit = nextMoment(input);
+  if (lit) {
+    return lit;
+  }
+  const { session, locked, now = new Date() } = input;
+  const open = ORDER.find((key) => {
+    if (locked.includes(key)) {
+      return false;
+    }
+    const status = sendCardStatus(session, key);
+    if (typeof status === 'object') {
+      return false;
+    }
+    return key !== 'thanks' || serviceIsOver(session.serviceDate, now);
+  });
+  return open ?? 'announce';
 }

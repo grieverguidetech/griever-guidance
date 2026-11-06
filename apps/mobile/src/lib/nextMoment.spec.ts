@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import type { Session } from '@griever/hooks';
-import { nextMoment, serviceIsOver } from './nextMoment';
+import { barMoment, nextMoment, serviceIsOver } from './nextMoment';
 
 const NOW = new Date(2026, 10, 5, 12, 0, 0); // November 5, 2026, local
 
@@ -75,14 +75,45 @@ describe('nextMoment', () => {
 });
 
 describe('serviceIsOver', () => {
-  it('reads an ISO date as that calendar day', () => {
+  it('is true only for a complete date before today', () => {
+    expect(serviceIsOver('November 4, 2026', NOW)).toBe(true);
     expect(serviceIsOver('2026-11-04', NOW)).toBe(true);
+    expect(serviceIsOver('11/4/2026', NOW)).toBe(true);
+  });
+
+  it('is false on the same day and after', () => {
+    expect(serviceIsOver('November 5, 2026', NOW)).toBe(false);
     expect(serviceIsOver('2026-11-05', NOW)).toBe(false);
+    expect(serviceIsOver('November 8, 2026', NOW)).toBe(false);
+  });
+
+  it('is false for dates without a year, which the engine would read as 2001 (C10)', () => {
+    expect(serviceIsOver('Nov 8', NOW)).toBe(false);
+    expect(serviceIsOver('Saturday, November 8', NOW)).toBe(false);
+    expect(serviceIsOver('11/8', NOW)).toBe(false);
   });
 
   it('is false for text that is not a date, or nothing', () => {
     expect(serviceIsOver('next Saturday', NOW)).toBe(false);
     expect(serviceIsOver(undefined, NOW)).toBe(false);
     expect(serviceIsOver('   ', NOW)).toBe(false);
+  });
+});
+
+describe('barMoment', () => {
+  it('is the lit card when there is one', () => {
+    expect(barMoment({ session: session(), locked: [], now: NOW })).toBe('announce');
+  });
+
+  it('falls to the first card that is not done and not locked, not back to a finished announcement', () => {
+    expect(barMoment({ session: session({ ...told, serviceTime: '' }), locked: [], now: NOW })).toBe('service');
+    expect(barMoment({ session: session(told), locked: ['service'], now: NOW })).toBe('obituary');
+  });
+
+  it('applies the thank-you date rule, and ends at the announcement when nothing is left', () => {
+    const sent = { announcement: ['a'], service: ['b'], obituary: ['c'] };
+    const done = { recipientsNotified: sent, obituaryUrl: 'https://x.test/o' };
+    expect(barMoment({ session: session({ ...done, serviceDate: 'November 8, 2026' }), locked: [], now: NOW })).toBe('announce');
+    expect(barMoment({ session: session({ ...done, serviceDate: 'November 8, 2026' }), locked: ['thanks'], now: NOW })).toBe('announce');
   });
 });

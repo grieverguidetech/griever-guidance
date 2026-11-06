@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, Linking, Modal, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App, withoutServiceKnown } from './App';
@@ -285,6 +285,8 @@ describe('the end of a send', () => {
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Ready to send' })).toBeTruthy();
+    // The announcement is done and the service still needs its date: the bottom button names the service.
+    expect(within(screen.getByTestId('hub-action-bar')).getByText('Share the service')).toBeTruthy();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
     expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith(
@@ -350,7 +352,7 @@ describe('the end of a send', () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
     // The announcement is now recorded as done; the service still needs its date, so it is a plain row.
-    fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
+    fireEvent.press(within(screen.getByTestId('hub-action-bar')).getByRole('button'));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
     // The service moment opened on its people (not the hub, not 'sent').
     expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();

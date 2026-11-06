@@ -1,11 +1,11 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
-import { Card } from '../Card';
+import { Phrasing } from '../phrasing';
 import { Heading } from '../Heading';
 import { Row } from '../Row';
 import { Body, Eyebrow } from '../Text';
@@ -141,16 +141,17 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     // The one lit card: a single press target. "Next" is in its name; the bottom button does the same.
     const tag = row.started ? `${copy.tagNext} · ${copy.tagStarted}` : copy.tagNext;
     return (
-      <Card selected>
-        <Row onPress={() => onStart(row.key)}>
+      // The pressable is the whole visible card: border and padding sit on it, so there is no dead band.
+      <Pressable role="button" onPress={() => onStart(row.key)} style={styles.lit}>
+        <Phrasing>
           <Body tone="muted" small>
             {tag}
           </Body>
           <Body tone="strong">{text.title}</Body>
           <Body>{text.body}</Body>
           <Meta meta={row.meta} />
-        </Row>
-      </Card>
+        </Phrasing>
+      </Pressable>
     );
   }
 
@@ -159,7 +160,7 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     // under way comes back, otherwise it is new and empty, because a finished send keeps no wording (C2).
     return (
       <Row bordered onPress={() => onStart(row.key)}>
-        <Body tone="strong">{row.meta ? `${text.title} · ${row.meta}` : text.title}</Body>
+        <Body tone="strong">{[text.title, row.meta, row.started ? copy.metaStarted : ''].filter(Boolean).join(' · ')}</Body>
       </Row>
     );
   }
@@ -193,6 +194,7 @@ const styles = StyleSheet.create({
   // The name may be long; it wraps, and the Edit person button keeps its full width.
   eyebrowText: { flexShrink: 1 },
   noShrink: { flexShrink: 0 },
+  lit: { gap: spacing[2], padding: spacing[3], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 

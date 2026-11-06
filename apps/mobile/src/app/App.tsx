@@ -526,7 +526,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   if (atHub) {
     return (
       <FadeIn key="hub">
-        <ScreenFrame>
+        <ScreenFrame bottomInset={false}>
           <HubScreen
             key={active.id}
             session={active}

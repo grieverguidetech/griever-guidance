@@ -32,11 +32,22 @@ describe('send steps and the top safe area', () => {
     expect(padded).toBe(true);
   });
 
-  it('pads every screen by the bottom inset too, so the last button clears the home indicator', async () => {
+  it('pads the hub bottom once, on the bar, so the button clears the home indicator', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('Ready to send');
+    const bar = StyleSheet.flatten(screen.getByTestId('hub-action-bar').props.style);
+    expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
+    // The frame leaves the bottom to the bar; the top is still padded.
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    expect(frame?.paddingBottom).toBe(0);
+  });
+
+  it('still pads every other screen by the bottom inset', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    render(<App />);
+    await screen.findByLabelText('Anna');
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
       return style.paddingTop === 47 && style.paddingBottom === 34 && style.backgroundColor === colors.bg;

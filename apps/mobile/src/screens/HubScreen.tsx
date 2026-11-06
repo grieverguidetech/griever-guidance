@@ -11,7 +11,7 @@ import { colors, spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { SentNoteText } from '../lib/sendNote';
-import { nextMoment } from '../lib/nextMoment';
+import { barMoment, nextMoment } from '../lib/nextMoment';
 
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
@@ -165,7 +165,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
   }));
 
   // The bottom button names the lit card and does what tapping it does. With none lit it offers the announcement.
-  const target: MomentKey = lit ?? 'announce';
+  const target: MomentKey = barMoment({ session, locked, partial: stopped });
   const primaryLabel = copy.moments[target].title;
 
   return (
@@ -194,7 +194,7 @@ export function HubScreen({ session, onBack, onStart, onEditPerson, note, paymen
         ) : null}
       </Hub>
       </ScrollView>
-      <ActionBar label={primaryLabel} onPress={() => onStart(target)} />
+      <ActionBar testID="hub-action-bar" label={primaryLabel} onPress={() => onStart(target)} />
       <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
       {paymentsEnabled && <PaywallSheet copy={paywallCopy} visible={paywallOpen} onClose={closePaywall} onDismiss={focusOpener} />}
     </View>

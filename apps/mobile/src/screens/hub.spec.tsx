@@ -40,8 +40,8 @@ function setup(session: Session = anna, paymentsEnabled = false) {
   return handlers;
 }
 
-// The bottom bar's button is the last button on the screen.
-const bottomButton = () => screen.getAllByRole('button').at(-1) as ReturnType<typeof screen.getByRole>;
+// The button in the bottom bar, found by the bar's test id.
+const bottomButton = () => within(screen.getByTestId('hub-action-bar')).getByRole('button');
 
 describe('HubScreen', () => {
   it('shows the person, the heading and the four steps, with the bottom button naming the announcement', () => {
@@ -393,11 +393,25 @@ describe('HubScreen: the next card and the bottom button', () => {
     expect(onStart).toHaveBeenLastCalledWith('obituary');
   });
 
-  it('offers the announcement when no card qualifies', () => {
+  it('names the first open card when none is lit', () => {
     const { onStart } = setup(sess(announced));
     expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+    // The announcement is done, so the button names the first card still open: the service.
+    expect(within(bottomButton()).getByText('Share the service')).toBeTruthy();
     fireEvent.press(bottomButton());
-    expect(onStart).toHaveBeenLastCalledWith('announce');
+    expect(onStart).toHaveBeenLastCalledWith('service');
+  });
+
+  it('falls back to the announcement only when no card is left', () => {
+    const sent = { announcement: ['a'], service: ['b'], obituary: ['c'] };
+    setup(sess({ ...ready, obituaryUrl: 'https://paper.test/anna', recipientsNotified: sent, serviceDate: 'January 2, 2999' }));
+    expect(within(bottomButton()).getByText('Announce the passing')).toBeTruthy();
+  });
+
+  it('keeps Started on a compact done row with a re-send draft in progress', () => {
+    const draft = freshDraft({ templateCategory: 'announcement', step: 'details', fields: { senderName: 'Sam' } });
+    setup(sess({ ...announced, drafts: { announcement: draft } }));
+    expect(screen.getByText('Announce the passing · Sent to 1 person · Started')).toBeTruthy();
   });
 
   it('lights the thank-yous only after a service date that parses and is past', () => {
@@ -413,10 +427,10 @@ describe('HubScreen: the next card and the bottom button', () => {
     }
   });
 
-  it('never lights a locked card', () => {
+  it('never lights a locked card, and the bar names the first open card that is not locked', () => {
     setup(sess({ ...announced, ...ready }), true);
     expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
-    expect(within(bottomButton()).getByText('Announce the passing')).toBeTruthy();
+    expect(within(bottomButton()).getByText('Share the obituary')).toBeTruthy();
   });
 
   it('after a stopped send, the card reads "text the rest" and is the lit card', () => {
