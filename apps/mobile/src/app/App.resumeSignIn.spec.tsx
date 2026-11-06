@@ -1,7 +1,7 @@
 import { AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import type { UseAccountResult } from '@griever/hooks';
 
 process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
@@ -52,7 +52,6 @@ const account = (over: Partial<UseAccountResult>): UseAccountResult => ({
   ...over,
 });
 const named = { id: 'u1', senderName: 'Sam', contactSource: null, accountType: 'owner' as const };
-const loading = account({ status: 'loading', isLoading: true });
 const signedOut = account({});
 const signedIn = account({ status: 'signed_in', isSignedIn: true, profile: named });
 
