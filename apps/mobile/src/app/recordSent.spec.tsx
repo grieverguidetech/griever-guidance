@@ -70,7 +70,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Next'));
-    fireEvent.press(await screen.findByText('Skip'));
+    fireEvent.press(await screen.findByText('Skip Eli'));
     fireEvent.press(await screen.findByText('Text Fay'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
@@ -89,8 +89,8 @@ describe('recording who was messaged (#621)', () => {
 
   it('records nothing when everyone is skipped, and the row is not done', async () => {
     await toSending(['Dee', 'Eli']);
-    fireEvent.press(await screen.findByText('Skip'));
-    fireEvent.press(await screen.findByText('Skip'));
+    fireEvent.press(await screen.findByText('Skip Dee'));
+    fireEvent.press(await screen.findByText('Skip Eli'));
     expect(await screen.findByText('No one was texted this time.')).toBeTruthy();
     const saved = await savedAnna();
     expect(saved.recipientsNotified).toEqual({});

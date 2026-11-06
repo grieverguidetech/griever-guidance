@@ -24,6 +24,11 @@ describe('ActionBar', () => {
     expect(screen.getByText('Nothing is sent until you tap.')).toBeTruthy();
   });
 
+  it('reads the hint after the label when available', () => {
+    render(<ActionBar label="Sent to Ana? Next: Ben" hint="Marks Ana sent" onPress={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Sent to Ana? Next: Ben' }).props.accessibilityHint).toBe('Marks Ana sent');
+  });
+
   it('uses the primary button, and the tappable button itself is at least 52 points tall', () => {
     render(<ActionBar label="Next" onPress={jest.fn()} />);
     expect(screen.UNSAFE_getByType(Button).props.variant ?? 'primary').toBe('primary');

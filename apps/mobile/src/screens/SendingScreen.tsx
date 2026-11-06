@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, AppState, findNodeHandle, KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, AppState, findNodeHandle, KeyboardAvoidingView, Linking, Platform, StyleSheet, Text } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
-import { colors, spacing } from '@griever/tokens';
+import { colors } from '@griever/tokens';
 import { Sending } from '../ui';
-import type { ButtonNode } from '../ui';
-import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import type { FlowProps } from '../app/App';
 
 const copy = screenCopy('sending');
+const texting = screenCopy('phoneTexting');
 /** A tap this soon after a hand-off is the same tap landing on the button that took the first one's place. */
 export const HAND_OFF_GUARD_MS = 1000;
 
@@ -28,7 +27,8 @@ interface Props extends FlowProps {
  * hands off to the device's native Messages app (an sms: link) with the contact and message
  * pre-filled; the griever taps Send there themselves. When the app goes to the background and
  * comes back active, it asks whether that person was sent (REQUIREMENTS.md section 6, Decision 3).
- * One tap marks them sent and opens Messages for the next; Not yet keeps the person; Skip stays.
+ * One tap marks them sent and opens Messages for the next; Not yet opens Messages again for the same person; Skip stays.
+ * The answer is the primary button in the bottom bar; Not yet and Skip are links above it.
  * Nothing is marked sent without a tap. If no return is detected, Next works as before.
  * The send job is not saved. Each person marked sent is written to the device the moment it
  * happens (ids only, in App.tsx), so a restart never texts them twice.
@@ -48,8 +48,6 @@ export function SendingScreen({ flow, contacts }: Props) {
   const confirmedFor = useRef<string | null>(null);
   // When a thank-you card moved on without opening Messages. A tap this soon lands on the Text button that took the Yes button's place.
   const confirmedAt = useRef(0);
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const checklistButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof Text>>(null);
 
   const active = sendJob?.recipients.find((r) => r.status === 'sending') ?? null;
@@ -90,20 +88,12 @@ export function SendingScreen({ flow, contacts }: Props) {
     }
   }, []);
 
-  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
-  const focusChecklistButton = () => {
-    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
-  };
-
   if (!sendJob) {
     return null;
   }
 
   const total = sendJob.recipients.length;
-  const done = sendJob.recipients.filter((r) => r.status === 'delivered' || r.status === 'skipped').length;
+  const segments = sendJob.recipients.map((r) => (r.status === 'delivered' || r.status === 'skipped' ? 'done' : r.status === 'sending' ? 'current' : 'waiting'));
   const activeIndex = active ? sendJob.recipients.findIndex((r) => r.contactId === active.contactId) : -1;
   const isLast = activeIndex === total - 1;
   const thankYou = flow.templateCategory === 'aftercare';
@@ -163,11 +153,10 @@ export function SendingScreen({ flow, contacts }: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Sending
         copy={copy}
         intro={copy.introTextOnly}
-        progress={total === 0 ? 0 : done / total}
+        segments={segments}
         current={
           active && activeContact
             ? {
@@ -201,6 +190,7 @@ export function SendingScreen({ flow, contacts }: Props) {
             : undefined
         }
         openLabel={activeContact ? fill(copy.textPerson, { name: activeContact.name }) : undefined}
+        skipLabel={activeContact ? fill(texting.skipPerson, { name: activeContact.name }) : ''}
         confirmSent={
           asking && activeContact
             ? {
@@ -210,9 +200,9 @@ export function SendingScreen({ flow, contacts }: Props) {
                 hint: isLast
                   ? fill(copy.sentHintDone, { name: activeContact.name })
                   : fill(thankYou ? copy.sentHintNextNote : copy.sentHintNext, { name: activeContact.name, next: nameFor(sendJob.recipients[activeIndex + 1].contactId) }),
-                notYet: copy.notYet,
+                notYet: texting.notYetOpenAgain,
                 onYes: confirmSent,
-                onNotYet: () => setHandedOffId(null),
+                onNotYet: openMessages,
               }
             : undefined
         }
@@ -221,18 +211,13 @@ export function SendingScreen({ flow, contacts }: Props) {
         onOpenMessages={openMessages}
         onNext={markNext}
         onSkip={markActiveSkipped}
-        stop={{ label: copy.stopForNow, note: copy.stopNote, onPress: stopSending }}
-        headingRef={heading}
-        onWhatYoullNeed={() => setChecklistOpen(true)}
-        checklistRef={checklistButton}
+        stop={{ label: copy.stopForNow, note: copy.stopNote, line: texting.stopAnyTime, onPress: stopSending }}
+        nameRef={heading}
       />
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
-    </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing[3], paddingTop: spacing[4] },
 });

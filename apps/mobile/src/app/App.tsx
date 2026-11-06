@@ -644,13 +644,18 @@ const HomeNavigation = ({
 
 // The person bar draws nothing now; it still carries Android back and the arrival announcement on
 // every step. This wrapper gives the step the shared safe-area frame.
-const PersonContext = ({ bar, children }: { bar: ReactNode; children: ReactNode }) => (
-  <ScreenFrame>
+const PersonContext = ({ bar, children, bottomInset }: { bar: ReactNode; children: ReactNode; bottomInset: boolean }) => (
+  <ScreenFrame bottomInset={bottomInset}>
     {bar}
     {children}
   </ScreenFrame>
 );
-const withPersonContext = (bar: ReactNode, screen: ReactNode) => <PersonContext bar={bar}>{screen}</PersonContext>;
+// A screen with its own bottom bar (Sending) pads by the inset itself, so the frame must not.
+const withPersonContext = (bar: ReactNode, screen: ReactNode, bottomInset = true) => (
+  <PersonContext bar={bar} bottomInset={bottomInset}>
+    {screen}
+  </PersonContext>
+);
 
 const Navigation = ({
   flow,
@@ -688,7 +693,7 @@ const Navigation = ({
         )}
         {flow.step === 'sending' && (
           <Stack.Screen name="Sending">
-            {() => withPersonContext(bar, <SendingScreen flow={flow} contacts={contacts} />)}
+            {() => withPersonContext(bar, <SendingScreen flow={flow} contacts={contacts} />, false)}
           </Stack.Screen>
         )}
         {flow.step === 'sent' && (

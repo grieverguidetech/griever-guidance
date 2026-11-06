@@ -1,1 +1,5 @@
-{}
+{
+  "notYetOpenAgain": "Not yet, open Messages again",
+  "skipPerson": "Skip {name}",
+  "stopAnyTime": "You can stop any time. People you told stay marked as told."
+}

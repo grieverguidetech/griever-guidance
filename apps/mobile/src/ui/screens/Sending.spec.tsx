@@ -1,13 +1,12 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { ActionBar } from '../ActionBar';
 import { Sending } from './Sending';
 import type { SendingCopy, SendingProps } from './Sending';
 
 const copy: SendingCopy = {
-  heading: 'Reaching people, one at a time',
-  checklist: "What you'll need",
   openMessages: 'Open Messages',
-  skip: 'Skip',
   next: 'Next',
   done: 'Done',
   sent: 'Sent',
@@ -19,7 +18,8 @@ function base(over: Partial<SendingProps> = {}): SendingProps {
   return {
     copy,
     intro: 'Each message opens in your own Messages app.',
-    progress: 0,
+    segments: ['current', 'waiting', 'waiting'],
+    skipLabel: 'Skip Aunt Carol',
     current: { position: '1 of 3', name: 'Aunt Carol', message: 'Margaret has died.', isLast: false },
     others: [
       { id: 'b', name: 'Bob Smith', status: 'waiting' },
@@ -34,16 +34,46 @@ function base(over: Partial<SendingProps> = {}): SendingProps {
 }
 
 describe('Sending (mobile)', () => {
-  it('shows a quiet Stop for now that calls onPress, and hides it when unset', () => {
+  it('shows Stop for now in the top bar beside the position, and hides it when unset', () => {
     const onPress = jest.fn();
-    const view = render(<Sending {...base({ stop: { label: 'Stop for now', note: 'People you told stay marked as told.', onPress } })} />);
-    // The visible line is hidden from screen readers (the button reads it as its hint).
-    expect(screen.getByText('People you told stay marked as told.', { includeHiddenElements: true })).toBeTruthy();
+    const view = render(<Sending {...base({ stop: { label: 'Stop for now', note: 'People you told stay marked as told.', line: 'You can stop any time.', onPress } })} />);
     expect(screen.getByRole('button', { name: 'Stop for now' }).props.accessibilityHint).toBe('People you told stay marked as told.');
+    expect(screen.getByText('1 of 3')).toBeTruthy();
+    expect(screen.getByText('You can stop any time.', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Stop for now' }));
     expect(onPress).toHaveBeenCalledTimes(1);
     view.rerender(<Sending {...base()} />);
     expect(screen.queryByRole('button', { name: 'Stop for now' })).toBeNull();
+  });
+
+  it('draws one progress segment per person and hides the strip from screen readers', () => {
+    render(<Sending {...base({ segments: ['done', 'current', 'waiting'] })} />);
+    const strip = screen.UNSAFE_getAllByProps({ importantForAccessibility: 'no-hide-descendants' }).find((node) => typeof node.type === 'string');
+    expect(strip?.props.accessibilityElementsHidden).toBe(true);
+    expect(strip?.props.children).toHaveLength(3);
+  });
+
+  it('shows the name as the page heading at 28 points or more', () => {
+    render(<Sending {...base()} />);
+    const name = screen.getByRole('heading', { name: 'Aunt Carol' });
+    expect(StyleSheet.flatten(name.props.style).fontSize).toBeGreaterThanOrEqual(28);
+  });
+
+  it('puts the hand-off in the bottom bar, with Skip above it', () => {
+    const onOpenMessages = jest.fn();
+    render(<Sending {...base({ onOpenMessages, openLabel: 'Text Aunt Carol' })} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Text Aunt Carol' }));
+    expect(onOpenMessages).toHaveBeenCalledTimes(1);
+    expect(screen.UNSAFE_getByType(ActionBar).props.label).toBe('Text Aunt Carol');
+    expect(screen.getByRole('button', { name: 'Skip Aunt Carol' })).toBeTruthy();
+  });
+
+  it('after a hand-off the bar reads Next (Done on the last person) with Open Messages again above', () => {
+    const view = render(<Sending {...base({ handOff: { note: 'Send it in Messages.', again: 'Open Messages again', onAgain: jest.fn() } })} />);
+    expect(screen.UNSAFE_getByType(ActionBar).props.label).toBe('Next');
+    expect(screen.getByRole('button', { name: 'Open Messages again' })).toBeTruthy();
+    view.rerender(<Sending {...base({ current: { position: '3 of 3', name: 'Dana Lee', message: 'm', isLast: true }, handOff: { note: 'n', again: 'Open Messages again', onAgain: jest.fn() } })} />);
+    expect(screen.UNSAFE_getByType(ActionBar).props.label).toBe('Done');
   });
 
   it('lists the other people as a list of items', () => {

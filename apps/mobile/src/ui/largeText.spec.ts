@@ -22,6 +22,7 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['ui/screens/WhoShouldKnow.tsx', 'sectionHead'],
   ['ui/screens/Review.tsx', 'topBar'],
   ['ui/screens/Account.tsx', 'topBar'],
+  ['ui/screens/Sending.tsx', 'topBar'],
   ['ui/screens/Sending.tsx', 'person'],
   ['screens/ContactSelectorScreen.tsx', 'topBar'],
   ['ui/screens/PersonSetup.tsx', 'topBar'],
