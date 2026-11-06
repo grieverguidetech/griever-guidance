@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
-import { AccessibilityInfo, Platform, View } from 'react-native';
+import { AccessibilityInfo, BackHandler, Platform, View } from 'react-native';
 import { colors } from '@griever/tokens';
 import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -85,6 +85,18 @@ export const useFirstScreen = (): { first: 'pending' | 'home' | 'signIn'; leaveF
   }, [first, launch, hydrated, signedIn]);
   const leaveFirst = useCallback(() => setFirst('home'), []);
   return { first, leaveFirst };
+};
+
+/** "Your account" opened from the person screen. Android Back returns to the person screen, as the Back button does. */
+const AccountFromHub = ({ onBack }: { onBack: () => void }) => {
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
+  return <AccountScreen onBack={onBack} />;
 };
 
 const Opening = () => (
@@ -572,7 +584,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     return (
       <FadeIn key="account">
         <ScreenFrame>
-          <AccountScreen onBack={() => setAtAccount(false)} />
+          <AccountFromHub onBack={() => setAtAccount(false)} />
         </ScreenFrame>
       </FadeIn>
     );
@@ -670,10 +682,13 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             others={sessions.filter((s) => s.id !== active.id && !isBlank(s))}
             onSwitch={(id) => {
               const picked = sessions.find((s) => s.id === id);
+              if (!picked) {
+                return;
+              }
               switchTo(id);
               setNote(null);
               setArrived(false);
-              announceOpen(picked ? personLabel(picked) : '');
+              announceOpen(personLabel(picked));
             }}
             onAddSomeone={
               CAN_CREATE

@@ -3,7 +3,7 @@
   "title": "Copy for the phone-only person screen: heading, intro, More button and its items, partial-send line",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "intro", "more", "moreHint", "close", "sentPartial", "addSomeone", "account", "importContacts"],
+  "required": ["heading", "intro", "more", "moreHint", "close", "sentPartial", "account", "importContacts"],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
     "intro": { "$ref": "#/$defs/text" },
@@ -11,7 +11,6 @@
     "moreHint": { "$ref": "#/$defs/text" },
     "close": { "$ref": "#/$defs/text" },
     "sentPartial": { "$ref": "#/$defs/text" },
-    "addSomeone": { "$ref": "#/$defs/text" },
     "account": { "$ref": "#/$defs/text" },
     "importContacts": { "$ref": "#/$defs/text" }
   },

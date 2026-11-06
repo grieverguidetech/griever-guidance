@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Modal } from 'react-native';
+import { BackHandler, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Each spec file has its own module registry, so setting the flag before App is first required is
@@ -50,5 +50,29 @@ describe('App with the account feature on', () => {
     expect(await screen.findByText("Accounts aren't available right now.")).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
+  });
+
+  it('Android Back on Your account (opened from More) returns to the person screen', async () => {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+      handlers.push(h as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(h as () => boolean), 1) };
+    });
+    const anna = {
+      id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
+      createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z', drafts: {}, serviceReady: false,
+      recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+    };
+    await AsyncStorage.setItem('gg.sessions.v1', JSON.stringify([anna]));
+    await AsyncStorage.setItem('gg.activeSession.v1', 'a');
+    render(<App />);
+    await screen.findByText('Ready to send');
+    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Your account' }));
+    act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
+    await screen.findByText("Accounts aren't available right now.");
+    act(() => void [...handlers].reverse().some((h) => h()));
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
+    expect(screen.queryByText("Accounts aren't available right now.")).toBeNull();
   });
 });

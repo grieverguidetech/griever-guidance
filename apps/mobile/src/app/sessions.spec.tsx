@@ -49,9 +49,7 @@ async function addPerson() {
     openSwitcher();
   }
   fireEvent.press(await screen.findByRole('button', { name: 'Add someone' }));
-  if (inMore) {
-    finishSheets();
-  }
+  finishSheets();
   await screen.findByText(SETUP_TITLE);
 }
 
@@ -76,6 +74,7 @@ describe('people kept on the phone', () => {
     // Ben is open; the switcher lists Anna, and picking her opens her screen.
     openSwitcher();
     fireEvent.press(await screen.findByRole('button', { name: 'Anna' }));
+    finishSheets();
     expect(await screen.findByText('For Anna')).toBeTruthy();
 
     // Each person is a separate record on the phone, holding only their own details.

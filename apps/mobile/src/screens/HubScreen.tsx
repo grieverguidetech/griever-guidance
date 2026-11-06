@@ -18,6 +18,7 @@ import { barMoment, nextMoment } from '../lib/nextMoment';
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
 const phoneCopy = screenCopy('phoneHub');
+const switcherCopy = screenCopy('phoneSwitcher');
 // The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
 const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, more: phoneCopy.more, moreHint: phoneCopy.moreHint };
 
@@ -227,7 +228,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
       <Sheet title={phoneCopy.more} closeLabel={phoneCopy.close} visible={moreOpen} onClose={() => closeMore()} onDismiss={finishMore}>
         <Button label={copy.checklist} variant="secondary" onPress={() => closeMore(() => setChecklistOpen(true))} />
         <Button label={copy.editPerson} variant="secondary" onPress={() => closeMore(onEditPerson)} />
-        {onAddSomeone && others.length === 0 ? <Button label={phoneCopy.addSomeone} variant="secondary" onPress={() => closeMore(onAddSomeone)} /> : null}
+        {onAddSomeone && others.length === 0 ? <Button label={switcherCopy.addSomeone} variant="secondary" onPress={() => closeMore(onAddSomeone)} /> : null}
         {onAccount ? <Button label={phoneCopy.account} variant="secondary" onPress={() => closeMore(onAccount)} /> : null}
         {onImportContacts ? <Button label={phoneCopy.importContacts} variant="secondary" onPress={() => closeMore(onImportContacts)} /> : null}
       </Sheet>

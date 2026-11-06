@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Modal, Platform } from 'react-native';
 import { App } from './App';
 import { ACTIVE_KEY, SESSIONS_KEY } from '../lib/useDeviceSessions';
 
@@ -16,6 +16,9 @@ const seed = async (people: ReturnType<typeof person>[], active: string | null) 
     await AsyncStorage.setItem(ACTIVE_KEY, active);
   }
 };
+
+// A sheet's onDismiss does not fire in Jest; the switcher runs its chosen item from it on iOS.
+const finishSheets = () => act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
 
 const say = () => jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
 
@@ -49,10 +52,33 @@ describe('the name switcher on the person screen', () => {
     spoken.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Ben' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Anna' }));
+    finishSheets();
     expect(await screen.findByText('For Anna')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Writing about Anna' })).toBeTruthy();
     expect(spoken).toHaveBeenCalledTimes(1);
     expect(spoken).toHaveBeenCalledWith('Now writing about Anna', { queue: true });
+  });
+
+  it('Android: picking the other person announces once, a moment after the sheet closes', async () => {
+    await seed([person('a', 'Anna', '2026-10-01T00:00:00.000Z'), person('b', 'Ben', '2026-10-03T00:00:00.000Z')], 'b');
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    const spoken = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    try {
+      render(<App />);
+      await screen.findByText('For Ben');
+      // The launch said who is open; count only what the switch says.
+      await new Promise((r) => setTimeout(r, 300));
+      spoken.mockClear();
+      fireEvent.press(screen.getByRole('button', { name: 'Writing about Ben' }));
+      fireEvent.press(await screen.findByRole('button', { name: 'Anna' }));
+      expect(await screen.findByText('For Anna')).toBeTruthy();
+      await waitFor(() => expect(spoken).toHaveBeenCalledWith('Now writing about Anna'));
+      await new Promise((r) => setTimeout(r, 300));
+      expect(spoken).toHaveBeenCalledTimes(1);
+    } finally {
+      Platform.OS = original;
+    }
   });
 
   it('Add someone in the switcher leads to setup; Back returns to the person who was open', async () => {
@@ -62,6 +88,7 @@ describe('the name switcher on the person screen', () => {
     await screen.findByText('For Ben');
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Ben' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Add someone' }));
+    finishSheets();
     expect(await screen.findByText('Who are we writing about?')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('For Ben')).toBeTruthy();
@@ -75,6 +102,7 @@ describe('the name switcher on the person screen', () => {
     await screen.findByText('For Ben');
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Ben' }));
     fireEvent.press(await screen.findByRole('button', { name: 'Add someone' }));
+    finishSheets();
     fireEvent.changeText(await screen.findByLabelText('Their name, required'), 'Cora');
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('For Cora')).toBeTruthy();

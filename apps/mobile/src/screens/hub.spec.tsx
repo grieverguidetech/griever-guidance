@@ -51,6 +51,7 @@ function setup(session: Session = anna, paymentsEnabled = false, extra: Partial<
 
 // The More sheet is the first Modal on the screen, the checklist the second.
 const moreModal = () => screen.UNSAFE_getAllByType(Modal)[0];
+const moreModalFirst = () => screen.UNSAFE_getAllByType(Modal)[0];
 const morePanel = () => within(moreModal());
 
 // The handle the fake findNodeHandle gave the node that was focused last.
@@ -127,6 +128,8 @@ describe('HubScreen', () => {
     const { onSwitch } = setup(anna, false, { others: [ben] });
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
     fireEvent.press(screen.getByRole('button', { name: 'Ben' }));
+    // The switcher sheet is the first Modal; it runs the choice once it is gone.
+    act(() => moreModalFirst().props.onDismiss());
     expect(onSwitch).toHaveBeenCalledWith('b');
   });
 
