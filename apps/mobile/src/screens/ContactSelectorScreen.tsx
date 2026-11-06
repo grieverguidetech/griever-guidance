@@ -14,7 +14,6 @@ import { everyoneYouTold, notSentYet } from '../lib/defaultRecipients';
 import { ErrorText, Field } from '../components/authForm';
 import { useRecheckWhenBlocked } from '../lib/useRecheckWhenBlocked';
 import { SavedNote } from '../components/SavedNote';
-import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
 interface Props extends FlowProps {
   contacts: UseContactsResult;
@@ -24,7 +23,8 @@ interface Props extends FlowProps {
 
 type Mode = { kind: 'list' } | { kind: 'reviewing'; fresh: NormalizedContact[] };
 
-const copy = screenCopy('whoShouldKnow');
+// The people list's own words (heading, Close, Done) sit over the shared ones, which web also reads.
+const copy = { ...screenCopy('whoShouldKnow'), ...screenCopy('phonePeople') };
 
 /**
  * The list is WhoShouldKnow in apps/mobile/src/ui. This holds what is mobile only: Bring people
@@ -43,15 +43,6 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
   const [reviewQuery, setReviewQuery] = useState('');
   // A second tap while a read or a save is running does nothing.
   const inFlight = useRef(false);
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const checklistButton = useRef<ButtonNode>(null);
-  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
-  const focusChecklistButton = () => {
-    const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
-  };
   const importButton = useRef<ButtonNode>(null);
   const reviewHeading = useRef<ComponentRef<typeof Text>>(null);
   const listHeading = useRef<ComponentRef<typeof Text>>(null);
@@ -242,7 +233,6 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         toldIds={toldIds}
         shortcuts={shortcuts}
         selectedIds={selectedContactIds}
-        selectedLabel={fill(copy.selected, { count: selectedContactIds.length })}
         loading={contacts.loading}
         onToggle={toggleContact}
         onSelectAll={selectContacts}
@@ -252,8 +242,8 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           toggleContact(created.contactId);
         }}
         onBack={prevStep}
-        onWhatYoullNeed={() => setChecklistOpen(true)}
-        checklistRef={checklistButton}
+        closeLabel={copy.close}
+        doneLabel={selectedContactIds.length > 0 ? fill(copy.doneCount, { count: selectedContactIds.length }) : copy.done}
         onContinue={nextStep}
         allowNone={templateCategory === 'service' || templateCategory === 'obituary'}
         bringAcross={{
@@ -265,7 +255,6 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         }}
         footer={<SavedNote />}
       />
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
     </KeyboardAvoidingView>
   );
 }

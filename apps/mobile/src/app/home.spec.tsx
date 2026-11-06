@@ -116,12 +116,12 @@ describe('the order in the app', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
     expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
   });
 
-  it('opens Who should know? with the name from setup already in the draft', async () => {
+  it('opens Who should get this? with the name from setup already in the draft', async () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], [{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]);
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
@@ -132,7 +132,7 @@ describe('the order in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
     await waitFor(async () => {
       const kept = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { fields: Record<string, string> }> }[];
       expect(kept.find((p) => p.personName === 'Ben Cole')?.drafts?.['aftercare']?.fields['deceasedName']).toBe('Ben Cole');
@@ -162,8 +162,8 @@ describe('the order in the app', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
-    // The draft on the retired details step resumes on Who should know?, and keeps its fields.
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    // The draft on the retired details step resumes on Who should get this?, and keeps its fields.
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
     await waitFor(async () => {
       const [kept] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { drafts: Record<string, { step: string; fields: Record<string, string> }> }[];
       expect(kept.drafts['aftercare']).toMatchObject({ step: 'contacts', fields: { deceasedName: 'Anna Lee' } });
@@ -188,10 +188,10 @@ describe('Home from every step', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     // No Home bar (#364): Back from the first form goes to the hub, and Back there goes Home.
     expect(screen.queryByLabelText('Back to home')).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
@@ -216,12 +216,12 @@ describe('Home from every step', () => {
     // The announcement's first form is the people step: Android back is the same as the on-screen Back, to the hub, once.
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     act(() => void pressBack());
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
     expect(screen.getByText('Ready to send')).toBeTruthy();
-    expect(screen.queryByText('Who should know?')).toBeNull();
+    expect(screen.queryByText('Who should get this?')).toBeNull();
   });
 });
 

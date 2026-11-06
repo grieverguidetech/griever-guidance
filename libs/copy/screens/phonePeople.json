@@ -1,1 +1,6 @@
-{}
+{
+  "heading": "Who should get this?",
+  "close": "Close",
+  "done": "Done",
+  "doneCount": "Done · {count} chosen"
+}

@@ -54,7 +54,7 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
   for (const name of pick) {
     fireEvent.press(await screen.findByText(name));
   }
-  fireEvent.press(screen.getByText('Continue'));
+  fireEvent.press(screen.getByText(/^Done/));
   // The optional note is under Add a personal note on Ready to send.
   if (note) {
     fireEvent.press(await screen.findByRole('button', { name: 'Add a personal note' }));
@@ -107,9 +107,9 @@ describe('recording who was messaged (#621)', () => {
     expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
     // Start the announcement again from its done row.
     fireEvent.press(screen.getByText(/Sent to 1 person/));
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.getByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
     expect(screen.queryByText('Ready to send')).toBeNull();
   });
 

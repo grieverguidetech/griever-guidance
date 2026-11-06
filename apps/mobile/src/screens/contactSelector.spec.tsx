@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, AppState, Linking } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Contact } from '@griever/shared';
 import type { UseContactsResult } from '@griever/hooks';
@@ -85,7 +85,7 @@ function renderScreen(
     <ContactSelectorScreen flow={{ ...flow, selectedContactIds: ids } as never} contacts={contacts} notified={notified} />
   );
   const { rerender } = render(ui(selectedContactIds));
-  return { toggleContact, selectContacts, contacts, nextStep: flow.nextStep, rerender: (ids: string[]) => rerender(ui(ids)) };
+  return { toggleContact, selectContacts, contacts, nextStep: flow.nextStep, prevStep: flow.prevStep, rerender: (ids: string[]) => rerender(ui(ids)) };
 }
 
 // The screen's own title is a heading too; the tier headings are the rest.
@@ -93,7 +93,47 @@ const headers = () =>
   screen
     .queryAllByRole('heading')
     .map((h) => h.props.children)
-    .filter((text) => text !== 'Who should know?');
+    .filter((text) => text !== 'Who should get this?');
+
+describe('ContactSelectorScreen as a list to close (#672)', () => {
+  it('reads "Who should get this?" and has no "What you\'ll need"', () => {
+    renderScreen();
+    expect(screen.getByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+    expect(screen.queryByText("What you'll need")).toBeNull();
+  });
+
+  it('Close does what Back did, and there is no Back or Continue', () => {
+    const { prevStep } = renderScreen();
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(prevStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts the people chosen in the Done label, and moves on', () => {
+    const { nextStep } = renderScreen(saved, 'announcement', ['1', '2']);
+    fireEvent.press(screen.getByRole('button', { name: 'Done · 2 chosen' }));
+    expect(nextStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows just "Done" when no one is chosen, and it still moves on', () => {
+    const { nextStep } = renderScreen();
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(nextStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no delete or swipe action on a row', () => {
+    renderScreen();
+    expect(screen.queryByRole('button', { name: /delete|remove/i })).toBeNull();
+    // No long press and no swipe on a row or the list.
+    for (const row of screen.getAllByRole('checkbox')) {
+      expect(row.props.onLongPress).toBeUndefined();
+    }
+    expect(screen.UNSAFE_queryAllByProps({ onLongPress: expect.any(Function) })).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByProps({ renderRightActions: expect.anything() })).toHaveLength(0);
+    expect(screen.UNSAFE_queryAllByProps({ renderLeftActions: expect.anything() })).toHaveLength(0);
+  });
+});
 
 describe('ContactSelectorScreen search', () => {
   const copy = screenCopy('whoShouldKnow');
@@ -102,7 +142,7 @@ describe('ContactSelectorScreen search', () => {
     const { toggleContact, selectContacts } = renderScreen(saved, 'announcement', ['2']);
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), 'cat');
     expect(screen.queryByText('Mum')).toBeNull();
-    expect(screen.getByText('1 selected')).toBeTruthy();
+    expect(screen.getByText('Done · 1 chosen')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText(copy.searchLabel), '');
     expect(screen.getByText('Mum')).toBeTruthy();
     expect(toggleContact).not.toHaveBeenCalled();
@@ -151,7 +191,7 @@ describe('ContactSelectorScreen grouping', () => {
 
   it('preselects no one and sends nothing until the user picks', () => {
     const { toggleContact } = renderScreen();
-    expect(screen.getByText('0 selected')).toBeTruthy();
+    expect(screen.getByText('Done')).toBeTruthy();
     expect(toggleContact).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText('Mum'));
     expect(toggleContact).toHaveBeenCalledTimes(1);
@@ -198,7 +238,7 @@ describe('ContactSelectorScreen grouping', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Add from your contacts' }));
     expect(await screen.findByRole('heading', { name: 'Add from your contacts' })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    expect(await screen.findByText('Who should get this?')).toBeTruthy();
     expect(screen.queryByText('Starred Sam')).toBeNull();
   });
 
@@ -211,7 +251,7 @@ describe('ContactSelectorScreen grouping', () => {
     expect(focus).toHaveBeenCalledTimes(1);
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    await screen.findByText('Who should know?');
+    await screen.findByText('Who should get this?');
     expect(focus).toHaveBeenCalledTimes(1);
   });
 
@@ -225,40 +265,51 @@ describe('ContactSelectorScreen grouping', () => {
     expect(screen.getByRole('button', { name: 'Add' }).props.accessibilityHint).toBe('Choose at least one person');
   });
 
-  it('reads Continue as disabled until someone is chosen, and says why', () => {
+  it('keeps Done available with no one chosen, with no reason line', () => {
     renderScreen();
-    const cont = screen.getByRole('button', { name: 'Continue' });
-    expect(cont.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
-    expect(cont.props.accessibilityHint).toBe('Choose at least one person');
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done.props.accessibilityState).not.toEqual(expect.objectContaining({ disabled: true }));
+    expect(screen.queryByText('Choose at least one person', { includeHiddenElements: true })).toBeNull();
   });
 
-  it('announces the new count when the selection changes', () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
-    const { rerender } = renderScreen();
-    announce.mockClear();
-    rerender(['2']);
-    expect(announce).toHaveBeenCalledWith('1 selected');
+  it.each(['ios', 'android'] as const)('announces the new count on %s when the selection changes, and not on first render', (os) => {
+    const original = Platform.OS;
+    Platform.OS = os;
+    try {
+      const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+      announce.mockClear();
+      const { rerender } = renderScreen();
+      expect(announce).not.toHaveBeenCalledWith('Done');
+      expect(announce).not.toHaveBeenCalledWith('Done · 1 chosen');
+      rerender(['2']);
+      expect(announce).toHaveBeenLastCalledWith('Done · 1 chosen');
+      rerender([]);
+      expect(announce).toHaveBeenLastCalledWith('Done');
+      expect(announce.mock.calls.filter(([text]) => String(text).startsWith('Done'))).toHaveLength(2);
+    } finally {
+      Platform.OS = original;
+    }
   });
 });
 
 describe('ContactSelectorScreen with no one picked', () => {
-  it.each(['service', 'obituary'])('lets Continue work on %s', (category) => {
+  it.each(['service', 'obituary'])('lets Done work on %s', (category) => {
     renderScreen(saved, category);
-    const cont = screen.getByRole('button', { name: 'Continue' });
+    const cont = screen.getByRole('button', { name: /^Done/ });
     expect(cont.props.accessibilityState).not.toEqual(expect.objectContaining({ disabled: true }));
     expect(screen.queryByText('Choose at least one person', { includeHiddenElements: true })).toBeNull();
   });
 
   it.each(['service', 'obituary'])('calls nextStep on %s with zero people', (category) => {
     const { nextStep } = renderScreen(saved, category);
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(nextStep).toHaveBeenCalledTimes(1);
   });
 
   it.each(['service', 'obituary'])('shows one muted line on %s while no one is ticked', (category) => {
     renderScreen(saved, category);
     expect(screen.getAllByText('No one picked? You can share it to a group or by email next.')).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Continue' }).props.accessibilityHint).toBe(
+    expect(screen.getByRole('button', { name: 'Done' }).props.accessibilityHint).toBe(
       'No one picked? You can share it to a group or by email next.',
     );
   });
@@ -273,12 +324,10 @@ describe('ContactSelectorScreen with no one picked', () => {
     expect(screen.queryByText(/No one picked/, { includeHiddenElements: true })).toBeNull();
   });
 
-  it.each(['announcement', 'aftercare'])('still blocks Continue on %s', (category) => {
+  it.each(['announcement', 'aftercare'])('still moves on from Done on %s with no one chosen', (category) => {
     const { nextStep } = renderScreen(saved, category);
-    const cont = screen.getByRole('button', { name: 'Continue' });
-    expect(cont.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
-    fireEvent.press(cont);
-    expect(nextStep).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(nextStep).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -443,7 +492,7 @@ describe('ContactSelectorScreen contacts never fail silently (#652)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(selectContacts).toHaveBeenCalledWith(['9']));
     expect(importContacts).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('Who should know?')).toBeTruthy();
+    expect(await screen.findByText('Who should get this?')).toBeTruthy();
   });
 
   it('searches the review by name', async () => {
@@ -527,19 +576,19 @@ describe('ContactSelectorScreen people list (#652)', () => {
     expect(screen.queryByText(copy.empty)).toBeNull();
   });
 
-  it('keeps the count and Continue outside the list, and renders the list as a FlatList', () => {
+  it('keeps Done outside the list, and renders the list as a FlatList', () => {
     renderScreen();
     const { FlatList } = require('react-native');
     expect(screen.UNSAFE_queryAllByType(FlatList)).toHaveLength(1);
     const list = screen.UNSAFE_getByType(FlatList);
-    expect(() => within(list).getByRole('button', { name: 'Continue' })).toThrow();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+    expect(() => within(list).getByRole('button', { name: /^Done/ })).toThrow();
+    expect(screen.getByRole('button', { name: /^Done/ })).toBeTruthy();
   });
 
   it('copes with a big address book', () => {
     const many = Array.from({ length: 300 }, (_, i) => make(String(i + 1), `Person ${i + 1}`, 'family'));
     renderScreen(many);
     expect(screen.getByText('Person 1')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Done/ })).toBeTruthy();
   });
 });

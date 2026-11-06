@@ -63,10 +63,10 @@ const startMoment = async (title: string) =>
   );
 
 describe('picking an announcement', () => {
-  it('opens on Who should know?, never the old intro or the checklist', async () => {
+  it('opens on Who should get this?, never the old intro or the checklist', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Announce the passing' })).toBeNull();
     expect(screen.queryByText(/This is only if you'd like to say more/)).toBeNull();
     expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
@@ -77,7 +77,7 @@ describe('picking an announcement', () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
     expect(screen.queryByText(/She was peaceful\./)).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Add a personal note' }));
@@ -85,20 +85,20 @@ describe('picking an announcement', () => {
     expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
     // Going to the people and back keeps the note.
     fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
-    await screen.findByText('1 selected');
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByText('Done · 1 chosen');
+    fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
   });
 
-  it('lets people be picked on Who should know?, and the picked people reach Review', async () => {
+  it('lets people be picked on Who should get this?, and the picked people reach Review', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    expect(await screen.findByText('0 selected')).toBeTruthy();
+    expect(await screen.findByText('Done')).toBeTruthy();
     fireEvent.press(await screen.findByRole('checkbox', { name: /Dee/ }));
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
     expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
-    expect(screen.getByText('2 selected')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Done · 2 chosen')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
     expect(screen.getByText('To Dee and Eli · 2')).toBeTruthy();
   });
@@ -106,40 +106,36 @@ describe('picking an announcement', () => {
   it('has no "Writing about" / Home bar on the people step', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     expect(screen.queryByText(/Writing about/)).toBeNull();
     expect(screen.queryByLabelText('Back to home')).toBeNull();
   });
 
-  it('opens What you will need in a sheet on Who should know?, and focus returns when it closes', async () => {
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+  it('has Close and no "What you\'ll need" on the people step, and Close goes back to the hub', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByText('Who should know?');
-    focus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
-    expect(screen.UNSAFE_getAllByType(Modal).some((m) => m.props.visible === true)).toBe(true);
-    act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.onDismiss)?.props.onDismiss());
-    expect(focus).toHaveBeenCalled();
+    await screen.findByRole('heading', { name: 'Who should get this?' });
+    expect(screen.queryByText("What you'll need")).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findByText('Ready to send')).toBeTruthy();
   });
 
   it.each([['Announce the passing'], ['Share the service'], ['Send thank-yous']])(
-    '%s opens Who should know? with a real header, and Back returns to the hub',
+    '%s opens Who should get this? with a real header, and Close returns to the hub',
     async (moment) => {
       const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
       await openAnna();
       await screen.findByText('Ready to send');
       focus.mockClear();
       await startMoment(moment);
-      expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
       expect(screen.queryByPlaceholderText('e.g. 2:00 PM')).toBeNull();
-      // Screen-reader focus went to the title itself, once.
-      const heading = screen.getByRole('heading', { name: 'Who should know?' });
+      // Screen-reader focus went to the title itself.
       const handle = focus.mock.calls.map(([h]) => h);
       expect(handle.length).toBeGreaterThan(0);
       expect([...mockHandles.entries()].find(([, h]) => h === handle[0])?.[0]).toBeTruthy();
-      expect(heading).toBeTruthy();
-      fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Close' }));
       expect(await screen.findByText('Ready to send')).toBeTruthy();
     },
   );
@@ -152,12 +148,12 @@ describe('picking an announcement', () => {
     });
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     act(() => void [...handlers].reverse().some((h) => h()));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
     expect(screen.getByText('Ready to send')).toBeTruthy();
-    expect(screen.queryByText('Who should know?')).toBeNull();
+    expect(screen.queryByText('Who should get this?')).toBeNull();
   });
 
   it('says who is open when the person arrives from Home', async () => {
@@ -168,22 +164,22 @@ describe('picking an announcement', () => {
     fireEvent.press(await screen.findByLabelText('Anna'));
     await screen.findByText('Ready to send');
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should know?' });
+    await screen.findByRole('heading', { name: 'Who should get this?' });
     expect(say).toHaveBeenCalledWith('Now writing about Anna');
   });
 
-  it('Back on the people step returns to the person screen once, with no bounce into the flow', async () => {
+  it('Close on the people step returns to the person screen once, with no bounce into the flow', async () => {
     await openAnna();
     await startMoment('Announce the passing');
-    await screen.findByRole('heading', { name: 'Who should know?' });
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByRole('heading', { name: 'Who should get this?' });
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
     expect(screen.getByText('Ready to send')).toBeTruthy();
-    expect(screen.queryByText('Who should know?')).toBeNull();
+    expect(screen.queryByText('Who should get this?')).toBeNull();
     // The moment can be started again from the person screen.
     await startMoment('Announce the passing');
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
   });
 });
 
@@ -192,7 +188,7 @@ describe('Ready to send (announcement)', () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Announce the passing' });
   };
 
@@ -250,10 +246,10 @@ describe('Ready to send (announcement)', () => {
   it('Change opens the people step with the ticks kept, and Continue returns to the message', async () => {
     await toReview();
     fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
-    expect(await screen.findByText('1 selected')).toBeTruthy();
+    expect(await screen.findByText('Done · 1 chosen')).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
-    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText('To Dee and Eli · 2')).toBeTruthy();
     expect(screen.getByText('Text 2 people')).toBeTruthy();
   });
@@ -273,7 +269,7 @@ describe('the end of a send', () => {
     for (const name of pick) {
       fireEvent.press(await screen.findByText(name));
     }
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
   };
 
@@ -357,7 +353,7 @@ describe('the end of a send', () => {
     fireEvent.press(within(screen.getByTestId('hub-action-bar')).getByRole('button'));
     await waitFor(() => expect(screen.queryByText('Everyone has been told.')).toBeNull());
     // The service moment opened on its people (not the hub, not 'sent').
-    expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
   });
 
   it('announces the note once, and focuses the hub heading as it opens', async () => {
@@ -400,7 +396,7 @@ describe('the end of a send', () => {
     fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
     fireEvent.press(screen.getByText('Text 1 person'));
     fireEvent.press(await screen.findByText('Text Dee'));
@@ -436,7 +432,7 @@ describe('Edit person from the hub', () => {
     await openAnna();
     await startMoment('Announce the passing');
     fireEvent.press(await screen.findByText('Dee'));
-    fireEvent.press(screen.getByText('Continue'));
+    fireEvent.press(screen.getByText(/^Done/));
     fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
