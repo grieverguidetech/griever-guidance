@@ -7,6 +7,13 @@ import { App } from './App';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
 
+// Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
+// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+const openPeople = async () => {
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  return screen.findByRole('heading', { name: 'Who should get this?' });
+};
+
 const person = (id: string, personName: string, lastOpenedAt: string, dateOfPassing = ''): Session =>
   ({
     id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing, senderName: '', obituaryUrl: '', createdAt: lastOpenedAt, lastOpenedAt,
@@ -116,7 +123,7 @@ describe('the order in the app', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await openPeople();
     expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
     expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
   });
@@ -132,7 +139,7 @@ describe('the order in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
-    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+    expect(await openPeople()).toBeTruthy();
     await waitFor(async () => {
       const kept = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { fields: Record<string, string> }> }[];
       expect(kept.find((p) => p.personName === 'Ben Cole')?.drafts?.['aftercare']?.fields['deceasedName']).toBe('Ben Cole');
@@ -162,11 +169,12 @@ describe('the order in the app', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
-    // The draft on the retired details step resumes on Who should get this?, and keeps its fields.
-    expect(await screen.findByRole('heading', { name: 'Who should get this?' })).toBeTruthy();
+    // The draft on the retired details step resumes on Ready to send (the people sheet stays closed), and keeps its fields.
+    expect(await screen.findByRole('button', { name: 'Choose who to tell' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
     await waitFor(async () => {
       const [kept] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { drafts: Record<string, { step: string; fields: Record<string, string> }> }[];
-      expect(kept.drafts['aftercare']).toMatchObject({ step: 'contacts', fields: { deceasedName: 'Anna Lee' } });
+      expect(kept.drafts['aftercare']).toMatchObject({ step: 'review', fields: { deceasedName: 'Anna Lee' } });
     });
   });
 });
@@ -188,10 +196,10 @@ describe('Home from every step', () => {
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
-    await screen.findByRole('heading', { name: 'Who should get this?' });
-    // No Home bar (#364): Back from the first form goes to the hub, and Back there goes Home.
+    await screen.findByRole('button', { name: 'Choose who to tell' });
+    // No Home bar (#364): Back from Ready to send goes to the hub, and Back there goes Home.
     expect(screen.queryByLabelText('Back to home')).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: 'Home' }));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
@@ -213,10 +221,10 @@ describe('Home from every step', () => {
     act(() => void pressBack());
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
 
-    // The announcement's first form is the people step: Android back is the same as the on-screen Back, to the hub, once.
+    // The announcement opens on Ready to send: Android back is the same as the on-screen Back, to the hub, once.
     fireEvent.press(await screen.findByLabelText('Anna'));
     fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
-    await screen.findByRole('heading', { name: 'Who should get this?' });
+    await screen.findByRole('button', { name: 'Choose who to tell' });
     act(() => void pressBack());
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     await act(async () => new Promise((r) => setTimeout(r, 300)));

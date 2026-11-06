@@ -49,6 +49,9 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
   const [shareFailed, setShareFailed] = useState(false);
   const shareButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof RNText>>(null);
+  const peopleButton = useRef<ButtonNode>(null);
+  // Set when the person opens the people sheet, so focus goes back to the button they pressed.
+  const openedSheet = useRef(false);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -57,6 +60,18 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   }, []);
+
+  // The people sheet is open while the step is 'contacts'. When it closes, focus returns to the button that opened it.
+  const sheetOpen = flow.step === 'contacts';
+  useEffect(() => {
+    if (!sheetOpen && openedSheet.current) {
+      openedSheet.current = false;
+      const handle = peopleButton.current ? findNodeHandle(peopleButton.current) : null;
+      if (handle) {
+        AccessibilityInfo.setAccessibilityFocus(handle);
+      }
+    }
+  }, [sheetOpen]);
 
   if (!selectedTemplate) {
     return null;
@@ -84,6 +99,11 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
+  }
+
+  function choosePeople() {
+    openedSheet.current = true;
+    onChoosePeople();
   }
 
   function changeMessage(message: string | null) {
@@ -127,7 +147,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
           text: fill(ready.to, { names: namesPhrase(names) || recipientsPhrase(recipientCount, copy), count: String(recipientCount) }),
           changeLabel: ready.change,
           changeName: ready.changeName,
-          onChange: onChoosePeople,
+          onChange: choosePeople,
         }}
         hasRecipients={recipientCount > 0}
         sendLabel={sendLabel(recipientCount, copy)}
@@ -136,7 +156,8 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople }: Props) {
         blockedReason={detailsMissing ? copy.detailsHint : undefined}
         onBack={prevStep}
         onSend={startSendJob}
-        onChoose={onChoosePeople}
+        onChoose={choosePeople}
+        peopleButtonRef={peopleButton}
         share={
           canShare
             ? {

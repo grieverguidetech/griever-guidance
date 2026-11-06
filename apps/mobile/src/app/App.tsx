@@ -295,9 +295,35 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
   }, [sendJob, templateCategory, id, onTold]);
 
+  // The people sheet is open on 'contacts'. Arriving there from the person screen must not open it:
+  // step on to Ready to send, once per arrival. The sheet opened by Change is left alone.
+  const sheetAsked = useRef(false);
+  const arrivalHandled = useRef(false);
+  const choosePeople = useCallback(() => {
+    sheetAsked.current = true;
+    flow.prevStep();
+  }, [flow.prevStep]);
+  useEffect(() => {
+    if (flow.step !== 'contacts') {
+      sheetAsked.current = false;
+      arrivalHandled.current = false;
+      return;
+    }
+    if (sheetAsked.current || arrivalHandled.current) {
+      return;
+    }
+    arrivalHandled.current = true;
+    nextStep();
+  }, [flow.step, nextStep]);
+
   const flowWithHub = {
     ...flow,
     prevStep: () => {
+      // With the people sheet open, Back closes the sheet and nothing else.
+      if (flow.step === 'contacts') {
+        flow.nextStep();
+        return;
+      }
       // The step before this one is the picker: go to the hub instead. Ready to send also goes
       // straight back to the person screen (the obituary: its link screen); "Change" is the way to the people.
       if (onFirstForm || flow.step === 'review') {
@@ -318,7 +344,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={flow.prevStep} notified={session.recipientsNotified} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={choosePeople} notified={session.recipientsNotified} />;
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
@@ -686,14 +712,19 @@ const Navigation = ({
           // (the announcement passes through 'announce' on the way).
           <Stack.Screen name="Starting">{() => <Opening />}</Stack.Screen>
         )}
-        {flow.step === 'contacts' && (
-          <Stack.Screen name="ContactSelector">
-            {() => withPersonContext(bar, <ContactSelectorScreen flow={flow} contacts={contacts} notified={notified} />, false)}
-          </Stack.Screen>
-        )}
-        {flow.step === 'review' && (
+        {(flow.step === 'contacts' || flow.step === 'review') && (
+          // One route for both steps: the people list is a sheet over Ready to send, open on 'contacts'.
           <Stack.Screen name="Confirm">
-            {() => withPersonContext(bar, <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} />, false)}
+            {() =>
+              withPersonContext(
+                bar,
+                <>
+                  <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} />
+                  {flow.step === 'contacts' ? <ContactSelectorScreen flow={flow} contacts={contacts} notified={notified} /> : null}
+                </>,
+                false,
+              )
+            }
           </Stack.Screen>
         )}
         {flow.step === 'sending' && (

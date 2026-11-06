@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ComponentRef } from 'react';
+import type { ComponentRef, ReactNode } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, FlatList, Linking, Text, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import type { UseContactsResult } from '@griever/hooks';
 import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
 import { colors, spacing } from '@griever/tokens';
-import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, WhoShouldKnow } from '../ui';
+import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, Sheet, WhoShouldKnow } from '../ui';
 import type { ButtonNode } from '../ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
 import type { FlowProps } from '../app/App';
@@ -31,7 +31,7 @@ const copy = { ...screenCopy('whoShouldKnow'), ...screenCopy('phonePeople') };
  * across (import from the phone's contacts) and its review list.
  */
 export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
-  const { selectedContactIds, toggleContact, selectContacts, nextStep, prevStep, templateCategory } = flow;
+  const { selectedContactIds, toggleContact, selectContacts, nextStep, templateCategory } = flow;
   const toldIds = templateCategory ? (notified?.[templateCategory] ?? []) : [];
   const shortcuts = buildShortcuts(templateCategory, notified, contacts.contacts.map((c) => c.contactId), selectContacts);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
@@ -86,6 +86,21 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
     focusNode(importButton.current);
   });
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
+
+  // Close, Done, a tap on the dim area, a swipe down and Android Back all end here: the ticks stay and the
+  // sheet closes. While the review of brought-in people is open, they step back to the list instead.
+  const leave = () => {
+    if (reviewing) {
+      setMode({ kind: 'list' });
+    } else {
+      nextStep();
+    }
+  };
+  const inSheet = (content: ReactNode) => (
+    <Sheet bare swipeToClose title={copy.heading} closeLabel={copy.close} onClose={leave}>
+      {content}
+    </Sheet>
+  );
 
   async function handleImport() {
     if (inFlight.current) {
@@ -156,7 +171,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
       });
     const needle = reviewQuery.trim().toLowerCase();
     const shownFresh = needle ? mode.fresh.filter((c) => c.displayName.toLowerCase().includes(needle)) : mode.fresh;
-    return (
+    return inSheet(
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
         style={styles.flex}
@@ -216,11 +231,11 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           </Body>
         ) : null}
       </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingView>,
     );
   }
 
-  return (
+  return inSheet(
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <WhoShouldKnow
         copy={copy}
@@ -241,7 +256,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
           const created = await contacts.addContact({ name, phone, tier: 'family' });
           toggleContact(created.contactId);
         }}
-        onBack={prevStep}
+        onBack={nextStep}
         closeLabel={copy.close}
         doneLabel={selectedContactIds.length > 0 ? fill(copy.doneCount, { count: selectedContactIds.length }) : copy.done}
         onContinue={nextStep}
@@ -255,7 +270,7 @@ export function ContactSelectorScreen({ flow, contacts, notified }: Props) {
         }}
         footer={<SavedNote />}
       />
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView>,
   );
 }
 
