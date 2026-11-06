@@ -3,7 +3,7 @@ import { AccessibilityInfo } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { App } from './App';
-import { SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
+import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Jest has no native view tree, so findNodeHandle returns null. This gives each node its own handle,
 // so a test can see which button focus went to.
@@ -53,7 +53,6 @@ afterEach(() => {
 describe('Import contacts from Home (#379)', () => {
   it('Home, Add from your contacts, import review, Back to Home with focus on the button', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
-    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
     mockFetch.mockResolvedValue([{ key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [] }]);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<App />);
@@ -71,7 +70,6 @@ describe('Import contacts from Home (#379)', () => {
 
   it('focus returns once only: after opening a person and coming Home it is not on the import button', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
-    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
     mockFetch.mockResolvedValue([{ key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [] }]);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<App />);

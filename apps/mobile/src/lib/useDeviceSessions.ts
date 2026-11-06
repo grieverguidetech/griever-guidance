@@ -59,5 +59,8 @@ export function useDeviceSessions(cache: ReturnType<typeof createSessionCache>) 
     select(blank ? blank.id : createSession().id);
   }, [sessions, createSession, select]);
 
-  return { ...store, active, switchTo, addPerson };
+  // The person this phone last opened, only if one was really saved (not the fallback to the first).
+  const lastOpened: Session | null = sessions.find((s) => s.id === savedId) ?? null;
+
+  return { ...store, active, lastOpened, switchTo, addPerson };
 }

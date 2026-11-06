@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
 import { HomeScreen } from '../screens/HomeScreen';
-import { SESSIONS_KEY, ACTIVE_KEY } from '../lib/useDeviceSessions';
+import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
 // ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
@@ -68,11 +68,10 @@ describe('HomeScreen', () => {
 describe('the order in the app', () => {
   const saved = async (sessions: Session[], contacts: unknown[] = []) => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
-    await AsyncStorage.setItem(ACTIVE_KEY, sessions[0]?.id ?? '');
     if (contacts.length) await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   };
 
-  it('lands on Home on every launch, even with a person already open', async () => {
+  it('lands on Home when no person was saved as open', async () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z')]);
     render(<App />);
     expect(await screen.findByLabelText('Anna')).toBeTruthy();
@@ -252,7 +251,6 @@ describe('people who would otherwise be hidden', () => {
     const anna = person('a', 'Anna', '2026-10-02T00:00:00.000Z');
     const blank = person('b', '', '2026-10-01T00:00:00.000Z');
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna, blank]));
-    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
     render(<App />);
     fireEvent.press(await screen.findByText("Someone else I've lost"));
     await screen.findByText('Who are we writing about?');

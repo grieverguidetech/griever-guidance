@@ -22,7 +22,7 @@ import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
 import { sendNote } from '../lib/sendNote';
 import type { SentNoteText } from '../lib/sendNote';
-import { createSessionCache, useDeviceSessions } from '../lib/useDeviceSessions';
+import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDeviceSessions';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
@@ -376,13 +376,16 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
-  const { sessions, active, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
+  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
   useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
-  const [atHome, setAtHome] = useState(true);
+  // A launch opens the last person's screen (the hub), unless they are still blank. Decided once,
+  // from the device cache SendAppWhenReady already read: nothing waits on the network.
+  const [resume] = useState(() => lastOpened !== null && !isBlank(lastOpened));
+  const [atHome, setAtHome] = useState(!resume);
   const [stage, setStage] = useState<SetupStage | null>(null);
-  const [arrived, setArrived] = useState(false);
-  const [atHub, setAtHub] = useState(false);
+  const [arrived, setArrived] = useState(resume);
+  const [atHub, setAtHub] = useState(resume);
   const [atShareObituary, setAtShareObituary] = useState(false);
   // Setup was opened with Edit, from a step or from the hub: Back there returns to where it was opened, as on web.
   const [editFrom, setEditFrom] = useState<'hub' | null>(null);
@@ -394,6 +397,12 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   const contacts = useContacts(mobileContactStore);
   const { first, leaveFirst } = useFirstScreen();
   const purgedOnBoot = useRef(false);
+  // Sign-in comes first: Home hosts it, so a signed-out launch starts there, not on the person.
+  useEffect(() => {
+    if (first === 'signIn') {
+      setAtHome(true);
+    }
+  }, [first]);
   const goHome = useCallback(() => {
     setStage(null);
     setEditFrom(null);
@@ -470,7 +479,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     setAtHub(true);
     setAtHome(false);
   };
-  if (atHome && importing) {
+  const showHome = atHome || first === 'signIn';
+  if (showHome && importing) {
     const leaveImport = () => {
       leaveFirst();
       setBackFromImport(true);
@@ -484,7 +494,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
       </FadeIn>
     );
   }
-  if (atHome) {
+  if (showHome) {
     return (
       <FadeIn key="home">
         <HomeNavigation initialRoute={first === 'signIn' ? 'Account' : 'Home'} onLeaveFirst={leaveFirst}>
