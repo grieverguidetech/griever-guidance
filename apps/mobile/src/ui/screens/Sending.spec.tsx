@@ -36,9 +36,10 @@ function base(over: Partial<SendingProps> = {}): SendingProps {
 describe('Sending (mobile)', () => {
   it('shows Stop for now in the top bar beside the position, and hides it when unset', () => {
     const onPress = jest.fn();
-    const view = render(<Sending {...base({ stop: { label: 'Stop for now', note: 'People you told stay marked as told.', onPress } })} />);
+    const view = render(<Sending {...base({ stop: { label: 'Stop for now', note: 'People you told stay marked as told.', line: 'You can stop any time.', onPress } })} />);
     expect(screen.getByRole('button', { name: 'Stop for now' }).props.accessibilityHint).toBe('People you told stay marked as told.');
     expect(screen.getByText('1 of 3')).toBeTruthy();
+    expect(screen.getByText('You can stop any time.', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Stop for now' }));
     expect(onPress).toHaveBeenCalledTimes(1);
     view.rerender(<Sending {...base()} />);
