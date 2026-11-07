@@ -223,6 +223,25 @@ describe('Ready to send (Share the service)', () => {
       expect(primary().props.accessibilityState?.disabled).toBe(true);
     });
 
+    it('shows ______ for the missing name, never sends it, and sends the typed name (#693)', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      open.mockClear();
+      render(<Harness thanks senderName="" fields={{}} />);
+      expect(screen.getByText(/On behalf of ______, we want/)).toBeTruthy();
+      expect(screen.queryByText(/undefined/)).toBeNull();
+      expect(primary().props.accessibilityState?.disabled).toBe(true);
+      fireEvent.press(primary());
+      expect(open).not.toHaveBeenCalled();
+      fireEvent.changeText(screen.getByLabelText('Your name or family name, Needed'), 'The Hayes Family');
+      expect(primary().props.accessibilityState?.disabled).toBeFalsy();
+      fireEvent.press(primary());
+      fireEvent.press(await screen.findByText('Text Dee'));
+      const body = bodyOfFirstLink(open);
+      expect(body).toContain('On behalf of The Hayes Family');
+      expect(body).not.toContain('______');
+      expect(body).not.toContain('undefined');
+    });
+
     it('shows only the personal note when setup has the name, and the message follows typing', () => {
       render(<Harness thanks senderName="The Hayes Family" fields={{}} />);
       fireEvent.press(screen.getByRole('button', { name: 'Change details' }));
