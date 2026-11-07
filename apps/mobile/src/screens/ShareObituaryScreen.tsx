@@ -10,6 +10,7 @@ import { colors, spacing } from '@griever/tokens';
 import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { openMailDraft } from '../lib/mailCompose';
+import { obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
 const copy = {
@@ -75,7 +76,7 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
 
   const linkValid = isValidObituaryLink(session.obituaryUrl);
   const name = session.personName.trim() || copy.nameFallback;
-  const obituaryText = session.obituaryText?.trim() ?? '';
+  const obituaryText = obituaryTextFor(session);
 
   // Step 1: the user's own mail app (or the share sheet) gets the text; they pick who it goes to (C1).
   const emailPublisher = async () => {
