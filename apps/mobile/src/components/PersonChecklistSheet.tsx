@@ -1,10 +1,18 @@
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import { computeChecklist } from '@griever/hooks';
 import { TIME_PHASE_KEYS } from '@griever/shared';
-import type { ChecklistFields, ChecklistPhaseKey } from '@griever/shared';
+import type {
+  ChecklistFields,
+  ChecklistItemId,
+  ChecklistItemState,
+  ChecklistPhaseKey,
+} from '@griever/shared';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
-import { Sheet, SerifText as Text } from '../ui';
+import { Sheet, focusNode, SerifText as Text } from '../ui';
+import type { ButtonNode } from '../ui';
+import { ChecklistGroupPanel } from './ChecklistGroupPanel';
 import { MUTED } from './colors';
 
 const copy = screenCopy('phoneChecklist');
@@ -18,8 +26,10 @@ export interface PersonChecklistSheetProps {
   onDismiss?: () => void;
   /** The open person's phase ticks (from useSessions). Missing means nothing is ticked yet. */
   checklist: ChecklistFields['checklist'];
-  /** A group was tapped. The panel with the tick rows is opened by the caller. */
-  onOpenGroup: (groupId: ChecklistGroupId) => void;
+  /** Saves one item on the person, on this phone: a state, or null to clear it. Never deletes (C9). */
+  onSetItem: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
+  /** Told when a group is tapped. The sheet shows the group's panel itself. */
+  onOpenGroup?: (groupId: ChecklistGroupId) => void;
 }
 
 /**
@@ -28,7 +38,40 @@ export interface PersonChecklistSheetProps {
  * Gather never says Done, as on web: its ticks stay on the device and are not read here.
  * No counts and no percentages (SE-5). Ticks stay on this phone. Nothing here deletes anything (C9).
  */
-export function PersonChecklistSheet({ visible, onClose, onDismiss, checklist, onOpenGroup }: PersonChecklistSheetProps) {
+export function PersonChecklistSheet({
+  visible,
+  onClose,
+  onDismiss,
+  checklist,
+  onSetItem,
+  onOpenGroup,
+}: PersonChecklistSheetProps) {
+  // The open group's panel replaces the list inside this same Modal: one focus trap only.
+  const [openId, setOpenId] = useState<ChecklistGroupId | null>(null);
+  const groupButtons = useRef<
+    Partial<Record<ChecklistGroupId, ButtonNode | null>>
+  >({});
+  const returnTo = useRef<ChecklistGroupId | null>(null);
+  useEffect(() => {
+    if (!visible) {
+      setOpenId(null);
+    }
+  }, [visible]);
+  // After Back, focus returns to the group that was open.
+  useEffect(() => {
+    if (openId === null && returnTo.current) {
+      const target = groupButtons.current[returnTo.current] ?? null;
+      returnTo.current = null;
+      // Deferred a tick, as on the hub, so the screen reader takes it after the list has drawn.
+      const timer = setTimeout(() => focusNode(target), 0);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [openId]);
+  const back = () => {
+    returnTo.current = openId;
+    setOpenId(null);
+  };
   const { phases } = computeChecklist({ checklist });
   const groups: { id: ChecklistGroupId; label: string; done: boolean }[] = [
     ...TIME_PHASE_KEYS.map((key) => ({
@@ -40,28 +83,62 @@ export function PersonChecklistSheet({ visible, onClose, onDismiss, checklist, o
   ];
 
   return (
-    <Sheet title={copy.title} closeLabel={copy.close} visible={visible} onClose={onClose} onDismiss={onDismiss}>
-      <Text style={styles.note}>{copy.staysOnPhone}</Text>
-      {groups.map((group) => (
-        <Pressable
-          key={group.id}
-          role="button"
-          accessibilityLabel={group.done ? fill(copy.groupDone, { group: group.label }) : group.label}
-          accessibilityHint={copy.groupHint}
-          onPress={() => onOpenGroup(group.id)}
-          style={({ pressed }) => [styles.group, pressed && styles.pressed]}
-        >
-          <Text style={styles.label}>{group.label}</Text>
-          {group.done ? (
-            <View style={styles.done} importantForAccessibility="no">
-              <Text style={styles.check} allowFontScaling={false}>
-                ✓
-              </Text>
-              <Text style={styles.doneText}>{checklistCopy.done}</Text>
-            </View>
-          ) : null}
-        </Pressable>
-      ))}
+    <Sheet
+      bare={openId !== null}
+      title={
+        openId === null
+          ? copy.title
+          : (groups.find((group) => group.id === openId)?.label ?? copy.title)
+      }
+      closeLabel={copy.close}
+      visible={visible}
+      onClose={onClose}
+      onRequestClose={openId === null ? onClose : back}
+      onDismiss={onDismiss}
+    >
+      {openId !== null ? (
+        <ChecklistGroupPanel
+          groupId={openId}
+          checklist={checklist}
+          onSetItem={onSetItem}
+          onBack={back}
+          onClose={onClose}
+        />
+      ) : (
+        <>
+          <Text style={styles.note}>{copy.staysOnPhone}</Text>
+          {groups.map((group) => (
+            <Pressable
+              key={group.id}
+              ref={(node) => {
+                groupButtons.current[group.id] = node;
+              }}
+              role="button"
+              accessibilityLabel={
+                group.done
+                  ? fill(copy.groupDone, { group: group.label })
+                  : group.label
+              }
+              accessibilityHint={copy.groupHint}
+              onPress={() => {
+                setOpenId(group.id);
+                onOpenGroup?.(group.id);
+              }}
+              style={({ pressed }) => [styles.group, pressed && styles.pressed]}
+            >
+              <Text style={styles.label}>{group.label}</Text>
+              {group.done ? (
+                <View style={styles.done} importantForAccessibility="no">
+                  <Text style={styles.check} allowFontScaling={false}>
+                    ✓
+                  </Text>
+                  <Text style={styles.doneText}>{checklistCopy.done}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ))}
+        </>
+      )}
     </Sheet>
   );
 }
