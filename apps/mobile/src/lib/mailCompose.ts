@@ -61,6 +61,11 @@ export async function savePublisherEmail(personId: string, value: string): Promi
   }
 }
 
+/** Forgets the saved addresses of these people (retention, or a person removed by sync). */
+export async function clearPublisherEmails(personIds: readonly string[]): Promise<void> {
+  await Promise.all(personIds.map((id) => savePublisherEmail(id, '')));
+}
+
 /**
  * A `mailto:` link. `to` goes in the path; with no recipient the user fills in To. Subject and body are
  * percent-encoded; encodeURIComponent writes a space as %20 and a line break as %0D%0A.
@@ -76,15 +81,21 @@ export function buildMailto({ to, subject, body }: MailDraft): string {
  * when it can't be used, so the caller falls back.
  */
 async function composeInApp({ to, subject, body }: MailDraft): Promise<MailResult | undefined> {
+  // Only this check may fall back. Once the sheet is asked to open, a failure is reported as failed:
+  // a second draft (mailto:) after a failed first one could confuse the user.
   try {
     if (!(await MailComposer.isAvailableAsync())) {
       return undefined;
     }
+  } catch {
+    return undefined;
+  }
+  try {
     const { status } = await MailComposer.composeAsync({ recipients: to ? [to] : [], subject, body });
     // 'cancelled' means the user closed the sheet with nothing saved or sent. Android always reports sent.
     return (status as string) === 'cancelled' ? 'dismissed' : 'mail';
   } catch {
-    return undefined;
+    return 'failed';
   }
 }
 

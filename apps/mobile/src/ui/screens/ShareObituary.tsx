@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { ComponentRef, Ref } from 'react';
+import type { ComponentRef, MutableRefObject, Ref } from 'react';
 import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
@@ -11,6 +11,8 @@ import { applyUrlInputMode } from '../inputMode';
 import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
 import { useSerifStyle } from '../typography';
+
+export type TextInputNode = ComponentRef<typeof TextInput>;
 
 /** The words the screen needs. libs/copy/screens/shareObituary.json has these keys, plus more. */
 export interface ShareObituaryCopy {
@@ -92,6 +94,8 @@ export interface PublisherEmail {
     value: string;
     onChange: (value: string) => void;
     onBlur: () => void;
+    /** For moving focus to the field when a press is refused. */
+    inputRef?: MutableRefObject<TextInputNode | null>;
     /** The calm refusal (already worded), shown under the field. Unset when the address is fine or empty. */
     error?: string;
   };
@@ -209,8 +213,9 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
                     onChangeText={publisherEmail.address.onChange}
                     onBlur={publisherEmail.address.onBlur}
                     invalid={publisherEmail.address.error !== undefined}
-                    describedBy={publisherEmail.address.error ? addressErrorId : copy.publisherEmailHint ? addressHintId : undefined}
-                    hint={publisherEmail.address.error}
+                    describedBy={[publisherEmail.address.error ? addressErrorId : null, copy.publisherEmailHint ? addressHintId : null].filter(Boolean).join(' ') || undefined}
+                    hint={publisherEmail.address.error ?? copy.publisherEmailHint}
+                    inputRef={publisherEmail.address.inputRef}
                     email
                     returnKeyType="done"
                   />
@@ -222,7 +227,14 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
                   ) : null}
                 </>
               ) : null}
-              <Button label={copy.emailButton} variant="secondary" busy={publisherEmail.busy} describedBy={publisherEmail.failed ? emailFailedId : undefined} onPress={publisherEmail.onPress} />
+              <Button
+                label={copy.emailButton}
+                variant="secondary"
+                busy={publisherEmail.busy}
+                describedBy={publisherEmail.address?.error ? addressErrorId : publisherEmail.failed ? emailFailedId : undefined}
+                hint={publisherEmail.address?.error}
+                onPress={publisherEmail.onPress}
+              />
               <Status id={emailFailedId} message={publisherEmail.failed ? copy.emailFailed : undefined} tone="danger" />
               <Status id={noteId} message={publisherEmail.failed ? undefined : publisherEmail.note === 'opened' ? copy.emailOpened : publisherEmail.note === 'shared' ? copy.emailShared : undefined} />
               {publisherEmail.onCopyText && copy.copyButton ? (
@@ -385,10 +397,12 @@ interface FieldProps {
   url?: boolean;
   /** An email address: the email keyboard, no auto-capitals. */
   email?: boolean;
+  /** Lets the screen move focus to this field. */
+  inputRef?: MutableRefObject<TextInputNode | null>;
   returnKeyType: 'next' | 'done';
 }
 
-function Field({ label, optional, accessibleName, placeholder, value, onChangeText, onBlur, invalid, describedBy, hint, url, email, returnKeyType }: FieldProps) {
+function Field({ label, optional, accessibleName, placeholder, value, onChangeText, onBlur, invalid, describedBy, hint, url, email, inputRef, returnKeyType }: FieldProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
   const [focused, setFocused] = useState(false);
@@ -401,6 +415,9 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
       <TextInput
         ref={(node) => {
           input.current = node;
+          if (inputRef) {
+            inputRef.current = node;
+          }
           if (url) {
             applyUrlInputMode(node);
           }
@@ -421,6 +438,9 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
         returnKeyType={returnKeyType}
         autoCapitalize="none"
         autoCorrect={false}
+        // The publisher's address is not the user's own: the phone must not offer their email.
+        autoComplete={email ? 'off' : undefined}
+        textContentType={email ? 'none' : undefined}
         // Not on web: a url input there adds the browser's own invalid state on top of ours.
         keyboardType={url && Platform.OS !== 'web' ? 'url' : email ? 'email-address' : 'default'}
         placeholder={placeholder}

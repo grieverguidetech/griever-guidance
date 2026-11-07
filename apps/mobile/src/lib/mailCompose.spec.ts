@@ -3,7 +3,7 @@ import { Linking, Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MailComposer from 'expo-mail-composer';
 import { SYNCED_KEYS } from '@griever/shared';
-import { buildMailto, checkPublisherEmail, loadPublisherEmail, openMailDraft, publisherEmailKey, savePublisherEmail } from './mailCompose';
+import { buildMailto, checkPublisherEmail, clearPublisherEmails, loadPublisherEmail, openMailDraft, publisherEmailKey, savePublisherEmail } from './mailCompose';
 
 // The native module can't load under Jest. The in-app composer is "unavailable" unless a test says otherwise.
 jest.mock('expo-mail-composer', () => ({ isAvailableAsync: jest.fn(), composeAsync: jest.fn() }));
@@ -110,12 +110,21 @@ describe('openMailDraft with the in-app composer', () => {
     expect(open.mock.calls[0]?.[0]).toMatch(/^mailto:obits%40paper\.com\?subject=/);
   });
 
-  it('falls back to mailto when the composer throws', async () => {
-    isAvailable.mockResolvedValue(true);
-    compose.mockRejectedValue(new Error('no mail'));
+  it('falls back to mailto when the availability check throws', async () => {
+    isAvailable.mockRejectedValue(new Error('no module'));
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await expect(openMailDraft({ ...draft, to: 'obits@paper.com' })).resolves.toBe('mail');
     expect(open).toHaveBeenCalledWith(buildMailto({ ...draft, to: 'obits@paper.com' }));
+  });
+
+  it('reports failed, and opens no second draft, when the compose sheet itself fails', async () => {
+    isAvailable.mockResolvedValue(true);
+    compose.mockRejectedValue(new Error('compose failed'));
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.sharedAction, activityType: undefined });
+    await expect(openMailDraft({ ...draft, to: 'obits@paper.com' })).resolves.toBe('failed');
+    expect(open).not.toHaveBeenCalled();
+    expect(share).not.toHaveBeenCalled();
   });
 
   it('falls back to the share sheet when the composer is unavailable and mailto fails', async () => {
@@ -158,6 +167,14 @@ describe('the saved publisher email', () => {
     await savePublisherEmail('anna', '  ');
     await expect(loadPublisherEmail('anna')).resolves.toBe('');
     await expect(AsyncStorage.getItem(publisherEmailKey('anna'))).resolves.toBeNull();
+  });
+
+  it('is cleared for the people given, and only them', async () => {
+    await savePublisherEmail('anna', 'obits@paper.com');
+    await savePublisherEmail('ben', 'desk@other.com');
+    await clearPublisherEmails(['anna']);
+    await expect(loadPublisherEmail('anna')).resolves.toBe('');
+    await expect(loadPublisherEmail('ben')).resolves.toBe('desk@other.com');
   });
 
   it('is a device-only key, never one of the synced keys', () => {

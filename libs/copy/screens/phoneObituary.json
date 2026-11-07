@@ -10,7 +10,7 @@
   "saved": "Saved on this phone.",
   "publisherEmailLabel": "Publisher's email",
   "publisherEmailPlaceholder": "name@example.com",
-  "publisherEmailHint": "Kept on this phone only. It is not shared with anyone.",
+  "publisherEmailHint": "Kept on this phone only.",
   "publisherEmailMany": "Please enter one email address only.",
   "publisherEmailInvalid": "That email address doesn't look right. Check it and try again."
 }

@@ -7,6 +7,7 @@ import { SerifReadyContext } from '../ui';
 import * as Clipboard from 'expo-clipboard';
 import { ShareObituaryScreen } from './ShareObituaryScreen';
 import { obituaryTextFor } from '../lib/obituaryText';
+import * as MailComposer from 'expo-mail-composer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { publisherEmailKey } from '../lib/mailCompose';
 
@@ -91,6 +92,7 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
     // Mail opens a moment later now (the composer is checked first).
     await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     finish();
+    expect(open).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy());
   });
 
@@ -515,10 +517,76 @@ describe("ShareObituaryScreen publisher's email", () => {
 
   it('remembers the address for the same person and not for another', async () => {
     await AsyncStorage.setItem(publisherEmailKey('a'), 'obits@paper.com');
+    await AsyncStorage.setItem(publisherEmailKey('b'), 'desk@other.com');
     setup(withText);
     expect(await screen.findByDisplayValue('obits@paper.com')).toBeTruthy();
     screen.unmount();
     setup({ ...withText, id: 'b' } as Session);
+    expect(await screen.findByDisplayValue('desk@other.com')).toBeTruthy();
+    expect(screen.queryByDisplayValue('obits@paper.com')).toBeNull();
+  });
+
+  it('shows nothing for a person with no saved address', async () => {
+    await AsyncStorage.setItem(publisherEmailKey('a'), 'obits@paper.com');
+    setup({ ...withText, id: 'c' } as Session);
     await waitFor(() => expect(screen.getByLabelText(FIELD).props.value).toBe(''));
+  });
+
+  it('is announced and focused on every refused press, not only the first', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    jest.useFakeTimers();
+    try {
+      setup(withText);
+      fireEvent.changeText(screen.getByLabelText(FIELD), 'nonsense');
+      const press = () => fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+      const message = "That email address doesn't look right. Check it and try again.";
+      const heard = () => announce.mock.calls.filter(([text]) => text === message).length;
+      press();
+      const afterFirst = heard();
+      expect(afterFirst).toBeGreaterThan(0);
+      // The error is already on screen, so only our own announcement can make the second press heard.
+      press();
+      expect(heard()).toBe(afterFirst + 1);
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+      // The Email button carries the reason as its hint while the address is wrong.
+      expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityHint).toBe(message);
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('shows the error on leaving the field, and hides it again while typing', async () => {
+    setup(withText);
+    const field = screen.getByLabelText(FIELD);
+    fireEvent.changeText(field, 'nonsense');
+    expect(screen.queryByText(/doesn't look right/)).toBeNull();
+    fireEvent(field, 'blur');
+    expect(await screen.findByText(/doesn't look right/)).toBeTruthy();
+    fireEvent.changeText(field, 'nonsens');
+    expect(screen.queryByText(/doesn't look right/)).toBeNull();
+  });
+
+  it('keeps the phone from offering the user\'s own email', () => {
+    setup(withText);
+    const field = screen.getByLabelText(FIELD);
+    expect(field.props.autoComplete).toBe('off');
+    expect(field.props.textContentType).toBe('none');
+    expect(field.props.accessibilityHint).toBe('Kept on this phone only.');
+  });
+
+  it('opens the in-app composer with the typed address as the only recipient', async () => {
+    (MailComposer.isAvailableAsync as jest.Mock<() => Promise<boolean>>).mockResolvedValueOnce(true);
+    (MailComposer.composeAsync as jest.Mock<() => Promise<{ status: string }>>).mockResolvedValueOnce({ status: 'sent' });
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(withText);
+    fireEvent.changeText(screen.getByLabelText(FIELD), 'obits@paper.com');
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(OPENED);
+    expect(MailComposer.composeAsync).toHaveBeenCalledWith({ recipients: ['obits@paper.com'], subject: expect.any(String), body: 'Anna loved the garden.' });
+    expect(open).not.toHaveBeenCalled();
   });
 });

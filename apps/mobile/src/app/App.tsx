@@ -27,6 +27,7 @@ import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDeviceSessions';
 import { personLabel } from '../components/PersonSwitcher';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
+import { clearPublisherEmails } from '../lib/mailCompose';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -534,8 +535,24 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
     if (contacts.loading || purgedOnBoot.current) return;
     purgedOnBoot.current = true;
     const expiry = getContactsRetentionExpiry(sessions);
-    if (expiry && Date.now() > expiry.getTime()) void clearAll();
+    if (expiry && Date.now() > expiry.getTime()) {
+      void clearAll();
+      // The publisher's email is kept per person on this phone (MOB-9); it goes with the contacts.
+      void clearPublisherEmails(sessions.map((s) => s.id));
+    }
   }, [contacts.loading, clearAll, sessions]);
+
+  // A person that sync removes from this phone takes their saved publisher email with them.
+  const knownPeople = useRef<string[] | null>(null);
+  useEffect(() => {
+    const ids = sessions.map((s) => s.id);
+    const before = knownPeople.current;
+    knownPeople.current = ids;
+    const gone = before ? before.filter((id) => !ids.includes(id)) : [];
+    if (gone.length > 0) {
+      void clearPublisherEmails(gone);
+    }
+  }, [sessions]);
 
   if (!active) return null;
   if (first === 'pending') {

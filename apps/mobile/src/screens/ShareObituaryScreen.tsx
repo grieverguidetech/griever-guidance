@@ -7,6 +7,7 @@ import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
 import { ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
+import type { TextInputNode } from '../ui/screens/ShareObituary';
 import { colors, spacing } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
@@ -56,7 +57,9 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   editingNow.current = editing;
   // The publisher's address is typed here and kept on this phone only, per person (never part of the session, so it never syncs: DS-7).
   const [address, setAddress] = useState('');
-  const [addressTouched, setAddressTouched] = useState(false);
+  // The error shows after the field is left or Email is pressed, and goes when the user types again.
+  const [addressShown, setAddressShown] = useState(false);
+  const addressInput = useRef<TextInputNode | null>(null);
   const addressEdited = useRef(false);
   const emailRunning = useRef(false);
   const [emailBusy, setEmailBusy] = useState(false);
@@ -76,7 +79,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     let live = true;
     addressEdited.current = false;
     setAddress('');
-    setAddressTouched(false);
+    setAddressShown(false);
     loadPublisherEmail(session.id).then((saved) => {
       if (live && !addressEdited.current) {
         setAddress(saved);
@@ -140,6 +143,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const changeAddress = (value: string) => {
     addressEdited.current = true;
     setAddress(value);
+    setAddressShown(false);
     void savePublisherEmail(session.id, value);
   };
 
@@ -170,7 +174,13 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     }
     // A wrong address is shown, not guessed at: nothing opens until it is fixed or cleared.
     if (!addressCheck.ok) {
-      setAddressTouched(true);
+      setAddressShown(true);
+      // Every refused press is heard: iOS announces the message, and on both systems focus goes to the field
+      // (Android reads the field's hint when it gets focus).
+      if (Platform.OS === 'ios') {
+        AccessibilityInfo.announceForAccessibility(addressError ?? '');
+      }
+      setTimeout(() => addressInput.current?.focus(), 0);
       return;
     }
     emailRunning.current = true;
@@ -230,7 +240,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           onContinue={onContinue}
           onPasteLink={pasteLink}
           pasteMessage={pasteMessage}
-          publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressTouched(true), error: addressTouched ? addressError : undefined }, hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
+          publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
           textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, saved: justSaved, editRef: editButton }}
           headingRef={heading}
           checklistRef={checklistButton}
