@@ -15,7 +15,7 @@ function drawShape(shape: IconShape, color: string, strokeWidth: number, key: nu
       d={shape.d}
       stroke={shape.fill ? undefined : color}
       fill={shape.fill ? color : undefined}
-      strokeWidth={strokeWidth}
+      strokeWidth={shape.fill ? undefined : strokeWidth}
       strokeLinecap={shape.linecap}
       strokeLinejoin={shape.linejoin}
     />

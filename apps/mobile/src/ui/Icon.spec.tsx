@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
+import { colors } from '@griever/tokens';
 import { Circle, Path } from 'react-native-svg';
 import { Icon } from './Icon';
 import { ICON_PATHS } from './iconPaths';
@@ -16,7 +17,11 @@ describe('Icon (mobile)', () => {
       'M8 11V7.5a4 4 0 0 1 8 0V11',
     ]);
     expect(paths.every((p) => p.props.strokeWidth === 1.8 && p.props.stroke === '#605d5d')).toBe(true);
-    expect(ICON_PATHS.lock.viewBox).toBe('0 0 24 24');
+    expect(paths[0].props.strokeLinejoin).toBe('round');
+    expect(paths[0].props.strokeLinecap).toBeUndefined();
+    expect(paths[1].props.strokeLinecap).toBe('round');
+    const svg = screen.getByTestId('icon', { includeHiddenElements: true }).findByProps({ viewBox: '0 0 24 24' });
+    expect(svg.props.viewBox).toBe('0 0 24 24');
   });
 
   it('draws the check as a round-capped stroke of 2 in the given colour', () => {
@@ -33,16 +38,16 @@ describe('Icon (mobile)', () => {
   });
 
   it('draws the not-started circle as an outline, r 5.5 at 8,8, stroke 1.5, with no fill shape', () => {
-    render(<Icon name="circle" color="#8a8686" />);
+    render(<Icon name="circle" color={colors['neutral-600']} />);
     const [circle] = screen.UNSAFE_getAllByType(Circle);
-    expect(circle.props).toMatchObject({ cx: 8, cy: 8, r: 5.5, stroke: '#8a8686', strokeWidth: 1.5 });
+    expect(circle.props).toMatchObject({ cx: 8, cy: 8, r: 5.5, stroke: colors['neutral-600'], strokeWidth: 1.5 });
     expect(screen.UNSAFE_queryAllByType(Path)).toHaveLength(0);
   });
 
   it('draws in-progress as the same circle plus a filled left half', () => {
     render(<Icon name="progress" color="#605d5d" />);
     const [circle] = screen.UNSAFE_getAllByType(Circle);
-    expect(circle.props).toMatchObject({ r: 5.5, strokeWidth: 1.5 });
+    expect(circle.props).toMatchObject({ r: 5.5, strokeWidth: 1.5, stroke: '#605d5d' });
     const [half] = screen.UNSAFE_getAllByType(Path);
     expect(half.props.fill).toBe('#605d5d');
     expect(half.props.stroke).toBeUndefined();
