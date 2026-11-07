@@ -138,3 +138,45 @@ describe('ShareObituary (mobile steps, #650)', () => {
     expect(screen.queryByRole('button', { name: 'Copy the text' })).toBeNull();
   });
 });
+
+describe('ShareObituary text card (#701)', () => {
+  const editorCopy = {
+    textTitle: 'The obituary text',
+    editHelp: 'Change anything you like.',
+    editButton: 'Edit the text',
+    writeButton: 'Write the text',
+    editLabel: 'Obituary text',
+    editPlaceholder: 'Write the obituary here.',
+    saveButton: 'Save the text',
+    cancelButton: 'Cancel',
+    saved: 'Saved on this phone.',
+  };
+  const editor = (over = {}) => ({ text: 'Anna loved the garden.', editing: false, value: '', onValueChange: jest.fn(), onEdit: jest.fn(), onSave: jest.fn(), onCancel: jest.fn(), ...over });
+
+  it('shows no card without textEditor, as the web does', () => {
+    setup();
+    expect(screen.queryByText('The obituary text')).toBeNull();
+  });
+
+  it('shows the text and calls onEdit', () => {
+    const e = editor();
+    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
+    expect(screen.getByText('Anna loved the garden.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit the text' }));
+    expect(e.onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('while editing shows one multiline box with the value, and Save and Cancel', () => {
+    const e = editor({ editing: true, value: 'Typed' });
+    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
+    const box = screen.getByLabelText('Obituary text');
+    expect(box.props.multiline).toBe(true);
+    expect(box.props.value).toBe('Typed');
+    fireEvent.changeText(box, 'More');
+    expect(e.onValueChange).toHaveBeenCalledWith('More');
+    fireEvent.press(screen.getByRole('button', { name: 'Save the text' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    expect(e.onSave).toHaveBeenCalledTimes(1);
+    expect(e.onCancel).toHaveBeenCalledTimes(1);
+  });
+});

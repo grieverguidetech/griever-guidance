@@ -1,0 +1,11 @@
+{
+  "textTitle": "The obituary text",
+  "editHelp": "Change anything you like. Nothing is sent until you choose.",
+  "editButton": "Edit the text",
+  "writeButton": "Write the text",
+  "editLabel": "Obituary text",
+  "editPlaceholder": "Write the obituary here.",
+  "saveButton": "Save the text",
+  "cancelButton": "Cancel",
+  "saved": "Saved on this phone."
+}

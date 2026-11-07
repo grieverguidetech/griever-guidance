@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
-import { isValidObituaryLink, obituaryLink } from '@griever/shared';
+import { FLOW_DETAIL_MAX_LENGTH, isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
 import { ShareObituary } from '../ui';
@@ -14,8 +14,10 @@ import { openMailDraft } from '../lib/mailCompose';
 import { obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
+const textCopy = screenCopy('phoneObituary');
 const copy = {
   ...shareCopy,
+  ...textCopy,
   heading: shareCopy.mobileHeading,
   emailTitle: shareCopy.mobileEmailTitle,
   emailFailed: shareCopy.mobileEmailFailed,
@@ -24,7 +26,7 @@ const copy = {
 
 type Props = {
   session: Session;
-  onChange: (patch: { obituaryUrl?: string; obituaryPublisher?: string }) => void;
+  onChange: (patch: { obituaryUrl?: string; obituaryPublisher?: string; obituaryText?: string }) => void;
   /** Saves one checklist item on this person, on this phone. */
   onSetItem: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
   onBack: () => void;
@@ -44,6 +46,14 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [pasteMessage, setPasteMessage] = useState<string | undefined>(undefined);
+  const editButton = useRef<ButtonNode>(null);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [justSaved, setJustSaved] = useState(false);
+  // Counts finished edits, so focus returns to the Edit button once it is back on screen.
+  const [editsEnded, setEditsEnded] = useState(0);
+  const editingNow = useRef(false);
+  editingNow.current = editing;
   const emailRunning = useRef(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const sheetOpen = useRef(false);
@@ -63,11 +73,26 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
       if (sheetOpen.current) {
         return false;
       }
+      // While editing, Back closes the keyboard only, so typed text is never lost by a stray Back.
+      if (editingNow.current) {
+        Keyboard.dismiss();
+        return true;
+      }
       onBack();
       return true;
     });
     return () => sub.remove();
   }, [onBack]);
+
+  useEffect(() => {
+    if (editsEnded === 0) {
+      return;
+    }
+    const handle = editButton.current ? findNodeHandle(editButton.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  }, [editsEnded]);
 
   // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
   const focusChecklistButton = () => {
@@ -88,6 +113,25 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const linkValid = isValidObituaryLink(session.obituaryUrl);
   const name = session.personName.trim() || copy.nameFallback;
   const obituaryText = obituaryTextFor(session);
+
+  const startEdit = () => {
+    setEditValue(obituaryText);
+    setJustSaved(false);
+    setEditing(true);
+  };
+
+  // Saving writes the full text, so the text stops following the details from then on (as on the web).
+  const saveEdit = () => {
+    onChange({ obituaryText: editValue });
+    setEditing(false);
+    setJustSaved(true);
+    setEditsEnded((n) => n + 1);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditsEnded((n) => n + 1);
+  };
 
   // Step 1: the user's own mail app (or the share sheet) gets the text; they pick who it goes to (C1).
   const emailPublisher = async () => {
@@ -153,6 +197,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           onPasteLink={pasteLink}
           pasteMessage={pasteMessage}
           publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
+          textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, saved: justSaved, editRef: editButton }}
           headingRef={heading}
           checklistRef={checklistButton}
         />

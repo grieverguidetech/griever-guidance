@@ -27,7 +27,7 @@ export type { WhoPerson, WhoShouldKnowCopy, WhoShouldKnowProps } from './screens
 export { ReadyToSend } from './screens/ReadyToSend';
 export type { ReadyToSendCopy, ReadyToSendProps } from './screens/ReadyToSend';
 export { ShareObituary } from './screens/ShareObituary';
-export type { ShareObituaryCopy, ShareObituaryProps } from './screens/ShareObituary';
+export type { ObituaryTextEditor, ShareObituaryCopy, ShareObituaryProps } from './screens/ShareObituary';
 export { Account } from './screens/Account';
 export type { AccountCopy, AccountProps } from './screens/Account';
 export { PersonSetup } from './screens/PersonSetup';

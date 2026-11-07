@@ -26,6 +26,7 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['screens/ContactSelectorScreen.tsx', 'topBar'],
   ['ui/screens/PersonSetup.tsx', 'topBar'],
   ['ui/screens/ShareObituary.tsx', 'topBar'],
+  ['ui/screens/ShareObituary.tsx', 'editActions'],
   ['ui/ActionBar.tsx', 'above'],
   ['components/ChecklistGroupPanel.tsx', 'header'],
 ];
@@ -47,6 +48,7 @@ describe('inputs are at least 15 pt (#654)', () => {
     ['components/SavedNote.tsx', 'note'],
     ['ui/screens/PersonSetup.tsx', 'input'],
     ['ui/screens/ShareObituary.tsx', 'input'],
+    ['ui/screens/ShareObituary.tsx', 'textInput'],
   ])('%s %s', (file, name) => {
     const size = /fontSize:\s*(\d+)/.exec(styleBlock(file, name));
     expect(Number(size?.[1])).toBeGreaterThanOrEqual(15);
