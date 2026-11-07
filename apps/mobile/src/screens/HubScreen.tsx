@@ -5,6 +5,7 @@ import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, use
 import type { Session, SendCardStatus } from '@griever/hooks';
 import type { MomentKey } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
+import { useSessionWithAccountName } from '../lib/accountName';
 import { ActionBar, Button, Hub, PaywallSheet, SentNote, Sheet } from '../ui';
 import type { ButtonNode, HubRow } from '../ui';
 import { colors, spacing } from '@griever/tokens';
@@ -87,7 +88,9 @@ export type HubScreenProps = {
  * apps/mobile/src/ui; this holds what is mobile only: the sheets, and reading the person's moments.
  */
 export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, onImportContacts, onStart, onEditPerson, note, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
-  const moments = usePathMoments(session);
+  // The account name counts as the sender name for the card status only. It is never saved to the person (DS-7).
+  const statusSession = useSessionWithAccountName(session);
+  const moments = usePathMoments(statusSession);
   const [moreOpen, setMoreOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -181,7 +184,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   const locked = paymentsEnabled ? PAID_MOMENTS : [];
   // "Stop for now" leaves the note; its card stays lit until the person leaves this screen.
   const stopped = note?.partial ? momentOfCategory(note.category) : null;
-  const lit = nextMoment({ session, locked, partial: stopped });
+  const lit = nextMoment({ session: statusSession, locked, partial: stopped });
 
   const rows: HubRow[] = moments.map((moment) => ({
     key: moment.key,
@@ -191,12 +194,12 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
     locked: locked.includes(moment.key),
     meta:
       moment.status === 'done'
-        ? sentLine(session, moment.key, moment.key === stopped)
-        : statusLine(sendCardStatus(session, moment.key), session, moment.key),
+        ? sentLine(statusSession, moment.key, moment.key === stopped)
+        : statusLine(sendCardStatus(statusSession, moment.key), statusSession, moment.key),
   }));
 
   // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.
-  const target: MomentKey = barMoment({ session, locked, partial: stopped });
+  const target: MomentKey = barMoment({ session: statusSession, locked, partial: stopped });
   const primaryLabel = copy.moments[target].title;
 
   return (

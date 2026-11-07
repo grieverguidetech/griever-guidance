@@ -18,6 +18,7 @@ import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
+import { useAccountSenderName } from '../lib/accountName';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
@@ -265,6 +266,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const inVisit = onForm || flow.step === 'review';
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
+  // The signed-in account's name, for the thank-you's sender field. On-device only (DS-7).
+  const accountName = useAccountSenderName();
+  const senderTyped = flow.fields['senderName'] ?? '';
   const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;
   useEffect(() => {
     if (!inVisit) {
@@ -282,6 +286,12 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       setMessageOverride(null);
     }
     const fresh = !hasDraftContent && messageOverride === null;
+    // The account name starts the sender field when the person has none and nothing is typed. Never
+    // over a typed name, and never when the family hand-edited the message: setField clears the
+    // override, so that wording would be lost. Runs before setMessageOverride below.
+    if (accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
+      setField('senderName', accountName);
+    }
     if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
     if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
     // The planned details and edited wording (synced from the web) start a fresh form. A form with
@@ -299,7 +309,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
         setMessageOverride(planned.messageOverride);
       }
     }
-  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session]);
+  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session, accountName, senderTyped]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not
