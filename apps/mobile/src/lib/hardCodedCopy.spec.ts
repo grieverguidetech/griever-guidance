@@ -28,6 +28,8 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'phoneTexting', file: 'screens/SendingScreen.tsx' },
   { copy: 'phonePeople', file: 'screens/ContactSelectorScreen.tsx' },
   { copy: 'phoneSwitcher', file: 'components/NameSwitcher.tsx' },
+  { copy: 'phoneChecklist', file: 'components/PersonChecklistSheet.tsx' },
+  { copy: 'cmsChecklist', file: 'components/PersonChecklistSheet.tsx' },
 ];
 
 describe('migrated screens do not hard-code copy', () => {
