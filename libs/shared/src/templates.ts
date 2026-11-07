@@ -144,7 +144,7 @@ export const thankYouNote: Template = {
   renderMessage(fields) {
     const note = fields['personalNote'] ? ` ${fields['personalNote']}` : '';
     return (
-      `On behalf of ${fields['senderName']}, we want to sincerely thank you for your kindness and support following the passing of ${fields['deceasedName']}.` +
+      `On behalf of ${fields['senderName'] || '______'}, we want to sincerely thank you for your kindness and support following the passing of ${fields['deceasedName']}.` +
       note +
       `\n\nYour presence and thoughtfulness during this time has meant more than words can express.`
     );
