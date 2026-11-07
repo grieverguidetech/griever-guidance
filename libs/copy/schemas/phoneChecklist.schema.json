@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the phone checklist sheet (the time groups and Gather when you can)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "close", "staysOnPhone", "groupDone", "groupHint"],
+  "properties": {
+    "title": { "$ref": "#/$defs/text" },
+    "close": { "$ref": "#/$defs/text" },
+    "staysOnPhone": { "$ref": "#/$defs/text" },
+    "groupDone": { "$ref": "#/$defs/text" },
+    "groupHint": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}
