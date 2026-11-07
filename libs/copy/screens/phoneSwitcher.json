@@ -1,6 +1,6 @@
 {
   "nameLabel": "Writing about {name}",
-  "nameHint": "Opens a list to edit this person or add someone",
+  "nameHint": "Opens a list of choices.",
   "title": "Who you're writing about",
   "editPerson": "Edit person",
   "addSomeone": "Add someone",

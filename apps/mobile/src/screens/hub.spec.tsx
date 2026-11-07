@@ -51,7 +51,7 @@ function setup(session: Session = anna, paymentsEnabled = false, extra: Partial<
 
 // The switcher sheet is the first Modal on the screen (always drawn), More the second, the checklist the third.
 const moreModal = () => screen.UNSAFE_getAllByType(Modal)[1];
-const moreModalFirst = () => screen.UNSAFE_getAllByType(Modal)[0];
+const switcherModal = () => screen.UNSAFE_getAllByType(Modal)[0];
 const morePanel = () => within(moreModal());
 
 // The handle the fake findNodeHandle gave the node that was focused last.
@@ -127,7 +127,7 @@ describe('HubScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
     expect(onEditPerson).not.toHaveBeenCalled();
-    act(() => moreModalFirst().props.onDismiss());
+    act(() => switcherModal().props.onDismiss());
     expect(onEditPerson).toHaveBeenCalledTimes(1);
   });
 
@@ -137,7 +137,7 @@ describe('HubScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
     fireEvent.press(screen.getByRole('button', { name: 'Ben' }));
     // The switcher sheet is the first Modal; it runs the choice once it is gone.
-    act(() => moreModalFirst().props.onDismiss());
+    act(() => switcherModal().props.onDismiss());
     expect(onSwitch).toHaveBeenCalledWith('b');
   });
 
@@ -153,7 +153,7 @@ describe('HubScreen', () => {
   it('leaves Add someone out of More with 2 or more people (it is in the switcher)', () => {
     const ben = { ...anna, id: 'b', personName: 'Ben' } as Session;
     setup(anna, false, { others: [ben], onAddSomeone: jest.fn() });
-    // The switcher sheet is the first Modal when it exists; More is the second.
+    // The switcher sheet is always the first Modal; More is the second.
     fireEvent.press(screen.getByRole('button', { name: 'More' }));
     expect(within(screen.UNSAFE_getAllByType(Modal)[1]).queryByRole('button', { name: 'Add someone' })).toBeNull();
   });

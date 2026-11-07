@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
-import { Modal, Platform } from 'react-native';
+import { AccessibilityInfo, Modal, Platform } from 'react-native';
 import type { Session } from '@griever/hooks';
 import { NameSwitcher } from './NameSwitcher';
+
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: (node: unknown) => (node ? 7 : null),
+}));
 
 const person = (id: string, personName: string, lastOpenedAt: string) => ({ id, personName, lastOpenedAt, drafts: {} }) as unknown as Session;
 
@@ -15,6 +21,7 @@ const sheet = () => screen.UNSAFE_getByType(Modal);
 afterEach(() => {
   jest.useRealTimers();
   jest.clearAllMocks();
+  jest.restoreAllMocks();
 });
 
 describe('NameSwitcher', () => {
@@ -160,5 +167,37 @@ describe('NameSwitcher', () => {
     fireEvent(sheet(), 'requestClose');
     expect(sheet().props.visible).toBe(false);
     expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it('the hint is the same for a member, who has no Add someone', () => {
+    render(<NameSwitcher name="Dan" onEdit={jest.fn()} others={[]} onPick={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Writing about Dan' }).props.accessibilityHint).toBe('Opens a list of choices.');
+  });
+
+  it('iOS: Close sends screen-reader focus back to the name once the sheet is gone', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<NameSwitcher name="Dan" onEdit={jest.fn()} others={[]} onPick={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Dan' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(focus).not.toHaveBeenCalled();
+    act(() => sheet().props.onDismiss());
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith(7);
+  });
+
+  it('Android: Close sends screen-reader focus back to the name after the timer', () => {
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    jest.useFakeTimers();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<NameSwitcher name="Dan" onEdit={jest.fn()} others={[]} onPick={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Dan' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    act(() => {
+      jest.advanceTimersByTime(10);
+    });
+    Platform.OS = original;
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith(7);
   });
 });
