@@ -95,6 +95,9 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   const [paywallOpen, setPaywallOpen] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const checklistButton = useRef<ButtonNode>(null);
+  // The Android focus return waits one tick; an unmount before it runs cancels it.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(focusTimer.current), []);
   // The locked row that opened the placeholder, so screen-reader focus can go back to it.
   const opener = useRef<unknown>(null);
 
@@ -145,7 +148,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   const closeChecklist = () => {
     setChecklistOpen(false);
     if (Platform.OS !== 'ios') {
-      setTimeout(focusChecklistButton, 0);
+      focusTimer.current = setTimeout(focusChecklistButton, 0);
     }
   };
 
