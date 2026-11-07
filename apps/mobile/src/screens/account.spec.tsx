@@ -122,13 +122,15 @@ describe('sign in', () => {
     expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
   });
 
-  it('asks for a name when the account has none', async () => {
+  it('does not ask for a name when the account has none', async () => {
     mockGetProfile.mockResolvedValue(profileWith(null));
     renderAccount();
     await screen.findByLabelText('Email');
     press('Sign in');
-    await screen.findByRole('heading', { name: 'What should we call you?' });
-    expect(screen.getByText('This is the name on your account.')).toBeTruthy();
+    await screen.findByLabelText('Your name');
+    expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
+    expect(screen.queryByText('What should we call you?')).toBeNull();
+    expect(screen.queryByText('This is the name on your account.')).toBeNull();
   });
 
   it('does not carry the error over to the sign-up screen', async () => {
@@ -196,7 +198,8 @@ describe('sign up', () => {
     type('Email', 'b@x.co');
     type('Password', 'another-password');
     press('Sign in');
-    await screen.findByRole('heading', { name: 'What should we call you?' });
+    await screen.findByLabelText('Your name');
+    expect(screen.queryByText('What should we call you?')).toBeNull();
     expect(mockUpdateProfile).not.toHaveBeenCalled();
     expect(value('Your name')).toBe('');
   });
@@ -216,11 +219,12 @@ describe('sign up', () => {
     expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }, { senderName: 'Samantha' }]);
   });
 
-  it('asks for a name when the profile still has none after sign-up', async () => {
+  it('does not ask for a name when the profile still has none after sign-up', async () => {
     mockUpdateProfile.mockResolvedValue(profileWith(''));
     await openSignUp();
     await createAccount();
-    await screen.findByRole('heading', { name: 'What should we call you?' });
+    await screen.findByLabelText('Your name');
+    expect(screen.queryByText('What should we call you?')).toBeNull();
   });
 
   it('keeps the typed name in the field when saving it fails', async () => {
@@ -230,6 +234,62 @@ describe('sign up', () => {
     await screen.findByText(OFFLINE);
     expect(value('Your name')).toBe('Sam');
     expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
+  });
+});
+
+describe('Account as the first screen', () => {
+  function renderFirst(onSignedIn: () => void, initial = true) {
+    return render(
+      <Harness initial={initial}>
+        <AccountScreen onBack={() => undefined} onSignedIn={onSignedIn} />
+      </Harness>,
+    );
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('leaves once signed in and the profile has loaded, with a name', async () => {
+    const onSignedIn = jest.fn();
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderFirst(onSignedIn);
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+  });
+
+  it('leaves once signed in and the profile has loaded, with no name, and never shows the name prompt', async () => {
+    const onSignedIn = jest.fn();
+    mockGetProfile.mockResolvedValue(profileWith(null));
+    renderFirst(onSignedIn);
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('What should we call you?')).toBeNull();
+  });
+
+  it('leaves when the account has no profile row yet', async () => {
+    const onSignedIn = jest.fn();
+    mockGetProfile.mockResolvedValue(noProfile);
+    renderFirst(onSignedIn);
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+  });
+
+  it('while the profile is loading: no name prompt and does not leave, then leaves when it loads', async () => {
+    const onSignedIn = jest.fn();
+    let resolveProfile: (r: ProfileResult) => void = () => undefined;
+    mockGetProfile.mockReturnValue(new Promise<ProfileResult>((resolve) => (resolveProfile = resolve)));
+    renderFirst(onSignedIn);
+    await screen.findByLabelText('Your name');
+    expect(screen.queryByText('What should we call you?')).toBeNull();
+    expect(onSignedIn).not.toHaveBeenCalled();
+    await act(async () => resolveProfile(profileWith(null)));
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('What should we call you?')).toBeNull();
+  });
+
+  it('does not leave while signed out', async () => {
+    const onSignedIn = jest.fn();
+    renderFirst(onSignedIn, false);
+    await screen.findByLabelText('Email');
+    expect(onSignedIn).not.toHaveBeenCalled();
   });
 });
 
@@ -268,7 +328,7 @@ describe('profile', () => {
   it('shows "Your name is saved." on the first save, when the account had no profile yet', async () => {
     mockGetProfile.mockResolvedValue(noProfile);
     renderAccount(true);
-    await screen.findByRole('heading', { name: 'What should we call you?' });
+    await screen.findByLabelText('Your name');
     type('Your name', 'Sam');
     press('Save');
     await screen.findByText('Your name is saved.');
@@ -377,10 +437,11 @@ describe('profile', () => {
       expect(await screen.findAllByRole('checkbox')).toHaveLength(5);
     });
 
-    it('leaves the list out while the account asks for a name', async () => {
+    it('leaves the list out while the account has no name', async () => {
       mockGetProfile.mockResolvedValue(profileWith(null));
       renderAccount(true);
-      await screen.findByRole('heading', { name: 'What should we call you?' });
+      await screen.findByRole('heading', { name: 'Your account' });
+      await screen.findByLabelText('Your name');
       expect(screen.queryByRole('checkbox')).toBeNull();
     });
   });
