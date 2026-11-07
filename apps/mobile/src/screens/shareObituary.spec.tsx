@@ -7,6 +7,8 @@ import { SerifReadyContext } from '../ui';
 import * as Clipboard from 'expo-clipboard';
 import { ShareObituaryScreen } from './ShareObituaryScreen';
 import { obituaryTextFor } from '../lib/obituaryText';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { publisherEmailKey } from '../lib/mailCompose';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
@@ -86,7 +88,8 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
     const button = screen.getByRole('button', { name: BUTTON });
     fireEvent.press(button);
     fireEvent.press(button);
-    expect(open).toHaveBeenCalledTimes(1);
+    // Mail opens a moment later now (the composer is checked first).
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     finish();
     await waitFor(() => expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy());
   });
@@ -222,6 +225,7 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
     setup({ ...base, obituaryText: 'Text' } as Session);
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).toMatchObject({ busy: true });
+    await waitFor(() => expect(Linking.openURL).toHaveBeenCalled());
     finish();
     await screen.findByText(OPENED);
   });
@@ -465,5 +469,56 @@ describe('ShareObituaryScreen shows and edits the obituary text (#701)', () => {
     fireEvent.press(screen.getByRole('button', { name: EDIT }));
     fireEvent.press(screen.getByRole('button', { name: SAVE }));
     expect(focus).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ShareObituaryScreen publisher's email", () => {
+  const withText = { ...base, obituaryText: 'Anna loved the garden.' } as Session;
+  const FIELD = "Publisher's email (optional)";
+
+  it('puts a typed address in the mailto To, on this phone only', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const onChange = jest.fn();
+    setup(withText, onChange);
+    fireEvent.changeText(screen.getByLabelText(FIELD), 'obits@paper.com');
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(open).toHaveBeenCalled());
+    expect(open.mock.calls[0]?.[0]).toMatch(/^mailto:obits%40paper\.com\?subject=/);
+    // Never handed to the session, so it can't sync (DS-7).
+    expect(onChange).not.toHaveBeenCalled();
+    await waitFor(async () => expect(await AsyncStorage.getItem(publisherEmailKey('a'))).toBe('obits@paper.com'));
+  });
+
+  it('refuses two addresses with calm copy and opens nothing', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(withText);
+    fireEvent.changeText(screen.getByLabelText(FIELD), 'a@b.com, c@d.com');
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    expect(await screen.findByText('Please enter one email address only.')).toBeTruthy();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('refuses a nonsense address when the field is left', async () => {
+    setup(withText);
+    fireEvent.changeText(screen.getByLabelText(FIELD), 'nonsense');
+    fireEvent(screen.getByLabelText(FIELD), 'blur');
+    expect(await screen.findByText("That email address doesn't look right. Check it and try again.")).toBeTruthy();
+  });
+
+  it('opens mail with no To when the field is empty', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(withText);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(open).toHaveBeenCalled());
+    expect(open.mock.calls[0]?.[0]).toMatch(/^mailto:\?subject=/);
+  });
+
+  it('remembers the address for the same person and not for another', async () => {
+    await AsyncStorage.setItem(publisherEmailKey('a'), 'obits@paper.com');
+    setup(withText);
+    expect(await screen.findByDisplayValue('obits@paper.com')).toBeTruthy();
+    screen.unmount();
+    setup({ ...withText, id: 'b' } as Session);
+    await waitFor(() => expect(screen.getByLabelText(FIELD).props.value).toBe(''));
   });
 });

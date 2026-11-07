@@ -3,7 +3,7 @@
   "title": "Copy for the phone-only obituary text editor on Share obituary (the rest comes from shareObituary.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["textTitle", "editHelp", "editButton", "writeButton", "editLabel", "editPlaceholder", "saveButton", "cancelButton", "saved"],
+  "required": ["textTitle", "editHelp", "editButton", "writeButton", "editLabel", "editPlaceholder", "saveButton", "cancelButton", "saved", "publisherEmailLabel", "publisherEmailPlaceholder", "publisherEmailHint", "publisherEmailMany", "publisherEmailInvalid"],
   "properties": {
     "textTitle": { "$ref": "#/$defs/text" },
     "editHelp": { "$ref": "#/$defs/text" },
@@ -13,7 +13,12 @@
     "editPlaceholder": { "$ref": "#/$defs/text" },
     "saveButton": { "$ref": "#/$defs/text" },
     "cancelButton": { "$ref": "#/$defs/text" },
-    "saved": { "$ref": "#/$defs/text" }
+    "saved": { "$ref": "#/$defs/text" },
+    "publisherEmailLabel": { "$ref": "#/$defs/text" },
+    "publisherEmailPlaceholder": { "$ref": "#/$defs/text" },
+    "publisherEmailHint": { "$ref": "#/$defs/text" },
+    "publisherEmailMany": { "$ref": "#/$defs/text" },
+    "publisherEmailInvalid": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }

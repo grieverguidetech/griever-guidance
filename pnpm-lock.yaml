@@ -296,6 +296,9 @@ importers:
       expo-font:
         specifier: 58.0.8
         version: 58.0.8(expo@58.0.14)(react-native@0.88.0(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
+      expo-mail-composer:
+        specifier: 58.0.3
+        version: 58.0.3(expo@58.0.14)
       expo-secure-store:
         specifier: 58.0.2
         version: 58.0.2(expo@58.0.14)
@@ -6254,6 +6257,11 @@ packages:
       expo: '*'
       react: 19.3.0
       react-native: '*'
+
+  expo-mail-composer@58.0.3:
+    resolution: {integrity: sha512-R/b4LmtQ8hM+X37KFvccnpidsYETZr2ry2DvnYRD2ZSMahSu4QWA6sxTfAqFEd8eRZfxOK9UbUjVVD4SlmR9Gg==}
+    peerDependencies:
+      expo: '*'
 
   expo-modules-autolinking@58.0.13:
     resolution: {integrity: sha512-uzLFoTnAKabUdITvzRqWTvFkZsOdRPEXj7AEMAuBEhA2kGhqaBDa2EOWqPXVay0QJVoZuIQaEEgPGAXN1dPuYg==}
@@ -16717,6 +16725,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
+
+  expo-mail-composer@58.0.3(expo@58.0.14):
+    dependencies:
+      expo: 58.0.14(@babel/core@7.29.0)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.14)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(encoding@0.1.13)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)
 
   expo-modules-autolinking@58.0.13(typescript@5.9.3):
     dependencies:
