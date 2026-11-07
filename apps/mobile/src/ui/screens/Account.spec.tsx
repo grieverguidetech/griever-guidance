@@ -5,8 +5,6 @@ import type { AccountCopy, AccountProps } from './Account';
 
 const copy: AccountCopy = {
   heading: 'Your account',
-  askHeading: 'What should we call you?',
-  askIntro: 'This is the name on your account.',
   back: 'Back',
   checklist: "What you'll need",
   nameLabel: 'Your name',

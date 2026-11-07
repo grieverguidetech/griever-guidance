@@ -69,7 +69,7 @@ function AccountRunner({
   /* eslint-disable react-hooks/exhaustive-deps */
   const account = useMemo(
     () => hook,
-    [hook.status, hook.offline, hook.profile, hook.error, hook.signOut, hook.updateSenderName, hook.clearError],
+    [hook.status, hook.offline, hook.profile, hook.profileAnswered, hook.profileLoaded, hook.error, hook.signOut, hook.updateSenderName, hook.clearError],
   );
   /* eslint-enable react-hooks/exhaustive-deps */
   useEffect(() => onAccount(account), [account, onAccount]);

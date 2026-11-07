@@ -52,7 +52,8 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     }
   }, [source, sessionEnded]);
 
-  const needsName = !sessionEnded && !savedName && !initialName;
+  // Mobile never asks for a name up front; the name field sits on the account page, empty until one is saved.
+  const hasName = !!savedName || !!initialName;
 
   async function save() {
     if (pending) {
@@ -87,7 +88,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   } else if (saved) {
     message = copy.saved;
   }
-  const showList = !needsName && !sessionEnded;
+  const showList = hasName && !sessionEnded;
   let primaryLabel = copy.save;
   if (sessionEnded) {
     primaryLabel = copy.signIn;
@@ -99,8 +100,6 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     <>
       <Account
         copy={copy}
-        asksName={needsName}
-        intro={needsName ? copy.askIntro : undefined}
         name={name}
         onNameChange={(next) => {
           touched.current = true;
