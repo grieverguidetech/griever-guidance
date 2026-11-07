@@ -55,15 +55,17 @@ type Checklist = ChecklistFields['checklist'];
 function Harness({
   start,
   onSave,
+  onClose = jest.fn(),
 }: {
   start: Checklist;
+  onClose?: () => void;
   onSave: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
 }) {
   const [checklist, setChecklist] = useState<Checklist>(start);
   return (
     <PersonChecklistSheet
       visible
-      onClose={jest.fn()}
+      onClose={onClose}
       checklist={checklist}
       onSetItem={(id, state) => {
         onSave(id, state);
@@ -81,13 +83,19 @@ function Harness({
   );
 }
 
+/** Lets the deferred focus calls (setTimeout 0) run. */
+const flush = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
 const open = async (groupLabel: string, start: Checklist = {}) => {
   const onSave =
     jest.fn<(id: ChecklistItemId, state: ChecklistItemState | null) => void>();
   render(<Harness start={start} onSave={onSave} />);
   await act(async () => {});
   fireEvent.press(screen.getByRole('button', { name: groupLabel }));
-  await act(async () => {});
+  await flush();
   return onSave;
 };
 const tickRow = (label: string) =>
@@ -125,6 +133,65 @@ describe('ChecklistGroupPanel (#697)', () => {
       screen.getByRole('button', { name: phrases.phases['first-days'] }),
     ).toBeTruthy();
     expect(screen.UNSAFE_getAllByType(Modal)).toHaveLength(1);
+  });
+
+  it('keeps the very same Modal, still visible, through open and Back (no remount)', async () => {
+    const onSave = jest.fn();
+    render(<Harness start={{}} onSave={onSave} />);
+    await flush();
+    const before = screen.UNSAFE_getByType(Modal);
+    fireEvent.press(screen.getByRole('button', { name: RIGHT_AWAY }));
+    await flush();
+    expect(screen.UNSAFE_getByType(Modal)).toBe(before);
+    expect(screen.UNSAFE_getByType(Modal).props.visible).toBe(true);
+    fireEvent.press(screen.getByRole('button', { name: phrases.back }));
+    await flush();
+    expect(screen.UNSAFE_getByType(Modal)).toBe(before);
+    expect(screen.UNSAFE_getByType(Modal).props.visible).toBe(true);
+  });
+
+  it('shows the list again when the sheet is hidden and shown while a panel was open', async () => {
+    const sheet = (visible: boolean) => (
+      <PersonChecklistSheet
+        visible={visible}
+        onClose={jest.fn()}
+        checklist={{}}
+        onSetItem={jest.fn()}
+      />
+    );
+    const view = render(sheet(true));
+    await flush();
+    fireEvent.press(screen.getByRole('button', { name: RIGHT_AWAY }));
+    await flush();
+    view.rerender(sheet(false));
+    view.rerender(sheet(true));
+    await flush();
+    expect(screen.getByText(copy.staysOnPhone)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: phrases.back })).toBeNull();
+  });
+
+  it('Android Back inside the panel goes Back and does not close the sheet', async () => {
+    const onClose = jest.fn();
+    render(<Harness start={{}} onSave={jest.fn()} onClose={onClose} />);
+    await flush();
+    fireEvent.press(screen.getByRole('button', { name: RIGHT_AWAY }));
+    await flush();
+    act(() => screen.UNSAFE_getByType(Modal).props.onRequestClose());
+    expect(screen.getByText(copy.staysOnPhone)).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows the words Doesn't apply on a row marked that way, and a done row does not", async () => {
+    await open(RIGHT_AWAY, {
+      [first]: 'not_applicable',
+      [itemIds[1] as ChecklistItemId]: 'done',
+    });
+    const marked = tickRow(`${firstLabel}. ${phrases.notApplicable}`);
+    expect(within(marked).getByText(phrases.notApplicable)).toBeTruthy();
+    expect(marked.props.accessibilityHint).toBe(copy.clearsIt);
+    const done = tickRow(phrases.items[itemIds[1] as ChecklistItemId]);
+    expect(within(done).queryByText(phrases.notApplicable)).toBeNull();
+    expect(done.props.accessibilityHint).toBeUndefined();
   });
 
   it('ticks an item, saves it on the person and strikes it through', async () => {
@@ -191,21 +258,47 @@ describe('ChecklistGroupPanel (#697)', () => {
     ).toHaveLength(0);
   });
 
-  it('announces once, politely, when the phase becomes Done, with no counts', async () => {
+  it('announces once, queued, when the phase becomes Done, with no counts', async () => {
     const announce = jest
-      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions')
       .mockImplementation(() => undefined);
     const [last, ...rest] = [...itemIds].reverse();
     await open(RIGHT_AWAY, Object.fromEntries(rest.map((id) => [id, 'done'])));
     expect(announce).not.toHaveBeenCalled();
     fireEvent.press(tickRow(phrases.items[last as ChecklistItemId]));
     expect(announce.mock.calls).toEqual([
-      [fill(copy.phaseNowDone, { group: RIGHT_AWAY })],
+      [fill(copy.phaseNowDone, { group: RIGHT_AWAY }), { queue: true }],
     ]);
     expect(announce.mock.calls[0][0]).not.toMatch(/\d+\s*(of|\/)\s*\d+|%|!/);
-    // Un-ticking and ticking again is a new change to Done, so it is announced again; a plain re-render is not.
-    fireEvent.press(tickRow(phrases.items[last as ChecklistItemId]));
-    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces nothing when the opened phase is already fully done', async () => {
+    const queued = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions')
+      .mockImplementation(() => undefined);
+    const plain = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => undefined);
+    await open(
+      RIGHT_AWAY,
+      Object.fromEntries(itemIds.map((id) => [id, 'done'])),
+    );
+    await flush();
+    expect(queued).not.toHaveBeenCalled();
+    expect(plain).not.toHaveBeenCalled();
+  });
+
+  it('announces again when an item is un-ticked and ticked again', async () => {
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions')
+      .mockImplementation(() => undefined);
+    const [last, ...rest] = [...itemIds].reverse();
+    await open(RIGHT_AWAY, Object.fromEntries(rest.map((id) => [id, 'done'])));
+    const row = () => tickRow(phrases.items[last as ChecklistItemId]);
+    fireEvent.press(row());
+    fireEvent.press(row());
+    fireEvent.press(row());
+    expect(announce).toHaveBeenCalledTimes(2);
   });
 
   it('moves focus to the panel title on open and back to the group on Back', async () => {
@@ -216,6 +309,7 @@ describe('ChecklistGroupPanel (#697)', () => {
     const titleHandle = focus.mock.calls.at(-1)?.[0];
     expect(titleHandle).toBeDefined();
     fireEvent.press(screen.getByRole('button', { name: phrases.back }));
+    await flush();
     const groupHandle = focus.mock.calls.at(-1)?.[0];
     expect(focus.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(groupHandle).not.toBe(titleHandle);
@@ -238,6 +332,11 @@ describe('ChecklistGroupPanel (#697)', () => {
         ).toBeTruthy();
       }
       expect(screen.queryByText(phrases.notApplicable)).toBeNull();
+    });
+
+    it('shows the Social Security tip under its row, always', async () => {
+      await open(phrases.gatherHeading);
+      expect(screen.getByText(phrases.gatherNotes.ssn)).toBeTruthy();
     });
 
     it('reads the saved device ticks', async () => {

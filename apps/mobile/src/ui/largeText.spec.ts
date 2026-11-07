@@ -27,6 +27,7 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['ui/screens/PersonSetup.tsx', 'topBar'],
   ['ui/screens/ShareObituary.tsx', 'topBar'],
   ['ui/ActionBar.tsx', 'above'],
+  ['components/ChecklistGroupPanel.tsx', 'header'],
 ];
 
 describe('rows that hold two controls wrap and keep a gap (#654)', () => {
@@ -63,6 +64,9 @@ describe('text is at least 15 pt (#654)', () => {
     ['screens/ContactsStepScreen.tsx', 'status'],
     ['screens/ContactsStepScreen.tsx', 'note'],
     ['ui/screens/WhoShouldKnow.tsx', 'error'],
+    ['components/ChecklistGroupPanel.tsx', 'linkText'],
+    ['components/ChecklistGroupPanel.tsx', 'meta'],
+    ['components/ChecklistGroupPanel.tsx', 'note'],
   ])('%s %s', (file, name) => {
     const size = /fontSize:\s*(\d+)/.exec(styleBlock(file, name));
     expect(Number(size?.[1])).toBeGreaterThanOrEqual(15);

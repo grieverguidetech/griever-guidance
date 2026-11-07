@@ -3,6 +3,7 @@ import type { ComponentRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AccessibilityInfo,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -54,9 +55,11 @@ export function ChecklistGroupPanel({
       ? checklistCopy.gatherHeading
       : checklistCopy.phases[groupId];
 
-  // Focus goes to the title when the panel opens.
+  // Focus goes to the title when the panel opens. Deferred a tick, as on the hub, so the
+  // screen reader takes it after the swap has drawn.
   useEffect(() => {
-    focusNode(title.current);
+    const timer = setTimeout(() => focusNode(title.current), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // One polite announcement when this phase becomes Done while the panel is open. No counts.
@@ -69,9 +72,15 @@ export function ChecklistGroupPanel({
   const wasDone = useRef(done);
   useEffect(() => {
     if (done && !wasDone.current) {
-      AccessibilityInfo.announceForAccessibility(
-        fill(copy.phaseNowDone, { group: label }),
-      );
+      const message = fill(copy.phaseNowDone, { group: label });
+      // Queued behind the focus move so it is read, not dropped. Some runtimes lack the options form.
+      if (AccessibilityInfo.announceForAccessibilityWithOptions) {
+        AccessibilityInfo.announceForAccessibilityWithOptions(message, {
+          queue: true,
+        });
+      } else {
+        AccessibilityInfo.announceForAccessibility(message);
+      }
     }
     wasDone.current = done;
   }, [done, label]);
@@ -133,6 +142,8 @@ function PhaseRows({
                   : itemLabel
               }
               text={itemLabel}
+              note={notApplicable ? checklistCopy.notApplicable : undefined}
+              hint={notApplicable ? copy.clearsIt : undefined}
               checked={finished}
               onPress={() => onSetItem(item.id, finished ? null : 'done')}
             />
@@ -197,7 +208,10 @@ function GatherRows() {
       () => setSaveFailed(false),
       () => {
         setSaveFailed(true);
-        AccessibilityInfo.announceForAccessibility(NOT_SAVED_NOTE_TEXT);
+        // Android reads the live region below; iOS needs this announcement.
+        if (Platform.OS === 'ios') {
+          AccessibilityInfo.announceForAccessibility(NOT_SAVED_NOTE_TEXT);
+        }
       },
     );
   };
@@ -218,7 +232,17 @@ function GatherRows() {
                 checked={ticked.includes(item.id)}
                 onPress={() => toggle(item.id)}
               />
-              {item.meta ? <Text style={styles.meta}>{item.meta}</Text> : null}
+              {item.meta ? (
+                // Already in the tick row's label, so hidden from screen readers here.
+                <View
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                  accessibilityElementsHidden
+                >
+                  <Text style={styles.meta}>{item.meta}</Text>
+                </View>
+              ) : null}
+              {item.tip ? <Text style={styles.meta}>{item.tip}</Text> : null}
             </View>
           ))
         : null}
@@ -230,11 +254,16 @@ function GatherRows() {
 function TickRow({
   label,
   text,
+  note,
+  hint,
   checked,
   onPress,
 }: {
   label: string;
   text: string;
+  /** A visible line under the text, already in `label` for screen readers. */
+  note?: string;
+  hint?: string;
   checked: boolean;
   onPress: () => void;
 }) {
@@ -242,6 +271,7 @@ function TickRow({
     <Pressable
       role="checkbox"
       accessibilityLabel={label}
+      accessibilityHint={hint}
       accessibilityState={{ checked }}
       onPress={onPress}
       style={({ pressed }) => [styles.tick, pressed && styles.pressed]}
@@ -256,7 +286,14 @@ function TickRow({
           </Text>
         ) : null}
       </View>
-      <Text style={[styles.text, checked && styles.struck]}>{text}</Text>
+      <View style={styles.textBlock}>
+        <Text style={[styles.text, checked && styles.struck]}>{text}</Text>
+        {note ? (
+          <Text style={styles.note} importantForAccessibility="no">
+            {note}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -267,12 +304,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: spacing[2],
   },
   close: { flexShrink: 0 },
   titleRow: { marginTop: spacing[3], marginBottom: spacing[2] },
   body: { paddingBottom: spacing[6], gap: spacing[3] },
-  item: { gap: 2 },
+  item: { gap: spacing[1] },
   tick: {
     minHeight: minTouchTarget,
     width: '100%',
@@ -297,7 +335,9 @@ const styles = StyleSheet.create({
   },
   boxOn: { borderColor: ACCENT, backgroundColor: ACCENT },
   mark: { fontSize: 16, color: colors.surface, fontWeight: '700' },
-  text: { flex: 1, fontSize: 16, color: colors.ink },
+  textBlock: { flex: 1 },
+  note: { fontSize: 15, color: MUTED, fontStyle: 'italic' },
+  text: { fontSize: 16, color: colors.ink },
   struck: { textDecorationLine: 'line-through', color: MUTED },
   link: {
     minHeight: minTouchTarget,
@@ -305,7 +345,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     alignSelf: 'flex-start',
   },
-  linkText: { fontSize: 14, color: ACCENT, textDecorationLine: 'underline' },
+  linkText: { fontSize: 15, color: ACCENT, textDecorationLine: 'underline' },
   linkOn: { fontWeight: '700' },
-  meta: { fontSize: 13, color: MUTED, paddingHorizontal: spacing[3] },
+  meta: { fontSize: 15, color: MUTED, paddingHorizontal: spacing[3] },
 });
