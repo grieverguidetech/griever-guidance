@@ -5,5 +5,6 @@
   "groupDone": "{group}. Done",
   "groupHint": "Shows the list.",
   "notApplicableFor": "Doesn't apply: {item}",
-  "phaseNowDone": "{group} is now done."
+  "phaseNowDone": "{group} is now done.",
+  "clearsIt": "Clears it."
 }

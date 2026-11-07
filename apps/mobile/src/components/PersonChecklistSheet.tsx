@@ -60,9 +60,13 @@ export function PersonChecklistSheet({
   // After Back, focus returns to the group that was open.
   useEffect(() => {
     if (openId === null && returnTo.current) {
-      focusNode(groupButtons.current[returnTo.current] ?? null);
+      const target = groupButtons.current[returnTo.current] ?? null;
       returnTo.current = null;
+      // Deferred a tick, as on the hub, so the screen reader takes it after the list has drawn.
+      const timer = setTimeout(() => focusNode(target), 0);
+      return () => clearTimeout(timer);
     }
+    return undefined;
   }, [openId]);
   const back = () => {
     returnTo.current = openId;
