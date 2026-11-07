@@ -20,7 +20,7 @@ const anna = {
 const copy = screenCopy('pathLanding');
 
 const renderHub = () =>
-  render(<HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} paymentsEnabled={false} />);
+  render(<HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} paymentsEnabled={false} />);
 const thanksCard = () => screen.getByRole('button', { name: /Send thank-yous/ });
 
 beforeEach(() => {

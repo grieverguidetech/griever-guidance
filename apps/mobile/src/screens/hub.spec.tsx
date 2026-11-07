@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, BackHandler, Modal, Platform, ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
-import { templates } from '@griever/shared';
+import { CHECKLIST_PHASES, templates } from '@griever/shared';
 import { colors } from '@griever/tokens';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
@@ -25,6 +25,9 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   },
 }));
 
+// The first item of the first phase, a real id so the saved tick is read back.
+const firstItem = CHECKLIST_PHASES.find((phase) => phase.key === 'right-away')?.itemIds[0] as string;
+
 const anna = {
   id: 'a',
   flowId: 'flow-a',
@@ -44,15 +47,23 @@ const anna = {
 } as unknown as Session;
 
 function setup(session: Session = anna, paymentsEnabled = false, extra: Partial<HubScreenProps> = {}) {
-  const handlers = { others: [] as Session[], onSwitch: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
+  const handlers = { others: [] as Session[], onSwitch: jest.fn(), onStart: jest.fn(), onSetItem: jest.fn(), onEditPerson: jest.fn() };
   render(<HubScreen session={session} paymentsEnabled={paymentsEnabled} {...handlers} {...extra} />);
   return handlers;
 }
 
-// The switcher sheet is the first Modal on the screen (always drawn), More the second, the checklist the third.
-const moreModal = () => screen.UNSAFE_getAllByType(Modal)[1];
-const switcherModal = () => screen.UNSAFE_getAllByType(Modal)[0];
-const morePanel = () => within(moreModal());
+// Each sheet's Modal is found by its test id, never by its place in the tree. A closed Modal draws nothing, so this looks at the React elements, not the drawn nodes.
+const modalById = (testID: string) => {
+  const modal = screen.UNSAFE_getAllByType(Modal).find((m) => m.props.testID === testID);
+  if (!modal) {
+    throw new Error(`No Modal with testID ${testID}`);
+  }
+  return modal;
+};
+const switcherModal = () => modalById('switcher-sheet');
+const checklistModal = () => modalById('checklist-sheet');
+const paywallModal = () => modalById('paywall-sheet');
+const checklistButton = () => screen.getByRole('button', { name: "What you'll need" });
 
 // The handle the fake findNodeHandle gave the node that was focused last.
 const handleOf = (predicate: (node: any) => boolean) => {
@@ -60,8 +71,8 @@ const handleOf = (predicate: (node: any) => boolean) => {
   return [...handles].find(([node]) => predicate(node))?.[1];
 };
 
-// The handle the fake gave the More button (found by its hint), so a test sees focus go to More and nowhere else.
-const moreHandle = () => handleOf((node) => node?.props?.accessibilityHint === 'Opens a list of more options') ?? -1;
+// The handle the fake gave the What you'll need button (found by its hint), so a test sees focus go to it and nowhere else.
+const checklistHandle = () => handleOf((node) => node?.props?.accessibilityHint === 'Opens the list.') ?? -1;
 
 // The node that got the last screen-reader focus call.
 const focusedNode = (focus: jest.SpiedFunction<typeof AccessibilityInfo.setAccessibilityFocus>) => {
@@ -75,7 +86,12 @@ const bottomButton = () => within(screen.getByTestId('hub-action-bar')).getByRol
 
 describe('HubScreen', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     (globalThis as unknown as { nodeHandles?: Map<unknown, number> }).nodeHandles?.clear();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('shows the person, the heading and the four steps, with the bottom button naming the announcement', () => {
@@ -141,138 +157,141 @@ describe('HubScreen', () => {
     expect(onSwitch).toHaveBeenCalledWith('b');
   });
 
-  it('puts Add someone in More when this is the only person, and runs it once the sheet is gone', () => {
+  it('puts Add someone in the switcher when this is the only person, and runs it once the sheet is gone', () => {
     const onAddSomeone = jest.fn();
     setup(anna, false, { onAddSomeone });
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: 'Add someone' }));
-    act(() => moreModal().props.onDismiss());
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
+    fireEvent.press(within(screen.getByTestId('switcher-sheet')).getByRole('button', { name: 'Add someone' }));
+    act(() => switcherModal().props.onDismiss());
     expect(onAddSomeone).toHaveBeenCalledTimes(1);
-  });
-
-  it('leaves Add someone out of More with 2 or more people (it is in the switcher)', () => {
-    const ben = { ...anna, id: 'b', personName: 'Ben' } as Session;
-    setup(anna, false, { others: [ben], onAddSomeone: jest.fn() });
-    // The switcher sheet is always the first Modal; More is the second.
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    expect(within(screen.UNSAFE_getAllByType(Modal)[1]).queryByRole('button', { name: 'Add someone' })).toBeNull();
   });
 
   it('draws no Add someone anywhere when the user cannot create a person (C11)', () => {
     const ben = { ...anna, id: 'b', personName: 'Ben' } as Session;
     setup(anna, false, { others: [ben] });
     fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
     expect(screen.queryByRole('button', { name: 'Add someone' })).toBeNull();
   });
 
-  it('adds Your account and Add from your contacts to More only when they are given', () => {
+  it('has a What you will need button on the top bar and no More, no Add from your contacts, no Edit person on the screen itself', () => {
     setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
+    expect(checklistButton()).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByText('More')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add from your contacts' })).toBeNull();
-  });
-
-  it('opens Your account and the contacts import from More, each once the sheet is gone', () => {
-    const onAccount = jest.fn();
-    const onImportContacts = jest.fn();
-    setup(anna, false, { onAccount, onImportContacts });
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: 'Your account' }));
-    act(() => moreModal().props.onDismiss());
-    expect(onAccount).toHaveBeenCalledTimes(1);
-    expect(onImportContacts).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: 'Add from your contacts' }));
-    act(() => moreModal().props.onDismiss());
-    expect(onImportContacts).toHaveBeenCalledTimes(1);
-  });
-
-  it('has More on the top bar, and no What you will need or Edit person button until More is opened', () => {
-    setup();
-    expect(screen.getByRole('button', { name: 'More' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit person' })).toBeNull();
   });
 
-  it('More opens a sheet with What you will need and Edit person, and nothing that deletes or removes', () => {
+  it('draws What you will need as the quiet text-only button: no outline, no background', () => {
     setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    const sheet = morePanel();
-    expect(sheet.getAllByRole("button")).toHaveLength(3);
-    expect(sheet.getByRole("button", { name: "What you'll need" })).toBeTruthy();
-    expect(sheet.getByRole("button", { name: "Edit person" })).toBeTruthy();
-    expect(sheet.getByRole("button", { name: "Close" })).toBeTruthy();
-    expect(JSON.stringify(screen.toJSON())).not.toMatch(/delete|remove/i);
+    const flat = StyleSheet.flatten(typeof checklistButton().props.style === 'function' ? checklistButton().props.style({ pressed: false }) : checklistButton().props.style);
+    expect(flat.backgroundColor).toBeUndefined();
+    expect(flat.borderColor).toBe('transparent');
   });
 
-  it('Edit person from More calls onEditPerson once the sheet has closed (iOS onDismiss)', () => {
-    const { onEditPerson } = setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: 'Edit person' }));
-    expect(onEditPerson).not.toHaveBeenCalled();
-    act(() => moreModal().props.onDismiss());
-    expect(onEditPerson).toHaveBeenCalledTimes(1);
-  });
-
-  it('What you will need from More opens the checklist sheet once More has closed', () => {
+  it('gives the button a hint on native', () => {
     setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: "What you'll need" }));
-    act(() => moreModal().props.onDismiss());
-    expect(screen.UNSAFE_getAllByType(Modal)[2].props.visible).toBe(true);
-    expect(screen.getByText('Not today. Just so none of it surprises you.')).toBeTruthy();
+    expect(checklistButton().props.accessibilityHint).toBe('Opens the list.');
   });
 
-  it('a second close while More slides out does not drop the chosen item', () => {
-    const { onEditPerson } = setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: 'Edit person' }));
-    // Close or the backdrop while the sheet slides out (both call onRequestClose or onClose).
-    act(() => moreModal().props.onRequestClose());
-    act(() => moreModal().props.onDismiss());
-    expect(onEditPerson).toHaveBeenCalledTimes(1);
-  });
-
-  it('gives More a hint on native', () => {
+  it('opens the checklist sheet only after a tap on What you will need', () => {
     setup();
-    expect(screen.getByRole('button', { name: 'More' }).props.accessibilityHint).toBe('Opens a list of more options');
+    expect(checklistModal().props.visible).toBe(false);
+    fireEvent.press(checklistButton());
+    expect(checklistModal().props.visible).toBe(true);
+    expect(within(screen.getByTestId('checklist-sheet')).getByRole('heading', { name: "What you'll need" })).toBeTruthy();
+    expect(within(screen.getByTestId('checklist-sheet')).getByText('Your ticks stay on this phone.')).toBeTruthy();
   });
 
-  it('closing More with Close sends screen-reader focus back to More', () => {
+  it('passes the open person\'s checklist to the sheet and saves a tick through onSetItem', () => {
+    const onSetItem = jest.fn();
+    setup({ ...anna, checklist: { [firstItem]: 'done' } } as unknown as Session, false, { onSetItem });
+    fireEvent.press(checklistButton());
+    // The first phase is not done by this one tick, so it shows no Done; opening it shows the saved tick.
+    fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: /^Right away/ }));
+    const rows = within(screen.getByTestId('checklist-sheet')).getAllByRole('checkbox');
+    expect(rows.some((row) => row.props.accessibilityState.checked === true)).toBe(true);
+    const open = rows.find((row) => row.props.accessibilityState.checked === false);
+    fireEvent.press(open as NonNullable<typeof open>);
+    expect(onSetItem).toHaveBeenCalledTimes(1);
+    expect(onSetItem.mock.calls[0][1]).toBe('done');
+  });
+
+  it('shows the Your account link at the foot only when accounts are on, and it runs onAccount', () => {
+    const { rerender } = render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
+    const onAccount = jest.fn();
+    rerender(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} onAccount={onAccount} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Your account' }));
+    expect(onAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('puts the Your account link after the last step, as plain text with no outline', () => {
+    setup(anna, false, { onAccount: jest.fn() });
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('Send thank-yous')).toBeLessThan(tree.indexOf('Your account'));
+    const link = screen.getByRole('button', { name: 'Your account' });
+    const flat = StyleSheet.flatten(typeof link.props.style === 'function' ? link.props.style({ pressed: false }) : link.props.style);
+    expect(flat.backgroundColor).toBeUndefined();
+    expect(flat.borderColor).toBe('transparent');
+  });
+
+  it('after the checklist sheet closes on iOS, screen-reader focus goes back to What you will need (onDismiss)', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-    const { onEditPerson } = setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    focus.mockClear();
-    fireEvent.press(morePanel().getByRole('button', { name: 'Close' }));
-    expect(moreModal().props.visible).toBe(false);
-    act(() => moreModal().props.onDismiss());
-    expect(focus).toHaveBeenCalledWith(moreHandle());
-    expect(moreHandle()).toBeDefined();
-    expect(onEditPerson).not.toHaveBeenCalled();
+    const original = Platform.OS;
+    Platform.OS = 'ios';
+    try {
+      setup();
+      fireEvent.press(checklistButton());
+      focus.mockClear();
+      fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
+      expect(checklistModal().props.visible).toBe(false);
+      // iOS tells us when the sheet is gone; nothing is sent before that.
+      expect(focus).not.toHaveBeenCalled();
+      act(() => checklistModal().props.onDismiss());
+      expect(focus).toHaveBeenCalledWith(checklistHandle());
+      expect(checklistHandle()).toBeDefined();
+    } finally {
+      Platform.OS = original;
+    }
   });
 
-  it('on Android, More does its item and returns focus without onDismiss', () => {
+  it('on Android, closing the checklist sheet sends focus back to What you will need without onDismiss', () => {
     jest.useFakeTimers();
     const original = Platform.OS;
     Platform.OS = 'android';
     try {
       const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-      const { onEditPerson } = setup();
-      fireEvent.press(screen.getByRole('button', { name: 'More' }));
-      fireEvent.press(morePanel().getByRole('button', { name: 'Edit person' }));
-      act(() => {
-        jest.runAllTimers();
-      });
-      expect(onEditPerson).toHaveBeenCalledTimes(1);
-      fireEvent.press(screen.getByRole('button', { name: 'More' }));
+      setup();
+      fireEvent.press(checklistButton());
       focus.mockClear();
-      fireEvent.press(morePanel().getByRole('button', { name: 'Close' }));
+      fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
       act(() => {
         jest.runAllTimers();
       });
-      expect(focus).toHaveBeenCalledWith(moreHandle());
-      expect(moreHandle()).toBeDefined();
+      expect(focus).toHaveBeenCalledWith(checklistHandle());
+      expect(checklistHandle()).toBeDefined();
+    } finally {
+      Platform.OS = original;
+      jest.useRealTimers();
+    }
+  });
+
+  it('on Android, the Back gesture on the checklist sheet closes it and returns focus to the button', () => {
+    jest.useFakeTimers();
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      setup();
+      fireEvent.press(checklistButton());
+      focus.mockClear();
+      act(() => checklistModal().props.onRequestClose());
+      expect(checklistModal().props.visible).toBe(false);
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).toHaveBeenCalledWith(checklistHandle());
     } finally {
       Platform.OS = original;
       jest.useRealTimers();
@@ -284,7 +303,7 @@ describe('HubScreen', () => {
     Platform.OS = 'ios';
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.', category: 'announcement' as const, partial: false };
-    render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
+    render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} note={note} />);
     Platform.OS = original;
     expect(screen.getByText('Everyone has been told.')).toBeTruthy();
     expect(screen.getByLabelText('Everyone has been told. Kept private.').props.accessibilityLiveRegion).toBe('polite');
@@ -298,7 +317,7 @@ describe('HubScreen', () => {
     Platform.OS = 'android';
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'Everyone has been told. Kept private.', category: 'announcement' as const, partial: false };
-    render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} note={note} />);
+    render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} note={note} />);
     Platform.OS = original;
     expect(announce).not.toHaveBeenCalled();
     act(() => {
@@ -380,11 +399,11 @@ describe('HubScreen', () => {
     });
     setup();
     expect(handlers.some((h) => h())).toBe(false);
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(checklistButton());
     expect(handlers.some((h) => h())).toBe(false);
     // The open sheet shuts through its own Back request.
-    act(() => moreModal().props.onRequestClose());
-    expect(moreModal().props.visible).toBe(false);
+    act(() => checklistModal().props.onRequestClose());
+    expect(checklistModal().props.visible).toBe(false);
   });
 
   it('with payments on, locks the paid steps: focusable, not disabled, with the reason as a hint', () => {
@@ -404,7 +423,7 @@ describe('HubScreen', () => {
     setup(anna, true);
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
-    act(() => screen.UNSAFE_getAllByType(Modal)[3].props.onDismiss());
+    act(() => paywallModal().props.onDismiss());
     expect(focusedNode(focus)?.props.accessibilityHint).toBe('Included with the full plan');
   });
 
@@ -459,22 +478,10 @@ describe('HubScreen', () => {
     expect(screen.UNSAFE_getAllByType(Modal).every((m) => !m.props.visible)).toBe(true);
   });
 
-  it('after the checklist sheet is dismissed, screen-reader focus goes back to More', () => {
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-    setup();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(morePanel().getByRole('button', { name: "What you'll need" }));
-    act(() => moreModal().props.onDismiss());
-    focus.mockClear();
-    act(() => screen.UNSAFE_getAllByType(Modal)[2].props.onDismiss());
-    expect(focus).toHaveBeenCalledWith(moreHandle());
-    expect(moreHandle()).toBeDefined();
-  });
-
   it('draws the heading in Source Serif once the app has loaded the font (the provider App.tsx supplies)', () => {
     render(
       <SerifReadyContext.Provider value>
-        <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
+        <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
     const heading = screen.getByRole('heading', { name: 'Ready to send' });
@@ -485,7 +492,7 @@ describe('HubScreen', () => {
   it('keeps the system font until the serif is ready', () => {
     render(
       <SerifReadyContext.Provider value={false}>
-        <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} />
+        <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
     const heading = screen.getByRole('heading', { name: 'Ready to send' });
@@ -523,14 +530,6 @@ describe('HubScreen', () => {
     expect(screen.getByText('Needs the place')).toBeTruthy();
   });
 
-  it('uses the header variant for More, so it is not the first strong button', () => {
-    setup();
-    const edit = screen.getByRole('button', { name: 'More' });
-    const flat = StyleSheet.flatten(typeof edit.props.style === 'function' ? edit.props.style({ pressed: false }) : edit.props.style);
-    expect(flat.backgroundColor).toBeUndefined();
-    expect(flat.borderColor).toBe(colors['accent-600']);
-  });
-
   it('draws an edge around the finished and later steps, so they read as pressable', () => {
     const done = {
       ...anna,
@@ -554,7 +553,7 @@ describe('HubScreen: the next card and the bottom button', () => {
   const announced = { recipientsNotified: { announcement: ['c1'] } };
   const ready = { senderName: 'Sam', serviceDate: 'November 8, 2026', serviceTime: '2:00 PM', servicePlace: 'St Mary' };
   const sess = (extra: object) => ({ ...anna, ...extra }) as unknown as Session;
-  const props = { paymentsEnabled: false, others: [] as Session[], onSwitch: jest.fn(), onStart: jest.fn(), onEditPerson: jest.fn() };
+  const props = { paymentsEnabled: false, others: [] as Session[], onSwitch: jest.fn(), onStart: jest.fn(), onSetItem: jest.fn(), onEditPerson: jest.fn() };
 
   it('lights the service once the announcement is done, and the bottom button names it', () => {
     const { onStart } = setup(sess({ ...announced, ...ready }));

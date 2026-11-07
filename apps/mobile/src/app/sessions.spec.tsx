@@ -28,7 +28,7 @@ async function startWith(name: string) {
 }
 
 // Home is only the first screen now. On the person screen the name opens the switcher (2 or more
-// people); with one person, "Add someone" is under More.
+// people); with one person it is still a button, and its sheet has "Add someone".
 const openSwitcher = () => fireEvent.press(screen.getByRole('button', { name: /^Writing about / }));
 const openThankYous = async () => fireEvent.press(await screen.findByRole('button', { name: /Send thank-yous/ }));
 
@@ -38,16 +38,11 @@ async function begin() {
   await screen.findByText(SETUP_TITLE);
 }
 
-// A sheet's onDismiss does not fire in Jest; the More sheet runs its chosen item from it on iOS.
+// A sheet's onDismiss does not fire in Jest; the switcher runs its chosen item from it on iOS.
 const finishSheets = () => act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
 
 async function addPerson() {
-  const inMore = !screen.queryByRole('button', { name: /^Writing about / });
-  if (inMore) {
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-  } else {
-    openSwitcher();
-  }
+  openSwitcher();
   fireEvent.press(await screen.findByRole('button', { name: 'Add someone' }));
   finishSheets();
   await screen.findByText(SETUP_TITLE);

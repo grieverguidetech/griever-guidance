@@ -22,5 +22,7 @@ export interface SheetProps {
   fallbackFocusRef?: FocusTargetRef;
   /** Web: id of the page root made inert while the sheet is open. Default "root", the id in apps/web/index.html. */
   inertRootId?: string;
+  /** Native: forwarded to the Modal, so a test can find this sheet without counting Modals. */
+  testID?: string;
   children: ReactNode;
 }

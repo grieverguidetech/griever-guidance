@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('the name switcher on the person screen', () => {
-  it('with one person the name is a button; its sheet has Edit person and Add someone, and More still has Add someone', async () => {
+  it('with one person the name is a button; its sheet has Edit person and Add someone, and there is no More', async () => {
     await seed([person('a', 'Anna', '2026-10-01T00:00:00.000Z')], 'a');
     say();
     render(<App />);
@@ -41,8 +41,7 @@ describe('the name switcher on the person screen', () => {
     expect(screen.getByRole('button', { name: 'Add someone' })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     finishSheets();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    expect(await screen.findByRole('button', { name: 'Add someone' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
   });
 
@@ -118,7 +117,7 @@ describe('the name switcher on the person screen', () => {
     render(<App />);
     await screen.findByText('For Ben');
     expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Ben' }));
     await screen.findByRole('button', { name: 'Edit person' });
     expect(screen.queryByText(/delete|remove/i)).toBeNull();
   });

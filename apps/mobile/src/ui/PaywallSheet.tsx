@@ -23,6 +23,7 @@ export type PaywallSheetProps = Pick<SheetProps, 'visible' | 'onClose' | 'onDism
 export function PaywallSheet({ copy, visible, onClose, onDismiss, returnFocusRef }: PaywallSheetProps) {
   return (
     <Sheet
+      testID="paywall-sheet"
       title={copy.heading}
       closeLabel={copy.close}
       visible={visible}

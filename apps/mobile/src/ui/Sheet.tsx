@@ -26,7 +26,7 @@ export interface SheetExtras {
  * button and Android's Back both shut it. The screen underneath stays mounted, so nothing typed
  * there is lost. Screen-reader focus starts on the title; the caller sends it back on dismiss.
  */
-export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClose, onDismiss, onBodyTouch, swipeToClose = false, bare = false, onShow, children }: SheetProps & SheetExtras) {
+export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClose, onDismiss, onBodyTouch, swipeToClose = false, bare = false, onShow, testID, children }: SheetProps & SheetExtras) {
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
@@ -60,6 +60,7 @@ export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClo
   };
   return (
     <Modal
+      testID={testID}
       visible={visible}
       animationType={reduceMotion ? 'none' : 'slide'}
       transparent

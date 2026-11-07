@@ -17,10 +17,10 @@ export type HubMomentKey = 'announce' | 'service' | 'obituary' | 'thanks';
 export interface HubCopy {
   heading: string;
   intro: string;
-  /** The top-bar button that opens the sheet with the less common actions. */
-  more: string;
-  /** Native hint read after the More button's name. */
-  moreHint: string;
+  /** The top-bar button that opens the checklist sheet. */
+  whatYoullNeed: string;
+  /** Native hint read after the button's name. */
+  whatYoullNeedHint: string;
   start: string;
   continue: string;
   tagStarted: string;
@@ -57,8 +57,8 @@ export interface HubProps {
   rows: HubRow[];
   /** The open person's name, top-left of the bar. The host draws it (plain text, or a button that opens the switcher). */
   name: ReactNode;
-  /** Opens the More sheet (What you'll need, Edit person and more). The host draws the sheet. */
-  onMore: () => void;
+  /** Opens the What you'll need sheet. The host draws the sheet. */
+  onWhatYoullNeed: () => void;
   onStart: (key: HubMomentKey) => void;
   /** `opener` is the row's node (DOM node on web, host instance on native), so focus can go back to it. */
   onLocked: (opener: unknown) => void;
@@ -69,8 +69,8 @@ export interface HubProps {
   /** Show `meta` on locked rows too. Web leaves this off and keeps its locked rows plain. */
   metaOnAllRows?: boolean;
   headingRef?: HeadingProps['headingRef'];
-  /** For the sheets that More opens to return screen-reader focus to. */
-  moreRef?: Ref<ButtonNode>;
+  /** The What you'll need button, so the host can return screen-reader focus to it when the sheet closes. */
+  whatYoullNeedRef?: Ref<ButtonNode>;
 }
 
 /**
@@ -84,7 +84,7 @@ export function Hub(props: HubProps) {
     <View style={styles.screen}>
       <View style={styles.topBar}>
         {props.name}
-        <Button label={copy.more} hint={copy.moreHint} variant="header" opensDialog onPress={props.onMore} buttonRef={props.moreRef} />
+        <Button label={copy.whatYoullNeed} hint={copy.whatYoullNeedHint} variant="tertiary" opensDialog onPress={props.onWhatYoullNeed} buttonRef={props.whatYoullNeedRef} />
       </View>
       <View style={styles.head}>
         <Eyebrow>{props.eyebrow}</Eyebrow>

@@ -80,6 +80,7 @@ export function PersonChecklistSheet({
 
   return (
     <Sheet
+      testID="checklist-sheet"
       bare={openId !== null}
       title={
         openId === null

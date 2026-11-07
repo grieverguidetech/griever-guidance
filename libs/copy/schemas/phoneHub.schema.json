@@ -1,18 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only person screen: heading, intro, More button and its items, partial-send line",
+  "title": "Copy for the phone-only person screen: heading, intro, What you'll need button, partial-send line, account link",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "intro", "more", "moreHint", "close", "sentPartial", "account", "importContacts"],
+  "required": ["heading", "intro", "whatYoullNeed", "whatYoullNeedHint", "sentPartial", "account"],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
     "intro": { "$ref": "#/$defs/text" },
-    "more": { "$ref": "#/$defs/text" },
-    "moreHint": { "$ref": "#/$defs/text" },
-    "close": { "$ref": "#/$defs/text" },
+    "whatYoullNeed": { "$ref": "#/$defs/text" },
+    "whatYoullNeedHint": { "$ref": "#/$defs/text" },
     "sentPartial": { "$ref": "#/$defs/text" },
-    "account": { "$ref": "#/$defs/text" },
-    "importContacts": { "$ref": "#/$defs/text" }
+    "account": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }
