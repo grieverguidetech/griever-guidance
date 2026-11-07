@@ -7,6 +7,7 @@ import {
   SHARE_SERVICE_SAMPLE,
   shareService,
   templates,
+  thankYouNote,
 } from './index.js';
 
 describe('announcePassing', () => {
@@ -169,5 +170,19 @@ describe('SHARE_SERVICE_SAMPLE', () => {
   it('is calm (no exclamation points) and uses placeholders, not names', () => {
     expect(SHARE_SERVICE_SAMPLE).not.toContain('!');
     expect(SHARE_SERVICE_SAMPLE).toContain('[Name]');
+  });
+});
+
+describe('thankYouNote (#693)', () => {
+  it.each([[{}], [{ senderName: '' }]])('shows ______ where the name goes when it is empty: %j', (extra) => {
+    const msg = thankYouNote.renderMessage({ deceasedName: 'Ann', ...extra });
+    expect(msg).toContain('On behalf of ______, we want');
+    expect(msg).not.toContain('undefined');
+  });
+
+  it('uses the name once it is typed', () => {
+    const msg = thankYouNote.renderMessage({ senderName: 'The Hayes Family', deceasedName: 'Ann' });
+    expect(msg).toContain('On behalf of The Hayes Family, we want');
+    expect(msg).not.toContain('______');
   });
 });
