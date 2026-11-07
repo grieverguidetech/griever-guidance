@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
+import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // The signed-in account is set per test. Null means nobody is signed in.
 let mockProfile: { id: string; senderName: string; firstName?: string | null; contactSource: null; accountType: 'owner' } | null = null;
@@ -15,8 +16,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockProfile = null;
 });
-import { SESSIONS_KEY } from '../lib/useDeviceSessions';
-
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
 // ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
 const openPeople = async () => {
@@ -239,7 +238,10 @@ describe('the thank-you name from the account (#695)', () => {
     await toConfirm();
     return screen.findByLabelText(NAME_LABEL);
   };
-  const saved = async () => (JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { senderName?: string }[])[0];
+  type SavedSession = { senderName?: string; drafts?: { aftercare?: { fields?: Record<string, string> } } };
+  const saved = async () => (JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as SavedSession[])[0];
+  // The draft is written after the form changes, so wait for the name to reach it.
+  const waitForDraftName = (name: string) => waitFor(async () => expect((await saved())?.drafts?.aftercare?.fields?.['senderName']).toBe(name));
 
   it('fills the name from the account sender name', async () => {
     mockProfile = account({ senderName: 'The Hayes family', firstName: 'Sam' });
@@ -282,7 +284,18 @@ describe('the thank-you name from the account (#695)', () => {
     mockProfile = account({ senderName: 'Sam' });
     await openMoment({ ...base, drafts: { aftercare: thanksDraft({}, 'Our own words.') } } as unknown as Session, /Send thank-yous/);
     expect(await screen.findByText('Our own words.')).toBeTruthy();
-    expect(screen.getByText('Our own words.')).toBeTruthy();
+    // The details row stays hidden while the wording is edited: the prefill did not touch the form.
+    expect(screen.queryByRole('button', { name: 'Change details' })).toBeNull();
+    expect(screen.queryByLabelText(NAME_LABEL)).toBeNull();
+  });
+
+  it('fills the name on a draft resumed on Ready to send, so sending is not blocked', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    await openMoment({ ...base, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session, /Send thank-yous/);
+    // The row opens by itself at first (the name was empty), so the field is there without a press.
+    expect((await screen.findByLabelText(NAME_LABEL)).props.value).toBe('Sam');
+    const send = screen.getByRole('button', { name: /^Text 1 person/ });
+    expect(send.props.accessibilityState?.disabled ?? false).toBe(false);
   });
 
   it('keeps the edited thank-you wording when the account fills the name', async () => {
@@ -291,16 +304,16 @@ describe('the thank-you name from the account (#695)', () => {
     await openPeople();
     await toConfirm();
     expect(await screen.findByText('Thank you all.')).toBeTruthy();
-    // The details row is hidden while the wording is edited, so the message itself is the check:
-    // filling the name must not have cleared it.
-    await new Promise((r) => setTimeout(r, 100));
+    // The details row is hidden while the wording is edited, so the saved draft shows the name went in.
+    // Filling it must not have cleared the wording.
+    await waitForDraftName('Sam');
     expect(screen.getByText('Thank you all.')).toBeTruthy();
   });
 
   it('does not write the account name to the person', async () => {
     mockProfile = account({ senderName: 'Sam' });
     await toThanks();
-    await new Promise((r) => setTimeout(r, 100));
+    await waitForDraftName('Sam');
     expect((await saved())?.senderName).toBe('');
   });
 });

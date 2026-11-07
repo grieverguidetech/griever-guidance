@@ -277,21 +277,24 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
     if (prefilled.current) return;
     prefilled.current = true;
-    // A draft resumed straight on Ready to send is not a first-form arrival: nothing to prefill.
-    if (!onForm) return;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    // The account name starts the sender field when the person has none and nothing is typed. Never
+    // over a typed name, and never when the family hand-edited the message: setField clears the
+    // override, so that wording would be lost. Runs before setMessageOverride below,
+    // and also for a draft resumed on Ready to send (the hub counts the account name, so that screen
+    // must not block on it). Once per visit: a profile that arrives later does not fill, on purpose,
+    // so a name never appears under a family that has started typing.
+    if (accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
+      setField('senderName', accountName);
+    }
+    // A draft resumed straight on Ready to send is not a first-form arrival: nothing else to prefill.
+    if (!onForm) return;
     // Older drafts saved obituaryText as the message. The obituary send texts the link template now
     // (MOB-9, #559 Decision 4), so drop that copy; a hand-edited message stays.
     if (category === 'obituary' && messageOverride && messageOverride === session.obituaryText) {
       setMessageOverride(null);
     }
     const fresh = !hasDraftContent && messageOverride === null;
-    // The account name starts the sender field when the person has none and nothing is typed. Never
-    // over a typed name, and never when the family hand-edited the message: setField clears the
-    // override, so that wording would be lost. Runs before setMessageOverride below.
-    if (accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
-      setField('senderName', accountName);
-    }
     if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
     if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
     // The planned details and edited wording (synced from the web) start a fresh form. A form with

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
+import { screenCopy } from '@griever/copy';
 import { HubScreen } from './HubScreen';
 import { withAccountName } from '../lib/accountName';
 
@@ -15,6 +16,8 @@ const anna = {
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
+
+const copy = screenCopy('pathLanding');
 
 const renderHub = () =>
   render(<HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onEditPerson={jest.fn()} paymentsEnabled={false} />);
@@ -35,6 +38,7 @@ describe('the thank-you card status with an account name (#695)', () => {
     mockProfile = { id: 'u1', senderName: '', firstName: 'Sam', contactSource: null, accountType: 'owner' };
     renderHub();
     expect(within(thanksCard()).queryByText(/Needs your name/)).toBeNull();
+    expect(within(thanksCard()).getByText(copy.statusReady)).toBeTruthy();
   });
 });
 
