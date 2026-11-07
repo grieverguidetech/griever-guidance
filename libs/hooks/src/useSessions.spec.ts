@@ -207,6 +207,15 @@ describe('one draft per moment (#83)', () => {
     }
   });
 
+  it('obituaryEmailedAt survives a remount on the same storage', () => {
+    const { result, id, storage } = start();
+    act(() => result.current.recordObituaryEmailed(id));
+    const saved = result.current.sessions[0].obituaryEmailedAt;
+    expect(saved).toBeTruthy();
+    const again = renderHook(() => useSessions(storage));
+    expect(again.result.current.sessions[0].obituaryEmailedAt).toBe(saved);
+  });
+
   it('does not keep a draft with no moment chosen yet', () => {
     const { result, id } = start();
     act(() => result.current.updateDraft(id, freshDraft({})));
