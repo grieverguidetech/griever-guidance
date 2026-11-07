@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { useState } from 'react';
 import { AccessibilityInfo, Modal } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CHECKLIST_KEY, SSN_TIP } from '../screens/WhatYoullNeedScreen';
-import { SetupScreen } from '../screens/SetupScreen';
+import { Button } from '../ui';
+import { WhatYoullNeedSheet } from './WhatYoullNeedSheet';
 
 // Jest has no native view tree, so findNodeHandle returns null and the focus calls would be skipped.
 // A fake handle lets the tests see that focus is sent to the right place.
@@ -13,7 +15,17 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   findNodeHandle: () => 1,
 }));
 
-const setup = () => render(<SetupScreen initial={{ personName: '', dateOfPassing: '' }} onContinue={jest.fn()} onBack={jest.fn()} />);
+// The Account page (ProfileScreen) is the one place that still opens this Gather-only sheet: it has no open person to save phase ticks on.
+function Harness() {
+  const [visible, setVisible] = useState(false);
+  return (
+    <>
+      <Button label="What you'll need" onPress={() => setVisible(true)} />
+      <WhatYoullNeedSheet visible={visible} onClose={() => setVisible(false)} onDismiss={() => AccessibilityInfo.setAccessibilityFocus(1)} />
+    </>
+  );
+}
+const setup = () => render(<Harness />);
 const open = () => fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
 const modal = () => screen.UNSAFE_getByType(Modal);
 
@@ -33,14 +45,13 @@ describe('What you will need sheet (#193)', () => {
     expect(screen.UNSAFE_getByProps({ accessibilityViewIsModal: true })).toBeTruthy();
   });
 
-  it('closes with the Close button and keeps what was typed', async () => {
+  it('closes with the Close button and leaves the button in place', async () => {
     setup();
-    fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Anna Lee');
     open();
     await screen.findAllByRole('checkbox');
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     expect(modal().props.visible).toBe(false);
-    expect(screen.getByLabelText('Their name, required').props.value).toBe('Anna Lee');
+    expect(screen.getByRole('button', { name: "What you'll need" })).toBeTruthy();
   });
 
   it('closes on the Android Back gesture (onRequestClose)', async () => {

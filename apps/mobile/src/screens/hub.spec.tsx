@@ -28,6 +28,8 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 // The first item of the first phase, a real id so the saved tick is read back.
 const firstItem = CHECKLIST_PHASES.find((phase) => phase.key === 'right-away')?.itemIds[0] as string;
 
+const rightAwayIds = (CHECKLIST_PHASES.find((phase) => phase.key === 'right-away')?.itemIds ?? []);
+
 const anna = {
   id: 'a',
   flowId: 'flow-a',
@@ -72,7 +74,7 @@ const handleOf = (predicate: (node: any) => boolean) => {
 };
 
 // The handle the fake gave the What you'll need button (found by its hint), so a test sees focus go to it and nowhere else.
-const checklistHandle = () => handleOf((node) => node?.props?.accessibilityHint === 'Opens the list.') ?? -1;
+const checklistHandle = () => handleOf((node) => node?.props?.accessibilityHint === 'Opens a checklist of things to do.') ?? -1;
 
 // The node that got the last screen-reader focus call.
 const focusedNode = (focus: jest.SpiedFunction<typeof AccessibilityInfo.setAccessibilityFocus>) => {
@@ -191,7 +193,7 @@ describe('HubScreen', () => {
 
   it('gives the button a hint on native', () => {
     setup();
-    expect(checklistButton().props.accessibilityHint).toBe('Opens the list.');
+    expect(checklistButton().props.accessibilityHint).toBe('Opens a checklist of things to do.');
   });
 
   it('opens the checklist sheet only after a tap on What you will need', () => {
@@ -214,6 +216,7 @@ describe('HubScreen', () => {
     const open = rows.find((row) => row.props.accessibilityState.checked === false);
     fireEvent.press(open as NonNullable<typeof open>);
     expect(onSetItem).toHaveBeenCalledTimes(1);
+    expect(onSetItem.mock.calls[0][0]).toBe(rightAwayIds[1]);
     expect(onSetItem.mock.calls[0][1]).toBe('done');
   });
 
@@ -271,6 +274,27 @@ describe('HubScreen', () => {
       });
       expect(focus).toHaveBeenCalledWith(checklistHandle());
       expect(checklistHandle()).toBeDefined();
+    } finally {
+      Platform.OS = original;
+      jest.useRealTimers();
+    }
+  });
+
+  it('on Android, leaving the screen before the focus timer runs cancels it', () => {
+    jest.useFakeTimers();
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      const view = render(<HubScreen session={anna} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />);
+      fireEvent.press(checklistButton());
+      focus.mockClear();
+      fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
+      view.unmount();
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).not.toHaveBeenCalled();
     } finally {
       Platform.OS = original;
       jest.useRealTimers();

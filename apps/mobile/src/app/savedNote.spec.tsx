@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe('saved-on-this-phone line (DS-3)', () => {
   it('renders on a flow step as plain text with no exclamation point', () => {
-    render(<SetupScreen initial={{ personName: '', dateOfPassing: '' }} onContinue={() => undefined} onBack={() => undefined} />);
+    render(<SetupScreen initial={{ personName: '', dateOfPassing: '' }} checklist={undefined} onSetItem={() => undefined} onContinue={() => undefined} onBack={() => undefined} />);
     const line = screen.getByText(SAVED_NOTE_TEXT);
     expect(line).toBeTruthy();
     expect(line.props.accessibilityLiveRegion).toBeUndefined();

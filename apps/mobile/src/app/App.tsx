@@ -665,6 +665,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           <SetupScreen
             key={active.id}
             initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
+            checklist={active.checklist}
+            onSetItem={(itemId, state) => setChecklistItem(active.id, itemId, state)}
             returnsToPlace={editFrom !== null}
             onBack={editFrom ? leaveEdit : leaveAdd}
             onContinue={(details) => {
