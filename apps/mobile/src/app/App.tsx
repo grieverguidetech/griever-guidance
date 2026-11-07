@@ -339,13 +339,18 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const sheetAsked = useRef(false);
   const arrivalHandled = useRef(false);
   const onPeople = useRef(false);
+  // State, not only the ref, so the render sees it: the sheet's Modal must never be visible on an
+  // arrival the user did not ask for, even for one render (#691: iOS keeps a stuck invisible window).
+  const [peopleAsked, setPeopleAsked] = useState(false);
   const choosePeople = useCallback(() => {
     sheetAsked.current = true;
+    setPeopleAsked(true);
     flow.prevStep();
   }, [flow.prevStep]);
   useEffect(() => {
     if (flow.step !== 'contacts') {
       sheetAsked.current = false;
+      setPeopleAsked(false);
       arrivalHandled.current = false;
       // Defaults apply at the first arrival or never: leaving the people once closes the chance.
       if (onPeople.current) {
@@ -401,7 +406,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={choosePeople} notified={session.recipientsNotified} focusPeopleButton={focusPeopleButton} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={choosePeople} peopleAsked={peopleAsked} notified={session.recipientsNotified} focusPeopleButton={focusPeopleButton} />;
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
@@ -833,6 +838,7 @@ const Navigation = ({
   contacts,
   bar,
   onChoosePeople,
+  peopleAsked,
   notified,
   focusPeopleButton,
 }: {
@@ -840,6 +846,7 @@ const Navigation = ({
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
   onChoosePeople: () => void;
+  peopleAsked: boolean;
   notified: Session['recipientsNotified'];
   focusPeopleButton?: MutableRefObject<(() => void) | null>;
 }) => {
@@ -864,7 +871,7 @@ const Navigation = ({
                     flow={flow}
                     contacts={contacts}
                     notified={notified}
-                    open={flow.step === 'contacts'}
+                    open={flow.step === 'contacts' && peopleAsked}
                     onDismiss={() => focusPeopleButton?.current?.()}
                   />
                 </>,
