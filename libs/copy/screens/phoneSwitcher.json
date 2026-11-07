@@ -1,7 +1,8 @@
 {
   "nameLabel": "Writing about {name}",
-  "nameHint": "Opens a list of the people you can switch to",
+  "nameHint": "Opens a list of choices.",
   "title": "Who you're writing about",
+  "editPerson": "Edit person",
   "addSomeone": "Add someone",
   "close": "Close",
   "nowWriting": "Now writing about {name}"
