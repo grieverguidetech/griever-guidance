@@ -1,3 +1,4 @@
+import { Modal } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,9 +18,11 @@ const anna = {
   recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 };
 
-const storedChecklist = async () => {
+const ben = { ...anna, id: 'b', flowId: 'flow-b', personName: 'Ben', createdAt: '2026-10-03T00:00:00.000Z', lastOpenedAt: '2026-10-03T00:00:00.000Z' };
+
+const storedChecklist = async (id = 'a') => {
   const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { id: string; checklist?: Record<string, string> }[];
-  return saved.find((person) => person.id === 'a')?.checklist;
+  return saved.find((person) => person.id === id)?.checklist;
 };
 
 beforeEach(async () => {
@@ -56,5 +59,22 @@ describe('What you will need on the person screen (#699)', () => {
     const row = await screen.findByRole('checkbox', { name: phrases.items[first] });
     expect(within(row).getByText(phrases.items[first])).toBeTruthy();
     expect(row.props.accessibilityState.checked).toBe(true);
+  });
+
+  it('after switching to Ben, a tick is saved on Ben and not on Anna', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna, ben]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 'a');
+    render(<App />);
+    await screen.findByText('For Anna');
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Ben' }));
+    // A sheet's onDismiss does not fire in Jest; the switcher runs the choice from it on iOS.
+    act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
+    await screen.findByText('For Ben');
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    fireEvent.press(await screen.findByRole('button', { name: RIGHT_AWAY }));
+    fireEvent.press(await screen.findByRole('checkbox', { name: phrases.items[first] }));
+    await waitFor(async () => expect(await storedChecklist('b')).toEqual({ [first]: 'done' }));
+    expect(await storedChecklist('a')).toBeUndefined();
   });
 });

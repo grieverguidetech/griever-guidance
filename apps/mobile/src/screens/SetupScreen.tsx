@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
+import type { ChecklistFields, ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import { PersonSetup } from '../ui';
 import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
 import { PassingDateField } from '../components/PassingDateField';
 import { SavedNote } from '../components/SavedNote';
-import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
+import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 
 const copy = screenCopy('personSetup');
 
@@ -16,6 +17,9 @@ export type SetupDetails = { personName: string; dateOfPassing: string };
 type Props = {
   /** What is already kept for this person (empty for someone new). */
   initial: SetupDetails;
+  /** The open person's phase ticks, and how to save one. The person exists before setup, so the same sheet as the person screen opens. */
+  checklist: ChecklistFields['checklist'];
+  onSetItem: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
   onContinue: (details: SetupDetails) => void;
   onBack: () => void;
   /** Opened with Edit from the hub or a step: Back returns there, so it keeps its short name. */
@@ -28,12 +32,15 @@ type Props = {
  * picker, focus, Android Back and the sheet. Only the name is required. There is deliberately no
  * obituary field here (C10).
  */
-export function SetupScreen({ initial, onContinue, onBack, returnsToPlace = false }: Props) {
+export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack, returnsToPlace = false }: Props) {
   const [name, setName] = useState(initial.personName);
   const [date, setDate] = useState(initial.dateOfPassing);
   const [sheetOpen, setSheetOpen] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const needButton = useRef<ButtonNode>(null);
+  // The Android focus return waits one tick; an unmount before it runs cancels it.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(focusTimer.current), []);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -43,11 +50,18 @@ export function SetupScreen({ initial, onContinue, onBack, returnsToPlace = fals
     }
   }, []);
 
-  // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
+  // iOS tells us when the sheet is gone (onDismiss); Android does not, so focus goes back when it is closed.
   const focusNeedButton = () => {
     const handle = needButton.current ? findNodeHandle(needButton.current) : null;
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+
+  const closeSheet = () => {
+    setSheetOpen(false);
+    if (Platform.OS !== 'ios') {
+      focusTimer.current = setTimeout(focusNeedButton, 0);
     }
   };
 
@@ -81,7 +95,7 @@ export function SetupScreen({ initial, onContinue, onBack, returnsToPlace = fals
           footer={<SavedNote />}
         />
       </ScrollView>
-      <WhatYoullNeedSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onDismiss={focusNeedButton} />
+      <PersonChecklistSheet visible={sheetOpen} onClose={closeSheet} onDismiss={focusNeedButton} checklist={checklist} onSetItem={onSetItem} />
     </KeyboardAvoidingView>
   );
 }

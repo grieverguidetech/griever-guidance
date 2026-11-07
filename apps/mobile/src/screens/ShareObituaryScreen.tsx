@@ -40,6 +40,9 @@ type Props = {
 export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onContinue }: Props) {
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const checklistButton = useRef<ButtonNode>(null);
+  // The Android focus return waits one tick; an unmount before it runs cancels it.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(focusTimer.current), []);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
   const [emailNote, setEmailNote] = useState<'opened' | 'shared' | undefined>(undefined);
@@ -128,7 +131,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const closeChecklist = () => {
     setChecklistOpen(false);
     if (Platform.OS !== 'ios') {
-      setTimeout(focusChecklistButton, 0);
+      focusTimer.current = setTimeout(focusChecklistButton, 0);
     }
   };
 
