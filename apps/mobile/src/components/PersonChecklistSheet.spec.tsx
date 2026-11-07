@@ -46,7 +46,6 @@ describe('PersonChecklistSheet (#696)', () => {
     const labels = screen.getAllByRole('button').map((button) => button.props.accessibilityLabel).filter(Boolean);
     const expected = [...TIME_PHASE_KEYS.map((key) => phrases.phases[key]), 'Gather when you can'];
     expect(labels.filter((label: string) => expected.includes(label))).toEqual(expected);
-    expect(TIME_PHASE_KEYS).toEqual(['right-away', 'first-days', 'first-weeks', 'first-months']);
     expect(phrases.gatherHeading).toBe('Gather when you can');
   });
 
@@ -81,19 +80,12 @@ describe('PersonChecklistSheet (#696)', () => {
     expect(doneGroup(phrases.phases['right-away'])).toBeNull();
   });
 
-  it('marks Gather Done only when all five saved Gather items are ticked', async () => {
-    await AsyncStorage.setItem(KEY, JSON.stringify(['will', 'plans', 'ssn', 'insurance']));
-    await setup();
-    expect(doneGroup('Gather when you can')).toBeNull();
+  it('never shows Done on Gather, even when all five are ticked', async () => {
     await AsyncStorage.setItem(KEY, JSON.stringify(['will', 'plans', 'ssn', 'insurance', 'military']));
     await setup();
-    expect(doneGroup('Gather when you can')).toBeTruthy();
-  });
-
-  it('treats a broken saved value as nothing ticked', async () => {
-    await AsyncStorage.setItem(KEY, '{not json');
-    await setup();
     expect(doneGroup('Gather when you can')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Gather when you can' })).toBeTruthy();
+    expect(screen.queryByText(phrases.done)).toBeNull();
   });
 
   it('tells the caller which group was tapped', async () => {

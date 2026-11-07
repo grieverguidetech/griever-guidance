@@ -1,21 +1,14 @@
-import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fill, screenCopy } from '@griever/copy';
 import { computeChecklist } from '@griever/hooks';
 import { TIME_PHASE_KEYS } from '@griever/shared';
 import type { ChecklistFields, ChecklistPhaseKey } from '@griever/shared';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Sheet, SerifText as Text } from '../ui';
-import { ACCENT, MUTED } from './colors';
+import { MUTED } from './colors';
 
 const copy = screenCopy('phoneChecklist');
 const checklistCopy = screenCopy('cmsChecklist');
-
-/** The saved list of Gather ticks on this phone (the same key the "What you'll need" screen writes). */
-const GATHER_KEY = 'gg.checklist.v1';
-/** The five Gather items. Done when every one is ticked; Gather has no "Doesn't apply". */
-export const GATHER_ITEM_IDS = ['will', 'plans', 'ssn', 'insurance', 'military'] as const;
 
 export type ChecklistGroupId = ChecklistPhaseKey | 'gather';
 
@@ -29,45 +22,13 @@ export interface PersonChecklistSheetProps {
   onOpenGroup: (groupId: ChecklistGroupId) => void;
 }
 
-/** True when every Gather item is in the saved list. */
-export function isGatherDone(ticked: readonly string[]): boolean {
-  return GATHER_ITEM_IDS.every((id) => ticked.includes(id));
-}
-
-/** Reads the Gather ticks on this phone. A missing or broken value counts as nothing ticked. */
-async function readGatherTicks(): Promise<string[]> {
-  try {
-    const raw = await AsyncStorage.getItem(GATHER_KEY);
-    const saved: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(saved) ? saved.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
 /**
  * The checklist as groups: the four time phases in their real order (C10), then "Gather when you
- * can". Each group is a button; a group whose items are all ticked or "Doesn't apply" says Done.
+ * can". Each group is a button; a phase whose items are all ticked or marked not applicable says Done.
+ * Gather never says Done, as on web: its ticks stay on the device and are not read here.
  * No counts and no percentages (SE-5). Ticks stay on this phone. Nothing here deletes anything (C9).
  */
 export function PersonChecklistSheet({ visible, onClose, onDismiss, checklist, onOpenGroup }: PersonChecklistSheetProps) {
-  const [gatherTicks, setGatherTicks] = useState<string[]>([]);
-  // Read again each time the sheet opens, so a tick made on the Gather screen shows here.
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-    let live = true;
-    readGatherTicks().then((ticks) => {
-      if (live) {
-        setGatherTicks(ticks);
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [visible]);
-
   const { phases } = computeChecklist({ checklist });
   const groups: { id: ChecklistGroupId; label: string; done: boolean }[] = [
     ...TIME_PHASE_KEYS.map((key) => ({
@@ -75,7 +36,7 @@ export function PersonChecklistSheet({ visible, onClose, onDismiss, checklist, o
       label: checklistCopy.phases[key],
       done: phases.find((phase) => phase.key === key)?.done ?? false,
     })),
-    { id: 'gather', label: checklistCopy.gatherHeading, done: isGatherDone(gatherTicks) },
+    { id: 'gather', label: checklistCopy.gatherHeading, done: false },
   ];
 
   return (
@@ -92,7 +53,7 @@ export function PersonChecklistSheet({ visible, onClose, onDismiss, checklist, o
         >
           <Text style={styles.label}>{group.label}</Text>
           {group.done ? (
-            <View style={styles.done} accessible={false} importantForAccessibility="no">
+            <View style={styles.done} importantForAccessibility="no">
               <Text style={styles.check} allowFontScaling={false}>
                 ✓
               </Text>
@@ -122,6 +83,6 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors['accent-100'] },
   label: { flex: 1, fontSize: 16, color: colors.ink },
   done: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  check: { fontSize: 16, color: ACCENT, fontWeight: '700' },
-  doneText: { fontSize: 14, color: ACCENT },
+  check: { fontSize: 16, color: colors['success-700'], fontWeight: '700' },
+  doneText: { fontSize: 14, color: colors['success-700'] },
 });
