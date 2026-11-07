@@ -1,10 +1,21 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
+// The signed-in account is set per test. Null means nobody is signed in.
+let mockProfile: { id: string; senderName: string; firstName?: string | null; contactSource: null; accountType: 'owner' } | null = null;
+jest.mock('../lib/AccountProvider', () => ({
+  ...jest.requireActual<object>('../lib/AccountProvider'),
+  useAccount: () => (mockProfile ? { status: 'signed_in', isSignedIn: true, profile: mockProfile } : null),
+}));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockProfile = null;
+});
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
 // ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
 const openPeople = async () => {
@@ -208,5 +219,101 @@ describe('send flow starts from the planned details', () => {
       await toConfirm();
       expect(await screen.findByText(/She was at peace\./)).toBeTruthy();
     });
+  });
+});
+
+// #695: the thank-you's name starts from the signed-in account, on the phone only (DS-7).
+describe('the thank-you name from the account (#695)', () => {
+  const account = (over: Partial<NonNullable<typeof mockProfile>>) => ({ id: 'u1', senderName: '', contactSource: null, accountType: 'owner' as const, ...over });
+  const thanksDraft = (fields: Record<string, string>, messageOverride: string | null) => ({
+    step: 'review', templateCategory: 'aftercare', templateOverrideId: 'thank-you-note', fields,
+    serviceDetailsKnown: null, selectedContactIds: ['c1'], includeFlowers: false, customFlorist: '',
+    flowerDeliveryTarget: 'service', tone: 'plain', messageOverride,
+  });
+  // The label gains ", Needed" while the field is empty.
+  const NAME_LABEL = /^Your name or family name/;
+  const toThanks = async (session: Session = base) => {
+    await openMoment(session, /Send thank-yous/);
+    await openPeople();
+    await toConfirm();
+    return screen.findByLabelText(NAME_LABEL);
+  };
+  type SavedSession = { senderName?: string; drafts?: { aftercare?: { fields?: Record<string, string> } } };
+  const saved = async () => (JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as SavedSession[])[0];
+  // The draft is written after the form changes, so wait for the name to reach it.
+  const waitForDraftName = (name: string) => waitFor(async () => expect((await saved())?.drafts?.aftercare?.fields?.['senderName']).toBe(name));
+
+  it('fills the name from the account sender name', async () => {
+    mockProfile = account({ senderName: 'The Hayes family', firstName: 'Sam' });
+    expect((await toThanks()).props.value).toBe('The Hayes family');
+  });
+
+  it('falls back to the first name', async () => {
+    mockProfile = account({ senderName: '', firstName: 'Sam' });
+    expect((await toThanks()).props.value).toBe('Sam');
+  });
+
+  it('fills nothing with no account, and the message shows the blank', async () => {
+    const field = await toThanks();
+    expect(field.props.value ?? '').toBe('');
+    expect(screen.getByText(/______/)).toBeTruthy();
+  });
+
+  it('fills nothing when the account has no name', async () => {
+    mockProfile = account({ senderName: '', firstName: null });
+    expect(((await toThanks()).props.value ?? '')).toBe('');
+  });
+
+  it('stays editable', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    const field = await toThanks();
+    fireEvent.changeText(field, 'The Hayes family');
+    await waitFor(() => expect(screen.getByLabelText(NAME_LABEL).props.value).toBe('The Hayes family'));
+  });
+
+  it('never overwrites a name already typed in the draft', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    // Resumed on Ready to send with a person already picked, so the field is there without the people steps.
+    await openMoment({ ...base, drafts: { aftercare: thanksDraft({ senderName: 'The Lee family' }, null) } } as unknown as Session, /Send thank-yous/);
+    // The details row is closed once nothing is missing.
+    fireEvent.press(await screen.findByRole('button', { name: 'Change details' }));
+    expect((await screen.findByLabelText(NAME_LABEL)).props.value).toBe('The Lee family');
+  });
+
+  it('keeps a hand-edited message', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    await openMoment({ ...base, drafts: { aftercare: thanksDraft({}, 'Our own words.') } } as unknown as Session, /Send thank-yous/);
+    expect(await screen.findByText('Our own words.')).toBeTruthy();
+    // The details row stays hidden while the wording is edited: the prefill did not touch the form.
+    expect(screen.queryByRole('button', { name: 'Change details' })).toBeNull();
+    expect(screen.queryByLabelText(NAME_LABEL)).toBeNull();
+  });
+
+  it('fills the name on a draft resumed on Ready to send, so sending is not blocked', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    await openMoment({ ...base, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session, /Send thank-yous/);
+    // The row opens by itself at first (the name was empty), so the field is there without a press.
+    expect((await screen.findByLabelText(NAME_LABEL)).props.value).toBe('Sam');
+    const send = screen.getByRole('button', { name: /^Text 1 person/ });
+    expect(send.props.accessibilityState?.disabled ?? false).toBe(false);
+  });
+
+  it('keeps the edited thank-you wording when the account fills the name', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    await openMoment({ ...base, thanksMessage: 'Thank you all.' } as Session, /Send thank-yous/);
+    await openPeople();
+    await toConfirm();
+    expect(await screen.findByText('Thank you all.')).toBeTruthy();
+    // The details row is hidden while the wording is edited, so the saved draft shows the name went in.
+    // Filling it must not have cleared the wording.
+    await waitForDraftName('Sam');
+    expect(screen.getByText('Thank you all.')).toBeTruthy();
+  });
+
+  it('does not write the account name to the person', async () => {
+    mockProfile = account({ senderName: 'Sam' });
+    await toThanks();
+    await waitForDraftName('Sam');
+    expect((await saved())?.senderName).toBe('');
   });
 });

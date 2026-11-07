@@ -18,6 +18,7 @@ import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
+import { useAccountSenderName } from '../lib/accountName';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
@@ -265,6 +266,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const inVisit = onForm || flow.step === 'review';
   const prefilled = useRef(false);
   const { personName, dateOfPassing } = session;
+  // The signed-in account's name, for the thank-you's sender field. On-device only (DS-7).
+  const accountName = useAccountSenderName();
+  const senderTyped = flow.fields['senderName'] ?? '';
   const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;
   useEffect(() => {
     if (!inVisit) {
@@ -273,9 +277,18 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
     if (prefilled.current) return;
     prefilled.current = true;
-    // A draft resumed straight on Ready to send is not a first-form arrival: nothing to prefill.
-    if (!onForm) return;
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
+    // The account name starts the sender field when the person has none and nothing is typed. Never
+    // over a typed name, and never when the family hand-edited the message: setField clears the
+    // override, so that wording would be lost. Runs before setMessageOverride below,
+    // and also for a draft resumed on Ready to send (the hub counts the account name, so that screen
+    // must not block on it). Once per visit: a profile that arrives later does not fill, on purpose,
+    // so a name never appears under a family that has started typing.
+    if (accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
+      setField('senderName', accountName);
+    }
+    // A draft resumed straight on Ready to send is not a first-form arrival: nothing else to prefill.
+    if (!onForm) return;
     // Older drafts saved obituaryText as the message. The obituary send texts the link template now
     // (MOB-9, #559 Decision 4), so drop that copy; a hand-edited message stays.
     if (category === 'obituary' && messageOverride && messageOverride === session.obituaryText) {
@@ -299,7 +312,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
         setMessageOverride(planned.messageOverride);
       }
     }
-  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session]);
+  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session, accountName, senderTyped]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not
