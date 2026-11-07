@@ -32,6 +32,8 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'phoneChecklist', file: 'components/PersonChecklistSheet.tsx' },
   { copy: 'cmsChecklist', file: 'components/PersonChecklistSheet.tsx' },
   { copy: 'phoneChecklist', file: 'components/ChecklistGroupPanel.tsx' },
+  { copy: 'phoneObituary', file: 'screens/ShareObituaryScreen.tsx' },
+  { copy: 'phoneObituary', file: 'ui/screens/ShareObituary.tsx' },
   { copy: 'cmsChecklist', file: 'components/ChecklistGroupPanel.tsx' },
 ];
 

@@ -1,0 +1,13 @@
+{
+  "textTitle": "The obituary text",
+  "editHelp": "Change anything you like.",
+  "editButton": "Edit the text",
+  "writeButton": "Write the text",
+  "editLabel": "Obituary text",
+  "editPlaceholder": "Write the obituary here.",
+  "saveButton": "Save the text",
+  "cancelButton": "Cancel",
+  "saved": "Saved.",
+  "followsDetails": "The text follows the details again.",
+  "emailNoText": "Write it above, or on the web."
+}

@@ -54,6 +54,19 @@ export interface ShareObituaryCopy {
   pasteNotLink?: string;
   pasteEmpty?: string;
   pasted?: string;
+  /** The obituary text card (mobile, from libs/copy/screens/phoneObituary.json). All optional; the card shows only with `textEditor`. */
+  textTitle?: string;
+  editHelp?: string;
+  editButton?: string;
+  /** The same button when there is no text yet. */
+  writeButton?: string;
+  editLabel?: string;
+  editPlaceholder?: string;
+  saveButton?: string;
+  cancelButton?: string;
+  saved?: string;
+  /** Calm line after clearing the box: the text follows the details again. */
+  followsDetails?: string;
   /** Label above the link field (mobile "Step 2: ..."). */
   linkStepLabel?: string;
   /** "Paste link" beside the link field. */
@@ -77,6 +90,25 @@ export interface PublisherEmail {
   copied?: boolean;
   /** true when the phone refused the copy. */
   copyFailed?: boolean;
+}
+
+/** The obituary text on the phone: shown as plain text, or edited in one multiline box. */
+export interface ObituaryTextEditor {
+  /** The saved text (or the draft built from the details). Empty when there is none. */
+  text: string;
+  editing: boolean;
+  /** What is in the box while editing. Kept by the screen, so closing the keyboard loses nothing. */
+  value: string;
+  onValueChange: (value: string) => void;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  /** The longest text the app keeps (libs/shared), so a save is never cut after the fact. */
+  maxLength?: number;
+  /** The calm line after leaving the box: saved, or cleared so the text follows the details again. */
+  note?: 'saved' | 'follows';
+  /** For returning screen-reader focus to the Edit button after Save or Cancel. */
+  editRef?: Ref<ButtonNode>;
 }
 
 export interface ShareObituaryProps {
@@ -103,6 +135,8 @@ export interface ShareObituaryProps {
   pasteMessage?: string;
   /** With `onDraft`: the draft button is unavailable, for this reason (already worded). */
   draftUnavailable?: string;
+  /** The obituary text and its editor (mobile). Leave unset to hide the card, as the web does. */
+  textEditor?: ObituaryTextEditor;
   /** Step 1 (mobile). Leave unset to hide the card, as the web does. */
   publisherEmail?: PublisherEmail;
   headingRef?: HeadingProps['headingRef'];
@@ -115,7 +149,7 @@ export interface ShareObituaryProps {
  * "Who should know?". Mobile's own screen
  * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, headingRef, checklistRef }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, headingRef, checklistRef }: ShareObituaryProps) {
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
   const errorId = useId();
@@ -125,6 +159,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const copiedId = useId();
   const noteId = useId();
   const pasteId = useId();
+  const savedId = useId();
   const empty = link.trim() === '';
   const showError = touched && !empty && !linkValid;
   const reason = empty ? copy.needLink : undefined;
@@ -143,7 +178,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         </Heading>
         <Body tone="muted">{copy.intro}</Body>
       </View>
-      {publisherEmail && copy.emailButton ? (
+      {textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} savedId={savedId} /> : null}
+      {publisherEmail && copy.emailButton && !textEditor?.editing ? (
         <Card>
           {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
           {publisherEmail.hasText ? (
@@ -164,6 +200,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           ) : null}
         </Card>
       ) : null}
+      {textEditor?.editing ? null : (
+      <>
       {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
       <Field
         label={copy.linkLabel}
@@ -240,7 +278,60 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           <Status id={draftReasonId} message={draftUnavailable} />
         </Card>
       ) : null}
+      </>
+      )}
     </View>
+  );
+}
+
+function TextCard({ copy, editor, savedId }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor; savedId: string }) {
+  const hasText = editor.text !== '';
+  const editLabelId = useId();
+  const font = useSerifStyle('regular');
+  const [focused, setFocused] = useState(false);
+  const label = hasText ? copy.editButton : copy.writeButton;
+  return (
+    <Card>
+      <Heading level={2}>{copy.textTitle}</Heading>
+      {editor.editing ? (
+        <>
+          {copy.editHelp ? <Body tone="muted">{copy.editHelp}</Body> : null}
+          {/* Above the box, so they stay reachable at the largest text size with the keyboard open. */}
+          <View style={styles.editActions}>
+            {copy.saveButton ? <Button label={copy.saveButton} onPress={editor.onSave} /> : null}
+            {copy.cancelButton ? <Button label={copy.cancelButton} variant="secondary" onPress={editor.onCancel} /> : null}
+          </View>
+          <Body tone="strong" id={editLabelId}>
+            {copy.editLabel}
+          </Body>
+          <TextInput
+            style={[styles.textInput, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
+            {...webFieldHook}
+            aria-labelledby={editLabelId}
+            accessibilityLabel={copy.editLabel}
+            accessibilityHint={copy.editHelp}
+            multiline
+            autoFocus
+            maxLength={editor.maxLength}
+            textAlignVertical="top"
+            autoCapitalize="sentences"
+            placeholder={copy.editPlaceholder}
+            placeholderTextColor={colors['neutral-700']}
+            value={editor.value}
+            onChangeText={editor.onValueChange}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+          />
+        </>
+      ) : (
+        <>
+          {hasText ? <Body>{editor.text}</Body> : null}
+          {label ? <Button label={label} variant="secondary" buttonRef={editor.editRef} onPress={editor.onEdit} /> : null}
+        </>
+      )}
+      {/* Always mounted, so only its text changes and the change is announced. */}
+      <Status id={savedId} queue message={editor.note === 'saved' ? copy.saved : editor.note === 'follows' ? copy.followsDetails : undefined} />
+    </Card>
   );
 }
 
@@ -324,6 +415,17 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
   },
+  textInput: {
+    minHeight: 200,
+    padding: spacing[2],
+    borderWidth: 1,
+    borderColor: colors['neutral-600'],
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    color: colors.ink,
+    fontSize: 16,
+  },
+  editActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], alignItems: 'center' },
   // Last, so an invalid field keeps its error border while it has focus.
   inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).
