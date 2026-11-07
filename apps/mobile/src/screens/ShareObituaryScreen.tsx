@@ -3,11 +3,12 @@ import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import { isValidObituaryLink, obituaryLink } from '@griever/shared';
+import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
 import { ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
-import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
+import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { openMailDraft } from '../lib/mailCompose';
 import { obituaryTextFor } from '../lib/obituaryText';
@@ -24,6 +25,8 @@ const copy = {
 type Props = {
   session: Session;
   onChange: (patch: { obituaryUrl?: string; obituaryPublisher?: string }) => void;
+  /** Saves one checklist item on this person, on this phone. */
+  onSetItem: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
   onBack: () => void;
   onContinue: () => void;
 };
@@ -32,9 +35,12 @@ type Props = {
  * The screen is the ShareObituary in apps/mobile/src/ui; this holds what is mobile only: focus, Android
  * Back and the sheet. It passes no drafting handler, so the drafting card is not shown.
  */
-export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: Props) {
+export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onContinue }: Props) {
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const checklistButton = useRef<ButtonNode>(null);
+  // The Android focus return waits one tick; an unmount before it runs cancels it.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(focusTimer.current), []);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
   const [emailNote, setEmailNote] = useState<'opened' | 'shared' | undefined>(undefined);
@@ -71,6 +77,14 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
     const handle = checklistButton.current ? findNodeHandle(checklistButton.current) : null;
     if (handle) {
       AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  };
+
+  // onDismiss is iOS only, so on Android focus goes back when the sheet is closed.
+  const closeChecklist = () => {
+    setChecklistOpen(false);
+    if (Platform.OS !== 'ios') {
+      focusTimer.current = setTimeout(focusChecklistButton, 0);
     }
   };
 
@@ -146,7 +160,7 @@ export function ShareObituaryScreen({ session, onChange, onBack, onContinue }: P
           checklistRef={checklistButton}
         />
       </ScrollView>
-      <WhatYoullNeedSheet visible={checklistOpen} onClose={() => setChecklistOpen(false)} onDismiss={focusChecklistButton} />
+      <PersonChecklistSheet visible={checklistOpen} onClose={closeChecklist} onDismiss={focusChecklistButton} checklist={session.checklist} onSetItem={onSetItem} />
     </KeyboardAvoidingView>
   );
 }

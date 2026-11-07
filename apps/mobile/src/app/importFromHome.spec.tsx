@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Modal } from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { App } from './App';
 import { ACTIVE_KEY, SESSIONS_KEY } from '../lib/useDeviceSessions';
@@ -68,24 +68,13 @@ describe('Import contacts from Home (#379)', () => {
     expect(focused).not.toContain('Your account');
   });
 
-  it('from the person screen: More, Add from your contacts, import review, Back returns to that person', async () => {
+  it('the person screen has no More and no Add from your contacts (the people sheet imports)', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     await AsyncStorage.setItem(ACTIVE_KEY, 'a');
-    mockFetch.mockResolvedValue([{ key: 'x', displayName: 'Sam', phones: ['+16175550111'], emails: [] }]);
-    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<App />);
     await screen.findByText('Ready to send');
-    fireEvent.press(screen.getByRole('button', { name: 'More' }));
-    fireEvent.press(await screen.findByRole('button', { name: 'Add from your contacts' }));
-    // A sheet's onDismiss does not fire in Jest; the More sheet runs its chosen item from it on iOS.
-    act(() => screen.UNSAFE_getAllByType(Modal).forEach((modal) => modal.props.onDismiss?.()));
-    expect(await screen.findByText('Sam')).toBeTruthy();
-    focus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(await screen.findByText('Ready to send')).toBeTruthy();
-    expect(screen.queryByText("Who you're writing about")).toBeNull();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const calls = focus.mock.calls.map((c) => textUnder(mockNodes[(c[0] as number) - 1]));
-    expect(calls.some((t) => t.includes('Add from your contacts'))).toBe(false);
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add from your contacts' })).toBeNull();
+    expect(screen.queryByText('Add from your contacts')).toBeNull();
   });
 });

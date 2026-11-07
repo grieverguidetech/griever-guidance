@@ -423,7 +423,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
-  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
+  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, setChecklistItem, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
   useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
   // A launch opens the last person's screen (the hub), unless they are still blank. Decided once,
@@ -648,6 +648,8 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           <SetupScreen
             key={active.id}
             initial={{ personName: active.personName, dateOfPassing: active.dateOfPassing ?? '' }}
+            checklist={active.checklist}
+            onSetItem={(itemId, state) => setChecklistItem(active.id, itemId, state)}
             returnsToPlace={editFrom !== null}
             onBack={editFrom ? leaveEdit : leaveAdd}
             onContinue={(details) => {
@@ -676,6 +678,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             key={active.id}
             session={active}
             onChange={(patch) => updateSession(active.id, patch)}
+            onSetItem={(itemId, state) => setChecklistItem(active.id, itemId, state)}
             onBack={() => {
               setAtShareObituary(false);
               setAtHub(true);
@@ -720,11 +723,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
                 : undefined
             }
             onAccount={AUTH_ENABLED ? () => setAtAccount(true) : undefined}
-            onImportContacts={() => {
-              setNote(null);
-              setBackFromImport(false);
-              setImporting(true);
-            }}
+            onSetItem={(itemId, state) => setChecklistItem(active.id, itemId, state)}
             onStart={(key: MomentKey) => {
               setNote(null);
               setAtHub(false);

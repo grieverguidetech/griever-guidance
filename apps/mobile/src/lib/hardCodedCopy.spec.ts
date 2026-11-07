@@ -25,6 +25,7 @@ const MIGRATED_SCREENS: { copy: ScreenName; file: string }[] = [
   { copy: 'personSetup', file: 'screens/SetupScreen.tsx' },
   { copy: 'personSetup', file: 'components/PassingDateField.tsx' },
   { copy: 'phoneHub', file: 'screens/HubScreen.tsx' },
+  { copy: 'phoneHub', file: 'ui/screens/Hub.tsx' },
   { copy: 'phoneTexting', file: 'screens/SendingScreen.tsx' },
   { copy: 'phonePeople', file: 'screens/ContactSelectorScreen.tsx' },
   { copy: 'phoneSwitcher', file: 'components/NameSwitcher.tsx' },

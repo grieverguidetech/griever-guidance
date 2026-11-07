@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Linking, Share } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, Linking, Modal, Platform, Share } from 'react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
+import { CHECKLIST_PHASES } from '@griever/shared';
 import { SerifReadyContext } from '../ui';
 import * as Clipboard from 'expo-clipboard';
 import { ShareObituaryScreen } from './ShareObituaryScreen';
@@ -11,8 +12,29 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: 
 
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  // A distinct handle per node, so a test can tell which node got screen-reader focus.
+  findNodeHandle: (node: unknown) => {
+    const g = globalThis as unknown as { nodeHandles?: Map<unknown, number> };
+    g.nodeHandles ??= new Map();
+    if (!g.nodeHandles.has(node)) {
+      g.nodeHandles.set(node, g.nodeHandles.size + 1);
+    }
+    return g.nodeHandles.get(node);
+  },
 }));
+
+// The node that got the last screen-reader focus call, looked up from the handle the fake gave it.
+const focusedNode = (focus: jest.SpiedFunction<typeof AccessibilityInfo.setAccessibilityFocus>) => {
+  const handle = focus.mock.calls.at(-1)?.[0];
+  const handles = (globalThis as unknown as { nodeHandles: Map<any, number> }).nodeHandles;
+  return [...handles].find(([, h]) => h === handle)?.[0];
+};
+
+// The focused node is the host view of the What you'll need button: the same press handler as the button the user sees.
+const isChecklistButton = (node: any) => {
+  const button = screen.getByRole('button', { name: "What you'll need" });
+  return node?.props?.role === 'button' && typeof node.props.onClick === 'function' && node.props.onClick === button.props.onClick;
+};
 
 const base = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
@@ -24,10 +46,10 @@ const BUTTON = 'Email it to the paper or funeral home';
 const OPENED = "Opened in your email app. Come back when it's published.";
 const SHARED = "Shared from your phone. Come back when it's published.";
 
-function setup(session: Session, onChange = jest.fn()) {
+function setup(session: Session, onChange = jest.fn(), onSetItem = jest.fn()) {
   render(
     <SerifReadyContext.Provider value>
-      <ShareObituaryScreen session={session} onChange={onChange} onBack={jest.fn()} onContinue={jest.fn()} />
+      <ShareObituaryScreen session={session} onChange={onChange} onSetItem={onSetItem} onBack={jest.fn()} onContinue={jest.fn()} />
     </SerifReadyContext.Provider>,
   );
 }
@@ -35,6 +57,7 @@ function setup(session: Session, onChange = jest.fn()) {
 // React Native's jest setup already mocks Linking, so spies keep their calls between tests unless cleared.
 beforeEach(() => {
   jest.clearAllMocks();
+  (globalThis as unknown as { nodeHandles?: Map<unknown, number> }).nodeHandles?.clear();
 });
 
 afterEach(() => {
@@ -248,5 +271,75 @@ describe('ShareObituaryScreen with fields only (#700)', () => {
     setup(fieldsOnly);
     fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
     await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith(draft));
+  });
+});
+
+describe('ShareObituaryScreen What you will need (#699)', () => {
+  const checklistModal = () => {
+    const modal = screen.UNSAFE_getAllByType(Modal).find((m) => m.props.testID === 'checklist-sheet');
+    if (!modal) {
+      throw new Error('No checklist sheet');
+    }
+    return modal;
+  };
+
+  it('opens the new checklist sheet only after a tap, not the old Gather-only sheet', () => {
+    setup(base);
+    expect(checklistModal().props.visible).toBe(false);
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    expect(checklistModal().props.visible).toBe(true);
+    const sheet = within(screen.getByTestId('checklist-sheet'));
+    expect(sheet.getByText('Your ticks stay on this phone.')).toBeTruthy();
+    expect(screen.queryByText('Not today. Just so none of it surprises you.')).toBeNull();
+  });
+
+  it('saves a tick through onSetItem', () => {
+    const onSetItem = jest.fn();
+    setup(base, jest.fn(), onSetItem);
+    fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+    fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: /^Right away/ }));
+    fireEvent.press(within(screen.getByTestId('checklist-sheet')).getAllByRole('checkbox')[0]);
+    expect(onSetItem).toHaveBeenCalledTimes(1);
+    expect(onSetItem.mock.calls[0][0]).toBe(CHECKLIST_PHASES.find((phase) => phase.key === 'right-away')?.itemIds[0]);
+    expect(onSetItem.mock.calls[0][1]).toBe('done');
+  });
+
+  it('on iOS focus returns to the button through onDismiss', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    const original = Platform.OS;
+    Platform.OS = 'ios';
+    try {
+      setup(base);
+      fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+      focus.mockClear();
+      fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
+      expect(focus).not.toHaveBeenCalled();
+      act(() => checklistModal().props.onDismiss());
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(isChecklistButton(focusedNode(focus))).toBe(true);
+    } finally {
+      Platform.OS = original;
+    }
+  });
+
+  it('on Android focus returns to the button when the sheet is closed', () => {
+    jest.useFakeTimers();
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      setup(base);
+      fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
+      focus.mockClear();
+      fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(isChecklistButton(focusedNode(focus))).toBe(true);
+    } finally {
+      Platform.OS = original;
+      jest.useRealTimers();
+    }
   });
 });

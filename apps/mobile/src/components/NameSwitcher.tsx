@@ -74,7 +74,7 @@ export function NameSwitcher({ name, others, onPick, onEdit, onAdd }: NameSwitch
           ⌄
         </Text>
       </Pressable>
-      <Sheet title={copy.title} closeLabel={copy.close} visible={open} onClose={() => close()} onDismiss={finish}>
+      <Sheet testID="switcher-sheet" title={copy.title} closeLabel={copy.close} visible={open} onClose={() => close()} onDismiss={finish}>
         <Button label={copy.editPerson} variant="secondary" onPress={() => close(onEdit)} />
         {newestFirst(others).map((person) => (
           <Button key={person.id} label={personLabel(person)} variant="secondary" onPress={() => close(() => onPick(person.id))} />

@@ -448,18 +448,18 @@ describe('the end of a send', () => {
   });
 });
 
-// Edit person lives in More. On iOS the choice runs when the More sheet has finished closing (onDismiss).
-function editPersonFromMore() {
-  fireEvent.press(screen.getByRole('button', { name: 'More' }));
+// Edit person lives in the name switcher. On iOS the choice runs when the sheet has finished closing (onDismiss).
+function editPersonFromSwitcher() {
+  fireEvent.press(screen.getByRole('button', { name: /^Writing about / }));
   fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
-  act(() => screen.UNSAFE_getAllByType(Modal)[1].props.onDismiss());
+  act(() => screen.UNSAFE_getAllByType(Modal).find((m) => m.props.testID === 'switcher-sheet')?.props.onDismiss());
 }
 
 describe('Edit person from the hub', () => {
   it('Back from setup returns to the hub, not Home', async () => {
     await openAnna();
     await screen.findByText('Ready to send');
-    editPersonFromMore();
+    editPersonFromSwitcher();
     // Back returns to the hub, so it is named plain "Back", not "Back to home".
     expect(screen.queryByLabelText('Back to home')).toBeNull();
     fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
@@ -480,7 +480,7 @@ describe('Edit person from the hub', () => {
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     await screen.findByText('Everyone has been told.');
-    editPersonFromMore();
+    editPersonFromSwitcher();
     fireEvent.press(await screen.findByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     expect(screen.queryByText('Everyone has been told.')).toBeNull();

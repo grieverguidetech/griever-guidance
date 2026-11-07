@@ -1,10 +1,8 @@
 {
   "heading": "Ready to send",
   "intro": "Send when you're ready.",
-  "more": "More",
-  "moreHint": "Opens a list of more options",
-  "close": "Close",
+  "whatYoullNeed": "What you'll need",
+  "whatYoullNeedHint": "Opens a checklist of things to do.",
   "sentPartial": "Sent to {n} {noun} · text the rest",
-  "account": "Your account",
-  "importContacts": "Add from your contacts"
+  "account": "Your account"
 }
