@@ -452,7 +452,7 @@ describe('the end of a send', () => {
 function editPersonFromMore() {
   fireEvent.press(screen.getByRole('button', { name: 'More' }));
   fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
-  act(() => screen.UNSAFE_getAllByType(Modal)[0].props.onDismiss());
+  act(() => screen.UNSAFE_getAllByType(Modal)[1].props.onDismiss());
 }
 
 describe('Edit person from the hub', () => {

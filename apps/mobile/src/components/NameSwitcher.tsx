@@ -15,33 +15,27 @@ const newestFirst = (people: Session[]) => [...people].sort((a, b) => b.lastOpen
 export type NameSwitcherProps = {
   /** The open person's name, as shown. */
   name: string;
-  /** The other people kept on this phone (not the open one). With none, the name is plain text. */
+  /** The other people kept on this phone (not the open one). May be empty. */
   others: Session[];
   onPick: (id: string) => void;
+  /** Opens the edit screen for the open person. */
+  onEdit: () => void;
   /** Absent when the user cannot add a person (C11): the add button is then not drawn. */
   onAdd?: () => void;
 };
 
 /**
- * The open person's name, top-left of the person screen. With other people on the phone it is a
- * button that opens a sheet: the others, newest first, and the add button. Nothing here removes
+ * The open person's name, top-left of the person screen. It is always a button that opens a
+ * sheet: Edit person, the others (newest first, when there are any), and the add button. Nothing here removes
  * anyone (C9).
  */
-export function NameSwitcher({ name, others, onPick, onAdd }: NameSwitcherProps) {
+export function NameSwitcher({ name, others, onPick, onEdit, onAdd }: NameSwitcherProps) {
   const [open, setOpen] = useState(false);
   const button = useRef<ButtonNode>(null);
   // What the sheet asked for, run once the sheet is gone so the screen swap and the announcement
   // do not land inside the closing modal (as the More sheet does).
   const after = useRef<(() => void) | null>(null);
   const label = fill(copy.nameLabel, { name });
-
-  if (others.length === 0) {
-    return (
-      <Text accessibilityLabel={label} style={styles.name}>
-        {name}
-      </Text>
-    );
-  }
 
   // The sheet is gone: run what was chosen, or put focus back on the name if nothing was.
   const finish = () => {
@@ -81,6 +75,7 @@ export function NameSwitcher({ name, others, onPick, onAdd }: NameSwitcherProps)
         </Text>
       </Pressable>
       <Sheet title={copy.title} closeLabel={copy.close} visible={open} onClose={() => close()} onDismiss={finish}>
+        <Button label={copy.editPerson} variant="secondary" onPress={() => close(onEdit)} />
         {newestFirst(others).map((person) => (
           <Button key={person.id} label={personLabel(person)} variant="secondary" onPress={() => close(() => onPick(person.id))} />
         ))}
