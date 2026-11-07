@@ -285,6 +285,34 @@ describe('Account as the first screen', () => {
     expect(screen.queryByText('What should we call you?')).toBeNull();
   });
 
+  it('after sign-up with a name on the first screen, saves the name and leaves once', async () => {
+    const onSignedIn = jest.fn();
+    render(
+      <Harness>
+        <AccountScreen onBack={() => undefined} onSignedIn={onSignedIn} />
+      </Harness>,
+    );
+    fireEvent.press(await screen.findByRole('button', { name: 'Create an account' }));
+    await screen.findByLabelText('Your name');
+    type('Your name', 'Sam');
+    type('Email', 'sam@x.co');
+    type('Password', 'a-long-password');
+    press('Create account');
+    await screen.findByLabelText('6-digit code');
+    type('6-digit code', '123456');
+    await act(async () => press('Create account'));
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Sam' });
+    expect(screen.queryByText('What should we call you?')).toBeNull();
+  });
+
+  it('leaves when the profile call fails (offline)', async () => {
+    const onSignedIn = jest.fn();
+    mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
+    renderFirst(onSignedIn);
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+  });
+
   it('does not leave while signed out', async () => {
     const onSignedIn = jest.fn();
     renderFirst(onSignedIn, false);

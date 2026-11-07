@@ -52,7 +52,7 @@ const account = (over: Partial<UseAccountResult>): UseAccountResult => ({
 const named = { id: 'u1', senderName: 'Sam', contactSource: null, accountType: 'owner' as const };
 const loading = account({ status: 'loading', isLoading: true });
 const signedOut = account({});
-const signedIn = account({ status: 'signed_in', isSignedIn: true, profile: named, profileLoaded: true });
+const signedIn = account({ status: 'signed_in', isSignedIn: true, profile: named, profileAnswered: true, profileLoaded: true });
 
 beforeEach(() => {
   mockAccount = signedOut;
@@ -113,7 +113,7 @@ describe('first screen with accounts on', () => {
   it('after sign-in without a name, goes straight to the normal first screen without asking for a name', async () => {
     render(<App />);
     await screen.findByRole('heading', { name: 'Sign in' });
-    act(() => mockSetAccount.current(account({ status: 'signed_in', isSignedIn: true, profileLoaded: true })));
+    act(() => mockSetAccount.current(account({ status: 'signed_in', isSignedIn: true, profileAnswered: true, profileLoaded: true })));
     expect(await screen.findByText("Who you're writing about")).toBeTruthy();
     expect(screen.queryByText('What should we call you?')).toBeNull();
   });
@@ -121,7 +121,7 @@ describe('first screen with accounts on', () => {
   it('after sign-in while the profile is still loading, stays on Your account without asking for a name', async () => {
     render(<App />);
     await screen.findByRole('heading', { name: 'Sign in' });
-    act(() => mockSetAccount.current(account({ status: 'signed_in', isSignedIn: true, profileLoaded: false })));
+    act(() => mockSetAccount.current(account({ status: 'signed_in', isSignedIn: true, profileAnswered: false, profileLoaded: false })));
     expect(await screen.findByRole('heading', { name: 'Your account' })).toBeTruthy();
     expect(screen.queryByText('What should we call you?')).toBeNull();
     expect(screen.queryByText("Who you're writing about")).toBeNull();

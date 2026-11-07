@@ -186,9 +186,10 @@ function LoadingOrUnavailable({ text, onBack }: { text: string; onBack: () => vo
 
 export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSignedIn?: () => void }) {
   const identity = useAccount();
-  // Opened as the first screen: leave once signed in and the profile has loaded, with or without a name.
-  // Never before the profile has loaded: a slow load must not drop the person onto a half-ready Home.
-  const ready = !!identity?.isSignedIn && identity.profileLoaded;
+  // Opened as the first screen: leave once signed in and the profile call has answered (or failed), with or without a name.
+  // Not before: a slow load must not drop the person onto a half-ready Home.
+  // profileAnswered, not profileLoaded: a name save right after sign-up supersedes the first load, which then never sets profileLoaded.
+  const ready = !!identity?.isSignedIn && identity.profileAnswered;
   // Kept in a ref so a new function on each render can't fire this twice.
   const signedInRef = useRef(onSignedIn);
   signedInRef.current = onSignedIn;

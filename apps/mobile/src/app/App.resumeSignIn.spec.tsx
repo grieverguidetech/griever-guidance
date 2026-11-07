@@ -53,7 +53,7 @@ const account = (over: Partial<UseAccountResult>): UseAccountResult => ({
 });
 const named = { id: 'u1', senderName: 'Sam', contactSource: null, accountType: 'owner' as const };
 const signedOut = account({});
-const signedIn = account({ status: 'signed_in', isSignedIn: true, profile: named, profileLoaded: true });
+const signedIn = account({ status: 'signed_in', isSignedIn: true, profile: named, profileAnswered: true, profileLoaded: true });
 
 const anna = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
