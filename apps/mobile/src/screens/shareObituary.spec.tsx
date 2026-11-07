@@ -5,6 +5,7 @@ import type { Session } from '@griever/hooks';
 import { SerifReadyContext } from '../ui';
 import * as Clipboard from 'expo-clipboard';
 import { ShareObituaryScreen } from './ShareObituaryScreen';
+import { obituaryTextFor } from '../lib/obituaryText';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
@@ -222,5 +223,30 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
     expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).toMatchObject({ busy: true });
     finish();
     await screen.findByText(OPENED);
+  });
+});
+
+describe('ShareObituaryScreen with fields only (#700)', () => {
+  const fieldsOnly = { ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa', obituaryCareer: 'a nurse' } as Session;
+  const draft = obituaryTextFor(fieldsOnly);
+
+  it('has a draft to send', () => {
+    expect(draft).toContain('Anna Lee');
+    expect(draft).toContain('Tulsa');
+  });
+
+  it('emails the draft built from the fields', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(fieldsOnly);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    expect(decodeURIComponent(String(open.mock.calls[0][0])).replace(/\r\n/g, '\n')).toContain(draft);
+  });
+
+  it('copies the draft built from the fields', async () => {
+    jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    setup(fieldsOnly);
+    fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
+    await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith(draft));
   });
 });
