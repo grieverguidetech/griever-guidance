@@ -13,8 +13,6 @@ import { useSerifStyle } from '../typography';
 /** The words the screen needs. libs/copy/screens/account.json has these keys, plus more. */
 export interface AccountCopy {
   heading: string;
-  askHeading: string;
-  askIntro: string;
   back: string;
   checklist: string;
   nameLabel: string;
@@ -24,10 +22,6 @@ export interface AccountCopy {
 
 export interface AccountProps {
   copy: AccountCopy;
-  /** The account has no name yet: "What should we call you?" replaces the heading. */
-  asksName?: boolean;
-  /** The line under the heading, already chosen. Leave unset for none. */
-  intro?: string;
   name: string;
   onNameChange: (name: string) => void;
   /** The field cannot be edited (the session has ended). */
@@ -53,12 +47,10 @@ export interface AccountProps {
 }
 
 /**
- * "Your account" and "What should we call you?": one screen. Mobile's own screen (apps/mobile/src/ui). It owns no state; the app holds the name.
+ * "Your account": the name field and its actions. Mobile's own screen (apps/mobile/src/ui). It owns no state; the app holds the name.
  */
 export function Account({
   copy,
-  asksName,
-  intro,
   name,
   onNameChange,
   fieldDisabled,
@@ -76,7 +68,6 @@ export function Account({
 }: AccountProps) {
   const inputFont = useSerifStyle('regular');
   const labelId = useId();
-  const introId = useId();
   const offlineId = useId();
   const statusId = useId();
   const [focused, setFocused] = useState(false);
@@ -122,13 +113,8 @@ export function Account({
       </View>
       <View style={styles.head}>
         <Heading level={1} headingRef={headingRef}>
-          {asksName ? copy.askHeading : copy.heading}
+          {copy.heading}
         </Heading>
-        {intro ? (
-          <Body tone="muted" id={introId}>
-            {intro}
-          </Body>
-        ) : null}
       </View>
       <Status id={offlineId} message={offline ? copy.offline : undefined} />
       <View style={styles.field}>
@@ -143,7 +129,6 @@ export function Account({
           {...webFieldHook}
           // Web names the field from the visible label; native reads the label text directly.
           aria-labelledby={labelId}
-          aria-describedby={intro ? introId : undefined}
           accessibilityLabel={copy.nameLabel}
           textContentType="name"
           autoComplete="name"

@@ -775,7 +775,7 @@ const sharedScreens = (leaveFirst?: () => void) => (
                 if (navigation.canGoBack()) navigation.goBack();
                 else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
               }}
-              // Opened as the first screen: once signed in (and named), land on the normal first screen.
+              // Opened as the first screen: once signed in and the profile has answered, land on the normal first screen.
               onSignedIn={
                 leaveFirst
                   ? () => {
