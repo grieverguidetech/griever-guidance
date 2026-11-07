@@ -90,6 +90,11 @@ export interface Session extends SessionDetails, SectionFields, ServiceEventFiel
    */
   recipientsNotified: Partial<Record<TemplateCategory, string[]>>;
   momentCompletedAt: Partial<Record<MomentKey, string>>;
+  /**
+   * When the obituary was emailed to the publisher. Device-only and never synced (not in
+   * SYNCED_KEYS). Kept apart from `momentCompletedAt.obituary`, which a text send also writes.
+   */
+  obituaryEmailedAt?: string;
   remindersScheduled: ReminderEntry[];
 }
 
@@ -129,7 +134,7 @@ export interface UseSessionsResult {
   /** Marks a moment done and records who was notified, for dedup. */
   recordMomentComplete: (id: string, category: TemplateCategory, contactIds: string[]) => void;
   /**
-   * Marks the obituary done because it was emailed to the publisher. Sets `momentCompletedAt.obituary`
+   * Marks the obituary done because it was emailed to the publisher. Sets `obituaryEmailedAt`
    * once (an earlier value is kept) and changes nothing else. Device-only, never synced.
    */
   recordObituaryEmailed: (id: string) => void;
@@ -894,13 +899,10 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
   const recordObituaryEmailed = useCallback((id: string) => {
     setSessions((list) =>
       list.map((s) => {
-        if (s.id !== id || s.momentCompletedAt.obituary) {
+        if (s.id !== id || s.obituaryEmailedAt) {
           return s;
         }
-        return {
-          ...s,
-          momentCompletedAt: { ...s.momentCompletedAt, obituary: new Date().toISOString() },
-        };
+        return { ...s, obituaryEmailedAt: new Date().toISOString() };
       }),
     );
   }, []);

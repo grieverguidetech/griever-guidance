@@ -57,10 +57,12 @@ describe('sendCardStatus', () => {
   });
 
   it('an emailed obituary is done with no link and no one texted, and counts texted people', () => {
-    const emailed = { momentCompletedAt: { obituary: '2026-10-11T10:00:00.000Z' } };
+    const emailed = { obituaryEmailedAt: '2026-10-11T10:00:00.000Z' };
     expect(sendCardStatus(session(emailed), 'obituary')).toEqual({ sent: 0 });
     expect(sendCardStatus(session({ ...emailed, recipientsNotified: { obituary: ['c1', 'c2'] } }), 'obituary')).toEqual({ sent: 2 });
-    expect(sendCardStatus(session({ momentCompletedAt: { announce: '2026-10-11T10:00:00.000Z' } }), 'obituary')).toBe('needsDetail');
+    // A text send also writes momentCompletedAt.obituary; without a link it is still waiting.
+    const texted = session({ obituaryText: 'Text', recipientsNotified: { obituary: ['c1'] }, momentCompletedAt: { obituary: '2026-10-11T10:00:00.000Z' } });
+    expect(sendCardStatus(texted, 'obituary')).toBe('waitingForLink');
   });
 
   it('obituary is not sent without a link, even if people were messaged', () => {

@@ -244,17 +244,15 @@ describe('applyRemoteFlows with details (DS-7)', () => {
 
 describe('the emailed-obituary marker stays on the device (C2, C3)', () => {
   it('is not a synced key and is not in the sync payload', () => {
-    const [s] = apply([local()], []);
-    expect(s).toBeDefined();
     const view = renderHook(() => useSessions(mem([local()])));
     act(() => view.result.current.recordObituaryEmailed('local-1'));
     const marked = view.result.current.sessions[0];
-    expect(marked.momentCompletedAt.obituary).toBeTruthy();
+    expect(marked.obituaryEmailedAt).toBeTruthy();
+    expect(SYNCED_KEYS as readonly string[]).not.toContain('obituaryEmailedAt');
     expect(SYNCED_KEYS as readonly string[]).not.toContain('momentCompletedAt');
-    expect(SYNCED_KEYS as readonly string[]).not.toContain('obituary');
     const payload = toSyncedFields(marked as never);
-    expect(Object.keys(payload)).not.toContain('momentCompletedAt');
-    expect(JSON.stringify(payload)).not.toContain(marked.momentCompletedAt.obituary as string);
+    expect(Object.keys(payload)).not.toContain('obituaryEmailedAt');
+    expect(JSON.stringify(payload)).not.toContain(marked.obituaryEmailedAt as string);
     expect(payload).toEqual(toSyncedFields(local() as never));
   });
 });

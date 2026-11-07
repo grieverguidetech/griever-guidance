@@ -19,8 +19,8 @@ export function hasObituaryLink(session: Pick<Session, 'obituaryUrl'>): boolean 
 }
 
 /** True when the obituary was emailed to the publisher (device-only marker, never synced). */
-export function isObituaryEmailed(session: Pick<Session, 'momentCompletedAt'>): boolean {
-  return Boolean(session.momentCompletedAt?.obituary);
+export function isObituaryEmailed(session: Pick<Session, 'obituaryEmailedAt'>): boolean {
+  return Boolean(session.obituaryEmailedAt);
 }
 
 function isMomentDone(session: Session, key: MomentKey): boolean {
