@@ -49,8 +49,8 @@ function setup(session: Session = anna, paymentsEnabled = false, extra: Partial<
   return handlers;
 }
 
-// The More sheet is the first Modal on the screen, the checklist the second.
-const moreModal = () => screen.UNSAFE_getAllByType(Modal)[0];
+// The switcher sheet is the first Modal on the screen (always drawn), More the second, the checklist the third.
+const moreModal = () => screen.UNSAFE_getAllByType(Modal)[1];
 const moreModalFirst = () => screen.UNSAFE_getAllByType(Modal)[0];
 const morePanel = () => within(moreModal());
 
@@ -117,10 +117,18 @@ describe('HubScreen', () => {
     expect(screen.queryByRole('button', { name: /delete|remove/i })).toBeNull();
   });
 
-  it('shows the name top-left with the label, as plain text while it is the only person', () => {
+  it('shows the name top-left as a button with the label, even while it is the only person', () => {
     setup();
-    expect(screen.getByLabelText('Writing about Anna')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Writing about Anna' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Writing about Anna' })).toBeTruthy();
+  });
+
+  it('with one person, the name opens the switcher with Edit person, which runs onEditPerson once the sheet is gone', () => {
+    const { onEditPerson } = setup();
+    fireEvent.press(screen.getByRole('button', { name: 'Writing about Anna' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
+    expect(onEditPerson).not.toHaveBeenCalled();
+    act(() => moreModalFirst().props.onDismiss());
+    expect(onEditPerson).toHaveBeenCalledTimes(1);
   });
 
   it('shows the name as a button with 2 or more people, and picking another person calls onSwitch', () => {
@@ -212,7 +220,7 @@ describe('HubScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'More' }));
     fireEvent.press(morePanel().getByRole('button', { name: "What you'll need" }));
     act(() => moreModal().props.onDismiss());
-    expect(screen.UNSAFE_getAllByType(Modal)[1].props.visible).toBe(true);
+    expect(screen.UNSAFE_getAllByType(Modal)[2].props.visible).toBe(true);
     expect(screen.getByText('Not today. Just so none of it surprises you.')).toBeTruthy();
   });
 
@@ -396,7 +404,7 @@ describe('HubScreen', () => {
     setup(anna, true);
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: /Share the service/ }));
-    act(() => screen.UNSAFE_getAllByType(Modal)[2].props.onDismiss());
+    act(() => screen.UNSAFE_getAllByType(Modal)[3].props.onDismiss());
     expect(focusedNode(focus)?.props.accessibilityHint).toBe('Included with the full plan');
   });
 
@@ -458,7 +466,7 @@ describe('HubScreen', () => {
     fireEvent.press(morePanel().getByRole('button', { name: "What you'll need" }));
     act(() => moreModal().props.onDismiss());
     focus.mockClear();
-    act(() => screen.UNSAFE_getAllByType(Modal)[1].props.onDismiss());
+    act(() => screen.UNSAFE_getAllByType(Modal)[2].props.onDismiss());
     expect(focus).toHaveBeenCalledWith(moreHandle());
     expect(moreHandle()).toBeDefined();
   });

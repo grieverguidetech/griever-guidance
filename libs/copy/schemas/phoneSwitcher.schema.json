@@ -3,11 +3,12 @@
   "title": "Copy for the phone-only name switcher on the person screen",
   "type": "object",
   "additionalProperties": false,
-  "required": ["nameLabel", "nameHint", "title", "addSomeone", "close", "nowWriting"],
+  "required": ["nameLabel", "nameHint", "title", "editPerson", "addSomeone", "close", "nowWriting"],
   "properties": {
     "nameLabel": { "$ref": "#/$defs/text" },
     "nameHint": { "$ref": "#/$defs/text" },
     "title": { "$ref": "#/$defs/text" },
+    "editPerson": { "$ref": "#/$defs/text" },
     "addSomeone": { "$ref": "#/$defs/text" },
     "close": { "$ref": "#/$defs/text" },
     "nowWriting": { "$ref": "#/$defs/text" }

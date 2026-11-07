@@ -206,7 +206,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
         copy={hubCopy}
         eyebrow={fill(copy.forName, { name: session.personName })}
         rows={rows}
-        name={<NameSwitcher name={personLabel(session)} others={others} onPick={onSwitch} onAdd={onAddSomeone} />}
+        name={<NameSwitcher name={personLabel(session)} others={others} onPick={onSwitch} onEdit={onEditPerson} onAdd={onAddSomeone} />}
         onMore={() => setMoreOpen(true)}
         onStart={onStart}
         onLocked={(row) => {
