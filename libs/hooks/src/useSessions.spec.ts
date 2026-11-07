@@ -187,6 +187,24 @@ describe('one draft per moment (#83)', () => {
     expect(saved.personName).toBe('Margaret Hayes');
   });
 
+  it('recordObituaryEmailed sets the obituary timestamp once, keeps an earlier one, and changes nothing else', () => {
+    const { result, id } = start();
+    const before = result.current.sessions[0];
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-11T10:00:00Z'));
+      act(() => result.current.recordObituaryEmailed(id));
+      const first = result.current.sessions[0];
+      expect(first.momentCompletedAt).toEqual({ obituary: '2026-10-11T10:00:00.000Z' });
+      vi.setSystemTime(new Date('2026-10-12T10:00:00Z'));
+      act(() => result.current.recordObituaryEmailed(id));
+      expect(result.current.sessions[0].momentCompletedAt.obituary).toBe('2026-10-11T10:00:00.000Z');
+      expect({ ...first, momentCompletedAt: {} }).toEqual({ ...before, momentCompletedAt: {} });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not keep a draft with no moment chosen yet', () => {
     const { result, id } = start();
     act(() => result.current.updateDraft(id, freshDraft({})));

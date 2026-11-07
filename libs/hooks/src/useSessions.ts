@@ -129,6 +129,11 @@ export interface UseSessionsResult {
   /** Marks a moment done and records who was notified, for dedup. */
   recordMomentComplete: (id: string, category: TemplateCategory, contactIds: string[]) => void;
   /**
+   * Marks the obituary done because it was emailed to the publisher. Sets `momentCompletedAt.obituary`
+   * once (an earlier value is kept) and changes nothing else. Device-only, never synced.
+   */
+  recordObituaryEmailed: (id: string) => void;
+  /**
    * Applies what the server returned for this account. `pendingByFlow` maps a flowId to the fact
    * fields with an unsent local edit; those keep the local value. A flow not on the device becomes
    * a 'member' session. A 'member' session whose flow is no longer returned is removed (access was
@@ -886,6 +891,20 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     [],
   );
 
+  const recordObituaryEmailed = useCallback((id: string) => {
+    setSessions((list) =>
+      list.map((s) => {
+        if (s.id !== id || s.momentCompletedAt.obituary) {
+          return s;
+        }
+        return {
+          ...s,
+          momentCompletedAt: { ...s.momentCompletedAt, obituary: new Date().toISOString() },
+        };
+      }),
+    );
+  }, []);
+
   const applyRemoteFlows = useCallback<UseSessionsResult['applyRemoteFlows']>(
     ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}) => {
       if (!myUserId) return;
@@ -938,6 +957,7 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     setServiceReady,
     scheduleReminder,
     recordMomentComplete,
+    recordObituaryEmailed,
     applyRemoteFlows,
   };
 }
