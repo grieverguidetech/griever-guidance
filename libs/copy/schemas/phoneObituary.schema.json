@@ -14,7 +14,12 @@
     "cancelButton",
     "saved",
     "followsDetails",
-    "emailNoText"
+    "emailNoText",
+    "publisherEmailLabel",
+    "publisherEmailPlaceholder",
+    "publisherEmailHint",
+    "publisherEmailMany",
+    "publisherEmailInvalid"
   ],
   "properties": {
     "textTitle": {
@@ -48,6 +53,21 @@
       "$ref": "#/$defs/text"
     },
     "emailNoText": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherEmailLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherEmailPlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherEmailHint": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherEmailMany": {
+      "$ref": "#/$defs/text"
+    },
+    "publisherEmailInvalid": {
       "$ref": "#/$defs/text"
     }
   },

@@ -48,6 +48,10 @@ jest.mock('expo-contacts/legacy', () => ({
   getContactsAsync: jest.fn(),
 }));
 
+// Native-only module: its entry needs the native ExpoMailComposer and fails to load under Jest. By default the
+// in-app composer is "unavailable", so the code falls back to mailto: (a spec can mock it again).
+jest.mock('expo-mail-composer', () => ({ isAvailableAsync: jest.fn(async () => false), composeAsync: jest.fn() }));
+
 // @clerk/clerk-js opens a BroadcastChannel as soon as it is imported and never closes it. Under
 // Jest 30 that open port keeps the test process alive after the last test, so a run with a single
 // worker (CI=true on a small runner) never exits. Unref every channel so it cannot hold the process.

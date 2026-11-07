@@ -561,6 +561,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
+- the publisher's email typed on Share obituary (`gg.publisherEmail.v1.<id>`, one per person, this phone only, MOB-9)
 - the checklist state (phase ticks and "Doesn't apply" marks, WEB-10) and `account.checklistTicks`: not synced yet (B9); planned later
 - `hearsFirstIds`, `momentCompletedAt`, `remindersScheduled`
 - the parser refuses these by name (`FORBIDDEN_SYNC_KEYS`), so a client that sends one gets an error

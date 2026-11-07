@@ -9,5 +9,10 @@
   "cancelButton": "Cancel",
   "saved": "Saved.",
   "followsDetails": "The text follows the details again.",
-  "emailNoText": "Write it above, or on the web."
+  "emailNoText": "Write it above, or on the web.",
+  "publisherEmailLabel": "Publisher's email",
+  "publisherEmailPlaceholder": "name@example.com",
+  "publisherEmailHint": "Kept on this phone only.",
+  "publisherEmailMany": "Please enter one email address only.",
+  "publisherEmailInvalid": "That email address doesn't look right. Check it and try again."
 }

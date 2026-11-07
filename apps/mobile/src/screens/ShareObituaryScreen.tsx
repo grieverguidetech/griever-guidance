@@ -7,10 +7,11 @@ import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
 import { ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
+import type { TextInputNode } from '../ui/screens/ShareObituary';
 import { colors, spacing } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
-import { openMailDraft } from '../lib/mailCompose';
+import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
 import { obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
@@ -55,6 +56,12 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [note, setNote] = useState<'saved' | 'follows' | undefined>(undefined);
   // Counts finished edits, so focus returns to the Edit button once it is back on screen.
   const [editsEnded, setEditsEnded] = useState(0);
+  // The publisher's address is typed here and kept on this phone only, per person (never part of the session, so it never syncs: DS-7).
+  const [address, setAddress] = useState('');
+  // The error shows after the field is left or Email is pressed, and goes when the user types again.
+  const [addressShown, setAddressShown] = useState(false);
+  const addressInput = useRef<TextInputNode | null>(null);
+  const addressEdited = useRef(false);
   // What the exits need, kept in refs so Android Back and unmount see the latest typed text.
   const latest = useRef({ editing: false, value: '', shown: '', onChange });
   const emailRunning = useRef(false);
@@ -69,6 +76,22 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   }, []);
+
+  // Loads this person's saved address, unless the user has already started typing.
+  useEffect(() => {
+    let live = true;
+    addressEdited.current = false;
+    setAddress('');
+    setAddressShown(false);
+    loadPublisherEmail(session.id).then((saved) => {
+      if (live && !addressEdited.current) {
+        setAddress(saved);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [session.id]);
 
   // Android Back goes to the hub, as the Back button does. A sheet that is open takes Back first.
   useEffect(() => {
@@ -139,6 +162,16 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const name = session.personName.trim() || copy.nameFallback;
   const obituaryText = obituaryTextFor(session);
 
+  const addressCheck = checkPublisherEmail(address);
+  const addressError = addressCheck.ok ? undefined : addressCheck.reason === 'many' ? copy.publisherEmailMany : copy.publisherEmailInvalid;
+
+  const changeAddress = (value: string) => {
+    addressEdited.current = true;
+    setAddress(value);
+    setAddressShown(false);
+    void savePublisherEmail(session.id, value);
+  };
+
   latest.current = { editing, value: editValue, shown: obituaryText, onChange };
 
   const startEdit = () => {
@@ -200,6 +233,17 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     if (emailRunning.current) {
       return;
     }
+    // A wrong address is shown, not guessed at: nothing opens until it is fixed or cleared.
+    if (!addressCheck.ok) {
+      setAddressShown(true);
+      // Every refused press is heard: iOS announces the message, and on both systems focus goes to the field
+      // (Android reads the field's hint when it gets focus).
+      if (Platform.OS === 'ios') {
+        AccessibilityInfo.announceForAccessibility(addressError ?? '');
+      }
+      setTimeout(() => addressInput.current?.focus(), 0);
+      return;
+    }
     emailRunning.current = true;
     // Cleared first, so a second failure changes the message again and is announced again.
     setEmailFailed(false);
@@ -207,7 +251,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     setCopied(false);
     setCopyFailed(false);
     setEmailBusy(true);
-    const result = await openMailDraft({ subject: fill(copy.emailSubject, { name }), body: obituaryText });
+    const result = await openMailDraft({ to: addressCheck.address, subject: fill(copy.emailSubject, { name }), body: obituaryText });
     emailRunning.current = false;
     setEmailBusy(false);
     setEmailFailed(result === 'failed');
@@ -257,7 +301,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           onContinue={() => leave(onContinue)}
           onPasteLink={pasteLink}
           pasteMessage={pasteMessage}
-          publisherEmail={{ hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
+          publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
           textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, note, editRef: editButton }}
           headingRef={heading}
           checklistRef={checklistButton}

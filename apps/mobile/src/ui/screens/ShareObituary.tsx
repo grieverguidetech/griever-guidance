@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { ComponentRef, Ref } from 'react';
+import type { ComponentRef, MutableRefObject, Ref } from 'react';
 import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
@@ -11,6 +11,8 @@ import { applyUrlInputMode } from '../inputMode';
 import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
 import { useSerifStyle } from '../typography';
+
+export type TextInputNode = ComponentRef<typeof TextInput>;
 
 /** The words the screen needs. libs/copy/screens/shareObituary.json has these keys, plus more. */
 export interface ShareObituaryCopy {
@@ -65,6 +67,11 @@ export interface ShareObituaryCopy {
   saveButton?: string;
   cancelButton?: string;
   saved?: string;
+  /** The optional publisher address field in step 1 (mobile, from phoneObituary.json). */
+  publisherEmailLabel?: string;
+  publisherEmailPlaceholder?: string;
+  /** Muted line under the field: where the address is kept. */
+  publisherEmailHint?: string;
   /** Calm line after clearing the box: the text follows the details again. */
   followsDetails?: string;
   /** Label above the link field (mobile "Step 2: ..."). */
@@ -84,6 +91,16 @@ export interface PublisherEmail {
   busy?: boolean;
   /** Which calm line follows a press: mail opened, or the share sheet completed. Unset: no line. */
   note?: 'opened' | 'shared';
+  /** The typed publisher address. Leave unset to hide the field. */
+  address?: {
+    value: string;
+    onChange: (value: string) => void;
+    onBlur: () => void;
+    /** For moving focus to the field when a press is refused. */
+    inputRef?: MutableRefObject<TextInputNode | null>;
+    /** The calm refusal (already worded), shown under the field. Unset when the address is fine or empty. */
+    error?: string;
+  };
   /** Copies the obituary text. Leave unset to hide "Copy the text". */
   onCopyText?: () => void;
   /** true after the text was copied. */
@@ -158,6 +175,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const emailFailedId = useId();
   const copiedId = useId();
   const noteId = useId();
+  const addressErrorId = useId();
+  const addressHintId = useId();
   const pasteId = useId();
   const savedId = useId();
   const empty = link.trim() === '';
@@ -185,7 +204,39 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           {publisherEmail.hasText ? (
             <>
               {copy.emailBody ? <Body tone="muted">{copy.emailBody}</Body> : null}
-              <Button label={copy.emailButton} variant="secondary" busy={publisherEmail.busy} describedBy={publisherEmail.failed ? emailFailedId : undefined} onPress={publisherEmail.onPress} />
+              {publisherEmail.address && copy.publisherEmailLabel ? (
+                <>
+                  <Field
+                    label={copy.publisherEmailLabel}
+                    optional={copy.optional}
+                    accessibleName={`${copy.publisherEmailLabel} ${copy.optional}`}
+                    placeholder={copy.publisherEmailPlaceholder ?? ''}
+                    value={publisherEmail.address.value}
+                    onChangeText={publisherEmail.address.onChange}
+                    onBlur={publisherEmail.address.onBlur}
+                    invalid={publisherEmail.address.error !== undefined}
+                    describedBy={[publisherEmail.address.error ? addressErrorId : null, copy.publisherEmailHint ? addressHintId : null].filter(Boolean).join(' ') || undefined}
+                    hint={publisherEmail.address.error ?? copy.publisherEmailHint}
+                    inputRef={publisherEmail.address.inputRef}
+                    email
+                    returnKeyType="done"
+                  />
+                  <Status id={addressErrorId} message={publisherEmail.address.error} tone="danger" />
+                  {copy.publisherEmailHint ? (
+                    <Body tone="muted" small id={addressHintId}>
+                      {copy.publisherEmailHint}
+                    </Body>
+                  ) : null}
+                </>
+              ) : null}
+              <Button
+                label={copy.emailButton}
+                variant="secondary"
+                busy={publisherEmail.busy}
+                describedBy={publisherEmail.address?.error ? addressErrorId : publisherEmail.failed ? emailFailedId : undefined}
+                hint={publisherEmail.address?.error}
+                onPress={publisherEmail.onPress}
+              />
               <Status id={emailFailedId} message={publisherEmail.failed ? copy.emailFailed : undefined} tone="danger" />
               <Status id={noteId} message={publisherEmail.failed ? undefined : publisherEmail.note === 'opened' ? copy.emailOpened : publisherEmail.note === 'shared' ? copy.emailShared : undefined} />
               {publisherEmail.onCopyText && copy.copyButton ? (
@@ -352,10 +403,14 @@ interface FieldProps {
   /** Native: read after the label (accessibilityHint). */
   hint?: string;
   url?: boolean;
+  /** An email address: the email keyboard, no auto-capitals. */
+  email?: boolean;
+  /** Lets the screen move focus to this field. */
+  inputRef?: MutableRefObject<TextInputNode | null>;
   returnKeyType: 'next' | 'done';
 }
 
-function Field({ label, optional, accessibleName, placeholder, value, onChangeText, onBlur, invalid, describedBy, hint, url, returnKeyType }: FieldProps) {
+function Field({ label, optional, accessibleName, placeholder, value, onChangeText, onBlur, invalid, describedBy, hint, url, email, inputRef, returnKeyType }: FieldProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
   const [focused, setFocused] = useState(false);
@@ -368,6 +423,9 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
       <TextInput
         ref={(node) => {
           input.current = node;
+          if (inputRef) {
+            inputRef.current = node;
+          }
           if (url) {
             applyUrlInputMode(node);
           }
@@ -388,8 +446,11 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
         returnKeyType={returnKeyType}
         autoCapitalize="none"
         autoCorrect={false}
+        // The publisher's address is not the user's own: the phone must not offer their email.
+        autoComplete={email ? 'off' : undefined}
+        textContentType={email ? 'none' : undefined}
         // Not on web: a url input there adds the browser's own invalid state on top of ours.
-        keyboardType={url && Platform.OS !== 'web' ? 'url' : 'default'}
+        keyboardType={url && Platform.OS !== 'web' ? 'url' : email ? 'email-address' : 'default'}
         placeholder={placeholder}
         placeholderTextColor={colors['neutral-700']}
         value={value}
