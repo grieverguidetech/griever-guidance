@@ -24,7 +24,7 @@ const tick = (phaseKeys: string[], state: ChecklistItemState = 'done'): Checklis
   Object.fromEntries(phaseKeys.flatMap(itemsOf).map((id) => [id, state]));
 
 const setup = async (checklist: ChecklistFields['checklist'] = {}, onOpenGroup = jest.fn()) => {
-  render(<PersonChecklistSheet visible onClose={jest.fn()} checklist={checklist} onOpenGroup={onOpenGroup} />);
+  render(<PersonChecklistSheet visible onClose={jest.fn()} checklist={checklist} onSetItem={jest.fn()} onOpenGroup={onOpenGroup} />);
   // Let the saved Gather ticks load.
   await act(async () => {});
   return onOpenGroup;
@@ -91,6 +91,8 @@ describe('PersonChecklistSheet (#696)', () => {
   it('tells the caller which group was tapped', async () => {
     const onOpenGroup = await setup();
     fireEvent.press(screen.getByRole('button', { name: phrases.phases['first-weeks'] }));
+    // The panel replaces the list, so go Back to tap the next group.
+    fireEvent.press(screen.getByRole('button', { name: phrases.back }));
     fireEvent.press(screen.getByRole('button', { name: 'Gather when you can' }));
     expect(onOpenGroup.mock.calls).toEqual([['first-weeks'], ['gather']]);
   });
@@ -98,7 +100,7 @@ describe('PersonChecklistSheet (#696)', () => {
   it('has a Close button, and screen-reader focus goes to the title when the sheet shows', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     const onClose = jest.fn();
-    render(<PersonChecklistSheet visible onClose={onClose} checklist={{}} onOpenGroup={jest.fn()} />);
+    render(<PersonChecklistSheet visible onClose={onClose} checklist={{}} onSetItem={jest.fn()} onOpenGroup={jest.fn()} />);
     await act(async () => {});
     expect(screen.getByText(copy.title)).toBeTruthy();
     act(() => screen.UNSAFE_getByType(Modal).props.onShow());

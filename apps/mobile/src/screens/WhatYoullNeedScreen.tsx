@@ -19,7 +19,7 @@ export const CHECKLIST_KEY = 'gg.checklist.v1';
 // Same words as the web list: both read them from libs/copy.
 export const SSN_TIP = checklistCopy.gatherNotes.ssn;
 
-const CHECKLIST: { id: string; label: string; meta?: string; tip?: string }[] = [
+export const CHECKLIST: { id: string; label: string; meta?: string; tip?: string }[] = [
   { id: 'will', label: 'Any will or written wishes', meta: 'Burial or cremation, and who they named' },
   { id: 'plans', label: 'Pre-arranged funeral plans', meta: 'Many people have already paid for this' },
   { id: 'ssn', label: 'Social Security number and ID', tip: SSN_TIP },
