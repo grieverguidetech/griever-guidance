@@ -3,17 +3,58 @@
   "title": "Copy for the phone-only obituary text editor on Share obituary (the rest comes from shareObituary.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["textTitle", "editHelp", "editButton", "writeButton", "editLabel", "editPlaceholder", "saveButton", "cancelButton", "saved"],
+  "required": [
+    "textTitle",
+    "editHelp",
+    "editButton",
+    "writeButton",
+    "editLabel",
+    "editPlaceholder",
+    "saveButton",
+    "cancelButton",
+    "saved",
+    "followsDetails",
+    "emailNoText"
+  ],
   "properties": {
-    "textTitle": { "$ref": "#/$defs/text" },
-    "editHelp": { "$ref": "#/$defs/text" },
-    "editButton": { "$ref": "#/$defs/text" },
-    "writeButton": { "$ref": "#/$defs/text" },
-    "editLabel": { "$ref": "#/$defs/text" },
-    "editPlaceholder": { "$ref": "#/$defs/text" },
-    "saveButton": { "$ref": "#/$defs/text" },
-    "cancelButton": { "$ref": "#/$defs/text" },
-    "saved": { "$ref": "#/$defs/text" }
+    "textTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "editHelp": {
+      "$ref": "#/$defs/text"
+    },
+    "editButton": {
+      "$ref": "#/$defs/text"
+    },
+    "writeButton": {
+      "$ref": "#/$defs/text"
+    },
+    "editLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "editPlaceholder": {
+      "$ref": "#/$defs/text"
+    },
+    "saveButton": {
+      "$ref": "#/$defs/text"
+    },
+    "cancelButton": {
+      "$ref": "#/$defs/text"
+    },
+    "saved": {
+      "$ref": "#/$defs/text"
+    },
+    "followsDetails": {
+      "$ref": "#/$defs/text"
+    },
+    "emailNoText": {
+      "$ref": "#/$defs/text"
+    }
   },
-  "$defs": { "text": { "type": "string", "minLength": 1 } }
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
 }

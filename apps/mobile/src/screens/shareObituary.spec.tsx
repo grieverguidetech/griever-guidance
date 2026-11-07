@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
-import { AccessibilityInfo, Linking, Modal, Platform, Share } from 'react-native';
+import { AccessibilityInfo, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { SerifReadyContext } from '../ui';
@@ -10,10 +10,26 @@ import { obituaryTextFor } from '../lib/obituaryText';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
+const mockHandles = new Map<string, number>();
+
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  // One handle per accessibility label, so a test can tell which view focus went to.
+  findNodeHandle: (node: unknown) => {
+    // A button is named by its accessibilityLabel or by the text inside it.
+    const textIn = (child: unknown): string =>
+      typeof child === 'string' ? child : Array.isArray(child) ? child.map(textIn).join('') : child && typeof child === 'object' ? textIn((child as { props?: { children?: unknown } }).props?.children) : '';
+    const props = (node as { props?: { accessibilityLabel?: string; children?: unknown } } | null)?.props;
+    const label = props?.accessibilityLabel ?? textIn(props?.children);
+    if (!mockHandles.has(label)) {
+      mockHandles.set(label, mockHandles.size + 1);
+    }
+    return mockHandles.get(label);
+  },
 }));
+
+// The mocked findNodeHandle above, so a test can ask which handle a button has.
+const { findNodeHandle } = jest.requireMock<{ findNodeHandle: (node: unknown) => number }>('react-native/Libraries/ReactNative/RendererProxy');
 
 const base = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
@@ -51,8 +67,7 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
   it('with no text, says it can be written on the web and still lets the user continue to the link field', () => {
     setup(base);
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
-    expect(screen.getByText("Once it's written, come back here.")).toBeTruthy();
-    expect(screen.queryByText(/the web/)).toBeNull();
+    expect(screen.getByText("Write it above, or on the web.")).toBeTruthy();
     expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
   });
 
@@ -320,7 +335,7 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
 });
 
 // A small stand-in for the app: it keeps the person, and a patch from the screen changes it (as updateSession does).
-function Harness({ initial, onPatch }: { initial: Session; onPatch: (patch: object) => void }) {
+function Harness({ initial, onPatch, onBack = jest.fn(), onContinue = jest.fn() }: { initial: Session; onPatch: (patch: object) => void; onBack?: () => void; onContinue?: () => void }) {
   const [session, setSession] = useState(initial);
   return (
     <SerifReadyContext.Provider value>
@@ -331,16 +346,16 @@ function Harness({ initial, onPatch }: { initial: Session; onPatch: (patch: obje
           setSession((s) => ({ ...s, ...patch }));
         }}
         onSetItem={jest.fn()}
-        onBack={jest.fn()}
-        onContinue={jest.fn()}
+        onBack={onBack}
+        onContinue={onContinue}
       />
     </SerifReadyContext.Provider>
   );
 }
 
-function setupLive(session: Session) {
+function setupLive(session: Session, extra: { onBack?: () => void; onContinue?: () => void } = {}) {
   const onPatch = jest.fn();
-  render(<Harness initial={session} onPatch={onPatch} />);
+  render(<Harness initial={session} onPatch={onPatch} {...extra} />);
   return onPatch;
 }
 
@@ -365,7 +380,7 @@ describe('ShareObituaryScreen shows and edits the obituary text (#701)', () => {
 
   it('with no text, keeps the come-back line and offers to write it here', () => {
     setup(base);
-    expect(screen.getByText("Once it's written, come back here.")).toBeTruthy();
+    expect(screen.getByText("Write it above, or on the web.")).toBeTruthy();
     expect(screen.queryByRole('button', { name: EDIT })).toBeNull();
     expect(screen.getByRole('button', { name: 'Write the text' })).toBeTruthy();
   });
@@ -382,17 +397,147 @@ describe('ShareObituaryScreen shows and edits the obituary text (#701)', () => {
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'New text.\nSecond line.' });
     expect(screen.queryByLabelText(BOX)).toBeNull();
     expect(screen.getByText('New text.\nSecond line.')).toBeTruthy();
-    expect(screen.getByText('Saved on this phone.')).toBeTruthy();
+    expect(screen.getByText('Saved.')).toBeTruthy();
   });
 
-  it('saving the draft built from the details freezes it as the edited text', () => {
+  it('saving the draft unchanged writes nothing, so it keeps following the details', () => {
     const session = { ...base, obituaryCity: 'Boston' } as Session;
     const draft = obituaryTextFor(session);
     const onPatch = setupLive(session);
     fireEvent.press(screen.getByRole('button', { name: EDIT }));
     expect(screen.getByLabelText(BOX).props.value).toBe(draft);
     fireEvent.press(screen.getByRole('button', { name: SAVE }));
-    expect(onPatch).toHaveBeenCalledWith({ obituaryText: draft });
+    expect(onPatch).not.toHaveBeenCalled();
+    expect(screen.getByText(draft)).toBeTruthy();
+  });
+
+  it('changing the draft freezes it as the edited text', () => {
+    const onPatch = setupLive({ ...base, obituaryCity: 'Boston' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    fireEvent.changeText(screen.getByLabelText(BOX), 'My own words.');
+    fireEvent.press(screen.getByRole('button', { name: SAVE }));
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'My own words.' });
+  });
+
+  it('clearing the box (or only spaces) sets obituaryText to undefined and says the text follows the details', () => {
+    const session = { ...base, obituaryText: 'Old text.', obituaryCity: 'Boston' } as Session;
+    const draft = obituaryTextFor({ ...session, obituaryText: undefined } as Session);
+    const onPatch = setupLive(session);
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    fireEvent.changeText(screen.getByLabelText(BOX), '   ');
+    fireEvent.press(screen.getByRole('button', { name: SAVE }));
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: undefined });
+    expect(screen.getByText('The text follows the details again.')).toBeTruthy();
+    expect(screen.getByText(draft)).toBeTruthy();
+  });
+
+  it('the box has a hint, a 10000 character limit, and Save above it; Step 2 and Continue are hidden while editing', () => {
+    setup({ ...base, obituaryText: 'Old text.' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    const box = screen.getByLabelText(BOX);
+    expect(box.props.maxLength).toBe(10000);
+    expect(box.props.accessibilityHint).toBe('Change anything you like.');
+    const texts = JSON.stringify(screen.toJSON());
+    expect(texts.indexOf('Save the text')).toBeLessThan(texts.indexOf('Obituary text'));
+    expect(screen.queryByLabelText('Link to the obituary')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Choose who to send it to/ })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+  });
+
+  it('header Back while editing saves the typed text first, then goes back', () => {
+    const onBack = jest.fn();
+    const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session, { onBack });
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Android Back while editing', () => {
+    function captureBack() {
+      let handler: () => boolean | null | undefined = () => false;
+      jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_e, h) => {
+        handler = h as () => boolean | null | undefined;
+        return { remove: jest.fn() };
+      });
+      return () => handler();
+    }
+
+    it('with the keyboard closed, saves and leaves the screen', () => {
+      const press = captureBack();
+      jest.spyOn(Keyboard, 'isVisible').mockReturnValue(false);
+      const onBack = jest.fn();
+      const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session, { onBack });
+      fireEvent.press(screen.getByRole('button', { name: EDIT }));
+      fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+      let handled: boolean | null | undefined;
+      act(() => {
+        handled = press();
+      });
+      expect(handled).toBe(true);
+      expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('with the keyboard open, only closes the keyboard', () => {
+      const press = captureBack();
+      jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+      const onBack = jest.fn();
+      const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session, { onBack });
+      fireEvent.press(screen.getByRole('button', { name: EDIT }));
+      fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+      let handled: boolean | null | undefined;
+      act(() => {
+        handled = press();
+      });
+      expect(handled).toBe(true);
+      expect(dismiss).toHaveBeenCalledTimes(1);
+      expect(onBack).not.toHaveBeenCalled();
+      expect(onPatch).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(BOX).props.value).toBe('Typed words.');
+    });
+  });
+
+  it('saves the typed text when the screen goes away another way (a person switch)', () => {
+    const onPatch = jest.fn();
+    const view = render(
+      <SerifReadyContext.Provider value>
+        <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} />
+      </SerifReadyContext.Provider>,
+    );
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    view.unmount();
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
+  });
+
+  it('on iOS, announces the saved line in the queue', () => {
+    const original = Platform.OS;
+    Platform.OS = 'ios';
+    try {
+      const say = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+      setupLive({ ...base, obituaryText: 'Old text.' } as Session);
+      fireEvent.press(screen.getByRole('button', { name: EDIT }));
+      fireEvent.changeText(screen.getByLabelText(BOX), 'Changed');
+      fireEvent.press(screen.getByRole('button', { name: SAVE }));
+      expect(say).toHaveBeenCalledWith('Saved.', { queue: true });
+    } finally {
+      Platform.OS = original;
+    }
+  });
+
+  it('uses height keyboard avoidance on Android', () => {
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      setup(base);
+      expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('height');
+    } finally {
+      Platform.OS = original;
+    }
   });
 
   it('writes from empty', () => {
@@ -455,15 +600,50 @@ describe('ShareObituaryScreen shows and edits the obituary text (#701)', () => {
     await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith('Edited text.'));
   });
 
-  it('puts screen-reader focus on the Edit button after Save and after Cancel', () => {
+  it('puts screen-reader focus on the Edit button (its own handle) after Save and after Cancel', () => {
+    jest.useFakeTimers();
+    try {
+      const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+      jest.spyOn(Keyboard, 'isVisible').mockReturnValue(false);
+      setupLive({ ...base, obituaryText: 'Old text.' } as Session);
+      const editHandle = findNodeHandle({ props: { accessibilityLabel: EDIT } });
+      focus.mockClear();
+      fireEvent.press(screen.getByRole('button', { name: EDIT }));
+      fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(focus).toHaveBeenLastCalledWith(editHandle);
+      fireEvent.press(screen.getByRole('button', { name: EDIT }));
+      fireEvent.changeText(screen.getByLabelText(BOX), 'Changed');
+      fireEvent.press(screen.getByRole('button', { name: SAVE }));
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(focus).toHaveBeenCalledTimes(2);
+      expect(focus).toHaveBeenLastCalledWith(editHandle);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('with the keyboard open, waits for keyboardDidHide before moving focus', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
+    let didHide: () => void = () => undefined;
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((_e: string, h: () => void) => {
+      didHide = h;
+      return { remove: jest.fn() };
+    }) as never);
     setupLive({ ...base, obituaryText: 'Old text.' } as Session);
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: EDIT }));
     fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    expect(focus).not.toHaveBeenCalled();
+    act(() => {
+      didHide();
+    });
     expect(focus).toHaveBeenCalledTimes(1);
-    fireEvent.press(screen.getByRole('button', { name: EDIT }));
-    fireEvent.press(screen.getByRole('button', { name: SAVE }));
-    expect(focus).toHaveBeenCalledTimes(2);
   });
 });

@@ -149,7 +149,8 @@ describe('ShareObituary text card (#701)', () => {
     editPlaceholder: 'Write the obituary here.',
     saveButton: 'Save the text',
     cancelButton: 'Cancel',
-    saved: 'Saved on this phone.',
+    saved: 'Saved.',
+    followsDetails: 'The text follows the details again.',
   };
   const editor = (over = {}) => ({ text: 'Anna loved the garden.', editing: false, value: '', onValueChange: jest.fn(), onEdit: jest.fn(), onSave: jest.fn(), onCancel: jest.fn(), ...over });
 

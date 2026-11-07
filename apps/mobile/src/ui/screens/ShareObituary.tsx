@@ -65,6 +65,8 @@ export interface ShareObituaryCopy {
   saveButton?: string;
   cancelButton?: string;
   saved?: string;
+  /** Calm line after clearing the box: the text follows the details again. */
+  followsDetails?: string;
   /** Label above the link field (mobile "Step 2: ..."). */
   linkStepLabel?: string;
   /** "Paste link" beside the link field. */
@@ -103,8 +105,8 @@ export interface ObituaryTextEditor {
   onCancel: () => void;
   /** The longest text the app keeps (libs/shared), so a save is never cut after the fact. */
   maxLength?: number;
-  /** true right after a save: a calm line is announced. */
-  saved?: boolean;
+  /** The calm line after leaving the box: saved, or cleared so the text follows the details again. */
+  note?: 'saved' | 'follows';
   /** For returning screen-reader focus to the Edit button after Save or Cancel. */
   editRef?: Ref<ButtonNode>;
 }
@@ -198,6 +200,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           ) : null}
         </Card>
       ) : null}
+      {textEditor?.editing ? null : (
+      <>
       {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
       <Field
         label={copy.linkLabel}
@@ -274,6 +278,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           <Status id={draftReasonId} message={draftUnavailable} />
         </Card>
       ) : null}
+      </>
+      )}
     </View>
   );
 }
@@ -283,12 +289,18 @@ function TextCard({ copy, editor, savedId }: { copy: ShareObituaryCopy; editor: 
   const editLabelId = useId();
   const font = useSerifStyle('regular');
   const [focused, setFocused] = useState(false);
+  const label = hasText ? copy.editButton : copy.writeButton;
   return (
     <Card>
       <Heading level={2}>{copy.textTitle}</Heading>
       {editor.editing ? (
         <>
           {copy.editHelp ? <Body tone="muted">{copy.editHelp}</Body> : null}
+          {/* Above the box, so they stay reachable at the largest text size with the keyboard open. */}
+          <View style={styles.editActions}>
+            {copy.saveButton ? <Button label={copy.saveButton} onPress={editor.onSave} /> : null}
+            {copy.cancelButton ? <Button label={copy.cancelButton} variant="secondary" onPress={editor.onCancel} /> : null}
+          </View>
           <Body tone="strong" id={editLabelId}>
             {copy.editLabel}
           </Body>
@@ -297,6 +309,7 @@ function TextCard({ copy, editor, savedId }: { copy: ShareObituaryCopy; editor: 
             {...webFieldHook}
             aria-labelledby={editLabelId}
             accessibilityLabel={copy.editLabel}
+            accessibilityHint={copy.editHelp}
             multiline
             autoFocus
             maxLength={editor.maxLength}
@@ -309,20 +322,15 @@ function TextCard({ copy, editor, savedId }: { copy: ShareObituaryCopy; editor: 
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
           />
-          <View style={styles.editActions}>
-            {copy.saveButton ? <Button label={copy.saveButton} onPress={editor.onSave} /> : null}
-            {copy.cancelButton ? <Button label={copy.cancelButton} variant="secondary" onPress={editor.onCancel} /> : null}
-          </View>
         </>
       ) : (
         <>
           {hasText ? <Body>{editor.text}</Body> : null}
-          {(hasText ? copy.editButton : copy.writeButton) ? (
-            <Button label={(hasText ? copy.editButton : copy.writeButton) ?? ''} variant="secondary" buttonRef={editor.editRef} onPress={editor.onEdit} />
-          ) : null}
-          <Status id={savedId} message={editor.saved ? copy.saved : undefined} />
+          {label ? <Button label={label} variant="secondary" buttonRef={editor.editRef} onPress={editor.onEdit} /> : null}
         </>
       )}
+      {/* Always mounted, so only its text changes and the change is announced. */}
+      <Status id={savedId} queue message={editor.note === 'saved' ? copy.saved : editor.note === 'follows' ? copy.followsDetails : undefined} />
     </Card>
   );
 }
@@ -417,7 +425,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 16,
   },
-  editActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], alignItems: 'center' },
+  editActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], alignItems: 'center' },
   // Last, so an invalid field keeps its error border while it has focus.
   inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).
