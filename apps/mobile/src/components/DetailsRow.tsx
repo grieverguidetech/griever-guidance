@@ -71,6 +71,7 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
                 accessibleName={accessibleName}
                 maximumDate={LATEST_DATE}
                 minimumDate={EARLIEST_DATE}
+                missing={missing}
               />
               {missing && (
                 <Text style={styles.needed} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>

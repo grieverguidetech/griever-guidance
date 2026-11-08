@@ -91,6 +91,7 @@ describe('the order in the app', () => {
     fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben');
     fireEvent.press(screen.getByRole('button', { name: 'Date they passed (optional)' }));
     fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2025, 5, 7));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     expect(screen.getByText('For Ben')).toBeTruthy();
@@ -135,6 +136,7 @@ describe('the order in the app', () => {
     fireEvent.changeText(screen.getByLabelText('Their name, required'), 'Ben Cole');
     fireEvent.press(screen.getByRole('button', { name: 'Date they passed (optional)' }));
     fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2025, 5, 7));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));

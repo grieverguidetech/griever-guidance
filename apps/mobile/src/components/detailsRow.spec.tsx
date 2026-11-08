@@ -61,6 +61,7 @@ describe('DetailsRow', () => {
       const onChange = renderDate();
       fireEvent.press(screen.getByRole('button', { name: 'Service date, Needed' }));
       fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 10, 14));
+      fireEvent.press(screen.getByRole('button', { name: 'Done' }));
       expect(onChange).toHaveBeenCalledWith('serviceDate', 'November 14, 2026');
       const written = onChange.mock.calls[0][1] as string;
       const read = parseCompleteDate(written);
@@ -90,7 +91,16 @@ describe('DetailsRow', () => {
       const today = new Date();
       expect([value.getFullYear(), value.getMonth(), value.getDate()]).toEqual([today.getFullYear(), today.getMonth(), today.getDate()]);
       fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 10, 8));
+      fireEvent.press(screen.getByRole('button', { name: 'Done' }));
       expect(onChange).toHaveBeenCalledWith('serviceDate', 'November 8, 2026');
+    });
+
+    it('shows the dashed border while empty and required, and drops it once filled', () => {
+      renderDate();
+      expect(StyleSheet.flatten(screen.getByRole('button', { name: 'Service date, Needed' }).props.style).borderStyle).toBe('dashed');
+      screen.unmount();
+      renderDate('June 7, 2025');
+      expect(StyleSheet.flatten(screen.getByRole('button', { name: 'Service date' }).props.style).borderStyle).toBeUndefined();
     });
 
     it('Clear empties it', () => {

@@ -178,6 +178,7 @@ describe('send flow starts from the planned details', () => {
     await toConfirm();
     fireEvent.press(await screen.findByLabelText(/Service date/));
     fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 6, 3));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { serviceDate?: string }[];
       expect(saved?.serviceDate).toBe('July 3, 2026');

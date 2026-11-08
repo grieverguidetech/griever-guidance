@@ -187,6 +187,7 @@ describe('Ready to send (Share the service)', () => {
       expect(screen.getByLabelText('Service date').props.accessibilityValue.text).toBe('June 14');
       fireEvent.press(screen.getByLabelText('Service date'));
       fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 5, 20));
+      fireEvent.press(screen.getByRole('button', { name: 'Done' }));
       // The field and the message both show the new day.
       expect(screen.getAllByText(/June 20/).length).toBeGreaterThanOrEqual(2);
       expect(screen.queryByText(/June 14/)).toBeNull();
