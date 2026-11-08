@@ -1,7 +1,9 @@
 import { useId, useRef, useState } from 'react';
 import type { ComponentRef, MutableRefObject, Ref } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '@griever/tokens';
+import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
@@ -35,6 +37,9 @@ export interface ShareObituaryCopy {
   draftTitle: string;
   draftBody: string;
   draftButton: string;
+  /** The bottom bar button after the obituary was emailed, and what a screen reader hears after it (phone only). */
+  doneButton?: string;
+  doneHint?: string;
   /** Mobile step 1 (all optional; web leaves them out). */
   emailTitle?: string;
   emailBody?: string;
@@ -156,6 +161,15 @@ export interface ShareObituaryProps {
   textEditor?: ObituaryTextEditor;
   /** Step 1 (mobile). Leave unset to hide the card, as the web does. */
   publisherEmail?: PublisherEmail;
+  /**
+   * true once the user's email went out (mail or share, never a cancel). Shows the bottom bar button,
+   * hidden while the text is being edited. Needs `onDone`.
+   */
+  emailed?: boolean;
+  /** true while the keyboard is open: the bar then drops the bottom safe-area inset, so no gap shows above the keyboard. */
+  keyboardOpen?: boolean;
+  /** Done was pressed: the screen records it and goes to Ready to send. */
+  onDone?: () => void;
   headingRef?: HeadingProps['headingRef'];
   /** For the sheet that "What you'll need" opens to return focus to. */
   checklistRef?: Ref<ButtonNode>;
@@ -166,7 +180,8 @@ export interface ShareObituaryProps {
  * "Who should know?". Mobile's own screen
  * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, headingRef, checklistRef }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef }: ShareObituaryProps) {
+  const insets = useSafeAreaInsets();
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
   const errorId = useId();
@@ -184,7 +199,12 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const reason = empty ? copy.needLink : undefined;
   const blockedBy = reason ?? (linkValid ? undefined : copy.invalidLink);
 
+  const showDone = Boolean(emailed && onDone && copy.doneButton && !textEditor?.editing);
+
   return (
+    <>
+    {/* The bar sits outside the scrolling content; with no bar, the content clears the home indicator itself. */}
+    <ScrollView style={styles.flex} contentContainerStyle={[styles.content, !showDone && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled">
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="header" onPress={onBack} />
@@ -332,6 +352,14 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
       </>
       )}
     </View>
+    </ScrollView>
+    {showDone && onDone ? (
+      // The bar pads by the inset itself; a negative margin takes it back while the keyboard covers that edge.
+      <View testID="obituary-done-wrap" style={keyboardOpen ? { marginBottom: -insets.bottom } : undefined}>
+        <ActionBar testID="obituary-done-bar" label={copy.doneButton as string} hint={copy.doneHint} onPress={onDone} />
+      </View>
+    ) : null}
+    </>
   );
 }
 
@@ -461,6 +489,8 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing[3], paddingTop: spacing[4] },
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
