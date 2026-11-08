@@ -69,7 +69,7 @@ const startAnnouncement = async (withContacts: boolean) => {
   }
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna'));
-  fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+  fireEvent.press(await screen.findByTestId('hub-next-card'));
 };
 
 afterEach(() => {

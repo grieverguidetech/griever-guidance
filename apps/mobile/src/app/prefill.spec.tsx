@@ -199,7 +199,7 @@ describe('send flow starts from the planned details', () => {
   // carries the name and date from setup, and the saved name is never wiped by opening it.
   describe('the announcement without its intro (#671)', () => {
     it('carries the name and date of passing from setup to Ready to send, and keeps them saved', async () => {
-      await openMoment({ ...base, dateOfPassing: 'May 2, 2026' } as Session, /Next/, 'Anna, passed May 2, 2026');
+      await openMoment({ ...base, dateOfPassing: 'May 2, 2026' } as Session, /^Announce the passing, .*Continue$/, 'Anna, passed May 2, 2026');
       await openPeople();
       await toConfirm();
       expect(await screen.findByText(/Anna passed away on May 2, 2026/)).toBeTruthy();
