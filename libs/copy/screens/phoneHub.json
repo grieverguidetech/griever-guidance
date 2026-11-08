@@ -6,5 +6,8 @@
   "account": "Your account",
   "stateDone": "Sent",
   "stateInProgress": "In progress",
-  "stateNotStarted": "Not started"
+  "stateNotStarted": "Not started",
+  "summarySentOne": "Sent to 1 person",
+  "summarySentMany": "Sent to {count} people",
+  "summaryEmailed": "Emailed to the paper"
 }

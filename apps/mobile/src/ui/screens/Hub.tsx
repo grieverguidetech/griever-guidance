@@ -25,8 +25,6 @@ export interface HubCopy {
   start: string;
   /** The accent line on the next card. */
   continue: string;
-  /** Read before the name of the next card only. Not drawn. */
-  tagNext: string;
   /** The state words: shown on each card and last in its accessible name. */
   stateDone: string;
   stateInProgress: string;
@@ -135,7 +133,7 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     return <LockedStep title={text.title} body={text.body} meta={metaOnAllRows ? row.meta : undefined} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
-  return <SendCard row={row} title={text.title} stateWord={stateWords(copy)[row.state]} continueWord={copy.continue} nextWord={copy.tagNext} onPress={() => onStart(row.key)} />;
+  return <SendCard row={row} title={text.title} stateWord={stateWords(copy)[row.state]} continueWord={copy.continue} onPress={() => onStart(row.key)} />;
 }
 
 const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
@@ -145,13 +143,13 @@ const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
 });
 
 /** A filled panel card like web's Overview card: title and state word, then one muted line. */
-function SendCard(props: { row: HubRow; title: string; stateWord: string; continueWord: string; nextWord: string; onPress: () => void }) {
+function SendCard(props: { row: HubRow; title: string; stateWord: string; continueWord: string; onPress: () => void }) {
   const { row } = props;
   const semibold = useSerifStyle('semibold');
   // The "Needs ..." line replaces the summary. The check is decorative, so it is not in the name.
   const line = row.meta ?? row.summary;
-  // The next card is announced as such first. Other tests and screen-reader users find it by "Next".
-  const label = [row.lit ? props.nextWord : undefined, props.title, line, props.stateWord].filter(Boolean).join(', ');
+  // The visible words in reading order. Continue is last, and only on the next card.
+  const label = [props.title, line, props.stateWord, row.lit ? props.continueWord : undefined].filter(Boolean).join(', ');
   return (
     <Pressable
       role="button"
@@ -191,8 +189,14 @@ function Meta({ meta }: { meta?: string }) {
   );
 }
 
-/** colors.surface with 7% of colors.ink over it (web's hover). */
-const PRESSED_SURFACE = '#dcdbdb';
+/** `base` with `amount` of `over` mixed in, as a hex colour. */
+function mixHex(base: string, over: string, amount: number): string {
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
+  return `#${[1, 3, 5].map((at) => Math.round(channel(base, at) * (1 - amount) + channel(over, at) * amount).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** The card colour while pressed: surface with 7% ink over it (web's hover). Muted text keeps 4.5:1 on it (hub.spec checks). */
+const PRESSED_SURFACE = mixHex(colors.surface, colors.ink, 0.07);
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
@@ -201,7 +205,7 @@ const styles = StyleSheet.create({
   rows: { gap: spacing[2] },
   // Web's gg-panel card: surface fill, no border, full width, at least 44 pt.
   card: { minHeight: minTouchTarget, padding: spacing[3], gap: 2, backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' },
-  // Web's hover mix: ink 7% over surface. Muted text keeps 4.5:1 on it (Hub.spec checks).
+  // Web's hover mix: ink 7% over surface. Muted text keeps 4.5:1 on it (hub.spec checks).
   cardPressed: { backgroundColor: PRESSED_SURFACE },
   // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
   nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },

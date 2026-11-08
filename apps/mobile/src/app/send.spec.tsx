@@ -66,7 +66,7 @@ const openAnna = async () => {
 // The hub comes first: Start is the announcement; the other steps are rows named for the step.
 const startMoment = async (title: string) =>
   fireEvent.press(
-    await screen.findByRole('button', { name: title === 'Announce the passing' ? /Next/ : new RegExp(title) }),
+    await screen.findByRole('button', { name: title === 'Announce the passing' ? /^Announce the passing, .*Continue$/ : new RegExp(title) }),
   );
 
 describe('picking an announcement', () => {

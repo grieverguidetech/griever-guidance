@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
+import { firstMissingField, isDraftStarted, isObituaryEmailed, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
 import { parseCompleteDate } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState, MomentKey } from '@griever/shared';
@@ -77,8 +77,24 @@ function obituarySummary(session: Session): string {
   return started ? shell.summaryObituaryDraft : shell.summaryObituaryEmpty;
 }
 
+/** A finished row says what happened, never a prompt to start: who was texted, else that the paper was emailed. */
+function doneLine(session: Session, key: MomentKey): string | undefined {
+  const sent = session.recipientsNotified?.[MOMENT_CATEGORY[key]]?.length ?? 0;
+  if (sent === 1) {
+    return phoneCopy.summarySentOne;
+  }
+  if (sent > 1) {
+    return fill(phoneCopy.summarySentMany, { count: String(sent) });
+  }
+  return key === 'obituary' && isObituaryEmailed(session) ? phoneCopy.summaryEmailed : undefined;
+}
+
 /** The muted line under a card's title: web's Overview summary, built from the phone session. */
-function summaryLine(session: Session, key: MomentKey): string {
+function summaryLine(session: Session, key: MomentKey, done: boolean): string {
+  const finished = done ? doneLine(session, key) : undefined;
+  if (finished) {
+    return finished;
+  }
   switch (key) {
     case 'announce':
       return announcementSummary(session);
@@ -231,15 +247,18 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   const stopped = note?.partial ? momentOfCategory(note.category) : null;
   const lit = nextMoment({ session: statusSession, locked, partial: stopped });
 
-  const rows: HubRow[] = moments.map((moment) => ({
-    key: moment.key,
-    status: moment.status,
-    state: rowState(statusSession, session, moment, stopped),
-    lit: moment.key === lit,
-    locked: locked.includes(moment.key),
-    summary: summaryLine(statusSession, moment.key),
-    meta: moment.status === 'done' ? undefined : metaLine(statusSession, moment.key),
-  }));
+  const rows: HubRow[] = moments.map((moment) => {
+    const state = rowState(statusSession, session, moment, stopped);
+    return {
+      key: moment.key,
+      status: moment.status,
+      state,
+      lit: moment.key === lit,
+      locked: locked.includes(moment.key),
+      summary: summaryLine(statusSession, moment.key, state === 'done'),
+      meta: moment.status === 'done' ? undefined : metaLine(statusSession, moment.key),
+    };
+  });
 
   // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.
   const target: MomentKey = barMoment({ session: statusSession, locked, partial: stopped });

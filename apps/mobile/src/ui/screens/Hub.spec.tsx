@@ -47,7 +47,7 @@ describe('Hub cards', () => {
     const lit = screen.getByTestId('hub-next-card');
     expect(within(lit).getByText('Continue')).toBeTruthy();
     expect(within(lit).getByTestId('next-bar')).toBeTruthy();
-    expect(lit.props.accessibilityLabel).toBe('Next, Announce the passing, Write a short note, In progress');
+    expect(lit.props.accessibilityLabel).toBe('Announce the passing, Write a short note, In progress, Continue');
     expect(screen.getAllByTestId('next-bar')).toHaveLength(1);
     expect(screen.getAllByText('Continue')).toHaveLength(1);
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/Started|Sent to/);

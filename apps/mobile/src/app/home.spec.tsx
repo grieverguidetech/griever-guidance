@@ -122,7 +122,7 @@ describe('the order in the app', () => {
     await saved([person('a', 'Anna', '2026-10-01T00:00:00.000Z', 'May 2, 2026')]);
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna, passed May 2, 2026'));
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByTestId('hub-next-card'));
     await openPeople();
     expect(screen.queryByPlaceholderText('e.g. Margaret Ellen Hayes')).toBeNull();
     expect(screen.queryByPlaceholderText('e.g. June 7, 2025')).toBeNull();
@@ -222,7 +222,7 @@ describe('Home from every step', () => {
     expect(screen.getByText('Ready to send')).toBeTruthy();
 
     // The announcement opens on Ready to send: Android back is the same as the on-screen Back, to the hub, once.
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByTestId('hub-next-card'));
     await screen.findByRole('button', { name: 'Choose who to tell' });
     act(() => void pressBack());
     expect(await screen.findByText('Ready to send')).toBeTruthy();

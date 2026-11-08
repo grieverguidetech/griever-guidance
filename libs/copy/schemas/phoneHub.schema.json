@@ -1,18 +1,60 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only person screen: heading, intro, What you'll need button, partial-send line, account link, and the status words (Sent, In progress, Not started)",
+  "title": "Copy for the phone-only person screen: heading, intro, What you'll need button, partial-send line, account link, the status words (Sent, In progress, Not started), and the done-row summaries (Sent to n people, Emailed to the paper)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "intro", "whatYoullNeed", "whatYoullNeedHint", "account", "stateDone", "stateInProgress", "stateNotStarted"],
+  "required": [
+    "heading",
+    "intro",
+    "whatYoullNeed",
+    "whatYoullNeedHint",
+    "account",
+    "stateDone",
+    "stateInProgress",
+    "stateNotStarted",
+    "summarySentOne",
+    "summarySentMany",
+    "summaryEmailed"
+  ],
   "properties": {
-    "heading": { "$ref": "#/$defs/text" },
-    "intro": { "$ref": "#/$defs/text" },
-    "whatYoullNeed": { "$ref": "#/$defs/text" },
-    "whatYoullNeedHint": { "$ref": "#/$defs/text" },
-    "account": { "$ref": "#/$defs/text" },
-    "stateDone": { "$ref": "#/$defs/text" },
-    "stateInProgress": { "$ref": "#/$defs/text" },
-    "stateNotStarted": { "$ref": "#/$defs/text" }
+    "heading": {
+      "$ref": "#/$defs/text"
+    },
+    "intro": {
+      "$ref": "#/$defs/text"
+    },
+    "whatYoullNeed": {
+      "$ref": "#/$defs/text"
+    },
+    "whatYoullNeedHint": {
+      "$ref": "#/$defs/text"
+    },
+    "account": {
+      "$ref": "#/$defs/text"
+    },
+    "stateDone": {
+      "$ref": "#/$defs/text"
+    },
+    "stateInProgress": {
+      "$ref": "#/$defs/text"
+    },
+    "stateNotStarted": {
+      "$ref": "#/$defs/text"
+    },
+    "summarySentOne": {
+      "$ref": "#/$defs/text"
+    },
+    "summarySentMany": {
+      "$ref": "#/$defs/text"
+    },
+    "summaryEmailed": {
+      "$ref": "#/$defs/text"
+    }
   },
-  "$defs": { "text": { "type": "string", "minLength": 1 } }
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
 }

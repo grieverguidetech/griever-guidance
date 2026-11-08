@@ -58,7 +58,7 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
   // A moment already sent to people shows its compact done row; a new one is the lit card.
-  fireEvent.press(told.length > 0 ? await screen.findByRole('button', { name: /^Announce the passing, .*, Sent$/ }) : await screen.findByRole('button', { name: /Next/ }));
+  fireEvent.press(told.length > 0 ? await screen.findByRole('button', { name: /^Announce the passing, .*, Sent$/ }) : await screen.findByTestId('hub-next-card'));
   await openPeople();
   for (const name of pick) {
     fireEvent.press(await screen.findByText(name));
@@ -84,7 +84,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Text Fay'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByRole('button', { name: /^Next, Announce the passing.*, In progress$/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^Announce the passing.*, In progress, Continue$/ })).toBeTruthy();
     await waitFor(async () => {
       const saved = await savedAnna();
       expect(saved.recipientsNotified.announcement).toEqual(['c1', 'c3']);
@@ -223,8 +223,8 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Stop for now'));
     expect(await screen.findByText('You told 1 of 3.')).toBeTruthy();
     // The stopped card is the lit card and shows progress; leaving the person screen clears this.
-    expect((await screen.findAllByRole('button', { name: /^Next, Announce the passing.*, In progress$/ })).length).toBe(1);
-    expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
+    expect((await screen.findAllByRole('button', { name: /^Announce the passing.*, In progress, Continue$/ })).length).toBe(1);
+    expect(screen.getAllByTestId('hub-next-card')).toHaveLength(1);
     expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
   });
 

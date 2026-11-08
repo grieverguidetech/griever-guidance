@@ -30,7 +30,7 @@ describe('send steps and the top safe area', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByTestId('hub-next-card'));
     await openPeople();
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
@@ -56,7 +56,7 @@ describe('send steps and the top safe area', () => {
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByTestId('hub-next-card'));
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
@@ -71,7 +71,7 @@ describe('send steps and the top safe area', () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna'));
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByTestId('hub-next-card'));
     await openPeople();
     const bar = StyleSheet.flatten(screen.getByTestId('people-action-bar').props.style);
     expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
@@ -96,7 +96,7 @@ describe('send steps and the top safe area', () => {
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify([{ contactId: 'c1', name: 'Dee', phone: '+15555550100', tier: 'family' }]));
     render(<App />);
     fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
-    fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.press(await screen.findByTestId('hub-next-card'));
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
