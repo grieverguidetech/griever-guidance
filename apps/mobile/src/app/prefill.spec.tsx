@@ -59,7 +59,7 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceDate: 'June 14' } as Session);
     await openPeople();
     await toConfirm();
-    expect((await screen.findByLabelText('Service date')).props.value).toBe('June 14');
+    expect((await screen.findByLabelText('Service date')).props.accessibilityValue.text).toBe('June 14');
   });
 
   it('uses the edited service message as the message', async () => {
@@ -176,10 +176,12 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base } as Session);
     await openPeople();
     await toConfirm();
-    fireEvent.changeText(await screen.findByLabelText(/Service date/), 'July 3');
+    fireEvent.press(await screen.findByLabelText(/Service date/));
+    fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 6, 3));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     await waitFor(async () => {
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { serviceDate?: string }[];
-      expect(saved?.serviceDate).toBe('July 3');
+      expect(saved?.serviceDate).toBe('July 3, 2026');
     });
   });
 
@@ -187,7 +189,7 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceDate: 'June 14' } as Session);
     await openPeople();
     await toConfirm();
-    expect((await screen.findByLabelText('Service date')).props.value).toBe('June 14');
+    expect((await screen.findByLabelText('Service date')).props.accessibilityValue.text).toBe('June 14');
     await new Promise((r) => setTimeout(r, 100));
     const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { serviceDate?: string }[];
     expect(saved?.serviceDate).toBe('June 14');

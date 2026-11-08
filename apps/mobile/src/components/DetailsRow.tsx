@@ -2,7 +2,9 @@ import { useRef, useState } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import type { Text as RNText } from 'react-native';
+import { screenCopy } from '@griever/copy';
 import { SerifText as Text } from '../ui';
+import { DateField } from './DateField';
 import { colors, radius, spacing } from '@griever/tokens';
 
 export interface DetailsField {
@@ -13,6 +15,13 @@ export interface DetailsField {
   /** A longer free-text answer: a taller box that wraps. */
   multiline?: boolean;
 }
+
+const dateCopy = screenCopy('personSetup');
+/** The service date is the one field written as a date, in the text web writes ("June 7, 2025"). */
+const DATE_KEY = 'serviceDate';
+// Same range as parseCompleteDate, which reads the text back. There is no real upper limit.
+const EARLIEST_DATE = new Date(2000, 0, 1);
+const LATEST_DATE = new Date(2100, 11, 31);
 
 export interface DetailsCopy {
   detailsHeading: string;
@@ -48,6 +57,30 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
       {fields.map((field, index) => {
         const missing = isMissing(field, values);
         const last = index === fields.length - 1;
+        const accessibleName = missing ? `${field.label}, ${copy.detailsNeeded}` : field.label;
+        if (field.key === DATE_KEY) {
+          return (
+            <View key={field.key} style={styles.field}>
+              <Text style={styles.label} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                {field.label}
+              </Text>
+              <DateField
+                copy={dateCopy}
+                value={values[field.key] ?? ''}
+                onChange={(text) => onChange(field.key, text)}
+                accessibleName={accessibleName}
+                maximumDate={LATEST_DATE}
+                minimumDate={EARLIEST_DATE}
+                missing={missing}
+              />
+              {missing && (
+                <Text style={styles.needed} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                  {copy.detailsNeeded}
+                </Text>
+              )}
+            </View>
+          );
+        }
         return (
           <View key={field.key} style={styles.field}>
             <Text style={styles.label} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
@@ -63,7 +96,7 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
                 missing && styles.inputMissing,
                 focusedKey === field.key && styles.inputFocused,
               ]}
-              accessibilityLabel={missing ? `${field.label}, ${copy.detailsNeeded}` : field.label}
+              accessibilityLabel={accessibleName}
               placeholder={field.placeholder}
               placeholderTextColor={colors['neutral-700']}
               value={values[field.key] ?? ''}

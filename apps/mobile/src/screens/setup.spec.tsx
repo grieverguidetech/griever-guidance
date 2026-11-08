@@ -79,6 +79,7 @@ describe('SetupScreen', () => {
     fireEvent.press(dateButton());
     expect(screen.getByTestId('date-picker').props.mode).toBe('date');
     choose(new Date(2025, 5, 7));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(screen.getByText('June 7, 2025')).toBeTruthy();
     expect(dateButton().props.accessibilityValue).toEqual({ text: 'June 7, 2025' });
     fireEvent.changeText(screen.getByLabelText('Their name, required'), ' Anna Lee ');
@@ -233,6 +234,7 @@ describe('SetupScreen date of birth (#715)', () => {
     const { onContinue } = setup({ personName: 'Anna', dateOfPassing: '' });
     fireEvent.press(birthButton());
     choose(new Date(1948, 2, 9));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(screen.getByText('March 9, 1948')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: '', birthDate: 'March 9, 1948' });
@@ -267,6 +269,7 @@ describe('SetupScreen date of birth (#715)', () => {
     expect(screen.queryByText(note)).toBeNull();
     fireEvent.press(birthButton());
     choose(new Date(2026, 5, 7));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(regions().some((r) => r.props.children === note || JSON.stringify(r.props.children) === JSON.stringify(note))).toBe(true);
     expect(screen.getByText(note)).toBeTruthy();
   });
@@ -280,6 +283,7 @@ describe('SetupScreen date of birth (#715)', () => {
     const { onContinue } = setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026' });
     fireEvent.press(birthButton());
     choose(new Date(1948, 2, 9));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'March 9, 1948' });
   });
