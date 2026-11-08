@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the phone-only words that mark a field required or optional in its spoken name on Your account (the rest comes from account.json, which web also reads)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["required", "optional"],
+  "properties": {
+    "required": { "$ref": "#/$defs/text" },
+    "optional": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}

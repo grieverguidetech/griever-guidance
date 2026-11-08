@@ -4,7 +4,7 @@ import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ProfileResult } from '@griever/api-client';
-import type { AccountAuth } from '@griever/shared';
+import type { AccountAuth, Address } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { CHECKLIST_KEY } from './WhatYoullNeedScreen';
 import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
@@ -23,11 +23,12 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 
 // The profile calls go through the gateway; here they are plain functions.
 const mockGetProfile = jest.fn<() => Promise<ProfileResult>>();
-const mockUpdateProfile = jest.fn<(token: string, u: { senderName?: string | null }) => Promise<ProfileResult>>();
+type ProfileUpdate = { senderName?: string | null; firstName?: string | null; lastName?: string | null; birthDate?: string | null; address?: Address | null };
+const mockUpdateProfile = jest.fn<(token: string, u: ProfileUpdate) => Promise<ProfileResult>>();
 jest.mock('@griever/api-client', () => ({
   ...jest.requireActual<object>('@griever/api-client'),
   getProfile: () => mockGetProfile(),
-  updateProfile: (token: string, u: { senderName?: string | null }) => mockUpdateProfile(token, u),
+  updateProfile: (token: string, u: ProfileUpdate) => mockUpdateProfile(token, u),
 }));
 
 // Clerk's screens-side hooks. `finalize` signs the fake auth in, the way Clerk's finalize starts the session.
@@ -51,9 +52,9 @@ jest.mock('@clerk/expo', () => ({
 }));
 jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'grieversguidance://sso-callback' }));
 
-const profileWith = (senderName: string | null): ProfileResult => ({
+const profileWith = (senderName: string | null, more: ProfileUpdate = {}): ProfileResult => ({
   ok: true,
-  profile: { id: 'u1', senderName, contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x' },
+  profile: { id: 'u1', senderName, contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: 'x', updatedAt: 'x', ...more },
 });
 const noProfile: ProfileResult = { ok: false, reason: 'no_profile' };
 const OFFLINE = "You need a connection to do this. Nothing you've typed is lost.";
@@ -89,7 +90,7 @@ beforeEach(async () => {
   jest.restoreAllMocks();
   await AsyncStorage.clear();
   mockGetProfile.mockReset().mockResolvedValue(noProfile);
-  mockUpdateProfile.mockReset().mockImplementation(async (_t, u) => profileWith(u.senderName ?? ''));
+  mockUpdateProfile.mockReset().mockImplementation(async (_t, u) => profileWith(u.senderName ?? u.firstName ?? '', u));
   mockSignIn.finalize.mockReset();
   mockSignUp.finalize.mockReset();
   mockSignIn.finalize.mockResolvedValue({ error: null });
@@ -127,7 +128,7 @@ describe('sign in', () => {
     renderAccount();
     await screen.findByLabelText('Email');
     press('Sign in');
-    await screen.findByLabelText('Your name');
+    await screen.findByLabelText('First name, required');
     expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
     expect(screen.queryByText('What should we call you?')).toBeNull();
     expect(screen.queryByText('This is the name on your account.')).toBeNull();
@@ -198,32 +199,30 @@ describe('sign up', () => {
     type('Email', 'b@x.co');
     type('Password', 'another-password');
     press('Sign in');
-    await screen.findByLabelText('Your name');
+    await screen.findByLabelText('First name, required');
     expect(screen.queryByText('What should we call you?')).toBeNull();
     expect(mockUpdateProfile).not.toHaveBeenCalled();
-    expect(value('Your name')).toBe('');
+    expect(value('First name, required')).toBe('');
   });
 
-  it('does not let an old unsaved name overwrite a newer saved one', async () => {
+  // A save made right after sign-up supersedes the first profile load, so profileLoaded stays false (see libs/hooks useAccount).
+  // Until it is true, Save waits (#717), so a stale sign-up name can never be written over a newer one.
+  it('does not save a newer name while the profile has not loaded after an offline sign-up', async () => {
     mockUpdateProfile.mockResolvedValueOnce({ ok: false, reason: 'offline' });
     await openSignUp();
     await createAccount();
     await screen.findByText(OFFLINE);
-    type('Your name', 'Samantha');
+    type('First name, required', 'Samantha');
     press('Save');
-    await screen.findByText('Your name is saved.');
-    screen.unmount();
-    renderAccount(true);
-    await screen.findByLabelText('Your name');
-    expect(screen.queryByDisplayValue('Sam')).toBeNull();
-    expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }, { senderName: 'Samantha' }]);
+    expect(value('First name, required')).toBe('Samantha');
+    expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }]);
   });
 
   it('does not ask for a name when the profile still has none after sign-up', async () => {
     mockUpdateProfile.mockResolvedValue(profileWith(''));
     await openSignUp();
     await createAccount();
-    await screen.findByLabelText('Your name');
+    await screen.findByLabelText('First name, required');
     expect(screen.queryByText('What should we call you?')).toBeNull();
   });
 
@@ -232,7 +231,7 @@ describe('sign up', () => {
     await openSignUp();
     await createAccount();
     await screen.findByText(OFFLINE);
-    expect(value('Your name')).toBe('Sam');
+    expect(value('First name, required')).toBe('Sam');
     expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
   });
 });
@@ -277,7 +276,7 @@ describe('Account as the first screen', () => {
     let resolveProfile: (r: ProfileResult) => void = () => undefined;
     mockGetProfile.mockReturnValue(new Promise<ProfileResult>((resolve) => (resolveProfile = resolve)));
     renderFirst(onSignedIn);
-    await screen.findByLabelText('Your name');
+    await screen.findByLabelText('First name, required');
     expect(screen.queryByText('What should we call you?')).toBeNull();
     expect(onSignedIn).not.toHaveBeenCalled();
     await act(async () => resolveProfile(profileWith(null)));
@@ -348,7 +347,7 @@ describe('profile', () => {
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
     await screen.findByText('Your name is saved.');
-    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Samantha' });
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Samantha', lastName: null, birthDate: null, address: null });
     // Only the shared status line announces it, once.
     expect(announce.mock.calls.filter(([m]) => m === 'Your name is saved.')).toHaveLength(1);
   });
@@ -356,11 +355,11 @@ describe('profile', () => {
   it('shows "Your name is saved." on the first save, when the account had no profile yet', async () => {
     mockGetProfile.mockResolvedValue(noProfile);
     renderAccount(true);
-    await screen.findByLabelText('Your name');
-    type('Your name', 'Sam');
+    await screen.findByLabelText('First name, required');
+    type('First name, required', 'Sam');
     press('Save');
     await screen.findByText('Your name is saved.');
-    expect(value('Your name')).toBe('Sam');
+    expect(value('First name, required')).toBe('Sam');
   });
 
   it('shows the error and keeps the typed name when saving fails', async () => {
@@ -369,14 +368,14 @@ describe('profile', () => {
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
     await screen.findByText(OFFLINE);
-    expect(value('Your name')).toBe('Samantha');
+    expect(value('First name, required')).toBe('Samantha');
   });
 
   it('does not save a name of only spaces', async () => {
     renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), '   ');
     press('Save');
-    await screen.findByText('Please enter your name.');
+    await screen.findByText('Please enter your first name.');
     expect(mockUpdateProfile).not.toHaveBeenCalled();
   });
 
@@ -391,10 +390,10 @@ describe('profile', () => {
     renderAccount(true);
     await screen.findByDisplayValue('Sam');
     expect(screen.queryByText(/You are offline/)).toBeNull();
-    type('Your name', 'Samantha');
+    type('First name, required', 'Samantha');
     press('Save');
     await screen.findByText('Your name is saved.');
-    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Samantha' });
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Samantha', lastName: null, birthDate: null, address: null });
     expect(screen.queryByText(/You are offline/)).toBeNull();
   });
 
@@ -412,7 +411,7 @@ describe('profile', () => {
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     act(() => mockAuthControl.setSignedIn(false));
     await screen.findByText("You've been signed out. Your work on this device is safe. Sign in again when you're ready.");
-    expect(value('Your name')).toBe('Samantha');
+    expect(value('First name, required')).toBe('Samantha');
     press('Sign in');
     await screen.findByLabelText('Email');
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy();
@@ -445,7 +444,7 @@ describe('profile', () => {
       mockGetProfile.mockResolvedValue(profileWith(null));
       renderAccount(true);
       await screen.findByRole('heading', { name: 'Your account' });
-      await screen.findByLabelText('Your name');
+      await screen.findByLabelText('First name, required');
       expectNoChecklist();
     });
 
@@ -453,10 +452,10 @@ describe('profile', () => {
       mockGetProfile.mockResolvedValue(profileWith(null));
       mockUpdateProfile.mockResolvedValue(profileWith('Ann'));
       renderAccount(true);
-      const field = await screen.findByLabelText('Your name');
+      const field = await screen.findByLabelText('First name, required');
       fireEvent.changeText(field, 'Ann');
       press('Save');
-      await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Ann' }));
+      await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Ann', lastName: null, birthDate: null, address: null }));
       press('Sign out');
       await screen.findByLabelText('Email');
     });
@@ -464,8 +463,171 @@ describe('profile', () => {
     it('leaves the saved Gather ticks on the device', async () => {
       await AsyncStorage.setItem(CHECKLIST_KEY, '["insurance"]');
       renderAccount(true);
-      await screen.findByLabelText('Your name');
+      await screen.findByLabelText('First name, required');
       expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]');
     });
+  });
+});
+
+describe('personal details (#717)', () => {
+  const FIRST = 'First name, required';
+  const LAST = 'Last name (optional)';
+  const saveButton = () => press('Save');
+  const full = profileWith('Anna', {
+    firstName: 'Anna',
+    lastName: 'Lee',
+    birthDate: '1980-05-29',
+    address: { line1: '1 Main St', line2: 'Apt 2', city: 'Newark', state: 'NJ', zip: '07101' },
+  });
+  const noAddress = { firstName: 'Anna', lastName: null, birthDate: null, address: null };
+
+  it('fills every field from the profile, with the date as the picker text', async () => {
+    mockGetProfile.mockResolvedValue(full);
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    expect(value(FIRST)).toBe('Anna');
+    expect(value(LAST)).toBe('Lee');
+    expect(value('Address line 1')).toBe('1 Main St');
+    expect(value('Address line 2 (optional)')).toBe('Apt 2');
+    expect(value('City')).toBe('Newark');
+    expect(value('State')).toBe('NJ');
+    expect(value('ZIP code')).toBe('07101');
+    expect(screen.getByRole('button', { name: 'Date of birth, optional' }).props.accessibilityValue).toEqual({ text: 'May 29, 1980' });
+  });
+
+  it('falls back to the sender name only when no first or last name is saved', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    screen.unmount();
+    mockGetProfile.mockResolvedValue(profileWith('Sam', { lastName: 'Lee' }));
+    renderAccount(true);
+    await screen.findByDisplayValue('Lee');
+    expect(value(FIRST)).toBe('');
+  });
+
+  it('never overwrites typing with a late load', async () => {
+    let resolveProfile: (r: ProfileResult) => void = () => undefined;
+    mockGetProfile.mockReturnValue(new Promise<ProfileResult>((resolve) => (resolveProfile = resolve)));
+    renderAccount(true);
+    await screen.findByLabelText(FIRST);
+    type(FIRST, 'Typed');
+    await act(async () => resolveProfile(full));
+    await screen.findByDisplayValue('Lee');
+    expect(value(FIRST)).toBe('Typed');
+  });
+
+  it('saves the typed values through updateDetails', async () => {
+    mockGetProfile.mockResolvedValue(full);
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type(FIRST, ' Annie ');
+    type(LAST, '');
+    type('Address line 2 (optional)', '');
+    type('State', 'new jersey');
+    saveButton();
+    await screen.findByText('Your name is saved.');
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', {
+      firstName: 'Annie',
+      lastName: null,
+      birthDate: '1980-05-29',
+      address: { line1: '1 Main St', line2: '', city: 'Newark', state: 'NJ', zip: '07101' },
+    });
+  });
+
+  it('saves a profile with no address and no date as nulls', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Anna', { firstName: 'Anna' }));
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    saveButton();
+    await screen.findByText('Your name is saved.');
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', noAddress);
+  });
+
+  it('refuses an empty first name and saves nothing', async () => {
+    mockGetProfile.mockResolvedValue(full);
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type(FIRST, '   ');
+    saveButton();
+    await screen.findByText('Please enter your first name.');
+    expect(screen.getByText('Please check the fields with a message under them.')).toBeTruthy();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a partial address with the message for each missing line', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Anna', { firstName: 'Anna' }));
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type('City', 'Newark');
+    saveButton();
+    await screen.findByText('Please enter the street address.');
+    expect(screen.getByText('Please enter the state.')).toBeTruthy();
+    expect(screen.getByText('Please enter the ZIP code.')).toBeTruthy();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a state or ZIP that is not valid', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Anna', { firstName: 'Anna' }));
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type('Address line 1', '1 Main St');
+    type('City', 'Newark');
+    type('State', 'Narnia');
+    type('ZIP code', '12');
+    saveButton();
+    await screen.findByText('Please use the two-letter state code, for example NJ.');
+    expect(screen.getByText('Please enter a ZIP code like 07001 or 07001-1234.')).toBeTruthy();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a birth date out of range', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Anna', { firstName: 'Anna', birthDate: '2999-01-01' }));
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    saveButton();
+    await screen.findByText("Please check the date. It can't be in the future or before 1900.");
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+  });
+
+  it('clears a field message when the person fixes that field', async () => {
+    mockGetProfile.mockResolvedValue(full);
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type(FIRST, '');
+    saveButton();
+    await screen.findByText('Please enter your first name.');
+    type(FIRST, 'Anna');
+    expect(screen.queryByText('Please enter your first name.')).toBeNull();
+  });
+
+  it('shows the server refusal message and keeps what was typed', async () => {
+    mockGetProfile.mockResolvedValue(full);
+    mockUpdateProfile.mockResolvedValue({ ok: false, reason: 'invalid' });
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type(FIRST, 'Annie');
+    saveButton();
+    await screen.findByText("We couldn't save that. Please check your details and try again.");
+    expect(value(FIRST)).toBe('Annie');
+  });
+
+  it('does nothing when Save is pressed before the profile has loaded', async () => {
+    mockGetProfile.mockReturnValue(new Promise<ProfileResult>(() => undefined));
+    renderAccount(true);
+    await screen.findByLabelText(FIRST);
+    type(FIRST, 'Typed');
+    saveButton();
+    await screen.findByText('Loading your details.');
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+  });
+
+  it('puts the date of birth under its label with the hint', async () => {
+    mockGetProfile.mockResolvedValue(full);
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    expect(screen.getByText('Date of birth')).toBeTruthy();
+    expect(screen.getByText('Optional. Only you can see this.')).toBeTruthy();
+    expect(screen.getByText('Address')).toBeTruthy();
   });
 });
