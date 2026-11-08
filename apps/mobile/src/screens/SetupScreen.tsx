@@ -1,18 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
+import { dateNote } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import { PersonSetup } from '../ui';
 import type { ButtonNode } from '../ui';
 import { colors, spacing } from '@griever/tokens';
-import { PassingDateField } from '../components/PassingDateField';
+import { DateField } from '../components/DateField';
 import { SavedNote } from '../components/SavedNote';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 
 const copy = screenCopy('personSetup');
+const phoneCopy = screenCopy('phonePerson');
 
-export type SetupDetails = { personName: string; dateOfPassing: string };
+/** The earliest day for the date they passed; the same limit the app's date parser accepts. */
+const EARLIEST_PASSING = new Date(2000, 0, 1);
+/** A date of birth can be long ago, so it reaches further back. */
+const EARLIEST_BIRTH = new Date(1900, 0, 1);
+
+
+export type SetupDetails = { personName: string; dateOfPassing: string; birthDate?: string };
 
 type Props = {
   /** What is already kept for this person (empty for someone new). */
@@ -35,6 +43,9 @@ type Props = {
 export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack, returnsToPlace = false }: Props) {
   const [name, setName] = useState(initial.personName);
   const [date, setDate] = useState(initial.dateOfPassing);
+  // Fixed when the screen opens, so the pickers' latest day does not change on every render.
+  const today = useMemo(() => new Date(), []);
+  const [birth, setBirth] = useState(initial.birthDate ?? '');
   const [sheetOpen, setSheetOpen] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const needButton = useRef<ButtonNode>(null);
@@ -77,6 +88,13 @@ export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack,
     return () => sub.remove();
   }, [onBack, sheetOpen]);
 
+  // Empty birth date adds no key, so nothing new is saved; clearing a saved one saves an empty text.
+  const details = (): SetupDetails => {
+    const saved = { personName: name.trim(), dateOfPassing: date.trim() };
+    const birthDate = birth.trim();
+    return birthDate || initial.birthDate ? { ...saved, birthDate } : saved;
+  };
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -86,10 +104,24 @@ export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack,
           backName={returnsToPlace ? undefined : copy.backName}
           name={name}
           onNameChange={setName}
-          renderDate={({ accessibleName }) => <PassingDateField copy={copy} value={date} onChange={setDate} accessibleName={accessibleName} />}
+          birthLabel={phoneCopy.birthLabel}
+          renderBirthDate={({ accessibleName }) => (
+            <DateField
+              copy={{ ...copy, dateClear: phoneCopy.birthClear, dateHint: phoneCopy.birthHint }}
+              value={birth}
+              onChange={setBirth}
+              accessibleName={accessibleName}
+              maximumDate={today}
+              minimumDate={EARLIEST_BIRTH}
+            />
+          )}
+          birthNote={dateNote(birth, { field: 'birth', dateOfPassing: date }) === 'birthAfterPassing' ? phoneCopy.birthAfterPassing : ''}
+          renderDate={({ accessibleName }) => (
+            <DateField copy={copy} value={date} onChange={setDate} accessibleName={accessibleName} maximumDate={today} minimumDate={EARLIEST_PASSING} />
+          )}
           onBack={onBack}
           onWhatYoullNeed={() => setSheetOpen(true)}
-          onContinue={() => onContinue({ personName: name.trim(), dateOfPassing: date.trim() })}
+          onContinue={() => onContinue(details())}
           headingRef={heading}
           checklistRef={needButton}
           footer={<SavedNote />}

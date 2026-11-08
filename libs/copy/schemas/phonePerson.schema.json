@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the phone-only date of birth on the Edit person screen (the rest comes from personSetup.json, which web also reads)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["birthLabel", "birthClear", "birthHint", "birthAfterPassing"],
+  "properties": {
+    "birthLabel": { "$ref": "#/$defs/text" },
+    "birthClear": { "$ref": "#/$defs/text" },
+    "birthHint": { "$ref": "#/$defs/text" },
+    "birthAfterPassing": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}
