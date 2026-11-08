@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
-import type { Session, SendCardStatus } from '@griever/hooks';
+import type { Session } from '@griever/hooks';
 import type { ChecklistItemId, ChecklistItemState, MomentKey } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
 import { useSessionWithAccountName } from '../lib/accountName';
@@ -20,27 +20,13 @@ const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
 const phoneCopy = screenCopy('phoneHub');
 // The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
-const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, whatYoullNeed: phoneCopy.whatYoullNeed, whatYoullNeedHint: phoneCopy.whatYoullNeedHint };
+const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, whatYoullNeed: phoneCopy.whatYoullNeed, whatYoullNeedHint: phoneCopy.whatYoullNeedHint, stateDone: phoneCopy.stateDone, stateInProgress: phoneCopy.stateInProgress, stateNotStarted: phoneCopy.stateNotStarted };
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 
 /** Where a moment's drafts are kept (one map, shared with the hooks). */
 export { MOMENT_CATEGORY as CATEGORY_BY_MOMENT } from '@griever/hooks';
-
-/** The status line for a card, from the copy file. */
-function statusLine(status: SendCardStatus, session: Session, key: MomentKey): string {
-  if (status === 'ready') {
-    return copy.statusReady;
-  }
-  if (status === 'needsDetail') {
-    return needsLine(session, key);
-  }
-  if (status === 'waitingForLink') {
-    return copy.statusWaitingForLink;
-  }
-  return fill(copy.statusSent, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
-}
 
 /** "Needs the service date": names the first missing required field. Falls back to the plain line. */
 function needsLine(session: Session, key: MomentKey): string {
@@ -52,13 +38,19 @@ function needsLine(session: Session, key: MomentKey): string {
   return fill(copy.statusNeedsField, { field: name });
 }
 
-/** The sent line of a finished card. A send stopped part-way adds what is left to do. */
-function sentLine(session: Session, key: MomentKey, stopped: boolean): string {
-  const status = sendCardStatus(session, key);
-  if (stopped && typeof status === 'object') {
-    return fill(phoneCopy.sentPartial, { n: status.sent, noun: status.sent === 1 ? copy.person : copy.people });
+/**
+ * Done, in progress or not started. A send stopped part-way is in progress even though people were
+ * texted. Otherwise done wins. Not done: a draft was started, or the obituary text waits for its link.
+ */
+function rowState(statusSession: Session, session: Session, moment: { key: MomentKey; status: string }, stopped: MomentKey | null): HubRow['state'] {
+  if (moment.key === stopped) {
+    return 'inProgress';
   }
-  return statusLine(status, session, key);
+  if (moment.status === 'done') {
+    return 'done';
+  }
+  const started = isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]], true, true);
+  return started || sendCardStatus(statusSession, moment.key) === 'waitingForLink' ? 'inProgress' : 'notStarted';
 }
 
 const momentOfCategory = (category: SentNoteText['category']): MomentKey | null =>
@@ -167,13 +159,11 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   const rows: HubRow[] = moments.map((moment) => ({
     key: moment.key,
     status: moment.status,
-    started: isDraftStarted(session.drafts[MOMENT_CATEGORY[moment.key]], true, true),
+    state: rowState(statusSession, session, moment, stopped),
     lit: moment.key === lit,
     locked: locked.includes(moment.key),
-    meta:
-      moment.status === 'done'
-        ? sentLine(statusSession, moment.key, moment.key === stopped)
-        : statusLine(sendCardStatus(statusSession, moment.key), statusSession, moment.key),
+    // Only what is missing is a sentence. Status is the icon.
+    meta: moment.status !== 'done' && sendCardStatus(statusSession, moment.key) === 'needsDetail' ? needsLine(statusSession, moment.key) : undefined,
   }));
 
   // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.

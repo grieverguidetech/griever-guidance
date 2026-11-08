@@ -1,7 +1,7 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
@@ -23,20 +23,24 @@ export interface HubCopy {
   whatYoullNeedHint: string;
   start: string;
   continue: string;
-  tagStarted: string;
   tagNext: string;
-  metaStarted: string;
+  /** The state words that end each row's accessible name. */
+  stateDone: string;
+  stateInProgress: string;
+  stateNotStarted: string;
   lockedReason: string;
   notInAppYet: string;
   moments: Record<HubMomentKey, { title: string; body: string; doneLabel: string }>;
 }
 
+export type HubRowState = 'done' | 'inProgress' | 'notStarted';
+
 export interface HubRow {
   key: HubMomentKey;
   /** done: finished. next: the one step to do now. later: a step after that. */
   status: 'done' | 'next' | 'later';
-  /** Something was written for this step but not sent. */
-  started: boolean;
+  /** Drawn as one icon at the trailing edge, and read as a word at the end of the row's name. */
+  state: HubRowState;
   /** The one card to do now. Exactly one row has this. It reads "Next" and its press starts the step. */
   lit?: boolean;
   /** In the full plan: stays focusable and opens the paywall placeholder. */
@@ -44,8 +48,8 @@ export interface HubRow {
   /** This host cannot do this step yet: shown with a calm reason, and not pressable. */
   unavailable?: boolean;
   /**
-   * The small status line under a step, already built (for example doneRowMeta in libs/copy, or
-   * "Ready"). Shown on any row, and part of the row's accessible name. Optional: web passes it on done rows only.
+   * The one line under a step that names what is missing, for example "Needs the service date".
+   * Shown on any row, and part of the row's accessible name. Status itself is the icon (`state`), never a sentence.
    */
   meta?: string;
 }
@@ -126,40 +130,67 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     return <LockedStep title={text.title} body={text.body} meta={metaOnAllRows ? row.meta : undefined} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
+  const stateWord = stateWords(copy)[row.state];
+  const icon = <StatusIcon state={row.state} />;
+
   if (row.lit) {
     // The one lit card: a single press target. "Next" is in its name; the bottom button does the same.
-    const tag = row.started ? `${copy.tagNext} · ${copy.tagStarted}` : copy.tagNext;
     return (
-      // The pressable is the whole visible card: border and padding sit on it, so there is no dead band.
-      <Pressable role="button" onPress={() => onStart(row.key)} style={styles.lit}>
-        <Phrasing>
-          <Body tone="muted" small>
-            {tag}
-          </Body>
-          <Body tone="strong">{text.title}</Body>
-          <Body>{text.body}</Body>
-          <Meta meta={row.meta} />
-        </Phrasing>
-      </Pressable>
+      <StatusPressable style={styles.lit} label={[copy.tagNext, text.title, text.body, row.meta, stateWord]} icon={icon} onPress={() => onStart(row.key)}>
+        <Body tone="muted" small>
+          {copy.tagNext}
+        </Body>
+        <Body tone="strong">{text.title}</Body>
+        <Body>{text.body}</Body>
+        <Meta meta={row.meta} />
+      </StatusPressable>
     );
   }
 
   if (row.status === 'done') {
-    // Compact: the title and what was sent, on one row. Opens this step's message: a draft still
-    // under way comes back, otherwise it is new and empty, because a finished send keeps no wording (C2).
+    // Compact: just the title. Opens this step's message: a draft still under way comes back,
+    // otherwise it is new and empty, because a finished send keeps no wording (C2).
     return (
-      <Row bordered onPress={() => onStart(row.key)}>
-        <Body tone="strong">{[text.title, row.meta, row.started ? copy.metaStarted : ''].filter(Boolean).join(' · ')}</Body>
-      </Row>
+      <StatusPressable style={styles.row} label={[text.title, stateWord]} icon={icon} onPress={() => onStart(row.key)}>
+        <Body tone="strong">{text.title}</Body>
+      </StatusPressable>
     );
   }
 
   return (
-    <Row bordered onPress={() => onStart(row.key)}>
-      <Body tone="strong">{row.started ? `${text.title} · ${copy.metaStarted}` : text.title}</Body>
+    <StatusPressable style={styles.row} label={[text.title, text.body, row.meta, stateWord]} icon={icon} onPress={() => onStart(row.key)}>
+      <Body tone="strong">{text.title}</Body>
       <Body>{text.body}</Body>
       <Meta meta={row.meta} />
-    </Row>
+    </StatusPressable>
+  );
+}
+
+const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
+  done: copy.stateDone,
+  inProgress: copy.stateInProgress,
+  notStarted: copy.stateNotStarted,
+});
+
+/** The status mark at the trailing edge. Decorative: the state word in the row's name carries the meaning. */
+function StatusIcon({ state }: { state: HubRowState }) {
+  if (state === 'done') {
+    return <Icon name="check" testID="status-check" color={colors['success-700']} trailing />;
+  }
+  if (state === 'inProgress') {
+    return <Icon name="progress" testID="status-progress" color={colors['neutral-700']} trailing />;
+  }
+  // neutral-600 is the lightest token with 3:1 contrast on the page (WCAG 1.4.11).
+  return <Icon name="circle" testID="status-circle" color={colors['neutral-600']} trailing />;
+}
+
+/** A pressable card whose name is set whole, so it can end with the state word. */
+function StatusPressable(props: { style: object; label: Array<string | undefined>; icon: ReactNode; onPress: () => void; children: ReactNode }) {
+  return (
+    <Pressable role="button" accessibilityLabel={props.label.filter(Boolean).join(', ')} onPress={props.onPress} style={props.style}>
+      <Phrasing>{props.children}</Phrasing>
+      {props.icon}
+    </Pressable>
   );
 }
 
@@ -180,7 +211,9 @@ const styles = StyleSheet.create({
   head: { gap: spacing[1] },
   rows: { gap: spacing[2] },
   // Must match the selected style of Card (ui/Card.tsx): border 2, accent, radius md, surface, padding spacing[3].
-  lit: { gap: spacing[2], padding: spacing[3], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
+  lit: { gap: spacing[2], padding: spacing[3], paddingRight: spacing[6], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
+  // Same edge as Row (ui/Row.tsx) when bordered, with room on the right for the status icon.
+  row: { minHeight: minTouchTarget, paddingVertical: spacing[2], paddingHorizontal: spacing[3], paddingRight: spacing[6], gap: 2, borderWidth: 1, borderColor: colors['neutral-600'], borderRadius: radius.md },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 

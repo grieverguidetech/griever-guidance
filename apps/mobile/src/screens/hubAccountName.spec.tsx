@@ -38,7 +38,8 @@ describe('the thank-you card status with an account name (#695)', () => {
     mockProfile = { id: 'u1', senderName: '', firstName: 'Sam', contactSource: null, accountType: 'owner' };
     renderHub();
     expect(within(thanksCard()).queryByText(/Needs your name/)).toBeNull();
-    expect(within(thanksCard()).getByText(copy.statusReady)).toBeTruthy();
+    // Ready is no longer a sentence; the row only shows what is missing.
+    expect(within(thanksCard()).queryByText(copy.statusReady)).toBeNull();
   });
 });
 
