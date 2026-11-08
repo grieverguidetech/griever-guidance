@@ -39,7 +39,7 @@ export interface ChecklistGroupPanelProps {
 /**
  * One group's items, drawn inside the sheet's own Modal (the sheet is `bare`, so this brings its
  * title, Back and Close). A phase's items are saved on the person, on this phone. Gather's five items
- * are the device ticks in `gg.checklist.v1` and have no not-applicable choice, as on the Gather screen.
+ * are the device ticks in `gg.checklist.v1` and are separate from the phase items.
  * Ticking again clears the tick. No counts (SE-5), no swipe actions, no delete (C9).
  */
 export function ChecklistGroupPanel({
@@ -130,38 +130,17 @@ function PhaseRows({
     <>
       {(phase?.items ?? []).map((item) => {
         const itemLabel = checklistCopy.items[item.id];
-        const notApplicable = item.state === 'not_applicable';
-        // As on web, a row marked not applicable counts as finished: the tick shows and pressing it clears.
-        const finished = item.state === 'done' || notApplicable;
+        // As on web, a saved not_applicable shows as done: the tick shows and pressing it clears.
+        const finished =
+          item.state === 'done' || item.state === 'not_applicable';
         return (
           <View key={item.id} style={styles.item}>
             <TickRow
-              label={
-                notApplicable
-                  ? `${itemLabel}. ${checklistCopy.notApplicable}`
-                  : itemLabel
-              }
+              label={itemLabel}
               text={itemLabel}
-              note={notApplicable ? checklistCopy.notApplicable : undefined}
-              hint={notApplicable ? copy.clearsIt : undefined}
               checked={finished}
               onPress={() => onSetItem(item.id, finished ? null : 'done')}
             />
-            <Pressable
-              role="button"
-              accessibilityLabel={fill(copy.notApplicableFor, {
-                item: itemLabel,
-              })}
-              accessibilityState={{ selected: notApplicable }}
-              onPress={() =>
-                onSetItem(item.id, notApplicable ? null : 'not_applicable')
-              }
-              style={({ pressed }) => [styles.link, pressed && styles.pressed]}
-            >
-              <Text style={[styles.linkText, notApplicable && styles.linkOn]}>
-                {checklistCopy.notApplicable}
-              </Text>
-            </Pressable>
           </View>
         );
       })}
@@ -254,16 +233,11 @@ function GatherRows() {
 function TickRow({
   label,
   text,
-  note,
-  hint,
   checked,
   onPress,
 }: {
   label: string;
   text: string;
-  /** A visible line under the text, already in `label` for screen readers. */
-  note?: string;
-  hint?: string;
   checked: boolean;
   onPress: () => void;
 }) {
@@ -271,7 +245,6 @@ function TickRow({
     <Pressable
       role="checkbox"
       accessibilityLabel={label}
-      accessibilityHint={hint}
       accessibilityState={{ checked }}
       onPress={onPress}
       style={({ pressed }) => [styles.tick, pressed && styles.pressed]}
@@ -288,11 +261,6 @@ function TickRow({
       </View>
       <View style={styles.textBlock}>
         <Text style={[styles.text, checked && styles.struck]}>{text}</Text>
-        {note ? (
-          <Text style={styles.note} importantForAccessibility="no">
-            {note}
-          </Text>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -336,16 +304,7 @@ const styles = StyleSheet.create({
   boxOn: { borderColor: ACCENT, backgroundColor: ACCENT },
   mark: { fontSize: 16, color: colors.surface, fontWeight: '700' },
   textBlock: { flex: 1 },
-  note: { fontSize: 15, color: MUTED, fontStyle: 'italic' },
   text: { fontSize: 16, color: colors.ink },
   struck: { textDecorationLine: 'line-through', color: MUTED },
-  link: {
-    minHeight: minTouchTarget,
-    justifyContent: 'center',
-    paddingHorizontal: spacing[3],
-    alignSelf: 'flex-start',
-  },
-  linkText: { fontSize: 15, color: ACCENT, textDecorationLine: 'underline' },
-  linkOn: { fontWeight: '700' },
   meta: { fontSize: 15, color: MUTED, paddingHorizontal: spacing[3] },
 });
