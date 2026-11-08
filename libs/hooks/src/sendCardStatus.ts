@@ -1,6 +1,6 @@
 import { sendPrefill, templates } from '@griever/shared';
 import type { MomentKey, TemplateField } from '@griever/shared';
-import { hasObituaryLink, MOMENT_CATEGORY } from './usePathMoments.js';
+import { hasObituaryLink, isObituaryEmailed, MOMENT_CATEGORY } from './usePathMoments.js';
 import type { Session } from './useSessions.js';
 
 /** What a person-screen card says about its moment. */
@@ -17,6 +17,9 @@ export function sendCardStatus(session: Session, key: MomentKey): SendCardStatus
   const sent = session.recipientsNotified?.[category]?.length ?? 0;
   const hasLink = hasObituaryLink(session);
   if (sent > 0 && (key !== 'obituary' || hasLink)) {
+    return { sent };
+  }
+  if (key === 'obituary' && isObituaryEmailed(session)) {
     return { sent };
   }
   if (key === 'announce') {
