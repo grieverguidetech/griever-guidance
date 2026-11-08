@@ -18,9 +18,16 @@ export function hasObituaryLink(session: Pick<Session, 'obituaryUrl'>): boolean 
   return Boolean(session.obituaryUrl?.trim());
 }
 
+/** True when the obituary was emailed to the publisher (device-only marker, never synced). */
+export function isObituaryEmailed(session: Pick<Session, 'obituaryEmailedAt'>): boolean {
+  return Boolean(session.obituaryEmailedAt);
+}
+
 function isMomentDone(session: Session, key: MomentKey): boolean {
   const recipients = session.recipientsNotified?.[MOMENT_CATEGORY[key]] ?? [];
-  if (key === 'obituary') return recipients.length > 0 && hasObituaryLink(session);
+  if (key === 'obituary') {
+    return (recipients.length > 0 && hasObituaryLink(session)) || isObituaryEmailed(session);
+  }
   return recipients.length > 0;
 }
 
