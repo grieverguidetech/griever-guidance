@@ -78,3 +78,8 @@ jest.mock('@react-native-community/datetimepicker', () => {
   const DateTimePicker = (props: Record<string, unknown>) => React.createElement(View, { testID: 'date-picker', ...props });
   return { __esModule: true, default: DateTimePicker, DateTimePickerAndroid: { open: jest.fn(), dismiss: jest.fn() } };
 });
+
+// No test may reach a real server (the gateway, Google). A spec that needs fetch stubs it itself.
+globalThis.fetch = (async (input: unknown) => {
+  throw new Error(`Unstubbed fetch in a test: ${String(input)}`);
+}) as typeof fetch;
