@@ -6,7 +6,8 @@ process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
 process.env.EXPO_PUBLIC_FEATURE_SYNC = 'true';
 delete process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-import { App } from './App';
+// Required after the env lines: a static import is hoisted above them and would read the flags too early.
+const { App } = require('./App') as typeof import('./App');
 
 describe('App with the account flag on but no Clerk key', () => {
   it('does not crash: opens on Home on this phone only, with no account entry', async () => {

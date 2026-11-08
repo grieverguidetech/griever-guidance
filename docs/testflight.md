@@ -27,10 +27,12 @@ Do the steps in order.
    (they need App Store Connect users), and add the processed build. Internal testing has no
    App Review.
 
-## Known risk
+## Known risk: Sign in with Apple
 
-App Store guideline 4.8 (Sign in with Apple) may apply before external testing or release if the
-app offers other social sign-in. Internal TestFlight is not affected.
+The app offers Google and Facebook sign-in. App Store guideline 4.8 therefore applies: the app
+must also offer Sign in with Apple (or an equivalent privacy-preserving login) before external
+TestFlight testing and before App Store release. Internal TestFlight testing has no App Review,
+so it is fine without it. Add Sign in with Apple before inviting external testers.
 
 ## What the app does without the key
 
