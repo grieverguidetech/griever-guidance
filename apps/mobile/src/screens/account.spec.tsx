@@ -104,6 +104,9 @@ const finalizeSignsIn = (fn: typeof mockSignIn.finalize) => fn.mockImplementatio
 beforeEach(async () => {
   resetUnsavedName();
   mockSignInInfo = { email: null, manageUrl: null };
+  mockClerkInstance.loaded = true;
+  mockClerkInstance.buildUserProfileUrl = () => 'https://accounts.example.com/user';
+  mockClerkUser.email = null;
   jest.restoreAllMocks();
   await AsyncStorage.clear();
   mockGetProfile.mockReset().mockResolvedValue(noProfile);
@@ -780,6 +783,17 @@ describe('sign-in details and support (#718)', () => {
     await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://accounts.example.com/user'));
   });
 
+  it('shows a calm line when the browser does not open', async () => {
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    (WebBrowser.openBrowserAsync as jest.Mock<() => Promise<unknown>>).mockRejectedValueOnce(new Error('no browser'));
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByText(/could not open your account page/)).toBeNull();
+    press('Manage sign-in');
+    await screen.findByText(/could not open your account page/);
+  });
+
   it('shows no Manage sign-in button when there is no address', async () => {
     mockSignInInfo = { email: 'sam@example.com', manageUrl: null };
     mockGetProfile.mockResolvedValue(profileWith('Sam'));
@@ -833,7 +847,6 @@ describe('the Clerk bridge (#718)', () => {
     mockClerkInstance.buildUserProfileUrl = () => '/user';
     render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
     expect(screen.getByText('sam@example.com|no url')).toBeTruthy();
-    mockClerkInstance.buildUserProfileUrl = () => 'https://accounts.example.com/user';
   });
 
   it('shows nothing when nobody is signed in', () => {

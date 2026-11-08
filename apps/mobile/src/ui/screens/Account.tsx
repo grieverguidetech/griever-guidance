@@ -33,6 +33,7 @@ export interface AccountCopy extends AddressFieldsCopy {
   supportEmail: string;
   /** The phoneAccount words: what Manage sign-in and the support button do, the support button, and the line shown when the mail app did not open. */
   manageSignInHint: string;
+  manageSignInFailed: string;
   supportButton: string;
   supportHint: string;
   supportFailed: string;
@@ -87,6 +88,8 @@ export interface AccountProps {
   email?: string | null;
   /** Opens Clerk's account page. Leave unset when there is no address, and the button is not shown. */
   onManageSignIn?: () => void;
+  /** Opening the account page failed: shows a calm line. */
+  manageFailed?: boolean;
   /** Opens the email app to write to support. */
   onSupport: () => void;
   /** The email app did not open: shows a calm line that the address can be copied. */
@@ -119,6 +122,7 @@ export function Account({
   onManageSignIn,
   onSupport,
   supportFailed,
+  manageFailed,
   onBack,
   headingRef,
   children,
@@ -155,6 +159,7 @@ export function Account({
   const offlineId = useId();
   const statusId = useId();
   const supportStatusId = useId();
+  const manageStatusId = useId();
   // A ref, not state: two fast taps can both run before a re-render shows `primaryBusy`.
   const inFlight = useRef(false);
   const submit = () => {
@@ -245,7 +250,7 @@ export function Account({
         <View style={styles.group}>
           <Heading level={2}>{copy.securityHeading}</Heading>
           {email ? (
-            <View style={styles.field}>
+            <View style={styles.field} accessible accessibilityLabel={`${copy.emailLabel}, ${email}`}>
               <Body tone="strong">{copy.emailLabel}</Body>
               <SerifText selectable style={styles.value}>{email}</SerifText>
             </View>
@@ -254,6 +259,7 @@ export function Account({
             <>
               <Body tone="muted">{copy.securityHint}</Body>
               <Button label={copy.manageSignIn} variant="secondary" hint={copy.manageSignInHint} onPress={onManageSignIn} />
+              <Status id={manageStatusId} message={manageFailed ? copy.manageSignInFailed : undefined} />
             </>
           ) : null}
         </View>

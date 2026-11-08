@@ -10,7 +10,8 @@
     "manageSignInHint",
     "supportButton",
     "supportHint",
-    "supportFailed"
+    "supportFailed",
+    "manageSignInFailed"
   ],
   "properties": {
     "required": {
@@ -32,6 +33,9 @@
       "$ref": "#/$defs/text"
     },
     "supportFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "manageSignInFailed": {
       "$ref": "#/$defs/text"
     }
   },

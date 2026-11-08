@@ -209,10 +209,14 @@ describe('Account sign-in, sign out and support (#718)', () => {
   const headings = () => screen.getAllByRole('heading').map((node) => node.props.children);
 
   it('shows the email read-only: text, not a field', () => {
-    const before = setup({ email: 'sam@example.com' }) && screen.UNSAFE_getAllByType(TextInput).length;
+    setup();
+    const without = screen.UNSAFE_getAllByType(TextInput).length;
+    screen.unmount();
+    setup({ email: 'sam@example.com' });
     expect(screen.getByText('Email')).toBeTruthy();
     expect(screen.getByText('sam@example.com')).toBeTruthy();
-    expect(before).toBe(7);
+    expect(screen.UNSAFE_getAllByType(TextInput)).toHaveLength(without);
+    expect(screen.getByLabelText('Email, sam@example.com')).toBeTruthy();
     expect(screen.queryByLabelText('sam@example.com')).toBeNull();
   });
 

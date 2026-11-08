@@ -172,6 +172,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const loadFailed = waiting && failedLoad;
   const signIn = useSignInInfo();
   const [supportFailed, setSupportFailed] = useState(false);
+  const [manageFailed, setManageFailed] = useState(false);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const focusCount = useRef(0);
 
@@ -200,14 +201,16 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   }
 
   async function manageSignIn() {
-    const url = signIn.manageUrl;
-    if (!url) {
-      return;
-    }
+    setManageFailed(false);
     try {
+      const url = signIn.manageUrl;
+      if (!url) {
+        throw new Error('No account page address');
+      }
       await WebBrowser.openBrowserAsync(url);
     } catch {
-      // The browser did not open; the person is still on this screen and can press the button again.
+      // The person is still on this screen and can press the button again.
+      setManageFailed(true);
     }
   }
 
@@ -274,7 +277,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
 
   return (
     <Account
-      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed }}
+      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed }}
       values={values}
       onChange={change}
       errors={errors}
@@ -299,6 +302,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       onManageSignIn={sessionEnded || !signIn.manageUrl ? undefined : () => void manageSignIn()}
       onSupport={() => void openSupport()}
       supportFailed={supportFailed}
+      manageFailed={manageFailed}
       offline={identity.offline}
       status={{ message, tone }}
       onBack={onBack}
