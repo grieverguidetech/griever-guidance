@@ -50,11 +50,10 @@ describe('DetailsRow', () => {
       return onChange;
     };
 
-    it('shows a date control, not a text box, and leaves the time a text box', () => {
+    it('shows a date control, not a text box', () => {
       renderDate();
       expect(screen.getByRole('button', { name: 'Service date, Needed' })).toBeTruthy();
       expect(screen.queryByPlaceholderText('June 14')).toBeNull();
-      expect(screen.getByLabelText('Time').props.placeholder).toBe('2 pm');
     });
 
     it('writes a picked day in the text web writes, and parseCompleteDate reads it back', () => {
@@ -115,6 +114,43 @@ describe('DetailsRow', () => {
       expect(screen.getAllByText('Needed', { includeHiddenElements: true })).toHaveLength(1);
       expect(StyleSheet.flatten(screen.getByText('Choose a date').props.style).fontSize).toBeGreaterThanOrEqual(15);
       expect(StyleSheet.flatten(screen.getByRole('button', { name: 'Service date, Needed' }).props.style).minHeight).toBeGreaterThanOrEqual(44);
+    });
+  });
+
+  describe('service time', () => {
+    const renderTime = (value = '') => {
+      const onChange = jest.fn();
+      render(<DetailsRow copy={copy} fields={dateFields} values={value ? { serviceTime: value } : {}} onChange={onChange} />);
+      return onChange;
+    };
+
+    it('shows a time control, not a text box, with the template placeholder', () => {
+      renderTime();
+      expect(screen.getByRole('button', { name: 'Time' })).toBeTruthy();
+      expect(screen.getByText('2 pm')).toBeTruthy();
+    });
+
+    it('writes a pick as "2:00 PM" through onChange', () => {
+      const onChange = renderTime();
+      fireEvent.press(screen.getByRole('button', { name: 'Time' }));
+      fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 10, 14, 14, 0));
+      fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+      expect(onChange).toHaveBeenCalledWith('serviceTime', '2:00 PM');
+    });
+
+    it('shows a saved text the picker cannot read as typed, and replaces it on a pick', () => {
+      const onChange = renderTime('around noon');
+      expect(screen.getByText('around noon')).toBeTruthy();
+      fireEvent.press(screen.getByRole('button', { name: 'Time' }));
+      expect(onChange).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+      expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
+    it('is never marked Needed when optional', () => {
+      const onlyTime = [dateFields[1]];
+      render(<DetailsRow copy={copy} fields={onlyTime} values={{}} onChange={() => undefined} />);
+      expect(screen.queryByText('Needed', { includeHiddenElements: true })).toBeNull();
     });
   });
 });

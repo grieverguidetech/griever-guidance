@@ -92,3 +92,42 @@ export function formatPassingDate(date: Date): string {
 export function passingDateFromText(value: string | undefined | null): Date | null {
   return parseCompleteDate(value);
 }
+
+/**
+ * A time from a time picker, written the way the session stores `serviceTime`
+ * ("2:00 PM"; the text web's `TimeField` writes). Uses the local clock, and does not depend on Intl.
+ */
+export function formatServiceTime(date: Date): string {
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`;
+}
+
+/**
+ * A stored `serviceTime` as a time a picker should open on (today, at that time); null when it is
+ * empty or not a clear time. Reads what web's `TimeField` reads: "2:00 PM", "2:00pm", "14:00".
+ */
+export function serviceTimeFromText(value: string | undefined | null): Date | null {
+  const match = /^(\d{1,2}):(\d{2})\s*([ap])\.?\s?m\.?$|^(\d{1,2}):(\d{2})$/i.exec(value?.trim() ?? '');
+  if (!match) {
+    return null;
+  }
+  const meridiem = match[3]?.toLowerCase();
+  let hours = Number(match[1] ?? match[4]);
+  const minutes = Number(match[2] ?? match[5]);
+  if (meridiem && (hours < 1 || hours > 12)) {
+    return null;
+  }
+  if (meridiem === 'p' && hours < 12) {
+    hours += 12;
+  }
+  if (meridiem === 'a' && hours === 12) {
+    hours = 0;
+  }
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}

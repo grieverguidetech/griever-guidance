@@ -51,7 +51,7 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceTime: '2:00 PM', servicePlace: 'St. Mary', serviceAddress: '12 Main St' } as Session);
     expect(await openPeople()).toBeTruthy();
     await toConfirm();
-    expect(await screen.findByDisplayValue('2:00 PM')).toBeTruthy();
+    expect((await screen.findByLabelText('Time')).props.accessibilityValue.text).toBe('2:00 PM');
     expect(screen.getByDisplayValue('St. Mary, 12 Main St')).toBeTruthy();
   });
 
@@ -81,7 +81,7 @@ describe('send flow starts from the planned details', () => {
     await openPeople();
     await toConfirm();
     fireEvent.press(await screen.findByRole('button', { name: 'Change date, time or place' }));
-    expect(await screen.findByDisplayValue('9:00 AM')).toBeTruthy();
+    expect((await screen.findByLabelText('Time')).props.accessibilityValue.text).toBe('9:00 AM');
     expect(screen.queryByText('Synced wording')).toBeNull();
   });
 
