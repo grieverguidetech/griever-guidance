@@ -71,6 +71,7 @@ describe('text is at least 15 pt (#654)', () => {
     ['components/ChecklistGroupPanel.tsx', 'meta'],
     ['ui/screens/Hub.tsx', 'title'],
     ['ui/screens/Hub.tsx', 'continue'],
+    ['ui/Button.tsx', 'labelLink'],
   ])('%s %s', (file, name) => {
     const size = /fontSize:\s*(\d+)/.exec(styleBlock(file, name));
     expect(Number(size?.[1])).toBeGreaterThanOrEqual(15);
