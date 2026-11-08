@@ -31,6 +31,8 @@ export interface UseAccountResult {
   profileAnswered: boolean;
   /** True only after a live answer for this sign-in with the stored profile or "no profile" (the account really has none): the profile call, or a save that returned it. Never from the cache, and not after unavailable, offline or a failed call. */
   profileLoaded: boolean;
+  /** True when the first profile call for this sign-in was answered with a failure (offline, unavailable, refused). A profile kept on the device is then the best known copy; before that answer it may be stale. Optional so older stand-ins still fit. */
+  profileLoadFailed?: boolean;
   error: string | null;
   clearError: () => void;
   /** Asks the server for the profile again, after a first load that failed. Optional so older stand-ins for this result still fit. */
@@ -171,6 +173,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   const [profile, setProfile] = useState<CachedProfile | null>(() => readOwnCache(storage));
   const [profileAnswered, setProfileAnswered] = useState(() => readOwnCache(storage) !== null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Bumped by reloadProfile; the profile effect runs again.
   const [reloadTick, setReloadTick] = useState(0);
@@ -204,6 +207,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     setProfile(null);
     setProfileAnswered(false);
     setProfileLoaded(false);
+    setProfileLoadFailed(false);
     setOffline(false);
     setError(null);
   }, []);
@@ -275,6 +279,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     // A cached profile for this user counts as an answer; otherwise the first server answer is still to come.
     setProfileAnswered(stored !== null && stored.id === authUserId);
     setProfileLoaded(false);
+    setProfileLoadFailed(false);
     // The provider cannot give a token yet; asking now would read as offline. This runs again when it settles.
     if (!authSettled) {
       return;
@@ -292,6 +297,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       // Any answer, even a failure, ends the wait: a failed load must not lock the person out of saving.
       setProfileAnswered(true);
+      setProfileLoadFailed(!(result.ok || result.reason === 'no_profile'));
       if (result.ok) {
         setOffline(false);
         if (!savedInSession.current) {
@@ -388,6 +394,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   );
 
   const clearError = useCallback(() => setError(null), []);
+  // The reload runs the profile effect again, which bumps gen. A save still in flight then has its result dropped here
+  // (nothing is shown or cached for it); the server still stores it, and the reload's answer reads it back.
   const reloadProfile = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
   const status: AccountAuthStatus = endedHere ? 'signed_out' : authStatus;
@@ -403,6 +411,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     profileLoaded,
     error,
     clearError,
+    profileLoadFailed,
     reloadProfile,
     signOut,
     updateSenderName,

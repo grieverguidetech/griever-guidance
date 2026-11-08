@@ -704,6 +704,26 @@ describe('useAccount profileLoaded and quiet saves (#603)', () => {
     expect(result.current.profile?.senderName).toBe('Peter');
   });
 
+  it('profileLoadFailed is true only after the first load answered with a failure', async () => {
+    fetchMock.mockImplementation(async () => reply(500));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    expect(result.current.profileLoadFailed).toBe(false);
+    await waitFor(() => expect(result.current.profileLoadFailed).toBe(true));
+    fetchMock.mockImplementation(async () => reply(200, profile('Peter')));
+    act(() => result.current.reloadProfile?.());
+    await waitFor(() => expect(result.current.profileLoaded).toBe(true));
+    expect(result.current.profileLoadFailed).toBe(false);
+  });
+
+  it('profileLoadFailed stays false while a kept profile waits for a pending first load', () => {
+    const storage = memoryStorage({ [PROFILE_STORAGE_KEY]: cached('u1'), [SIGNED_IN_STORAGE_KEY]: 'u1' });
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth(), storage }));
+    expect(result.current.profile).not.toBeNull();
+    expect(result.current.profileLoadFailed).toBe(false);
+    expect(result.current.profileLoaded).toBe(false);
+  });
+
   it('a quiet details save that fails sets no error', async () => {
     const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
     await waitFor(() => expect(result.current.profileLoaded).toBe(true));

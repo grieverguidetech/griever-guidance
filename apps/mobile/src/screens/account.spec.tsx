@@ -674,6 +674,21 @@ describe('personal details (#717)', () => {
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Kept', lastName: 'Name', birthDate: '1980-05-29', address: null });
   });
 
+  it('a profile kept on the device while the first load is pending: shows Loading and blocks Save', async () => {
+    await AsyncStorage.setItem('gg.signedIn.v1', 'u1');
+    await AsyncStorage.setItem(
+      'gg.profile.v1',
+      JSON.stringify({ id: 'u1', senderName: 'Kept', firstName: 'Kept', lastName: null, birthDate: null, address: null, contactSource: null, accountType: 'owner' }),
+    );
+    mockGetProfile.mockReturnValue(new Promise<ProfileResult>(() => undefined));
+    renderAccount(true);
+    await screen.findByDisplayValue('Kept');
+    await screen.findByText('Loading your details.');
+    saveButton();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
   it('first load says there is no profile: Save works', async () => {
     mockGetProfile.mockResolvedValue(noProfile);
     renderAccount(true);

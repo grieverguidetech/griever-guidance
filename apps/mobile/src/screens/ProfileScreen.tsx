@@ -155,11 +155,14 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const [errors, setErrors] = useState<DetailErrors>({});
   const [serverInvalid, setServerInvalid] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
-  // Save is safe once the stored values are known: a live answer (a profile, or "no profile"), or a profile kept on the device.
-  // After a failed first load with nothing kept, empty fields would wipe the stored details, so Save waits and Try again is offered.
-  const canSave = identity.profileLoaded || identity.profile !== null;
+  // Save is safe once the stored values are known: a live answer (a profile, or "no profile"), or a failed load with a profile kept
+  // on the device (the best copy there is). While the first load is still pending, a kept profile may be stale and could overwrite
+  // newer edits made elsewhere. After a failed load with nothing kept, empty fields would wipe the stored details. Either way Save waits.
+  const failedLoad = identity.profileLoadFailed === true;
+  const canSave = identity.profileLoaded || (failedLoad && identity.profile !== null);
   const waiting = !canSave && !sessionEnded;
-  const loadFailed = waiting && identity.profileAnswered;
+  // Try again is offered only when the load failed and there is nothing kept to edit.
+  const loadFailed = waiting && failedLoad;
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const focusCount = useRef(0);
 
