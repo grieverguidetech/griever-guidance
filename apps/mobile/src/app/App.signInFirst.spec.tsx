@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { UseAccountResult } from '@griever/hooks';
 
 process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
+process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_example';
 
 // The account state is driven by hand: loading, signed out, signed in, offline.
 let mockAccount: UseAccountResult | null = null; // eslint-disable-line prefer-const

@@ -6,11 +6,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Each spec file has its own module registry, so setting the flag before App is first required is
 // enough. (jest.isolateModules loads a second copy of react and breaks hooks here.)
 process.env.EXPO_PUBLIC_FEATURE_AUTH = 'true';
-const mockClerkProvider = jest.fn();
-jest.mock('@clerk/expo', () => ({
-  ...jest.requireActual<object>('@clerk/expo'),
-  ClerkProvider: (props: { children: unknown }) => {
-    mockClerkProvider();
+process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_example';
+// The Clerk key is set so the flag stays on, but Clerk itself is not mounted: AccountProvider renders
+// its children with no account, which is the "accounts are unavailable" state these specs cover.
+const mockMountAccounts = jest.fn();
+jest.mock('../lib/AccountProvider', () => ({
+  ...jest.requireActual<object>('../lib/AccountProvider'),
+  AccountProvider: (props: { children: unknown }) => {
+    mockMountAccounts();
     return props.children;
   },
 }));
@@ -26,10 +29,10 @@ describe('App with the account feature on', () => {
   it('shows the account link and opens the account screen', async () => {
     render(<App />);
     fireEvent.press(await screen.findByText('Your account'));
-    // No Clerk key in tests, so accounts are unavailable and the screen says so calmly.
+    // Clerk is not mounted in this spec, so accounts are unavailable and the screen says so calmly.
     expect(await screen.findByText("Accounts aren't available right now.")).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Your account' })).toBeTruthy();
-    expect(mockClerkProvider).not.toHaveBeenCalled();
+    expect(mockMountAccounts).toHaveBeenCalled();
   });
 
   it('reaches Your account from the link at the foot of the person screen, and Back returns to that person', async () => {

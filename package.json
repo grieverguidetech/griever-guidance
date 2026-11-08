@@ -62,15 +62,15 @@
     "wrangler": "^4.90.0"
   },
   "dependencies": {
-    "@expo/metro-config": "58.0.14",
-    "@expo/metro-runtime": "58.0.14",
-    "expo": "58.0.14",
-    "expo-splash-screen": "58.0.10",
-    "expo-status-bar": "58.0.3",
-    "expo-system-ui": "58.0.6",
+    "@expo/metro-config": "58.0.21",
+    "@expo/metro-runtime": "58.0.17",
+    "expo": "58.0.23",
+    "expo-splash-screen": "58.0.13",
+    "expo-status-bar": "58.0.4",
+    "expo-system-ui": "58.0.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-native": "0.88.0",
+    "react-native": "0.88.1",
     "react-native-svg": "15.16.0",
     "react-native-svg-transformer": "~1.5.1",
     "react-native-web": "0.21.4"
@@ -82,14 +82,14 @@
       "@clerk/shared": "4.40.0",
       "react": "19.3.0",
       "react-dom": "19.3.0",
-      "@expo/config-plugins": "58.0.9",
+      "@expo/config-plugins": "58.0.12",
       "@expo/config-types": "58.0.3",
-      "@expo/config": "58.0.6",
+      "@expo/config": "58.0.11",
       "@expo/env": "2.5.2",
-      "@expo/fingerprint": "0.21.5",
+      "@expo/fingerprint": "0.21.9",
       "@expo/inline-modules": "0.2.6",
       "@expo/local-build-cache-provider": "58.0.6",
-      "@expo/log-box": "58.0.12",
+      "@expo/log-box": "58.0.15",
       "@expo/metro-file-map": "58.0.5",
       "@expo/package-manager": "1.14.2",
       "@expo/require-utils": "58.0.4",
@@ -113,7 +113,7 @@
       "expo-asset": "58.0.16",
       "expo-file-system": "58.0.9",
       "@react-native/normalize-colors@>=0.88.0": "0.88.0",
-      "expo-font": "58.0.8"
+      "expo-font": "58.0.11"
     }
   }
 }
