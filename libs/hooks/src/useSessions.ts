@@ -90,6 +90,11 @@ export interface Session extends SessionDetails, SectionFields, ServiceEventFiel
    */
   recipientsNotified: Partial<Record<TemplateCategory, string[]>>;
   momentCompletedAt: Partial<Record<MomentKey, string>>;
+  /**
+   * When the obituary was emailed to the publisher. Device-only and never synced (not in
+   * SYNCED_KEYS). Kept apart from `momentCompletedAt.obituary`, which a text send also writes.
+   */
+  obituaryEmailedAt?: string;
   remindersScheduled: ReminderEntry[];
 }
 
@@ -128,6 +133,11 @@ export interface UseSessionsResult {
   scheduleReminder: (id: string, momentKey: MomentKey, dueAt: string) => void;
   /** Marks a moment done and records who was notified, for dedup. */
   recordMomentComplete: (id: string, category: TemplateCategory, contactIds: string[]) => void;
+  /**
+   * Marks the obituary done because it was emailed to the publisher. Sets `obituaryEmailedAt`
+   * once (an earlier value is kept) and changes nothing else. Device-only, never synced.
+   */
+  recordObituaryEmailed: (id: string) => void;
   /**
    * Applies what the server returned for this account. `pendingByFlow` maps a flowId to the fact
    * fields with an unsent local edit; those keep the local value. A flow not on the device becomes
@@ -886,6 +896,17 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     [],
   );
 
+  const recordObituaryEmailed = useCallback((id: string) => {
+    setSessions((list) =>
+      list.map((s) => {
+        if (s.id !== id || s.obituaryEmailedAt) {
+          return s;
+        }
+        return { ...s, obituaryEmailedAt: new Date().toISOString() };
+      }),
+    );
+  }, []);
+
   const applyRemoteFlows = useCallback<UseSessionsResult['applyRemoteFlows']>(
     ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}) => {
       if (!myUserId) return;
@@ -938,6 +959,7 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     setServiceReady,
     scheduleReminder,
     recordMomentComplete,
+    recordObituaryEmailed,
     applyRemoteFlows,
   };
 }

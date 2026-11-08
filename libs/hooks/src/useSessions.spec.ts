@@ -187,6 +187,35 @@ describe('one draft per moment (#83)', () => {
     expect(saved.personName).toBe('Margaret Hayes');
   });
 
+  it('recordObituaryEmailed sets obituaryEmailedAt once, keeps the first, and changes nothing else', () => {
+    const { result, id } = start();
+    const before = result.current.sessions[0];
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-11T10:00:00Z'));
+      act(() => result.current.recordObituaryEmailed(id));
+      const first = result.current.sessions[0];
+      expect(first.obituaryEmailedAt).toBe('2026-10-11T10:00:00.000Z');
+      vi.setSystemTime(new Date('2026-10-12T10:00:00Z'));
+      act(() => result.current.recordObituaryEmailed(id));
+      expect(result.current.sessions[0].obituaryEmailedAt).toBe('2026-10-11T10:00:00.000Z');
+      const { obituaryEmailedAt: _marker, ...rest } = first;
+      expect(rest).toEqual(before);
+      expect(first.momentCompletedAt).toEqual({});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('obituaryEmailedAt survives a remount on the same storage', () => {
+    const { result, id, storage } = start();
+    act(() => result.current.recordObituaryEmailed(id));
+    const saved = result.current.sessions[0].obituaryEmailedAt;
+    expect(saved).toBeTruthy();
+    const again = renderHook(() => useSessions(storage));
+    expect(again.result.current.sessions[0].obituaryEmailedAt).toBe(saved);
+  });
+
   it('does not keep a draft with no moment chosen yet', () => {
     const { result, id } = start();
     act(() => result.current.updateDraft(id, freshDraft({})));
