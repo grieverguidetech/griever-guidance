@@ -69,7 +69,7 @@ describe('PersonChecklistSheet (#696)', () => {
     expect(doneGroup(phrases.phases['first-days'])).toBeNull();
   });
 
-  it("counts Doesn't apply as handled", async () => {
+  it('counts a saved not_applicable as handled for the phase (value kept for sync with web)', async () => {
     await setup(tick(['first-days'], 'not_applicable'));
     expect(doneGroup(phrases.phases['first-days'])).toBeTruthy();
   });

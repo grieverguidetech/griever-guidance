@@ -181,17 +181,33 @@ describe('ChecklistGroupPanel (#697)', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("shows the words Doesn't apply on a row marked that way, and a done row does not", async () => {
-    await open(RIGHT_AWAY, {
+  it("shows no Doesn't apply text or button on any row", async () => {
+    await open(RIGHT_AWAY, { [first]: 'not_applicable' });
+    expect(screen.queryByText(phrases.notApplicable)).toBeNull();
+    expect(screen.queryByText(/doesn.t apply/i)).toBeNull();
+    expect(
+      screen.queryAllByRole('button', { name: /doesn.t apply/i }),
+    ).toHaveLength(0);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(itemIds.length);
+  });
+
+  it('shows a saved not_applicable row as done, like a done row, and a press clears it', async () => {
+    const second = itemIds[1] as ChecklistItemId;
+    const onSave = await open(RIGHT_AWAY, {
       [first]: 'not_applicable',
-      [itemIds[1] as ChecklistItemId]: 'done',
+      [second]: 'done',
     });
-    const marked = tickRow(`${firstLabel}. ${phrases.notApplicable}`);
-    expect(within(marked).getByText(phrases.notApplicable)).toBeTruthy();
-    expect(marked.props.accessibilityHint).toBe(copy.clearsIt);
-    const done = tickRow(phrases.items[itemIds[1] as ChecklistItemId]);
-    expect(within(done).queryByText(phrases.notApplicable)).toBeNull();
+    const marked = tickRow(firstLabel);
+    const done = tickRow(phrases.items[second]);
+    expect(marked.props.accessibilityState.checked).toBe(true);
+    expect(marked.props.accessibilityHint).toBeUndefined();
     expect(done.props.accessibilityHint).toBeUndefined();
+    expect(within(marked).getByText(firstLabel)).toHaveStyle({
+      textDecorationLine: 'line-through',
+    });
+    fireEvent.press(marked);
+    expect(onSave.mock.calls).toEqual([[first, null]]);
+    expect(tickRow(firstLabel).props.accessibilityState.checked).toBe(false);
   });
 
   it('ticks an item, saves it on the person and strikes it through', async () => {
@@ -211,32 +227,15 @@ describe('ChecklistGroupPanel (#697)', () => {
     expect(tickRow(firstLabel).props.accessibilityState.checked).toBe(false);
   });
 
-  it("marks Doesn't apply, shows it done, and a second press clears it", async () => {
-    const onSave = await open(RIGHT_AWAY);
-    const link = () =>
-      screen.getByRole('button', {
-        name: fill(copy.notApplicableFor, { item: firstLabel }),
-      });
-    fireEvent.press(link());
-    expect(onSave.mock.calls).toEqual([[first, 'not_applicable']]);
-    expect(link().props.accessibilityState.selected).toBe(true);
-    expect(
-      tickRow(`${firstLabel}. ${phrases.notApplicable}`).props
-        .accessibilityState.checked,
-    ).toBe(true);
-    fireEvent.press(link());
-    expect(onSave.mock.calls[1]).toEqual([first, null]);
-    expect(link().props.accessibilityState.selected).toBe(false);
-  });
-
-  it("gives every row a full-width tick target of at least 44 pt and a Doesn't apply link", async () => {
+  it('gives every row a full-width tick target of at least 44 pt and text of at least 15 pt', async () => {
     await open(RIGHT_AWAY);
     const flat = StyleSheet.flatten(tickRow(firstLabel).props.style);
     expect(flat.minHeight).toBeGreaterThanOrEqual(44);
     expect(flat.width).toBe('100%');
-    expect(screen.getAllByText(phrases.notApplicable)).toHaveLength(
-      itemIds.length,
+    const text = StyleSheet.flatten(
+      within(tickRow(firstLabel)).getByText(firstLabel).props.style,
     );
+    expect(text.fontSize).toBeGreaterThanOrEqual(15);
   });
 
   it('shows a phase as Done in the list after its items are ticked', async () => {
