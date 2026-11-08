@@ -3,9 +3,7 @@ import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Account } from '../ui';
-import type { ButtonNode } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
-import { WhatYoullNeedSheet } from '../components/WhatYoullNeedSheet';
 
 const copy = screenCopy('account');
 
@@ -24,7 +22,7 @@ type Props = {
   onSignInAgain: () => void;
 };
 
-/** The screen is the Account in apps/mobile/src/ui; this holds what is mobile only: saving, focus and the sheet. */
+/** The screen is the Account in apps/mobile/src/ui; this holds what is mobile only: saving and focus. */
 export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
   const savedName = identity.profile?.senderName?.trim() ?? '';
   const source = initialName ?? savedName;
@@ -32,10 +30,8 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const touched = useRef(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
-  const checklistButton = useRef<ButtonNode>(null);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -51,9 +47,6 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       setName(source);
     }
   }, [source, sessionEnded]);
-
-  // Mobile never asks for a name up front; the name field sits on the account page, empty until one is saved.
-  const hasName = !!savedName || !!initialName;
 
   async function save() {
     if (pending) {
@@ -88,7 +81,6 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   } else if (saved) {
     message = copy.saved;
   }
-  const showList = hasName && !sessionEnded;
   let primaryLabel = copy.save;
   if (sessionEnded) {
     primaryLabel = copy.signIn;
@@ -97,36 +89,23 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   }
 
   return (
-    <>
-      <Account
-        copy={copy}
-        name={name}
-        onNameChange={(next) => {
-          touched.current = true;
-          setName(next);
-          setLocalError(null);
-        }}
-        fieldDisabled={sessionEnded}
-        primaryLabel={primaryLabel}
-        primaryBusy={sessionEnded ? false : pending}
-        onPrimary={sessionEnded ? onSignInAgain : save}
-        onSignOut={sessionEnded ? undefined : onSignOut}
-        offline={identity.offline}
-        status={{ message, tone }}
-        onBack={onBack}
-        // The list is on the page when it shows; otherwise it opens in a sheet.
-        onWhatYoullNeed={showList ? undefined : () => setSheetOpen(true)}
-        checklistRef={checklistButton}
-        headingRef={heading}
-      />
-      <WhatYoullNeedSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onDismiss={() => focusButton(checklistButton.current)} />
-    </>
+    <Account
+      copy={copy}
+      name={name}
+      onNameChange={(next) => {
+        touched.current = true;
+        setName(next);
+        setLocalError(null);
+      }}
+      fieldDisabled={sessionEnded}
+      primaryLabel={primaryLabel}
+      primaryBusy={sessionEnded ? false : pending}
+      onPrimary={sessionEnded ? onSignInAgain : save}
+      onSignOut={sessionEnded ? undefined : onSignOut}
+      offline={identity.offline}
+      status={{ message, tone }}
+      onBack={onBack}
+      headingRef={heading}
+    />
   );
-}
-
-function focusButton(node: ButtonNode | null) {
-  const handle = node ? findNodeHandle(node) : null;
-  if (handle) {
-    AccessibilityInfo.setAccessibilityFocus(handle);
-  }
 }

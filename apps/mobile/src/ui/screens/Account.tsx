@@ -1,9 +1,8 @@
 import { useId, useRef, useState } from 'react';
-import type { ComponentRef, ReactNode, Ref } from 'react';
+import type { ComponentRef, ReactNode } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
-import type { ButtonNode } from '../Button';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
 import { Status } from '../Status';
@@ -14,7 +13,6 @@ import { useSerifStyle } from '../typography';
 export interface AccountCopy {
   heading: string;
   back: string;
-  checklist: string;
   nameLabel: string;
   signOut: string;
   offline: string;
@@ -38,11 +36,8 @@ export interface AccountProps {
   /** One calm line: a save result or an error. The status node is always rendered. */
   status?: { message: string; tone?: 'muted' | 'danger' };
   onBack: () => void;
-  /** Opens "What you'll need". Leave unset to hide the button (the list is on the page instead). */
-  onWhatYoullNeed?: () => void;
-  checklistRef?: Ref<ButtonNode>;
   headingRef?: HeadingProps['headingRef'];
-  /** Under the form, for example the checklist or "People helping you". */
+  /** Under the form, for example "People helping you". */
   children?: ReactNode;
 }
 
@@ -61,8 +56,6 @@ export function Account({
   offline,
   status,
   onBack,
-  onWhatYoullNeed,
-  checklistRef,
   headingRef,
   children,
 }: AccountProps) {
@@ -107,9 +100,6 @@ export function Account({
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="header" onPress={onBack} />
-        {onWhatYoullNeed ? (
-          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
-        ) : null}
       </View>
       <View style={styles.head}>
         <Heading level={1} headingRef={headingRef}>

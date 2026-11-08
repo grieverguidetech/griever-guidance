@@ -6,7 +6,6 @@ import type { AccountCopy, AccountProps } from './Account';
 const copy: AccountCopy = {
   heading: 'Your account',
   back: 'Back',
-  checklist: "What you'll need",
   nameLabel: 'Your name',
   signOut: 'Sign out',
   offline: 'You are offline. You can change your name when you are connected.',
@@ -67,5 +66,11 @@ describe('Account (mobile save guard)', () => {
     const props = setup({ primaryBusy: true });
     save();
     expect(props.onPrimary).not.toHaveBeenCalled();
+  });
+
+  it("renders no What you'll need button", () => {
+    setup();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
 });
