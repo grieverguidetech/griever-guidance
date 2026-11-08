@@ -10,10 +10,9 @@ import type { UseAccountResult } from '@griever/hooks';
 import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../ui/screens/Account';
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
-import { DeleteCancelledError, useSignInInfo } from '../lib/clerk';
-import { announceLocalDataReset, deleteLocalData } from '../lib/deleteLocalData';
+import { DeleteCancelledError, DeleteNeedsSignInError, useSignInInfo } from '../lib/clerk';
+import { announceAccountDeleted, deleteLocalData } from '../lib/deleteLocalData';
 import type { DeleteOutcome } from '../components/DeleteAccountPanel';
-import { AccountDeletedScreen } from './AccountDeletedScreen';
 
 const copy = screenCopy('account');
 const phoneAccount = screenCopy('phoneAccount');
@@ -141,7 +140,6 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
   const profile = identity.profile;
   // Deleting the account signs the person out before the delete call returns. That is not "your session ended".
   const [removing, setRemoving] = useState(false);
-  const [deleted, setDeleted] = useState<{ cleared: boolean } | null>(null);
   const sessionEnded = sessionEndedProp && !removing;
   // An account saved before first and last name existed has only the name messages are signed with.
   const noNames = !profile?.firstName && !profile?.lastName;
@@ -232,10 +230,14 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
       await remove();
     } catch (error) {
       setRemoving(false);
+      if (error instanceof DeleteNeedsSignInError) {
+        return 'needsSignIn';
+      }
       return error instanceof DeleteCancelledError ? 'cancelled' : 'failed';
     }
-    // Clerk has ended the session itself; the account screen's cache is cleared when it sees that.
-    setDeleted({ cleared: await deleteLocalData() });
+    // Clerk has ended the session itself. The app (App.tsx) hears this, drops everything it holds in memory
+    // and shows the deleted screen in place of the whole send flow, so every way out of it lands clean.
+    announceAccountDeleted(await deleteLocalData());
     return 'deleted';
   }
 
@@ -300,17 +302,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
     primaryLabel = copy.saving;
   }
 
-  if (deleted) {
-    return <AccountDeletedScreen cleared={deleted.cleared} onDone={() => {
-        // Memory is reset first, so the first screen is drawn from an empty phone and nothing old can be written back.
-        announceLocalDataReset();
-        onBack();
-      }} />;
-  }
   const canDelete = removing || (!sessionEndedProp && !!signIn.deleteAccount);
   return (
     <Account
-      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed }}
+      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed, deleteNeedsSignIn: phoneAccount.deleteNeedsSignIn }}
       values={values}
       onChange={change}
       errors={errors}

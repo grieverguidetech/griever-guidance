@@ -9,8 +9,10 @@ import { screenCopy } from '@griever/copy';
 import type { AccountAuth, Address } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { CHECKLIST_KEY } from './WhatYoullNeedScreen';
-import { ClerkBoundary, DeleteCancelledError } from '../lib/clerk';
-import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
+import { ClerkBoundary, DeleteCancelledError, DeleteNeedsSignInError } from '../lib/clerk';
+import { onAccountDeleted } from '../lib/deleteLocalData';
+import { SIGNED_IN_STORAGE_KEY } from '@griever/hooks';
+import { AccountProvider, AccountStateProvider, useAccount, useLaunchState } from '../lib/AccountProvider';
 
 // On a cold Babel cache (a fresh worktree) the first sign-in render compiles modules lazily and
 // takes longer than the 1s default for findBy*. 10s is still a clear hang signal (#404).
@@ -49,6 +51,8 @@ const mockSignUp = {
   finalize: jest.fn(async () => ({ error: null as unknown })),
 };
 const mockClerkUser: { email: string | null } = { email: null };
+// Stands in for Clerk's useReverification wrapper: by default it just runs the call.
+let mockReverify: (fn: (...args: never[]) => unknown, options: { onNeedsReverification?: (h: { cancel: () => void }) => void } | undefined, args: never[]) => Promise<unknown> = async (fn, _options, args) => fn(...args); // eslint-disable-line prefer-const
 const mockClerkInstance: { loaded: boolean; buildUserProfileUrl: () => string } = { loaded: true, buildUserProfileUrl: () => 'https://accounts.example.com/user' };
 jest.mock('@clerk/expo/token-cache', () => ({ tokenCache: undefined }));
 jest.mock('@clerk/expo/resource-cache', () => ({ resourceCache: undefined }));
@@ -63,7 +67,7 @@ jest.mock('@clerk/expo', () => ({
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
   useUser: () => ({ user: mockClerkUser.email ? { primaryEmailAddress: { emailAddress: mockClerkUser.email } } : null }),
   useClerk: () => mockClerkInstance,
-  useReverification: (fn: (...args: never[]) => unknown) => fn,
+  useReverification: (fn: (...args: never[]) => unknown, options?: { onNeedsReverification?: (h: { cancel: () => void }) => void }) => (...args: never[]) => mockReverify(fn, options, args),
   useSignIn: () => ({ signIn: mockSignIn }),
   useSignUp: () => ({ signUp: mockSignUp }),
   useSSO: () => ({ startSSOFlow: jest.fn() }),
@@ -109,6 +113,7 @@ beforeEach(async () => {
   mockClerkInstance.loaded = true;
   mockClerkInstance.buildUserProfileUrl = () => 'https://accounts.example.com/user';
   mockClerkUser.email = null;
+  mockReverify = async (fn, _options, args) => fn(...args);
   jest.restoreAllMocks();
   await AsyncStorage.clear();
   mockGetProfile.mockReset().mockResolvedValue(noProfile);
@@ -861,6 +866,7 @@ describe('the Clerk bridge (#718)', () => {
 
 describe('Delete account (#719)', () => {
   const copy = screenCopy('account');
+  const phone = screenCopy('phoneAccount');
   const seedLocalData = () =>
     AsyncStorage.multiSet([
       ['gg.sessions.v1', '[{"id":"anna","obituaryEmailedAt":"2026-01-01"}]'],
@@ -881,23 +887,24 @@ describe('Delete account (#719)', () => {
     expect(screen.queryByRole('button', { name: copy.deleteOpen })).toBeNull();
   });
 
-  it('after a delete: signs out, clears this phone, and shows the deleted screen with no session-ended line', async () => {
+  it('after a delete: clears this phone, then tells the app the account is gone and whether it was fully cleared', async () => {
     await seedLocalData();
+    const heard = jest.fn<(cleared: boolean) => void>();
+    const stop = onAccountDeleted(heard);
     const remove = jest.fn(async () => {
       act(() => mockAuthControl.setSignedIn(false));
     });
     mockSignInInfo.deleteAccount = remove;
     await openConfirm();
     press(copy.deleteConfirmAction);
-    await screen.findByRole('heading', { name: copy.deletedHeading });
+    await waitFor(() => expect(heard).toHaveBeenCalledWith(true));
+    stop();
     expect(remove).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(copy.deletedBody)).toBeTruthy();
-    expect(screen.queryByText(copy.deletedLeftover)).toBeNull();
     expect(screen.queryByText(copy.sessionEnded)).toBeNull();
     expect(await AsyncStorage.getAllKeys()).toEqual([]);
   });
 
-  it('says some things were left on the phone when a local item cannot be removed', async () => {
+  it('tells the app some things were left on the phone when a local item cannot be removed', async () => {
     await seedLocalData();
     const real = AsyncStorage.removeItem.bind(AsyncStorage);
     jest.spyOn(AsyncStorage, 'removeItem').mockImplementation(async (key: string) => {
@@ -906,22 +913,39 @@ describe('Delete account (#719)', () => {
       }
       return real(key);
     });
+    const heard = jest.fn<(cleared: boolean) => void>();
+    const stop = onAccountDeleted(heard);
     mockSignInInfo.deleteAccount = jest.fn(async () => undefined);
     await openConfirm();
     press(copy.deleteConfirmAction);
-    await screen.findByText(copy.deletedLeftover);
+    await waitFor(() => expect(heard).toHaveBeenCalledWith(false));
+    stop();
   });
 
   it('a closed verify step says the account was not deleted and keeps everything on the phone', async () => {
     await seedLocalData();
+    const heard = jest.fn();
+    const stop = onAccountDeleted(heard);
     mockSignInInfo.deleteAccount = jest.fn(async () => {
       throw new DeleteCancelledError();
     });
     await openConfirm();
     press(copy.deleteConfirmAction);
     await screen.findByText(copy.deleteCancelled);
-    expect(screen.queryByRole('heading', { name: copy.deletedHeading })).toBeNull();
+    stop();
+    expect(heard).not.toHaveBeenCalled();
     expect(await AsyncStorage.getAllKeys()).toEqual(expect.arrayContaining(['gg.sessions.v1', 'gg.contacts.v1', 'gg.publisherEmail.v1.anna']));
+  });
+
+  it('a delete that needs a fresh sign-in says to sign out, sign back in and try again, and keeps everything', async () => {
+    await seedLocalData();
+    mockSignInInfo.deleteAccount = jest.fn(async () => {
+      throw new DeleteNeedsSignInError();
+    });
+    await openConfirm();
+    press(copy.deleteConfirmAction);
+    await screen.findByText(phone.deleteNeedsSignIn);
+    expect(await AsyncStorage.getAllKeys()).toEqual(expect.arrayContaining(['gg.sessions.v1', 'gg.publisherEmail.v1.anna']));
   });
 
   it('any other failure says so calmly, keeps everything, and stays signed in', async () => {
@@ -936,21 +960,57 @@ describe('Delete account (#719)', () => {
     expect(screen.getByDisplayValue('Sam')).toBeTruthy();
     expect(await AsyncStorage.getAllKeys()).toEqual(expect.arrayContaining(['gg.sessions.v1', 'gg.publisherEmail.v1.anna']));
   });
+});
 
-  it('Back to the start leaves the screen', async () => {
-    const onBack = jest.fn();
-    mockSignInInfo.deleteAccount = jest.fn(async () => undefined);
-    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+describe('the Clerk bridge: delete account on the phone (#719)', () => {
+  const { useSignInInfo: actualUseSignInInfo } = jest.requireActual<typeof import('../lib/clerk')>('../lib/clerk');
+  let outcome = 'not run';
+  function DeleteProbe() {
+    const info = actualUseSignInInfo();
+    return <Text onPress={() => void info.deleteAccount?.().then(() => (outcome = 'deleted'), (e: unknown) => (outcome = (e as Error).name))}>delete</Text>;
+  }
+  const mockUser = () => {
+    mockClerkUser.email = 'sam@example.com';
+  };
+
+  it('Clerk asks for a verify step: the step is cancelled, and the error says to sign in again', async () => {
+    mockUser();
+    mockReverify = (_fn, options) =>
+      new Promise((_resolve, reject) => {
+        options?.onNeedsReverification?.({ cancel: () => reject(Object.assign(new Error('User cancelled attempted verification'), { code: 'reverification_cancelled' })) });
+      });
+    render(<ClerkBoundary publishableKey="pk_test"><DeleteProbe /></ClerkBoundary>);
+    fireEvent.press(screen.getByText('delete'));
+    await waitFor(() => expect(outcome).toBe('DeleteNeedsSignInError'));
+  });
+
+  it('a cancel that did not come from the bridge stays a plain cancel', async () => {
+    mockUser();
+    mockReverify = async () => {
+      throw Object.assign(new Error('closed'), { code: 'reverification_cancelled' });
+    };
+    render(<ClerkBoundary publishableKey="pk_test"><DeleteProbe /></ClerkBoundary>);
+    fireEvent.press(screen.getByText('delete'));
+    await waitFor(() => expect(outcome).toBe('DeleteCancelledError'));
+  });
+});
+
+describe('the launch state after a delete (#719)', () => {
+  function LaunchProbe() {
+    const launch = useLaunchState();
+    return <Text>{launch?.hydrated ? (launch.signedIn ? 'signed-in marker' : 'no marker') : 'reading'}</Text>;
+  }
+  it('reads the signed-in marker again, so the next first screen is the signed-out one', async () => {
+    await AsyncStorage.setItem(SIGNED_IN_STORAGE_KEY, 'u1');
+    await AsyncStorage.setItem('gg.profile.v1', JSON.stringify({ id: 'u1', senderName: 'Sam' }));
     render(
       <Harness initial>
-        <AccountScreen onBack={onBack} />
+        <LaunchProbe />
       </Harness>,
     );
-    await screen.findByDisplayValue('Sam');
-    press(copy.deleteOpen);
-    press(copy.deleteConfirmAction);
-    await screen.findByRole('heading', { name: copy.deletedHeading });
-    press(copy.deletedAction);
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await screen.findByText('signed-in marker');
+    const { announceAccountDeleted } = jest.requireActual<typeof import('../lib/deleteLocalData')>('../lib/deleteLocalData');
+    act(() => announceAccountDeleted(true));
+    await screen.findByText('no marker');
   });
 });

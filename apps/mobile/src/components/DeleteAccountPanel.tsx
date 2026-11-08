@@ -21,10 +21,12 @@ export interface DeleteAccountCopy {
   deleting: string;
   deleteFailed: string;
   deleteCancelled: string;
+  /** The phone-only line for a delete that needs a fresh sign-in first (phoneAccount.deleteNeedsSignIn). */
+  deleteNeedsSignIn: string;
 }
 
-/** `deleted`: the account is gone. `cancelled`: the person closed Clerk's verify step. `failed`: anything else. Only `deleted` removes anything. */
-export type DeleteOutcome = 'deleted' | 'cancelled' | 'failed';
+/** `deleted`: the account is gone. `cancelled`: the person closed Clerk's verify step. `needsSignIn`: Clerk wants a fresh sign-in first (the phone cannot show its verify step). `failed`: anything else. Only `deleted` removes anything. */
+export type DeleteOutcome = 'deleted' | 'cancelled' | 'needsSignIn' | 'failed';
 
 type Step = 'idle' | 'confirm' | 'deleting';
 
@@ -35,7 +37,7 @@ type Step = 'idle' | 'confirm' | 'deleting';
  */
 export function DeleteAccountPanel({ copy, onDelete }: { copy: DeleteAccountCopy; onDelete: () => Promise<DeleteOutcome> }) {
   const [step, setStep] = useState<Step>('idle');
-  const [problem, setProblem] = useState<'none' | 'cancelled' | 'failed'>('none');
+  const [problem, setProblem] = useState<'none' | 'cancelled' | 'needsSignIn' | 'failed'>('none');
   const statusId = useId();
   const opener = useRef<ButtonNode>(null);
   const confirmHeading = useRef<ComponentRef<typeof Text>>(null);
@@ -43,13 +45,16 @@ export function DeleteAccountPanel({ copy, onDelete }: { copy: DeleteAccountCopy
   // A ref as well as state: two quick taps can both run before a re-render shows `deleting`.
   const running = useRef(false);
 
+  // Deferred a tick, as on the checklist panel, so the screen reader takes focus after the swap has drawn.
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (step === 'confirm' && !wasConfirming.current) {
-      focusNode(confirmHeading.current);
+      timer = setTimeout(() => focusNode(confirmHeading.current), 0);
     } else if (step === 'idle' && wasConfirming.current) {
-      focusNode(opener.current);
+      timer = setTimeout(() => focusNode(opener.current), 0);
     }
     wasConfirming.current = step !== 'idle';
+    return () => clearTimeout(timer);
   }, [step]);
 
   async function confirm() {
@@ -67,9 +72,16 @@ export function DeleteAccountPanel({ copy, onDelete }: { copy: DeleteAccountCopy
     }
     running.current = false;
     if (outcome !== 'deleted') {
-      // Nothing changed. Focus stays on the button that was pressed, and the status line says so.
-      setProblem(outcome === 'cancelled' ? 'cancelled' : 'failed');
+      // Nothing changed. The status line says so, and focus goes back to the confirm heading on the next
+      // frame (the same as web), after any system sheet that was shown has gone.
+      setProblem(outcome === 'cancelled' || outcome === 'needsSignIn' ? outcome : 'failed');
       setStep('confirm');
+      const refocus = () => focusNode(confirmHeading.current);
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(refocus);
+      } else {
+        setTimeout(refocus, 0);
+      }
     }
   }
 
@@ -87,6 +99,8 @@ export function DeleteAccountPanel({ copy, onDelete }: { copy: DeleteAccountCopy
     message = copy.deleting;
   } else if (problem === 'cancelled') {
     message = copy.deleteCancelled;
+  } else if (problem === 'needsSignIn') {
+    message = copy.deleteNeedsSignIn;
   } else if (problem === 'failed') {
     message = copy.deleteFailed;
   }
@@ -96,7 +110,7 @@ export function DeleteAccountPanel({ copy, onDelete }: { copy: DeleteAccountCopy
       {step === 'idle' ? (
         <>
           <Body tone="muted">{copy.deleteHint}</Body>
-          <Button label={copy.deleteOpen} variant="secondary" buttonRef={opener} onPress={() => setStep('confirm')} />
+          <Button label={copy.deleteOpen} variant="secondary" hint={copy.deleteHint} buttonRef={opener} onPress={() => setStep('confirm')} />
         </>
       ) : (
         <View style={styles.group}>

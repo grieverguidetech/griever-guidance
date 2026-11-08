@@ -45,4 +45,16 @@ describe('deleteLocalData', () => {
     jest.spyOn(AsyncStorage, 'getAllKeys').mockRejectedValue(new Error('disk'));
     expect(await deleteLocalData()).toBe(false);
   });
+
+  it('removes a key that a late fire-and-forget save writes after the first pass', async () => {
+    await AsyncStorage.setItem('gg.sessions.v1', '[]');
+    const real = AsyncStorage.setItem.bind(AsyncStorage);
+    // A save started just before the delete: it only lands a tick later.
+    jest.spyOn(AsyncStorage, 'setItem').mockImplementation(
+      (key: string, value: string) => new Promise<void>((resolve) => setTimeout(() => void real(key, value).then(resolve), 0)),
+    );
+    void AsyncStorage.setItem('gg.contacts.v1', '[{"late":true}]');
+    expect(await deleteLocalData()).toBe(true);
+    expect(await AsyncStorage.getAllKeys()).toEqual([]);
+  });
 });

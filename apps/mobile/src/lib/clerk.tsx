@@ -169,6 +169,18 @@ export class DeleteCancelledError extends Error {
   }
 }
 
+/**
+ * Thrown by the bridge's `deleteAccount` when Clerk asked for a verify step. Clerk's native SDK has no screen
+ * for it, so the step is cancelled and the person is told to sign in again first. Nothing was deleted.
+ */
+export class DeleteNeedsSignInError extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super('Clerk needs a fresh sign-in before the account can be deleted');
+    this.name = 'DeleteNeedsSignInError';
+    (this as { cause?: unknown }).cause = options?.cause;
+  }
+}
+
 /** The part of Clerk's user that deleting the account uses. */
 export interface DeletableUser {
   delete(): Promise<unknown>;
@@ -234,8 +246,22 @@ function SignInInfoBridge({ children }: { children: ReactNode }) {
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
   // Clerk's hosted account page (the account portal). Asked for only once Clerk has loaded and a person is signed in.
   const manageUrl = email && instance.loaded ? safeProfileUrl(instance) : null;
-  const runDelete = useReverification((target: DeletableUser) => target.delete()) as unknown as RunDelete;
-  const deleteAccount = useCallback(() => deleteClerkAccount(user, runDelete), [user, runDelete]);
+  // Clerk's native SDK has no verify screen. When it asks for one, cancel it and say what to do instead.
+  const askedToVerify = useRef(false);
+  const runDelete = useReverification((target: DeletableUser) => target.delete(), {
+    onNeedsReverification: ({ cancel }: { cancel: () => void }) => {
+      askedToVerify.current = true;
+      cancel();
+    },
+  }) as unknown as RunDelete;
+  const deleteAccount = useCallback(async () => {
+    askedToVerify.current = false;
+    try {
+      await deleteClerkAccount(user, runDelete);
+    } catch (error) {
+      throw askedToVerify.current && error instanceof DeleteCancelledError ? new DeleteNeedsSignInError({ cause: error }) : error;
+    }
+  }, [user, runDelete]);
   const canDelete = !!user && instance.loaded;
   return <SignInInfoContext.Provider value={{ email, manageUrl, deleteAccount: canDelete ? deleteAccount : null }}>{children}</SignInInfoContext.Provider>;
 }

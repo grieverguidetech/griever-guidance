@@ -7,33 +7,49 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export const OUR_KEY_PREFIX = 'gg.';
 
-/**
- * Removes everything this app keeps on this phone. Local only: no request is made.
- * Resolves true when every key was removed, false when some could not be (or the list could not be read).
- * Never throws: the account is already deleted when this runs.
- */
-export async function deleteLocalData(): Promise<boolean> {
-  let keys: readonly string[];
-  try {
-    keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(OUR_KEY_PREFIX));
-  } catch {
-    return false;
-  }
+/** Lists our keys. Throws when the list cannot be read. */
+async function ourKeys(): Promise<string[]> {
+  return (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(OUR_KEY_PREFIX));
+}
+
+/** Removes the given keys; true when every removal worked. */
+async function removeAll(keys: readonly string[]): Promise<boolean> {
   const results = await Promise.allSettled(keys.map((key) => AsyncStorage.removeItem(key)));
   return results.every((result) => result.status === 'fulfilled');
 }
 
-const resetListeners = new Set<() => void>();
+/**
+ * Removes everything this app keeps on this phone. Local only: no request is made.
+ * Resolves true when every key was removed, false when some could not be (or the list could not be read).
+ * Never throws: the account is already deleted when this runs.
+ *
+ * Writers in the app are fire-and-forget (a save started just before the delete can land after it), so
+ * after the first pass this waits a tick and removes any `gg.` key that has appeared since.
+ */
+export async function deleteLocalData(): Promise<boolean> {
+  try {
+    const removedFirst = await removeAll(await ourKeys());
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const late = await ourKeys();
+    const removedLate = await removeAll(late);
+    return removedFirst && removedLate && (await ourKeys()).length === 0;
+  } catch {
+    return false;
+  }
+}
 
-/** The running app listens, so it can drop what it holds in memory after a delete. Returns the unsubscribe. */
-export function onLocalDataReset(listener: () => void): () => void {
-  resetListeners.add(listener);
+type DeletedListener = (cleared: boolean) => void;
+const deletedListeners = new Set<DeletedListener>();
+
+/** The running app and the account provider listen, so they can drop what they hold in memory after a delete. Returns the unsubscribe. */
+export function onAccountDeleted(listener: DeletedListener): () => void {
+  deletedListeners.add(listener);
   return () => {
-    resetListeners.delete(listener);
+    deletedListeners.delete(listener);
   };
 }
 
-/** Tells the running app that this phone's data is gone: people, contacts and caches held in memory must start empty. */
-export function announceLocalDataReset(): void {
-  resetListeners.forEach((listener) => listener());
+/** Tells the running app that the account is deleted and this phone's data is gone (`cleared` is false when some of it could not be removed). */
+export function announceAccountDeleted(cleared: boolean): void {
+  deletedListeners.forEach((listener) => listener(cleared));
 }

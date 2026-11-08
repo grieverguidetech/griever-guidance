@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { spacing } from '@griever/tokens';
 import { Button, Heading } from '../ui';
+import { focusNode } from '../ui/focusNode';
 import { Body } from '../ui/Text';
 
 const copy = screenCopy('account');
@@ -14,12 +15,19 @@ const copy = screenCopy('account');
  */
 export function AccountDeletedScreen({ cleared = true, onDone }: { cleared?: boolean; onDone: () => void }) {
   const heading = useRef<ComponentRef<typeof Text>>(null);
+  // Deferred a tick, as on the checklist panel, so the screen reader takes focus after the swap has drawn.
   useEffect(() => {
-    const handle = heading.current ? findNodeHandle(heading.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
+    const timer = setTimeout(() => focusNode(heading.current), 0);
+    return () => clearTimeout(timer);
   }, []);
+  // Android Back leaves the same way the button does: the account is gone, so there is no screen behind this one.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onDone();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onDone]);
   return (
     <View style={styles.screen}>
       <Heading level={1} headingRef={heading}>

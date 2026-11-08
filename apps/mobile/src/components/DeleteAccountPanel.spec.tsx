@@ -11,7 +11,9 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   findNodeHandle: () => 1,
 }));
 
-const copy = screenCopy('account');
+const copy = { ...screenCopy('account'), ...screenCopy('phoneAccount') };
+/** Focus moves a tick after the swap draws (and on the next frame after a failure). */
+const nextTick = () => act(async () => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 
 function setup(onDelete: () => Promise<DeleteOutcome> = async () => 'deleted') {
   const handler = jest.fn(onDelete);
@@ -35,7 +37,7 @@ describe('DeleteAccountPanel', () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
-  it('opens the confirm step in place and moves screen-reader focus to its heading', () => {
+  it('opens the confirm step in place and moves screen-reader focus to its heading', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     // The spy can be the same function other tests already called, so count from here.
     focus.mockClear();
@@ -44,18 +46,21 @@ describe('DeleteAccountPanel', () => {
     expect(screen.getByRole('heading', { name: copy.deleteConfirmHeading })).toBeTruthy();
     expect(screen.getByText(copy.deleteConfirmBody)).toBeTruthy();
     expect(screen.getByRole('button', { name: copy.deleteCancel })).toBeTruthy();
+    await nextTick();
     expect(focus).toHaveBeenCalledTimes(1);
     focus.mockRestore();
   });
 
-  it('Cancel goes back to the first button and returns focus to it, with nothing deleted', () => {
+  it('Cancel goes back to the first button and returns focus to it, with nothing deleted', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     // The spy can be the same function other tests already called, so count from here.
     focus.mockClear();
     const onDelete = setup();
     open();
+    await nextTick();
     fireEvent.press(screen.getByRole('button', { name: copy.deleteCancel }));
     expect(screen.getByRole('button', { name: copy.deleteOpen })).toBeTruthy();
+    await nextTick();
     expect(screen.queryByText(copy.deleteConfirmHeading)).toBeNull();
     expect(onDelete).not.toHaveBeenCalled();
     expect(focus).toHaveBeenCalledTimes(2);
@@ -77,13 +82,32 @@ describe('DeleteAccountPanel', () => {
     await act(async () => finish('deleted'));
   });
 
-  it('a closed verify step says the account was not deleted and keeps the confirm step', async () => {
+  it('reads the hint with the first button, so the explanation is not only on screen', () => {
+    setup();
+    expect(screen.getByRole('button', { name: copy.deleteOpen }).props.accessibilityHint).toBe(copy.deleteHint);
+  });
+
+  it('a closed verify step says the account was not deleted, keeps the confirm step and puts focus back on its heading', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     setup(async () => 'cancelled');
     open();
+    await nextTick();
+    focus.mockClear();
     await act(async () => yes());
+    await nextTick();
+    expect(focus).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
     expect(screen.getByText(copy.deleteCancelled)).toBeTruthy();
     expect(screen.getByText(copy.deleteConfirmHeading)).toBeTruthy();
     expect(screen.queryByText(copy.deleting)).toBeNull();
+  });
+
+  it('a delete that needs a fresh sign-in says to sign out, sign back in and try again', async () => {
+    setup(async () => 'needsSignIn');
+    open();
+    await act(async () => yes());
+    expect(screen.getByText(copy.deleteNeedsSignIn)).toBeTruthy();
+    expect(screen.getByText(copy.deleteConfirmHeading)).toBeTruthy();
   });
 
   it('any other failure says so calmly, and the person can try again', async () => {

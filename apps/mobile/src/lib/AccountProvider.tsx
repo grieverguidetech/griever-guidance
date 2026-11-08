@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { SIGNED_IN_STORAGE_KEY, useAccount as useAccountState } from '@griever/hooks';
+import { PROFILE_STORAGE_KEY, SIGNED_IN_STORAGE_KEY, useAccount as useAccountState } from '@griever/hooks';
 import type { UseAccountResult } from '@griever/hooks';
 import type { AccountAuth } from '@griever/shared';
 import { createProfileCache } from './authStorage';
+import { onAccountDeleted } from './deleteLocalData';
 import { AUTH_ENABLED } from './features';
 import { CLERK_PUBLISHABLE_KEY, ClerkBoundary, useClerkAccountAuth } from './clerk';
 
@@ -113,9 +114,22 @@ function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: Pro
     }),
     [status, userId],
   );
+  // The account is deleted: forget the signed-in marker and the cached profile held in memory, and read the launch state again,
+  // so the next first screen is the signed-out one.
+  const [resets, setResets] = useState(0);
+  useEffect(
+    () =>
+      onAccountDeleted(() => {
+        cache.storage.removeItem(SIGNED_IN_STORAGE_KEY);
+        cache.storage.removeItem(PROFILE_STORAGE_KEY);
+        setResets((n) => n + 1);
+      }),
+    [cache.storage],
+  );
   const launch = useMemo<LaunchState>(
     () => ({ hydrated: cache.ready, signedIn: cache.ready && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
-    [cache.ready, cache.storage],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cache.ready, cache.storage, resets],
   );
   return (
     <>
