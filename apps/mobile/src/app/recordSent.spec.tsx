@@ -58,7 +58,7 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
   render(<App />);
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
   // A moment already sent to people shows its compact done row; a new one is the lit card.
-  fireEvent.press(told.length > 0 ? await screen.findByText(/Sent to \d+ (person|people)/) : await screen.findByRole('button', { name: /Next/ }));
+  fireEvent.press(told.length > 0 ? await screen.findByRole('button', { name: 'Announce the passing, Done' }) : await screen.findByRole('button', { name: /Next/ }));
   await openPeople();
   for (const name of pick) {
     fireEvent.press(await screen.findByText(name));
@@ -73,7 +73,7 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
 };
 
 describe('recording who was messaged (#621)', () => {
-  it('records the two sent ids, not the skipped one, and the hub shows the row done', async () => {
+  it('records the two sent ids, not the skipped one, and the hub shows the row in progress after a partial send', async () => {
     await toSending(['Dee', 'Eli', 'Fay'], NOTE);
     // The composed message really carries the note, so the check below means something.
     expect(await screen.findByText(new RegExp(NOTE))).toBeTruthy();
@@ -84,7 +84,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Text Fay'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByText(/Sent to 2 people/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^Next, Announce the passing.*, In progress$/ })).toBeTruthy();
     await waitFor(async () => {
       const saved = await savedAnna();
       expect(saved.recipientsNotified.announcement).toEqual(['c1', 'c3']);
@@ -105,7 +105,7 @@ describe('recording who was messaged (#621)', () => {
     const saved = await savedAnna();
     expect(saved.recipientsNotified).toEqual({});
     expect(saved.momentCompletedAt).toEqual({});
-    expect(screen.queryByText(/Sent to \d+ (person|people)/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Announce the passing, Done' })).toBeNull();
   });
 
   it('opens the flow again from the done row, without bouncing back to the hub', async () => {
@@ -113,9 +113,9 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Text Dee'));
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
-    expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
     // Start the announcement again from its done row.
-    fireEvent.press(screen.getByText(/Sent to 1 person/));
+    fireEvent.press(screen.getByRole('button', { name: 'Announce the passing, Done' }));
     // It opens on Ready to send, with the people sheet closed, and stays there.
     expect(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
@@ -167,7 +167,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     await screen.findByText('Text Eli');
     act(() => void [...handlers].reverse().some((h) => h()));
-    fireEvent.press(await screen.findByText(/Sent to 1 person/));
+    fireEvent.press(await screen.findByRole('button', { name: 'Announce the passing, Done' }));
     // The flow reopens on review with Eli and Fay, not all three and not a blank form.
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
@@ -181,7 +181,7 @@ describe('recording who was messaged (#621)', () => {
       await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
-      fireEvent.press(await screen.findByText(/Sent to \d+ (person|people)|Continue|Started/));
+      fireEvent.press(await screen.findByRole('button', { name: /^Announce the passing.*(Done|In progress)$/ }));
     };
 
     it('opens on Ready to send without the people already told, and the sheet closed', async () => {
@@ -211,7 +211,7 @@ describe('recording who was messaged (#621)', () => {
     await screen.findByText('Text Eli');
     act(() => void [...handlers].reverse().some((h) => h()));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
-    expect(await screen.findByText(/Sent to 1 person/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
     expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
   });
 
@@ -222,8 +222,8 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     fireEvent.press(await screen.findByText('Stop for now'));
     expect(await screen.findByText('You told 1 of 3.')).toBeTruthy();
-    // The stopped card is the lit card and says what is left; leaving the person screen clears this.
-    expect(await screen.findByText('Sent to 1 person · text the rest')).toBeTruthy();
+    // The stopped card is the lit card and shows progress; leaving the person screen clears this.
+    expect((await screen.findAllByRole('button', { name: /^Next, Announce the passing.*, In progress$/ })).length).toBe(1);
     expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
     expect((await savedAnna()).recipientsNotified.announcement).toEqual(['c1']);
   });
@@ -241,7 +241,7 @@ describe('recording who was messaged (#621)', () => {
     fireEvent.press(await screen.findByText('Next'));
     await screen.findByText('Text Eli');
     act(() => void [...handlers].reverse().some((h) => h()));
-    fireEvent.press(await screen.findByText(/Sent to \d+ (person|people)/));
+    fireEvent.press(await screen.findByRole('button', { name: 'Announce the passing, Done' }));
     // Only Dee was confirmed in this send, so Eli and Fay are offered again.
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
   });
