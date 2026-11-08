@@ -68,9 +68,9 @@ describe('Account (mobile save guard)', () => {
     expect(props.onPrimary).not.toHaveBeenCalled();
   });
 
-  it("renders no What you'll need button", () => {
+  it('has Back in the top bar and no other header button', () => {
     setup();
-    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
   });
 });
