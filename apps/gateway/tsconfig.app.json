@@ -15,6 +15,9 @@
       "path": "../../libs/gateway-messages/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/gateway-places/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/identity/tsconfig.lib.json"
     }
   ],
