@@ -6,7 +6,6 @@ import type { AccountCopy, AccountProps } from './Account';
 const copy: AccountCopy = {
   heading: 'Your account',
   back: 'Back',
-  checklist: "What you'll need",
   nameLabel: 'Your name',
   signOut: 'Sign out',
   offline: 'You are offline. You can change your name when you are connected.',
@@ -67,5 +66,11 @@ describe('Account (mobile save guard)', () => {
     const props = setup({ primaryBusy: true });
     save();
     expect(props.onPrimary).not.toHaveBeenCalled();
+  });
+
+  it('has Back in the top bar and no other header button', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
   });
 });

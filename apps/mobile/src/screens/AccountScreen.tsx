@@ -6,11 +6,9 @@ import { SerifText as Text, Button } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
 import { ScreenHeader, authStyles } from '../components/authForm';
-import { MUTED } from '../components/colors';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
 import { ProfileScreen } from './ProfileScreen';
-import { ChecklistRows } from './WhatYoullNeedScreen';
 
 const copy = screenCopy('account');
 
@@ -26,17 +24,6 @@ export function resetUnsavedName() {
   unsavedName = null;
 }
 
-/** The "What you'll need" list, kept on the signed-in account page. Same saved ticks as the checklist screen. */
-function AccountChecklist({ tipOpen, onTipChange }: { tipOpen: string | null; onTipChange: (id: string | null) => void }) {
-  return (
-    <View style={styles.checklist}>
-      <Text accessibilityRole="header" style={styles.checklistTitle}>What you'll need</Text>
-      <Text style={styles.checklistNote}>{copy.checklistNote}</Text>
-      <ChecklistRows tipOpen={tipOpen} onTipChange={onTipChange} />
-    </View>
-  );
-}
-
 /**
  * Picks sign in, sign up or profile from the identity state. Reached from the first screen.
  *
@@ -46,13 +33,9 @@ function AccountChecklist({ tipOpen, onTipChange }: { tipOpen: string | null; on
 function AccountBody({
   identity,
   onBack,
-  tipOpen,
-  onTipChange,
 }: {
   identity: UseAccountResult;
   onBack: () => void;
-  tipOpen: string | null;
-  onTipChange: (id: string | null) => void;
 }) {
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
@@ -115,27 +98,23 @@ function AccountBody({
   }
   if (isSignedIn || ended) {
     return (
-      <>
-        <ProfileScreen
-          identity={identity}
-          initialName={pendingName?.name}
-          onSaved={clearPending}
-          onBack={onBack}
-          sessionEnded={ended}
-          onSignOut={() => {
-            explicitSignOut.current = true;
-            clearPending();
-            void signOut();
-          }}
-          onSignInAgain={() => {
-            clearError();
-            setEnded(false);
-            setMode('signIn');
-          }}
-        />
-        {/* Shown once the account has a name; before that it opens from the button. */}
-        {isSignedIn && (savedName || pendingName) ? <AccountChecklist tipOpen={tipOpen} onTipChange={onTipChange} /> : null}
-      </>
+      <ProfileScreen
+        identity={identity}
+        initialName={pendingName?.name}
+        onSaved={clearPending}
+        onBack={onBack}
+        sessionEnded={ended}
+        onSignOut={() => {
+          explicitSignOut.current = true;
+          clearPending();
+          void signOut();
+        }}
+        onSignInAgain={() => {
+          clearError();
+          setEnded(false);
+          setMode('signIn');
+        }}
+      />
     );
   }
   if (mode === 'signUp') {
@@ -196,7 +175,6 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
   useEffect(() => {
     if (ready) signedInRef.current?.();
   }, [ready]);
-  const [tipOpen, setTipOpen] = useState<string | null>(null);
   // No error left over from an earlier visit should be read out on arrival.
   const clearError = identity?.clearError;
   useEffect(() => clearError?.(), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -207,11 +185,9 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        // A touch anywhere on the page closes an open tip; the info button stops its own touch.
-        onTouchStart={() => setTipOpen(null)}
       >
         {identity ? (
-          <AccountBody identity={identity} onBack={onBack} tipOpen={tipOpen} onTipChange={setTipOpen} />
+          <AccountBody identity={identity} onBack={onBack} />
         ) : (
           <LoadingOrUnavailable text={UNAVAILABLE} onBack={onBack} />
         )}
@@ -225,7 +201,4 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 24, paddingTop: 20, paddingBottom: 40 },
   backRow: { alignSelf: 'flex-start', marginBottom: 16 },
-  checklist: { marginTop: 32 },
-  checklistTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 4 },
-  checklistNote: { fontSize: 13, color: MUTED, marginBottom: 16 },
 });

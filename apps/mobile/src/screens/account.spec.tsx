@@ -6,7 +6,7 @@ import { act, configure, fireEvent, render, screen, waitFor } from '@testing-lib
 import type { ProfileResult } from '@griever/api-client';
 import type { AccountAuth } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
-import { CHECKLIST_KEY, SSN_TIP } from './WhatYoullNeedScreen';
+import { CHECKLIST_KEY } from './WhatYoullNeedScreen';
 import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
 
 // On a cold Babel cache (a fresh worktree) the first sign-in render compiles modules lazily and
@@ -426,51 +426,46 @@ describe('profile', () => {
     expect(screen.queryByText(/You've been signed out/)).toBeNull();
   });
 
-  describe("What you'll need on Your account (#191)", () => {
-    const row = (name: string) => screen.getByRole('checkbox', { name: new RegExp(`^${name}`) });
+  describe("What you'll need is not on Your account (#716)", () => {
+    const expectNoChecklist = () => {
+      expect(screen.queryByText("What you'll need")).toBeNull();
+      expect(screen.queryByRole('header', { name: "What you'll need" })).toBeNull();
+      expect(screen.queryByRole('button', { name: "What you'll need" })).toBeNull();
+      expect(screen.queryByRole('checkbox')).toBeNull();
+    };
 
-    it('lists the items as checkboxes of at least 44 high, unticked to start', async () => {
-      renderAccount(true);
-      await screen.findByDisplayValue('Sam');
-      expect(screen.getByRole('header', { name: "What you'll need" })).toBeTruthy();
-      const boxes = await screen.findAllByRole('checkbox');
-      expect(boxes).toHaveLength(5);
-      for (const box of boxes) {
-        expect(box.props.accessibilityState).toEqual({ checked: false });
-      }
-      expect(StyleSheet.flatten(row('Life insurance policies').props.style).minHeight).toBeGreaterThanOrEqual(44);
-    });
-
-    it('saves a tick with the same key as the checklist screen', async () => {
-      renderAccount(true);
-      await screen.findAllByRole('checkbox');
-      fireEvent.press(row('Life insurance policies'));
-      expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
-      await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]'));
-    });
-
-    it('closes an open tip on a touch elsewhere, such as Save', async () => {
-      renderAccount(true);
-      await screen.findAllByRole('checkbox');
-      fireEvent.press(screen.getByRole('button', { name: 'Why we list this' }));
-      expect(screen.getByText(SSN_TIP)).toBeTruthy();
-      fireEvent(screen.getByRole('button', { name: 'Save' }), 'touchStart');
-      expect(screen.queryByText(SSN_TIP)).toBeNull();
-    });
-
-    it('shows the list when the name came from the account, with nothing typed here', async () => {
+    it('shows no list, note or button when the account has a name', async () => {
       mockGetProfile.mockResolvedValue(profileWith('Server Name'));
       renderAccount(true);
       await screen.findByDisplayValue('Server Name');
-      expect(await screen.findAllByRole('checkbox')).toHaveLength(5);
+      expectNoChecklist();
     });
 
-    it('leaves the list out while the account has no name', async () => {
+    it('shows no list, note or button when the account has no name', async () => {
       mockGetProfile.mockResolvedValue(profileWith(null));
       renderAccount(true);
       await screen.findByRole('heading', { name: 'Your account' });
       await screen.findByLabelText('Your name');
-      expect(screen.queryByRole('checkbox')).toBeNull();
+      expectNoChecklist();
+    });
+
+    it('still saves the name and signs out', async () => {
+      mockGetProfile.mockResolvedValue(profileWith(null));
+      mockUpdateProfile.mockResolvedValue(profileWith('Ann'));
+      renderAccount(true);
+      const field = await screen.findByLabelText('Your name');
+      fireEvent.changeText(field, 'Ann');
+      press('Save');
+      await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith('t', { senderName: 'Ann' }));
+      press('Sign out');
+      await screen.findByLabelText('Email');
+    });
+
+    it('leaves the saved Gather ticks on the device', async () => {
+      await AsyncStorage.setItem(CHECKLIST_KEY, '["insurance"]');
+      renderAccount(true);
+      await screen.findByLabelText('Your name');
+      expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]');
     });
   });
 });

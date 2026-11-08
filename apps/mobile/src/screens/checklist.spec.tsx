@@ -2,10 +2,7 @@ import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AccountAuth } from '@griever/shared';
 import { HomeScreen } from './HomeScreen';
-import { AccountScreen } from './AccountScreen';
-import { AccountStateProvider } from '../lib/AccountProvider';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
 import { CHECKLIST_KEY, SSN_TIP, WhatYoullNeedScreen } from './WhatYoullNeedScreen';
 import { Sheet } from '../ui';
@@ -170,32 +167,18 @@ describe('old screens use the serif through SerifText', () => {
   });
 });
 
-describe('the list on Your account and the checklist screen share their ticks (#191)', () => {
-  const auth: AccountAuth = { status: 'signed_in', userId: 'u1', getToken: async () => ({ ok: true, token: 't' }), signOut: async () => undefined };
-  const accountScreen = (
-    <AccountStateProvider auth={auth}>
-      <AccountScreen onBack={() => undefined} />
-    </AccountStateProvider>
-  );
-
-  it('shows a tick made on Your account in the checklist screen, and the reverse', async () => {
+describe('the checklist screen saves its ticks (#191, #716)', () => {
+  it('shows a saved tick again after the screen is closed and reopened', async () => {
     await AsyncStorage.clear();
-    const account = render(accountScreen);
+    const first = render(<WhatYoullNeedScreen />);
     await screen.findAllByRole('checkbox');
     fireEvent.press(row('Life insurance policies'));
     await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance"]'));
-    account.unmount();
+    first.unmount();
 
-    const list = render(<WhatYoullNeedScreen />);
+    render(<WhatYoullNeedScreen />);
     await screen.findAllByRole('checkbox');
     expect(row('Life insurance policies').props.accessibilityState).toEqual({ checked: true });
-    fireEvent.press(row('Military discharge papers'));
-    await waitFor(async () => expect(await AsyncStorage.getItem(CHECKLIST_KEY)).toBe('["insurance","military"]'));
-    list.unmount();
-
-    render(accountScreen);
-    await screen.findAllByRole('checkbox');
-    expect(row('Military discharge papers').props.accessibilityState).toEqual({ checked: true });
   });
 
   it('says so, calmly, when the tick could not be saved, and clears after a good tick', async () => {
