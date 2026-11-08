@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import type { PlaceSuggestResponse } from '@griever/shared';
 import { googleDetails, googleSuggest } from './google.js';
 import { placesRateLimit } from './rateLimit.js';
 import { parseDetailsBody, parseSuggestBody } from './validate.js';
 
 export const NOT_SET_UP = 'Place search is not set up.';
+export const INVALID_BODY = 'Invalid request body';
 export const UNAVAILABLE = 'Place suggestions are not available right now.';
 
 /**
@@ -20,14 +22,22 @@ placesRouter.use('/places/*', async (c, next) => {
 });
 placesRouter.use('/places/*', placesRateLimit());
 
-const serverKey = () => process.env['GOOGLE_PLACES_SERVER_KEY']?.trim() || undefined;
+// Both bodies are tiny (a typed line, a token, up to 5 types); 2 KB is generous.
+const limitBody = bodyLimit({ maxSize: 2048, onError: (c) => c.json({ error: INVALID_BODY }, 413) });
+placesRouter.use('/places/*', limitBody);
+
+/**
+ * Read on each request from process.env, trimmed, the same way libs/identity reads its Worker
+ * secrets (for example CLERK_WEBHOOK_SECRET in identity/src/index.ts), so a key set after startup is seen.
+ */
+export const readServerKey = () => process.env['GOOGLE_PLACES_SERVER_KEY']?.trim() || undefined;
 
 placesRouter.post('/places/suggest', async (c) => {
   const body = parseSuggestBody(await c.req.json().catch(() => null));
   if (!body) {
-    return c.json({ error: 'Invalid request body' }, 400);
+    return c.json({ error: INVALID_BODY }, 400);
   }
-  const key = serverKey();
+  const key = readServerKey();
   if (!key) {
     return c.json({ error: NOT_SET_UP }, 503);
   }
@@ -42,9 +52,9 @@ placesRouter.post('/places/suggest', async (c) => {
 placesRouter.post('/places/details', async (c) => {
   const body = parseDetailsBody(await c.req.json().catch(() => null));
   if (!body) {
-    return c.json({ error: 'Invalid request body' }, 400);
+    return c.json({ error: INVALID_BODY }, 400);
   }
-  const key = serverKey();
+  const key = readServerKey();
   if (!key) {
     return c.json({ error: NOT_SET_UP }, 503);
   }

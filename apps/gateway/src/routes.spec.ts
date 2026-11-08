@@ -108,11 +108,16 @@ describe('gateway route inventory (C8)', () => {
     });
 
     it('echoes CORS only for a configured origin', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
       const app = await loadApp();
+      vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', '');
       const allowed = await post(app, { origin: 'https://web.grieversguidance.com' });
       expect(allowed.headers.get('access-control-allow-origin')).toBe('https://web.grieversguidance.com');
       const other = await post(app, { origin: 'https://evil.example' });
       expect(other.headers.get('access-control-allow-origin')).toBeNull();
+      expect(allowed.status).toBe(503);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

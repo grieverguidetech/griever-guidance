@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { placesRouter, NOT_SET_UP, UNAVAILABLE } from './router.js';
+import { placesRouter, readServerKey, INVALID_BODY, NOT_SET_UP, UNAVAILABLE } from './router.js';
 import { PLACES_RATE_LIMITED, PLACES_RATE_LIMIT_BINDING } from './rateLimit.js';
 
 const KEY = 'test-places-key-not-real';
@@ -100,7 +100,7 @@ describe('POST /places/suggest', () => {
     vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', '');
     const res = await post('/places/suggest', { input: 'ab', sessionToken: token });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'Invalid request body' });
+    expect(await res.json()).toEqual({ error: INVALID_BODY });
     expect((await app.request('/places/suggest', { method: 'POST' })).status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -127,6 +127,22 @@ describe('POST /places/suggest', () => {
     expect((await post('/places/suggest', suggestBody)).status).toBe(502);
     fetchMock.mockReturnValueOnce(Promise.resolve(new Response('not json', { status: 200 })));
     expect((await post('/places/suggest', suggestBody)).status).toBe(502);
+  });
+
+  it('refuses a 3 KB body with 413 and no Google call', async () => {
+    for (const path of ['/places/suggest', '/places/details']) {
+      const res = await post(path, { input: 'a'.repeat(3000), sessionToken: token });
+      expect(res.status).toBe(413);
+      expect(await res.json()).toEqual({ error: INVALID_BODY });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('gives Google a 5 second timeout signal', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockReturnValue(googleJson({}));
+    await post('/places/suggest', suggestBody);
+    expect(timeout).toHaveBeenCalledWith(5000);
   });
 
   it('never logs the typed text, the place id or the key', async () => {
@@ -183,6 +199,17 @@ describe('POST /places/details', () => {
     vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', '');
     expect((await post('/places/details', detailsBody)).status).toBe(503);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('readServerKey', () => {
+  it('reads GOOGLE_PLACES_SERVER_KEY from process.env on each call, trimmed, like the identity secrets', () => {
+    vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', '  abc  ');
+    expect(readServerKey()).toBe('abc');
+    vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', 'next');
+    expect(readServerKey()).toBe('next');
+    vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', '   ');
+    expect(readServerKey()).toBeUndefined();
   });
 });
 
