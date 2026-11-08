@@ -174,10 +174,11 @@ jobs:
 
       # Account delete (#327): CLERK_WEBHOOK_SECRET verifies the Clerk webhook; DATA_FUNCTION_SERVICE_SECRET
       # is the second lock on the data function's delete path. Both are Worker secrets set like the keys above.
+      # GOOGLE_PLACES_SERVER_KEY is the server key for place search (libs/gateway-places).
       # Each is skipped when its GitHub secret is empty; a value already on the Worker stays.
-      - name: Set the Worker secrets CLERK_WEBHOOK_SECRET and DATA_FUNCTION_SERVICE_SECRET
+      - name: Set the Worker secrets CLERK_WEBHOOK_SECRET, DATA_FUNCTION_SERVICE_SECRET and GOOGLE_PLACES_SERVER_KEY
         run: |
-          for name in CLERK_WEBHOOK_SECRET DATA_FUNCTION_SERVICE_SECRET; do
+          for name in CLERK_WEBHOOK_SECRET DATA_FUNCTION_SERVICE_SECRET GOOGLE_PLACES_SERVER_KEY; do
             if [ -z "${!name}" ]; then
               echo "::notice::$name is empty; skipped. A value already on the Worker stays."
               continue
@@ -188,6 +189,7 @@ jobs:
         env:
           CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
           DATA_FUNCTION_SERVICE_SECRET: ${{ secrets.DATA_FUNCTION_SERVICE_SECRET }}
+          GOOGLE_PLACES_SERVER_KEY: ${{ secrets.GOOGLE_PLACES_SERVER_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 

@@ -37,6 +37,9 @@
       "path": "./libs/gateway-messages"
     },
     {
+      "path": "./libs/gateway-places"
+    },
+    {
       "path": "./libs/identity"
     },
     {
