@@ -3,6 +3,8 @@
   "intro": "Send when you're ready.",
   "whatYoullNeed": "What you'll need",
   "whatYoullNeedHint": "Opens a checklist of things to do.",
-  "sentPartial": "Sent to {n} {noun} · text the rest",
-  "account": "Your account"
+  "account": "Your account",
+  "stateDone": "Done",
+  "stateInProgress": "In progress",
+  "stateNotStarted": "Not started"
 }

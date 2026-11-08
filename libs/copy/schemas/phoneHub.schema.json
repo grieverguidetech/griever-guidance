@@ -1,16 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only person screen: heading, intro, What you'll need button, partial-send line, account link",
+  "title": "Copy for the phone-only person screen: heading, intro, What you'll need button, partial-send line, account link, and the status words (Done, In progress, Not started)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "intro", "whatYoullNeed", "whatYoullNeedHint", "sentPartial", "account"],
+  "required": ["heading", "intro", "whatYoullNeed", "whatYoullNeedHint", "account", "stateDone", "stateInProgress", "stateNotStarted"],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
     "intro": { "$ref": "#/$defs/text" },
     "whatYoullNeed": { "$ref": "#/$defs/text" },
     "whatYoullNeedHint": { "$ref": "#/$defs/text" },
-    "sentPartial": { "$ref": "#/$defs/text" },
-    "account": { "$ref": "#/$defs/text" }
+    "account": { "$ref": "#/$defs/text" },
+    "stateDone": { "$ref": "#/$defs/text" },
+    "stateInProgress": { "$ref": "#/$defs/text" },
+    "stateNotStarted": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }
