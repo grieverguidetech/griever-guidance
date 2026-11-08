@@ -5,6 +5,8 @@ import type { Text as RNText } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { SerifText as Text } from '../ui';
 import { DateField } from './DateField';
+import { TimeField } from './TimeField';
+import type { TimeFieldCopy } from './TimeField';
 import { colors, radius, spacing } from '@griever/tokens';
 
 export interface DetailsField {
@@ -17,8 +19,13 @@ export interface DetailsField {
 }
 
 const dateCopy = screenCopy('personSetup');
+const detailsCopy = screenCopy('phoneDetails');
 /** The service date is the one field written as a date, in the text web writes ("June 7, 2025"). */
 const DATE_KEY = 'serviceDate';
+/** The service time is written as time text, in the text web writes ("2:00 PM"). */
+const TIME_KEY = 'serviceTime';
+// The Done label matches the date field's.
+const TIME_COPY: Omit<TimeFieldCopy, 'placeholder'> = { done: dateCopy.dateDone, clear: detailsCopy.timeClear, hint: detailsCopy.timeHint };
 // Same range as parseCompleteDate, which reads the text back. There is no real upper limit.
 const EARLIEST_DATE = new Date(2000, 0, 1);
 const LATEST_DATE = new Date(2100, 11, 31);
@@ -71,6 +78,27 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
                 accessibleName={accessibleName}
                 maximumDate={LATEST_DATE}
                 minimumDate={EARLIEST_DATE}
+                missing={missing}
+              />
+              {missing && (
+                <Text style={styles.needed} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                  {copy.detailsNeeded}
+                </Text>
+              )}
+            </View>
+          );
+        }
+        if (field.key === TIME_KEY) {
+          return (
+            <View key={field.key} style={styles.field}>
+              <Text style={styles.label} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                {field.label}
+              </Text>
+              <TimeField
+                copy={{ ...TIME_COPY, placeholder: field.placeholder }}
+                value={values[field.key] ?? ''}
+                onChange={(text) => onChange(field.key, text)}
+                accessibleName={accessibleName}
                 missing={missing}
               />
               {missing && (

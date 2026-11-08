@@ -1,4 +1,4 @@
-import { addDays, formatPassingDate, passingDateFromText, mergeSessionScreens, parseCompleteDate, parseLooseDate, type SessionDocument } from './index.js';
+import { addDays, formatPassingDate, formatServiceTime, serviceTimeFromText, passingDateFromText, mergeSessionScreens, parseCompleteDate, parseLooseDate, type SessionDocument } from './index.js';
 
 describe('parseLooseDate', () => {
   it('parses what a family types and ISO dates', () => {
@@ -161,5 +161,38 @@ describe.each(['UTC', 'America/Chicago', 'Pacific/Kiritimati'])('formatPassingDa
   it('round-trips', () => {
     const date = new Date(2023, 8, 15);
     expect(formatPassingDate(passingDateFromText(formatPassingDate(date)) as Date)).toBe('September 15, 2023');
+  });
+});
+
+describe('formatServiceTime / serviceTimeFromText', () => {
+  it('writes the text web writes', () => {
+    expect(formatServiceTime(new Date(2026, 0, 1, 14, 0))).toBe('2:00 PM');
+    expect(formatServiceTime(new Date(2026, 0, 1, 0, 0))).toBe('12:00 AM');
+    expect(formatServiceTime(new Date(2026, 0, 1, 12, 5))).toBe('12:05 PM');
+    expect(formatServiceTime(new Date(2026, 0, 1, 9, 7))).toBe('9:07 AM');
+    expect(formatServiceTime(new Date(2026, 0, 1, 11, 30))).toBe('11:30 AM');
+    expect(formatServiceTime(new Date(2026, 0, 1, 23, 59))).toBe('11:59 PM');
+  });
+
+  it('reads back what it writes, and what web reads', () => {
+    const at = (text: string) => {
+      const read = serviceTimeFromText(text);
+      return read ? [read.getHours(), read.getMinutes()] : null;
+    };
+    expect(at('2:00 PM')).toEqual([14, 0]);
+    expect(at('12:00 AM')).toEqual([0, 0]);
+    expect(at('12:30 AM')).toEqual([0, 30]);
+    expect(at('12:00 PM')).toEqual([12, 0]);
+    expect(at('12:05 PM')).toEqual([12, 5]);
+    expect(at('11:30 am')).toEqual([11, 30]);
+    expect(at('2:00pm')).toEqual([14, 0]);
+    expect(at('14:00')).toEqual([14, 0]);
+  });
+
+  it('is null for text that is not a clear time', () => {
+    for (const text of ['', '  ', 'around noon', '2 pm', '25:00', '13:00 PM', '0:30 AM', '2:75 PM']) {
+      expect(serviceTimeFromText(text)).toBeNull();
+    }
+    expect(serviceTimeFromText(undefined)).toBeNull();
   });
 });

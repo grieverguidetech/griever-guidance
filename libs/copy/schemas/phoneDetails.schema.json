@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the phone-only time control in the service Details row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timeClear", "timeHint"],
+  "properties": {
+    "timeClear": { "$ref": "#/$defs/text" },
+    "timeHint": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}
