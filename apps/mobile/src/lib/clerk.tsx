@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ClerkProvider, useAuth, useClerk } from '@clerk/expo';
+import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/expo';
 import { resourceCache } from '@clerk/expo/resource-cache';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { SIGNED_IN_STORAGE_KEY } from '@griever/hooks';
@@ -160,11 +160,48 @@ export function useClerkAccountAuth(storage: SendFlowStorage, hydrated: boolean)
   });
 }
 
+/** What Your account shows about the sign-in: the email (read-only) and Clerk's hosted account page. Both null until Clerk has them. */
+export interface SignInInfo {
+  email: string | null;
+  /** An https address for Clerk's account management page. Null when there is none, and Manage sign-in is not shown. */
+  manageUrl: string | null;
+}
+
+const NO_SIGN_IN_INFO: SignInInfo = { email: null, manageUrl: null };
+const SignInInfoContext = createContext<SignInInfo>(NO_SIGN_IN_INFO);
+
+/** Reads Clerk's signed-in email and account page. Empty outside Clerk (accounts off). */
+export function useSignInInfo(): SignInInfo {
+  return useContext(SignInInfoContext);
+}
+
+/** Only an https address is ever opened. */
+function httpsOrNull(url: string | null | undefined): string | null {
+  return url && url.startsWith('https://') ? url : null;
+}
+
+function SignInInfoBridge({ children }: { children: ReactNode }) {
+  const { user } = useUser();
+  const instance = useClerk();
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  // Clerk's hosted account page (the account portal). Asked for only once Clerk has loaded and a person is signed in.
+  const manageUrl = email && instance.loaded ? safeProfileUrl(instance) : null;
+  return <SignInInfoContext.Provider value={{ email, manageUrl }}>{children}</SignInInfoContext.Provider>;
+}
+
+function safeProfileUrl(instance: { buildUserProfileUrl?: () => string }): string | null {
+  try {
+    return httpsOrNull(instance.buildUserProfileUrl?.());
+  } catch {
+    return null;
+  }
+}
+
 /** The children render at once; Clerk loads behind them. */
 export function ClerkBoundary({ publishableKey, children }: { publishableKey: string; children: ReactNode }) {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} __experimental_resourceCache={resourceCache}>
-      {children}
+      <SignInInfoBridge>{children}</SignInInfoBridge>
     </ClerkProvider>
   );
 }

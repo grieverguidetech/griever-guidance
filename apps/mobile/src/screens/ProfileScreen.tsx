@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Text } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Linking, Text } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { screenCopy } from '@griever/copy';
 import { BIRTH_YEAR_MIN, checkAddress, formatPassingDate, isValidBirthDate, isValidNamePart, NAME_PART_MAX_LENGTH, normalizeNamePart, parseCompleteDate } from '@griever/shared';
 import type { Address, AddressField } from '@griever/shared';
@@ -9,11 +10,17 @@ import type { UseAccountResult } from '@griever/hooks';
 import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../ui/screens/Account';
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
+import { useSignInInfo } from '../lib/clerk';
 
 const copy = screenCopy('account');
 const phoneAccount = screenCopy('phoneAccount');
 const personSetup = screenCopy('personSetup');
 const phonePerson = screenCopy('phonePerson');
+
+/** The support address as a mailto link, with the subject encoded. */
+export function supportMailto(address: string, subject: string): string {
+  return `mailto:${address}?subject=${encodeURIComponent(subject)}`;
+}
 
 export const SESSION_ENDED = copy.sessionEnded;
 
@@ -163,6 +170,9 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const waiting = !canSave && !sessionEnded;
   // Try again is offered only when the load failed and there is nothing kept to edit.
   const loadFailed = waiting && failedLoad;
+  const signIn = useSignInInfo();
+  const [supportFailed, setSupportFailed] = useState(false);
+  const [manageFailed, setManageFailed] = useState(false);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const focusCount = useRef(0);
 
@@ -179,6 +189,29 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     setErrors((current) => ({ ...current, [field === 'birth' ? 'birthDate' : field]: undefined }));
     setSaved(false);
     setServerInvalid(false);
+  }
+
+  async function openSupport() {
+    setSupportFailed(false);
+    try {
+      await Linking.openURL(supportMailto(copy.supportEmail, copy.supportSubject));
+    } catch {
+      setSupportFailed(true);
+    }
+  }
+
+  async function manageSignIn() {
+    setManageFailed(false);
+    try {
+      const url = signIn.manageUrl;
+      if (!url) {
+        throw new Error('No account page address');
+      }
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      // The person is still on this screen and can press the button again.
+      setManageFailed(true);
+    }
   }
 
   async function save() {
@@ -244,7 +277,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
 
   return (
     <Account
-      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry }}
+      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed }}
       values={values}
       onChange={change}
       errors={errors}
@@ -265,6 +298,11 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       onRetry={loadFailed ? identity.reloadProfile : undefined}
       onPrimary={sessionEnded ? onSignInAgain : save}
       onSignOut={sessionEnded ? undefined : onSignOut}
+      email={sessionEnded ? null : signIn.email}
+      onManageSignIn={sessionEnded || !signIn.manageUrl ? undefined : () => void manageSignIn()}
+      onSupport={() => void openSupport()}
+      supportFailed={supportFailed}
+      manageFailed={manageFailed}
       offline={identity.offline}
       status={{ message, tone }}
       onBack={onBack}

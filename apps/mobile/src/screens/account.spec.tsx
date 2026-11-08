@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, Linking, Platform, StyleSheet, Text } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ProfileResult } from '@griever/api-client';
 import type { AccountAuth, Address } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { CHECKLIST_KEY } from './WhatYoullNeedScreen';
+import { ClerkBoundary } from '../lib/clerk';
 import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
 
 // On a cold Babel cache (a fresh worktree) the first sign-in render compiles modules lazily and
@@ -45,7 +47,21 @@ const mockSignUp = {
   verifications: { sendEmailCode: jest.fn(async () => ({ error: null })), verifyEmailCode: jest.fn(async () => ({ error: null })) },
   finalize: jest.fn(async () => ({ error: null as unknown })),
 };
+const mockClerkUser: { email: string | null } = { email: null };
+const mockClerkInstance: { loaded: boolean; buildUserProfileUrl: () => string } = { loaded: true, buildUserProfileUrl: () => 'https://accounts.example.com/user' };
+jest.mock('@clerk/expo/token-cache', () => ({ tokenCache: undefined }));
+jest.mock('@clerk/expo/resource-cache', () => ({ resourceCache: undefined }));
+jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'dismiss' })) }));
+// The sign-in info the screen reads comes from Clerk through the bridge in lib/clerk.tsx; the tests below set it on these fakes.
+let mockSignInInfo: { email: string | null; manageUrl: string | null } = { email: null, manageUrl: null };
+jest.mock('../lib/clerk', () => ({
+  ...jest.requireActual<object>('../lib/clerk'),
+  useSignInInfo: () => mockSignInInfo,
+}));
 jest.mock('@clerk/expo', () => ({
+  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  useUser: () => ({ user: mockClerkUser.email ? { primaryEmailAddress: { emailAddress: mockClerkUser.email } } : null }),
+  useClerk: () => mockClerkInstance,
   useSignIn: () => ({ signIn: mockSignIn }),
   useSignUp: () => ({ signUp: mockSignUp }),
   useSSO: () => ({ startSSOFlow: jest.fn() }),
@@ -87,6 +103,10 @@ const finalizeSignsIn = (fn: typeof mockSignIn.finalize) => fn.mockImplementatio
 
 beforeEach(async () => {
   resetUnsavedName();
+  mockSignInInfo = { email: null, manageUrl: null };
+  mockClerkInstance.loaded = true;
+  mockClerkInstance.buildUserProfileUrl = () => 'https://accounts.example.com/user';
+  mockClerkUser.email = null;
   jest.restoreAllMocks();
   await AsyncStorage.clear();
   mockGetProfile.mockReset().mockResolvedValue(noProfile);
@@ -731,5 +751,107 @@ describe('sign-up name save with a slow first load (#717)', () => {
     press('Save');
     await screen.findByText('Your details are saved.');
     expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }, { firstName: 'Samantha', lastName: null, birthDate: null, address: null }]);
+  });
+});
+
+describe('sign-in details and support (#718)', () => {
+  const headingNames = () => screen.getAllByRole('heading').map((node) => node.props.children);
+
+  it('shows the email and the groups in order: Profile, Sign-in and security, Sign out, Help and support', async () => {
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.getByText('sam@example.com')).toBeTruthy();
+    expect(headingNames()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'Sign out', 'Help and support']);
+  });
+
+  it('hides the sign-in group while the email has not loaded', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByText('Sign-in and security')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Manage sign-in' })).toBeNull();
+  });
+
+  it('opens the hosted Clerk account page in the browser from Manage sign-in', async () => {
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    press('Manage sign-in');
+    await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://accounts.example.com/user'));
+  });
+
+  it('shows a calm line when the browser does not open', async () => {
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    (WebBrowser.openBrowserAsync as jest.Mock<() => Promise<unknown>>).mockRejectedValueOnce(new Error('no browser'));
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByText(/could not open your account page/)).toBeNull();
+    press('Manage sign-in');
+    await screen.findByText(/could not open your account page/);
+  });
+
+  it('shows no Manage sign-in button when there is no address', async () => {
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: null };
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByRole('button', { name: 'Manage sign-in' })).toBeNull();
+    expect(screen.getByText('sam@example.com')).toBeTruthy();
+  });
+
+  it('opens the mail app with the subject encoded', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    press('Email support');
+    await waitFor(() => expect(open).toHaveBeenCalledWith('mailto:grieversguidancetech@gmail.com?subject=Help%20with%20Grievers%20Guidance'));
+    expect(screen.queryByText(/could not open your email app/)).toBeNull();
+  });
+
+  it('says the address can be copied when the mail app does not open', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail app'));
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    press('Email support');
+    await screen.findByText(/could not open your email app. You can copy the address above/);
+    expect(screen.getByText('grieversguidancetech@gmail.com')).toBeTruthy();
+  });
+});
+
+describe('the Clerk bridge (#718)', () => {
+  const { useSignInInfo: actualUseSignInInfo } = jest.requireActual<typeof import('../lib/clerk')>('../lib/clerk');
+  function ActualProbe() {
+    const info = actualUseSignInInfo();
+    return <Text>{`${info.email ?? 'no email'}|${info.manageUrl ?? 'no url'}`}</Text>;
+  }
+
+  it('reads the signed-in email and the https account page from Clerk', () => {
+    mockClerkUser.email = 'sam@example.com';
+    render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
+    expect(screen.getByText('sam@example.com|https://accounts.example.com/user')).toBeTruthy();
+  });
+
+  it('gives no address until Clerk has loaded, and none that is not https', () => {
+    mockClerkUser.email = 'sam@example.com';
+    mockClerkInstance.loaded = false;
+    const { unmount } = render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
+    expect(screen.getByText('sam@example.com|no url')).toBeTruthy();
+    unmount();
+    mockClerkInstance.loaded = true;
+    mockClerkInstance.buildUserProfileUrl = () => '/user';
+    render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
+    expect(screen.getByText('sam@example.com|no url')).toBeTruthy();
+  });
+
+  it('shows nothing when nobody is signed in', () => {
+    mockClerkUser.email = null;
+    render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
+    expect(screen.getByText('no email|no url')).toBeTruthy();
   });
 });

@@ -1,13 +1,48 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the phone-only words that mark a field required or optional in its spoken name on Your account (the rest comes from account.json, which web also reads)",
+  "title": "Copy for the phone-only words on Your account: required or optional in a field's spoken name, Try again, and the sign-in and support words (the rest comes from account.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["required", "optional", "retry"],
+  "required": [
+    "required",
+    "optional",
+    "retry",
+    "manageSignInHint",
+    "supportButton",
+    "supportHint",
+    "supportFailed",
+    "manageSignInFailed"
+  ],
   "properties": {
-    "required": { "$ref": "#/$defs/text" },
-    "optional": { "$ref": "#/$defs/text" },
-    "retry": { "$ref": "#/$defs/text" }
+    "required": {
+      "$ref": "#/$defs/text"
+    },
+    "optional": {
+      "$ref": "#/$defs/text"
+    },
+    "retry": {
+      "$ref": "#/$defs/text"
+    },
+    "manageSignInHint": {
+      "$ref": "#/$defs/text"
+    },
+    "supportButton": {
+      "$ref": "#/$defs/text"
+    },
+    "supportHint": {
+      "$ref": "#/$defs/text"
+    },
+    "supportFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "manageSignInFailed": {
+      "$ref": "#/$defs/text"
+    }
   },
-  "$defs": { "text": { "type": "string", "minLength": 1 } }
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
 }

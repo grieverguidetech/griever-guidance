@@ -164,7 +164,7 @@ describe('first screen with accounts on', () => {
     mockLaunch = { hydrated: true, signedIn: true };
     render(<App />);
     fireEvent.press(await screen.findByText('Your account'));
-    fireEvent.press(await screen.findByText('Sign out'));
+    fireEvent.press(await screen.findByRole('button', { name: 'Sign out' }));
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
   });
 });

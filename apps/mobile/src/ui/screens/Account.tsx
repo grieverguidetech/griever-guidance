@@ -1,16 +1,17 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ComponentRef, ReactNode } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, TextInput, View } from 'react-native';
-import { spacing } from '@griever/tokens';
+import { colors, spacing } from '@griever/tokens';
 import { AddressFields, LabelledInput } from '../../components/AddressFields';
 import type { AddressFieldsCopy } from '../../components/AddressFields';
 import { Button } from '../Button';
 import { Heading } from '../Heading';
+import { SerifText } from '../SerifText';
 import type { HeadingProps } from '../Heading';
 import { Status } from '../Status';
 import { Body } from '../Text';
 
-/** The words the screen needs. libs/copy/screens/account.json has these keys, plus more; the last two come from phoneAccount.json. */
+/** The words the screen needs. libs/copy/screens/account.json has these keys, plus more; the phone-only ones come from phoneAccount.json. */
 export interface AccountCopy extends AddressFieldsCopy {
   heading: string;
   back: string;
@@ -20,6 +21,22 @@ export interface AccountCopy extends AddressFieldsCopy {
   birthDateHint: string;
   signOut: string;
   offline: string;
+  profileHeading: string;
+  securityHeading: string;
+  emailLabel: string;
+  securityHint: string;
+  manageSignIn: string;
+  signOutHeading: string;
+  signOutHint: string;
+  supportHeading: string;
+  supportBody: string;
+  supportEmail: string;
+  /** The phoneAccount words: what Manage sign-in and the support button do, the support button, and the line shown when the mail app did not open. */
+  manageSignInHint: string;
+  manageSignInFailed: string;
+  supportButton: string;
+  supportHint: string;
+  supportFailed: string;
   /** Read after a required field's label, for example "required". */
   requiredWord: string;
   /** Read after an optional field's label when the label does not say it, for example "optional". */
@@ -67,6 +84,16 @@ export interface AccountProps {
   status?: { message: string; tone?: 'muted' | 'danger' };
   /** Shows a Try again button above Save: the profile could not be loaded and there is nothing to edit safely. */
   onRetry?: () => void;
+  /** The signed-in email, shown read-only. Leave unset until it has loaded. */
+  email?: string | null;
+  /** Opens Clerk's account page. Leave unset when there is no address, and the button is not shown. */
+  onManageSignIn?: () => void;
+  /** Opening the account page failed: shows a calm line. */
+  manageFailed?: boolean;
+  /** Opens the email app to write to support. */
+  onSupport: () => void;
+  /** The email app did not open: shows a calm line that the address can be copied. */
+  supportFailed?: boolean;
   onBack: () => void;
   headingRef?: HeadingProps['headingRef'];
   /** Under the form, for example "People helping you". */
@@ -91,6 +118,11 @@ export function Account({
   offline,
   status,
   onRetry,
+  email,
+  onManageSignIn,
+  onSupport,
+  supportFailed,
+  manageFailed,
   onBack,
   headingRef,
   children,
@@ -126,6 +158,8 @@ export function Account({
   }, [focusRequest]);
   const offlineId = useId();
   const statusId = useId();
+  const supportStatusId = useId();
+  const manageStatusId = useId();
   // A ref, not state: two fast taps can both run before a re-render shows `primaryBusy`.
   const inFlight = useRef(false);
   const submit = () => {
@@ -168,6 +202,7 @@ export function Account({
         </Heading>
       </View>
       <Status id={offlineId} message={offline ? copy.offline : undefined} />
+      <Heading level={2}>{copy.profileHeading}</Heading>
       <LabelledInput
         label={copy.firstNameLabel}
         accessibleName={`${copy.firstNameLabel}, ${copy.requiredWord}`}
@@ -211,7 +246,38 @@ export function Account({
       <Status id={statusId} message={status?.message} tone={status?.tone} />
       {onRetry ? <Button label={copy.retry} variant="secondary" onPress={onRetry} /> : null}
       <Button label={primaryLabel} ariaDisabled={primaryBusy === true} announceDisabled onPress={submit} />
-      {onSignOut ? <Button label={copy.signOut} variant="header" onPress={onSignOut} /> : null}
+      {email || onManageSignIn ? (
+        <View style={styles.group}>
+          <Heading level={2}>{copy.securityHeading}</Heading>
+          {email ? (
+            <View style={styles.field} accessible accessibilityLabel={`${copy.emailLabel}, ${email}`}>
+              <Body tone="strong">{copy.emailLabel}</Body>
+              <SerifText selectable style={styles.value}>{email}</SerifText>
+            </View>
+          ) : null}
+          {onManageSignIn ? (
+            <>
+              <Body tone="muted">{copy.securityHint}</Body>
+              <Button label={copy.manageSignIn} variant="secondary" hint={copy.manageSignInHint} onPress={onManageSignIn} />
+              <Status id={manageStatusId} message={manageFailed ? copy.manageSignInFailed : undefined} />
+            </>
+          ) : null}
+        </View>
+      ) : null}
+      {onSignOut ? (
+        <View style={styles.group}>
+          <Heading level={2}>{copy.signOutHeading}</Heading>
+          <Body tone="muted">{copy.signOutHint}</Body>
+          <Button label={copy.signOut} variant="header" onPress={onSignOut} />
+        </View>
+      ) : null}
+      <View style={styles.group}>
+        <Heading level={2}>{copy.supportHeading}</Heading>
+        <Body tone="muted">{copy.supportBody}</Body>
+        <SerifText selectable style={styles.value}>{copy.supportEmail}</SerifText>
+        <Button label={copy.supportButton} variant="secondary" hint={copy.supportHint} onPress={onSupport} />
+        <Status id={supportStatusId} message={supportFailed ? copy.supportFailed : undefined} />
+      </View>
       {children}
     </View>
   );
@@ -222,4 +288,6 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
+  value: { fontSize: 15, lineHeight: 22, color: colors['neutral-800'] },
+  group: { gap: spacing[2], marginTop: spacing[2] },
 });
