@@ -44,6 +44,13 @@ export interface PersonSetupProps {
    * (aria-labelledby on web) and `accessibleName` as the name native reads.
    */
   renderDate: (label: { labelId: string; accessibleName: string }) => ReactNode;
+  /**
+   * With `birthLabel`: an optional date of birth between the name and the date of passing. Same
+   * rules as `renderDate`. `birthNote` is a calm line under it (for example, after the date of passing).
+   */
+  birthLabel?: string;
+  renderBirthDate?: (label: { labelId: string; accessibleName: string }) => ReactNode;
+  birthNote?: string;
   /** With `onSenderChange`: shows "Your name (optional)". Leave both unset to hide it. */
   sender?: string;
   onSenderChange?: (sender: string) => void;
@@ -61,8 +68,9 @@ export interface PersonSetupProps {
  * "Who are we writing about?": the name (required), the date (optional, in the app's own control)
  * and optionally the sender. Mobile's own screen (apps/mobile/src/ui). It owns no state.
  */
-export function PersonSetup({ copy, editing, backName, name, onNameChange, renderDate, sender, onSenderChange, onBack, onWhatYoullNeed, onContinue, footer, headingRef, checklistRef }: PersonSetupProps) {
+export function PersonSetup({ copy, editing, backName, name, onNameChange, renderDate, birthLabel, renderBirthDate, birthNote, sender, onSenderChange, onBack, onWhatYoullNeed, onContinue, footer, headingRef, checklistRef }: PersonSetupProps) {
   const dateLabelId = useId();
+  const birthLabelId = useId();
   const reasonId = useId();
   const canContinue = name.trim() !== '';
   const reason = canContinue ? undefined : copy.needName;
@@ -80,6 +88,15 @@ export function PersonSetup({ copy, editing, backName, name, onNameChange, rende
         <Body tone="muted">{copy.intro}</Body>
       </View>
       <Field label={copy.nameLabel} accessibleName={copy.nameAccessible} placeholder={copy.namePlaceholder} value={name} onChangeText={onNameChange} capitalize />
+      {birthLabel && renderBirthDate ? (
+        <View style={styles.field}>
+          <Body tone="strong" id={birthLabelId} hidden>
+            {birthLabel} <Text style={styles.optional}>{copy.optional}</Text>
+          </Body>
+          {renderBirthDate({ labelId: birthLabelId, accessibleName: optionalName(birthLabel) })}
+          {birthNote ? <Body tone="muted">{birthNote}</Body> : null}
+        </View>
+      ) : null}
       <View style={styles.field}>
         <Body tone="strong" id={dateLabelId} hidden>
           {copy.dateLabel} <Text style={styles.optional}>{copy.optional}</Text>

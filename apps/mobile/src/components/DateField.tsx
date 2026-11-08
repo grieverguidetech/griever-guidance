@@ -2,40 +2,41 @@ import { useRef, useState } from 'react';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { formatPassingDate, passingDateFromText } from '@griever/shared';
+import { formatPassingDate, parseCompleteDate } from '@griever/shared';
 import { Button, SerifText as Text } from '../ui';
 import { colors, radius, spacing } from '@griever/tokens';
 
-export interface PassingDateCopy {
+export interface DateFieldCopy {
   datePlaceholder: string;
   dateDone: string;
   dateClear: string;
   dateHint: string;
 }
 
-/** The earliest day offered; the same limit the app's date parser accepts. */
-const EARLIEST = new Date(2000, 0, 1);
-
 interface Props {
-  copy: PassingDateCopy;
+  copy: DateFieldCopy;
   /** The stored text ("June 7, 2025"), or empty. */
   value: string;
   onChange: (value: string) => void;
   /** What a screen reader says for the control, for example "Date they passed (optional)". */
   accessibleName: string;
+  /** The latest day offered, for example today. */
+  maximumDate: Date;
+  /** The earliest day offered. A saved date before this opens the calendar on today. */
+  minimumDate: Date;
 }
 
 /**
- * The date control on the setup screen. A real native picker, kept in step with the text the
- * session stores: Android opens its system dialog; iOS shows the calendar under the field, with
- * Done and Clear. No day after today can be chosen.
+ * A date control on the setup screen (date they passed, date of birth). A real native picker, kept
+ * in step with the text the session stores: Android opens its system dialog; iOS shows the calendar
+ * under the field, with Done and Clear. The caller sets the latest and earliest day.
  */
-export function PassingDateField({ copy, value, onChange, accessibleName }: Props) {
+export function DateField({ copy, value, onChange, accessibleName, maximumDate, minimumDate }: Props) {
   const [open, setOpen] = useState(false);
   // The day the calendar shows. Set once when it opens, so it does not jump back to today.
   const [draft, setDraft] = useState(() => new Date());
   const field = useRef<ComponentRef<typeof Pressable>>(null);
-  const opensOn = () => passingDateFromText(value) ?? new Date();
+  const opensOn = () => parseCompleteDate(value, { minYear: minimumDate.getFullYear() }) ?? new Date();
 
   const focusField = () => {
     const handle = field.current ? findNodeHandle(field.current) : null;
@@ -56,8 +57,8 @@ export function PassingDateField({ copy, value, onChange, accessibleName }: Prop
       DateTimePickerAndroid.open({
         value: opensOn(),
         mode: 'date',
-        maximumDate: new Date(),
-        minimumDate: EARLIEST,
+        maximumDate,
+        minimumDate,
         neutralButton: { label: copy.dateClear },
         onChange: (event, date) => {
           if (event.type === 'set') {
@@ -104,7 +105,7 @@ export function PassingDateField({ copy, value, onChange, accessibleName }: Prop
       </Pressable>
       {open && Platform.OS === 'ios' ? (
         <View style={styles.picker}>
-          <DateTimePicker value={draft} mode="date" display="inline" maximumDate={new Date()} minimumDate={EARLIEST} accentColor={colors['accent-700']} onChange={pick} />
+          <DateTimePicker value={draft} mode="date" display="inline" maximumDate={maximumDate} minimumDate={minimumDate} accentColor={colors['accent-700']} onChange={pick} />
           <View style={styles.actions}>
             {value ? <Button label={copy.dateClear} variant="tertiary" onPress={clear} /> : null}
             <Button label={copy.dateDone} variant="secondary" onPress={done} />
@@ -126,8 +127,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
   },
-  value: { fontSize: 14, color: colors.ink },
-  placeholder: { fontSize: 14, color: colors['neutral-700'] },
+  value: { fontSize: 15, color: colors.ink },
+  placeholder: { fontSize: 15, color: colors['neutral-700'] },
   picker: { gap: spacing[1] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: spacing[1] },
 });

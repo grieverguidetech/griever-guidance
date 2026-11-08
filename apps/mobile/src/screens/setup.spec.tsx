@@ -20,7 +20,7 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 
 import { SetupScreen } from './SetupScreen';
 
-const setup = (initial = { personName: '', dateOfPassing: '' }) => {
+const setup = (initial: { personName: string; dateOfPassing: string; birthDate?: string } = { personName: '', dateOfPassing: '' }) => {
   const onContinue = jest.fn();
   const onBack = jest.fn();
   const onSetItem = jest.fn();
@@ -32,6 +32,7 @@ const todayText = () => {
   const today = new Date();
   return `${today.toLocaleString('en-US', { month: 'long' })} ${today.getDate()}, ${today.getFullYear()}`;
 };
+const birthButton = () => screen.getByRole('button', { name: 'Date of birth (optional)' });
 const dateButton = () => screen.getByRole('button', { name: 'Date they passed (optional)' });
 /** What the OS does when a day is chosen in the picker. */
 const choose = (date: Date) => fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, date);
@@ -74,7 +75,7 @@ describe('SetupScreen', () => {
   it('shows no picker until the date control is pressed, then a chosen day is shown and kept', () => {
     const { onContinue } = setup();
     expect(screen.queryByTestId('date-picker')).toBeNull();
-    expect(screen.getByText('Choose a date')).toBeTruthy();
+    expect(within(dateButton()).getByText('Choose a date')).toBeTruthy();
     fireEvent.press(dateButton());
     expect(screen.getByTestId('date-picker').props.mode).toBe('date');
     choose(new Date(2025, 5, 7));
@@ -100,7 +101,7 @@ describe('SetupScreen', () => {
     expect(screen.getByText('May 2, 2026')).toBeTruthy();
     fireEvent.press(dateButton());
     fireEvent.press(screen.getByRole('button', { name: 'Clear the date' }));
-    expect(screen.getByText('Choose a date')).toBeTruthy();
+    expect(within(dateButton()).getByText('Choose a date')).toBeTruthy();
     expect(screen.queryByTestId('date-picker')).toBeNull();
     fireEvent.press(dateButton());
     fireEvent.press(screen.getByRole('button', { name: 'Done' }));
@@ -165,7 +166,7 @@ describe('SetupScreen', () => {
     expect(screen.getByText('December 31, 2024')).toBeTruthy();
     // The neutral button clears the date.
     act(() => open.mock.calls[0][0].onChange?.({ type: 'neutralButtonPressed', nativeEvent: {} } as never, new Date(2020, 0, 1)));
-    expect(screen.getByText('Choose a date')).toBeTruthy();
+    expect(within(dateButton()).getByText('Choose a date')).toBeTruthy();
     act(() => options.onChange?.({ type: 'set', nativeEvent: {} } as never, new Date(2024, 11, 31)));
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: 'December 31, 2024' });
@@ -197,6 +198,78 @@ describe('SetupScreen', () => {
     setup();
     expect(screen.getByPlaceholderText('e.g. Margaret Hayes')).toBeTruthy();
     expect(StyleSheet.flatten(screen.getByLabelText('Back to home').props.style)).toEqual(expect.objectContaining({ minHeight: 44, borderWidth: 1 }));
+  });
+});
+
+describe('SetupScreen date of birth (#715)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the birth date between the name and the date of passing', () => {
+    setup();
+    expect(birthButton()).toBeTruthy();
+    expect(birthButton().props.accessibilityHint).toBe('Opens a calendar');
+    const order = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel);
+    expect(order.indexOf('Date of birth (optional)')).toBeLessThan(order.indexOf('Date they passed (optional)'));
+    expect(screen.queryByText(/mark as ready/i)).toBeNull();
+  });
+
+  it('shows the saved birth date', () => {
+    setup({ personName: 'Anna', dateOfPassing: '', birthDate: 'March 9, 1948' });
+    expect(screen.getByText('March 9, 1948')).toBeTruthy();
+  });
+
+  it('allows birth dates back to 1900, up to today, and opens on the saved day', () => {
+    setup({ personName: 'Anna', dateOfPassing: '', birthDate: 'March 9, 1948' });
+    fireEvent.press(birthButton());
+    const picker = screen.getByTestId('date-picker');
+    expect((picker.props.minimumDate as Date).getFullYear()).toBe(1900);
+    expect(Math.abs((picker.props.maximumDate as Date).getTime() - Date.now())).toBeLessThan(60_000);
+    expect((picker.props.value as Date).getFullYear()).toBe(1948);
+  });
+
+  it('saves a picked birth date with Continue', () => {
+    const { onContinue } = setup({ personName: 'Anna', dateOfPassing: '' });
+    fireEvent.press(birthButton());
+    choose(new Date(1948, 2, 9));
+    expect(screen.getByText('March 9, 1948')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: '', birthDate: 'March 9, 1948' });
+  });
+
+  it('saves no birth date when none was set', () => {
+    const { onContinue } = setup({ personName: 'Anna', dateOfPassing: '' });
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue.mock.calls[0][0]).not.toHaveProperty('birthDate');
+  });
+
+  it('Clear removes a saved birth date', () => {
+    const { onContinue } = setup({ personName: 'Anna', dateOfPassing: '', birthDate: 'March 9, 1948' });
+    fireEvent.press(birthButton());
+    fireEvent.press(screen.getByRole('button', { name: 'Clear the birth date' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: '', birthDate: '' });
+  });
+
+  it('shows a calm note when the birth is after the date of passing, and Continue still saves', () => {
+    const { onContinue } = setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'June 7, 2026' });
+    expect(screen.getByText('This is after the date they passed. You can keep it.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'June 7, 2026' });
+  });
+
+  it('shows no note for a birth before the date of passing', () => {
+    setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'March 9, 1948' });
+    expect(screen.queryByText(/after the date they passed/)).toBeNull();
+  });
+
+  it('leaves the date of passing as before when a birth date is picked', () => {
+    const { onContinue } = setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026' });
+    fireEvent.press(birthButton());
+    choose(new Date(1948, 2, 9));
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'March 9, 1948' });
   });
 });
 
