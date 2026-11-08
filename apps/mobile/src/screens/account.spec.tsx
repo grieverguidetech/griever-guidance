@@ -624,8 +624,54 @@ describe('personal details (#717)', () => {
     mockGetProfile.mockResolvedValue(full);
     renderAccount(true);
     await screen.findByDisplayValue('Anna');
-    expect(screen.getByText('Date of birth')).toBeTruthy();
+    expect(screen.getByText('Date of birth', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByText('Optional. Only you can see this.')).toBeTruthy();
     expect(screen.getByText('Address')).toBeTruthy();
+  });
+
+  it('does not wait forever when the first load fails: no Loading line, and Save still works', async () => {
+    mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
+    renderAccount(true);
+    await screen.findByText('You are offline. You can change your name when you are connected.');
+    expect(screen.queryByText('Loading your details.')).toBeNull();
+    type(FIRST, 'Annie');
+    saveButton();
+    await screen.findByText('Your details are saved.');
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Annie', lastName: null, birthDate: null, address: null });
+  });
+
+  it('after a failed save, moves focus to the first wrong field', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
+    mockGetProfile.mockResolvedValue(full);
+    renderAccount(true);
+    await screen.findByDisplayValue('Anna');
+    type('ZIP code', '1');
+    type(FIRST, '');
+    focus.mockClear();
+    saveButton();
+    await screen.findByText('Please enter your first name.');
+    await waitFor(() => expect(focus).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText(FIRST).props.accessibilityHint).toBe('Please enter your first name.');
+  });
+});
+
+describe('sign-up name save with a slow first load (#717)', () => {
+  it('lets a details Save succeed afterwards', async () => {
+    mockGetProfile.mockReturnValue(new Promise<ProfileResult>(() => undefined));
+    renderAccount();
+    fireEvent.press(await screen.findByRole('button', { name: 'Create an account' }));
+    await screen.findByLabelText('Your name');
+    type('Your name', 'Sam');
+    type('Email', 'sam@x.co');
+    type('Password', 'a-long-password');
+    press('Create account');
+    await screen.findByLabelText('6-digit code');
+    type('6-digit code', '123456');
+    await act(async () => press('Create account'));
+    await screen.findByDisplayValue('Sam');
+    type('First name, required', 'Samantha');
+    press('Save');
+    await screen.findByText('Your details are saved.');
+    expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }, { firstName: 'Samantha', lastName: null, birthDate: null, address: null }]);
   });
 });

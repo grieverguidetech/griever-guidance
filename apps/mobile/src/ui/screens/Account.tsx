@@ -1,6 +1,6 @@
-import { useId, useRef } from 'react';
-import type { ReactNode } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { useEffect, useId, useRef } from 'react';
+import type { ComponentRef, ReactNode } from 'react';
+import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { spacing } from '@griever/tokens';
 import { AddressFields, LabelledInput } from '../../components/AddressFields';
 import type { AddressFieldsCopy } from '../../components/AddressFields';
@@ -31,12 +31,23 @@ export type DetailField = 'firstName' | 'lastName' | 'line1' | 'line2' | 'city' 
 export type DetailValues = Record<DetailField, string>;
 export type DetailErrors = Partial<Record<DetailField | 'birthDate', string>>;
 
+/** The order of the typed fields, for the Next key. The date is a button, so Next skips it. */
+const TYPED_ORDER: readonly DetailField[] = ['firstName', 'lastName', 'line1', 'line2', 'city', 'state', 'zip'];
+
+/** Asks the screen to move focus to a field. A new `id` asks again for the same field. */
+export interface FocusRequest {
+  field: DetailField | 'birthDate';
+  id: number;
+}
+
 export interface AccountProps {
   copy: AccountCopy;
   values: DetailValues;
   onChange: (field: DetailField, text: string) => void;
   /** A calm message under each field that is wrong. */
   errors?: DetailErrors;
+  /** Moves keyboard and screen-reader focus to this field (the first wrong one after a failed save). */
+  focusRequest?: FocusRequest | null;
   /** The date of birth control (the app's native date picker). Gets the name a screen reader says for it. */
   renderBirthDate: (props: { accessibleName: string }) => ReactNode;
   /** The fields cannot be edited (the session has ended). */
@@ -67,6 +78,7 @@ export function Account({
   onChange,
   errors = {},
   renderBirthDate,
+  focusRequest,
   fieldDisabled,
   primaryLabel,
   onPrimary,
@@ -79,6 +91,34 @@ export function Account({
   children,
 }: AccountProps) {
   const birthLabelId = useId();
+  const nodes = useRef<Partial<Record<DetailField, ComponentRef<typeof TextInput> | null>>>({});
+  const birthNode = useRef<ComponentRef<typeof View>>(null);
+  const register = (field: DetailField) => (node: ComponentRef<typeof TextInput> | null) => {
+    nodes.current[field] = node;
+  };
+  const next = (field: DetailField) => {
+    const after = TYPED_ORDER[TYPED_ORDER.indexOf(field) + 1];
+    if (after) {
+      nodes.current[after]?.focus();
+    }
+  };
+
+  useEffect(() => {
+    if (!focusRequest) {
+      return;
+    }
+    const target = focusRequest.field === 'birthDate' ? birthNode.current : nodes.current[focusRequest.field];
+    if (!target) {
+      return;
+    }
+    if (focusRequest.field !== 'birthDate') {
+      nodes.current[focusRequest.field]?.focus();
+    }
+    const handle = findNodeHandle(target);
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
+  }, [focusRequest]);
   const offlineId = useId();
   const statusId = useId();
   // A ref, not state: two fast taps can both run before a re-render shows `primaryBusy`.
@@ -131,6 +171,8 @@ export function Account({
         editable={!fieldDisabled}
         textContentType="givenName"
         autoComplete="given-name"
+        inputRef={register('firstName')}
+        onSubmitEditing={() => next('firstName')}
         onChangeText={(text) => onChange('firstName', text)}
       />
       <LabelledInput
@@ -141,10 +183,13 @@ export function Account({
         editable={!fieldDisabled}
         textContentType="familyName"
         autoComplete="family-name"
+        inputRef={register('lastName')}
+        onSubmitEditing={() => next('lastName')}
         onChangeText={(text) => onChange('lastName', text)}
       />
-      <View style={styles.field}>
-        <Body tone="strong" id={birthLabelId}>
+      <View ref={birthNode} style={styles.field}>
+        {/* Read through the date control's own name, so the label is not read again. */}
+        <Body tone="strong" id={birthLabelId} hidden>
           {copy.birthDateLabel}
         </Body>
         {renderBirthDate({ accessibleName: `${copy.birthDateLabel}, ${copy.optionalWord}` })}
@@ -157,7 +202,7 @@ export function Account({
           </Body>
         ) : null}
       </View>
-      <AddressFields copy={copy} values={values} errors={errors} onChange={onChange} editable={!fieldDisabled} onSubmit={submit} />
+      <AddressFields copy={copy} values={values} errors={errors} onChange={onChange} editable={!fieldDisabled} onNext={next} registerRef={register} />
       <Status id={statusId} message={status?.message} tone={status?.tone} />
       <Button label={primaryLabel} ariaDisabled={primaryBusy === true} announceDisabled onPress={submit} />
       {onSignOut ? <Button label={copy.signOut} variant="header" onPress={onSignOut} /> : null}

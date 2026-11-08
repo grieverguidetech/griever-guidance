@@ -29,7 +29,7 @@ export interface UseAccountResult {
   profile: CachedProfile | null;
   /** True once the server has answered the profile call (a profile, no profile, or a failure), or a cached profile exists. False only while the first answer is still pending. */
   profileAnswered: boolean;
-  /** True only after a live profile call for this sign-in answered with a profile or "no profile" (the account really has none). Never from the cache, and not after unavailable, offline or a failed call. */
+  /** True only after a live answer for this sign-in with the stored profile or "no profile" (the account really has none): the profile call, or a save that returned it. Never from the cache, and not after unavailable, offline or a failed call. */
   profileLoaded: boolean;
   error: string | null;
   clearError: () => void;

@@ -1,9 +1,15 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Pressable, TextInput } from 'react-native';
+import { AccessibilityInfo, Pressable, TextInput } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Account } from './Account';
 import type { AccountCopy, AccountProps, DetailValues } from './Account';
+
+// Jest has no native view tree, so findNodeHandle returns null; the focus test needs a handle. Same replacement as screens/account.spec.tsx.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 1,
+}));
 
 const copy: AccountCopy = {
   ...screenCopy('account'),
@@ -30,14 +36,12 @@ function setup(over: Partial<AccountProps> = {}) {
 }
 
 const save = () => fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-const enter = () => fireEvent(screen.getByLabelText('ZIP code'), 'submitEditing');
 
 describe('Account (mobile save guard)', () => {
-  it('calls save from the primary button and from the keyboard Go key', () => {
+  it('calls save from the primary button', () => {
     const props = setup();
     save();
-    enter();
-    expect(props.onPrimary).toHaveBeenCalledTimes(2);
+    expect(props.onPrimary).toHaveBeenCalledTimes(1);
   });
 
   it('ignores a second press while the first save is still running, even before primaryBusy shows', async () => {
@@ -46,7 +50,6 @@ describe('Account (mobile save guard)', () => {
     setup({ onPrimary });
     save();
     save();
-    enter();
     expect(onPrimary).toHaveBeenCalledTimes(1);
     await act(async () => {
       finish();
@@ -93,7 +96,7 @@ describe('Account personal details (#717)', () => {
       'ZIP code',
     ];
     const text = screen
-      .getAllByText(/./)
+      .getAllByText(/./, { includeHiddenElements: true })
       .map((node) => node.props.children)
       .filter((child): child is string => typeof child === 'string');
     const positions = labels.map((label) => text.indexOf(label));
@@ -138,5 +141,52 @@ describe('Account personal details (#717)', () => {
     for (const input of screen.UNSAFE_getAllByType(TextInput)) {
       expect(input.props.editable).toBe(false);
     }
+  });
+
+  it('ties each message to its field as the accessibility hint, and keeps the visible text', () => {
+    setup({ errors: { firstName: 'Please enter your first name.', city: 'Please enter the city.' } });
+    expect(screen.getByLabelText('First name, required').props.accessibilityHint).toBe('Please enter your first name.');
+    expect(screen.getByLabelText('City').props.accessibilityHint).toBe('Please enter the city.');
+    expect(screen.getByLabelText('State').props.accessibilityHint).toBeUndefined();
+    expect(screen.getByText('Please enter your first name.')).toBeTruthy();
+  });
+
+  it('chains the Next key through the fields in order, and ZIP says done', () => {
+    setup();
+    const order = ['First name, required', 'Last name (optional)', 'Address line 1', 'Address line 2 (optional)', 'City', 'State', 'ZIP code'];
+    const focus = new Map<string, jest.Mock>();
+    for (const input of screen.UNSAFE_getAllByType(TextInput)) {
+      const fn = jest.fn();
+      (input.instance as unknown as { focus: () => void }).focus = fn;
+      focus.set(String(input.props.accessibilityLabel), fn);
+    }
+    for (let i = 0; i < order.length - 1; i += 1) {
+      fireEvent(screen.getByLabelText(order[i]), 'submitEditing');
+      expect(focus.get(order[i + 1])).toHaveBeenCalledTimes(1);
+    }
+    fireEvent(screen.getByLabelText('ZIP code'), 'submitEditing');
+    for (const name of order) {
+      expect(screen.getByLabelText(name).props.returnKeyType).toBe(name === 'ZIP code' ? 'done' : 'next');
+    }
+  });
+
+  it('hides the visible date label from screen readers, so the name is read once', () => {
+    setup();
+    const label = screen.getByText('Date of birth', { includeHiddenElements: true });
+    expect(label.props['aria-hidden']).toBe(true);
+    expect(screen.queryByText('Date of birth')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Date of birth, optional' })).toBeTruthy();
+  });
+
+  it('moves screen-reader and keyboard focus to the requested field', () => {
+    const spy = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    const props = setup();
+    const target = screen.UNSAFE_getAllByType(TextInput).find((i) => i.props.accessibilityLabel === 'City');
+    const focus = jest.fn();
+    (target?.instance as unknown as { focus: () => void }).focus = focus;
+    screen.rerender(<Account {...props} focusRequest={{ field: 'city', id: 1 }} />);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

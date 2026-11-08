@@ -3,6 +3,7 @@ import type { ComponentRef } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
+import { ERROR } from './colors';
 import { Heading } from '../ui/Heading';
 import { Body } from '../ui/Text';
 import { useSerifStyle } from '../ui/typography';
@@ -31,6 +32,8 @@ export interface LabelledInputProps {
   value: string;
   onChangeText: (text: string) => void;
   editable?: boolean;
+  /** Hands the input to the screen, so it can move focus (Next key, first wrong field). */
+  inputRef?: (node: ComponentRef<typeof TextInput> | null) => void;
   /** A calm line under the field, shown while there is no error. */
   hint?: string;
   /** The message when the value is wrong. */
@@ -52,6 +55,7 @@ export function LabelledInput({
   value,
   onChangeText,
   editable = true,
+  inputRef,
   hint,
   error,
   returnKeyType = 'next',
@@ -64,7 +68,7 @@ export function LabelledInput({
 }: LabelledInputProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
-  const ref = useRef<ComponentRef<typeof TextInput>>(null);
+  const ref = useRef<ComponentRef<typeof TextInput> | null>(null);
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
@@ -72,13 +76,18 @@ export function LabelledInput({
         {label}
       </Body>
       <TextInput
-        ref={ref}
+        ref={(node) => {
+          ref.current = node;
+          inputRef?.(node);
+        }}
         style={[styles.input, font, error ? styles.inputError : null, focused && Platform.OS !== 'web' && styles.inputFocused]}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         {...webFieldHook}
         aria-labelledby={labelId}
         accessibilityLabel={accessibleName}
+        // The message is also the hint, so the field says what is wrong when it is reached.
+        accessibilityHint={error}
         textContentType={textContentType}
         autoComplete={autoComplete}
         autoCapitalize={autoCapitalize}
@@ -124,12 +133,14 @@ export interface AddressFieldsProps {
   errors: Partial<Record<AddressKey, string>>;
   onChange: (field: AddressKey, text: string) => void;
   editable?: boolean;
-  /** The Go key on the last field. */
-  onSubmit?: () => void;
+  /** The Next key on a field: the screen moves focus to the field after it. */
+  onNext: (field: AddressKey) => void;
+  /** Hands each input to the screen. */
+  registerRef: (field: AddressKey) => (node: ComponentRef<typeof TextInput> | null) => void;
 }
 
 /** The address group: a heading, one hint, then line 1, line 2, city, state and ZIP. */
-export function AddressFields({ copy, values, errors, onChange, editable, onSubmit }: AddressFieldsProps) {
+export function AddressFields({ copy, values, errors, onChange, editable, onNext, registerRef }: AddressFieldsProps) {
   return (
     <View style={styles.group}>
       <Heading level={2}>{copy.addressHeading}</Heading>
@@ -144,6 +155,8 @@ export function AddressFields({ copy, values, errors, onChange, editable, onSubm
         editable={editable}
         textContentType="streetAddressLine1"
         autoComplete="address-line1"
+        inputRef={registerRef('line1')}
+        onSubmitEditing={() => onNext('line1')}
         onChangeText={(text) => onChange('line1', text)}
       />
       <LabelledInput
@@ -154,6 +167,8 @@ export function AddressFields({ copy, values, errors, onChange, editable, onSubm
         editable={editable}
         textContentType="streetAddressLine2"
         autoComplete="address-line2"
+        inputRef={registerRef('line2')}
+        onSubmitEditing={() => onNext('line2')}
         onChangeText={(text) => onChange('line2', text)}
       />
       <LabelledInput
@@ -163,6 +178,9 @@ export function AddressFields({ copy, values, errors, onChange, editable, onSubm
         error={errors.city}
         editable={editable}
         textContentType="addressCity"
+        autoComplete="postal-address-locality"
+        inputRef={registerRef('city')}
+        onSubmitEditing={() => onNext('city')}
         onChangeText={(text) => onChange('city', text)}
       />
       <LabelledInput
@@ -175,6 +193,9 @@ export function AddressFields({ copy, values, errors, onChange, editable, onSubm
         literal
         autoCapitalize="characters"
         textContentType="addressState"
+        autoComplete="postal-address-region"
+        inputRef={registerRef('state')}
+        onSubmitEditing={() => onNext('state')}
         onChangeText={(text) => onChange('state', text)}
       />
       <LabelledInput
@@ -188,8 +209,9 @@ export function AddressFields({ copy, values, errors, onChange, editable, onSubm
         keyboardType="number-pad"
         textContentType="postalCode"
         autoComplete="postal-code"
-        returnKeyType="go"
-        onSubmitEditing={onSubmit}
+        returnKeyType="done"
+        inputRef={registerRef('zip')}
+        onSubmitEditing={() => onNext('zip')}
         onChangeText={(text) => onChange('zip', text)}
       />
     </View>
@@ -213,7 +235,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   // A wrong value also gets a message below; the border is only a second cue.
-  inputError: { borderColor: '#b91c1c' },
+  inputError: { borderColor: ERROR },
   // Native focus cue (web draws its own ring through data-gg-field).
   inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
 });

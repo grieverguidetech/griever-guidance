@@ -6,7 +6,7 @@ import { BIRTH_YEAR_MIN, checkAddress, formatPassingDate, isValidBirthDate, isVa
 import type { Address, AddressField } from '@griever/shared';
 import { Account } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
-import type { DetailErrors, DetailField, DetailValues } from '../ui/screens/Account';
+import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../ui/screens/Account';
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
 
@@ -19,6 +19,10 @@ export const SESSION_ENDED = copy.sessionEnded;
 
 /** A date of birth can be long ago; the picker offers any day from here to today. */
 const EARLIEST_BIRTH = new Date(BIRTH_YEAR_MIN, 0, 1);
+/** The fields in the order they sit on the screen; the first wrong one takes focus. */
+const FIELD_ORDER: readonly (DetailField | 'birthDate')[] = ['firstName', 'lastName', 'birthDate', 'line1', 'line2', 'city', 'state', 'zip'];
+/** Lets the iOS announcement of the summary line start before focus moves. */
+const FOCUS_DELAY_MS = 400;
 /** Any four-digit year parses; isValidBirthDate then says whether it is allowed. */
 const BIRTH_YEARS = { minYear: 1000, maxYear: 9999 };
 
@@ -127,7 +131,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const profile = identity.profile;
   // An account saved before first and last name existed has only the name messages are signed with.
   const noNames = !profile?.firstName && !profile?.lastName;
-  const fallbackName = initialName ?? profile?.senderName?.trim() ?? '';
+  const fallbackName = initialName ?? profile?.senderName ?? '';
   const known: DetailValues & { birth: string } = {
     firstName: profile?.firstName ?? (noNames ? fallbackName : ''),
     lastName: profile?.lastName ?? '',
@@ -151,7 +155,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const [errors, setErrors] = useState<DetailErrors>({});
   const [serverInvalid, setServerInvalid] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
-  const waiting = !identity.profileLoaded && !sessionEnded;
+  // Like web: wait for the first answer (a profile, no profile, or a failure), not for a successful one, so a failed load never waits forever.
+  const waiting = !identity.profileAnswered && !sessionEnded;
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const focusCount = useRef(0);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -169,14 +176,17 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   }
 
   async function save() {
-    // Empty fields must never overwrite stored values, so nothing is saved before the profile has loaded.
+    // Empty fields must never overwrite stored values, so nothing is saved before the first answer.
     if (pending || waiting) {
       return;
     }
     const checked = checkDetails(values, values.birth);
     setErrors(checked.errors);
     setServerInvalid(false);
-    if (Object.keys(checked.errors).length > 0) {
+    const firstWrong = FIELD_ORDER.find((field) => checked.errors[field] !== undefined);
+    if (firstWrong) {
+      // After the summary line is announced, so focus does not cut it off.
+      setTimeout(() => setFocusRequest({ field: firstWrong, id: ++focusCount.current }), FOCUS_DELAY_MS);
       return;
     }
     setPending(true);
@@ -228,9 +238,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       values={values}
       onChange={change}
       errors={errors}
+      focusRequest={focusRequest}
       renderBirthDate={({ accessibleName }) => (
         <DateField
-          copy={{ ...personSetup, dateClear: phonePerson.birthClear, dateHint: phonePerson.birthHint }}
+          copy={{ ...personSetup, dateClear: phonePerson.birthClear, dateHint: errors.birthDate ? `${phonePerson.birthHint}. ${errors.birthDate}` : phonePerson.birthHint }}
           value={values.birth}
           onChange={(text) => change('birth', text)}
           accessibleName={accessibleName}
