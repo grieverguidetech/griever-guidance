@@ -148,7 +148,7 @@ describe('sharing the obituary on mobile', () => {
     focus.mockClear();
     fireEvent.press(done);
     // The obituary row on the hub reads Done, and it is saved on this phone.
-    expect(await screen.findByRole('button', { name: 'Share the obituary, Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Share the obituary, Emailed to the paper, Sent' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Share the obituary' })).toBeNull();
     // Focus went to the hub heading: the handle is the one the fake gave that node.
     const handles = (globalThis as unknown as { nodeHandles: Map<any, number> }).nodeHandles;
@@ -161,7 +161,7 @@ describe('sharing the obituary on mobile', () => {
       expect(saved[0].obituaryEmailedAt).toBeTruthy();
     });
     // Pressing the row opens Share the obituary again, with no Done until the next email.
-    fireEvent.press(screen.getByRole('button', { name: 'Share the obituary, Done' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Share the obituary, Emailed to the paper, Sent' }));
     await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
   });

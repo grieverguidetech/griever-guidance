@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { firstMissingField, isDraftStarted, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
+import { firstMissingField, isDraftStarted, isObituaryEmailed, MOMENT_CATEGORY, sendCardStatus, usePathMoments } from '@griever/hooks';
 import type { Session } from '@griever/hooks';
+import { parseCompleteDate } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState, MomentKey } from '@griever/shared';
 import { fill, screenCopy } from '@griever/copy';
 import { useSessionWithAccountName } from '../lib/accountName';
@@ -19,8 +20,10 @@ import { barMoment, nextMoment } from '../lib/nextMoment';
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
 const phoneCopy = screenCopy('phoneHub');
+// Web's Overview wording for the card summaries and the Continue line. Read only: web owns it.
+const shell = screenCopy('cmsShell');
 // The person screen on the phone has its own heading and line; the rest comes from the shared hub copy.
-const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, whatYoullNeed: phoneCopy.whatYoullNeed, whatYoullNeedHint: phoneCopy.whatYoullNeedHint, stateDone: phoneCopy.stateDone, stateInProgress: phoneCopy.stateInProgress, stateNotStarted: phoneCopy.stateNotStarted };
+const hubCopy = { ...copy, heading: phoneCopy.heading, intro: phoneCopy.intro, whatYoullNeed: phoneCopy.whatYoullNeed, whatYoullNeedHint: phoneCopy.whatYoullNeedHint, continue: shell.continue, stateDone: phoneCopy.stateDone, stateInProgress: phoneCopy.stateInProgress, stateNotStarted: phoneCopy.stateNotStarted };
 
 /** The moments in the full plan. The announcement is free. */
 const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
@@ -28,7 +31,83 @@ const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 /** Where a moment's drafts are kept (one map, shared with the hooks). */
 export { MOMENT_CATEGORY as CATEGORY_BY_MOMENT } from '@griever/hooks';
 
-/** The one sentence under a row: what is missing. Nothing else is said in words; status is the icon. */
+const SUMMARY_MAX = 80;
+
+const present = (value: string | null | undefined): string => value?.trim() ?? '';
+
+/** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
+function dateLabel(value: string): string {
+  const date = parseCompleteDate(value);
+  if (!date) {
+    return value;
+  }
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function serviceSummary(session: Session): string {
+  const type = present(session.serviceType);
+  const date = present(session.serviceDate);
+  const place = present(session.servicePlace);
+  if (!type && !date && !place) {
+    return shell.summaryServiceEmpty;
+  }
+  const head = type || shell.summaryServiceDefaultType;
+  const withDate = date ? fill(shell.summaryServiceDate, { type: head, date: dateLabel(date) }) : head;
+  return place ? fill(shell.summaryServicePlace, { summary: withDate, place }) : withDate;
+}
+
+/** First non-empty line of the message, cut short so a card stays one line. */
+function announcementSummary(session: Session): string {
+  const line = present(session.announcementMessage)
+    .split('\n')
+    .map((part) => part.trim())
+    .find(Boolean);
+  if (!line) {
+    return shell.summaryAnnouncementEmpty;
+  }
+  return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX).trimEnd()}…` : line;
+}
+
+function obituarySummary(session: Session): string {
+  const publisher = present(session.obituaryPublisher);
+  if (publisher) {
+    return fill(shell.summaryObituaryPublisher, { publisher });
+  }
+  const started = [session.obituaryText, session.obituaryCity, session.obituaryCareer, session.obituarySurvivors, session.obituaryNote].some((value) => present(value));
+  return started ? shell.summaryObituaryDraft : shell.summaryObituaryEmpty;
+}
+
+/** A finished row says what happened, never a prompt to start: who was texted, else that the paper was emailed. */
+function doneLine(session: Session, key: MomentKey): string | undefined {
+  const sent = session.recipientsNotified?.[MOMENT_CATEGORY[key]]?.length ?? 0;
+  if (sent === 1) {
+    return phoneCopy.summarySentOne;
+  }
+  if (sent > 1) {
+    return fill(phoneCopy.summarySentMany, { count: String(sent) });
+  }
+  return key === 'obituary' && isObituaryEmailed(session) ? phoneCopy.summaryEmailed : undefined;
+}
+
+/** The muted line under a card's title: web's Overview summary, built from the phone session. */
+function summaryLine(session: Session, key: MomentKey, done: boolean): string {
+  const finished = done ? doneLine(session, key) : undefined;
+  if (finished) {
+    return finished;
+  }
+  switch (key) {
+    case 'announce':
+      return announcementSummary(session);
+    case 'service':
+      return serviceSummary(session);
+    case 'obituary':
+      return obituarySummary(session);
+    default:
+      return present(session.thanksMessage) ? shell.summaryThanksDraft : shell.summaryThanksEmpty;
+  }
+}
+
+/** The "Needs ..." line: what is missing. It replaces the summary on its card. */
 function metaLine(session: Session, key: MomentKey): string | undefined {
   const status = sendCardStatus(session, key);
   if (status === 'needsDetail') {
@@ -168,15 +247,18 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   const stopped = note?.partial ? momentOfCategory(note.category) : null;
   const lit = nextMoment({ session: statusSession, locked, partial: stopped });
 
-  const rows: HubRow[] = moments.map((moment) => ({
-    key: moment.key,
-    status: moment.status,
-    state: rowState(statusSession, session, moment, stopped),
-    lit: moment.key === lit,
-    locked: locked.includes(moment.key),
-    // Only what is missing is a sentence. Status is the icon.
-    meta: moment.status === 'done' ? undefined : metaLine(statusSession, moment.key),
-  }));
+  const rows: HubRow[] = moments.map((moment) => {
+    const state = rowState(statusSession, session, moment, stopped);
+    return {
+      key: moment.key,
+      status: moment.status,
+      state,
+      lit: moment.key === lit,
+      locked: locked.includes(moment.key),
+      summary: summaryLine(statusSession, moment.key, state === 'done'),
+      meta: moment.status === 'done' ? undefined : metaLine(statusSession, moment.key),
+    };
+  });
 
   // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.
   const target: MomentKey = barMoment({ session: statusSession, locked, partial: stopped });

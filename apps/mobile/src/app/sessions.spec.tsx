@@ -198,7 +198,7 @@ describe('people kept on the phone', () => {
       await withDrafts({ aftercare: kept });
       render(<App />);
       expect(await screen.findByText('For Anna')).toBeTruthy(); // the relaunch opens Anna
-      fireEvent.press(await screen.findByRole('button', { name: /Next/ }));
+      fireEvent.press(await screen.findByTestId('hub-next-card'));
       expect(await findPicker()).toBeTruthy();
       await waitFor(async () => {
         const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]');

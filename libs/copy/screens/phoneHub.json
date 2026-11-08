@@ -4,7 +4,10 @@
   "whatYoullNeed": "What you'll need",
   "whatYoullNeedHint": "Opens a checklist of things to do.",
   "account": "Your account",
-  "stateDone": "Done",
+  "stateDone": "Sent",
   "stateInProgress": "In progress",
-  "stateNotStarted": "Not started"
+  "stateNotStarted": "Not started",
+  "summarySentOne": "Sent to 1 person",
+  "summarySentMany": "Sent to {count} people",
+  "summaryEmailed": "Emailed to the paper"
 }

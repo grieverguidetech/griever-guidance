@@ -6,7 +6,7 @@ import { freshDraft } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, templates } from '@griever/shared';
 import { colors } from '@griever/tokens';
-import { Circle, Path } from 'react-native-svg';
+import { Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
 import type { HubScreenProps } from './HubScreen';
@@ -25,6 +25,19 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
     return g.nodeHandles.get(node);
   },
 }));
+
+// WCAG relative luminance and contrast ratio, to check text and the check mark on the card colour.
+function luminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * (r as number) + 0.7152 * (g as number) + 0.0722 * (b as number);
+}
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return ((hi as number) + 0.05) / ((lo as number) + 0.05);
+}
 
 // The first item of the first phase, a real id so the saved tick is read back.
 const firstItem = CHECKLIST_PHASES.find((phase) => phase.key === 'right-away')?.itemIds[0] as string;
@@ -353,7 +366,7 @@ describe('HubScreen', () => {
     jest.useRealTimers();
   });
 
-  it('shows a finished step as one compact row with a check, and a started step with the progress icon', () => {
+  it('shows a finished step with a check and the word Sent, and a started step with In progress and no icon', () => {
     const done = {
       ...anna,
       recipientsNotified: { announcement: ['c1', 'c2'] },
@@ -361,13 +374,14 @@ describe('HubScreen', () => {
       drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
     } as unknown as Session;
     setup(done);
-    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
-    expect(screen.queryByText(/October 2, 2026|Send again|Sent to|Started/)).toBeNull();
-    expect(within(screen.getByRole('button', { name: /^Share the service.*In progress$/ })).getByTestId('status-progress', { includeHiddenElements: true })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Sent to 2 people, Sent' })).toBeTruthy();
+    expect(screen.queryByText(/October 2, 2026|Send again|Sent to 0|Started/)).toBeNull();
+    const service = screen.getByRole('button', { name: /^Share the service.*In progress$/ });
+    expect(within(service).getByText('In progress')).toBeTruthy();
+    expect(within(service).queryByTestId('status-check', { includeHiddenElements: true })).toBeNull();
   });
 
-  it('shows a check, progress, progress and a circle, and ends each name with its state word', () => {
+  it('shows the check only beside Sent, and no progress or circle icon anywhere', () => {
     const mixed = {
       ...anna,
       recipientsNotified: { announcement: ['c1'] },
@@ -376,32 +390,26 @@ describe('HubScreen', () => {
       obituaryText: 'Anna loved the garden.',
     } as unknown as Session;
     setup(mixed);
-    const icon = (name: RegExp, id: string) => within(screen.getByRole('button', { name })).getByTestId(id, { includeHiddenElements: true });
-    expect(icon(/^Announce the passing, Done$/, 'status-check')).toBeTruthy();
-    expect(icon(/^Share the service.*, In progress$/, 'status-progress')).toBeTruthy();
-    expect(icon(/Share the obituary.*, In progress$/, 'status-progress')).toBeTruthy();
-    expect(icon(/^Send thank-yous.*, Not started$/, 'status-circle')).toBeTruthy();
-    for (const id of ['status-check', 'status-progress', 'status-circle']) {
-      for (const node of screen.queryAllByTestId(id, { includeHiddenElements: true })) {
-        expect(node.props.importantForAccessibility).toBe('no-hide-descendants');
-      }
+    const check = (name: RegExp | string) => within(screen.getByRole('button', { name })).queryByTestId('status-check', { includeHiddenElements: true });
+    expect(check('Announce the passing, Sent to 1 person, Sent')).toBeTruthy();
+    expect(check(/^Share the service.*, In progress(, Continue)?$/)).toBeNull();
+    expect(check(/Share the obituary.*, In progress(, Continue)?$/)).toBeNull();
+    expect(check(/^Send thank-yous.*, Not started$/)).toBeNull();
+    // The word is drawn on every card.
+    expect(within(screen.getByRole('button', { name: /^Send thank-yous/ })).getByText('Not started')).toBeTruthy();
+    for (const id of ['status-progress', 'status-circle']) {
+      expect(screen.queryAllByTestId(id, { includeHiddenElements: true })).toHaveLength(0);
+    }
+    for (const node of screen.queryAllByTestId('status-check', { includeHiddenElements: true })) {
+      expect(node.props.importantForAccessibility).toBe('no-hide-descendants');
     }
   });
 
-  it('draws each icon in its own colour: success-700 check, neutral-700 progress, neutral-600 circle', () => {
-    setup({
-      ...anna,
-      recipientsNotified: { announcement: ['c1'] },
-      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
-      drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
-    } as unknown as Session);
-    const first = (id: string) => screen.getAllByTestId(id, { includeHiddenElements: true })[0];
-    expect(first('status-check').findByType(Path).props.stroke).toBe(colors['success-700']);
-    const progress = first('status-progress');
-    expect(progress.findByType(Circle).props.stroke).toBe(colors['neutral-700']);
-    expect(progress.findByType(Path).props.fill).toBe(colors['neutral-700']);
-    // Not the row border: the stroke inside the icon itself.
-    expect(first('status-circle').findByType(Circle).props.stroke).toBe(colors['neutral-600']);
+  it('draws the check in success-700, and it keeps 3:1 on the panel colour', () => {
+    setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
+    const check = screen.getAllByTestId('status-check', { includeHiddenElements: true })[0];
+    expect(check.findByType(Path).props.stroke).toBe(colors['success-700']);
+    expect(contrast(colors['success-700'], colors.surface)).toBeGreaterThanOrEqual(3);
   });
 
   it('names what is missing on an obituary that waits for its link', () => {
@@ -412,14 +420,14 @@ describe('HubScreen', () => {
   it('shows no status sentence on any row, in text or in a name', () => {
     setup({ ...anna, recipientsNotified: { announcement: ['c1', 'c2'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' }, obituaryText: 'x' } as unknown as Session);
     const tree = JSON.stringify(screen.toJSON());
-    expect(tree).not.toMatch(/Sent to|Started|Waiting for the link|Ready"/);
+    expect(tree).not.toMatch(/Sent to 0|Started|Waiting for the link|Ready"/);
   });
 
   it('shows the done check and no "Sent to 0" for a row whose status is { sent: 0 } (emailed obituary)', () => {
     // An obituary emailed to the publisher, with nobody texted.
     const emailed = { ...anna, obituaryEmailedAt: '2026-11-04T10:00:00.000Z', recipientsNotified: {} } as unknown as Session;
     setup(emailed);
-    const row = screen.getByRole('button', { name: 'Share the obituary, Done' });
+    const row = screen.getByRole('button', { name: 'Share the obituary, Emailed to the paper, Sent' });
     expect(within(row).getByTestId('status-check', { includeHiddenElements: true })).toBeTruthy();
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/Sent to/);
     expect(screen.queryByRole('button', { name: /Sent to/ })).toBeNull();
@@ -432,7 +440,7 @@ describe('HubScreen', () => {
 
   it('opens the step from a done row', () => {
     const { onStart } = setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
-    fireEvent.press(screen.getByRole('button', { name: 'Announce the passing, Done' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Announce the passing, Sent to 1 person, Sent' }));
     expect(onStart).toHaveBeenLastCalledWith('announce');
   });
 
@@ -446,7 +454,7 @@ describe('HubScreen', () => {
       momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
     } as unknown as Session;
     setup(mixed);
-    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Sent to 1 person, Sent' })).toBeTruthy();
     // The service is the lit card; "Ready" is no longer a sentence.
     expect(screen.queryByText('Ready')).toBeNull();
     expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs the obituary link/)).toBeTruthy();
@@ -464,16 +472,14 @@ describe('HubScreen', () => {
     expect(within(card).getByText('Needs the obituary link')).toBeTruthy();
   });
 
-  it('lights exactly one card, names it Next, and a press on it starts that step', () => {
+  it('lights exactly one card, puts Continue last in its name, and a press on it starts that step', () => {
     const { onStart } = setup();
-    const lit = screen.getAllByRole('button', { name: /Next/ });
+    const lit = screen.getAllByTestId('hub-next-card');
     expect(lit).toHaveLength(1);
-    expect(lit[0].props.accessibilityLabel).toMatch(/, Not started$/);
+    expect(lit[0].props.accessibilityLabel).toMatch(/, Not started, Continue$/);
     expect(within(lit[0]).queryByText('Ready')).toBeNull();
     expect(within(lit[0]).getByText('Announce the passing')).toBeTruthy();
-    const style = StyleSheet.flatten(typeof lit[0].props.style === 'function' ? lit[0].props.style({ pressed: false }) : lit[0].props.style);
-    expect(style.borderWidth).toBe(2);
-    expect(style.borderColor).toBe(colors.accent);
+    expect(within(lit[0]).getByText('Continue')).toBeTruthy();
     fireEvent.press(lit[0]);
     expect(onStart).toHaveBeenLastCalledWith('announce');
   });
@@ -627,22 +633,101 @@ describe('HubScreen', () => {
     expect(screen.getByText('Needs the place')).toBeTruthy();
   });
 
-  it('draws an edge around the finished and later steps, so they read as pressable', () => {
-    const done = {
-      ...anna,
-      recipientsNotified: { announcement: ['c1'] },
-      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
-    } as unknown as Session;
-    setup(done);
-    for (const name of [/Announce the passing, Done/, /Share the obituary/]) {
-      let box = screen.getByRole('button', { name }).parent;
-      while (box && !StyleSheet.flatten(box.props.style)?.borderWidth) {
-        box = box.parent;
+  it('draws every available row as a filled panel card: surface fill, no border, 44 pt, darker when pressed', () => {
+    setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
+    for (const name of [/^Announce the passing/, /^Share the service/, /^Share the obituary/, /^Send thank-yous/]) {
+      // The host node has the resolved style; the Pressable above it holds the function that takes `pressed`.
+      let card = screen.getAllByRole('button', { name })[0].parent;
+      while (card && typeof card.props.style !== 'function') {
+        card = card.parent;
       }
-      const flat = StyleSheet.flatten(box?.props.style);
-      expect(flat.borderWidth).toBe(1);
-      expect(flat.borderColor).toBe(colors['neutral-600']);
+      expect(card).toBeTruthy();
+      const rest = StyleSheet.flatten(card?.props.style({ pressed: false }));
+      const pressed = StyleSheet.flatten(card?.props.style({ pressed: true }));
+      expect(rest.backgroundColor).toBe(colors.surface);
+      expect(rest.borderWidth).toBeUndefined();
+      expect(rest.minHeight).toBeGreaterThanOrEqual(44);
+      expect(pressed.backgroundColor).not.toBe(colors.surface);
+      expect(luminance(pressed.backgroundColor as string)).toBeLessThan(luminance(colors.surface));
+      // Muted text, accent text and the state word keep 4.5:1 on the resting and the pressed panel.
+      for (const bg of [colors.surface, pressed.backgroundColor as string]) {
+        expect(contrast(colors['neutral-700'], bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(colors['accent-700'], bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(colors['neutral-800'], bg)).toBeGreaterThanOrEqual(4.5);
+        // The check is a graphic: 3:1 (WCAG 1.4.11).
+        expect(contrast(colors['success-700'], bg)).toBeGreaterThanOrEqual(3);
+      }
     }
+  });
+
+  it('gives only the next card the accent bar and the Continue line', () => {
+    setup();
+    expect(screen.getAllByTestId('next-bar')).toHaveLength(1);
+    expect(screen.getAllByText('Continue')).toHaveLength(1);
+    const lit = screen.getByTestId('hub-next-card');
+    expect(within(lit).getByTestId('next-bar')).toBeTruthy();
+    const bar = StyleSheet.flatten(screen.getByTestId('next-bar').props.style);
+    expect(bar.width).toBe(3);
+    expect(bar.backgroundColor).toBe(colors['accent-700']);
+    expect(bar.left).toBe(0);
+    expect(within(screen.getByRole('button', { name: /^Share the service/ })).queryByText('Continue')).toBeNull();
+  });
+
+  it('builds each summary from the phone session, and the Needs line replaces it', () => {
+    const long = `${'x'.repeat(90)}`;
+    setup({
+      ...anna,
+      announcementMessage: `\n  ${long}\nsecond line`,
+      senderName: 'Sam',
+      serviceTime: '2:00 PM',
+      serviceType: 'Funeral',
+      serviceDate: 'June 14, 2026',
+      servicePlace: 'St Mary',
+      obituaryPublisher: 'The Daily News',
+      thanksMessage: 'Thank you all',
+    } as unknown as Session);
+    expect(screen.getByText(`${'x'.repeat(80)}…`)).toBeTruthy();
+    expect(screen.getByText('Funeral, June 14, 2026 at St Mary')).toBeTruthy();
+    // The obituary and the thanks both need something, so their Needs line shows instead.
+    const obit = screen.getByRole('button', { name: /^Share the obituary/ });
+    expect(within(obit).getByText('Needs the obituary link')).toBeTruthy();
+    expect(within(obit).queryByText('Published in The Daily News')).toBeNull();
+    expect(obit.props.accessibilityLabel).toBe('Share the obituary, Needs the obituary link, Not started');
+  });
+
+  it('falls back to the empty and draft summaries', () => {
+    setup({ ...anna, obituaryText: 'Anna loved the garden.', obituaryUrl: 'https://paper.test/anna', thanksMessage: 'Thanks' } as unknown as Session, false);
+    expect(screen.getByText('Write a short note')).toBeTruthy();
+    expect(screen.getByText('Draft started')).toBeTruthy();
+  });
+
+  it('reads title, summary and state once as the name of each row', () => {
+    setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' }, announcementMessage: 'Anna has died.' } as unknown as Session);
+    expect(screen.getByRole('button', { name: 'Announce the passing, Sent to 1 person, Sent' })).toBeTruthy();
+    // A card that needs something reads the Needs line in place of the summary.
+    expect(screen.getByRole('button', { name: 'Share the service, Needs the service date, Not started' })).toBeTruthy();
+  });
+
+  it('names a Sent row by who was told: pinned for a texted announcement, a texted obituary and an emailed-only obituary', () => {
+    const texted = { announcement: ['c1', 'c2', 'c3'], obituary: ['c1'] };
+    const base = { ...anna, recipientsNotified: texted, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' }, obituaryUrl: 'https://paper.test/anna' } as unknown as Session;
+    const first = render(<HubScreen session={base} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Announce the passing, Sent to 3 people, Sent' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Share the obituary, Sent to 1 person, Sent' })).toBeTruthy();
+    first.unmount();
+    // Emailed to the paper with nobody texted.
+    const emailed = { ...anna, obituaryEmailedAt: '2026-11-04T10:00:00.000Z', recipientsNotified: {} } as unknown as Session;
+    const second = render(<HubScreen session={emailed} paymentsEnabled={false} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Share the obituary, Emailed to the paper, Sent' })).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/Start with a draft|Sent to 0/);
+    second.unmount();
+  });
+
+  it('keeps locked rows as they were: lock icon, reason, no state word', () => {
+    setup(anna, true);
+    expect(screen.getAllByTestId('lock-icon', { includeHiddenElements: true }).length).toBeGreaterThan(0);
+    const locked = screen.getByRole('button', { name: /Share the service/ });
+    expect(within(locked).queryByText('Not started')).toBeNull();
   });
 });
 
@@ -654,7 +739,7 @@ describe('HubScreen: the next card and the bottom button', () => {
 
   it('lights the service once the announcement is done, and the bottom button names it', () => {
     const { onStart } = setup(sess({ ...announced, ...ready }));
-    expect(within(screen.getAllByRole('button', { name: /Next/ })[0]).getByText('Share the service')).toBeTruthy();
+    expect(within(screen.getAllByTestId('hub-next-card')[0]).getByText('Share the service')).toBeTruthy();
     fireEvent.press(bottomButton());
     expect(onStart).toHaveBeenLastCalledWith('service');
   });
@@ -664,7 +749,7 @@ describe('HubScreen: the next card and the bottom button', () => {
     ['the text is written and the link is missing', { obituaryText: 'Anna loved the garden.' }],
   ])('names the obituary button "Share the obituary" and starts it when %s', (_state, extra) => {
     const { onStart } = setup(sess({ ...ready, recipientsNotified: { announcement: ['a'], service: ['b'] }, ...extra }));
-    expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
+    expect(screen.getAllByTestId('hub-next-card')).toHaveLength(1);
     expect(within(bottomButton()).getByText('Share the obituary')).toBeTruthy();
     fireEvent.press(bottomButton());
     expect(onStart).toHaveBeenLastCalledWith('obituary');
@@ -672,7 +757,7 @@ describe('HubScreen: the next card and the bottom button', () => {
 
   it('names the first open card when none is lit', () => {
     const { onStart } = setup(sess(announced));
-    expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+    expect(screen.queryByTestId('hub-next-card')).toBeNull();
     // The announcement is done, so the button names the first card still open: the service.
     expect(within(bottomButton()).getByText('Share the service')).toBeTruthy();
     fireEvent.press(bottomButton());
@@ -688,26 +773,26 @@ describe('HubScreen: the next card and the bottom button', () => {
   it('a done row with a re-send draft stays done, with no Started', () => {
     const draft = freshDraft({ templateCategory: 'announcement', step: 'details', fields: { senderName: 'Sam' } });
     setup(sess({ ...announced, drafts: { announcement: draft } }));
-    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
-    expect(screen.queryByText(/Started|Sent to/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Sent to 1 person, Sent' })).toBeTruthy();
+    expect(screen.queryByText(/Started|Sent to 0/)).toBeNull();
   });
 
   it('lights the thank-yous only after a service date that parses and is past', () => {
     const everything = { ...ready, obituaryUrl: 'https://paper.test/anna', recipientsNotified: { announcement: ['a'], service: ['b'], obituary: ['c'] } };
     const past = render(<HubScreen session={sess({ ...everything, serviceDate: 'January 2, 2020' })} {...props} />);
     expect(within(bottomButton()).getByText('Send thank-yous')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /Next/ })).toHaveLength(1);
+    expect(screen.getAllByTestId('hub-next-card')).toHaveLength(1);
     past.unmount();
     for (const serviceDate of ['next Saturday', '', 'January 2, 2999']) {
       const view = render(<HubScreen session={sess({ ...everything, serviceDate })} {...props} />);
-      expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+      expect(screen.queryByTestId('hub-next-card')).toBeNull();
       view.unmount();
     }
   });
 
   it('never lights a locked card, and the bar names the first open card that is not locked', () => {
     setup(sess({ ...announced, ...ready }), true);
-    expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+    expect(screen.queryByTestId('hub-next-card')).toBeNull();
     expect(within(bottomButton()).getByText('Share the obituary')).toBeTruthy();
   });
 
@@ -715,10 +800,10 @@ describe('HubScreen: the next card and the bottom button', () => {
     const note = { lead: 'You told 1 of 3.', rest: 'You can text the others.', spoken: 'You told 1 of 3.', category: 'announcement' as const, partial: true };
     const onStart = jest.fn();
     render(<HubScreen session={sess({ ...announced, ...ready })} {...props} onStart={onStart} note={note} />);
-    const lit = screen.getAllByRole('button', { name: /Next/ });
+    const lit = screen.getAllByTestId('hub-next-card');
     expect(lit).toHaveLength(1);
-    expect(lit[0].props.accessibilityLabel).toMatch(/, In progress$/);
-    expect(within(lit[0]).getByTestId('status-progress', { includeHiddenElements: true })).toBeTruthy();
+    expect(lit[0].props.accessibilityLabel).toMatch(/, In progress, Continue$/);
+    expect(within(lit[0]).getByText('In progress')).toBeTruthy();
     expect(within(lit[0]).queryByText(/Sent to|text the rest/)).toBeNull();
     fireEvent.press(bottomButton());
     expect(onStart).toHaveBeenLastCalledWith('announce');
@@ -728,8 +813,8 @@ describe('HubScreen: the next card and the bottom button', () => {
     const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'x', category: 'announcement' as const, partial: false };
     render(<HubScreen session={sess(announced)} {...props} note={note} />);
     expect(screen.queryByText(/text the rest/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Sent to 1 person, Sent' })).toBeTruthy();
+    expect(screen.queryByTestId('hub-next-card')).toBeNull();
   });
 
   it('keeps the bar outside the scrolling area, so the cards stay reachable at the largest text size', () => {
