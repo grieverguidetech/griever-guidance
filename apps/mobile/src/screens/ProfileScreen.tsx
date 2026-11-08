@@ -155,8 +155,11 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   const [errors, setErrors] = useState<DetailErrors>({});
   const [serverInvalid, setServerInvalid] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
-  // Like web: wait for the first answer (a profile, no profile, or a failure), not for a successful one, so a failed load never waits forever.
-  const waiting = !identity.profileAnswered && !sessionEnded;
+  // Save is safe once the stored values are known: a live answer (a profile, or "no profile"), or a profile kept on the device.
+  // After a failed first load with nothing kept, empty fields would wipe the stored details, so Save waits and Try again is offered.
+  const canSave = identity.profileLoaded || identity.profile !== null;
+  const waiting = !canSave && !sessionEnded;
+  const loadFailed = waiting && identity.profileAnswered;
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const focusCount = useRef(0);
 
@@ -176,7 +179,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   }
 
   async function save() {
-    // Empty fields must never overwrite stored values, so nothing is saved before the first answer.
+    // Empty fields must never overwrite stored values, so nothing is saved until they are known.
     if (pending || waiting) {
       return;
     }
@@ -220,6 +223,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   } else if (identity.error) {
     message = identity.error;
     tone = 'danger';
+  } else if (loadFailed) {
+    // The offline line shows by itself when the phone is offline.
+    message = identity.offline ? '' : copy.unavailable;
+    tone = 'danger';
   } else if (waiting) {
     message = copy.loadingDetails;
   } else if (saved) {
@@ -234,7 +241,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
 
   return (
     <Account
-      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional }}
+      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry }}
       values={values}
       onChange={change}
       errors={errors}
@@ -251,7 +258,8 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       )}
       fieldDisabled={sessionEnded}
       primaryLabel={primaryLabel}
-      primaryBusy={sessionEnded ? false : pending}
+      primaryBusy={sessionEnded ? false : pending || waiting}
+      onRetry={loadFailed ? identity.reloadProfile : undefined}
       onPrimary={sessionEnded ? onSignInAgain : save}
       onSignOut={sessionEnded ? undefined : onSignOut}
       offline={identity.offline}

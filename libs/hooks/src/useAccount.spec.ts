@@ -693,6 +693,17 @@ describe('useAccount profileLoaded and quiet saves (#603)', () => {
     expect(result.current.profileLoaded).toBe(false);
   });
 
+  it('reloadProfile asks again after a failed first load, and a good answer sets profileLoaded', async () => {
+    fetchMock.mockImplementation(async () => reply(500));
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await waitFor(() => expect(result.current.profileAnswered).toBe(true));
+    expect(result.current.profileLoaded).toBe(false);
+    fetchMock.mockImplementation(async () => reply(200, profile('Peter')));
+    act(() => result.current.reloadProfile?.());
+    await waitFor(() => expect(result.current.profileLoaded).toBe(true));
+    expect(result.current.profile?.senderName).toBe('Peter');
+  });
+
   it('a quiet details save that fails sets no error', async () => {
     const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
     await waitFor(() => expect(result.current.profileLoaded).toBe(true));

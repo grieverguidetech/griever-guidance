@@ -24,6 +24,8 @@ export interface AccountCopy extends AddressFieldsCopy {
   requiredWord: string;
   /** Read after an optional field's label when the label does not say it, for example "optional". */
   optionalWord: string;
+  /** The retry button after the profile could not be loaded, for example "Try again". */
+  retry: string;
 }
 
 /** The fields that are typed. The date of birth is picked, so the app passes it in `renderBirthDate`. */
@@ -63,6 +65,8 @@ export interface AccountProps {
   offline?: boolean;
   /** One calm line: a save result or an error. The status node is always rendered. */
   status?: { message: string; tone?: 'muted' | 'danger' };
+  /** Shows a Try again button above Save: the profile could not be loaded and there is nothing to edit safely. */
+  onRetry?: () => void;
   onBack: () => void;
   headingRef?: HeadingProps['headingRef'];
   /** Under the form, for example "People helping you". */
@@ -86,6 +90,7 @@ export function Account({
   onSignOut,
   offline,
   status,
+  onRetry,
   onBack,
   headingRef,
   children,
@@ -204,6 +209,7 @@ export function Account({
       </View>
       <AddressFields copy={copy} values={values} errors={errors} onChange={onChange} editable={!fieldDisabled} onNext={next} registerRef={register} />
       <Status id={statusId} message={status?.message} tone={status?.tone} />
+      {onRetry ? <Button label={copy.retry} variant="secondary" onPress={onRetry} /> : null}
       <Button label={primaryLabel} ariaDisabled={primaryBusy === true} announceDisabled onPress={submit} />
       {onSignOut ? <Button label={copy.signOut} variant="header" onPress={onSignOut} /> : null}
       {children}

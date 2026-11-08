@@ -15,6 +15,7 @@ const copy: AccountCopy = {
   ...screenCopy('account'),
   requiredWord: 'required',
   optionalWord: 'optional',
+  retry: 'Try again',
 };
 
 const values: DetailValues = { firstName: 'Anna', lastName: '', line1: '', line2: '', city: '', state: '', zip: '' };
@@ -188,5 +189,17 @@ describe('Account personal details (#717)', () => {
     expect(focus).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it('shows Try again only when asked, and calls it', () => {
+    const onRetry = jest.fn();
+    setup({ onRetry });
+    fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no Try again by default', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 });

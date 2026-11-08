@@ -33,6 +33,8 @@ export interface UseAccountResult {
   profileLoaded: boolean;
   error: string | null;
   clearError: () => void;
+  /** Asks the server for the profile again, after a first load that failed. Optional so older stand-ins for this result still fit. */
+  reloadProfile?: () => void;
   signOut: () => Promise<void>;
   updateSenderName: (name: string) => Promise<boolean>;
   /** Saves the optional first name, last name, date of birth and address (null clears one). The server sets senderName from firstName. `invalid` means the server refused a value; no general error is set for it. */
@@ -170,6 +172,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   const [profileAnswered, setProfileAnswered] = useState(() => readOwnCache(storage) !== null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by reloadProfile; the profile effect runs again.
+  const [reloadTick, setReloadTick] = useState(0);
   // Set by signOut so the screen leaves the signed-in state before the provider answers.
   const [endedHere, setEndedHere] = useState(false);
   const mounted = useRef(true);
@@ -308,7 +312,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       // unavailable / invalid / failed: keep what we have, stay signed in.
     })();
-  }, [authStatus, authUserId, authSettled, callWithToken, clearLocal, keepProfile, fail]);
+  }, [authStatus, authUserId, authSettled, reloadTick, callWithToken, clearLocal, keepProfile, fail]);
 
   /**
    * Local state is cleared first and stays cleared even if `auth.signOut()` rejects: on a shared
@@ -384,6 +388,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   );
 
   const clearError = useCallback(() => setError(null), []);
+  const reloadProfile = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
   const status: AccountAuthStatus = endedHere ? 'signed_out' : authStatus;
 
@@ -398,6 +403,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     profileLoaded,
     error,
     clearError,
+    reloadProfile,
     signOut,
     updateSenderName,
     updateDetails,

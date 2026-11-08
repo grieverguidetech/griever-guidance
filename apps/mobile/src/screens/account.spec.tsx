@@ -629,15 +629,58 @@ describe('personal details (#717)', () => {
     expect(screen.getByText('Address')).toBeTruthy();
   });
 
-  it('does not wait forever when the first load fails: no Loading line, and Save still works', async () => {
+  it('first load fails with nothing kept: shows the offline line and Try again, blocks Save, and a retry unblocks it', async () => {
     mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
     renderAccount(true);
     await screen.findByText('You are offline. You can change your name when you are connected.');
     expect(screen.queryByText('Loading your details.')).toBeNull();
     type(FIRST, 'Annie');
     saveButton();
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    mockGetProfile.mockResolvedValue(full);
+    press('Try again');
+    await screen.findByDisplayValue('Lee');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    saveButton();
     await screen.findByText('Your details are saved.');
-    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Annie', lastName: null, birthDate: null, address: null });
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', {
+      firstName: 'Annie',
+      lastName: 'Lee',
+      birthDate: '1980-05-29',
+      address: { line1: '1 Main St', line2: 'Apt 2', city: 'Newark', state: 'NJ', zip: '07101' },
+    });
+  });
+
+  it('first load fails and the server is unreachable (not offline): says so, never Loading', async () => {
+    mockGetProfile.mockResolvedValue({ ok: false, reason: 'failed' } as ProfileResult);
+    renderAccount(true);
+    await screen.findByText("Accounts aren't available right now.");
+    expect(screen.queryByText('Loading your details.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  it('first load fails but a profile is kept on the device: Save works with the kept values', async () => {
+    await AsyncStorage.setItem('gg.signedIn.v1', 'u1');
+    await AsyncStorage.setItem(
+      'gg.profile.v1',
+      JSON.stringify({ id: 'u1', senderName: 'Kept', firstName: 'Kept', lastName: 'Name', birthDate: '1980-05-29', address: null, contactSource: null, accountType: 'owner' }),
+    );
+    mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
+    renderAccount(true);
+    await screen.findByDisplayValue('Kept');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    saveButton();
+    await screen.findByText('Your details are saved.');
+    expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Kept', lastName: 'Name', birthDate: '1980-05-29', address: null });
+  });
+
+  it('first load says there is no profile: Save works', async () => {
+    mockGetProfile.mockResolvedValue(noProfile);
+    renderAccount(true);
+    await screen.findByLabelText(FIRST);
+    type(FIRST, 'Annie');
+    saveButton();
+    await screen.findByText('Your details are saved.');
   });
 
   it('after a failed save, moves focus to the first wrong field', async () => {
