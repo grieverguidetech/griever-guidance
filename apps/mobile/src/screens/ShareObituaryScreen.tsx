@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH, isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
@@ -8,7 +8,7 @@ import type { Session } from '@griever/hooks';
 import { ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { TextInputNode } from '../ui/screens/ShareObituary';
-import { colors, spacing } from '@griever/tokens';
+import { colors } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
@@ -32,13 +32,15 @@ type Props = {
   onSetItem: (id: ChecklistItemId, state: ChecklistItemState | null) => void;
   onBack: () => void;
   onContinue: () => void;
+  /** Done after emailing: the app records it (this person) and goes to Ready to send. */
+  onEmailed: () => void;
 };
 
 /**
  * The screen is the ShareObituary in apps/mobile/src/ui; this holds what is mobile only: focus, Android
  * Back and the sheet. It passes no drafting handler, so the drafting card is not shown.
  */
-export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onContinue }: Props) {
+export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onContinue, onEmailed }: Props) {
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const checklistButton = useRef<ButtonNode>(null);
   // The Android focus return waits one tick; an unmount before it runs cancels it.
@@ -46,6 +48,8 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   useEffect(() => () => clearTimeout(focusTimer.current), []);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
+  // Set only by a mail or share result in this visit, so leaving and coming back does not show Done again.
+  const [emailed, setEmailed] = useState(false);
   const [emailNote, setEmailNote] = useState<'opened' | 'shared' | undefined>(undefined);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
@@ -256,6 +260,9 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     setEmailBusy(false);
     setEmailFailed(result === 'failed');
     // A dismissed share sheet means nothing was sent or opened, so no line is shown.
+    if (result === 'mail' || result === 'share') {
+      setEmailed(true);
+    }
     setEmailNote(result === 'mail' ? 'opened' : result === 'share' ? 'shared' : undefined);
   };
 
@@ -284,7 +291,6 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   };
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <ShareObituary
           copy={copy}
           eyebrow={fill(copy.forName, { name })}
@@ -303,10 +309,11 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           pasteMessage={pasteMessage}
           publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
           textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, note, editRef: editButton }}
+          emailed={emailed}
+          onDone={() => leave(onEmailed)}
           headingRef={heading}
           checklistRef={checklistButton}
         />
-      </ScrollView>
       <PersonChecklistSheet visible={checklistOpen} onClose={closeChecklist} onDismiss={focusChecklistButton} checklist={session.checklist} onSetItem={onSetItem} />
     </KeyboardAvoidingView>
   );
@@ -314,5 +321,4 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing[3], paddingTop: spacing[4] },
 });

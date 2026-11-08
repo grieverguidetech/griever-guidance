@@ -56,10 +56,10 @@ const BUTTON = 'Email it to the paper or funeral home';
 const OPENED = "Opened in your email app. Come back when it's published.";
 const SHARED = "Shared from your phone. Come back when it's published.";
 
-function setup(session: Session, onChange = jest.fn(), onSetItem = jest.fn()) {
+function setup(session: Session, onChange = jest.fn(), onSetItem = jest.fn(), onEmailed = jest.fn()) {
   render(
     <SerifReadyContext.Provider value>
-      <ShareObituaryScreen session={session} onChange={onChange} onSetItem={onSetItem} onBack={jest.fn()} onContinue={jest.fn()} />
+      <ShareObituaryScreen session={session} onChange={onChange} onSetItem={onSetItem} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={onEmailed} />
     </SerifReadyContext.Provider>,
   );
 }
@@ -370,6 +370,7 @@ function Harness({ initial, onPatch, onBack = jest.fn(), onContinue = jest.fn() 
         onSetItem={jest.fn()}
         onBack={onBack}
         onContinue={onContinue}
+        onEmailed={jest.fn()}
       />
     </SerifReadyContext.Provider>
   );
@@ -527,7 +528,7 @@ describe('ShareObituaryScreen shows and edits the obituary text (#701)', () => {
     const onPatch = jest.fn();
     const view = render(
       <SerifReadyContext.Provider value>
-        <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} />
+        <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
     fireEvent.press(screen.getByRole('button', { name: EDIT }));
@@ -783,5 +784,64 @@ describe("ShareObituaryScreen publisher's email", () => {
     await screen.findByText(OPENED);
     expect(MailComposer.composeAsync).toHaveBeenCalledWith({ recipients: ['obits@paper.com'], subject: expect.any(String), body: 'Anna loved the garden.' });
     expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe('ShareObituaryScreen Done after emailing (#726)', () => {
+  const withText = { ...base, obituaryText: 'Anna loved the garden.' } as Session;
+  const DONE = { name: 'Done' };
+
+  it('shows no Done on arrival', () => {
+    setup(withText);
+    expect(screen.queryByRole('button', DONE)).toBeNull();
+  });
+
+  it('shows Done after mail opened, and a tap calls onEmailed once', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const onEmailed = jest.fn();
+    setup(withText, jest.fn(), jest.fn(), onEmailed);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(OPENED);
+    fireEvent.press(screen.getByRole('button', DONE));
+    expect(onEmailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Done after the share sheet completed', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.sharedAction, activityType: undefined });
+    setup(withText);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(SHARED);
+    expect(screen.getByRole('button', DONE)).toBeTruthy();
+  });
+
+  it('shows no Done when the share sheet was dismissed', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction, activityType: undefined });
+    setup(withText);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).not.toMatchObject({ busy: true }));
+    expect(screen.queryByRole('button', DONE)).toBeNull();
+  });
+
+  it('shows no Done when mail and sharing both fail', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    jest.spyOn(Share, 'share').mockRejectedValue(new Error('no share'));
+    setup(withText);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(/couldn't open email or sharing/);
+    expect(screen.queryByRole('button', DONE)).toBeNull();
+  });
+
+  it('hides Done while the text is being edited and shows it again after Save', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(withText);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(OPENED);
+    fireEvent.press(screen.getByRole('button', { name: 'Edit the text' }));
+    expect(screen.queryByRole('button', DONE)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Save the text' }));
+    expect(screen.getByRole('button', DONE)).toBeTruthy();
   });
 });

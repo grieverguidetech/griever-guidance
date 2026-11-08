@@ -35,6 +35,8 @@ const copy: ShareObituaryCopy = {
   pasted: 'Link pasted.',
   linkStepLabel: "Step 2: once it's published, paste the link",
   pasteButton: 'Paste link',
+  doneButton: 'Done',
+  doneHint: 'Marks the obituary done',
 };
 
 /** Every string in the rendered host tree, depth first, so the order is the reading order. */
@@ -67,6 +69,36 @@ function setup(over: Partial<ShareObituaryProps> = {}) {
     />,
   );
 }
+
+describe('ShareObituary Done after emailing (#726)', () => {
+  const editor = { text: 'Anna loved the garden.', editing: false, value: '', onValueChange: jest.fn(), onEdit: jest.fn(), onSave: jest.fn(), onCancel: jest.fn() };
+  const email = { hasText: true, onPress: jest.fn() };
+
+  it('shows no Done until the obituary was emailed', () => {
+    setup({ publisherEmail: email, onDone: jest.fn() });
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+  });
+
+  it('shows Done in the bottom bar once emailed, reads the hint, and calls onDone on a tap', () => {
+    const onDone = jest.fn();
+    setup({ publisherEmail: email, emailed: true, onDone });
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done.props.accessibilityHint).toBe('Marks the obituary done');
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
+    fireEvent.press(done);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Done while the text is being edited', () => {
+    setup({ publisherEmail: email, emailed: true, onDone: jest.fn(), textEditor: { ...editor, editing: true } });
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+  });
+
+  it('keeps Step 2 (Continue) available beside Done', () => {
+    setup({ publisherEmail: email, emailed: true, onDone: jest.fn(), link: 'https://legacy.com/anna', linkValid: true });
+    expect(screen.getByRole('button', { name: 'Choose who to send it to' })).toBeTruthy();
+  });
+});
 
 describe('ShareObituary (mobile steps, #650)', () => {
   it('says the obituary is not written, with no email button, when there is no text', () => {
