@@ -28,6 +28,9 @@ import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDevice
 import { personLabel } from '../components/PersonSwitcher';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { clearPublisherEmails } from '../lib/mailCompose';
+import { deleteLocalData, onAccountDeleted } from '../lib/deleteLocalData';
+import { AccountDeletedScreen } from '../screens/AccountDeletedScreen';
+import { resetUnsavedName } from '../screens/AccountScreen';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -949,16 +952,53 @@ const SendAppWhenReady = () => {
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
   const fontsSettled = useSerifFonts();
+  // After the account is deleted, everything held in memory (people, contacts, caches, a name typed at sign-up) is dropped at once:
+  // the deleted screen stands in place of the send flow until the person leaves it, and the send flow then mounts again from an empty phone.
+  // Every way out of that screen (its button, Android Back) then lands on a clean first screen.
+  // `cleared` is null while this phone is being cleared.
+  const [deleted, setDeleted] = useState<{ cleared: boolean | null } | null>(null);
+  useEffect(
+    () =>
+      onAccountDeleted(() => {
+        resetUnsavedName();
+        setDeleted({ cleared: null });
+      }),
+    [],
+  );
+  // The sweep starts after the send flow has unmounted (effects run after the commit), so no write from it can land afterwards.
+  const clearing = deleted !== null && deleted.cleared === null;
+  useEffect(() => {
+    if (!clearing) {
+      return;
+    }
+    let live = true;
+    void deleteLocalData().then((cleared) => {
+      if (live) {
+        setDeleted({ cleared });
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [clearing]);
+  const leaveDeleted = useCallback(() => setDeleted(null), []);
+  const content = deleted ? (
+    <ScreenFrame>
+      <View style={{ flex: 1, padding: 24, paddingTop: 20 }}>
+        <AccountDeletedScreen cleared={deleted.cleared} onDone={leaveDeleted} />
+      </View>
+    </ScreenFrame>
+  ) : (
+    <SendAppWhenReady />
+  );
   // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
     <SafeAreaProvider>
       <SerifReadyContext.Provider value={fontsSettled}>
         {AUTH_ENABLED ? (
-          <AccountProvider>
-            <SendAppWhenReady />
-          </AccountProvider>
+          <AccountProvider>{content}</AccountProvider>
         ) : (
-          <SendAppWhenReady />
+          content
         )}
       </SerifReadyContext.Provider>
     </SafeAreaProvider>

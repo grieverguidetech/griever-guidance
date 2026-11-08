@@ -259,3 +259,14 @@ describe('Account sign-in, sign out and support (#718)', () => {
     expect(screen.getByText(/could not open your email app. You can copy the address above/)).toBeTruthy();
   });
 });
+
+describe('Account (Delete account)', () => {
+  it('shows the Delete account group, after support, only when the app offers it', () => {
+    setup();
+    expect(screen.queryByRole('heading', { name: copy.deleteHeading })).toBeNull();
+    screen.unmount();
+    setup({ onDeleteAccount: async () => 'deleted' });
+    expect(screen.getByRole('heading', { name: copy.deleteHeading })).toBeTruthy();
+    expect(screen.getByRole('button', { name: copy.deleteOpen })).toBeTruthy();
+  });
+});

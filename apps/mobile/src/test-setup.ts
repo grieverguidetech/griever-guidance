@@ -19,6 +19,9 @@ jest.mock('@react-native-async-storage/async-storage', () => {
     getItem: async (key: string) => fresh().get(key) ?? null,
     setItem: async (key: string, value: string) => void fresh().set(key, value),
     removeItem: async (key: string) => void fresh().delete(key),
+    getAllKeys: async () => [...fresh().keys()],
+    multiSet: async (pairs: [string, string][]) => void pairs.forEach(([key, value]) => fresh().set(key, value)),
+    multiRemove: async (keys: string[]) => void keys.forEach((key) => fresh().delete(key)),
     clear: async () => fresh().clear(),
   };
   return { __esModule: true, default: asyncStorage, ...asyncStorage };

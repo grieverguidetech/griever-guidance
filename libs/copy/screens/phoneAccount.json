@@ -6,5 +6,7 @@
   "supportButton": "Email support",
   "supportHint": "Opens your email app.",
   "supportFailed": "We could not open your email app. You can copy the address above and write to us from any email app.",
-  "manageSignInFailed": "We could not open your account page. Check your connection and try again."
+  "manageSignInFailed": "We could not open your account page. Check your connection and try again.",
+  "deleteNeedsSignIn": "Nothing was deleted. To delete your account, we need you to sign in again first. Sign out, sign back in, then choose Delete my account again.",
+  "deletedClearing": "Removing what is saved on this phone…"
 }

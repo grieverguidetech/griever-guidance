@@ -11,7 +11,9 @@
     "supportButton",
     "supportHint",
     "supportFailed",
-    "manageSignInFailed"
+    "manageSignInFailed",
+    "deleteNeedsSignIn",
+    "deletedClearing"
   ],
   "properties": {
     "required": {
@@ -36,6 +38,12 @@
       "$ref": "#/$defs/text"
     },
     "manageSignInFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "deleteNeedsSignIn": {
+      "$ref": "#/$defs/text"
+    },
+    "deletedClearing": {
       "$ref": "#/$defs/text"
     }
   },

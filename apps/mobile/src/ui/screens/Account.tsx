@@ -3,6 +3,8 @@ import type { ComponentRef, ReactNode } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { colors, spacing } from '@griever/tokens';
 import { AddressFields, LabelledInput } from '../../components/AddressFields';
+import { DeleteAccountPanel } from '../../components/DeleteAccountPanel';
+import type { DeleteAccountCopy, DeleteOutcome } from '../../components/DeleteAccountPanel';
 import type { AddressFieldsCopy } from '../../components/AddressFields';
 import { Button } from '../Button';
 import { Heading } from '../Heading';
@@ -12,7 +14,7 @@ import { Status } from '../Status';
 import { Body } from '../Text';
 
 /** The words the screen needs. libs/copy/screens/account.json has these keys, plus more; the phone-only ones come from phoneAccount.json. */
-export interface AccountCopy extends AddressFieldsCopy {
+export interface AccountCopy extends AddressFieldsCopy, DeleteAccountCopy {
   heading: string;
   back: string;
   firstNameLabel: string;
@@ -94,6 +96,8 @@ export interface AccountProps {
   onSupport: () => void;
   /** The email app did not open: shows a calm line that the address can be copied. */
   supportFailed?: boolean;
+  /** Deletes the account. Leave unset to hide Delete account (accounts off, session ended, or Clerk not ready). */
+  onDeleteAccount?: () => Promise<DeleteOutcome>;
   onBack: () => void;
   headingRef?: HeadingProps['headingRef'];
   /** Under the form, for example "People helping you". */
@@ -123,6 +127,7 @@ export function Account({
   onSupport,
   supportFailed,
   manageFailed,
+  onDeleteAccount,
   onBack,
   headingRef,
   children,
@@ -278,6 +283,7 @@ export function Account({
         <Button label={copy.supportButton} variant="secondary" hint={copy.supportHint} onPress={onSupport} />
         <Status id={supportStatusId} message={supportFailed ? copy.supportFailed : undefined} />
       </View>
+      {onDeleteAccount ? <DeleteAccountPanel copy={copy} onDelete={onDeleteAccount} /> : null}
       {children}
     </View>
   );

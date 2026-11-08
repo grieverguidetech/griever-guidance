@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { SIGNED_IN_STORAGE_KEY, useAccount as useAccountState } from '@griever/hooks';
+import { PROFILE_STORAGE_KEY, SIGNED_IN_STORAGE_KEY, useAccount as useAccountState } from '@griever/hooks';
 import type { UseAccountResult } from '@griever/hooks';
 import type { AccountAuth } from '@griever/shared';
 import { createProfileCache } from './authStorage';
+import { onAccountDeleted } from './deleteLocalData';
 import { AUTH_ENABLED } from './features';
 import { CLERK_PUBLISHABLE_KEY, ClerkBoundary, useClerkAccountAuth } from './clerk';
 
@@ -113,9 +114,26 @@ function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: Pro
     }),
     [status, userId],
   );
+  // The account is deleted: forget the signed-in marker and the cached profile held in memory, so the next first screen is the signed-out one.
+  const [markerForgotten, setMarkerForgotten] = useState(false);
+  useEffect(
+    () =>
+      onAccountDeleted(() => {
+        cache.storage.removeItem(SIGNED_IN_STORAGE_KEY);
+        cache.storage.removeItem(PROFILE_STORAGE_KEY);
+        setMarkerForgotten(true);
+      }),
+    [cache.storage],
+  );
+  // A new sign-in after that writes the marker again.
+  useEffect(() => {
+    if (status === 'signed_in') {
+      setMarkerForgotten(false);
+    }
+  }, [status]);
   const launch = useMemo<LaunchState>(
-    () => ({ hydrated: cache.ready, signedIn: cache.ready && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
-    [cache.ready, cache.storage],
+    () => ({ hydrated: cache.ready, signedIn: cache.ready && !markerForgotten && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
+    [cache.ready, cache.storage, markerForgotten],
   );
   return (
     <>

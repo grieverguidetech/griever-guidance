@@ -10,7 +10,9 @@ import type { UseAccountResult } from '@griever/hooks';
 import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../ui/screens/Account';
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
-import { useSignInInfo } from '../lib/clerk';
+import { DeleteCancelledError, DeleteNeedsSignInError, useSignInInfo } from '../lib/clerk';
+import { announceAccountDeleted } from '../lib/deleteLocalData';
+import type { DeleteOutcome } from '../components/DeleteAccountPanel';
 
 const copy = screenCopy('account');
 const phoneAccount = screenCopy('phoneAccount');
@@ -134,8 +136,11 @@ type Props = {
 };
 
 /** The screen is the Account in apps/mobile/src/ui; this holds what is mobile only: saving and focus. */
-export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
+export function ProfileScreen({ identity, initialName, sessionEnded: sessionEndedProp, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
   const profile = identity.profile;
+  // Deleting the account signs the person out before the delete call returns. That is not "your session ended".
+  const [removing, setRemoving] = useState(false);
+  const sessionEnded = sessionEndedProp && !removing;
   // An account saved before first and last name existed has only the name messages are signed with.
   const noNames = !profile?.firstName && !profile?.lastName;
   const fallbackName = initialName ?? profile?.senderName ?? '';
@@ -214,6 +219,28 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     }
   }
 
+  /** Deletes the account on the server, and only when that works tells the app to clear this phone. A failure changes nothing. */
+  async function deleteAccount(): Promise<DeleteOutcome> {
+    const remove = signIn.deleteAccount;
+    if (!remove) {
+      return 'failed';
+    }
+    setRemoving(true);
+    try {
+      await remove();
+    } catch (error) {
+      setRemoving(false);
+      if (error instanceof DeleteNeedsSignInError) {
+        return 'needsSignIn';
+      }
+      return error instanceof DeleteCancelledError ? 'cancelled' : 'failed';
+    }
+    // Clerk has ended the session itself. The app (App.tsx) hears this, drops the whole send flow, shows the deleted screen
+    // in its place, and only then clears this phone, so every way out of the deleted screen lands clean.
+    announceAccountDeleted();
+    return 'deleted';
+  }
+
   async function save() {
     // Empty fields must never overwrite stored values, so nothing is saved until they are known.
     if (pending || waiting) {
@@ -275,9 +302,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     primaryLabel = copy.saving;
   }
 
+  const canDelete = removing || (!sessionEndedProp && !!signIn.deleteAccount);
   return (
     <Account
-      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed }}
+      copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed, deleteNeedsSignIn: phoneAccount.deleteNeedsSignIn }}
       values={values}
       onChange={change}
       errors={errors}
@@ -303,6 +331,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       onSupport={() => void openSupport()}
       supportFailed={supportFailed}
       manageFailed={manageFailed}
+      onDeleteAccount={canDelete ? deleteAccount : undefined}
       offline={identity.offline}
       status={{ message, tone }}
       onBack={onBack}
