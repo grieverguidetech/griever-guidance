@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { renderHook, act } from '@testing-library/react-native';
-import { SETTLE_AFTER_MS, toAccountAuth, useClerkAccountAuth } from './clerk';
+import { DeleteCancelledError, SETTLE_AFTER_MS, deleteClerkAccount, toAccountAuth, useClerkAccountAuth } from './clerk';
 import type { AdapterInputs, ClerkAuthLike } from './clerk';
 import { clerkMessage } from './clerkMessages';
 
@@ -210,5 +210,40 @@ describe('useClerkAccountAuth settling (#343)', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+
+describe('deleteClerkAccount', () => {
+  it('deletes the user', async () => {
+    const user = { delete: jest.fn(async () => undefined) };
+    await deleteClerkAccount(user);
+    expect(user.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects when there is no user', async () => {
+    await expect(deleteClerkAccount(null)).rejects.toThrow('No signed-in user');
+  });
+
+  it('rejects with the original error when Clerk refuses', async () => {
+    const refused = new Error('offline');
+    const result = deleteClerkAccount({ delete: async () => undefined }, async () => {
+      throw refused;
+    });
+    await expect(result).rejects.toBe(refused);
+    await expect(result).rejects.not.toBeInstanceOf(DeleteCancelledError);
+  });
+
+  it('rejects with DeleteCancelledError when the person closes the verify step', async () => {
+    const closed = Object.assign(new Error('User cancelled attempted verification'), { code: 'reverification_cancelled' });
+    await expect(
+      deleteClerkAccount({ delete: async () => undefined }, async () => {
+        throw closed;
+      }),
+    ).rejects.toBeInstanceOf(DeleteCancelledError);
+  });
+
+  it('rejects when Clerk still wants verification after its retry', async () => {
+    await expect(deleteClerkAccount({ delete: async () => undefined }, async () => ({ clerk_error: {} }))).rejects.toThrow(/verification/);
   });
 });

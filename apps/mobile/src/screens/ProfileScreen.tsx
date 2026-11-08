@@ -10,7 +10,10 @@ import type { UseAccountResult } from '@griever/hooks';
 import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../ui/screens/Account';
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
-import { useSignInInfo } from '../lib/clerk';
+import { DeleteCancelledError, useSignInInfo } from '../lib/clerk';
+import { deleteLocalData } from '../lib/deleteLocalData';
+import type { DeleteOutcome } from '../components/DeleteAccountPanel';
+import { AccountDeletedScreen } from './AccountDeletedScreen';
 
 const copy = screenCopy('account');
 const phoneAccount = screenCopy('phoneAccount');
@@ -134,8 +137,12 @@ type Props = {
 };
 
 /** The screen is the Account in apps/mobile/src/ui; this holds what is mobile only: saving and focus. */
-export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
+export function ProfileScreen({ identity, initialName, sessionEnded: sessionEndedProp, onSaved, onBack, onSignOut, onSignInAgain }: Props) {
   const profile = identity.profile;
+  // Deleting the account signs the person out before the delete call returns. That is not "your session ended".
+  const [removing, setRemoving] = useState(false);
+  const [deleted, setDeleted] = useState<{ cleared: boolean } | null>(null);
+  const sessionEnded = sessionEndedProp && !removing;
   // An account saved before first and last name existed has only the name messages are signed with.
   const noNames = !profile?.firstName && !profile?.lastName;
   const fallbackName = initialName ?? profile?.senderName ?? '';
@@ -214,6 +221,24 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     }
   }
 
+  /** Deletes the account on the server, and only when that works clears this phone. A failure changes nothing. */
+  async function deleteAccount(): Promise<DeleteOutcome> {
+    const remove = signIn.deleteAccount;
+    if (!remove) {
+      return 'failed';
+    }
+    setRemoving(true);
+    try {
+      await remove();
+    } catch (error) {
+      setRemoving(false);
+      return error instanceof DeleteCancelledError ? 'cancelled' : 'failed';
+    }
+    // Clerk has ended the session itself; the account screen's cache is cleared when it sees that.
+    setDeleted({ cleared: await deleteLocalData() });
+    return 'deleted';
+  }
+
   async function save() {
     // Empty fields must never overwrite stored values, so nothing is saved until they are known.
     if (pending || waiting) {
@@ -275,6 +300,10 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
     primaryLabel = copy.saving;
   }
 
+  if (deleted) {
+    return <AccountDeletedScreen cleared={deleted.cleared} onDone={onBack} />;
+  }
+  const canDelete = removing || (!sessionEndedProp && !!signIn.deleteAccount);
   return (
     <Account
       copy={{ ...copy, requiredWord: phoneAccount.required, optionalWord: phoneAccount.optional, retry: phoneAccount.retry, manageSignInHint: phoneAccount.manageSignInHint, manageSignInFailed: phoneAccount.manageSignInFailed, supportButton: phoneAccount.supportButton, supportHint: phoneAccount.supportHint, supportFailed: phoneAccount.supportFailed }}
@@ -303,6 +332,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
       onSupport={() => void openSupport()}
       supportFailed={supportFailed}
       manageFailed={manageFailed}
+      onDeleteAccount={canDelete ? deleteAccount : undefined}
       offline={identity.offline}
       status={{ message, tone }}
       onBack={onBack}

@@ -17,6 +17,7 @@ jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ isLoaded: false, isSignedIn: undefined, userId: undefined, sessionId: undefined, getToken: jest.fn(), signOut: jest.fn() }),
   useClerk: () => ({ status: 'loading' }),
   useUser: () => ({ user: null }),
+  useReverification: (fn: unknown) => fn,
   useSignIn: jest.fn(),
   useSignUp: jest.fn(),
   useSSO: jest.fn(),

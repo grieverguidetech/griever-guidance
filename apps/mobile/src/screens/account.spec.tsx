@@ -5,10 +5,11 @@ import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ProfileResult } from '@griever/api-client';
+import { screenCopy } from '@griever/copy';
 import type { AccountAuth, Address } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
 import { CHECKLIST_KEY } from './WhatYoullNeedScreen';
-import { ClerkBoundary } from '../lib/clerk';
+import { ClerkBoundary, DeleteCancelledError } from '../lib/clerk';
 import { AccountProvider, AccountStateProvider, useAccount } from '../lib/AccountProvider';
 
 // On a cold Babel cache (a fresh worktree) the first sign-in render compiles modules lazily and
@@ -22,6 +23,20 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
   findNodeHandle: () => 1,
 }));
+
+// The shared test setup's AsyncStorage has no getAllKeys; deleteLocalData lists keys, so these tests use a fuller in-memory one.
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const store = new Map<string, string>();
+  const asyncStorage = {
+    getItem: async (key: string) => store.get(key) ?? null,
+    setItem: async (key: string, value: string) => void store.set(key, value),
+    removeItem: async (key: string) => void store.delete(key),
+    getAllKeys: async () => [...store.keys()],
+    multiSet: async (pairs: [string, string][]) => void pairs.forEach(([key, value]) => store.set(key, value)),
+    clear: async () => store.clear(),
+  };
+  return { __esModule: true, default: asyncStorage, ...asyncStorage };
+});
 
 // The profile calls go through the gateway; here they are plain functions.
 const mockGetProfile = jest.fn<() => Promise<ProfileResult>>();
@@ -53,7 +68,7 @@ jest.mock('@clerk/expo/token-cache', () => ({ tokenCache: undefined }));
 jest.mock('@clerk/expo/resource-cache', () => ({ resourceCache: undefined }));
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'dismiss' })) }));
 // The sign-in info the screen reads comes from Clerk through the bridge in lib/clerk.tsx; the tests below set it on these fakes.
-let mockSignInInfo: { email: string | null; manageUrl: string | null } = { email: null, manageUrl: null };
+let mockSignInInfo: { email: string | null; manageUrl: string | null; deleteAccount: (() => Promise<void>) | null } = { email: null, manageUrl: null, deleteAccount: null };
 jest.mock('../lib/clerk', () => ({
   ...jest.requireActual<object>('../lib/clerk'),
   useSignInInfo: () => mockSignInInfo,
@@ -62,6 +77,7 @@ jest.mock('@clerk/expo', () => ({
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
   useUser: () => ({ user: mockClerkUser.email ? { primaryEmailAddress: { emailAddress: mockClerkUser.email } } : null }),
   useClerk: () => mockClerkInstance,
+  useReverification: (fn: (...args: never[]) => unknown) => fn,
   useSignIn: () => ({ signIn: mockSignIn }),
   useSignUp: () => ({ signUp: mockSignUp }),
   useSSO: () => ({ startSSOFlow: jest.fn() }),
@@ -103,7 +119,7 @@ const finalizeSignsIn = (fn: typeof mockSignIn.finalize) => fn.mockImplementatio
 
 beforeEach(async () => {
   resetUnsavedName();
-  mockSignInInfo = { email: null, manageUrl: null };
+  mockSignInInfo = { email: null, manageUrl: null, deleteAccount: null };
   mockClerkInstance.loaded = true;
   mockClerkInstance.buildUserProfileUrl = () => 'https://accounts.example.com/user';
   mockClerkUser.email = null;
@@ -758,7 +774,7 @@ describe('sign-in details and support (#718)', () => {
   const headingNames = () => screen.getAllByRole('heading').map((node) => node.props.children);
 
   it('shows the email and the groups in order: Profile, Sign-in and security, Sign out, Help and support', async () => {
-    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user', deleteAccount: null };
     mockGetProfile.mockResolvedValue(profileWith('Sam'));
     renderAccount(true);
     await screen.findByDisplayValue('Sam');
@@ -775,7 +791,7 @@ describe('sign-in details and support (#718)', () => {
   });
 
   it('opens the hosted Clerk account page in the browser from Manage sign-in', async () => {
-    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user', deleteAccount: null };
     mockGetProfile.mockResolvedValue(profileWith('Sam'));
     renderAccount(true);
     await screen.findByDisplayValue('Sam');
@@ -784,7 +800,7 @@ describe('sign-in details and support (#718)', () => {
   });
 
   it('shows a calm line when the browser does not open', async () => {
-    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user' };
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user', deleteAccount: null };
     (WebBrowser.openBrowserAsync as jest.Mock<() => Promise<unknown>>).mockRejectedValueOnce(new Error('no browser'));
     mockGetProfile.mockResolvedValue(profileWith('Sam'));
     renderAccount(true);
@@ -795,7 +811,7 @@ describe('sign-in details and support (#718)', () => {
   });
 
   it('shows no Manage sign-in button when there is no address', async () => {
-    mockSignInInfo = { email: 'sam@example.com', manageUrl: null };
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: null, deleteAccount: null };
     mockGetProfile.mockResolvedValue(profileWith('Sam'));
     renderAccount(true);
     await screen.findByDisplayValue('Sam');
@@ -828,30 +844,127 @@ describe('the Clerk bridge (#718)', () => {
   const { useSignInInfo: actualUseSignInInfo } = jest.requireActual<typeof import('../lib/clerk')>('../lib/clerk');
   function ActualProbe() {
     const info = actualUseSignInInfo();
-    return <Text>{`${info.email ?? 'no email'}|${info.manageUrl ?? 'no url'}`}</Text>;
+    return <Text>{`${info.email ?? 'no email'}|${info.manageUrl ?? 'no url'}|${info.deleteAccount ? 'can delete' : 'no delete'}`}</Text>;
   }
 
   it('reads the signed-in email and the https account page from Clerk', () => {
     mockClerkUser.email = 'sam@example.com';
     render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
-    expect(screen.getByText('sam@example.com|https://accounts.example.com/user')).toBeTruthy();
+    expect(screen.getByText('sam@example.com|https://accounts.example.com/user|can delete')).toBeTruthy();
   });
 
   it('gives no address until Clerk has loaded, and none that is not https', () => {
     mockClerkUser.email = 'sam@example.com';
     mockClerkInstance.loaded = false;
     const { unmount } = render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
-    expect(screen.getByText('sam@example.com|no url')).toBeTruthy();
+    expect(screen.getByText('sam@example.com|no url|no delete')).toBeTruthy();
     unmount();
     mockClerkInstance.loaded = true;
     mockClerkInstance.buildUserProfileUrl = () => '/user';
     render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
-    expect(screen.getByText('sam@example.com|no url')).toBeTruthy();
+    expect(screen.getByText('sam@example.com|no url|can delete')).toBeTruthy();
   });
 
   it('shows nothing when nobody is signed in', () => {
     mockClerkUser.email = null;
     render(<ClerkBoundary publishableKey="pk_test"><ActualProbe /></ClerkBoundary>);
-    expect(screen.getByText('no email|no url')).toBeTruthy();
+    expect(screen.getByText('no email|no url|no delete')).toBeTruthy();
+  });
+});
+
+
+describe('Delete account (#719)', () => {
+  const copy = screenCopy('account');
+  const seedLocalData = () =>
+    AsyncStorage.multiSet([
+      ['gg.sessions.v1', '[{"id":"anna","obituaryEmailedAt":"2026-01-01"}]'],
+      ['gg.contacts.v1', '[]'],
+      ['gg.publisherEmail.v1.anna', 'obits@paper.example'],
+    ]);
+  async function openConfirm() {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    press(copy.deleteOpen);
+  }
+
+  it('is not offered until Clerk has a user to delete', async () => {
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByRole('button', { name: copy.deleteOpen })).toBeNull();
+  });
+
+  it('after a delete: signs out, clears this phone, and shows the deleted screen with no session-ended line', async () => {
+    await seedLocalData();
+    const remove = jest.fn(async () => {
+      act(() => mockAuthControl.setSignedIn(false));
+    });
+    mockSignInInfo.deleteAccount = remove;
+    await openConfirm();
+    press(copy.deleteConfirmAction);
+    await screen.findByRole('heading', { name: copy.deletedHeading });
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(copy.deletedBody)).toBeTruthy();
+    expect(screen.queryByText(copy.deletedLeftover)).toBeNull();
+    expect(screen.queryByText(copy.sessionEnded)).toBeNull();
+    expect(await AsyncStorage.getAllKeys()).toEqual([]);
+  });
+
+  it('says some things were left on the phone when a local item cannot be removed', async () => {
+    await seedLocalData();
+    const real = AsyncStorage.removeItem.bind(AsyncStorage);
+    jest.spyOn(AsyncStorage, 'removeItem').mockImplementation(async (key: string) => {
+      if (key === 'gg.publisherEmail.v1.anna') {
+        throw new Error('disk');
+      }
+      return real(key);
+    });
+    mockSignInInfo.deleteAccount = jest.fn(async () => undefined);
+    await openConfirm();
+    press(copy.deleteConfirmAction);
+    await screen.findByText(copy.deletedLeftover);
+  });
+
+  it('a closed verify step says the account was not deleted and keeps everything on the phone', async () => {
+    await seedLocalData();
+    mockSignInInfo.deleteAccount = jest.fn(async () => {
+      throw new DeleteCancelledError();
+    });
+    await openConfirm();
+    press(copy.deleteConfirmAction);
+    await screen.findByText(copy.deleteCancelled);
+    expect(screen.queryByRole('heading', { name: copy.deletedHeading })).toBeNull();
+    expect(await AsyncStorage.getAllKeys()).toEqual(expect.arrayContaining(['gg.sessions.v1', 'gg.contacts.v1', 'gg.publisherEmail.v1.anna']));
+  });
+
+  it('any other failure says so calmly, keeps everything, and stays signed in', async () => {
+    await seedLocalData();
+    mockSignInInfo.deleteAccount = jest.fn(async () => {
+      throw new Error('offline');
+    });
+    await openConfirm();
+    press(copy.deleteConfirmAction);
+    await screen.findByText(copy.deleteFailed);
+    expect(screen.queryByText(copy.sessionEnded)).toBeNull();
+    expect(screen.getByDisplayValue('Sam')).toBeTruthy();
+    expect(await AsyncStorage.getAllKeys()).toEqual(expect.arrayContaining(['gg.sessions.v1', 'gg.publisherEmail.v1.anna']));
+  });
+
+  it('Back to the start leaves the screen', async () => {
+    const onBack = jest.fn();
+    mockSignInInfo.deleteAccount = jest.fn(async () => undefined);
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    render(
+      <Harness initial>
+        <AccountScreen onBack={onBack} />
+      </Harness>,
+    );
+    await screen.findByDisplayValue('Sam');
+    press(copy.deleteOpen);
+    press(copy.deleteConfirmAction);
+    await screen.findByRole('heading', { name: copy.deletedHeading });
+    press(copy.deletedAction);
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
