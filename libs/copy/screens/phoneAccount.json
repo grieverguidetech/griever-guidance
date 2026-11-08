@@ -1,5 +1,9 @@
 {
   "required": "required",
   "optional": "optional",
-  "retry": "Try again"
+  "retry": "Try again",
+  "manageSignInHint": "Opens your account page in a browser. Come back to the app when you are done.",
+  "supportButton": "Email support",
+  "supportHint": "Opens your email app.",
+  "supportFailed": "We could not open your email app. You can copy the address above and write to us from any email app."
 }

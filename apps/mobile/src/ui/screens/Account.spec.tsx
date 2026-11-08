@@ -13,9 +13,9 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 
 const copy: AccountCopy = {
   ...screenCopy('account'),
+  ...screenCopy('phoneAccount'),
   requiredWord: 'required',
   optionalWord: 'optional',
-  retry: 'Try again',
 };
 
 const values: DetailValues = { firstName: 'Anna', lastName: '', line1: '', line2: '', city: '', state: '', zip: '' };
@@ -29,6 +29,7 @@ function setup(over: Partial<AccountProps> = {}) {
     primaryLabel: 'Save',
     onPrimary: jest.fn<() => void | Promise<void>>(),
     onSignOut: jest.fn(),
+    onSupport: jest.fn(),
     onBack: jest.fn(),
     ...over,
   };
@@ -201,5 +202,56 @@ describe('Account personal details (#717)', () => {
   it('shows no Try again by default', () => {
     setup();
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+});
+
+describe('Account sign-in, sign out and support (#718)', () => {
+  const headings = () => screen.getAllByRole('heading').map((node) => node.props.children);
+
+  it('shows the email read-only: text, not a field', () => {
+    const before = setup({ email: 'sam@example.com' }) && screen.UNSAFE_getAllByType(TextInput).length;
+    expect(screen.getByText('Email')).toBeTruthy();
+    expect(screen.getByText('sam@example.com')).toBeTruthy();
+    expect(before).toBe(7);
+    expect(screen.queryByLabelText('sam@example.com')).toBeNull();
+  });
+
+  it('gives every group a header role, in order: Profile, Sign-in and security, Sign out, Help and support', () => {
+    setup({ email: 'sam@example.com', onManageSignIn: jest.fn() });
+    expect(headings()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'Sign out', 'Help and support']);
+  });
+
+  it('hides the sign-in group until there is an email or a manage address', () => {
+    setup();
+    expect(headings()).toEqual(['Your account', 'Profile', 'Address', 'Sign out', 'Help and support']);
+    expect(screen.queryByRole('button', { name: 'Manage sign-in' })).toBeNull();
+  });
+
+  it('shows Manage sign-in only when it can be opened, and calls it', () => {
+    const onManageSignIn = jest.fn();
+    setup({ email: 'sam@example.com', onManageSignIn });
+    fireEvent.press(screen.getByRole('button', { name: 'Manage sign-in' }));
+    expect(onManageSignIn).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Change your email, password or the devices signed in to your account.')).toBeTruthy();
+  });
+
+  it('shows the sign out heading and hint with the button', () => {
+    setup();
+    expect(screen.getByText('Your work stays on this device. You can sign in again when you are ready.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+  });
+
+  it('shows the support text, the address as text and a button, and no failure line at first', () => {
+    const props = setup();
+    expect(screen.getByText('Write to us if you have a question or something is not working.')).toBeTruthy();
+    expect(screen.getByText('grieversguidancetech@gmail.com')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Email support' }));
+    expect(props.onSupport).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/could not open your email app/)).toBeNull();
+  });
+
+  it('says the address can be copied when the email app did not open', () => {
+    setup({ supportFailed: true });
+    expect(screen.getByText(/could not open your email app. You can copy the address above/)).toBeTruthy();
   });
 });
