@@ -166,6 +166,8 @@ export interface ShareObituaryProps {
    * hidden while the text is being edited. Needs `onDone`.
    */
   emailed?: boolean;
+  /** true while the keyboard is open: the bar then drops the bottom safe-area inset, so no gap shows above the keyboard. */
+  keyboardOpen?: boolean;
   /** Done was pressed: the screen records it and goes to Ready to send. */
   onDone?: () => void;
   headingRef?: HeadingProps['headingRef'];
@@ -178,7 +180,7 @@ export interface ShareObituaryProps {
  * "Who should know?". Mobile's own screen
  * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, onDone, headingRef, checklistRef }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef }: ShareObituaryProps) {
   const insets = useSafeAreaInsets();
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
@@ -351,7 +353,12 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
       )}
     </View>
     </ScrollView>
-    {showDone && onDone ? <ActionBar testID="obituary-done-bar" label={copy.doneButton as string} hint={copy.doneHint} onPress={onDone} /> : null}
+    {showDone && onDone ? (
+      // The bar pads by the inset itself; a negative margin takes it back while the keyboard covers that edge.
+      <View testID="obituary-done-wrap" style={keyboardOpen ? { marginBottom: -insets.bottom } : undefined}>
+        <ActionBar testID="obituary-done-bar" label={copy.doneButton as string} hint={copy.doneHint} onPress={onDone} />
+      </View>
+    ) : null}
     </>
   );
 }

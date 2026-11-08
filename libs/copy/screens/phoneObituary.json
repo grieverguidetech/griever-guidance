@@ -16,5 +16,7 @@
   "publisherEmailMany": "Please enter one email address only.",
   "publisherEmailInvalid": "That email address doesn't look right. Check it and try again.",
   "doneButton": "Done",
-  "doneHint": "Marks the obituary done"
+  "doneHint": "Marks the obituary done",
+  "emailOpened": "Opened in your email app. Tap Done when you have sent it.",
+  "emailShared": "Shared from your phone. Tap Done when you have sent it."
 }

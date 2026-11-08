@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
-import { AccessibilityInfo, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share } from 'react-native';
+import { AccessibilityInfo, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Session } from '@griever/hooks';
 import { CHECKLIST_PHASES } from '@griever/shared';
 import { SerifReadyContext } from '../ui';
@@ -53,8 +54,8 @@ const base = {
 } as unknown as Session;
 
 const BUTTON = 'Email it to the paper or funeral home';
-const OPENED = "Opened in your email app. Come back when it's published.";
-const SHARED = "Shared from your phone. Come back when it's published.";
+const OPENED = "Opened in your email app. Tap Done when you have sent it.";
+const SHARED = "Shared from your phone. Tap Done when you have sent it.";
 
 function setup(session: Session, onChange = jest.fn(), onSetItem = jest.fn(), onEmailed = jest.fn()) {
   render(
@@ -788,6 +789,33 @@ describe("ShareObituaryScreen publisher's email", () => {
 });
 
 describe('ShareObituaryScreen Done after emailing (#726)', () => {
+  it('says to tap Done after mail opened, in the polite live line', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    const note = await screen.findByText('Opened in your email app. Tap Done when you have sent it.');
+    expect(note.props.accessibilityLiveRegion ?? note.parent?.props.accessibilityLiveRegion).toBe('polite');
+  });
+
+  it('drops the bar bottom inset while the keyboard is open', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const handlers: Record<string, () => void> = {};
+    jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, h: () => void) => {
+      handlers[event] = h;
+      return { remove: jest.fn() };
+    }) as unknown as typeof Keyboard.addListener);
+    (useSafeAreaInsets as jest.Mock).mockReturnValue({ top: 0, left: 0, right: 0, bottom: 34 });
+    setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByRole('button', { name: 'Done' });
+    expect(screen.getByTestId('obituary-done-wrap').props.style).toBeUndefined();
+    act(() => (handlers.keyboardWillShow ?? handlers.keyboardDidShow)?.());
+    expect(StyleSheet.flatten(screen.getByTestId('obituary-done-wrap').props.style)).toEqual({ marginBottom: -34 });
+    act(() => (handlers.keyboardWillHide ?? handlers.keyboardDidHide)?.());
+    expect(screen.getByTestId('obituary-done-wrap').props.style).toBeUndefined();
+    (useSafeAreaInsets as jest.Mock).mockReturnValue({ top: 0, left: 0, right: 0, bottom: 0 });
+  });
+
   const withText = { ...base, obituaryText: 'Anna loved the garden.' } as Session;
   const DONE = { name: 'Done' };
 
@@ -813,6 +841,17 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await screen.findByText(SHARED);
     expect(screen.getByRole('button', DONE)).toBeTruthy();
+  });
+
+  it('leaving by Back before Done and coming back shows no Done', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(withText);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByRole('button', DONE);
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    screen.unmount();
+    setup(withText);
+    expect(screen.queryByRole('button', DONE)).toBeNull();
   });
 
   it('shows no Done when the share sheet was dismissed', async () => {

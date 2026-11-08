@@ -21,7 +21,9 @@
     "publisherEmailMany",
     "publisherEmailInvalid",
     "doneButton",
-    "doneHint"
+    "doneHint",
+    "emailOpened",
+    "emailShared"
   ],
   "properties": {
     "textTitle": {
@@ -76,6 +78,12 @@
       "$ref": "#/$defs/text"
     },
     "doneHint": {
+      "$ref": "#/$defs/text"
+    },
+    "emailOpened": {
+      "$ref": "#/$defs/text"
+    },
+    "emailShared": {
       "$ref": "#/$defs/text"
     }
   },

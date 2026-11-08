@@ -15,7 +15,15 @@ const openPeople = async () => {
 
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  // A distinct handle per node, so a test can tell which node got screen-reader focus.
+  findNodeHandle: (node: unknown) => {
+    const g = globalThis as unknown as { nodeHandles?: Map<unknown, number> };
+    g.nodeHandles ??= new Map();
+    if (!g.nodeHandles.has(node)) {
+      g.nodeHandles.set(node, g.nodeHandles.size + 1);
+    }
+    return g.nodeHandles.get(node);
+  },
 }));
 
 const anna = {
@@ -136,11 +144,18 @@ describe('sharing the obituary on mobile', () => {
     await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Email it to the paper or funeral home' }));
-    fireEvent.press(await screen.findByRole('button', { name: 'Done' }));
+    const done = await screen.findByRole('button', { name: 'Done' });
+    focus.mockClear();
+    fireEvent.press(done);
     // The obituary row on the hub reads Done, and it is saved on this phone.
     expect(await screen.findByRole('button', { name: 'Share the obituary, Done' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Share the obituary' })).toBeNull();
-    expect(focus).toHaveBeenCalled();
+    // Focus went to the hub heading: the handle is the one the fake gave that node.
+    const handles = (globalThis as unknown as { nodeHandles: Map<any, number> }).nodeHandles;
+    const calledWith = focus.mock.calls.at(-1)?.[0];
+    const focused = [...handles].find(([, handle]) => handle === calledWith)?.[0];
+    expect(focused?.props?.role).toBe('heading');
+    expect(focused?.props?.children).toBe('Ready to send');
     await waitFor(async () => {
       const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { obituaryEmailedAt?: string }[];
       expect(saved[0].obituaryEmailedAt).toBeTruthy();

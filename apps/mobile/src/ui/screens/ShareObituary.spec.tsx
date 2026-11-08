@@ -94,6 +94,12 @@ describe('ShareObituary Done after emailing (#726)', () => {
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
   });
 
+  it('keeps Done on screen with the keyboard open (its inset is dropped by a negative margin)', () => {
+    setup({ publisherEmail: email, emailed: true, keyboardOpen: true, onDone: jest.fn() });
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByTestId('obituary-done-wrap').props.style).toEqual({ marginBottom: -0 });
+  });
+
   it('keeps Step 2 (Continue) available beside Done', () => {
     setup({ publisherEmail: email, emailed: true, onDone: jest.fn(), link: 'https://legacy.com/anna', linkValid: true });
     expect(screen.getByRole('button', { name: 'Choose who to send it to' })).toBeTruthy();

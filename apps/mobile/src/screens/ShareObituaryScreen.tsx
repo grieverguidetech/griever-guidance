@@ -50,6 +50,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [emailFailed, setEmailFailed] = useState(false);
   // Set only by a mail or share result in this visit, so leaving and coming back does not show Done again.
   const [emailed, setEmailed] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [emailNote, setEmailNote] = useState<'opened' | 'shared' | undefined>(undefined);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
@@ -72,6 +73,16 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [emailBusy, setEmailBusy] = useState(false);
   const sheetOpen = useRef(false);
   sheetOpen.current = checklistOpen;
+
+  // Whether the keyboard is open, so the Done bar can drop its bottom inset (iOS announces the change early).
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // The heading takes screen-reader focus when the screen opens.
   useEffect(() => {
@@ -310,6 +321,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
           textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, note, editRef: editButton }}
           emailed={emailed}
+          keyboardOpen={keyboardOpen}
           onDone={() => leave(onEmailed)}
           headingRef={heading}
           checklistRef={checklistButton}
