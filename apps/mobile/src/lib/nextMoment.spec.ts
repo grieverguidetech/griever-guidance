@@ -55,6 +55,27 @@ describe('nextMoment', () => {
     expect(nextMoment({ session: session({ ...done, serviceDate: '' }), locked: [], now: NOW })).toBeNull();
   });
 
+  it('does not light an emailed obituary, and the thank-yous rule is unchanged', () => {
+    const emailed = {
+      recipientsNotified: { announcement: ['a'], service: ['b'] },
+      obituaryEmailedAt: '2026-11-04T10:00:00.000Z',
+      obituaryText: 'Anna loved the garden.',
+    };
+    expect(nextMoment({ session: session(emailed), locked: [], now: NOW })).toBeNull();
+    expect(nextMoment({ session: session({ ...emailed, serviceDate: 'November 4, 2026' }), locked: [], now: NOW })).toBe('thanks');
+    expect(nextMoment({ session: session({ ...emailed, serviceDate: 'November 8, 2026' }), locked: [], now: NOW })).toBeNull();
+    expect(barMoment({ session: session({ ...emailed, serviceDate: 'November 8, 2026' }), locked: [], now: NOW })).toBe('announce');
+  });
+
+  it('still lights the obituary texted without a link, though a text send writes momentCompletedAt.obituary', () => {
+    const s = session({
+      recipientsNotified: { announcement: ['a'], service: ['b'], obituary: ['c'] },
+      momentCompletedAt: { obituary: '2026-11-04T10:00:00.000Z' },
+      obituaryText: 'Anna loved the garden.',
+    });
+    expect(nextMoment({ session: s, locked: [], now: NOW })).toBe('obituary');
+  });
+
   it('lights the obituary when its text is written and only the link is missing', () => {
     const s = session({ recipientsNotified: { announcement: ['a'], service: ['b'] }, obituaryText: 'Anna loved the garden.' });
     expect(nextMoment({ session: s, locked: [], now: NOW })).toBe('obituary');
