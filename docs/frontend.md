@@ -94,13 +94,13 @@ is no hub screen, no gate and no obituary screen.
 | Screen (heading users see) | File | Reached from | Goes to | Feature flag |
 |---|---|---|---|---|
 | "The people you're writing about" | `HomeScreen.tsx` | App start. "Back" on the hub (there is no Home link in the send steps; Back from a first form goes to the hub, and Back there goes Home). End of a send, with a note. | The hub. "What you'll need". "Your account" (AUTH). | None |
-| "One thing at a time." (hub, built from apps/mobile/src/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. | The chosen step's first form (Who should know? for service and thank-you). "What you'll need" sheet. Paywall placeholder. | PAYMENTS (locked rows) |
+| "Ready to send" (the person screen: four Overview-style cards, each with a state word Sent, In progress or Not started, a check beside Sent, one muted line such as "Sent to 3 people" or "Emailed to the paper", and an accent bar plus "Continue" on the next card; built from apps/mobile/src/ui) | `HubScreen.tsx` | Opening a person. End of setup. Back from a moment's first form. Done after emailing the obituary. | The chosen step's first form (Who should know? for service and thank-you). "What you'll need" sheet (no "Doesn't apply" on the phone). Paywall placeholder. | PAYMENTS (locked rows) |
 | "Announce the passing" (announcement form; service and thank-you have none on mobile and open on "Who should know?") | `AnnounceScreen.tsx` | Hub. Used for the `announce` step. | Contact selector | None |
 | "Who should know?", "Add from your contacts" | `ContactSelectorScreen.tsx` | Announce form. For service and thank-you: the hub. | Confirm | None |
 | "Review your message" | `ConfirmScreen.tsx` | Contact selector | Sending | None |
 | "Reaching people, one at a time" | `SendingScreen.tsx` | Confirm | Home with a note | None |
 | "What you'll need" | `WhatYoullNeedScreen.tsx` | Home and picker | Back | None |
-| "Your account", "Create an account", "Sign in", "Check your email", "What should we call you?" | `AccountScreen.tsx`, `SignUpScreen.tsx`, `SignInScreen.tsx`, `ProfileScreen.tsx` | "Your account" on Home | Back | `AUTH` |
+| "Your account", "Create an account", "Sign in", "Check your email", "What should we call you?" | `AccountScreen.tsx`, `SignUpScreen.tsx`, `SignInScreen.tsx`, `ProfileScreen.tsx` | "Your account" at the foot of the person screen | Back. Signed in, it shows Profile (names, optional date of birth with a native picker, optional address), Sign-in and security (the email, and Manage sign-in on the Clerk-hosted page), Help and support, Sign out, and Delete account. No checklist; no Plans, Payments or On your phone. | `AUTH` |
 
 ### 2.3 Marketing
 
@@ -302,6 +302,11 @@ Saved contacts are cleared 30 days after the latest known service date
 | Contacts | `gg.contacts.v1` |
 | "What you'll need" ticks | `gg.checklist.v1` |
 | Profile (with `AUTH` on) | `gg.profile.v1` |
+
+"Delete account" in Your account (`AUTH` on) deletes the account through Clerk. When that works, the
+phone removes every key that starts with `gg.` (`apps/mobile/src/lib/deleteLocalData.ts`), and no
+request is made for that step. Place search for the service Location calls the gateway's public
+`/places/*` routes (`libs/gateway-places`); nothing from it is stored on the phone.
 
 The key `gg.checklist.v1` is mobile only. The web app keeps ticks in IndexedDB, not under this
 key.
