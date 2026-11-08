@@ -1,6 +1,6 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
@@ -9,6 +9,7 @@ import { Phrasing } from '../phrasing';
 import { Heading } from '../Heading';
 import { Row } from '../Row';
 import { Body, Eyebrow } from '../Text';
+import { useSerifStyle } from '../typography';
 import type { HeadingProps } from '../Heading';
 
 export type HubMomentKey = 'announce' | 'service' | 'obituary' | 'thanks';
@@ -22,9 +23,11 @@ export interface HubCopy {
   /** Native hint read after the button's name. */
   whatYoullNeedHint: string;
   start: string;
+  /** The accent line on the next card. */
   continue: string;
+  /** Read before the name of the next card only. Not drawn. */
   tagNext: string;
-  /** The state words that end each row's accessible name. */
+  /** The state words: shown on each card and last in its accessible name. */
   stateDone: string;
   stateInProgress: string;
   stateNotStarted: string;
@@ -39,9 +42,11 @@ export interface HubRow {
   key: HubMomentKey;
   /** done: finished. next: the one step to do now. later: a step after that. */
   status: 'done' | 'next' | 'later';
-  /** Drawn as one icon at the trailing edge, and read as a word at the end of the row's name. */
+  /** Shown as a word at the top right (a check before it only for done), and last in the row's name. */
   state: HubRowState;
-  /** The one card to do now. Exactly one row has this. It reads "Next" and its press starts the step. */
+  /** The muted second line, like web's Overview summary. The host builds it from the session. */
+  summary?: string;
+  /** The one card to do now. Exactly one row has this. It gets the accent bar and the Continue line. */
   lit?: boolean;
   /** In the full plan: stays focusable and opens the paywall placeholder. */
   locked: boolean;
@@ -49,7 +54,7 @@ export interface HubRow {
   unavailable?: boolean;
   /**
    * The one line under a step that names what is missing, for example "Needs the service date".
-   * Shown on any row, and part of the row's accessible name. Status itself is the icon (`state`), never a sentence.
+   * Shown on any row in place of the summary, and part of the row's accessible name. Status itself is the state word.
    */
   meta?: string;
 }
@@ -130,40 +135,7 @@ function HubStep({ row, copy, onStart, onLocked, metaOnAllRows }: HubProps & { r
     return <LockedStep title={text.title} body={text.body} meta={metaOnAllRows ? row.meta : undefined} reason={copy.lockedReason} onLocked={onLocked} />;
   }
 
-  const stateWord = stateWords(copy)[row.state];
-  const icon = <StatusIcon state={row.state} />;
-
-  if (row.lit) {
-    // The one lit card: a single press target. "Next" is in its name; the bottom button does the same.
-    return (
-      <StatusPressable style={styles.lit} label={[copy.tagNext, text.title, text.body, row.meta, stateWord]} icon={icon} onPress={() => onStart(row.key)}>
-        <Body tone="muted" small>
-          {copy.tagNext}
-        </Body>
-        <Body tone="strong">{text.title}</Body>
-        <Body>{text.body}</Body>
-        <Meta meta={row.meta} />
-      </StatusPressable>
-    );
-  }
-
-  if (row.status === 'done') {
-    // Compact: just the title. Opens this step's message: a draft still under way comes back,
-    // otherwise it is new and empty, because a finished send keeps no wording (C2).
-    return (
-      <StatusPressable style={styles.row} label={[text.title, stateWord]} icon={icon} onPress={() => onStart(row.key)}>
-        <Body tone="strong">{text.title}</Body>
-      </StatusPressable>
-    );
-  }
-
-  return (
-    <StatusPressable style={styles.row} label={[text.title, text.body, row.meta, stateWord]} icon={icon} onPress={() => onStart(row.key)}>
-      <Body tone="strong">{text.title}</Body>
-      <Body>{text.body}</Body>
-      <Meta meta={row.meta} />
-    </StatusPressable>
-  );
+  return <SendCard row={row} title={text.title} stateWord={stateWords(copy)[row.state]} continueWord={copy.continue} nextWord={copy.tagNext} onPress={() => onStart(row.key)} />;
 }
 
 const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
@@ -172,24 +144,38 @@ const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
   notStarted: copy.stateNotStarted,
 });
 
-/** The status mark at the trailing edge. Decorative: the state word in the row's name carries the meaning. */
-function StatusIcon({ state }: { state: HubRowState }) {
-  if (state === 'done') {
-    return <Icon name="check" testID="status-check" color={colors['success-700']} trailing />;
-  }
-  if (state === 'inProgress') {
-    return <Icon name="progress" testID="status-progress" color={colors['neutral-700']} trailing />;
-  }
-  // neutral-600 is the lightest token with 3:1 contrast on the page (WCAG 1.4.11).
-  return <Icon name="circle" testID="status-circle" color={colors['neutral-600']} trailing />;
-}
-
-/** A pressable card whose name is set whole, so it can end with the state word. */
-function StatusPressable(props: { style: object; label: Array<string | undefined>; icon: ReactNode; onPress: () => void; children: ReactNode }) {
+/** A filled panel card like web's Overview card: title and state word, then one muted line. */
+function SendCard(props: { row: HubRow; title: string; stateWord: string; continueWord: string; nextWord: string; onPress: () => void }) {
+  const { row } = props;
+  const semibold = useSerifStyle('semibold');
+  // The "Needs ..." line replaces the summary. The check is decorative, so it is not in the name.
+  const line = row.meta ?? row.summary;
+  // The next card is announced as such first. Other tests and screen-reader users find it by "Next".
+  const label = [row.lit ? props.nextWord : undefined, props.title, line, props.stateWord].filter(Boolean).join(', ');
   return (
-    <Pressable role="button" accessibilityLabel={props.label.filter(Boolean).join(', ')} onPress={props.onPress} style={props.style}>
-      <Phrasing>{props.children}</Phrasing>
-      {props.icon}
+    <Pressable
+      role="button"
+      testID={row.lit ? 'hub-next-card' : undefined}
+      accessibilityLabel={label}
+      onPress={props.onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    >
+      {row.lit ? <View testID="next-bar" style={styles.nextBar} /> : null}
+      <Phrasing>
+        <View style={styles.top}>
+          <Text style={[styles.title, semibold]}>{props.title}</Text>
+          <View style={styles.state}>
+            {row.state === 'done' ? <Icon name="check" size={16} testID="status-check" color={colors['success-700']} /> : null}
+            <Body small>{props.stateWord}</Body>
+          </View>
+        </View>
+        {line ? (
+          <Body tone="muted" small>
+            {line}
+          </Body>
+        ) : null}
+        {row.lit ? <Text style={[styles.continue, semibold]}>{props.continueWord}</Text> : null}
+      </Phrasing>
     </Pressable>
   );
 }
@@ -205,15 +191,24 @@ function Meta({ meta }: { meta?: string }) {
   );
 }
 
+/** colors.surface with 7% of colors.ink over it (web's hover). */
+const PRESSED_SURFACE = '#dcdbdb';
+
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   rows: { gap: spacing[2] },
-  // Must match the selected style of Card (ui/Card.tsx): border 2, accent, radius md, surface, padding spacing[3].
-  lit: { gap: spacing[2], padding: spacing[3], paddingRight: spacing[6], backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 2, borderColor: colors.accent },
-  // Same edge as Row (ui/Row.tsx) when bordered, with room on the right for the status icon.
-  row: { minHeight: minTouchTarget, paddingVertical: spacing[2], paddingHorizontal: spacing[3], paddingRight: spacing[6], gap: 2, borderWidth: 1, borderColor: colors['neutral-600'], borderRadius: radius.md },
+  // Web's gg-panel card: surface fill, no border, full width, at least 44 pt.
+  card: { minHeight: minTouchTarget, padding: spacing[3], gap: 2, backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' },
+  // Web's hover mix: ink 7% over surface. Muted text keeps 4.5:1 on it (Hub.spec checks).
+  cardPressed: { backgroundColor: PRESSED_SURFACE },
+  // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
+  nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },
+  top: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 15, lineHeight: 22, color: colors.ink },
+  state: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  continue: { fontSize: 15, lineHeight: 22, color: colors['accent-700'] },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 
