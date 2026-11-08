@@ -28,6 +28,18 @@ const PAID_MOMENTS: MomentKey[] = ['service', 'thanks'];
 /** Where a moment's drafts are kept (one map, shared with the hooks). */
 export { MOMENT_CATEGORY as CATEGORY_BY_MOMENT } from '@griever/hooks';
 
+/** The one sentence under a row: what is missing. Nothing else is said in words; status is the icon. */
+function metaLine(session: Session, key: MomentKey): string | undefined {
+  const status = sendCardStatus(session, key);
+  if (status === 'needsDetail') {
+    return needsLine(session, key);
+  }
+  if (status === 'waitingForLink') {
+    return fill(copy.statusNeedsField, { field: copy.statusFieldNames.obituaryUrl });
+  }
+  return undefined;
+}
+
 /** "Needs the service date": names the first missing required field. Falls back to the plain line. */
 function needsLine(session: Session, key: MomentKey): string {
   const field = firstMissingField(session, key);
@@ -163,7 +175,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
     lit: moment.key === lit,
     locked: locked.includes(moment.key),
     // Only what is missing is a sentence. Status is the icon.
-    meta: moment.status !== 'done' && sendCardStatus(statusSession, moment.key) === 'needsDetail' ? needsLine(statusSession, moment.key) : undefined,
+    meta: moment.status === 'done' ? undefined : metaLine(statusSession, moment.key),
   }));
 
   // The bottom button names the lit card and does what tapping it does. With none lit it uses `barMoment`: the first open card, else the announcement.

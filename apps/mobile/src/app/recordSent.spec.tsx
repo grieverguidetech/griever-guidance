@@ -73,7 +73,7 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
 };
 
 describe('recording who was messaged (#621)', () => {
-  it('records the two sent ids, not the skipped one, and the hub shows the row done', async () => {
+  it('records the two sent ids, not the skipped one, and the hub shows the row in progress after a partial send', async () => {
     await toSending(['Dee', 'Eli', 'Fay'], NOTE);
     // The composed message really carries the note, so the check below means something.
     expect(await screen.findByText(new RegExp(NOTE))).toBeTruthy();

@@ -6,6 +6,7 @@ import { freshDraft } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, templates } from '@griever/shared';
 import { colors } from '@griever/tokens';
+import { Circle, Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
 import type { HubScreenProps } from './HubScreen';
@@ -387,10 +388,25 @@ describe('HubScreen', () => {
     }
   });
 
-  it('shows the circle in neutral-600 or darker', () => {
-    setup();
-    expect(screen.getAllByTestId('status-circle', { includeHiddenElements: true }).length).toBeGreaterThan(0);
-    expect(JSON.stringify(screen.toJSON())).toContain(colors['neutral-600']);
+  it('draws each icon in its own colour: success-700 check, neutral-700 progress, neutral-600 circle', () => {
+    setup({
+      ...anna,
+      recipientsNotified: { announcement: ['c1'] },
+      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
+      drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
+    } as unknown as Session);
+    const first = (id: string) => screen.getAllByTestId(id, { includeHiddenElements: true })[0];
+    expect(first('status-check').findByType(Path).props.stroke).toBe(colors['success-700']);
+    const progress = first('status-progress');
+    expect(progress.findByType(Circle).props.stroke).toBe(colors['neutral-700']);
+    expect(progress.findByType(Path).props.fill).toBe(colors['neutral-700']);
+    // Not the row border: the stroke inside the icon itself.
+    expect(first('status-circle').findByType(Circle).props.stroke).toBe(colors['neutral-600']);
+  });
+
+  it('names what is missing on an obituary that waits for its link', () => {
+    setup({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
+    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText('Needs the obituary link')).toBeTruthy();
   });
 
   it('shows no status sentence on any row, in text or in a name', () => {
@@ -445,6 +461,7 @@ describe('HubScreen', () => {
     setup({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
     const card = screen.getByRole('button', { name: /Share the obituary.*In progress$/ });
     expect(within(card).queryByText(/Waiting for the link/)).toBeNull();
+    expect(within(card).getByText('Needs the obituary link')).toBeTruthy();
   });
 
   it('lights exactly one card, names it Next, and a press on it starts that step', () => {
