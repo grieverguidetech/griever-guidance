@@ -29,10 +29,14 @@ export interface UseAccountResult {
   profile: CachedProfile | null;
   /** True once the server has answered the profile call (a profile, no profile, or a failure), or a cached profile exists. False only while the first answer is still pending. */
   profileAnswered: boolean;
-  /** True only after a live profile call for this sign-in answered with a profile or "no profile" (the account really has none). Never from the cache, and not after unavailable, offline or a failed call. */
+  /** True only after a live answer for this sign-in with the stored profile or "no profile" (the account really has none): the profile call, or a save that returned it. Never from the cache, and not after unavailable, offline or a failed call. */
   profileLoaded: boolean;
+  /** True when the first profile call for this sign-in was answered with a failure (offline, unavailable, refused). A profile kept on the device is then the best known copy; before that answer it may be stale. Optional so older stand-ins still fit. */
+  profileLoadFailed?: boolean;
   error: string | null;
   clearError: () => void;
+  /** Asks the server for the profile again, after a first load that failed. Optional so older stand-ins for this result still fit. */
+  reloadProfile?: () => void;
   signOut: () => Promise<void>;
   updateSenderName: (name: string) => Promise<boolean>;
   /** Saves the optional first name, last name, date of birth and address (null clears one). The server sets senderName from firstName. `invalid` means the server refused a value; no general error is set for it. */
@@ -169,7 +173,10 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   const [profile, setProfile] = useState<CachedProfile | null>(() => readOwnCache(storage));
   const [profileAnswered, setProfileAnswered] = useState(() => readOwnCache(storage) !== null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by reloadProfile; the profile effect runs again.
+  const [reloadTick, setReloadTick] = useState(0);
   // Set by signOut so the screen leaves the signed-in state before the provider answers.
   const [endedHere, setEndedHere] = useState(false);
   const mounted = useRef(true);
@@ -179,6 +186,11 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   // Bumped by anything that decides state (a new session, sign-out, a profile edit). A slower,
   // older request compares its captured value and drops its result instead of overwriting newer state.
   const gen = useRef(0);
+  // The gen value of the current sign-in (-1 when none). A save bumps gen, so a first load can be "superseded"
+  // yet still belong to this sign-in; this tells those apart from a load that belongs to an older one.
+  const session = useRef(-1);
+  // True once a save from this sign-in has returned the stored profile, which is newer than any first load.
+  const savedInSession = useRef(false);
 
   const keepProfile = useCallback((next: CachedProfile | null) => {
     writeKey(storageRef.current, PROFILE_STORAGE_KEY, next ? JSON.stringify(next) : null);
@@ -189,11 +201,13 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
 
   const clearLocal = useCallback(() => {
     gen.current += 1;
+    session.current = -1;
     writeKey(storageRef.current, PROFILE_STORAGE_KEY, null);
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, null);
     setProfile(null);
     setProfileAnswered(false);
     setProfileLoaded(false);
+    setProfileLoadFailed(false);
     setOffline(false);
     setError(null);
   }, []);
@@ -253,6 +267,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       return;
     }
     const g = ++gen.current;
+    session.current = g;
+    savedInSession.current = false;
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, authUserId);
     // A cache written for another account must not show here.
     const stored = readCache(storageRef.current);
@@ -263,26 +279,38 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     // A cached profile for this user counts as an answer; otherwise the first server answer is still to come.
     setProfileAnswered(stored !== null && stored.id === authUserId);
     setProfileLoaded(false);
+    setProfileLoadFailed(false);
     // The provider cannot give a token yet; asking now would read as offline. This runs again when it settles.
     if (!authSettled) {
       return;
     }
     void (async () => {
       const result = await callWithToken(g, (token) => getProfile(token));
-      if (!mounted.current || g !== gen.current) {
+      if (!mounted.current) {
+        return;
+      }
+      // A save made during this load bumps gen. That must not leave profileLoaded false for good, so a
+      // superseded load of this same sign-in still counts when it answered with a profile or "no profile".
+      const superseded = g !== gen.current;
+      if (superseded && (session.current !== g || !(result.ok || result.reason === 'no_profile'))) {
         return;
       }
       // Any answer, even a failure, ends the wait: a failed load must not lock the person out of saving.
       setProfileAnswered(true);
+      setProfileLoadFailed(!(result.ok || result.reason === 'no_profile'));
       if (result.ok) {
         setOffline(false);
-        keepProfile(toCached(result.profile));
+        if (!savedInSession.current) {
+          keepProfile(toCached(result.profile));
+        }
         setProfileLoaded(true);
       } else if (result.reason === 'offline') {
         setOffline(true);
       } else if (result.reason === 'no_profile') {
         setOffline(false);
-        keepProfile(null);
+        if (!savedInSession.current) {
+          keepProfile(null);
+        }
         setProfileLoaded(true);
       } else if (result.reason === 'signed_out') {
         setOffline(false);
@@ -290,7 +318,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       // unavailable / invalid / failed: keep what we have, stay signed in.
     })();
-  }, [authStatus, authUserId, authSettled, callWithToken, clearLocal, keepProfile, fail]);
+  }, [authStatus, authUserId, authSettled, reloadTick, callWithToken, clearLocal, keepProfile, fail]);
 
   /**
    * Local state is cleared first and stays cleared even if `auth.signOut()` rejects: on a shared
@@ -318,7 +346,9 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       if (result.ok) {
         setOffline(false);
+        savedInSession.current = true;
         keepProfile(toCached(result.profile));
+        setProfileLoaded(true);
         return true;
       }
       if (result.reason === 'offline') {
@@ -343,7 +373,10 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       if (result.ok) {
         setOffline(false);
+        savedInSession.current = true;
         keepProfile(toCached(result.profile));
+        // The server returned the whole stored profile, so it counts as loaded.
+        setProfileLoaded(true);
         return { ok: true };
       }
       if (result.reason === 'invalid') {
@@ -361,6 +394,9 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   );
 
   const clearError = useCallback(() => setError(null), []);
+  // The reload runs the profile effect again, which bumps gen. A save still in flight then has its result dropped here
+  // (nothing is shown or cached for it); the server still stores it, and the reload's answer reads it back.
+  const reloadProfile = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
   const status: AccountAuthStatus = endedHere ? 'signed_out' : authStatus;
 
@@ -375,6 +411,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     profileLoaded,
     error,
     clearError,
+    profileLoadFailed,
+    reloadProfile,
     signOut,
     updateSenderName,
     updateDetails,

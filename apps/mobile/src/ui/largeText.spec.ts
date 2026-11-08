@@ -43,7 +43,7 @@ describe('inputs are at least 15 pt (#654)', () => {
   it.each([
     ['ui/screens/WhoShouldKnow.tsx', 'input'],
     ['ui/screens/ReadyToSend.tsx', 'input'],
-    ['ui/screens/Account.tsx', 'input'],
+    ['components/AddressFields.tsx', 'input'],
     ['components/DetailsRow.tsx', 'input'],
     ['components/SavedNote.tsx', 'note'],
     ['components/DateField.tsx', 'value'],
