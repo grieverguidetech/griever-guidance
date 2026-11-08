@@ -213,7 +213,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded, onSaved, on
   } else if (waiting) {
     message = copy.loadingDetails;
   } else if (saved) {
-    message = copy.saved;
+    message = copy.detailsSaved;
   }
   let primaryLabel = copy.save;
   if (sessionEnded) {

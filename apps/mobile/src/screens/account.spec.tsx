@@ -205,17 +205,15 @@ describe('sign up', () => {
     expect(value('First name, required')).toBe('');
   });
 
-  // A save made right after sign-up supersedes the first profile load, so profileLoaded stays false (see libs/hooks useAccount).
-  // Until it is true, Save waits (#717), so a stale sign-up name can never be written over a newer one.
-  it('does not save a newer name while the profile has not loaded after an offline sign-up', async () => {
+  it('saves a newer name after an offline sign-up, and the old sign-up name does not overwrite it', async () => {
     mockUpdateProfile.mockResolvedValueOnce({ ok: false, reason: 'offline' });
     await openSignUp();
     await createAccount();
     await screen.findByText(OFFLINE);
     type('First name, required', 'Samantha');
     press('Save');
-    expect(value('First name, required')).toBe('Samantha');
-    expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }]);
+    await screen.findByText('Your details are saved.');
+    expect(mockUpdateProfile.mock.calls.map((c) => c[1])).toEqual([{ senderName: 'Sam' }, { firstName: 'Samantha', lastName: null, birthDate: null, address: null }]);
   });
 
   it('does not ask for a name when the profile still has none after sign-up', async () => {
@@ -346,19 +344,19 @@ describe('profile', () => {
     renderAccount(true);
     fireEvent.changeText(await screen.findByDisplayValue('Sam'), 'Samantha');
     press('Save');
-    await screen.findByText('Your name is saved.');
+    await screen.findByText('Your details are saved.');
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Samantha', lastName: null, birthDate: null, address: null });
     // Only the shared status line announces it, once.
-    expect(announce.mock.calls.filter(([m]) => m === 'Your name is saved.')).toHaveLength(1);
+    expect(announce.mock.calls.filter(([m]) => m === 'Your details are saved.')).toHaveLength(1);
   });
 
-  it('shows "Your name is saved." on the first save, when the account had no profile yet', async () => {
+  it('shows "Your details are saved." on the first save, when the account had no profile yet', async () => {
     mockGetProfile.mockResolvedValue(noProfile);
     renderAccount(true);
     await screen.findByLabelText('First name, required');
     type('First name, required', 'Sam');
     press('Save');
-    await screen.findByText('Your name is saved.');
+    await screen.findByText('Your details are saved.');
     expect(value('First name, required')).toBe('Sam');
   });
 
@@ -392,7 +390,7 @@ describe('profile', () => {
     expect(screen.queryByText(/You are offline/)).toBeNull();
     type('First name, required', 'Samantha');
     press('Save');
-    await screen.findByText('Your name is saved.');
+    await screen.findByText('Your details are saved.');
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', { firstName: 'Samantha', lastName: null, birthDate: null, address: null });
     expect(screen.queryByText(/You are offline/)).toBeNull();
   });
@@ -526,7 +524,7 @@ describe('personal details (#717)', () => {
     type('Address line 2 (optional)', '');
     type('State', 'new jersey');
     saveButton();
-    await screen.findByText('Your name is saved.');
+    await screen.findByText('Your details are saved.');
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', {
       firstName: 'Annie',
       lastName: null,
@@ -540,7 +538,7 @@ describe('personal details (#717)', () => {
     renderAccount(true);
     await screen.findByDisplayValue('Anna');
     saveButton();
-    await screen.findByText('Your name is saved.');
+    await screen.findByText('Your details are saved.');
     expect(mockUpdateProfile).toHaveBeenCalledWith('t', noAddress);
   });
 

@@ -628,6 +628,71 @@ describe('useAccount profileLoaded and quiet saves (#603)', () => {
     expect(result.current.profileLoaded).toBe(false);
   });
 
+  it('a details save during the first load leaves profileLoaded true and holds the saved values', async () => {
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT' ? Promise.resolve(reply(200, { ...profile('Anna'), firstName: 'Anna' })) : new Promise(() => undefined),
+    );
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    expect(result.current.profileLoaded).toBe(false);
+    await act(async () => {
+      await result.current.updateDetails({ firstName: 'Anna', lastName: null });
+    });
+    expect(result.current.profileLoaded).toBe(true);
+    expect(result.current.profile).toMatchObject({ senderName: 'Anna', firstName: 'Anna' });
+  });
+
+  it('a name save during the first load leaves profileLoaded true and holds the saved name', async () => {
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT' ? Promise.resolve(reply(200, profile('Sam'))) : new Promise(() => undefined),
+    );
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await act(async () => {
+      await result.current.updateSenderName('Sam');
+    });
+    expect(result.current.profileLoaded).toBe(true);
+    expect(result.current.profile?.senderName).toBe('Sam');
+  });
+
+  it('a first load that answers after a failed save still ends the wait, with its profile', async () => {
+    let answerLoad: (r: Response) => void = () => undefined;
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT' ? Promise.resolve(reply(500)) : new Promise<Response>((resolve) => (answerLoad = resolve)),
+    );
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await act(async () => {
+      await result.current.updateSenderName('Sam');
+    });
+    expect(result.current.profileLoaded).toBe(false);
+    await act(async () => answerLoad(reply(200, profile('Stored'))));
+    expect(result.current.profileLoaded).toBe(true);
+    expect(result.current.profile?.senderName).toBe('Stored');
+  });
+
+  it('a first load that answers after a good save does not overwrite the saved profile', async () => {
+    let answerLoad: (r: Response) => void = () => undefined;
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT' ? Promise.resolve(reply(200, profile('Saved'))) : new Promise<Response>((resolve) => (answerLoad = resolve)),
+    );
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await act(async () => {
+      await result.current.updateSenderName('Saved');
+    });
+    await act(async () => answerLoad(reply(200, profile('Old'))));
+    expect(result.current.profile?.senderName).toBe('Saved');
+    expect(result.current.profileLoaded).toBe(true);
+  });
+
+  it('a failed save during the first load does not make profileLoaded true', async () => {
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT' ? Promise.resolve(reply(500)) : new Promise(() => undefined),
+    );
+    const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
+    await act(async () => {
+      await result.current.updateDetails({ firstName: 'Anna', lastName: null });
+    });
+    expect(result.current.profileLoaded).toBe(false);
+  });
+
   it('a quiet details save that fails sets no error', async () => {
     const { result } = renderHook(() => useAccount({ auth: fakeAuth() }));
     await waitFor(() => expect(result.current.profileLoaded).toBe(true));

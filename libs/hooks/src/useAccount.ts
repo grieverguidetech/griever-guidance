@@ -179,6 +179,11 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
   // Bumped by anything that decides state (a new session, sign-out, a profile edit). A slower,
   // older request compares its captured value and drops its result instead of overwriting newer state.
   const gen = useRef(0);
+  // The gen value of the current sign-in (-1 when none). A save bumps gen, so a first load can be "superseded"
+  // yet still belong to this sign-in; this tells those apart from a load that belongs to an older one.
+  const session = useRef(-1);
+  // True once a save from this sign-in has returned the stored profile, which is newer than any first load.
+  const savedInSession = useRef(false);
 
   const keepProfile = useCallback((next: CachedProfile | null) => {
     writeKey(storageRef.current, PROFILE_STORAGE_KEY, next ? JSON.stringify(next) : null);
@@ -189,6 +194,7 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
 
   const clearLocal = useCallback(() => {
     gen.current += 1;
+    session.current = -1;
     writeKey(storageRef.current, PROFILE_STORAGE_KEY, null);
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, null);
     setProfile(null);
@@ -253,6 +259,8 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       return;
     }
     const g = ++gen.current;
+    session.current = g;
+    savedInSession.current = false;
     writeKey(storageRef.current, SIGNED_IN_STORAGE_KEY, authUserId);
     // A cache written for another account must not show here.
     const stored = readCache(storageRef.current);
@@ -269,20 +277,30 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
     }
     void (async () => {
       const result = await callWithToken(g, (token) => getProfile(token));
-      if (!mounted.current || g !== gen.current) {
+      if (!mounted.current) {
+        return;
+      }
+      // A save made during this load bumps gen. That must not leave profileLoaded false for good, so a
+      // superseded load of this same sign-in still counts when it answered with a profile or "no profile".
+      const superseded = g !== gen.current;
+      if (superseded && (session.current !== g || !(result.ok || result.reason === 'no_profile'))) {
         return;
       }
       // Any answer, even a failure, ends the wait: a failed load must not lock the person out of saving.
       setProfileAnswered(true);
       if (result.ok) {
         setOffline(false);
-        keepProfile(toCached(result.profile));
+        if (!savedInSession.current) {
+          keepProfile(toCached(result.profile));
+        }
         setProfileLoaded(true);
       } else if (result.reason === 'offline') {
         setOffline(true);
       } else if (result.reason === 'no_profile') {
         setOffline(false);
-        keepProfile(null);
+        if (!savedInSession.current) {
+          keepProfile(null);
+        }
         setProfileLoaded(true);
       } else if (result.reason === 'signed_out') {
         setOffline(false);
@@ -318,7 +336,9 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       if (result.ok) {
         setOffline(false);
+        savedInSession.current = true;
         keepProfile(toCached(result.profile));
+        setProfileLoaded(true);
         return true;
       }
       if (result.reason === 'offline') {
@@ -343,7 +363,10 @@ export function useAccount({ auth, storage }: UseAccountOptions): UseAccountResu
       }
       if (result.ok) {
         setOffline(false);
+        savedInSession.current = true;
         keepProfile(toCached(result.profile));
+        // The server returned the whole stored profile, so it counts as loaded.
+        setProfileLoaded(true);
         return { ok: true };
       }
       if (result.reason === 'invalid') {
