@@ -181,6 +181,8 @@ describe('formatServiceTime / serviceTimeFromText', () => {
     };
     expect(at('2:00 PM')).toEqual([14, 0]);
     expect(at('12:00 AM')).toEqual([0, 0]);
+    expect(at('12:30 AM')).toEqual([0, 30]);
+    expect(at('12:00 PM')).toEqual([12, 0]);
     expect(at('12:05 PM')).toEqual([12, 5]);
     expect(at('11:30 am')).toEqual([11, 30]);
     expect(at('2:00pm')).toEqual([14, 0]);

@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { Platform, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet } from 'react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { TimeField } from './TimeField';
+
+// The test renderer has no native handles, so give every field one.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 42,
+}));
 
 const copy = { placeholder: 'Choose a time', done: 'Done', clear: 'Clear it', hint: 'Opens a clock' };
 
@@ -75,6 +81,18 @@ describe('TimeField', () => {
     fireEvent.press(field());
     fireEvent.press(screen.getByRole('button', { name: 'Clear it' }));
     expect(onChange).toHaveBeenCalledWith('');
+  });
+
+  it('puts screen-reader focus back on the field after Done and after Clear', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    setup('2:00 PM');
+    fireEvent.press(field());
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(focus).toHaveBeenCalledWith(42);
+    focus.mockClear();
+    fireEvent.press(field());
+    fireEvent.press(screen.getByRole('button', { name: 'Clear it' }));
+    expect(focus).toHaveBeenCalledWith(42);
   });
 
   it('draws the dashed border only when missing', () => {

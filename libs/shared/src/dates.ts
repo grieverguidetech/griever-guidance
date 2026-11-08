@@ -105,7 +105,8 @@ export function formatServiceTime(date: Date): string {
 
 /**
  * A stored `serviceTime` as a time a picker should open on (today, at that time); null when it is
- * empty or not a clear time. Reads what web's `TimeField` reads: "2:00 PM", "2:00pm", "14:00".
+ * empty or not a clear time: "2:00 PM", "2:00pm", "14:00". Stricter than web's `timeToISO`: with AM/PM
+ * the hour must be 1-12, so "0:30 AM" and "13:00 PM" are null and the saved text is kept as typed.
  */
 export function serviceTimeFromText(value: string | undefined | null): Date | null {
   const match = /^(\d{1,2}):(\d{2})\s*([ap])\.?\s?m\.?$|^(\d{1,2}):(\d{2})$/i.exec(value?.trim() ?? '');

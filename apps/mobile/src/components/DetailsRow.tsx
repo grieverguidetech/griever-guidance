@@ -19,12 +19,13 @@ export interface DetailsField {
 }
 
 const dateCopy = screenCopy('personSetup');
+const detailsCopy = screenCopy('phoneDetails');
 /** The service date is the one field written as a date, in the text web writes ("June 7, 2025"). */
 const DATE_KEY = 'serviceDate';
 /** The service time is written as time text, in the text web writes ("2:00 PM"). */
 const TIME_KEY = 'serviceTime';
-// Not in libs/copy yet (outside this ticket); the Done label matches the date field's.
-const TIME_COPY: Omit<TimeFieldCopy, 'placeholder'> = { done: dateCopy.dateDone, clear: 'Clear the time', hint: 'Opens a clock' };
+// The Done label matches the date field's.
+const TIME_COPY: Omit<TimeFieldCopy, 'placeholder'> = { done: dateCopy.dateDone, clear: detailsCopy.timeClear, hint: detailsCopy.timeHint };
 // Same range as parseCompleteDate, which reads the text back. There is no real upper limit.
 const EARLIEST_DATE = new Date(2000, 0, 1);
 const LATEST_DATE = new Date(2100, 11, 31);

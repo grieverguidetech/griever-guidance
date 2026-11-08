@@ -143,8 +143,18 @@ describe('DetailsRow', () => {
       expect(screen.getByText('around noon')).toBeTruthy();
       fireEvent.press(screen.getByRole('button', { name: 'Time' }));
       expect(onChange).not.toHaveBeenCalled();
+      fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 10, 14, 12, 0));
       fireEvent.press(screen.getByRole('button', { name: 'Done' }));
       expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith('serviceTime', '12:00 PM');
+    });
+
+    it('names a required, empty time "Time, Needed" and draws the dashed border', () => {
+      const required = [{ key: 'serviceTime', label: 'Time', placeholder: '2 pm', required: true }];
+      render(<DetailsRow copy={copy} fields={required} values={{}} onChange={() => undefined} />);
+      const control = screen.getByRole('button', { name: 'Time, Needed' });
+      expect(StyleSheet.flatten(control.props.style).borderStyle).toBe('dashed');
+      expect(screen.getAllByText('Needed', { includeHiddenElements: true })).toHaveLength(1);
     });
 
     it('is never marked Needed when optional', () => {
