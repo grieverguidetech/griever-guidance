@@ -424,7 +424,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
-  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, setChecklistItem, applyRemoteFlows, recordMomentComplete } = useDeviceSessions(cache);
+  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, setChecklistItem, applyRemoteFlows, recordMomentComplete, recordObituaryEmailed } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
   useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
   // A launch opens the last person's screen (the hub), unless they are still blank. Decided once,
@@ -690,7 +690,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
   if (atShareObituary) {
     return (
       <FadeIn key="obituary">
-        <ScreenFrame>
+        <ScreenFrame bottomInset={false}>
           <ShareObituaryScreen
             key={active.id}
             session={active}
@@ -703,6 +703,13 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
             onContinue={() => {
               setStartCategory('obituary');
               setAtShareObituary(false);
+            }}
+            onEmailed={() => {
+              // Emailing it marks the obituary done, before the link is texted. The hub's heading takes focus.
+              recordObituaryEmailed(active.id);
+              setNote(null);
+              setAtShareObituary(false);
+              setAtHub(true);
             }}
           />
         </ScreenFrame>

@@ -41,7 +41,44 @@ describe('DateField', () => {
     const { onChange } = setup();
     fireEvent.press(field());
     fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(1948, 2, 9));
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(onChange).toHaveBeenCalledWith('March 9, 1948');
+  });
+
+  it('iOS: calendar taps only move the draft; the value is saved once, on Done', () => {
+    const { onChange } = setup();
+    fireEvent.press(field());
+    fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(1948, 2, 9));
+    fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(1948, 2, 10));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith('March 10, 1948');
+  });
+
+  it('iOS: Done on a partial saved text, with the calendar untouched, writes the day shown (today)', () => {
+    const { onChange } = setup('Nov 8');
+    fireEvent.press(field());
+    fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    const today = new Date();
+    const shown = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][today.getMonth()];
+    expect(onChange).toHaveBeenCalledWith(`${shown} ${today.getDate()}, ${today.getFullYear()}`);
+  });
+
+  it('Android: Set saves the day at once', () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const { onChange } = setup();
+    fireEvent.press(field());
+    const options = jest.mocked(DateTimePickerAndroid.open).mock.calls.at(-1)?.[0];
+    options?.onChange?.({ type: 'set' } as never, new Date(1948, 2, 9));
+    expect(onChange).toHaveBeenCalledWith('March 9, 1948');
+  });
+
+  it('draws the dashed border only when missing', () => {
+    render(<DateField copy={copy} value="" onChange={() => undefined} accessibleName="Missing one" maximumDate={maximumDate} minimumDate={minimumDate} missing />);
+    expect(StyleSheet.flatten(screen.getByRole('button', { name: 'Missing one' }).props.style).borderStyle).toBe('dashed');
+    setup();
+    expect(StyleSheet.flatten(field().props.style).borderStyle).toBeUndefined();
   });
 
   it('Clear empties the value', () => {

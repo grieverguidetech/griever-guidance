@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Platform } from 'react-native';
+import { AccessibilityInfo, Linking, Platform } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
@@ -15,7 +15,15 @@ const openPeople = async () => {
 
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
-  findNodeHandle: () => 1,
+  // A distinct handle per node, so a test can tell which node got screen-reader focus.
+  findNodeHandle: (node: unknown) => {
+    const g = globalThis as unknown as { nodeHandles?: Map<unknown, number> };
+    g.nodeHandles ??= new Map();
+    if (!g.nodeHandles.has(node)) {
+      g.nodeHandles.set(node, g.nodeHandles.size + 1);
+    }
+    return g.nodeHandles.get(node);
+  },
 }));
 
 const anna = {
@@ -123,5 +131,38 @@ describe('sharing the obituary on mobile', () => {
     expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
+  });
+
+  it('shows no Done on arrival; emailing then Done lands on the hub with the obituary row done and focus on the heading', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: 'Anna loved the garden.' }]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    fireEvent.press(await screen.findByRole('button', { name: /Share the obituary/ }));
+    await screen.findByRole('heading', { name: 'Share the obituary' });
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Email it to the paper or funeral home' }));
+    const done = await screen.findByRole('button', { name: 'Done' });
+    focus.mockClear();
+    fireEvent.press(done);
+    // The obituary row on the hub reads Done, and it is saved on this phone.
+    expect(await screen.findByRole('button', { name: 'Share the obituary, Done' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Share the obituary' })).toBeNull();
+    // Focus went to the hub heading: the handle is the one the fake gave that node.
+    const handles = (globalThis as unknown as { nodeHandles: Map<any, number> }).nodeHandles;
+    const calledWith = focus.mock.calls.at(-1)?.[0];
+    const focused = [...handles].find(([, handle]) => handle === calledWith)?.[0];
+    expect(focused?.props?.role).toBe('heading');
+    expect(focused?.props?.children).toBe('Ready to send');
+    await waitFor(async () => {
+      const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { obituaryEmailedAt?: string }[];
+      expect(saved[0].obituaryEmailedAt).toBeTruthy();
+    });
+    // Pressing the row opens Share the obituary again, with no Done until the next email.
+    fireEvent.press(screen.getByRole('button', { name: 'Share the obituary, Done' }));
+    await screen.findByRole('heading', { name: 'Share the obituary' });
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
   });
 });

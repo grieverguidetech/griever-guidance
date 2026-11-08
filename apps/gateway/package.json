@@ -69,6 +69,7 @@
     "@griever/gateway-messages": "workspace:*",
     "@hono/node-server": "^2.1.1",
     "hono": "^4.13.7",
-    "@griever/gateway-flows": "workspace:*"
+    "@griever/gateway-flows": "workspace:*",
+    "@griever/gateway-places": "workspace:*"
   }
 }

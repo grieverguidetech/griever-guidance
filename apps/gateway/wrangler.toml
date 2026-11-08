@@ -57,3 +57,11 @@ DATA_FUNCTION_REGION = "us-east-2"
 name = "WRITE_RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 120, period = 60 }
+
+# Per-IP rate limit on the public place routes (POST /places/suggest and /places/details; libs/gateway-places).
+# Both routes share one bucket per client IP (CF-Connecting-IP). Same binding type as above.
+# The code reads the binding by this name; if it is missing the limit is simply off.
+[[ratelimits]]
+name = "PLACES_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }

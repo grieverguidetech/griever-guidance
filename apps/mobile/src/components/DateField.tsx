@@ -24,6 +24,8 @@ interface Props {
   maximumDate: Date;
   /** The earliest day offered. A saved date before this opens the calendar on today. */
   minimumDate: Date;
+  /** A required field with no value: the same dashed border the text inputs get. */
+  missing?: boolean;
 }
 
 /**
@@ -31,7 +33,7 @@ interface Props {
  * in step with the text the session stores: Android opens its system dialog; iOS shows the calendar
  * under the field, with Done and Clear. The caller sets the latest and earliest day.
  */
-export function DateField({ copy, value, onChange, accessibleName, maximumDate, minimumDate }: Props) {
+export function DateField({ copy, value, onChange, accessibleName, maximumDate, minimumDate, missing }: Props) {
   const [open, setOpen] = useState(false);
   // The day the calendar shows. Set once when it opens, so it does not jump back to today.
   const [draft, setDraft] = useState(() => new Date());
@@ -45,10 +47,11 @@ export function DateField({ copy, value, onChange, accessibleName, maximumDate, 
     }
   };
 
-  const pick = (_event: unknown, date?: Date) => {
+  // The iOS calendar only moves the draft. The value is saved on Done, so each tap does not save
+  // the session and re-write the message.
+  const moveDraft = (_event: unknown, date?: Date) => {
     if (date) {
       setDraft(date);
-      onChange(formatPassingDate(date));
     }
   };
 
@@ -61,8 +64,9 @@ export function DateField({ copy, value, onChange, accessibleName, maximumDate, 
         minimumDate,
         neutralButton: { label: copy.dateClear },
         onChange: (event, date) => {
-          if (event.type === 'set') {
-            pick(event, date);
+          if (event.type === 'set' && date) {
+            setDraft(date);
+            onChange(formatPassingDate(date));
           } else if (event.type === 'neutralButtonPressed') {
             onChange('');
           }
@@ -99,13 +103,13 @@ export function DateField({ copy, value, onChange, accessibleName, maximumDate, 
         accessibilityHint={copy.dateHint}
         accessibilityValue={{ text: value || copy.datePlaceholder }}
         accessibilityState={{ expanded: Platform.OS === 'ios' ? open : undefined }}
-        style={styles.field}
+        style={[styles.field, missing && styles.fieldMissing]}
       >
         <Text style={value ? styles.value : styles.placeholder}>{value || copy.datePlaceholder}</Text>
       </Pressable>
       {open && Platform.OS === 'ios' ? (
         <View style={styles.picker}>
-          <DateTimePicker value={draft} mode="date" display="inline" maximumDate={maximumDate} minimumDate={minimumDate} accentColor={colors['accent-700']} onChange={pick} />
+          <DateTimePicker value={draft} mode="date" display="inline" maximumDate={maximumDate} minimumDate={minimumDate} accentColor={colors['accent-700']} onChange={moveDraft} />
           <View style={styles.actions}>
             {value ? <Button label={copy.dateClear} variant="tertiary" onPress={clear} /> : null}
             <Button label={copy.dateDone} variant="secondary" onPress={done} />
@@ -127,6 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface,
   },
+  fieldMissing: { borderStyle: 'dashed', borderColor: colors.ink },
   value: { fontSize: 15, color: colors.ink },
   placeholder: { fontSize: 15, color: colors['neutral-700'] },
   picker: { gap: spacing[1] },

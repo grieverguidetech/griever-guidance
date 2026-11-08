@@ -6,6 +6,7 @@ import { freshDraft } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, templates } from '@griever/shared';
 import { colors } from '@griever/tokens';
+import { Circle, Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
 import type { HubScreenProps } from './HubScreen';
@@ -352,7 +353,7 @@ describe('HubScreen', () => {
     jest.useRealTimers();
   });
 
-  it('shows a finished step as one compact row, and a started step as Started', () => {
+  it('shows a finished step as one compact row with a check, and a started step with the progress icon', () => {
     const done = {
       ...anna,
       recipientsNotified: { announcement: ['c1', 'c2'] },
@@ -360,10 +361,79 @@ describe('HubScreen', () => {
       drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
     } as unknown as Session;
     setup(done);
-    expect(screen.getByRole('button', { name: 'Announce the passing · Sent to 2 people' })).toBeTruthy();
-    expect(screen.queryByText(/October 2, 2026|Send again/)).toBeNull();
-    expect(screen.getByText(/Share the service · Started/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
+    expect(screen.queryByText(/October 2, 2026|Send again|Sent to|Started/)).toBeNull();
+    expect(within(screen.getByRole('button', { name: /^Share the service.*In progress$/ })).getByTestId('status-progress', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+  });
+
+  it('shows a check, progress, progress and a circle, and ends each name with its state word', () => {
+    const mixed = {
+      ...anna,
+      recipientsNotified: { announcement: ['c1'] },
+      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
+      drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
+      obituaryText: 'Anna loved the garden.',
+    } as unknown as Session;
+    setup(mixed);
+    const icon = (name: RegExp, id: string) => within(screen.getByRole('button', { name })).getByTestId(id, { includeHiddenElements: true });
+    expect(icon(/^Announce the passing, Done$/, 'status-check')).toBeTruthy();
+    expect(icon(/^Share the service.*, In progress$/, 'status-progress')).toBeTruthy();
+    expect(icon(/Share the obituary.*, In progress$/, 'status-progress')).toBeTruthy();
+    expect(icon(/^Send thank-yous.*, Not started$/, 'status-circle')).toBeTruthy();
+    for (const id of ['status-check', 'status-progress', 'status-circle']) {
+      for (const node of screen.queryAllByTestId(id, { includeHiddenElements: true })) {
+        expect(node.props.importantForAccessibility).toBe('no-hide-descendants');
+      }
+    }
+  });
+
+  it('draws each icon in its own colour: success-700 check, neutral-700 progress, neutral-600 circle', () => {
+    setup({
+      ...anna,
+      recipientsNotified: { announcement: ['c1'] },
+      momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
+      drafts: { service: freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary' } }) },
+    } as unknown as Session);
+    const first = (id: string) => screen.getAllByTestId(id, { includeHiddenElements: true })[0];
+    expect(first('status-check').findByType(Path).props.stroke).toBe(colors['success-700']);
+    const progress = first('status-progress');
+    expect(progress.findByType(Circle).props.stroke).toBe(colors['neutral-700']);
+    expect(progress.findByType(Path).props.fill).toBe(colors['neutral-700']);
+    // Not the row border: the stroke inside the icon itself.
+    expect(first('status-circle').findByType(Circle).props.stroke).toBe(colors['neutral-600']);
+  });
+
+  it('names what is missing on an obituary that waits for its link', () => {
+    setup({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
+    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText('Needs the obituary link')).toBeTruthy();
+  });
+
+  it('shows no status sentence on any row, in text or in a name', () => {
+    setup({ ...anna, recipientsNotified: { announcement: ['c1', 'c2'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' }, obituaryText: 'x' } as unknown as Session);
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree).not.toMatch(/Sent to|Started|Waiting for the link|Ready"/);
+  });
+
+  it('shows the done check and no "Sent to 0" for a row whose status is { sent: 0 } (emailed obituary)', () => {
+    // An obituary emailed to the publisher, with nobody texted.
+    const emailed = { ...anna, obituaryEmailedAt: '2026-11-04T10:00:00.000Z', recipientsNotified: {} } as unknown as Session;
+    setup(emailed);
+    const row = screen.getByRole('button', { name: 'Share the obituary, Done' });
+    expect(within(row).getByTestId('status-check', { includeHiddenElements: true })).toBeTruthy();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/Sent to/);
+    expect(screen.queryByRole('button', { name: /Sent to/ })).toBeNull();
+  });
+
+  it('keeps the Needs line on a row that needs a detail', () => {
+    setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
+    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs the obituary link/)).toBeTruthy();
+  });
+
+  it('opens the step from a done row', () => {
+    const { onStart } = setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
+    fireEvent.press(screen.getByRole('button', { name: 'Announce the passing, Done' }));
+    expect(onStart).toHaveBeenLastCalledWith('announce');
   });
 
   it('shows the status lines in the real order, in each row\'s name', () => {
@@ -376,9 +446,9 @@ describe('HubScreen', () => {
       momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
     } as unknown as Session;
     setup(mixed);
-    expect(screen.getByRole('button', { name: 'Announce the passing · Sent to 1 person' })).toBeTruthy();
-    // The service is the lit card; its status sits in the card.
-    expect(screen.getByText('Ready')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
+    // The service is the lit card; "Ready" is no longer a sentence.
+    expect(screen.queryByText('Ready')).toBeNull();
     expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Needs the obituary link/)).toBeTruthy();
     expect(within(screen.getByRole('button', { name: /Send thank-yous/ })).getByText(/Needs your name/)).toBeTruthy();
     const tree = JSON.stringify(screen.toJSON());
@@ -387,16 +457,19 @@ describe('HubScreen', () => {
     expect(at.every((i) => i >= 0)).toBe(true);
   });
 
-  it('the obituary card reads "Waiting for the link" once its text is written and the link is not', () => {
+  it('the obituary card is in progress, with no sentence, once its text is written and the link is not', () => {
     setup({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
-    expect(within(screen.getByRole('button', { name: /Share the obituary/ })).getByText(/Waiting for the link/)).toBeTruthy();
+    const card = screen.getByRole('button', { name: /Share the obituary.*In progress$/ });
+    expect(within(card).queryByText(/Waiting for the link/)).toBeNull();
+    expect(within(card).getByText('Needs the obituary link')).toBeTruthy();
   });
 
   it('lights exactly one card, names it Next, and a press on it starts that step', () => {
     const { onStart } = setup();
     const lit = screen.getAllByRole('button', { name: /Next/ });
     expect(lit).toHaveLength(1);
-    expect(within(lit[0]).getByText('Ready')).toBeTruthy();
+    expect(lit[0].props.accessibilityLabel).toMatch(/, Not started$/);
+    expect(within(lit[0]).queryByText('Ready')).toBeNull();
     expect(within(lit[0]).getByText('Announce the passing')).toBeTruthy();
     const style = StyleSheet.flatten(typeof lit[0].props.style === 'function' ? lit[0].props.style({ pressed: false }) : lit[0].props.style);
     expect(style.borderWidth).toBe(2);
@@ -561,7 +634,7 @@ describe('HubScreen', () => {
       momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' },
     } as unknown as Session;
     setup(done);
-    for (const name of [/Announce the passing · Sent/, /Share the obituary/]) {
+    for (const name of [/Announce the passing, Done/, /Share the obituary/]) {
       let box = screen.getByRole('button', { name }).parent;
       while (box && !StyleSheet.flatten(box.props.style)?.borderWidth) {
         box = box.parent;
@@ -612,10 +685,11 @@ describe('HubScreen: the next card and the bottom button', () => {
     expect(within(bottomButton()).getByText('Announce the passing')).toBeTruthy();
   });
 
-  it('keeps Started on a compact done row with a re-send draft in progress', () => {
+  it('a done row with a re-send draft stays done, with no Started', () => {
     const draft = freshDraft({ templateCategory: 'announcement', step: 'details', fields: { senderName: 'Sam' } });
     setup(sess({ ...announced, drafts: { announcement: draft } }));
-    expect(screen.getByText('Announce the passing · Sent to 1 person · Started')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
+    expect(screen.queryByText(/Started|Sent to/)).toBeNull();
   });
 
   it('lights the thank-yous only after a service date that parses and is past', () => {
@@ -637,13 +711,15 @@ describe('HubScreen: the next card and the bottom button', () => {
     expect(within(bottomButton()).getByText('Share the obituary')).toBeTruthy();
   });
 
-  it('after a stopped send, the card reads "text the rest" and is the lit card', () => {
+  it('after a stopped send, the card shows progress and is the lit card', () => {
     const note = { lead: 'You told 1 of 3.', rest: 'You can text the others.', spoken: 'You told 1 of 3.', category: 'announcement' as const, partial: true };
     const onStart = jest.fn();
     render(<HubScreen session={sess({ ...announced, ...ready })} {...props} onStart={onStart} note={note} />);
     const lit = screen.getAllByRole('button', { name: /Next/ });
     expect(lit).toHaveLength(1);
-    expect(within(lit[0]).getByText('Sent to 1 person · text the rest')).toBeTruthy();
+    expect(lit[0].props.accessibilityLabel).toMatch(/, In progress$/);
+    expect(within(lit[0]).getByTestId('status-progress', { includeHiddenElements: true })).toBeTruthy();
+    expect(within(lit[0]).queryByText(/Sent to|text the rest/)).toBeNull();
     fireEvent.press(bottomButton());
     expect(onStart).toHaveBeenLastCalledWith('announce');
   });
@@ -652,6 +728,7 @@ describe('HubScreen: the next card and the bottom button', () => {
     const note = { lead: 'Everyone has been told.', rest: 'Kept private.', spoken: 'x', category: 'announcement' as const, partial: false };
     render(<HubScreen session={sess(announced)} {...props} note={note} />);
     expect(screen.queryByText(/text the rest/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Announce the passing, Done' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Next/ })).toBeNull();
   });
 

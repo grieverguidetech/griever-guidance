@@ -249,7 +249,7 @@ Hooks (`libs/hooks`), shared logic (`libs/shared` and the other logic libs), cop
 ```
 apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
-              Composes libs/identity, libs/gateway-messages and libs/gateway-flows into
+              Composes libs/identity, libs/gateway-messages, libs/gateway-flows and libs/gateway-places into
               one HTTP surface (CORS + routing) — this app owns no domain logic itself.
   web/        React + Vite + Tailwind. Planning editor (behind VITE_FEATURE_CMS, off in production),
               account management, and the old browser send flow until a later round removes it.
@@ -280,8 +280,10 @@ libs/
   gateway-flows/    Invite and member routes (GET /members, POST /invites, POST /invites/accept,
                     DELETE /invites/:id, DELETE /members/:memberId) and the invite mailer; mounted
                     by apps/gateway. The /flows routes are planned (#131).
+  gateway-places/   Place search proxy, POST /places/suggest and /places/details, to Google Places
+                    API (New) with a server key; stores and logs nothing.
 
-  identity, gateway-messages, and gateway-flows each own their own Hono router and
+  identity, gateway-messages, gateway-flows, and gateway-places each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
   together. The only shared code is libs/gateway-auth (rule 2b below).
 ```
@@ -347,7 +349,7 @@ Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app 
 `apps/web` calls `apps/gateway`'s REST endpoints (and Clerk, with its public publishable key). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.)
 
 **2b. Identity, messages, and flows are separate libs — no cross-imports.**
-`libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Clerk token verification plus the signed calls to the data function), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` still never import each other.
+`libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Clerk token verification plus the signed calls to the data function), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` still never import each other.
 
 **3. Messages are sent from the user's own phone, never a backend.**
 There is no server-side SMS provider (no Twilio, no `libs/sms`) — a bulk send from a business number reads as impersonal for a grief app. Sending is an `sms:` deep link (`buildSmsLink()` in `libs/hooks`) that opens the device's native Messages app with one contact and the message pre-filled; the user taps Send themselves, one contact at a time. Service and obituary may also hand the text to the OS share sheet or to email compose (2026-11-01, #559); that is still the user's own action each time. Nothing in this repo may add a backend message-sending path or a bulk text.
@@ -514,6 +516,11 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               no code default), DATA_FUNCTION_ACCESS_KEY_ID and DATA_FUNCTION_SECRET_ACCESS_KEY
               (Worker secrets, set by deploy.yml from the GitHub secrets; both skipped when
               either is empty; rotate every 90 days: docs/aws-data-function.md)
+              GOOGLE_PLACES_SERVER_KEY (Worker secret, set by deploy.yml from the GitHub
+              secret; skipped when empty, and a key already on the Worker stays; to remove it:
+              `wrangler secret delete GOOGLE_PLACES_SERVER_KEY --config apps/gateway/wrangler.toml`;
+              a server key restricted to Places API (New), separate from the web browser key;
+              with no key, POST /places/suggest and POST /places/details answer 503)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_CLERK_PUBLISHABLE_KEY (read only when the flag is on)
               VITE_FEATURE_SHARING ("true" enables sharing; default off)
@@ -524,7 +531,8 @@ apps/mobile   EXPO_PUBLIC_API_URL
 
 Production repo variables (public, not secrets): `CLERK_ISSUER`, `CLERK_PUBLISHABLE_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
 (off until the PO sets it to `true`), `DATA_FUNCTION_URL`. The gateway's Worker secrets are `RESEND_API_KEY`,
-`DATA_FUNCTION_ACCESS_KEY_ID` and `DATA_FUNCTION_SECRET_ACCESS_KEY` (from the repo secrets of the same names).
+`DATA_FUNCTION_ACCESS_KEY_ID`, `DATA_FUNCTION_SECRET_ACCESS_KEY`, `CLERK_WEBHOOK_SECRET`,
+`DATA_FUNCTION_SERVICE_SECRET` and `GOOGLE_PLACES_SERVER_KEY` (from the repo secrets of the same names).
 Web production has `FEATURE_AUTH=true` (since 2026-10-11). To turn accounts off or on again, change it
 and re-run the deploy. Mobile (`EXPO_PUBLIC_*`, EAS) is a follow-up.
 
@@ -553,7 +561,7 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation
-- No cross-imports between `libs/identity`, `libs/gateway-messages`, and `libs/gateway-flows` (only `libs/gateway-auth` is shared)
+- No cross-imports between `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` (only `libs/gateway-auth` is shared)
 - No contact ids in flow sync (C3), and no invitee picked from contacts: the owner types the email (C6)
 - No service-role key anywhere (see "Identity")
 - No friends-list or peer-to-peer DM API calls to Facebook or Instagram — see "Identity"; neither platform allows either for a personal contact, regardless of sign-in
