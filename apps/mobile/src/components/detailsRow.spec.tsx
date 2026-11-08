@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TextInput } from 'react-native';
 import { parseCompleteDate } from '@griever/shared';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { DetailsRow, isMissing } from './DetailsRow';
@@ -56,6 +56,24 @@ describe('DetailsRow', () => {
       );
       fireEvent.changeText(screen.getByLabelText('Location'), 'El');
       expect(onChange).toHaveBeenCalledWith('serviceLocation', 'El');
+    });
+
+    it('registers the place input so Next from the field before it moves focus into it', () => {
+      const focus = jest.spyOn(TextInput.prototype, 'focus').mockImplementation(() => undefined);
+      render(
+        <DetailsRow
+          copy={copy}
+          fields={[
+            { key: 'a', label: 'Service name', placeholder: 'Name', required: false },
+            { key: 'serviceLocation', label: 'Location', placeholder: 'Place', required: false },
+          ]}
+          values={{}}
+          onChange={() => undefined}
+        />,
+      );
+      fireEvent(screen.getByLabelText('Service name'), 'submitEditing');
+      expect(focus).toHaveBeenCalledTimes(1);
+      focus.mockRestore();
     });
 
     it('a picked place is reported as the serviceLocation text', async () => {

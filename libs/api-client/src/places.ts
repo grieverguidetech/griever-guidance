@@ -71,10 +71,18 @@ export async function suggestPlaces(
 ): Promise<PlaceSuggestion[]> {
   const body: PlaceSuggestRequest = { input: input.trim(), sessionToken, ...(types.length > 0 ? { types: [...types] } : {}) };
   const result = await placesCall<PlaceSuggestResponse>('/places/suggest', body, signal);
+  // A 200 that is not the shape we expect is the service misbehaving, not an empty result.
+  if (!Array.isArray(result?.suggestions)) {
+    throw new PlacesError('unavailable');
+  }
   return result.suggestions;
 }
 
 /** The name and street address of a picked suggestion. Ends the billing session for the token. */
-export function placeDetails(placeId: string, sessionToken: string, signal?: AbortSignal): Promise<PlaceDetails> {
-  return placesCall<PlaceDetails>('/places/details', { placeId, sessionToken }, signal);
+export async function placeDetails(placeId: string, sessionToken: string, signal?: AbortSignal): Promise<PlaceDetails> {
+  const result = await placesCall<PlaceDetails>('/places/details', { placeId, sessionToken }, signal);
+  if (typeof result?.address !== 'string' || typeof result.name !== 'string') {
+    throw new PlacesError('unavailable');
+  }
+  return result;
 }

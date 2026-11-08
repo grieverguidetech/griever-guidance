@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { forwardRef, useEffect, useRef, useState } from 'react';
+import type { ComponentRef, ForwardRefExoticComponent, ForwardedRef, RefAttributes } from 'react';
+import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { fill } from '@griever/copy';
 import { newPlaceSessionToken, placeDetails, suggestPlaces } from '@griever/api-client';
 import { SERVICE_PLACE_TYPES } from '@griever/shared';
@@ -11,12 +12,12 @@ export const PLACE_DEBOUNCE_MS = 300;
 export const PLACE_MIN_CHARS = 3;
 
 export interface PlaceFieldCopy {
-  placesListLabel: string;
   placesOne: string;
   placesMany: string;
   placesNone: string;
   placesUnavailable: string;
   placeFilled: string;
+  placesHint: string;
 }
 
 /** The calls the field makes. Tests pass a fake; the app uses the gateway client. */
@@ -50,7 +51,11 @@ function countText(copy: PlaceFieldCopy, count: number): string {
 
 /** "{name}, {address}", the text web writes for a pick. */
 function pickedText(suggestion: PlaceSuggestion, details: PlaceDetails): string {
-  return `${details.name.trim() || suggestion.mainText}, ${details.address}`;
+  // Never write "…, undefined" if the answer is not the shape we expect.
+  if (typeof details.address !== 'string' || details.address.trim() === '') {
+    return suggestion.text;
+  }
+  return `${(typeof details.name === 'string' ? details.name.trim() : '') || suggestion.mainText}, ${details.address}`;
 }
 
 /** What a screen reader says for a suggestion row. */
@@ -63,7 +68,19 @@ function rowName(suggestion: PlaceSuggestion): string {
  * Suggestions only help: on any failure the field stays a plain text box and one calm line says why.
  * The list is plain views, not a Modal, so nothing opens or flips without a tap.
  */
-export function PlaceField({ copy, value, onChange, accessibleName, placeholder, missing, returnKeyType, onSubmitEditing, client = gatewayClient }: Props) {
+function PlaceFieldBase(
+  { copy, value, onChange, accessibleName, placeholder, missing, returnKeyType, onSubmitEditing, client = gatewayClient }: Props,
+  forwardedRef: ForwardedRef<ComponentRef<typeof TextInput>>,
+) {
+  const inputRef = useRef<ComponentRef<typeof TextInput> | null>(null);
+  const setInputRef = (node: ComponentRef<typeof TextInput> | null) => {
+    inputRef.current = node;
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(node);
+    } else if (forwardedRef) {
+      forwardedRef.current = node;
+    }
+  };
   const [focused, setFocused] = useState(false);
   const [options, setOptions] = useState<PlaceSuggestion[]>([]);
   const [status, setStatus] = useState('');
@@ -107,6 +124,7 @@ export function PlaceField({ copy, value, onChange, accessibleName, placeholder,
       setOptions(shown);
       say(countText(copy, shown.length));
     } catch {
+      // Intended: a failure for text the user has since changed is dropped, so the next keystroke retries.
       if (mine !== ticket.current) {
         return;
       }
@@ -147,16 +165,25 @@ export function PlaceField({ copy, value, onChange, accessibleName, placeholder,
     } catch {
       // The suggestion's own line is still a good answer.
     }
+    // Intended: typing after the tap wins, so a late pick never overwrites what the user is typing now.
     if (mine !== ticket.current) {
       return;
     }
     onChange(text);
+    // Hand focus back to the input so the screen reader moves off the removed row and reads the status.
+    inputRef.current?.focus();
+    const handle = inputRef.current ? findNodeHandle(inputRef.current) : null;
+    if (handle) {
+      AccessibilityInfo.setAccessibilityFocus(handle);
+    }
     say(copy.placeFilled);
   };
 
   return (
     <View style={styles.wrap}>
       <TextInput
+        ref={setInputRef}
+        accessibilityHint={copy.placesHint}
         style={[styles.input, missing && styles.inputMissing, focused && styles.inputFocused]}
         accessibilityLabel={accessibleName}
         placeholder={placeholder}
@@ -169,7 +196,7 @@ export function PlaceField({ copy, value, onChange, accessibleName, placeholder,
         onSubmitEditing={onSubmitEditing}
       />
       {options.length > 0 && (
-        <View accessibilityLabel={copy.placesListLabel} style={styles.list}>
+        <View style={styles.list}>
           {options.map((option) => (
             <Pressable
               key={option.id}
@@ -194,6 +221,8 @@ export function PlaceField({ copy, value, onChange, accessibleName, placeholder,
     </View>
   );
 }
+
+export const PlaceField: ForwardRefExoticComponent<Props & RefAttributes<ComponentRef<typeof TextInput>>> = forwardRef(PlaceFieldBase);
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing[1] },

@@ -3,7 +3,7 @@
   "title": "Copy for the phone-only Ready to send screen (the rest comes from review.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["changeService", "changeThanks", "addNote", "notePlaceholder", "to", "and", "everyoneYouTold", "andMore", "change", "changeName", "choose", "fine", "shareInstead", "placesListLabel", "placesOne", "placesMany", "placesNone", "placesUnavailable", "placeFilled"],
+  "required": ["changeService", "changeThanks", "addNote", "notePlaceholder", "to", "and", "everyoneYouTold", "andMore", "change", "changeName", "choose", "fine", "shareInstead", "placesOne", "placesMany", "placesNone", "placesUnavailable", "placeFilled", "placesHint"],
   "properties": {
     "changeService": { "$ref": "#/$defs/text" },
     "changeThanks": { "$ref": "#/$defs/text" },
@@ -18,12 +18,12 @@
     "choose": { "$ref": "#/$defs/text" },
     "fine": { "$ref": "#/$defs/text" },
     "shareInstead": { "$ref": "#/$defs/text" },
-    "placesListLabel": { "$ref": "#/$defs/text" },
     "placesOne": { "$ref": "#/$defs/text" },
     "placesMany": { "$ref": "#/$defs/text" },
     "placesNone": { "$ref": "#/$defs/text" },
     "placesUnavailable": { "$ref": "#/$defs/text" },
-    "placeFilled": { "$ref": "#/$defs/text" }
+    "placeFilled": { "$ref": "#/$defs/text" },
+    "placesHint": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }

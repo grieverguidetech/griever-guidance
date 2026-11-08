@@ -120,6 +120,9 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
                 {field.label}
               </Text>
               <PlaceField
+                ref={(node) => {
+                  inputs.current[index] = node;
+                }}
                 copy={placeCopy}
                 value={values[field.key] ?? ''}
                 onChange={(text) => onChange(field.key, text)}

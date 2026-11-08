@@ -61,6 +61,11 @@ describe('suggestPlaces', () => {
     await expect(suggestPlaces('elm', [], TOKEN)).rejects.toMatchObject({ reason: 'unavailable' });
   });
 
+  it.each([[{}], [{ suggestions: 'x' }], [null]])('rejects a 200 without a suggestions array (%j)', async (body) => {
+    fetchMock.mockResolvedValue(json(200, body));
+    await expect(suggestPlaces('elm', [], TOKEN)).rejects.toMatchObject({ reason: 'unavailable' });
+  });
+
   it('passes an abort through unchanged', async () => {
     const abort = new DOMException('aborted', 'AbortError');
     fetchMock.mockRejectedValue(abort);
@@ -75,6 +80,11 @@ describe('placeDetails', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://gw.test/places/details');
     expect(JSON.parse(init.body as string)).toEqual({ placeId: 'abc_123', sessionToken: TOKEN });
+  });
+
+  it.each([[{ name: 'A' }], [{ address: '1 Elm St' }], [{ name: 'A', address: 5 }], [{}]])('rejects a 200 without a string name and address (%j)', async (body) => {
+    fetchMock.mockResolvedValue(json(200, body));
+    await expect(placeDetails('abc', TOKEN)).rejects.toMatchObject({ reason: 'unavailable' });
   });
 
   it('rejects a 502 with a typed error', async () => {

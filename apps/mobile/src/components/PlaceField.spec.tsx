@@ -8,12 +8,12 @@ import { PlaceField } from './PlaceField';
 import type { PlaceFieldCopy, PlacesClient } from './PlaceField';
 
 const copy: PlaceFieldCopy = {
-  placesListLabel: 'Place suggestions',
   placesOne: '1 suggestion available',
   placesMany: '{count} suggestions available',
   placesNone: 'No matches',
   placesUnavailable: 'Suggestions are not available',
   placeFilled: 'Place filled in',
+  placesHint: 'Suggestions appear below as you type',
 };
 
 const chapel: PlaceSuggestion = { id: 'p1', text: 'Elm Chapel, 1 Elm St', mainText: 'Elm Chapel', secondaryText: '1 Elm St' };
@@ -28,6 +28,12 @@ function fakeClient(overrides: Partial<PlacesClient> = {}) {
   };
   return client;
 }
+
+// The test renderer has no native handles, so give every field one.
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: () => 42,
+}));
 
 // Holds the value in state so typing and picking behave as they do in the row.
 function Harness({ client, onChange }: { client: PlacesClient; onChange?: (v: string) => void }) {
@@ -59,6 +65,7 @@ describe('PlaceField', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
   });
   afterEach(() => {
     jest.useRealTimers();
@@ -96,7 +103,7 @@ describe('PlaceField', () => {
     const row = screen.getByRole('button', { name: 'P0, A' });
     expect(StyleSheet.flatten(row.props.style).minHeight).toBeGreaterThanOrEqual(44);
     expect(screen.getByText('5 suggestions available').props.accessibilityLiveRegion).toBe('polite');
-    expect(screen.getByLabelText('Place suggestions')).toBeTruthy();
+    expect(input().props.accessibilityHint).toBe('Suggestions appear below as you type');
   });
 
   it('says so when nothing matches, and keeps typing open', async () => {
@@ -122,10 +129,22 @@ describe('PlaceField', () => {
     expect(input().props.value).toBe('Elm Chapel, 1 Elm St, Town, ST 12345');
     expect(screen.queryAllByRole('button')).toHaveLength(0);
     expect(screen.getByText('Place filled in')).toBeTruthy();
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(42);
     // The next run of typing gets a fresh token.
     type('Oak');
     await settle();
     expect(client.newToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('never fills "undefined" when details come back without an address', async () => {
+    const client = fakeClient({ details: jest.fn<PlacesClient['details']>().mockResolvedValue({ name: 'X' } as never) });
+    render(<Harness client={client} />);
+    type('Elm');
+    await settle();
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Elm Church, 9 Oak Ave' }));
+    });
+    expect(input().props.value).not.toContain('undefined');
   });
 
   it('uses the suggestion text when details fail', async () => {
