@@ -19,7 +19,11 @@
     "publisherEmailPlaceholder",
     "publisherEmailHint",
     "publisherEmailMany",
-    "publisherEmailInvalid"
+    "publisherEmailInvalid",
+    "doneButton",
+    "doneHint",
+    "emailOpened",
+    "emailShared"
   ],
   "properties": {
     "textTitle": {
@@ -68,6 +72,18 @@
       "$ref": "#/$defs/text"
     },
     "publisherEmailInvalid": {
+      "$ref": "#/$defs/text"
+    },
+    "doneButton": {
+      "$ref": "#/$defs/text"
+    },
+    "doneHint": {
+      "$ref": "#/$defs/text"
+    },
+    "emailOpened": {
+      "$ref": "#/$defs/text"
+    },
+    "emailShared": {
       "$ref": "#/$defs/text"
     }
   },

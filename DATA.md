@@ -527,6 +527,11 @@ contacted. The picked text (and the address it fills) is saved like any typed te
 other person details (`servicePlace`, `serviceAddress`, `burialPlace`, `visitationPlace`, `receptionPlace`). Google's own terms and privacy
 policy apply to those requests.
 
+On the phone, the typed text, the place types and the session token go to our gateway
+(`POST /places/suggest` and `/places/details`), which sends them to Google with a server key. Google
+then sees the Worker's IP address, not the phone's. The gateway stores nothing, caches nothing and
+logs no request content.
+
 ### Shared people
 
 **Decided design (family-sharing G1, 2026-10-11). The client sync queue (`useFlowSync`, #134) is
