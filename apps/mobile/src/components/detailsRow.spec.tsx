@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { StyleSheet } from 'react-native';
 import { parseCompleteDate } from '@griever/shared';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { DetailsRow, isMissing } from './DetailsRow';
 
 const copy = { detailsHeading: 'Details', detailsNeeded: 'Needed' };
@@ -41,6 +41,56 @@ describe('DetailsRow', () => {
     expect(isMissing(fields[0], {})).toBe(true);
     expect(isMissing(fields[0], { a: '  ' })).toBe(true);
     expect(isMissing(fields[1], {})).toBe(false);
+  });
+
+  describe('service location', () => {
+    it('is a place field: typing under 3 characters is a plain input that reports the text', () => {
+      const onChange = jest.fn();
+      render(
+        <DetailsRow
+          copy={copy}
+          fields={[{ key: 'serviceLocation', label: 'Location', placeholder: 'Place', required: false }]}
+          values={{}}
+          onChange={onChange}
+        />,
+      );
+      fireEvent.changeText(screen.getByLabelText('Location'), 'El');
+      expect(onChange).toHaveBeenCalledWith('serviceLocation', 'El');
+    });
+
+    it('a picked place is reported as the serviceLocation text', async () => {
+      const fetchMock = jest.fn<typeof fetch>();
+      fetchMock.mockImplementation(async (url) =>
+        String(url).endsWith('/places/suggest')
+          ? new Response(JSON.stringify({ suggestions: [{ id: 'p1', text: 'Elm Chapel, 1 Elm St', mainText: 'Elm Chapel', secondaryText: '1 Elm St' }] }), { status: 200 })
+          : new Response(JSON.stringify({ name: 'Elm Chapel', address: '1 Elm St, Town, ST 12345' }), { status: 200 }),
+      );
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = fetchMock;
+      jest.useFakeTimers();
+      try {
+        const onChange = jest.fn();
+        render(
+          <DetailsRow
+            copy={copy}
+            fields={[{ key: 'serviceLocation', label: 'Location', placeholder: 'Place', required: false }]}
+            values={{}}
+            onChange={onChange}
+          />,
+        );
+        fireEvent.changeText(screen.getByLabelText('Location'), 'Elm');
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(300);
+        });
+        await act(async () => {
+          fireEvent.press(screen.getByRole('button', { name: 'Elm Chapel, 1 Elm St' }));
+        });
+        expect(onChange).toHaveBeenLastCalledWith('serviceLocation', 'Elm Chapel, 1 Elm St, Town, ST 12345');
+      } finally {
+        jest.useRealTimers();
+        globalThis.fetch = realFetch;
+      }
+    });
   });
 
   describe('service date', () => {

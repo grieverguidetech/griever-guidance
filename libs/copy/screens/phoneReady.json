@@ -11,5 +11,11 @@
   "changeName": "Change who gets this",
   "choose": "Choose who to tell",
   "fine": "One at a time, from your own number.",
-  "shareInstead": "Share elsewhere instead"
+  "shareInstead": "Share elsewhere instead",
+  "placesListLabel": "Place suggestions",
+  "placesOne": "1 suggestion available",
+  "placesMany": "{count} suggestions available",
+  "placesNone": "No matches. You can type the place.",
+  "placesUnavailable": "Suggestions are not available right now. You can type the place.",
+  "placeFilled": "Place filled in"
 }

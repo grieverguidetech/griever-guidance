@@ -5,6 +5,7 @@ import type { Text as RNText } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { SerifText as Text } from '../ui';
 import { DateField } from './DateField';
+import { PlaceField } from './PlaceField';
 import { TimeField } from './TimeField';
 import type { TimeFieldCopy } from './TimeField';
 import { colors, radius, spacing } from '@griever/tokens';
@@ -20,10 +21,13 @@ export interface DetailsField {
 
 const dateCopy = screenCopy('personSetup');
 const detailsCopy = screenCopy('phoneDetails');
+const placeCopy = screenCopy('phoneReady');
 /** The service date is the one field written as a date, in the text web writes ("June 7, 2025"). */
 const DATE_KEY = 'serviceDate';
 /** The service time is written as time text, in the text web writes ("2:00 PM"). */
 const TIME_KEY = 'serviceTime';
+/** The service location can be picked from a place search; free typing still works. */
+const PLACE_KEY = 'serviceLocation';
 // The Done label matches the date field's.
 const TIME_COPY: Omit<TimeFieldCopy, 'placeholder'> = { done: dateCopy.dateDone, clear: detailsCopy.timeClear, hint: detailsCopy.timeHint };
 // Same range as parseCompleteDate, which reads the text back. There is no real upper limit.
@@ -100,6 +104,34 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
                 onChange={(text) => onChange(field.key, text)}
                 accessibleName={accessibleName}
                 missing={missing}
+              />
+              {missing && (
+                <Text style={styles.needed} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                  {copy.detailsNeeded}
+                </Text>
+              )}
+            </View>
+          );
+        }
+        if (field.key === PLACE_KEY) {
+          return (
+            <View key={field.key} style={styles.field}>
+              <Text style={styles.label} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                {field.label}
+              </Text>
+              <PlaceField
+                copy={placeCopy}
+                value={values[field.key] ?? ''}
+                onChange={(text) => onChange(field.key, text)}
+                accessibleName={accessibleName}
+                placeholder={field.placeholder}
+                missing={missing}
+                returnKeyType={last ? 'done' : 'next'}
+                onSubmitEditing={() => {
+                  if (!last) {
+                    inputs.current[index + 1]?.focus();
+                  }
+                }}
               />
               {missing && (
                 <Text style={styles.needed} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
