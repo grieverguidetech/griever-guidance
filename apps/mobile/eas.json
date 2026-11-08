@@ -8,7 +8,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com"
+        "EXPO_PUBLIC_API_URL": "https://api.grieversguidance.com",
+        "EXPO_PUBLIC_FEATURE_AUTH": "true",
+        "EXPO_PUBLIC_FEATURE_SYNC": "true"
       },
       "environment": "production",
       "autoIncrement": true
