@@ -3,20 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteLocalData } from './deleteLocalData';
 import { publisherEmailKey } from './mailCompose';
 
-// The shared test setup's AsyncStorage has no getAllKeys; deleteLocalData lists keys, so this spec uses a fuller in-memory one.
-jest.mock('@react-native-async-storage/async-storage', () => {
-  const store = new Map<string, string>();
-  const asyncStorage = {
-    getItem: async (key: string) => store.get(key) ?? null,
-    setItem: async (key: string, value: string) => void store.set(key, value),
-    removeItem: async (key: string) => void store.delete(key),
-    getAllKeys: async () => [...store.keys()],
-    multiSet: async (pairs: [string, string][]) => void pairs.forEach(([key, value]) => store.set(key, value)),
-    clear: async () => store.clear(),
-  };
-  return { __esModule: true, default: asyncStorage, ...asyncStorage };
-});
-
 beforeEach(async () => {
   jest.restoreAllMocks();
   await AsyncStorage.clear();

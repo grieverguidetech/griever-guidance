@@ -28,6 +28,7 @@ import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDevice
 import { personLabel } from '../components/PersonSwitcher';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { clearPublisherEmails } from '../lib/mailCompose';
+import { onLocalDataReset } from '../lib/deleteLocalData';
 import { PersonBar } from '../components/PersonSwitcher';
 import { ShareObituaryScreen } from '../screens/ShareObituaryScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -949,16 +950,19 @@ const SendAppWhenReady = () => {
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
   const fontsSettled = useSerifFonts();
+  // After the account is deleted, everything held in memory (people, contacts, caches) is dropped: a new key remounts the send flow from an empty phone.
+  const [generation, setGeneration] = useState(0);
+  useEffect(() => onLocalDataReset(() => setGeneration((n) => n + 1)), []);
   // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
     <SafeAreaProvider>
       <SerifReadyContext.Provider value={fontsSettled}>
         {AUTH_ENABLED ? (
           <AccountProvider>
-            <SendAppWhenReady />
+            <SendAppWhenReady key={generation} />
           </AccountProvider>
         ) : (
-          <SendAppWhenReady />
+          <SendAppWhenReady key={generation} />
         )}
       </SerifReadyContext.Provider>
     </SafeAreaProvider>

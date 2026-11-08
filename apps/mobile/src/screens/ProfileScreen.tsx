@@ -11,7 +11,7 @@ import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../u
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
 import { DeleteCancelledError, useSignInInfo } from '../lib/clerk';
-import { deleteLocalData } from '../lib/deleteLocalData';
+import { announceLocalDataReset, deleteLocalData } from '../lib/deleteLocalData';
 import type { DeleteOutcome } from '../components/DeleteAccountPanel';
 import { AccountDeletedScreen } from './AccountDeletedScreen';
 
@@ -301,7 +301,11 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
   }
 
   if (deleted) {
-    return <AccountDeletedScreen cleared={deleted.cleared} onDone={onBack} />;
+    return <AccountDeletedScreen cleared={deleted.cleared} onDone={() => {
+        // Memory is reset first, so the first screen is drawn from an empty phone and nothing old can be written back.
+        announceLocalDataReset();
+        onBack();
+      }} />;
   }
   const canDelete = removing || (!sessionEndedProp && !!signIn.deleteAccount);
   return (

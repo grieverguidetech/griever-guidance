@@ -22,3 +22,18 @@ export async function deleteLocalData(): Promise<boolean> {
   const results = await Promise.allSettled(keys.map((key) => AsyncStorage.removeItem(key)));
   return results.every((result) => result.status === 'fulfilled');
 }
+
+const resetListeners = new Set<() => void>();
+
+/** The running app listens, so it can drop what it holds in memory after a delete. Returns the unsubscribe. */
+export function onLocalDataReset(listener: () => void): () => void {
+  resetListeners.add(listener);
+  return () => {
+    resetListeners.delete(listener);
+  };
+}
+
+/** Tells the running app that this phone's data is gone: people, contacts and caches held in memory must start empty. */
+export function announceLocalDataReset(): void {
+  resetListeners.forEach((listener) => listener());
+}

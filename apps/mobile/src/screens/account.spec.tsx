@@ -24,20 +24,6 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   findNodeHandle: () => 1,
 }));
 
-// The shared test setup's AsyncStorage has no getAllKeys; deleteLocalData lists keys, so these tests use a fuller in-memory one.
-jest.mock('@react-native-async-storage/async-storage', () => {
-  const store = new Map<string, string>();
-  const asyncStorage = {
-    getItem: async (key: string) => store.get(key) ?? null,
-    setItem: async (key: string, value: string) => void store.set(key, value),
-    removeItem: async (key: string) => void store.delete(key),
-    getAllKeys: async () => [...store.keys()],
-    multiSet: async (pairs: [string, string][]) => void pairs.forEach(([key, value]) => store.set(key, value)),
-    clear: async () => store.clear(),
-  };
-  return { __esModule: true, default: asyncStorage, ...asyncStorage };
-});
-
 // The profile calls go through the gateway; here they are plain functions.
 const mockGetProfile = jest.fn<() => Promise<ProfileResult>>();
 type ProfileUpdate = { senderName?: string | null; firstName?: string | null; lastName?: string | null; birthDate?: string | null; address?: Address | null };
