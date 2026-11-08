@@ -3,8 +3,11 @@ import { useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ProfileResult } from '@griever/api-client';
+
+// A cold Babel cache or a busy machine makes the first renders slow; 10s is still a clear hang signal (as in account.spec).
+configure({ asyncUtilTimeout: 10_000 });
 
 // The whole app, with the account feature on and a fake Clerk, driven through the real delete flow:
 // the panel, the Clerk delete, deleteLocalData, then the reset in App.tsx and the account provider.
@@ -70,6 +73,7 @@ const anna = {
   recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 };
 
+const CLEARING = 'Removing what is saved on this phone…';
 const press = (name: string | RegExp) => fireEvent.press(screen.getByRole('button', { name }));
 
 /** Signed in as Sam with Anna on the phone: open Anna, then Your account, then the confirm step, then the deliberate button. */
@@ -81,6 +85,8 @@ async function deleteTheAccount() {
   press('Delete my account');
   press('Yes, delete my account');
   await screen.findByRole('heading', { name: 'Your account is deleted' });
+  // The phone is cleared after the deleted screen shows; the button waits until then.
+  await waitFor(() => expect(screen.queryByText(CLEARING)).toBeNull());
 }
 
 beforeEach(async () => {
@@ -149,5 +155,68 @@ describe('after the account is deleted (#719)', () => {
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Your account is deleted' })).toBeNull());
     expect(await AsyncStorage.getItem('gg.sessions.v1')).toContain('Anna');
     expect(await AsyncStorage.getItem('gg.publisherEmail.v1.a')).toBe('obits@paper.example');
+  });
+
+  it('clears the phone only after the send flow has gone, so nothing it writes can land after the sweep', async () => {
+    let atSweep: { annaOnScreen: boolean; deletedScreen: boolean } | null = null;
+    const realKeys = AsyncStorage.getAllKeys.bind(AsyncStorage);
+    jest.spyOn(AsyncStorage, 'getAllKeys').mockImplementation(async () => {
+      atSweep ??= {
+        annaOnScreen: screen.queryByLabelText('Anna') !== null || screen.queryByText('Ready to send') !== null,
+        deletedScreen: screen.queryByRole('heading', { name: 'Your account is deleted' }) !== null,
+      };
+      return realKeys();
+    });
+    render(<App />);
+    await deleteTheAccount();
+    expect(atSweep).toEqual({ annaOnScreen: false, deletedScreen: true });
+  });
+
+  it('says some things were left on the phone when a local item cannot be removed', async () => {
+    const real = AsyncStorage.removeItem.bind(AsyncStorage);
+    jest.spyOn(AsyncStorage, 'removeItem').mockImplementation(async (key: string) => {
+      if (key === 'gg.publisherEmail.v1.a') {
+        throw new Error('disk');
+      }
+      return real(key);
+    });
+    render(<App />);
+    await deleteTheAccount();
+    expect(screen.getByText('Some things could not be removed from this device.')).toBeTruthy();
+  });
+
+  it('the button and Android Back wait while the phone is being cleared', async () => {
+    let release: () => void = () => undefined;
+    const realKeys = AsyncStorage.getAllKeys.bind(AsyncStorage);
+    let held = false;
+    jest.spyOn(AsyncStorage, 'getAllKeys').mockImplementation(async () => {
+      if (!held) {
+        held = true;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return realKeys();
+    });
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
+      handlers.push(handler as () => boolean);
+      return { remove: () => void handlers.splice(handlers.indexOf(handler as () => boolean), 1) };
+    });
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByText('Ready to send');
+    press('Your account');
+    await screen.findByDisplayValue('Sam');
+    press('Delete my account');
+    press('Yes, delete my account');
+    await screen.findByText(CLEARING);
+    press('Back to the start');
+    act(() => void handlers[handlers.length - 1]?.());
+    expect(screen.getByRole('heading', { name: 'Your account is deleted' })).toBeTruthy();
+    await act(async () => release());
+    await waitFor(() => expect(screen.queryByText(CLEARING)).toBeNull());
+    press('Back to the start');
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
   });
 });

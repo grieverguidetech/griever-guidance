@@ -109,7 +109,10 @@ export function DeleteAccountPanel({ copy, onDelete }: { copy: DeleteAccountCopy
       <Heading level={2}>{copy.deleteHeading}</Heading>
       {step === 'idle' ? (
         <>
-          <Body tone="muted">{copy.deleteHint}</Body>
+          {/* Read once, as the button's hint; the visible words are hidden from the screen reader so they are not read twice. */}
+          <Body tone="muted" hidden>
+            {copy.deleteHint}
+          </Body>
           <Button label={copy.deleteOpen} variant="secondary" hint={copy.deleteHint} buttonRef={opener} onPress={() => setStep('confirm')} />
         </>
       ) : (

@@ -11,7 +11,7 @@ import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../u
 import { stateToCode } from '../components/AddressFields';
 import { DateField } from '../components/DateField';
 import { DeleteCancelledError, DeleteNeedsSignInError, useSignInInfo } from '../lib/clerk';
-import { announceAccountDeleted, deleteLocalData } from '../lib/deleteLocalData';
+import { announceAccountDeleted } from '../lib/deleteLocalData';
 import type { DeleteOutcome } from '../components/DeleteAccountPanel';
 
 const copy = screenCopy('account');
@@ -219,7 +219,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
     }
   }
 
-  /** Deletes the account on the server, and only when that works clears this phone. A failure changes nothing. */
+  /** Deletes the account on the server, and only when that works tells the app to clear this phone. A failure changes nothing. */
   async function deleteAccount(): Promise<DeleteOutcome> {
     const remove = signIn.deleteAccount;
     if (!remove) {
@@ -235,9 +235,9 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
       }
       return error instanceof DeleteCancelledError ? 'cancelled' : 'failed';
     }
-    // Clerk has ended the session itself. The app (App.tsx) hears this, drops everything it holds in memory
-    // and shows the deleted screen in place of the whole send flow, so every way out of it lands clean.
-    announceAccountDeleted(await deleteLocalData());
+    // Clerk has ended the session itself. The app (App.tsx) hears this, drops the whole send flow, shows the deleted screen
+    // in its place, and only then clears this phone, so every way out of the deleted screen lands clean.
+    announceAccountDeleted();
     return 'deleted';
   }
 

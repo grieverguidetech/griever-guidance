@@ -38,18 +38,20 @@ export async function deleteLocalData(): Promise<boolean> {
   }
 }
 
-type DeletedListener = (cleared: boolean) => void;
-const deletedListeners = new Set<DeletedListener>();
+const deletedListeners = new Set<() => void>();
 
 /** The running app and the account provider listen, so they can drop what they hold in memory after a delete. Returns the unsubscribe. */
-export function onAccountDeleted(listener: DeletedListener): () => void {
+export function onAccountDeleted(listener: () => void): () => void {
   deletedListeners.add(listener);
   return () => {
     deletedListeners.delete(listener);
   };
 }
 
-/** Tells the running app that the account is deleted and this phone's data is gone (`cleared` is false when some of it could not be removed). */
-export function announceAccountDeleted(cleared: boolean): void {
-  deletedListeners.forEach((listener) => listener(cleared));
+/**
+ * Tells the running app that the account is deleted. The app drops the send flow first and only then sweeps this phone
+ * with `deleteLocalData`, so nothing in the send flow can write after the sweep.
+ */
+export function announceAccountDeleted(): void {
+  deletedListeners.forEach((listener) => listener());
 }

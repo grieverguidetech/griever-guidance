@@ -114,22 +114,26 @@ function AccountState({ auth, cache, children }: { auth: AccountAuth; cache: Pro
     }),
     [status, userId],
   );
-  // The account is deleted: forget the signed-in marker and the cached profile held in memory, and read the launch state again,
-  // so the next first screen is the signed-out one.
-  const [resets, setResets] = useState(0);
+  // The account is deleted: forget the signed-in marker and the cached profile held in memory, so the next first screen is the signed-out one.
+  const [markerForgotten, setMarkerForgotten] = useState(false);
   useEffect(
     () =>
       onAccountDeleted(() => {
         cache.storage.removeItem(SIGNED_IN_STORAGE_KEY);
         cache.storage.removeItem(PROFILE_STORAGE_KEY);
-        setResets((n) => n + 1);
+        setMarkerForgotten(true);
       }),
     [cache.storage],
   );
+  // A new sign-in after that writes the marker again.
+  useEffect(() => {
+    if (status === 'signed_in') {
+      setMarkerForgotten(false);
+    }
+  }, [status]);
   const launch = useMemo<LaunchState>(
-    () => ({ hydrated: cache.ready, signedIn: cache.ready && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cache.ready, cache.storage, resets],
+    () => ({ hydrated: cache.ready, signedIn: cache.ready && !markerForgotten && cache.storage.getItem(SIGNED_IN_STORAGE_KEY) !== null }),
+    [cache.ready, cache.storage, markerForgotten],
   );
   return (
     <>

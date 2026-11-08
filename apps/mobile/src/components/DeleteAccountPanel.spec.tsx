@@ -26,7 +26,9 @@ const yes = () => fireEvent.press(screen.getByRole('button', { name: copy.delete
 describe('DeleteAccountPanel', () => {
   it('shows the hint and one button, and no confirm step, until the first press', () => {
     setup();
-    expect(screen.getByText(copy.deleteHint)).toBeTruthy();
+    // The words are on screen but hidden from the screen reader, which reads them as the button's hint.
+    expect(screen.getByText(copy.deleteHint, { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText(copy.deleteHint)).toBeNull();
     expect(screen.queryByText(copy.deleteConfirmHeading)).toBeNull();
     expect(screen.queryByRole('button', { name: copy.deleteConfirmAction })).toBeNull();
   });

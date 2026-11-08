@@ -28,7 +28,7 @@ import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDevice
 import { personLabel } from '../components/PersonSwitcher';
 import { useMobileFlowSync } from '../lib/useMobileFlowSync';
 import { clearPublisherEmails } from '../lib/mailCompose';
-import { onAccountDeleted } from '../lib/deleteLocalData';
+import { deleteLocalData, onAccountDeleted } from '../lib/deleteLocalData';
 import { AccountDeletedScreen } from '../screens/AccountDeletedScreen';
 import { resetUnsavedName } from '../screens/AccountScreen';
 import { PersonBar } from '../components/PersonSwitcher';
@@ -955,15 +955,32 @@ export const App = () => {
   // After the account is deleted, everything held in memory (people, contacts, caches, a name typed at sign-up) is dropped at once:
   // the deleted screen stands in place of the send flow until the person leaves it, and the send flow then mounts again from an empty phone.
   // Every way out of that screen (its button, Android Back) then lands on a clean first screen.
-  const [deleted, setDeleted] = useState<{ cleared: boolean } | null>(null);
+  // `cleared` is null while this phone is being cleared.
+  const [deleted, setDeleted] = useState<{ cleared: boolean | null } | null>(null);
   useEffect(
     () =>
-      onAccountDeleted((cleared) => {
+      onAccountDeleted(() => {
         resetUnsavedName();
-        setDeleted({ cleared });
+        setDeleted({ cleared: null });
       }),
     [],
   );
+  // The sweep starts after the send flow has unmounted (effects run after the commit), so no write from it can land afterwards.
+  const clearing = deleted !== null && deleted.cleared === null;
+  useEffect(() => {
+    if (!clearing) {
+      return;
+    }
+    let live = true;
+    void deleteLocalData().then((cleared) => {
+      if (live) {
+        setDeleted({ cleared });
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [clearing]);
   const leaveDeleted = useCallback(() => setDeleted(null), []);
   const content = deleted ? (
     <ScreenFrame>

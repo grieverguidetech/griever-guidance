@@ -887,9 +887,9 @@ describe('Delete account (#719)', () => {
     expect(screen.queryByRole('button', { name: copy.deleteOpen })).toBeNull();
   });
 
-  it('after a delete: clears this phone, then tells the app the account is gone and whether it was fully cleared', async () => {
+  it('after a delete: tells the app the account is gone, and leaves clearing the phone to the app', async () => {
     await seedLocalData();
-    const heard = jest.fn<(cleared: boolean) => void>();
+    const heard = jest.fn();
     const stop = onAccountDeleted(heard);
     const remove = jest.fn(async () => {
       act(() => mockAuthControl.setSignedIn(false));
@@ -897,29 +897,10 @@ describe('Delete account (#719)', () => {
     mockSignInInfo.deleteAccount = remove;
     await openConfirm();
     press(copy.deleteConfirmAction);
-    await waitFor(() => expect(heard).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(heard).toHaveBeenCalledTimes(1));
     stop();
     expect(remove).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(copy.sessionEnded)).toBeNull();
-    expect(await AsyncStorage.getAllKeys()).toEqual([]);
-  });
-
-  it('tells the app some things were left on the phone when a local item cannot be removed', async () => {
-    await seedLocalData();
-    const real = AsyncStorage.removeItem.bind(AsyncStorage);
-    jest.spyOn(AsyncStorage, 'removeItem').mockImplementation(async (key: string) => {
-      if (key === 'gg.publisherEmail.v1.anna') {
-        throw new Error('disk');
-      }
-      return real(key);
-    });
-    const heard = jest.fn<(cleared: boolean) => void>();
-    const stop = onAccountDeleted(heard);
-    mockSignInInfo.deleteAccount = jest.fn(async () => undefined);
-    await openConfirm();
-    press(copy.deleteConfirmAction);
-    await waitFor(() => expect(heard).toHaveBeenCalledWith(false));
-    stop();
   });
 
   it('a closed verify step says the account was not deleted and keeps everything on the phone', async () => {
@@ -1010,7 +991,7 @@ describe('the launch state after a delete (#719)', () => {
     );
     await screen.findByText('signed-in marker');
     const { announceAccountDeleted } = jest.requireActual<typeof import('../lib/deleteLocalData')>('../lib/deleteLocalData');
-    act(() => announceAccountDeleted(true));
+    act(() => announceAccountDeleted());
     await screen.findByText('no marker');
   });
 });
