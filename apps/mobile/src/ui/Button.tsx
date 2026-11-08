@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   label: {
   },
   labelPrimary: { fontSize: 15 },
-  labelLink: { fontSize: 14 },
+  labelLink: { fontSize: 15 },
   labelOnFill: { color: colors.bg },
   labelTertiary: { textDecorationLine: 'underline' },
   labelAccent: { color: colors['accent-700'] },
