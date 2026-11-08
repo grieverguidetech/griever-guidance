@@ -259,6 +259,18 @@ describe('SetupScreen date of birth (#715)', () => {
     expect(onContinue).toHaveBeenCalledWith({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'June 7, 2026' });
   });
 
+  it('announces the note through a live region that is mounted before the text', () => {
+    setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026' });
+    const note = 'This is after the date they passed. You can keep it.';
+    const regions = () => screen.getAllByRole('status', { includeHiddenElements: true }).filter((r) => r.props.accessibilityLiveRegion === 'polite');
+    expect(regions().length).toBeGreaterThan(0);
+    expect(screen.queryByText(note)).toBeNull();
+    fireEvent.press(birthButton());
+    choose(new Date(2026, 5, 7));
+    expect(regions().some((r) => r.props.children === note || JSON.stringify(r.props.children) === JSON.stringify(note))).toBe(true);
+    expect(screen.getByText(note)).toBeTruthy();
+  });
+
   it('shows no note for a birth before the date of passing', () => {
     setup({ personName: 'Anna', dateOfPassing: 'May 2, 2026', birthDate: 'March 9, 1948' });
     expect(screen.queryByText(/after the date they passed/)).toBeNull();

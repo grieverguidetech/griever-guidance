@@ -94,7 +94,10 @@ export function PersonSetup({ copy, editing, backName, name, onNameChange, rende
             {birthLabel} <Text style={styles.optional}>{copy.optional}</Text>
           </Body>
           {renderBirthDate({ labelId: birthLabelId, accessibleName: optionalName(birthLabel) })}
-          {birthNote ? <Body tone="muted">{birthNote}</Body> : null}
+          {/* Always mounted, so a screen reader announces the text when it appears. */}
+          <Body tone="muted" live>
+            {birthNote ?? ''}
+          </Body>
         </View>
       ) : null}
       <View style={styles.field}>

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { parseCompleteDate } from '@griever/shared';
+import { dateNote } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import { PersonSetup } from '../ui';
 import type { ButtonNode } from '../ui';
@@ -19,12 +19,6 @@ const EARLIEST_PASSING = new Date(2000, 0, 1);
 /** A date of birth can be long ago, so it reaches further back. */
 const EARLIEST_BIRTH = new Date(1900, 0, 1);
 
-/** True when both dates are complete and the birth is after the date of passing. Never blocks saving. */
-function birthIsAfterPassing(birth: string, passing: string): boolean {
-  const born = parseCompleteDate(birth, { minYear: EARLIEST_BIRTH.getFullYear() });
-  const passed = parseCompleteDate(passing);
-  return born !== null && passed !== null && born.getTime() > passed.getTime();
-}
 
 export type SetupDetails = { personName: string; dateOfPassing: string; birthDate?: string };
 
@@ -49,6 +43,8 @@ type Props = {
 export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack, returnsToPlace = false }: Props) {
   const [name, setName] = useState(initial.personName);
   const [date, setDate] = useState(initial.dateOfPassing);
+  // Fixed when the screen opens, so the pickers' latest day does not change on every render.
+  const today = useMemo(() => new Date(), []);
   const [birth, setBirth] = useState(initial.birthDate ?? '');
   const [sheetOpen, setSheetOpen] = useState(false);
   const heading = useRef<ComponentRef<typeof Text>>(null);
@@ -115,13 +111,13 @@ export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack,
               value={birth}
               onChange={setBirth}
               accessibleName={accessibleName}
-              maximumDate={new Date()}
+              maximumDate={today}
               minimumDate={EARLIEST_BIRTH}
             />
           )}
-          birthNote={birthIsAfterPassing(birth, date) ? phoneCopy.birthAfterPassing : undefined}
+          birthNote={dateNote(birth, { field: 'birth', dateOfPassing: date }) === 'birthAfterPassing' ? phoneCopy.birthAfterPassing : ''}
           renderDate={({ accessibleName }) => (
-            <DateField copy={copy} value={date} onChange={setDate} accessibleName={accessibleName} maximumDate={new Date()} minimumDate={EARLIEST_PASSING} />
+            <DateField copy={copy} value={date} onChange={setDate} accessibleName={accessibleName} maximumDate={today} minimumDate={EARLIEST_PASSING} />
           )}
           onBack={onBack}
           onWhatYoullNeed={() => setSheetOpen(true)}

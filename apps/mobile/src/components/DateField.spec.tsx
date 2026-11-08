@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { Platform, StyleSheet } from 'react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { fireEvent, render, screen } from '@testing-library/react-native';
@@ -16,6 +16,10 @@ const setup = (value = '') => {
 const field = () => screen.getByRole('button', { name: 'Date of birth (optional)' });
 
 describe('DateField', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('passes the latest and earliest day to the iOS picker', () => {
     setup();
     fireEvent.press(field());
@@ -25,13 +29,12 @@ describe('DateField', () => {
   });
 
   it('passes the latest and earliest day to the Android dialog', () => {
-    const platform = jest.replaceProperty(Platform, 'OS', 'android');
+    jest.replaceProperty(Platform, 'OS', 'android');
     setup();
     fireEvent.press(field());
     const options = jest.mocked(DateTimePickerAndroid.open).mock.calls.at(-1)?.[0];
     expect(options?.maximumDate).toBe(maximumDate);
     expect(options?.minimumDate).toBe(minimumDate);
-    platform.restore();
   });
 
   it('writes a picked day as "Month d, yyyy"', () => {

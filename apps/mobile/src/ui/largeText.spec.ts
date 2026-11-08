@@ -46,6 +46,8 @@ describe('inputs are at least 15 pt (#654)', () => {
     ['ui/screens/Account.tsx', 'input'],
     ['components/DetailsRow.tsx', 'input'],
     ['components/SavedNote.tsx', 'note'],
+    ['components/DateField.tsx', 'value'],
+    ['components/DateField.tsx', 'placeholder'],
     ['ui/screens/PersonSetup.tsx', 'input'],
     ['ui/screens/ShareObituary.tsx', 'input'],
     ['ui/screens/ShareObituary.tsx', 'textInput'],
