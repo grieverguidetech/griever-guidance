@@ -17,6 +17,8 @@ const EXPECTED_ROUTES = [
   'GET /flows',
   'POST /flows',
   'PATCH /flows/:id',
+  'POST /places/suggest',
+  'POST /places/details',
 ];
 
 async function loadApp() {
@@ -43,6 +45,8 @@ describe('gateway route inventory (C8)', () => {
 
   it.each([
     ['POST', '/obituary'],
+    ['POST', '/places/suggest'],
+    ['POST', '/places/details'],
   ])('%s %s refuses an empty request with 400', async (method, path) => {
     const app = await loadApp();
     const res = await app.request(path, { method });
@@ -71,5 +75,44 @@ describe('gateway route inventory (C8)', () => {
     vi.stubEnv('CLERK_WEBHOOK_SECRET', 'whsec_dGVzdA==');
     const res = await app.request('/webhooks/clerk', { method: 'POST', body: '{"type":"user.deleted"}' });
     expect(res.status).toBe(401);
+  });
+
+  describe('place search (public, no sign-in)', () => {
+    const body = JSON.stringify({ input: 'Smith Funeral', sessionToken: 'abcdefghijklmnop1234' });
+    const post = (app: Awaited<ReturnType<typeof loadApp>>, headers: Record<string, string> = {}) =>
+      app.request('/places/suggest', { method: 'POST', body, headers: { 'content-type': 'application/json', ...headers } });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('answers 503 with no key and never calls Google', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const app = await loadApp();
+      vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', '');
+      expect((await post(app)).status).toBe(503);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('answers 200 in the shared shape with a key and a stubbed Google', async () => {
+      const fetchMock = vi.fn(async () =>
+        new Response(JSON.stringify({ suggestions: [{ placePrediction: { placeId: 'p1', text: { text: 'A Chapel, OK, USA' } } }] })),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const app = await loadApp();
+      vi.stubEnv('GOOGLE_PLACES_SERVER_KEY', 'test-key-not-real');
+      const res = await post(app);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        suggestions: [{ id: 'p1', text: 'A Chapel, OK', mainText: 'A Chapel, OK', secondaryText: '' }],
+      });
+    });
+
+    it('echoes CORS only for a configured origin', async () => {
+      const app = await loadApp();
+      const allowed = await post(app, { origin: 'https://web.grieversguidance.com' });
+      expect(allowed.headers.get('access-control-allow-origin')).toBe('https://web.grieversguidance.com');
+      const other = await post(app, { origin: 'https://evil.example' });
+      expect(other.headers.get('access-control-allow-origin')).toBeNull();
+    });
   });
 });

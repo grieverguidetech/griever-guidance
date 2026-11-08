@@ -215,6 +215,9 @@ importers:
       '@griever/gateway-messages':
         specifier: workspace:*
         version: link:../../libs/gateway-messages
+      '@griever/gateway-places':
+        specifier: workspace:*
+        version: link:../../libs/gateway-places
       '@griever/identity':
         specifier: workspace:*
         version: link:../../libs/identity
@@ -537,6 +540,15 @@ importers:
         version: link:../data-aws
 
   libs/gateway-messages:
+    dependencies:
+      '@griever/shared':
+        specifier: workspace:*
+        version: link:../shared
+      hono:
+        specifier: ^4.13.7
+        version: 4.13.7
+
+  libs/gateway-places:
     dependencies:
       '@griever/shared':
         specifier: workspace:*
