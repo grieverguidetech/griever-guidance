@@ -78,6 +78,8 @@
     "personRowField",
     "peopleLimit",
     "removePersonUnnamed",
+    "personRemoved",
+    "personRemovedUnnamed",
     "nameFilled"
   ],
   "properties": {
@@ -301,6 +303,12 @@
       "$ref": "#/$defs/text"
     },
     "removePersonUnnamed": {
+      "$ref": "#/$defs/text"
+    },
+    "personRemoved": {
+      "$ref": "#/$defs/text"
+    },
+    "personRemovedUnnamed": {
       "$ref": "#/$defs/text"
     },
     "nameFilled": {

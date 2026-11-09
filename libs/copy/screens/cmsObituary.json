@@ -65,7 +65,7 @@
   "relationSibling": "Sibling",
   "relationParent": "Parent",
   "addPerson": "Add a person",
-  "removePerson": "Remove {name}",
+  "removePerson": "Remove {name}, person {n}",
   "addMemorial": "Add Memorial",
   "memorialLabel": "Memorial",
   "memorialHint": "Replace the placeholder text with the memorial details.",
@@ -73,5 +73,7 @@
   "personRowField": "{field}, person {n}",
   "peopleLimit": "This list holds up to 40 people.",
   "removePersonUnnamed": "Remove person {n}",
+  "personRemoved": "{name} removed.",
+  "personRemovedUnnamed": "Person {n} removed.",
   "nameFilled": "Name filled in from The person."
 }
