@@ -57,9 +57,7 @@ describe('ObituarySection', () => {
     await userEvent.type(screen.getByLabelText(/Survived by/), 'her sons');
     expect(text().value).toContain('Ann Lee is survived by her sons.');
     await userEvent.type(screen.getByLabelText(/A personal note/), 'She loved gardens.');
-    // The note leaves the template; the memorial is its own text (#774).
-    expect(text().value).not.toContain('She loved gardens.');
-    expect(text().value).toMatch(/is survived by her sons\.$/);
+    expect(text().value).toMatch(/She loved gardens\.$/);
   });
 
   it('fills the service and visitation parts from the Service fields', () => {

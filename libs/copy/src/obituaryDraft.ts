@@ -48,7 +48,7 @@ export interface ObituaryDraftFields {
   /** Older fields. They still fill the draft when the newer ones are empty. */
   obituaryCareer?: string;
   obituarySurvivors?: string;
-  /** No longer read: the memorial is its own text (`copy.memorial`, added by `obituaryShareText`). */
+  /** Older field. A note with text stays as the last paragraph. The memorial is its own text (`copy.memorial`). */
   obituaryNote?: string;
 }
 
@@ -194,17 +194,27 @@ function parsePeopleRows(text: string | undefined, relations: readonly string[])
   return rows;
 }
 
-/** "A", "A and B", "A, B and C". */
-function joinList(items: string[]): string {
+/** "A", "A and B", "A, B and C". With `strong` (a city may blur the join): "A, and B", "A, B, and C". */
+function joinList(items: string[], strong = false): string {
   if (items.length <= 1) {
     return items.join('');
   }
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+  const and = strong ? ', and' : ' and';
+  return `${items.slice(0, -1).join(', ')}${and} ${items[items.length - 1]}`;
+}
+
+/** Groups: "A; and B", "A; B; and C". Inside a group a comma stays, so the groups need a stronger mark. */
+function joinGroups(groups: string[]): string {
+  if (groups.length <= 1) {
+    return groups.join('');
+  }
+  return `${groups.slice(0, -1).join('; ')}; and ${groups[groups.length - 1]}`;
 }
 
 /**
- * "his wife..." style text for one list: rows of one relation are grouped (in the order each relation first
- * appears), as "<their> <relation>, <name> of <city>". A row without a city leaves out "of".
+ * Text for one list: rows of one relation are grouped (in the order each relation first appears), as
+ * "<their> <relation>, <name> of <city>". A row without a city leaves out "of". Groups are joined with
+ * semicolons; people in a group with a city are joined with ", and", so a city never runs into the next one.
  * The relation word is "spouse", because we do not know the spouse's gender.
  */
 function peopleText(rows: Person[], copy: DraftCopy, their: string): string {
@@ -222,10 +232,10 @@ function peopleText(rows: Person[], copy: DraftCopy, their: string): string {
     return fillSlots(copy.personRow, {
       their,
       relation: members.length === 1 ? words.one : words.many,
-      person: joinList(people),
+      person: joinList(people, members.some((member) => member.city.trim() !== '')),
     });
   });
-  return joinList(parts);
+  return joinGroups(parts);
 }
 
 /** "30" reads "30 years" ("1" reads "1 year"). Text that has no "year" word gets " years"; "thirty years" is kept. */
@@ -362,9 +372,12 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
         : fillSlots(copy.precededSentence, { ...pronoun, preceded: peopleText(precededRows, copy, pronoun.their) }),
   };
 
-  return [copy.paragraph1, copy.paragraph2, copy.paragraph3, copy.paragraph4]
-    .map((paragraph) => fillSlots(paragraph, values))
-    .join('\n\n');
+  const body = [copy.paragraph1, copy.paragraph2, copy.paragraph3, copy.paragraph4].map((paragraph) =>
+    fillSlots(paragraph, values),
+  );
+  // An older note stays as the last paragraph, so no existing note disappears.
+  const oldNote = fields.obituaryNote?.trim() ?? '';
+  return (oldNote === '' ? body : [...body, oldNote]).join('\n\n');
 }
 
 /** The draft with the memorial as its last paragraph. A blank memorial (trimmed) adds nothing. */

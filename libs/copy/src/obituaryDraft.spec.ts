@@ -222,10 +222,11 @@ describe('buildObituaryDraft: older values', () => {
     expect(text).toContain('Anna Lee is survived by her husband, John of Boston.');
   });
 
-  it('never reads the older note', () => {
-    const text = build({ personName: 'Anna Lee', obituaryNote: 'She will be missed.' });
-    expect(text).not.toContain('She will be missed.');
-    expect(text.split('\n\n')).toHaveLength(4);
+  it('keeps the older note as the last paragraph, trimmed, and adds none when blank', () => {
+    const text = build({ personName: 'Anna Lee', obituaryNote: '  She will be missed.\n' });
+    expect(text.endsWith('\n\nShe will be missed.')).toBe(true);
+    expect(text.split('\n\n')).toHaveLength(5);
+    expect(build({ personName: 'Anna Lee', obituaryNote: ' \n' }).split('\n\n')).toHaveLength(4);
   });
 });
 
@@ -244,10 +245,27 @@ describe('paragraph 4: survivors and preceded', () => {
 
   it('groups several survivors, joins with "and" before the last, and leaves out "of" without a city', () => {
     expect(p4({ ...base, obituaryPronoun: 'he', obituarySurvivorList: several })).toBe(
-      'Anna is survived by his spouse, Ann of Boston and his children, Bo and Cy of Salem.',
+      'Anna is survived by his spouse, Ann of Boston; and his children, Bo, and Cy of Salem.',
     );
     const three = people(['sibling', 'Al', ''], ['sibling', 'Bea', ''], ['sibling', 'Cal', '']);
     expect(p4({ ...base, obituaryPronoun: 'they', obituarySurvivorList: three })).toBe('Anna is survived by their siblings, Al, Bea and Cal.');
+  });
+
+  it('joins one, two and three groups, with and without cities, in both lists', () => {
+    const cases: [string, string][] = [
+      [people(['child', 'Bo', 'Salem'], ['child', 'Cy', '']), 'his children, Bo of Salem, and Cy'],
+      [people(['child', 'Bo', ''], ['child', 'Cy', '']), 'his children, Bo and Cy'],
+      [people(['spouse', 'Ann', ''], ['child', 'Bo', '']), 'his spouse, Ann; and his child, Bo'],
+      [people(['spouse', 'Ann', 'Boston'], ['child', 'Bo', 'Lynn']), 'his spouse, Ann of Boston; and his child, Bo of Lynn'],
+      [
+        people(['spouse', 'Ann', 'Boston'], ['child', 'Bo', ''], ['child', 'Cy', 'Salem'], ['sibling', 'Di', '']),
+        'his spouse, Ann of Boston; his children, Bo, and Cy of Salem; and his sibling, Di',
+      ],
+    ];
+    for (const [list, expected] of cases) {
+      expect(p4({ ...base, obituaryPronoun: 'he', obituarySurvivorList: list })).toBe(`Anna is survived by ${expected}.`);
+      expect(p4({ ...base, obituaryPronoun: 'he', obituaryPrecededList: list })).toContain(`He is preceded in death by ${expected}.`);
+    }
   });
 
   it('keeps the bracket when there are no rows, and for a list that does not parse', () => {
@@ -267,7 +285,7 @@ describe('paragraph 4: survivors and preceded', () => {
   it('writes the preceded sentence with agreeing verbs, and drops it when empty', () => {
     const list = people(['parent', 'Joe', ''], ['parent', 'Sue', ''], ['child', 'Max', 'Lynn']);
     expect(p4({ ...base, obituaryPronoun: 'he', obituaryPrecededList: list })).toBe(
-      'Anna is survived by his [RELATION], [SURVIVOR NAME] of [SURVIVOR CITY]. He is preceded in death by his parents, Joe and Sue and his child, Max of Lynn.',
+      'Anna is survived by his [RELATION], [SURVIVOR NAME] of [SURVIVOR CITY]. He is preceded in death by his parents, Joe and Sue; and his child, Max of Lynn.',
     );
     expect(p4({ ...base, obituaryPronoun: 'they', obituarySurvivorList: one, obituaryPrecededList: preceded })).toContain(
       ' They are preceded in death by their spouse, Tom of Salem.',
