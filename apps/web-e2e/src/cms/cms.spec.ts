@@ -173,6 +173,10 @@ test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps 
   await expect(nudge).toBeFocused();
   expect(await nudge.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
   expect(await violations(page)).toEqual([]);
+  const desktop = page.viewportSize();
+  if (!desktop) {
+    throw new Error('no viewport');
+  }
   // At 375px the Got it button wraps below the text, stays right-aligned and 44px tall.
   await page.setViewportSize({ width: 375, height: 800 });
   const box = async (locator: typeof nudge) => {
@@ -190,6 +194,8 @@ test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps 
   expect(button.y).toBeGreaterThanOrEqual(body.y + body.height);
   expect(Math.abs(card.x + card.width - paddingRight - (button.x + button.width))).toBeLessThanOrEqual(2);
   expect(button.height).toBeGreaterThanOrEqual(44);
+  // Back to the desktop width: at 375px the side nav collapses and openSection cannot reach it.
+  await page.setViewportSize(desktop);
   await page.getByRole('button', { name: 'Got it' }).click();
   await expect(nudge).toHaveCount(0);
   await expect(toggle).toBeFocused();
