@@ -20,3 +20,4 @@ export * from './sendPrefill.js';
 export * from './profileFields.js';
 export * from './greeting.js';
 export * from './places.js';
+export * from './obituaryPeople.js';
