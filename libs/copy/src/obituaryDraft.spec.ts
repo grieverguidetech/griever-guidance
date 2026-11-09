@@ -263,9 +263,11 @@ describe('articles before a job title or degree', () => {
 
   it('adds nothing when the family typed an article', () => {
     expect(job('a nurse')).toContain('worked as a nurse for');
-    expect(job('An engineer')).toContain('worked as An engineer for');
+    expect(job('An engineer')).toContain('worked as an engineer for');
     expect(job('the dean')).toContain('worked as the dean for');
-    expect(job('The dean')).not.toContain('a The');
+    expect(job('The dean')).toContain('worked as the dean for');
+    expect(job('An engineer')).not.toContain('An engineer');
+    expect(job('The Dean of Men')).toContain('worked as the Dean of Men for');
     expect(job('A nurse')).not.toContain('an A');
   });
 

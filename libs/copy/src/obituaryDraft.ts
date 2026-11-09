@@ -70,12 +70,13 @@ const SILENT_H_SAYS_AN = /^(hour|honest|honou?r|heir)/i;
 
 /**
  * The value with "a" or "an" in front, for a typed job title or degree. Nothing is added when the
- * family already typed an article ("a nurse", "the dean"), or when the first word is in capitals
+ * family already typed an article ("a nurse", "the dean"; a capital first letter is lower-cased), or when the first word is in capitals
  * ("MBA"), because we cannot tell how a set of letters is said.
  */
 function withArticle(value: string): string {
-  if (/^(a|an|the)\s/i.test(value)) {
-    return value;
+  const typed = /^(a|an|the)(\s.*)$/is.exec(value);
+  if (typed) {
+    return typed[1].toLowerCase() + typed[2];
   }
   const firstWord = value.split(/\s+/)[0];
   if (firstWord.length > 1 && firstWord === firstWord.toUpperCase() && /[A-Z]/.test(firstWord)) {
