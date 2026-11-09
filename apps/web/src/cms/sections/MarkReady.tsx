@@ -16,13 +16,20 @@ interface Props {
   onNext?: () => void;
   /** Opt in to the phone nudge (WEB-13) for this section. Without it nothing extra renders. */
   phoneNudge?: PhoneNudgeSection;
+  /** Refuses to turn Ready on and says why. Ignored once ready, so the family can always take Ready back. */
+  blockedMessage?: string;
 }
 
 /** A toggle (the libs/ui Button has no icon slot, so this is a plain button). A check shows when ready;
  * the name never changes and aria-pressed carries the state. A toggle, not a one-way switch: the family can take "ready" back at any time.
  * Once ready, one button leads on: to the next section, or back to the Overview when nothing is left. */
-export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNudge }: Props) {
+export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNudge, blockedMessage }: Props) {
   const hintId = useId();
+  const blockedId = useId();
+  const blocked = blockedMessage !== undefined && blockedMessage !== '' && !ready;
+  // The live region text. A trailing no-break space on every second press makes a repeat press change the text, so it is read again.
+  const [announced, setAnnounced] = useState('');
+  const pressesRef = useRef(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const nudgeRef = useRef<HTMLDivElement>(null);
   // Set by the toggle click that turns ready, so focus moves to the nudge then and not on mount.
@@ -48,6 +55,11 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
   }, [showNudge]);
 
   function toggle() {
+    if (blocked) {
+      pressesRef.current += 1;
+      setAnnounced(blockedMessage + (pressesRef.current % 2 === 0 ? '\u00A0' : ''));
+      return;
+    }
     // Got it lasts only until the section is marked ready again (#761), so any toggle clears it.
     if (phoneNudge !== undefined) {
       clearDismissedNudge(phoneNudge);
@@ -72,7 +84,8 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
           type="button"
           className="gg-chip gg-chip-outlined"
           aria-pressed={ready}
-          aria-describedby={hintId}
+          aria-disabled={blocked ? 'true' : undefined}
+          aria-describedby={blocked ? `${hintId} ${blockedId}` : hintId}
           onClick={toggle}
         >
           <span className="gg-check-box" data-testid="ready-box" aria-hidden="true">
@@ -90,7 +103,17 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
         <p id={hintId} className="gg-hint">
           {copy.readyHint}
         </p>
-      </div>
+    </div>
+      {blocked ? (
+        <p id={blockedId} className="m-0 text-[13px] font-semibold leading-[1.5]">
+          {blockedMessage}
+        </p>
+      ) : null}
+      {blockedMessage ? (
+        <p role="status" aria-live="polite" className="sr-only">
+          {blocked ? announced : ''}
+          </p>
+        ) : null}
       {showNudge && phoneNudge ? <PhoneNudge section={phoneNudge} nudgeRef={nudgeRef} onDismiss={() => dismissNudge(phoneNudge)} /> : null}
       {ready && onNext ? (
         <button type="button" className={`gg-btn gg-btn-primary gg-enter min-h-[44px]${showNudge ? ' mt-3' : ''}`}
