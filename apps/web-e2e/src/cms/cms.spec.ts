@@ -171,7 +171,25 @@ test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps 
   await expect(page.getByRole('heading', { level: 2, name: 'The announcement is ready.' })).toBeVisible();
   await expect(line).toBeVisible();
   await expect(nudge).toBeFocused();
+  expect(await nudge.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
   expect(await violations(page)).toEqual([]);
+  // At 375px the Got it button wraps below the text, stays right-aligned and 44px tall.
+  await page.setViewportSize({ width: 375, height: 800 });
+  const box = async (locator: typeof nudge) => {
+    const found = await locator.boundingBox();
+    if (!found) {
+      throw new Error('no bounding box');
+    }
+    return found;
+  };
+  const gotIt = page.getByRole('button', { name: 'Got it' });
+  const body = await box(line);
+  const button = await box(gotIt);
+  const card = await box(nudge);
+  const paddingRight = await nudge.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
+  expect(button.y).toBeGreaterThanOrEqual(body.y + body.height);
+  expect(Math.abs(card.x + card.width - paddingRight - (button.x + button.width))).toBeLessThanOrEqual(2);
+  expect(button.height).toBeGreaterThanOrEqual(44);
   await page.getByRole('button', { name: 'Got it' }).click();
   await expect(nudge).toHaveCount(0);
   await expect(toggle).toBeFocused();

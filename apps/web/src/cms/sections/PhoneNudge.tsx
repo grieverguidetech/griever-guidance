@@ -76,7 +76,7 @@ export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
       aria-describedby={lineId}
       className="gg-phone-nudge flex w-full flex-wrap items-end gap-x-4 gap-y-3 p-4 gg-enter"
     >
-      <div className="flex min-w-[14rem] flex-1 flex-col gap-1">
+      <div className="flex min-w-0 basis-56 flex-1 flex-col gap-1">
         <h2 id={headingId} className="text-base font-semibold">
           {HEADINGS[section]}
         </h2>

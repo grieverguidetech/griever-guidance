@@ -161,6 +161,28 @@ describe('MarkReady', () => {
       expect(document.body).toHaveFocus();
     });
 
+    it('shows the nudge without focus when ready flips by prop (no click)', () => {
+      const { rerender } = render(<MarkReady ready={false} onChange={() => undefined} phoneNudge="announcement" />);
+      rerender(<MarkReady ready onChange={() => undefined} phoneNudge="announcement" />);
+      expect(screen.getByRole('region')).toBeInTheDocument();
+      expect(screen.getByRole('region')).not.toHaveFocus();
+    });
+
+    it('moves focus to the toggle when ready turns false while focus is in the nudge', () => {
+      const { rerender } = render(<MarkReady ready onChange={() => undefined} phoneNudge="announcement" />);
+      screen.getByRole('button', { name: 'Got it' }).focus();
+      rerender(<MarkReady ready={false} onChange={() => undefined} phoneNudge="announcement" />);
+      expect(screen.queryByRole('region')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
+    });
+
+    it('moves focus to the toggle when ready turns false while the region itself has focus', () => {
+      const { rerender } = render(<MarkReady ready onChange={() => undefined} phoneNudge="announcement" />);
+      screen.getByRole('region').focus();
+      rerender(<MarkReady ready={false} onChange={() => undefined} phoneNudge="announcement" />);
+      expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
+    });
+
     it('Got it hides the nudge, saves it and focuses the toggle', async () => {
       render(<Harness start />);
       await userEvent.click(screen.getByRole('button', { name: 'Got it' }));

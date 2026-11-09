@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Check } from '@phosphor-icons/react/Check';
 import { fill, screenCopy } from '@griever/copy';
 import type { SectionKey } from '@griever/shared';
@@ -30,6 +30,16 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
   const [dismissed, setDismissed] = useState(() => (phoneNudge ? readDismissedNudges() : []));
   const showNudge = phoneNudge !== undefined && ready && !dismissed.includes(phoneNudge);
 
+  // Read before this render commits: was focus inside the nudge? If the nudge then goes away
+  // (ready turned false), focus would drop to the page, so hand it to the toggle.
+  const nudgeHadFocusRef = useRef(false);
+  nudgeHadFocusRef.current = nudgeRef.current?.contains(document.activeElement) ?? false;
+  useLayoutEffect(() => {
+    if (!showNudge && nudgeHadFocusRef.current) {
+      toggleRef.current?.focus();
+    }
+  }, [showNudge]);
+
   useEffect(() => {
     if (showNudge && focusNudgeRef.current) {
       nudgeRef.current?.focus();
@@ -38,7 +48,7 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
   }, [showNudge]);
 
   function toggle() {
-    focusNudgeRef.current = !ready;
+    focusNudgeRef.current = !ready && phoneNudge !== undefined && !dismissed.includes(phoneNudge);
     onChange(!ready);
   }
 

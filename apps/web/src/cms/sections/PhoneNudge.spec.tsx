@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { PHONE_NUDGE_KEY, PhoneNudge, readDismissedNudges, resetSessionDismissed, saveDismissedNudges } from './PhoneNudge';
@@ -30,14 +30,14 @@ describe('PhoneNudge', () => {
     expect(card).toHaveAccessibleDescription(line);
   });
 
-  it('keeps every body line under 200 characters and every text free of exclamation points', () => {
-    for (const [section, heading, line] of CASES) {
-      render(<PhoneNudge section={section} onDismiss={() => undefined} />);
-      expect(line.length).toBeLessThan(200);
-      expect(heading).not.toContain('!');
-      expect(line).not.toContain('!');
-      cleanup();
-    }
+  it.each(CASES)('ships a %s body under 200 characters, with no exclamation point in heading or body', (section, heading) => {
+    render(<PhoneNudge section={section} onDismiss={() => undefined} />);
+    const card = screen.getByRole('region', { name: heading });
+    const body = card.querySelector('p')?.textContent ?? '';
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.length).toBeLessThan(200);
+    expect(body).not.toContain('!');
+    expect(card.querySelector('h2')?.textContent).not.toContain('!');
   });
 
   it('has a Got it button at least 44px tall, last in the card, that calls onDismiss', async () => {
