@@ -50,9 +50,6 @@
   --color-accent-2-900: #4b1528;
 
   --color-success-700: #2a7048;
-  /* Error text. Contrast (WCAG luminance, computed): 5.85:1 on --color-bg, 5.39:1 on --color-surface,
-     6.54:1 on white, 6.02:1 on --color-accent-100. Clears AA 4.5:1 for 13px semibold. The file has one theme (no dark). */
-  --color-error: #b3261e;
 }
 
 /* Non-colour tokens + aliases for the component layer below. Plain custom
@@ -76,6 +73,10 @@
   --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+
+  /* Error text. Contrast (WCAG luminance, computed): 5.85:1 on --color-bg, 5.39:1 on --color-surface,
+     6.54:1 on white, 6.02:1 on --color-accent-100. Clears AA 4.5:1 for 13px semibold. One theme only (no dark). Lives in :root, not @theme, so it stays web-only and apart from @griever/tokens. */
+  --color-error: #b3261e;
 
   /* Every text tone clears WCAG AA 4.5:1 on --color-bg, --color-surface and
      --color-accent-100. Measured: 72% is 5.9:1+, 68% is 5.25:1 on the darkest of them
