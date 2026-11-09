@@ -1,0 +1,161 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { useState } from 'react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { findHardCodedCopy, screenCopy } from '@griever/copy';
+import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
+import { ObituaryLifeFields, type ObituaryLifeKey, type ObituaryLifePatch } from './ObituaryLifeFields';
+
+type Values = Parameters<typeof ObituaryLifeFields>[0]['values'];
+
+function setup(initial: Values = {}) {
+  const patches: ObituaryLifePatch[] = [];
+  function Harness() {
+    const [values, setValues] = useState<Values>(initial);
+    return (
+      <ObituaryLifeFields
+        values={values}
+        onChange={(patch) => {
+          patches.push(patch);
+          setValues((v) => ({ ...v, ...patch }));
+        }}
+      />
+    );
+  }
+  render(<Harness />);
+  return patches;
+}
+
+const copy = screenCopy('cmsObituary');
+
+const fields: [ObituaryLifeKey, string][] = [
+  ['obituaryGivenName', copy.givenNameLabel],
+  ['obituaryMiddleName', copy.middleNameLabel],
+  ['obituarySurname', copy.surnameLabel],
+  ['obituaryAge', copy.ageLabel],
+  ['obituaryCity', copy.cityLabel],
+  ['obituaryState', copy.stateLabel],
+  ['obituaryDeathPlace', copy.deathPlaceLabel],
+  ['obituaryFuneralHome', copy.funeralHomeLabel],
+  ['obituaryChurch', copy.churchLabel],
+  ['obituaryCemeteryLocation', copy.cemeteryLabel],
+  ['obituaryBirthPlace', copy.birthPlaceLabel],
+  ['obituaryMotherName', copy.motherNameLabel],
+  ['obituaryFatherName', copy.fatherNameLabel],
+  ['obituaryHighSchool', copy.highSchoolLabel],
+  ['obituaryGradYear', copy.graduationYearLabel],
+  ['obituaryDegree', copy.degreeLabel],
+  ['obituaryCollege', copy.collegeLabel],
+  ['obituaryJobTitle', copy.jobTitleLabel],
+  ['obituaryCompany', copy.companyLabel],
+  ['obituaryJobYears', copy.yearsLabel],
+  ['obituaryHobbies', copy.hobbiesLabel],
+  ['obituaryAwards', copy.awardsLabel],
+  ['obituaryOrganizations', copy.charitiesLabel],
+];
+
+describe('ObituaryLifeFields', () => {
+  it.each(fields)('%s is found by its label and sends only its own key', async (key, label) => {
+    const patches = setup();
+    await userEvent.type(screen.getByLabelText(label), 'x');
+    expect(patches).toEqual([{ [key]: 'x' }]);
+  });
+
+  it.each(fields)('%s has the maxLength of its key', (key, label) => {
+    setup();
+    const cap = FLOW_DETAIL_MAX_LENGTH[key as keyof typeof FLOW_DETAIL_MAX_LENGTH];
+    expect(screen.getByLabelText(label)).toHaveAttribute('maxLength', String(cap));
+  });
+
+  it('uses the numeric keypad for year and number fields but accepts text', async () => {
+    const patches = setup();
+    for (const label of [copy.graduationYearLabel, copy.yearsLabel, copy.ageLabel]) {
+      expect(screen.getByLabelText(label)).toHaveAttribute('inputMode', 'numeric');
+    }
+    await userEvent.type(screen.getByLabelText(copy.yearsLabel), 'about 30');
+    expect(patches.at(-1)).toEqual({ obituaryJobYears: 'about 30' });
+  });
+
+  it('fills given, middle and surname from a three-word name in one patch', async () => {
+    const patches = setup({ personName: 'Ann Marie Lee' });
+    await userEvent.click(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
+    expect(patches).toEqual([
+      { obituaryGivenName: 'Ann', obituaryMiddleName: 'Marie', obituarySurname: 'Lee' },
+    ]);
+    expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Lee');
+  });
+
+  it('hides the name button without a name', () => {
+    setup({ personName: '  ' });
+    expect(screen.queryByRole('button', { name: copy.useNameFromPersonLabel })).toBeNull();
+  });
+
+  describe('age', () => {
+    const dates = { birthDate: 'June 15, 1940', dateOfPassing: 'November 2, 2026' };
+
+    it('starts from the dates without saving', () => {
+      const patches = setup(dates);
+      expect(screen.getByLabelText(copy.ageLabel)).toHaveValue('86');
+      expect(patches).toEqual([]);
+    });
+
+    it('can be typed over, and returns when cleared', async () => {
+      const patches = setup(dates);
+      const age = screen.getByLabelText(copy.ageLabel);
+      await userEvent.clear(age);
+      expect(patches.at(-1)).toEqual({ obituaryAge: '' });
+      expect(age).toHaveValue('86');
+      await userEvent.type(age, '9', { initialSelectionStart: 0, initialSelectionEnd: 2 });
+      expect(patches.at(-1)).toEqual({ obituaryAge: '9' });
+      expect(age).toHaveValue('9');
+      await userEvent.clear(age);
+      expect(age).toHaveValue('86');
+    });
+
+    it('shows a saved age over the worked-out one', () => {
+      setup({ ...dates, obituaryAge: '85' });
+      expect(screen.getByLabelText(copy.ageLabel)).toHaveValue('85');
+    });
+
+    it('is empty when the dates do not parse', () => {
+      setup({ birthDate: 'soon', dateOfPassing: 'November 2, 2026' });
+      expect(screen.getByLabelText(copy.ageLabel)).toHaveValue('');
+    });
+  });
+
+  describe('pronoun', () => {
+    it('is a native select with not chosen, he, she, they', () => {
+      setup();
+      const select = screen.getByLabelText(copy.pronounLabel);
+      expect(select.tagName).toBe('SELECT');
+      expect(Array.from((select as HTMLSelectElement).options).map((o) => [o.value, o.text])).toEqual([
+        ['', 'Not chosen'],
+        ['he', 'He'],
+        ['she', 'She'],
+        ['they', 'They'],
+      ]);
+    });
+
+    it('sends the choice, and an empty value for not chosen', async () => {
+      const patches = setup({ obituaryPronoun: 'she' });
+      const select = screen.getByLabelText(copy.pronounLabel);
+      expect(select).toHaveValue('she');
+      await userEvent.selectOptions(select, 'they');
+      await userEvent.selectOptions(select, 'Not chosen');
+      expect(patches).toEqual([{ obituaryPronoun: 'they' }, { obituaryPronoun: '' }]);
+    });
+  });
+
+  it('shows the group headings', () => {
+    setup();
+    for (const heading of [copy.groupNameHeading, copy.groupLifeHeading, copy.groupFamilyHeading, copy.groupServiceHeading]) {
+      expect(screen.getByRole('group', { name: heading })).toBeInTheDocument();
+    }
+  });
+
+  it('holds no hard-coded copy', () => {
+    const source = readFileSync(join(import.meta.dirname, 'ObituaryLifeFields.tsx'), 'utf8');
+    expect(findHardCodedCopy(source, 'cmsObituary')).toEqual([]);
+  });
+});
