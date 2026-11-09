@@ -139,6 +139,16 @@ describe('running an action', () => {
     expect(rules.updateFlow).toHaveBeenCalledWith(c.doc, 'gg-test', caller, ID, patch, c.clock);
   });
 
+  it('accepts the new obituary keys and refuses a bad pronoun or list', async () => {
+    const rules = stubRules();
+    const c = context(rules);
+    const patch = { obituaryGivenName: 'Margaret', obituaryPronoun: 'they', obituarySurvivorList: '' };
+    await prepareAction('updateFlow', { id: ID, patch })!(c);
+    expect(rules.updateFlow).toHaveBeenCalledWith(c.doc, 'gg-test', caller, ID, patch, c.clock);
+    expect(prepareAction('updateFlow', { id: ID, patch: { obituaryPronoun: 'it' } })).toBeNull();
+    expect(prepareAction('updateFlow', { id: ID, patch: { obituaryPrecededList: 'junk' } })).toBeNull();
+  });
+
   it('wraps a success as { ok, data }, and a read with no rows as null data', async () => {
     const rules = stubRules();
     expect(await prepareAction('updateFlow', GOOD['updateFlow']!)!(context(rules))).toEqual({ ok: true, data: 'v' });

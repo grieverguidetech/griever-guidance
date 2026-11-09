@@ -627,3 +627,52 @@ describe('saveFailed (#460)', () => {
     expect(renderHook(() => useSessions()).result.current.saveFailed).toBe(false);
   });
 });
+
+describe('a person with only an obituary field counts as started (#772)', () => {
+  const NEW_KEYS = [
+    'obituaryGivenName', 'obituaryMiddleName', 'obituarySurname', 'obituaryAge', 'obituaryState',
+    'obituaryDeathPlace', 'obituaryFuneralHome', 'obituaryChurch', 'obituaryCemeteryLocation',
+    'obituaryBirthPlace', 'obituaryMotherName', 'obituaryFatherName', 'obituaryHighSchool',
+    'obituaryGradYear', 'obituaryDegree', 'obituaryCollege', 'obituaryJobTitle', 'obituaryCompany',
+    'obituaryJobYears', 'obituaryHobbies', 'obituaryAwards', 'obituaryOrganizations',
+    'obituaryPronoun', 'obituarySurvivorList', 'obituaryPrecededList', 'obituaryMemorial',
+  ];
+
+  function pruned(extra: Record<string, unknown>): string[] {
+    const person = {
+      id: '1',
+      flowId: '11111111-1111-4111-8111-111111111101',
+      ownerId: null,
+      role: 'owner',
+      personName: '',
+      dateOfPassing: '',
+      senderName: '',
+      obituaryUrl: '',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      lastOpenedAt: '2026-01-01T00:00:00.000Z',
+      drafts: {},
+      serviceReady: false,
+      recipientsNotified: {},
+      momentCompletedAt: {},
+      remindersScheduled: [],
+      ...extra,
+    };
+    const map = new Map<string, string>([['gg.sessions.v1', JSON.stringify([person])]]);
+    const storage: SendFlowStorage = {
+      getItem: (k) => map.get(k) ?? null,
+      setItem: (k, v) => void map.set(k, v),
+      removeItem: (k) => void map.delete(k),
+    };
+    const hook = renderHook(() => useSessions(storage));
+    act(() => hook.result.current.pruneEmpty());
+    return hook.result.current.sessions.map((s) => s.id);
+  }
+
+  it.each(NEW_KEYS)('keeps an unnamed person who has %s', (key) => {
+    expect(pruned({ [key]: 'x' })).toEqual(['1']);
+  });
+
+  it('drops an unnamed person whose new fields are blank', () => {
+    expect(pruned({ obituaryGivenName: '  ', obituaryMemorial: '' })).toEqual([]);
+  });
+});

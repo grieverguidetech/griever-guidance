@@ -38,6 +38,32 @@ export interface SectionFields {
   obituarySurvivors?: string;
   obituaryNote?: string;
   thanksMessage?: string;
+  obituaryGivenName?: string;
+  obituaryMiddleName?: string;
+  obituarySurname?: string;
+  obituaryAge?: string;
+  obituaryState?: string;
+  obituaryDeathPlace?: string;
+  obituaryFuneralHome?: string;
+  obituaryChurch?: string;
+  obituaryCemeteryLocation?: string;
+  obituaryBirthPlace?: string;
+  obituaryMotherName?: string;
+  obituaryFatherName?: string;
+  obituaryHighSchool?: string;
+  obituaryGradYear?: string;
+  obituaryDegree?: string;
+  obituaryCollege?: string;
+  obituaryJobTitle?: string;
+  obituaryCompany?: string;
+  obituaryJobYears?: string;
+  obituaryHobbies?: string;
+  obituaryAwards?: string;
+  obituaryOrganizations?: string;
+  obituaryPronoun?: string;
+  obituarySurvivorList?: string;
+  obituaryPrecededList?: string;
+  obituaryMemorial?: string;
   /** A missing key means "Not started". */
   sectionStatus?: Partial<Record<SectionKey, SectionStatus>>;
 }

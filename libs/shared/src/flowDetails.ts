@@ -16,6 +16,11 @@ import {
   stripControl,
 } from './flowFacts.js';
 import { isUserId, isUuid } from './members.js';
+import {
+  PRECEDED_RELATIONS,
+  SURVIVOR_RELATIONS,
+  parsePeople,
+} from './obituaryPeople.js';
 import type { SectionKey, SectionStatus } from './sections.js';
 
 export const FLOW_DETAIL_TEXT_KEYS = [
@@ -43,6 +48,32 @@ export const FLOW_DETAIL_TEXT_KEYS = [
   'receptionDate',
   'receptionTime',
   'receptionPlace',
+  'obituaryGivenName',
+  'obituaryMiddleName',
+  'obituarySurname',
+  'obituaryAge',
+  'obituaryState',
+  'obituaryDeathPlace',
+  'obituaryFuneralHome',
+  'obituaryChurch',
+  'obituaryCemeteryLocation',
+  'obituaryBirthPlace',
+  'obituaryMotherName',
+  'obituaryFatherName',
+  'obituaryHighSchool',
+  'obituaryGradYear',
+  'obituaryDegree',
+  'obituaryCollege',
+  'obituaryJobTitle',
+  'obituaryCompany',
+  'obituaryJobYears',
+  'obituaryHobbies',
+  'obituaryAwards',
+  'obituaryOrganizations',
+  'obituaryPronoun',
+  'obituarySurvivorList',
+  'obituaryPrecededList',
+  'obituaryMemorial',
 ] as const;
 
 export type FlowDetailTextKey = (typeof FLOW_DETAIL_TEXT_KEYS)[number];
@@ -118,6 +149,32 @@ export const FLOW_DETAIL_MAX_LENGTH: Record<FlowDetailTextKey, number> = {
   receptionDate: 100,
   receptionTime: 100,
   receptionPlace: 200,
+  obituaryGivenName: 100,
+  obituaryMiddleName: 200,
+  obituarySurname: 100,
+  obituaryAge: 20,
+  obituaryState: 100,
+  obituaryDeathPlace: 200,
+  obituaryFuneralHome: 200,
+  obituaryChurch: 200,
+  obituaryCemeteryLocation: 200,
+  obituaryBirthPlace: 200,
+  obituaryMotherName: 200,
+  obituaryFatherName: 200,
+  obituaryHighSchool: 200,
+  obituaryGradYear: 20,
+  obituaryDegree: 200,
+  obituaryCollege: 200,
+  obituaryJobTitle: 200,
+  obituaryCompany: 200,
+  obituaryJobYears: 50,
+  obituaryHobbies: 500,
+  obituaryAwards: 500,
+  obituaryOrganizations: 500,
+  obituaryPronoun: 10,
+  obituarySurvivorList: 3000,
+  obituaryPrecededList: 2000,
+  obituaryMemorial: 2000,
 };
 
 const STATUS_BY_SECTION: Record<SectionKey, FlowStatusKey> = {
@@ -171,6 +228,59 @@ const isMessageKey = (key: FlowDetailTextKey): key is FlowMessageKey =>
   (FLOW_MESSAGE_KEYS as readonly string[]).includes(key);
 
 
+const PRONOUNS: readonly string[] = ['he', 'she', 'they'];
+
+/** Index of the first lone surrogate (a high one with no low one after it, or a low one alone), or -1. */
+function loneSurrogateAt(value: string): number {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        i++;
+      } else {
+        return i;
+      }
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+const hasLoneSurrogate = (value: string): boolean => loneSurrogateAt(value) !== -1;
+
+// No regex lookbehind: Hermes (mobile) may not support it.
+function stripLoneSurrogates(value: string): string {
+  let out = value;
+  let at = loneSurrogateAt(out);
+  while (at !== -1) {
+    out = out.slice(0, at) + out.slice(at + 1);
+    at = loneSurrogateAt(out);
+  }
+  return out;
+}
+
+/**
+ * The 26 keys added in #772 refuse a lone surrogate. The first 24 do not: an old stored value
+ * could hold one, and refusing it would make the data function throw when it lists flows.
+ */
+const STRICT_SURROGATE_KEYS: ReadonlySet<string> = new Set(FLOW_DETAIL_TEXT_KEYS.slice(24));
+
+/** The two list keys hold JSON, so they are never cut: they are kept whole or not at all. */
+const LIST_RELATIONS = {
+  obituarySurvivorList: SURVIVOR_RELATIONS,
+  obituaryPrecededList: PRECEDED_RELATIONS,
+} as const;
+
+const isListKey = (key: FlowDetailTextKey): key is keyof typeof LIST_RELATIONS =>
+  Object.hasOwn(LIST_RELATIONS, key);
+
+/** True when the text is a list `parsePeople` accepts for this key ('' is an empty list). */
+function validList(key: keyof typeof LIST_RELATIONS, text: string): boolean {
+  return parsePeople(text, LIST_RELATIONS[key] as readonly string[]) !== null;
+}
+
 /** Cuts to `max` without splitting a surrogate pair. */
 function cut(value: string, max: number): string {
   if (value.length <= max) {
@@ -187,10 +297,20 @@ function cut(value: string, max: number): string {
  */
 function toWireText(key: FlowDetailTextKey, value: string | undefined) {
   const max = FLOW_DETAIL_MAX_LENGTH[key];
+  const clean = (text: string) => stripLoneSurrogates(stripControl(text));
   if (isMessageKey(key)) {
-    return value === undefined ? null : cut(stripControl(value), max);
+    return value === undefined ? null : cut(clean(value), max);
   }
-  return cut(stripControl(value ?? '').trim(), max).trimEnd() || null;
+  if (isListKey(key)) {
+    // Never cut mid-JSON: a list that is too long or does not parse is sent as null.
+    const text = clean(value ?? '').trim();
+    return text !== '' && text.length <= max && validList(key, text) ? text : null;
+  }
+  const text = cut(clean(value ?? '').trim(), max).trimEnd() || null;
+  if (key === 'obituaryPronoun') {
+    return text !== null && PRONOUNS.includes(text) ? text : null;
+  }
+  return text;
 }
 
 /** Details for a session: the full, valid set (always passes `parseFlowDetails`). */
@@ -271,12 +391,20 @@ function validDetail(key: FlowDetailKey, value: unknown): boolean {
   if (value === null) {
     return true;
   }
-  const max = FLOW_DETAIL_MAX_LENGTH[key as FlowDetailTextKey];
-  return (
-    typeof value === 'string' &&
-    value.length <= max &&
-    !CONTROL_CHARS.test(value)
-  );
+  const textKey = key as FlowDetailTextKey;
+  const max = FLOW_DETAIL_MAX_LENGTH[textKey];
+  if (
+    typeof value !== 'string' ||
+    value.length > max ||
+    CONTROL_CHARS.test(value) ||
+    (STRICT_SURROGATE_KEYS.has(textKey) && hasLoneSurrogate(value))
+  ) {
+    return false;
+  }
+  if (textKey === 'obituaryPronoun') {
+    return PRONOUNS.includes(value);
+  }
+  return isListKey(textKey) ? validList(textKey, value) : true;
 }
 
 /**
