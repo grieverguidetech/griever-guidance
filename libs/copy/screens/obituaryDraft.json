@@ -12,8 +12,20 @@
   "awardsSentence": " {They} received {awards}.",
   "involvedSentence": " {They} {was} involved in {organizations}.",
   "awardsAndInvolvedSentence": " {They} received {awards} and {was} involved in {organizations}.",
-  "paragraph4": "{name} is survived by {survivors}. {They} {is} preceded in death by {their} [RELATION], [NAME].",
-  "paragraph5": "Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME]. {note}",
+  "paragraph4": "{name} is survived by {survivors}.{precededSentence}",
+  "precededSentence": " {They} {is} preceded in death by {preceded}.",
+  "personRow": "{their} {relation}, {person}",
+  "personWithCity": "{personName} of {personCity}",
+  "relations": {
+    "spouse": { "one": "spouse", "many": "spouses" },
+    "child": { "one": "child", "many": "children" },
+    "grandchild": { "one": "grandchild", "many": "grandchildren" },
+    "great-grandchild": { "one": "great-grandchild", "many": "great-grandchildren" },
+    "2nd great-grandchild": { "one": "2nd great-grandchild", "many": "2nd great-grandchildren" },
+    "sibling": { "one": "sibling", "many": "siblings" },
+    "parent": { "one": "parent", "many": "parents" }
+  },
+  "memorial": "Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME] [FINAL WORDS].",
   "burialSentence": "Burial will follow at {burialPlace}, {cemeteryLocation}.",
   "burialPrivate": "Burial will be private.",
   "pronouns": {
@@ -50,8 +62,9 @@
     "jobTitle": "[JOB TITLE]",
     "company": "[COMPANY]",
     "jobYears": "[NUMBER OF YEARS]",
-    "survivors": "[his/her] [RELATION], [NAME] of [CITY]",
-    "note": "[FINAL WORDS]"
+    "relation": "[RELATION]",
+    "personName": "[SURVIVOR NAME]",
+    "personCity": "[SURVIVOR CITY]"
   },
-  "legacyBlanks": ["[AGE]","[STATE]","[LOCATION OF DEATH]","[PLACE OF WORSHIP]","[NAME OF FUNERAL HOME]","[LOCATION OF BIRTH]","[PARENTS' NAMES]","[He/She]","[SCHOOL NAME]","[YEAR]","[DEGREE TYPE]","[ACTIVITIES/HOBBIES]","[AWARDS/HONORS]","[CHARITIES/ORGANIZATIONS]","[his/her]","[RELATION]","[NAME]","[ORGANIZATION NAME]","[MAILING ADDRESS]","[ORGANIZATION/NAME]","[CEMETERY LOCATION]","[GIVEN NAME]","[MIDDLE NAME (AND NICKNAME)]","[SURNAME]","[CITY]","[DATE OF DEATH]","[LOCATION]","[DATE]","[TIME]","[OFFICIANT]","[CEMETERY NAME]","[DATE OF BIRTH]","[JOB TYPE]","[COMPANY]","[NUMBER OF YEARS]","[FINAL WORDS]"]
+  "legacyBlanks": ["[AGE]","[STATE]","[LOCATION OF DEATH]","[PLACE OF WORSHIP]","[NAME OF FUNERAL HOME]","[LOCATION OF BIRTH]","[PARENTS' NAMES]","[He/She]","[SCHOOL NAME]","[YEAR]","[DEGREE TYPE]","[ACTIVITIES/HOBBIES]","[AWARDS/HONORS]","[CHARITIES/ORGANIZATIONS]","[his/her]","[RELATION]","[NAME]","[SURVIVOR NAME]","[SURVIVOR CITY]","[ORGANIZATION NAME]","[MAILING ADDRESS]","[ORGANIZATION/NAME]","[CEMETERY LOCATION]","[GIVEN NAME]","[MIDDLE NAME (AND NICKNAME)]","[SURNAME]","[CITY]","[DATE OF DEATH]","[LOCATION]","[DATE]","[TIME]","[OFFICIANT]","[CEMETERY NAME]","[DATE OF BIRTH]","[JOB TYPE]","[COMPANY]","[NUMBER OF YEARS]","[FINAL WORDS]"]
 }

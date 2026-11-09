@@ -31,6 +31,9 @@ export interface ObituaryDraftFields {
   obituaryAwards?: string;
   obituaryOrganizations?: string;
   obituaryPronoun?: string;
+  /** The two people lists, each one text key of JSON rows (see `parsePeople` in libs/shared). */
+  obituarySurvivorList?: string;
+  obituaryPrecededList?: string;
   dateOfPassing?: string;
   birthDate?: string;
   servicePlace?: string;
@@ -45,6 +48,7 @@ export interface ObituaryDraftFields {
   /** Older fields. They still fill the draft when the newer ones are empty. */
   obituaryCareer?: string;
   obituarySurvivors?: string;
+  /** No longer read: the memorial is its own text (`copy.memorial`, added by `obituaryShareText`). */
   obituaryNote?: string;
 }
 
@@ -141,6 +145,89 @@ function pronounOf(value: string | undefined): ObituaryPronoun | 'unset' {
   return value === 'he' || value === 'she' || value === 'they' ? value : 'unset';
 }
 
+const SURVIVOR_RELATIONS = ['spouse', 'child', 'grandchild', 'great-grandchild', '2nd great-grandchild', 'sibling', 'parent'];
+const PRECEDED_RELATIONS = ['spouse', 'child', 'sibling', 'parent'];
+const PEOPLE_MAX_ROWS = 40;
+
+interface Person {
+  name: string;
+  city: string;
+  relation: string;
+}
+
+/**
+ * Rows of one people list. Anything that is not a valid list counts as no rows.
+ * Reads rows the way `parsePeople` in libs/shared does (copy cannot import shared);
+ * libs/shared/src/obituaryPeopleParity.spec.ts keeps the two equal.
+ */
+function parsePeopleRows(text: string | undefined, relations: readonly string[]): Person[] {
+  if (!text) {
+    return [];
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data) || data.length > PEOPLE_MAX_ROWS) {
+    return [];
+  }
+  const rows: Person[] = [];
+  for (const item of data) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      return [];
+    }
+    const keys = Object.keys(item);
+    if (keys.length !== 3 || !['name', 'city', 'relation'].every((key) => keys.includes(key))) {
+      return [];
+    }
+    const { name, city, relation } = item as Record<string, unknown>;
+    if (typeof name !== 'string' || typeof city !== 'string' || typeof relation !== 'string') {
+      return [];
+    }
+    if (!relations.includes(relation)) {
+      return [];
+    }
+    rows.push({ name, city, relation });
+  }
+  return rows;
+}
+
+/** "A", "A and B", "A, B and C". */
+function joinList(items: string[]): string {
+  if (items.length <= 1) {
+    return items.join('');
+  }
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/**
+ * "his wife..." style text for one list: rows of one relation are grouped (in the order each relation first
+ * appears), as "<their> <relation>, <name> of <city>". A row without a city leaves out "of".
+ * The relation word is "spouse", because we do not know the spouse's gender.
+ */
+function peopleText(rows: Person[], copy: DraftCopy, their: string): string {
+  const groups = new Map<string, Person[]>();
+  for (const row of rows) {
+    groups.set(row.relation, [...(groups.get(row.relation) ?? []), row]);
+  }
+  const parts = [...groups].map(([relation, members]) => {
+    const words = copy.relations[relation as keyof DraftCopy['relations']];
+    const people = members.map((member) => {
+      const personName = member.name.trim() || copy.blanks.personName;
+      const personCity = member.city.trim();
+      return personCity === '' ? personName : fillSlots(copy.personWithCity, { personName, personCity });
+    });
+    return fillSlots(copy.personRow, {
+      their,
+      relation: members.length === 1 ? words.one : words.many,
+      person: joinList(people),
+    });
+  });
+  return joinList(parts);
+}
+
 /** "30" reads "30 years" ("1" reads "1 year"). Text that has no "year" word gets " years"; "thirty years" is kept. */
 function yearsPhrase(value: string, blank: string): string {
   if (value === '') {
@@ -153,13 +240,13 @@ function yearsPhrase(value: string, blank: string): string {
 }
 
 /**
- * Fill the obituary template (five paragraphs, separated by a blank line).
+ * Fill the obituary template (four paragraphs, separated by a blank line).
  *
  * Core parts (names, age, city, state, dates, service, burial, visitation, birth, parents, school, job)
  * keep their own [BRACKET] when empty, so the family sees what is missing. Optional parts (middle name,
  * place of death, funeral home, degree and college, hobbies, awards, organizations) drop out when empty.
  * A value in the middle of a sentence is trimmed only ("2:00 p.m." keeps its stop). A value the template
- * follows with a full stop loses one typed full stop, so there is no "..". The final note is trimmed only.
+ * follows with a full stop loses one typed full stop, so there is no "..".
  */
 export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy): string {
   const { blanks } = copy;
@@ -223,7 +310,21 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
     awardsSentence = fillSlots(copy.involvedSentence, { ...pronoun, organizations });
   }
 
-  const survivors = cleanEnd(fields.obituarySurvivors);
+  const survivorRows = parsePeopleRows(fields.obituarySurvivorList, SURVIVOR_RELATIONS);
+  const precededRows = parsePeopleRows(fields.obituaryPrecededList, PRECEDED_RELATIONS);
+  const oldSurvivors = cleanEnd(fields.obituarySurvivors);
+  let survivors: string;
+  if (survivorRows.length > 0) {
+    survivors = peopleText(survivorRows, copy, pronoun.their);
+  } else if (oldSurvivors !== '') {
+    survivors = oldSurvivors;
+  } else {
+    survivors = fillSlots(copy.personRow, {
+      their: pronoun.their,
+      relation: blanks.relation,
+      person: fillSlots(copy.personWithCity, { personName: blanks.personName, personCity: blanks.personCity }),
+    });
+  }
 
   const values: Record<string, string> = {
     ...pronoun,
@@ -254,13 +355,22 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
     jobSentence,
     hobbiesSentence: hobbies === '' ? '' : fillSlots(copy.hobbiesSentence, { ...pronoun, hobbies }),
     awardsSentence,
-    survivors: survivors || blanks.survivors,
-    note: fields.obituaryNote?.trim() || blanks.note,
+    survivors,
+    precededSentence:
+      precededRows.length === 0
+        ? ''
+        : fillSlots(copy.precededSentence, { ...pronoun, preceded: peopleText(precededRows, copy, pronoun.their) }),
   };
 
-  return [copy.paragraph1, copy.paragraph2, copy.paragraph3, copy.paragraph4, copy.paragraph5]
+  return [copy.paragraph1, copy.paragraph2, copy.paragraph3, copy.paragraph4]
     .map((paragraph) => fillSlots(paragraph, values))
     .join('\n\n');
+}
+
+/** The draft with the memorial as its last paragraph. A blank memorial (trimmed) adds nothing. */
+export function obituaryShareText(draft: string, memorial: string): string {
+  const trimmed = memorial.trim();
+  return trimmed === '' ? draft : `${draft}\n\n${trimmed}`;
 }
 
 const BRACKET_WORD = /\[[^\]]*\]/g;
@@ -273,7 +383,7 @@ function templateBracketWords(copy: DraftCopy): Set<string> {
   if (cached) {
     return cached;
   }
-  const { pronouns, blanks, legacyBlanks, ...sentences } = copy;
+  const { pronouns, blanks, legacyBlanks, relations, ...sentences } = copy;
   const sources = [
     ...Object.values(sentences),
     ...Object.values(blanks),

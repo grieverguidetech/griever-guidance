@@ -92,7 +92,7 @@ export function sendLabel(count: number | undefined, copy: ScreenCopy<'review'>)
   return fill(copy.send, { recipients: recipientsPhrase(count, copy) });
 }
 
-export { buildObituaryDraft, findTemplateBlanks, hasTemplateBlanks } from './obituaryDraft';
+export { buildObituaryDraft, findTemplateBlanks, hasTemplateBlanks, obituaryShareText } from './obituaryDraft';
 export type { ObituaryDraftFields, ObituaryPronoun } from './obituaryDraft';
 
 export { checklistDetail } from './checklistDetails';
