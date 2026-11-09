@@ -74,5 +74,6 @@
   "peopleLimit": "This list holds up to 40 people.",
   "removePersonUnnamed": "Remove person {n}",
   "personRemoved": "{name} removed.",
-  "personRemovedUnnamed": "Person {n} removed."
+  "personRemovedUnnamed": "Person {n} removed.",
+  "nameFilled": "Name filled in from The person."
 }

@@ -79,7 +79,8 @@
     "peopleLimit",
     "removePersonUnnamed",
     "personRemoved",
-    "personRemovedUnnamed"
+    "personRemovedUnnamed",
+    "nameFilled"
   ],
   "properties": {
     "intro": {
@@ -308,6 +309,9 @@
       "$ref": "#/$defs/text"
     },
     "personRemovedUnnamed": {
+      "$ref": "#/$defs/text"
+    },
+    "nameFilled": {
       "$ref": "#/$defs/text"
     }
   },
