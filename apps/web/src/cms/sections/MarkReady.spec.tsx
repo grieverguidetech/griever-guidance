@@ -248,4 +248,72 @@ describe('MarkReady', () => {
       expect(screen.queryByRole('region')).toBeNull();
     });
   });
+
+  describe('blockedMessage', () => {
+    const reason = 'Fill in the brackets first.';
+    const toggle = () => screen.getByRole('button', { name: 'Mark as ready' });
+
+    it('marks the toggle aria-disabled, keeps it focusable, and shows the message', async () => {
+      render(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
+      expect(toggle()).toHaveAttribute('aria-disabled', 'true');
+      expect(toggle()).not.toBeDisabled();
+      await userEvent.tab();
+      expect(toggle()).toHaveFocus();
+      expect(screen.getByText(reason, { selector: 'p:not([role])' })).toBeInTheDocument();
+    });
+
+    it('does not call onChange on click, Enter or Space', async () => {
+      const onChange = vi.fn();
+      render(<MarkReady ready={false} onChange={onChange} blockedMessage={reason} />);
+      await userEvent.click(toggle());
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('lists the message id after the hint in aria-describedby', () => {
+      render(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
+      const ids = (toggle().getAttribute('aria-describedby') ?? '').split(' ');
+      expect(ids).toHaveLength(2);
+      expect(document.getElementById(ids[0])).toHaveTextContent('Mark as ready when these details are settled');
+      expect(document.getElementById(ids[1])).toHaveTextContent(reason);
+    });
+
+    it('announces the message in a polite live region, also on a second press', async () => {
+      render(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
+      const region = screen.getByRole('status');
+      expect(region).toHaveAttribute('aria-live', 'polite');
+      expect(region).toHaveTextContent('');
+      await userEvent.click(toggle());
+      const first = region.textContent;
+      expect(first?.trim()).toBe(reason);
+      await userEvent.click(toggle());
+      expect(region.textContent?.trim()).toBe(reason);
+      expect(region.textContent).not.toBe(first);
+    });
+
+    it('keeps the live region empty after ready turns off until a press', async () => {
+      const { rerender } = render(<MarkReady ready onChange={() => undefined} blockedMessage={reason} />);
+      rerender(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      await userEvent.click(toggle());
+      expect(screen.getByRole('status').textContent?.trim()).toBe(reason);
+    });
+
+    it('never blocks once ready, and shows no message', async () => {
+      const onChange = vi.fn();
+      render(<MarkReady ready onChange={onChange} blockedMessage={reason} />);
+      expect(toggle()).not.toHaveAttribute('aria-disabled');
+      expect(screen.queryByText(reason)).toBeNull();
+      await userEvent.click(toggle());
+      expect(onChange).toHaveBeenCalledWith(false);
+    });
+
+    it('changes nothing without the prop', () => {
+      render(<MarkReady ready={false} onChange={() => undefined} />);
+      expect(toggle()).not.toHaveAttribute('aria-disabled');
+      expect(screen.queryByRole('status')).toBeNull();
+      expect((toggle().getAttribute('aria-describedby') ?? '').split(' ')).toHaveLength(1);
+    });
+  });
 });
