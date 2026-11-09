@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { MarkReady } from './MarkReady';
+import { resetSessionDismissed } from './PhoneNudge';
 
 describe('MarkReady', () => {
   it('is a toggle button that is not pressed when not ready', () => {
@@ -114,6 +115,7 @@ describe('MarkReady', () => {
       return <MarkReady ready={ready} onChange={setReady} phoneNudge={phoneNudge} />;
     }
     afterEach(() => {
+      resetSessionDismissed();
       window.localStorage.clear();
       vi.restoreAllMocks();
     });
@@ -166,9 +168,12 @@ describe('MarkReady', () => {
       vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
         throw new Error('blocked');
       });
-      render(<Harness start />);
+      const { unmount } = render(<Harness start />);
       expect(screen.getByRole('status')).toHaveTextContent(line);
       await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      unmount();
+      render(<Harness start />);
       expect(screen.getByRole('status')).toBeEmptyDOMElement();
     });
   });

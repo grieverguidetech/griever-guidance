@@ -24,11 +24,11 @@ interface Props {
 export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNudge }: Props) {
   const hintId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const [dismissed, setDismissed] = useState(readDismissedNudges);
+  const [dismissed, setDismissed] = useState(() => (phoneNudge ? readDismissedNudges() : []));
   const showNudge = phoneNudge !== undefined && ready && !dismissed.includes(phoneNudge);
 
   function dismissNudge(section: PhoneNudgeSection) {
-    const next = [...dismissed, section];
+    const next = [...new Set([...readDismissedNudges(), ...dismissed, section])];
     setDismissed(next);
     saveDismissedNudges(next);
     // The Got it button goes away, so keep focus on the toggle.
