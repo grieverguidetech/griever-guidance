@@ -358,6 +358,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
         onChange={onReadyChange}
         nextSection={nextSection}
         onNext={onNext}
+        phoneNudge="service"
       />
     </div>
   );

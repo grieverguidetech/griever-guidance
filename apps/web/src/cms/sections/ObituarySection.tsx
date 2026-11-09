@@ -159,6 +159,7 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
         onChange={onReadyChange}
         nextSection={nextSection}
         onNext={onNext}
+        phoneNudge="obituary"
       />
     </div>
   );

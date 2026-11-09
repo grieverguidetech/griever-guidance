@@ -7,6 +7,7 @@ import { findHardCodedCopy } from '@griever/copy';
 import { PlacesProvider } from '../../lib/places/PlacesContext';
 import type { PlacesClient } from '../../lib/places/placesClient';
 import { ServiceSection, type ServicePatch } from './ServiceSection';
+import { resetSessionDismissed } from './PhoneNudge';
 
 type Values = Parameters<typeof ServiceSection>[0]['values'];
 
@@ -499,5 +500,43 @@ describe('ServiceSection pick fills the address', () => {
     await pickInto('oak');
     expect(detailsMock).not.toHaveBeenCalled();
     expect(addressField()).toHaveValue('9 My Road');
+  });
+});
+
+describe('ServiceSection phone nudge', () => {
+  afterEach(() => {
+    resetSessionDismissed();
+    window.localStorage.clear();
+  });
+
+  function renderReadyToggle() {
+    function Ready() {
+      const [ready, setReady] = useState(false);
+      return (
+        <ServiceSection
+          values={{ sectionStatus: { service: ready ? 'ready' : 'in_progress' } }}
+          onChange={() => undefined}
+          onReadyChange={setReady}
+        />
+      );
+    }
+    render(<Ready />);
+  }
+
+  it('shows its own line once marked ready and hides it when un-marked', async () => {
+    renderReadyToggle();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toHaveTextContent('You will share the service details from the Grievers Guidance phone app, signed in to this account.');
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('Got it saves only the service dismissal', async () => {
+    renderReadyToggle();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v1')).toBe('["service"]');
   });
 });
