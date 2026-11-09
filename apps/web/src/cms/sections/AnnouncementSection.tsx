@@ -68,6 +68,7 @@ export function AnnouncementSection({ values, onChange, onReadyChange, nextSecti
         onChange={onReadyChange}
         nextSection={nextSection}
         onNext={onNext}
+        phoneNudge="announcement"
       />
     </div>
   );

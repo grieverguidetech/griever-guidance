@@ -1,8 +1,9 @@
-import { useId } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Check } from '@phosphor-icons/react/Check';
 import { fill, screenCopy } from '@griever/copy';
 import type { SectionKey } from '@griever/shared';
 import { navTitle } from '../SideNav';
+import { PhoneNudge, readDismissedNudges, saveDismissedNudges, type PhoneNudgeSection } from './PhoneNudge';
 
 const copy = screenCopy('cmsShell');
 
@@ -13,17 +14,31 @@ interface Props {
   nextSection?: SectionKey | null;
   /** Without it no continue button shows. */
   onNext?: () => void;
+  /** Opt in to the phone nudge (WEB-13) for this section. Without it nothing extra renders. */
+  phoneNudge?: PhoneNudgeSection;
 }
 
 /** A toggle (the libs/ui Button has no icon slot, so this is a plain button). A check shows when ready;
  * the name never changes and aria-pressed carries the state. A toggle, not a one-way switch: the family can take "ready" back at any time.
  * Once ready, one button leads on: to the next section, or back to the Overview when nothing is left. */
-export function MarkReady({ ready, onChange, nextSection = null, onNext }: Props) {
+export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNudge }: Props) {
   const hintId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const [dismissed, setDismissed] = useState(() => (phoneNudge ? readDismissedNudges() : []));
+  const showNudge = phoneNudge !== undefined && ready && !dismissed.includes(phoneNudge);
+
+  function dismissNudge(section: PhoneNudgeSection) {
+    const next = [...new Set([...readDismissedNudges(), ...dismissed, section])];
+    setDismissed(next);
+    saveDismissedNudges(next);
+    // The Got it button goes away, so keep focus on the toggle.
+    toggleRef.current?.focus();
+  }
   return (
     <div className="flex flex-col gap-3 items-start">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
+          ref={toggleRef}
           type="button"
           className="gg-chip gg-chip-outlined"
           aria-pressed={ready}
@@ -50,6 +65,11 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext }: Props
         <button type="button" className="gg-btn gg-btn-primary gg-enter min-h-[44px]" onClick={onNext}>
           {nextSection ? fill(copy.next, { section: navTitle(nextSection) }) : copy.backToOverview}
         </button>
+      ) : null}
+      {phoneNudge ? (
+        <div role="status" aria-live="polite" className="w-full">
+          {showNudge ? <PhoneNudge section={phoneNudge} onDismiss={() => dismissNudge(phoneNudge)} /> : null}
+        </div>
       ) : null}
     </div>
   );

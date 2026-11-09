@@ -80,4 +80,22 @@ describe('AnnouncementSection', () => {
     const source = readFileSync(join(import.meta.dirname, 'AnnouncementSection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsAnnouncement')).toEqual([]);
   });
+
+  it('shows the phone line once marked ready', async () => {
+    window.localStorage.clear();
+    function Ready() {
+      const [values, setValues] = useState<Values>({});
+      return (
+        <AnnouncementSection
+          values={values}
+          onChange={() => undefined}
+          onReadyChange={(ready) => setValues({ sectionStatus: { announcement: ready ? 'ready' : 'in_progress' } })}
+        />
+      );
+    }
+    render(<Ready />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toHaveTextContent('You will send the announcement from the Grievers Guidance phone app');
+  });
 });

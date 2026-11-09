@@ -159,6 +159,25 @@ test('Ready leads on: The person ready, Next opens Announcement with its h1; no 
   await expect(heading).toBeFocused();
 });
 
+test('Announcement phone nudge: shows when Ready, Got it keeps focus on the toggle and stays hidden after reload; axe clean (WEB-13)', async ({ page }) => {
+  await startPerson(page);
+  await page.getByLabel('Their name').fill('Margaret Hayes');
+  await openSection(page, 'Announcement', 'Announcement');
+  const line = page.getByText('You will send the announcement from the Grievers Guidance phone app, signed in to this account.');
+  await expect(line).toHaveCount(0);
+  const toggle = page.getByRole('button', { name: 'Mark as ready' });
+  await toggle.click();
+  await expect(line).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Got it' }).click();
+  await expect(line).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+  await page.reload();
+  await openSection(page, 'Announcement', 'Announcement');
+  await expect(page.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(line).toHaveCount(0);
+});
+
 test.describe('no sync while signed out (#520)', () => {
   test('the editor flow makes no /flows request (auth is off in this build)', async ({ page }) => {
     const flowRequests: string[] = [];
