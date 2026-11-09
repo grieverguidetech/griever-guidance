@@ -3,7 +3,7 @@ import { Check } from '@phosphor-icons/react/Check';
 import { fill, screenCopy } from '@griever/copy';
 import type { SectionKey } from '@griever/shared';
 import { navTitle } from '../SideNav';
-import { PhoneNudge, readDismissedNudges, saveDismissedNudges, type PhoneNudgeSection } from './PhoneNudge';
+import { PhoneNudge, clearDismissedNudge, readDismissedNudges, saveDismissedNudges, type PhoneNudgeSection } from './PhoneNudge';
 
 const copy = screenCopy('cmsShell');
 
@@ -48,7 +48,12 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
   }, [showNudge]);
 
   function toggle() {
-    focusNudgeRef.current = !ready && phoneNudge !== undefined && !dismissed.includes(phoneNudge);
+    // Got it lasts only until the section is marked ready again (#761), so any toggle clears it.
+    if (phoneNudge !== undefined) {
+      clearDismissedNudge(phoneNudge);
+      setDismissed((current) => current.filter((name) => name !== phoneNudge));
+    }
+    focusNudgeRef.current = !ready && phoneNudge !== undefined;
     onChange(!ready);
   }
 
@@ -88,7 +93,8 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
       </div>
       {showNudge && phoneNudge ? <PhoneNudge section={phoneNudge} nudgeRef={nudgeRef} onDismiss={() => dismissNudge(phoneNudge)} /> : null}
       {ready && onNext ? (
-        <button type="button" className="gg-btn gg-btn-primary gg-enter min-h-[44px]" onClick={onNext}>
+        <button type="button" className={`gg-btn gg-btn-primary gg-enter min-h-[44px]${showNudge ? ' mt-3' : ''}`}
+          onClick={onNext}>
           {nextSection ? fill(copy.next, { section: navTitle(nextSection) }) : copy.backToOverview}
         </button>
       ) : null}

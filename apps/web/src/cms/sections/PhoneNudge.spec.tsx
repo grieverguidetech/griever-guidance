@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
-import { PHONE_NUDGE_KEY, PhoneNudge, readDismissedNudges, resetSessionDismissed, saveDismissedNudges } from './PhoneNudge';
+import { PHONE_NUDGE_KEY, clearDismissedNudge, PhoneNudge, readDismissedNudges, resetSessionDismissed, saveDismissedNudges } from './PhoneNudge';
 
 afterEach(() => {
   resetSessionDismissed();
@@ -75,6 +75,30 @@ describe('dismissed storage', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked');
     });
+    expect(readDismissedNudges()).toEqual([]);
+  });
+
+  it('uses the v2 key and ignores a v1 value', () => {
+    expect(PHONE_NUDGE_KEY).toBe('gg.cmsPhoneNudge.v2');
+    window.localStorage.setItem('gg.cmsPhoneNudge.v1', '["announcement"]');
+    expect(readDismissedNudges()).toEqual([]);
+    saveDismissedNudges(['service']);
+    expect(window.localStorage.getItem('gg.cmsPhoneNudge.v1')).toBeNull();
+  });
+
+  it('clears one section from the visit and storage and leaves the others', () => {
+    saveDismissedNudges(['announcement', 'service']);
+    clearDismissedNudge('service');
+    expect(window.localStorage.getItem(PHONE_NUDGE_KEY)).toBe('["announcement"]');
+    expect(readDismissedNudges()).toEqual(['announcement']);
+  });
+
+  it('clears a visit dismissal even when storage throws', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('full');
+    });
+    saveDismissedNudges(['service']);
+    clearDismissedNudge('service');
     expect(readDismissedNudges()).toEqual([]);
   });
 
