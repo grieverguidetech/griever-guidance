@@ -305,3 +305,13 @@ describe('hasTemplateBlanks', () => {
     expect(findTemplateBlanks('Anna [my note] and [CITY]', copy)).toEqual(['[CITY]']);
   });
 });
+
+describe('findTemplateBlanks covers the whole template', () => {
+  it('finds every distinct bracket the empty template contains', () => {
+    const copy = screenCopy('obituaryDraft');
+    const empty = buildObituaryDraft({}, copy);
+    const all = new Set(empty.match(/\[[^\]]*\]/g));
+    expect(all.size).toBeGreaterThan(10);
+    expect(new Set(findTemplateBlanks(empty, copy))).toEqual(all);
+  });
+});

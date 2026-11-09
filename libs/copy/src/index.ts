@@ -161,7 +161,13 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy
 const BRACKET_WORD = /\[[^\]]*\]/g;
 
 /** Every [BRACKET] word the template can leave in a text (from its paragraphs and its blanks). */
+const bracketWordCache = new WeakMap<object, Set<string>>();
+
 function templateBracketWords(copy: ScreenCopy<'obituaryDraft'>): Set<string> {
+  const cached = bracketWordCache.get(copy);
+  if (cached) {
+    return cached;
+  }
   const sources = [
     copy.paragraph1,
     copy.paragraph2,
@@ -171,7 +177,9 @@ function templateBracketWords(copy: ScreenCopy<'obituaryDraft'>): Set<string> {
     copy.burialSentence,
     ...Object.values(copy.blanks),
   ];
-  return new Set(sources.flatMap((source) => source.match(BRACKET_WORD) ?? []));
+  const words = new Set(sources.flatMap((source) => source.match(BRACKET_WORD) ?? []));
+  bracketWordCache.set(copy, words);
+  return words;
 }
 
 /** The template's [BRACKET] words still in the text, in order. A family's own brackets, such as [my note], do not count. */

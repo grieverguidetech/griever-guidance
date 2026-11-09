@@ -81,16 +81,27 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
     expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
   });
 
-  it('shows one calm line above Email while [brackets] remain, and keeps Email and Copy enabled', () => {
-    setup({ ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session);
+  it('shows one calm line above Email while [brackets] remain, and Email and Copy still work', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    const session = { ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session;
+    setup(session);
     expect(screen.getByText('Some parts are still in [brackets]. Fill them in or delete them before you send.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).not.toMatchObject({ disabled: true });
-    expect(screen.getByRole('button', { name: 'Copy the text' }).props.accessibilityState).not.toMatchObject({ disabled: true });
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
+    await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith(obituaryTextFor(session)));
+  });
+
+  it('gives the Email button the blanks line as its hint', () => {
+    setup({ ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session);
+    expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityHint).toBe('Some parts are still in [brackets]. Fill them in or delete them before you send.');
   });
 
   it('shows no brackets line when the text has none', () => {
     setup({ ...base, obituaryText: 'Anna loved the garden [my note].' } as Session);
     expect(screen.queryByText(/still in \[brackets\]/)).toBeNull();
+    expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityHint).toBeUndefined();
     expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
   });
 

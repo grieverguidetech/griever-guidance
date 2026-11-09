@@ -194,6 +194,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const emailFailedId = useId();
   const copiedId = useId();
   const noteId = useId();
+  const blanksId = useId();
+  const blanksShown = Boolean(publisherEmail?.hasBlanks && copy.emailBlanks);
   const addressErrorId = useId();
   const addressHintId = useId();
   const pasteId = useId();
@@ -253,13 +255,13 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
                   ) : null}
                 </>
               ) : null}
-              {publisherEmail.hasBlanks && copy.emailBlanks ? <Body tone="muted">{copy.emailBlanks}</Body> : null}
+              {blanksShown ? <Body tone="muted" id={blanksId}>{copy.emailBlanks}</Body> : null}
               <Button
                 label={copy.emailButton}
                 variant="secondary"
                 busy={publisherEmail.busy}
-                describedBy={publisherEmail.address?.error ? addressErrorId : publisherEmail.failed ? emailFailedId : undefined}
-                hint={publisherEmail.address?.error}
+                describedBy={publisherEmail.address?.error ? addressErrorId : publisherEmail.failed ? emailFailedId : blanksShown ? blanksId : undefined}
+                hint={publisherEmail.address?.error ?? (publisherEmail.failed ? undefined : blanksShown ? copy.emailBlanks : undefined)}
                 onPress={publisherEmail.onPress}
               />
               <Status id={emailFailedId} message={publisherEmail.failed ? copy.emailFailed : undefined} tone="danger" />
