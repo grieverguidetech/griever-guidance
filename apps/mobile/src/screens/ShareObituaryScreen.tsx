@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
-import { fill, screenCopy } from '@griever/copy';
+import { fill, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH, isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
@@ -16,6 +16,7 @@ import { obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
 const textCopy = screenCopy('phoneObituary');
+const draftCopy = screenCopy('obituaryDraft');
 const copy = {
   ...shareCopy,
   heading: shareCopy.mobileHeading,
@@ -318,7 +319,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           onContinue={() => leave(onContinue)}
           onPasteLink={pasteLink}
           pasteMessage={pasteMessage}
-          publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
+          publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', hasBlanks: hasTemplateBlanks(obituaryText, draftCopy), onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
           textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, note, editRef: editButton }}
           emailed={emailed}
           keyboardOpen={keyboardOpen}

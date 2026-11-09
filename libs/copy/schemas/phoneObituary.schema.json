@@ -15,6 +15,7 @@
     "saved",
     "followsDetails",
     "emailNoText",
+    "emailBlanks",
     "publisherEmailLabel",
     "publisherEmailPlaceholder",
     "publisherEmailHint",
@@ -57,6 +58,9 @@
       "$ref": "#/$defs/text"
     },
     "emailNoText": {
+      "$ref": "#/$defs/text"
+    },
+    "emailBlanks": {
       "$ref": "#/$defs/text"
     },
     "publisherEmailLabel": {

@@ -18,6 +18,7 @@
     "noteHint",
     "textLabel",
     "textHint",
+    "textBlanks",
     "textHintEdited",
     "useDetails"
   ],
@@ -62,6 +63,9 @@
       "$ref": "#/$defs/text"
     },
     "textHint": {
+      "$ref": "#/$defs/text"
+    },
+    "textBlanks": {
       "$ref": "#/$defs/text"
     },
     "textHintEdited": {

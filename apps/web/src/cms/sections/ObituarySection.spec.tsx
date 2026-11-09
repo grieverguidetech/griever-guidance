@@ -91,6 +91,18 @@ describe('ObituarySection', () => {
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
 
+  it('shows one calm line while [brackets] remain, as part of the text description, and hides it when none remain', async () => {
+    setup(person);
+    const line = 'Parts in [brackets] are still to fill in. Type over them, or delete what you don\'t need.';
+    expect(screen.getByText(line)).toBeInTheDocument();
+    expect(text()).toHaveAccessibleDescription(expect.stringContaining(line));
+    expect(screen.queryByRole('status')).toBeNull();
+    await userEvent.clear(text());
+    await userEvent.type(text(), 'Ann Lee loved gardens [[my note].');
+    expect(screen.queryByText(line)).toBeNull();
+    expect(text()).not.toHaveAccessibleDescription(expect.stringContaining('Parts in'));
+  });
+
   it('has no where-it-is-published inputs', () => {
     setup();
     expect(screen.queryByLabelText(/Link to the obituary/)).toBeNull();

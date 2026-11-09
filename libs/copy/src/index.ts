@@ -158,5 +158,32 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy
     .join('\n\n');
 }
 
+const BRACKET_WORD = /\[[^\]]*\]/g;
+
+/** Every [BRACKET] word the template can leave in a text (from its paragraphs and its blanks). */
+function templateBracketWords(copy: ScreenCopy<'obituaryDraft'>): Set<string> {
+  const sources = [
+    copy.paragraph1,
+    copy.paragraph2,
+    copy.paragraph3,
+    copy.paragraph4,
+    copy.paragraph5,
+    copy.burialSentence,
+    ...Object.values(copy.blanks),
+  ];
+  return new Set(sources.flatMap((source) => source.match(BRACKET_WORD) ?? []));
+}
+
+/** The template's [BRACKET] words still in the text, in order. A family's own brackets, such as [my note], do not count. */
+export function findTemplateBlanks(text: string, copy: ScreenCopy<'obituaryDraft'>): string[] {
+  const words = templateBracketWords(copy);
+  return (text.match(BRACKET_WORD) ?? []).filter((word) => words.has(word));
+}
+
+/** True while any of the template's [BRACKET] words is still in the text. */
+export function hasTemplateBlanks(text: string, copy: ScreenCopy<'obituaryDraft'>): boolean {
+  return findTemplateBlanks(text, copy).length > 0;
+}
+
 export { checklistDetail } from './checklistDetails';
 export type { ChecklistDetail } from './checklistDetails';

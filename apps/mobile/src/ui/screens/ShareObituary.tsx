@@ -46,6 +46,8 @@ export interface ShareObituaryCopy {
   emailButton?: string;
   /** Shown instead of the button when there is no obituary text yet. */
   emailNoText?: string;
+  /** Calm line above the Email button while [BRACKET] parts remain. It never disables a button. */
+  emailBlanks?: string;
   /** Shown under the button when neither mail nor sharing could open. */
   emailFailed?: string;
   /** Muted line after mail or the share sheet opened. */
@@ -89,6 +91,8 @@ export interface ShareObituaryCopy {
 export interface PublisherEmail {
   /** false when no obituary text has been written yet: a calm line shows, nothing is blocked. */
   hasText: boolean;
+  /** True while the text still has the template's [BRACKET] parts. */
+  hasBlanks?: boolean;
   onPress: () => void;
   /** true after mail and sharing both failed. */
   failed?: boolean;
@@ -249,6 +253,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
                   ) : null}
                 </>
               ) : null}
+              {publisherEmail.hasBlanks && copy.emailBlanks ? <Body tone="muted">{copy.emailBlanks}</Body> : null}
               <Button
                 label={copy.emailButton}
                 variant="secondary"

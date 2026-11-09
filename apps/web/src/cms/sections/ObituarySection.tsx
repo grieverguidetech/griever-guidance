@@ -1,5 +1,5 @@
 import { useId, useRef } from 'react';
-import { buildObituaryDraft, screenCopy } from '@griever/copy';
+import { buildObituaryDraft, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { MarkReady } from './MarkReady';
 
@@ -51,6 +51,8 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
     draftCopy,
   );
   const edited = values.obituaryText !== undefined;
+  const shownText = values.obituaryText ?? prefill;
+  const blanksLeft = hasTemplateBlanks(shownText, draftCopy);
   const facts = [
     { label: copy.nameLabel, value: values.personName },
     { label: copy.bornLabel, value: values.birthDate },
@@ -136,12 +138,17 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
         <textarea
           id={`${id}-text`}
           ref={textRef}
-          aria-describedby={`${id}-text-hint`}
+          aria-describedby={blanksLeft ? `${id}-text-hint ${id}-text-blanks` : `${id}-text-hint`}
           className="gg-input"
           rows={10}
-          value={values.obituaryText ?? prefill}
+          value={shownText}
           onChange={(e) => onChange({ obituaryText: e.target.value })}
         />
+        {blanksLeft && (
+          <p id={`${id}-text-blanks`} className="gg-hint">
+            {copy.textBlanks}
+          </p>
+        )}
         {edited && (
           <button
             type="button"

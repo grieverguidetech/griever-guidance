@@ -81,6 +81,19 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
     expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
   });
 
+  it('shows one calm line above Email while [brackets] remain, and keeps Email and Copy enabled', () => {
+    setup({ ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session);
+    expect(screen.getByText('Some parts are still in [brackets]. Fill them in or delete them before you send.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState).not.toMatchObject({ disabled: true });
+    expect(screen.getByRole('button', { name: 'Copy the text' }).props.accessibilityState).not.toMatchObject({ disabled: true });
+  });
+
+  it('shows no brackets line when the text has none', () => {
+    setup({ ...base, obituaryText: 'Anna loved the garden [my note].' } as Session);
+    expect(screen.queryByText(/still in \[brackets\]/)).toBeNull();
+    expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
+  });
+
   it('with no text, says it can be written on the web and still lets the user continue to the link field', () => {
     setup(base);
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
