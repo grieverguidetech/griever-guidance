@@ -148,7 +148,7 @@ assumption" are the assumptions accepted in #385 (A1 to A9 and B1 to B10).
 | WEB-11 | Item detail screen in the main column: what it is, why it matters, who to call, what to bring, doesn't apply when. Facts checked against official sources by a human | Done (behind `VITE_FEATURE_CMS`, on in production) | #410, #411, #412, #418, #421. A person checks each fact before it ships (round 1 assumption, #385 B10) No item shows "More guidance is coming" today (0 of 37) |
 | WEB-12 | Overview shows the current phase and the next open item | Done (behind `VITE_FEATURE_CMS`, on in production) | #392, #421. Reads the WEB-10 state (SE-5). The current phase is the first one not done (round 1 assumption, #385 B5) |
 | WEB-13 | Phone nudge on the section screens | Done (behind `VITE_FEATURE_CMS`) | #751, redesigned in #757. Once a section is Ready, one soft blue card (the same for every section, with a drop shadow) sits right below the toggle: an h2 heading, one line saying the sending happens in the phone app, and "Got it" at the right. Focus moves to the card when the toggle turns Ready (not on page load); no live region. Opt-in on `MarkReady`; never on The person. Dismissal is kept per device and section in `gg.cmsPhoneNudge.v1` (DATA.md §1), never synced. No Sent state on web (C2), no order (C10) |
-| WEB-14 | Overview phone card, tinted per section | Done (behind `VITE_FEATURE_CMS`) | #558 built the card; this ticket tints it |
+| WEB-14 | Overview phone card | Removed (#759) | #558 built the card and #750 tinted it. #759 removed it: the Overview shows no phone prompt. The phone prompt is the WEB-13 nudge only. Your account keeps its plain phone list |
 
 ### 3.8 Phone send round (#559)
 

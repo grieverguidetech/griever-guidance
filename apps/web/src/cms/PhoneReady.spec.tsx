@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { screenCopy } from '@griever/copy';
 import type { SectionKey } from '@griever/shared';
 import { navTitle } from './SideNav';
-import { PhoneReadyCard, PhoneReadyList, readyPhoneSections } from './PhoneReady';
+import { PhoneReadyList, readyPhoneSections } from './PhoneReady';
 
 describe('readyPhoneSections', () => {
   it('keeps only ready announcement, service, obituary and thanks, in order', () => {
@@ -21,48 +21,25 @@ describe('readyPhoneSections', () => {
   });
 });
 
-describe('PhoneReadyList and PhoneReadyCard', () => {
-  it('render nothing for an empty list', () => {
-    const { container } = render(
-      <>
-        <PhoneReadyList ready={[]} />
-        <PhoneReadyCard ready={[]} />
-      </>,
-    );
+describe('PhoneReadyList', () => {
+  it('renders nothing for an empty list', () => {
+    const { container } = render(<PhoneReadyList ready={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('the card has an h2 and one item per ready section', () => {
-    render(<PhoneReadyCard ready={['service']} />);
-    expect(screen.getByRole('heading', { level: 2, name: 'Ready to send from your phone' })).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(1);
-  });
-
-  it('each card row has its own section tint class and keeps the section name and line', () => {
-    render(<PhoneReadyCard ready={['announcement', 'service', 'obituary', 'thanks']} />);
-    const rows = screen.getAllByRole('listitem');
-    expect(rows).toHaveLength(4);
-    const tints = ['announcement', 'service', 'obituary', 'thanks'];
+  it('lists each ready section with its name and line, in plain rows', () => {
     const shell = screenCopy('cmsShell');
     const lines: Record<string, string> = {
-      announcement: shell.phoneReadyAnnouncement,
       service: shell.phoneReadyService,
-      obituary: shell.phoneReadyObituary,
       thanks: shell.phoneReadyThanks,
     };
-    rows.forEach((row, i) => {
-      expect(row).toHaveClass('gg-tint-card', `gg-tint-${tints[i]}`);
-      expect(within(row).getByText(navTitle(tints[i] as SectionKey))).toBeInTheDocument();
-      expect(within(row).getByText(lines[tints[i]])).toBeInTheDocument();
-    });
-    expect(screen.getByText('Ready to send from your phone')).toBeInTheDocument();
-    expect(screen.getByText(screenCopy('account').phoneNotInStores)).toBeInTheDocument();
-  });
-
-  it('the list on its own stays plain', () => {
     render(<PhoneReadyList ready={['service', 'thanks']} />);
-    for (const row of screen.getAllByRole('listitem')) {
-      expect(row.className).not.toMatch(/tint/);
-    }
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    (['service', 'thanks'] as SectionKey[]).forEach((key, i) => {
+      expect(within(rows[i]).getByText(navTitle(key))).toBeInTheDocument();
+      expect(within(rows[i]).getByText(lines[key])).toBeInTheDocument();
+      expect(rows[i].className).not.toMatch(/tint/);
+    });
   });
 });
