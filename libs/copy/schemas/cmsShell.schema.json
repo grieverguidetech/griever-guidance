@@ -63,7 +63,6 @@
     "summaryObituaryPublisher",
     "summaryThanksEmpty",
     "summaryThanksDraft",
-    "phoneReadyHeading",
     "phoneReadyAnnouncement",
     "phoneReadyService",
     "phoneReadyObituary",
@@ -250,9 +249,6 @@
       "$ref": "#/$defs/text"
     },
     "summaryThanksDraft": {
-      "$ref": "#/$defs/text"
-    },
-    "phoneReadyHeading": {
       "$ref": "#/$defs/text"
     },
     "phoneReadyAnnouncement": {

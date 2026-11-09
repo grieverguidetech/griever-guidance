@@ -25,7 +25,6 @@ describe('PhoneNudge', () => {
     const card = screen.getByRole('region', { name: heading });
     expect(card).toHaveTextContent(line);
     expect(card).toHaveClass('gg-phone-nudge');
-    expect(card.className).not.toMatch(/gg-tint-/);
     expect(card).toHaveAttribute('tabindex', '-1');
     expect(card).toHaveAccessibleDescription(line);
   });

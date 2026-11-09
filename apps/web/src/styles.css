@@ -74,16 +74,9 @@
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 
-  /* Section tints (#750): one soft background per phone section, each an alias of an
-     existing 100 or 200 step. Text on them stays --color-text. Guarded by sectionTints.spec.ts. */
-  --tint-service: var(--color-accent-100);
-  --tint-announcement: var(--color-accent-2-100);
-  --tint-obituary: var(--color-neutral-200);
-  --tint-thanks: var(--color-accent-200);
-
   /* Every text tone clears WCAG AA 4.5:1 on --color-bg, --color-surface,
-     --color-accent-100 and the four --tint-* backgrounds (the backgrounds text sits on). Measured: 72% is
-     5.9:1+, 68% is 5.21:1 on the darkest of them (--tint-obituary, neutral-200). Below ~62% fails. */
+     --color-accent-100. Measured: 72% is 5.9:1+, 68% is 5.21:1 on the darkest of them
+     (neutral-200). Below ~62% fails. */
   --text-muted: color-mix(in srgb, var(--color-text) 72%, transparent);
   --text-hint: color-mix(in srgb, var(--color-text) 68%, transparent);
   --text-eyebrow: color-mix(in srgb, var(--color-text) 68%, transparent);
@@ -425,12 +418,6 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: var(--radius-lg);
     padding: var(--space-4);
   }
-  /* #750: a soft tinted card, one tint per section. Text stays --color-text. */
-  .gg-tint-card {
-    color: var(--color-text);
-    border-radius: var(--radius-lg);
-    padding: var(--space-3) var(--space-4);
-  }
   /* #757: the one look for every phone nudge: soft blue, lifted. */
   .gg-phone-nudge {
     background: var(--color-accent-100);
@@ -439,10 +426,6 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: var(--shadow-md);
     padding: var(--space-3) var(--space-4);
   }
-  .gg-tint-service { background: var(--tint-service); }
-  .gg-tint-announcement { background: var(--tint-announcement); }
-  .gg-tint-obituary { background: var(--tint-obituary); }
-  .gg-tint-thanks { background: var(--tint-thanks); }
   /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). neutral-600 is
      3.55:1 on --color-surface (the panel) and 3.85:1 on --color-bg (the input fill). */
   .gg-panel .gg-input {
