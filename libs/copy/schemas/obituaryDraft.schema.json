@@ -1,18 +1,42 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the obituary draft template, one sentence per field",
+  "title": "Copy for the obituary template: five paragraphs, and the bracket shown for each empty field",
   "type": "object",
   "additionalProperties": false,
-  "required": ["nameFallback", "opening", "openingWithDate", "born", "city", "career", "memory", "survivors", "closing"],
+  "required": ["paragraph1", "paragraph2", "paragraph3", "paragraph4", "paragraph5", "burialSentence", "burialPrivate", "blanks"],
   "properties": {
-    "nameFallback": { "type": "string", "minLength": 1 },
-    "opening": { "type": "string", "pattern": "\\{fullName\\}" },
-    "openingWithDate": { "type": "string", "pattern": "^(?=.*\\{fullName\\})(?=.*\\{dateOfPassing\\})" },
-    "born": { "type": "string", "pattern": "\\{dateOfBirth\\}" },
-    "city": { "type": "string", "pattern": "\\{cityOfResidence\\}" },
-    "career": { "type": "string", "pattern": "\\{career\\}" },
-    "memory": { "type": "string", "pattern": "\\{personalNote\\}" },
-    "survivors": { "type": "string", "pattern": "\\{survivors\\}" },
-    "closing": { "type": "string", "pattern": "\\{fullName\\}" }
+    "paragraph1": { "type": "string", "pattern": "^(?=.*\\{fullName\\})(?=.*\\{city\\})(?=.*\\{dateOfPassing\\})" },
+    "paragraph2": { "type": "string", "pattern": "\\{burial\\}" },
+    "paragraph3": { "type": "string", "pattern": "^(?=.*\\{name\\})(?=.*\\{birthDate\\})(?=.*\\{career\\})" },
+    "paragraph4": { "type": "string", "pattern": "^(?=.*\\{name\\})(?=.*\\{survivors\\})" },
+    "paragraph5": { "type": "string", "pattern": "\\{note\\}" },
+    "burialSentence": { "type": "string", "pattern": "\\{burialPlace\\}" },
+    "burialPrivate": { "type": "string", "minLength": 1 },
+    "blanks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fullName", "name", "city", "dateOfPassing", "servicePlace", "serviceDate", "serviceTime", "officiant",
+        "burialPlace", "visitationPlace", "visitationDate", "visitationTime", "birthDate", "career", "survivors", "note"
+      ],
+      "properties": {
+        "fullName": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "city": { "type": "string", "minLength": 1 },
+        "dateOfPassing": { "type": "string", "minLength": 1 },
+        "servicePlace": { "type": "string", "minLength": 1 },
+        "serviceDate": { "type": "string", "minLength": 1 },
+        "serviceTime": { "type": "string", "minLength": 1 },
+        "officiant": { "type": "string", "minLength": 1 },
+        "burialPlace": { "type": "string", "minLength": 1 },
+        "visitationPlace": { "type": "string", "minLength": 1 },
+        "visitationDate": { "type": "string", "minLength": 1 },
+        "visitationTime": { "type": "string", "minLength": 1 },
+        "birthDate": { "type": "string", "minLength": 1 },
+        "career": { "type": "string", "minLength": 1 },
+        "survivors": { "type": "string", "minLength": 1 },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    }
   }
 }

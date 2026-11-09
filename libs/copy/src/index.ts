@@ -92,15 +92,24 @@ export function sendLabel(count: number | undefined, copy: ScreenCopy<'review'>)
   return fill(copy.send, { recipients: recipientsPhrase(count, copy) });
 }
 
-/** The obituary form's fields (same names as `ObituaryRequest`). Dates are display text. */
+/** What the obituary template reads. Names match the person's fields; dates and times are display text. */
 export interface ObituaryDraftFields {
-  fullName: string;
-  dateOfBirth?: string;
+  personName?: string;
+  obituaryCity?: string;
   dateOfPassing?: string;
-  cityOfResidence?: string;
-  career?: string;
-  survivors?: string;
-  personalNote?: string;
+  birthDate?: string;
+  servicePlace?: string;
+  serviceDate?: string;
+  serviceTime?: string;
+  serviceOfficiant?: string;
+  burialPlace?: string;
+  burialPrivate?: boolean;
+  visitationPlace?: string;
+  visitationDate?: string;
+  visitationTime?: string;
+  obituaryCareer?: string;
+  obituarySurvivors?: string;
+  obituaryNote?: string;
 }
 
 /** Trim, and drop one trailing full stop, for a value that sits before a full stop the template adds. */
@@ -108,45 +117,41 @@ function cleanEnd(value: string | undefined): string {
   return (value ?? '').trim().replace(/\.$/, '').trim();
 }
 
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** Full stop at the end of a sentence, unless the person already ended it. */
-function endSentence(text: string): string {
-  return /[.!?]$/.test(text) ? text : `${text}.`;
-}
-
 /**
- * Fill the obituary template. A sentence is left out when its field is empty or only spaces.
- * Sentences are grouped into three short paragraphs, separated by a blank line.
+ * Fill the obituary template (five paragraphs, separated by a blank line). A field that is empty or
+ * only spaces keeps its [BRACKET] from the copy, so the family sees what is missing. The final note
+ * is trimmed only, because the template adds no full stop after it.
  */
 export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy<'obituaryDraft'>): string {
-  // Every sentence starts with the name, so the fallback gets a capital.
-  const fullName = fields.fullName.trim() || capitalize(copy.nameFallback);
-  const dateOfBirth = cleanEnd(fields.dateOfBirth);
-  const dateOfPassing = cleanEnd(fields.dateOfPassing);
-  const cityOfResidence = cleanEnd(fields.cityOfResidence);
-  const career = cleanEnd(fields.career);
-  const survivors = cleanEnd(fields.survivors);
-  const personalNote = (fields.personalNote ?? '').trim();
+  const { blanks } = copy;
+  const or = (value: string | undefined, blank: string): string => cleanEnd(value) || blank;
+  const name = fields.personName?.trim() ?? '';
 
-  const paragraphs = [
-    [
-      dateOfPassing ? fill(copy.openingWithDate, { fullName, dateOfPassing }) : fill(copy.opening, { fullName }),
-      dateOfBirth ? fill(copy.born, { dateOfBirth }) : '',
-    ],
-    [
-      cityOfResidence ? fill(copy.city, { fullName, cityOfResidence }) : '',
-      career ? fill(copy.career, { career }) : '',
-      personalNote ? fill(copy.memory, { personalNote }) : '',
-    ],
-    [survivors ? fill(copy.survivors, { survivors }) : '', fill(copy.closing, { fullName })],
-  ];
+  const burial = fields.burialPrivate
+    ? copy.burialPrivate
+    : fill(copy.burialSentence, { burialPlace: or(fields.burialPlace, blanks.burialPlace) });
 
-  return paragraphs
-    .map((sentences) => sentences.filter(Boolean).map(endSentence).join(' '))
-    .filter(Boolean)
+  const values = {
+    fullName: name || blanks.fullName,
+    name: name || blanks.name,
+    city: or(fields.obituaryCity, blanks.city),
+    dateOfPassing: or(fields.dateOfPassing, blanks.dateOfPassing),
+    servicePlace: or(fields.servicePlace, blanks.servicePlace),
+    serviceDate: or(fields.serviceDate, blanks.serviceDate),
+    serviceTime: or(fields.serviceTime, blanks.serviceTime),
+    officiant: or(fields.serviceOfficiant, blanks.officiant),
+    burial,
+    visitationPlace: or(fields.visitationPlace, blanks.visitationPlace),
+    visitationDate: or(fields.visitationDate, blanks.visitationDate),
+    visitationTime: or(fields.visitationTime, blanks.visitationTime),
+    birthDate: or(fields.birthDate, blanks.birthDate),
+    career: or(fields.obituaryCareer, blanks.career),
+    survivors: or(fields.obituarySurvivors, blanks.survivors),
+    note: fields.obituaryNote?.trim() || blanks.note,
+  };
+
+  return [copy.paragraph1, copy.paragraph2, copy.paragraph3, copy.paragraph4, copy.paragraph5]
+    .map((paragraph) => fill(paragraph, values))
     .join('\n\n');
 }
 
