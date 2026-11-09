@@ -8,7 +8,7 @@
   "cityLabel": "City where they lived (optional)",
   "careerLabel": "Their work (optional)",
   "survivorsLabel": "Survived by (optional)",
-  "survivorsHint": "List all survivors, for example their spouse, children and grandchildren. Add family who died before them in the text below.",
+  "survivorsHint": "List all survivors: spouse, children, siblings, parents, grandchildren, nieces and nephews. Family who died before them (spouse, parents, children and siblings) go in the text below.",
   "noteLabel": "A personal note (optional)",
   "noteHint": "A memory or a few words about who they were.",
   "textLabel": "Obituary",
