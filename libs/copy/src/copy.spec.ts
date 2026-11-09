@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
-import { announceRecap, buildObituaryDraft, doneRowMeta, fill, findHardCodedCopy, screenCopy, screenNames, sendLabel } from './index';
+import { announceRecap, buildObituaryDraft, doneRowMeta, fill, findHardCodedCopy, findTemplateBlanks, hasTemplateBlanks, screenCopy, screenNames, sendLabel } from './index';
 
 const SCREENS_DIR = join(import.meta.dirname, '..', 'screens');
 const SCHEMAS_DIR = join(import.meta.dirname, '..', 'schemas');
@@ -280,5 +280,38 @@ describe('buildObituaryDraft', () => {
   it('never writes the template instruction notes into the text', () => {
     const draft = buildObituaryDraft(filled, copy);
     expect(draft).not.toMatch(/list all|list predeceased/i);
+  });
+});
+
+describe('hasTemplateBlanks', () => {
+  const copy = screenCopy('obituaryDraft');
+
+  it('is true for the untouched template', () => {
+    expect(hasTemplateBlanks(buildObituaryDraft({}, copy), copy)).toBe(true);
+  });
+
+  it('is true when one template word is left in a typed text', () => {
+    expect(hasTemplateBlanks('Anna died in [LOCATION OF DEATH].', copy)).toBe(true);
+    expect(findTemplateBlanks('[He/She] liked tea. [He/She] sang.', copy)).toEqual(['[He/She]', '[He/She]']);
+  });
+
+  it('is false for a fully typed text', () => {
+    expect(hasTemplateBlanks('Anna Lee died at home. She loved the garden.', copy)).toBe(false);
+    expect(hasTemplateBlanks('', copy)).toBe(false);
+  });
+
+  it("is false for the family's own brackets that are not template words", () => {
+    expect(hasTemplateBlanks('Anna Lee [my note] loved the garden. [1]', copy)).toBe(false);
+    expect(findTemplateBlanks('Anna [my note] and [CITY]', copy)).toEqual(['[CITY]']);
+  });
+});
+
+describe('findTemplateBlanks covers the whole template', () => {
+  it('finds every distinct bracket the empty template contains', () => {
+    const copy = screenCopy('obituaryDraft');
+    const empty = buildObituaryDraft({}, copy);
+    const all = new Set(empty.match(/\[[^\]]*\]/g));
+    expect(all.size).toBeGreaterThan(10);
+    expect(new Set(findTemplateBlanks(empty, copy))).toEqual(all);
   });
 });

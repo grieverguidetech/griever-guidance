@@ -10,6 +10,7 @@
   "saved": "Saved.",
   "followsDetails": "The text follows the details again.",
   "emailNoText": "Write it above, or on the web.",
+  "emailBlanks": "Some parts are still in [brackets]. Fill them in or delete them before you send.",
   "publisherEmailLabel": "Publisher's email",
   "publisherEmailPlaceholder": "name@example.com",
   "publisherEmailHint": "Kept on this phone only.",

@@ -46,6 +46,8 @@ export interface ShareObituaryCopy {
   emailButton?: string;
   /** Shown instead of the button when there is no obituary text yet. */
   emailNoText?: string;
+  /** Calm line above the Email button while [BRACKET] parts remain. It never disables a button. */
+  emailBlanks?: string;
   /** Shown under the button when neither mail nor sharing could open. */
   emailFailed?: string;
   /** Muted line after mail or the share sheet opened. */
@@ -89,6 +91,8 @@ export interface ShareObituaryCopy {
 export interface PublisherEmail {
   /** false when no obituary text has been written yet: a calm line shows, nothing is blocked. */
   hasText: boolean;
+  /** True while the text still has the template's [BRACKET] parts. */
+  hasBlanks?: boolean;
   onPress: () => void;
   /** true after mail and sharing both failed. */
   failed?: boolean;
@@ -190,6 +194,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const emailFailedId = useId();
   const copiedId = useId();
   const noteId = useId();
+  const blanksId = useId();
+  const blanksShown = Boolean(publisherEmail?.hasBlanks && copy.emailBlanks);
   const addressErrorId = useId();
   const addressHintId = useId();
   const pasteId = useId();
@@ -249,12 +255,13 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
                   ) : null}
                 </>
               ) : null}
+              {blanksShown ? <Body tone="muted" id={blanksId}>{copy.emailBlanks}</Body> : null}
               <Button
                 label={copy.emailButton}
                 variant="secondary"
                 busy={publisherEmail.busy}
-                describedBy={publisherEmail.address?.error ? addressErrorId : publisherEmail.failed ? emailFailedId : undefined}
-                hint={publisherEmail.address?.error}
+                describedBy={publisherEmail.address?.error ? addressErrorId : publisherEmail.failed ? emailFailedId : blanksShown ? blanksId : undefined}
+                hint={publisherEmail.address?.error ?? (publisherEmail.failed ? undefined : blanksShown ? copy.emailBlanks : undefined)}
                 onPress={publisherEmail.onPress}
               />
               <Status id={emailFailedId} message={publisherEmail.failed ? copy.emailFailed : undefined} tone="danger" />
