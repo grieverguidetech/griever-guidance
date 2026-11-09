@@ -94,8 +94,8 @@ describe('AnnouncementSection', () => {
       );
     }
     render(<Ready />);
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The announcement is ready.' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toHaveTextContent('You will send the announcement from the Grievers Guidance phone app');
+    expect(screen.getByRole('region', { name: 'The announcement is ready.' })).toHaveTextContent('begin sending it to your loved ones');
   });
 });

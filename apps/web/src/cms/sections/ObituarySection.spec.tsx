@@ -119,10 +119,10 @@ describe('ObituarySection phone nudge', () => {
 
   it('shows its own line once marked ready and hides it when un-marked', async () => {
     renderReadyToggle();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The obituary is ready.' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toHaveTextContent('You will share the obituary from the Grievers Guidance phone app, signed in to this account.');
+    expect(screen.getByRole('region', { name: 'The obituary is ready.' })).toHaveTextContent('begin sharing it with your loved ones');
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The obituary is ready.' })).toBeNull();
   });
 });

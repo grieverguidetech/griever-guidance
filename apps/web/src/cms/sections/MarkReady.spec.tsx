@@ -109,10 +109,10 @@ describe('MarkReady', () => {
   });
 
   describe('phone nudge', () => {
-    const line = 'You will send the announcement from the Grievers Guidance phone app, signed in to this account.';
-    function Harness({ phoneNudge = 'announcement', start = false }: { phoneNudge?: 'service' | 'announcement'; start?: boolean }) {
+    const line = 'Open the Grievers Guidance phone app to begin sending it to your loved ones. Sign in with this same account to find it there.';
+    function Harness({ phoneNudge = 'announcement', start = false, onNext }: { phoneNudge?: 'service' | 'announcement'; start?: boolean; onNext?: () => void }) {
       const [ready, setReady] = useState(start);
-      return <MarkReady ready={ready} onChange={setReady} phoneNudge={phoneNudge} />;
+      return <MarkReady ready={ready} onChange={setReady} phoneNudge={phoneNudge} onNext={onNext} />;
     }
     afterEach(() => {
       resetSessionDismissed();
@@ -120,34 +120,73 @@ describe('MarkReady', () => {
       vi.restoreAllMocks();
     });
 
-    it('renders no status wrapper without the prop', () => {
+    it('renders no nudge without the prop', () => {
       render(<MarkReady ready onChange={() => undefined} />);
+      expect(screen.queryByRole('region')).toBeNull();
       expect(screen.queryByRole('status')).toBeNull();
     });
 
-    it('renders an empty polite wrapper when not ready', () => {
+    it('renders nothing extra when not ready, and no live region wrapper ever', () => {
       render(<Harness />);
-      const status = screen.getByRole('status');
-      expect(status).toHaveAttribute('aria-live', 'polite');
-      expect(status).toBeEmptyDOMElement();
+      expect(screen.queryByRole('region')).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
     });
 
-    it('shows the line when marked ready without moving focus, and hides it when un-marked', async () => {
+    it('puts the nudge between the toggle row and the Next button', () => {
+      render(<Harness start onNext={() => undefined} />);
+      const toggle = screen.getByRole('button', { name: 'Mark as ready' });
+      const nudge = screen.getByRole('region', { name: 'The announcement is ready.' });
+      const next = screen.getByRole('button', { name: /^(Next|Back to Overview)/ });
+      expect(toggle.compareDocumentPosition(nudge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(nudge.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    it('moves focus to the nudge when marked ready, and hides it when un-marked', async () => {
       render(<Harness />);
       const toggle = screen.getByRole('button', { name: 'Mark as ready' });
       await userEvent.click(toggle);
-      expect(screen.getByRole('status')).toHaveTextContent(line);
-      expect(toggle).toHaveFocus();
+      const nudge = screen.getByRole('region', { name: 'The announcement is ready.' });
+      expect(nudge).toHaveTextContent(line);
+      expect(nudge).toHaveFocus();
       await userEvent.click(toggle);
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByRole('region')).toBeNull();
       await userEvent.click(toggle);
-      expect(screen.getByRole('status')).toHaveTextContent(line);
+      expect(screen.getByRole('region')).toHaveFocus();
     });
 
-    it('Got it hides the line, saves it and focuses the toggle', async () => {
+    it('does not move focus when the page loads already ready', () => {
+      render(<Harness start />);
+      expect(screen.getByRole('region')).not.toHaveFocus();
+      expect(document.body).toHaveFocus();
+    });
+
+    it('shows the nudge without focus when ready flips by prop (no click)', () => {
+      const { rerender } = render(<MarkReady ready={false} onChange={() => undefined} phoneNudge="announcement" />);
+      rerender(<MarkReady ready onChange={() => undefined} phoneNudge="announcement" />);
+      expect(screen.getByRole('region')).toBeInTheDocument();
+      expect(screen.getByRole('region')).not.toHaveFocus();
+    });
+
+    it('moves focus to the toggle when ready turns false while focus is in the nudge', () => {
+      const { rerender } = render(<MarkReady ready onChange={() => undefined} phoneNudge="announcement" />);
+      screen.getByRole('button', { name: 'Got it' }).focus();
+      rerender(<MarkReady ready={false} onChange={() => undefined} phoneNudge="announcement" />);
+      expect(screen.queryByRole('region')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
+    });
+
+    it('moves focus to the toggle when ready turns false while the region itself has focus', () => {
+      const { rerender } = render(<MarkReady ready onChange={() => undefined} phoneNudge="announcement" />);
+      screen.getByRole('region').focus();
+      rerender(<MarkReady ready={false} onChange={() => undefined} phoneNudge="announcement" />);
+      expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
+    });
+
+    it('Got it hides the nudge, saves it and focuses the toggle', async () => {
       render(<Harness start />);
       await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByRole('region')).toBeNull();
       await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v1')).toBe('["announcement"]');
       expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
     });
@@ -155,13 +194,13 @@ describe('MarkReady', () => {
     it('keeps a dismissed section hidden after remount while another still shows', () => {
       window.localStorage.setItem('gg.cmsPhoneNudge.v1', '["announcement"]');
       const { unmount } = render(<Harness start />);
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByRole('region')).toBeNull();
       unmount();
       render(<Harness phoneNudge="service" start />);
-      expect(screen.getByRole('status')).toHaveTextContent('You will share the service details');
+      expect(screen.getByRole('region')).toHaveTextContent('begin sharing them with your loved ones');
     });
 
-    it('still shows the line and lasts the visit when storage throws', async () => {
+    it('still shows the nudge and lasts the visit when storage throws', async () => {
       vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
         throw new Error('blocked');
       });
@@ -169,12 +208,12 @@ describe('MarkReady', () => {
         throw new Error('blocked');
       });
       const { unmount } = render(<Harness start />);
-      expect(screen.getByRole('status')).toHaveTextContent(line);
+      expect(screen.getByRole('region')).toHaveTextContent(line);
       await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByRole('region')).toBeNull();
       unmount();
       render(<Harness start />);
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByRole('region')).toBeNull();
     });
   });
 });
