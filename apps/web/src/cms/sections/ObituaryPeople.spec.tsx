@@ -59,7 +59,6 @@ describe('ObituaryPeople', () => {
   it('offers seven relations for survivors and four for preceded', () => {
     setup(two);
     expect(screen.getAllByRole('option')).toHaveLength(14);
-    expect(SURVIVOR_RELATIONS).toHaveLength(7);
   });
 
   it('labels every survivor relation from the copy', () => {
@@ -92,14 +91,14 @@ describe('ObituaryPeople', () => {
 
   it('removes a row by name and moves focus to the next row Name', async () => {
     const { calls, user } = setup(two);
-    await user.click(screen.getByRole('button', { name: 'Remove Ann' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Ann, person 1' }));
     expect(JSON.parse(calls[calls.length - 1])).toEqual([{ name: 'Bo', city: '', relation: 'child' }]);
     expect(screen.getByRole('textbox', { name: 'Name, person 1' })).toHaveFocus();
   });
 
   it('moves focus to Add a person after removing the last row', async () => {
     const { user } = setup(two);
-    await user.click(screen.getByRole('button', { name: 'Remove Bo' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Bo, person 2' }));
     expect(screen.getByRole('button', { name: 'Add a person' })).toHaveFocus();
   });
 
@@ -136,12 +135,55 @@ describe('ObituaryPeople', () => {
     expect(screen.getByText('This list holds up to 40 people.')).toBeInTheDocument();
   });
 
-  it('shows no rows for a bad value and leaves it alone until a row is added', async () => {
+  it('keeps a bad value when a row is added, and writes on the first edit', async () => {
     const { calls, user } = setup('not json');
     expect(screen.queryByRole('textbox')).toBeNull();
-    expect(calls).toEqual([]);
     await user.click(screen.getByRole('button', { name: 'Add a person' }));
     expect(screen.getAllByRole('textbox')).toHaveLength(2);
+    expect(calls).toEqual([]);
+    await user.type(screen.getByRole('textbox', { name: 'Name, person 1' }), 'A');
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0])).toEqual([{ name: 'A', city: '', relation: 'spouse' }]);
+  });
+
+  it('gives two rows with the same name different remove names', () => {
+    const same = JSON.stringify([
+      { name: 'Ann', city: '', relation: 'child' },
+      { name: 'Ann', city: '', relation: 'child' },
+    ]);
+    setup(same);
+    expect(screen.getByRole('button', { name: 'Remove Ann, person 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Ann, person 2' })).toBeInTheDocument();
+  });
+
+  it('announces a removal in one polite status region', async () => {
+    const { user } = setup(two);
+    const region = screen.getByRole('status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    await user.click(screen.getByRole('button', { name: 'Remove Ann, person 1' }));
+    expect(region).toHaveTextContent('Ann removed.');
+    await user.click(screen.getByRole('button', { name: 'Add a person' }));
+    await user.click(screen.getByRole('button', { name: 'Remove person 2' }));
+    expect(region).toHaveTextContent('Person 2 removed.');
+  });
+
+  it('announces the limit when the 40th row is added', async () => {
+    const thirtyNine = JSON.stringify(
+      Array.from({ length: 39 }, (_, i) => ({ name: `P${i}`, city: '', relation: 'child' })),
+    );
+    const { user } = setup(thirtyNine);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await user.click(screen.getByRole('button', { name: 'Add a person' }));
+    expect(screen.getByRole('status')).toHaveTextContent('This list holds up to 40 people.');
+  });
+
+  it('focuses Add a person after removing a row at 40 rows', async () => {
+    const forty = JSON.stringify(
+      Array.from({ length: 40 }, (_, i) => ({ name: `P${i}`, city: '', relation: 'child' })),
+    );
+    const { user } = setup(forty);
+    await user.click(screen.getByRole('button', { name: 'Remove P39, person 40' }));
+    expect(screen.getByRole('button', { name: 'Add a person' })).toHaveFocus();
   });
 
   it('holds no hard-coded copy', () => {

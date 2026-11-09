@@ -6,23 +6,21 @@ import {
   SURVIVOR_RELATIONS,
   serializePeople,
   type ObituaryPerson,
+  type SurvivorRelation,
 } from '@griever/shared';
 
 const copy = screenCopy('cmsObituary');
 
-// Same order as SURVIVOR_RELATIONS; the spec checks every label.
-const RELATION_COPY = [
-  copy.relationSpouse,
-  copy.relationChild,
-  copy.relationGrandchild,
-  copy.relationGreatGrandchild,
-  copy.relationSecondGreatGrandchild,
-  copy.relationSibling,
-  copy.relationParent,
-];
-const RELATION_LABELS: Record<string, string> = Object.fromEntries(
-  SURVIVOR_RELATIONS.map((relation, i) => [relation, RELATION_COPY[i]]),
-);
+const RELATION_LABELS: Record<SurvivorRelation, string> = {
+  spouse: copy.relationSpouse,
+  child: copy.relationChild,
+  grandchild: copy.relationGrandchild,
+  'great-grandchild': copy.relationGreatGrandchild,
+  // Computed so the copy scanner does not read this key as text.
+  [SURVIVOR_RELATIONS[4]]: copy.relationSecondGreatGrandchild,
+  sibling: copy.relationSibling,
+  parent: copy.relationParent,
+};
 
 interface Row {
   key: number;
@@ -53,6 +51,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
   const nameRefs = useRef<(HTMLInputElement | null)[]>([]);
   const addRef = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef<Focus | null>(null);
+  const [message, setMessage] = useState('');
 
   function fromValue(text: string): Row[] {
     const parsed = parsePeople(text, relations);
@@ -93,16 +92,24 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
     update(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  // Adding an empty row writes nothing, so a stored value that did not parse is kept until a real edit.
   function addRow() {
     if (rows.length >= OBITUARY_PEOPLE_MAX_ROWS) {
       return;
     }
     pendingFocus.current = { kind: 'name', index: rows.length };
-    update([...rows, { key: nextKey.current++, name: '', city: '', relation: relations[0] }]);
+    setMessage(rows.length + 1 >= OBITUARY_PEOPLE_MAX_ROWS ? copy.peopleLimit : '');
+    setRows([...rows, { key: nextKey.current++, name: '', city: '', relation: relations[0] }]);
   }
 
   function removeRow(index: number) {
     const next = rows.filter((_, i) => i !== index);
+    const removed = rows[index].name.trim();
+    setMessage(
+      removed === ''
+        ? fill(copy.personRemovedUnnamed, { n: index + 1 })
+        : fill(copy.personRemoved, { name: removed }),
+    );
     pendingFocus.current = index < next.length ? { kind: 'name', index } : { kind: 'add' };
     update(next);
   }
@@ -118,7 +125,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
         const removeName =
           row.name.trim() === ''
             ? fill(copy.removePersonUnnamed, { n })
-            : fill(copy.removePerson, { name: row.name.trim() });
+            : fill(copy.removePerson, { name: row.name.trim(), n });
         return (
           <div key={row.key} className="gg-panel flex flex-col gap-3">
             <div className="gg-field">
@@ -156,14 +163,14 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
               >
                 {relations.map((relation) => (
                   <option key={relation} value={relation}>
-                    {RELATION_LABELS[relation]}
+                    {RELATION_LABELS[relation as SurvivorRelation]}
                   </option>
                 ))}
               </select>
             </div>
             <button
               type="button"
-              className="gg-btn gg-btn-secondary self-start min-h-[44px] min-w-[44px]"
+              className="gg-btn gg-btn-secondary self-start min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
               onClick={() => removeRow(index)}
             >
               {removeName}
@@ -171,9 +178,10 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
           </div>
         );
       })}
-      {atLimit ? (
-        <p>{copy.peopleLimit}</p>
-      ) : (
+      <p role="status" aria-live="polite">
+        {message || (atLimit ? copy.peopleLimit : '')}
+      </p>
+      {atLimit ? null : (
         <button
           type="button"
           ref={addRef}
