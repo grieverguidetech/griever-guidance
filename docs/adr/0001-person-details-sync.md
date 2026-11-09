@@ -50,3 +50,32 @@ the device that typed them.
 The data function and gateway (#517, #518), the sync engine (#519) and both apps (#520 to #522)
 build on `libs/shared/src/flowDetails.ts`. Adding a synced key needs a change to this ADR's list,
 REQUIREMENTS DS-7 and DATA.md in the same PR.
+
+## Addendum, 2026-11-09: obituary fields (#772, parent #764)
+
+The product owner approved this at gate G1 on 2026-11-09. The obituary retool replaces the free
+text "career", "survivors" and "note" inputs with structured fields. They sync under DS-7 so a
+person planned on the web is complete on the phone.
+
+**Keys.** 26 new optional text keys are added to `FLOW_DETAIL_TEXT_KEYS`: `obituaryGivenName`, `obituaryMiddleName`, `obituarySurname`, `obituaryAge`, `obituaryState`, `obituaryDeathPlace`, `obituaryFuneralHome`, `obituaryChurch`, `obituaryCemeteryLocation`, `obituaryBirthPlace`, `obituaryMotherName`, `obituaryFatherName`, `obituaryHighSchool`, `obituaryGradYear`, `obituaryDegree`, `obituaryCollege`, `obituaryJobTitle`, `obituaryCompany`, `obituaryJobYears`, `obituaryHobbies`, `obituaryAwards`, `obituaryOrganizations`, `obituaryPronoun`, `obituarySurvivorList`, `obituaryPrecededList`, `obituaryMemorial`.
+That makes 50 text keys and 56 detail keys. No existing key is removed or renamed (`obituaryCareer`,
+`obituarySurvivors` and `obituaryNote` stay as fallbacks). The caps are in `FLOW_DETAIL_MAX_LENGTH`.
+
+**Rules.** `obituaryPronoun` is `he`, `she`, `they` or null. The two list keys hold JSON rows of
+`{ name, city, relation }` (at most 40 rows) and are checked with `parsePeople`; a list that is too
+long or does not parse is sent as null, never cut mid-JSON. Every text value with a lone surrogate
+is refused (and stripped on save).
+
+**Third-party names reach the server.** Parents' names, survivors with their cities, and people who
+died before now reach the data function, as `obituarySurvivors` already did. The reason is the
+same: the family must not retype them on the phone. They are not contact data (no numbers, no ids),
+and they are shared only with the owner's members. The product owner accepted this.
+
+**Payload.** The worst case with every new key at its cap, plus full lists, in 3-byte characters, is
+112,990 bytes (it was 83,492), under the 128 KB limit. The payload test in
+`libs/shared/src/flowDetails.spec.ts` computes it.
+
+**Deploy order.** The data function refuses unknown keys, and it is deployed by hand
+(`docs/aws-data-function.md`). The owner redeploys it from the #772 branch BEFORE the PR merges.
+Merging first breaks sync for every new person. Clients ignore unknown keys on read, so old phones
+keep working.

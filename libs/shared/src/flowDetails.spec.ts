@@ -26,10 +26,10 @@ import {
 } from './index.js';
 
 describe('keys', () => {
-  it('has 24 text keys, burialPrivate and 5 status keys', () => {
-    expect(FLOW_DETAIL_TEXT_KEYS).toHaveLength(24);
+  it('has 50 text keys, burialPrivate and 5 status keys', () => {
+    expect(FLOW_DETAIL_TEXT_KEYS).toHaveLength(50);
     expect(FLOW_STATUS_KEYS).toHaveLength(5);
-    expect(FLOW_DETAIL_KEYS).toHaveLength(30);
+    expect(FLOW_DETAIL_KEYS).toHaveLength(56);
     expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_DETAIL_KEYS]);
     expect(new Set(SYNCED_KEYS).size).toBe(SYNCED_KEYS.length);
   });
@@ -50,8 +50,30 @@ describe('keys', () => {
   });
 });
 
+const SPECIAL_KEYS = ['obituaryPronoun', 'obituarySurvivorList', 'obituaryPrecededList'];
+
+describe('new obituary caps', () => {
+  it('has the planned cap for every new key', () => {
+    const caps: Record<string, number> = {
+      obituaryGivenName: 100, obituarySurname: 100, obituaryState: 100,
+      obituaryMiddleName: 200, obituaryBirthPlace: 200, obituaryMotherName: 200,
+      obituaryFatherName: 200, obituaryHighSchool: 200, obituaryJobTitle: 200,
+      obituaryCompany: 200, obituaryDeathPlace: 200, obituaryFuneralHome: 200,
+      obituaryDegree: 200, obituaryCollege: 200, obituaryChurch: 200,
+      obituaryCemeteryLocation: 200, obituaryAge: 20, obituaryGradYear: 20,
+      obituaryJobYears: 50, obituaryPronoun: 10, obituaryHobbies: 500,
+      obituaryAwards: 500, obituaryOrganizations: 500, obituarySurvivorList: 3000,
+      obituaryPrecededList: 2000, obituaryMemorial: 2000,
+    };
+    expect(Object.keys(caps)).toHaveLength(26);
+    for (const [key, max] of Object.entries(caps)) {
+      expect(FLOW_DETAIL_MAX_LENGTH[key as keyof typeof FLOW_DETAIL_MAX_LENGTH]).toBe(max);
+    }
+  });
+});
+
 describe('parseFlowDetails', () => {
-  it.each(FLOW_DETAIL_TEXT_KEYS)(
+  it.each(FLOW_DETAIL_TEXT_KEYS.filter((key) => !SPECIAL_KEYS.includes(key)))(
     '%s parses at its cap and fails above it',
     (key) => {
       const max = FLOW_DETAIL_MAX_LENGTH[key];
@@ -59,11 +81,41 @@ describe('parseFlowDetails', () => {
         [key]: 'a'.repeat(max),
       });
       expect(parseFlowDetails({ [key]: 'a'.repeat(max + 1) })).toBeNull();
+      expect(parseFlowDetails({ [key]: `a${'\ud83d'}b` })).toBeNull();
+      expect(parseFlowDetails({ [key]: `a${'\ude00'}b` })).toBeNull();
+      expect(parseFlowDetails({ [key]: 'a😀b' })).not.toBeNull();
       expect(parseFlowDetails({ [key]: null })).toEqual({ [key]: null });
       expect(parseFlowDetails({ [key]: 'a\u0000b' })).toBeNull();
       expect(parseFlowDetails({ [key]: 5 })).toBeNull();
     },
   );
+
+  it('accepts only he, she, they or null for the pronoun', () => {
+    for (const ok of ['he', 'she', 'they', null]) {
+      expect(parseFlowDetails({ obituaryPronoun: ok })).toEqual({ obituaryPronoun: ok });
+    }
+    for (const bad of ['', 'He', 'it', 'xe', 'they ']) {
+      expect(parseFlowDetails({ obituaryPronoun: bad })).toBeNull();
+    }
+  });
+
+  it('accepts a list only when parsePeople accepts it for that relation list', () => {
+    const row = (relation: string) => ({ name: 'Ann', city: 'Tulsa', relation });
+    const list = (relation: string) => JSON.stringify([row(relation)]);
+    expect(parseFlowDetails({ obituarySurvivorList: list('grandchild') })).not.toBeNull();
+    // 'grandchild' is not a relation of someone who died before.
+    expect(parseFlowDetails({ obituaryPrecededList: list('grandchild') })).toBeNull();
+    expect(parseFlowDetails({ obituaryPrecededList: list('spouse') })).not.toBeNull();
+    for (const key of ['obituarySurvivorList', 'obituaryPrecededList']) {
+      expect(parseFlowDetails({ [key]: '' })).toEqual({ [key]: '' });
+      expect(parseFlowDetails({ [key]: null })).toEqual({ [key]: null });
+      expect(parseFlowDetails({ [key]: 'not json' })).toBeNull();
+      expect(parseFlowDetails({ [key]: '{"a":1}' })).toBeNull();
+      expect(parseFlowDetails({ [key]: JSON.stringify([{ name: 'A', city: '', relation: 'spouse', extra: 1 }]) })).toBeNull();
+      const over = JSON.stringify(Array.from({ length: 41 }, () => row('spouse')));
+      expect(parseFlowDetails({ [key]: over })).toBeNull();
+    }
+  });
 
   it('checks burialPrivate and the status values', () => {
     expect(parseFlowDetails({ burialPrivate: true })).toEqual({
@@ -179,6 +231,37 @@ describe('null and undefined rule', () => {
     ).not.toBeNull();
   });
 
+  it('sends null for a bad pronoun and strips lone surrogates', () => {
+    expect(toFlowDetails({ obituaryPronoun: 'she' }).obituaryPronoun).toBe('she');
+    expect(toFlowDetails({ obituaryPronoun: 'it' }).obituaryPronoun).toBeNull();
+    const out = toFlowDetails({ obituaryHobbies: `fish\ud83ding 😀`, serviceMessage: 'a\ude00b' });
+    expect(out.obituaryHobbies).toBe('fishing 😀');
+    expect(out.serviceMessage).toBe('ab');
+    expect(parseFlowDetails(out)).not.toBeNull();
+  });
+
+  it('keeps a list only when it fits its cap and parses, never cutting JSON', () => {
+    const ok = JSON.stringify([{ name: 'Ann', city: 'Tulsa', relation: 'child' }]);
+    expect(toFlowDetails({ obituarySurvivorList: ok }).obituarySurvivorList).toBe(ok);
+    expect(toFlowDetails({ obituarySurvivorList: 'junk' }).obituarySurvivorList).toBeNull();
+    expect(toFlowDetails({ obituarySurvivorList: '' }).obituarySurvivorList).toBeNull();
+    const long = JSON.stringify(
+      Array.from({ length: 40 }, () => ({ name: 'n'.repeat(60), city: 'c'.repeat(30), relation: 'child' })),
+    );
+    expect(long.length).toBeGreaterThan(3000);
+    expect(toFlowDetails({ obituarySurvivorList: long }).obituarySurvivorList).toBeNull();
+    expect(toFlowDetails({ obituaryPrecededList: long }).obituaryPrecededList).toBeNull();
+    const bad = JSON.stringify([{ name: 'A', city: '', relation: 'grandchild' }]);
+    expect(toFlowDetails({ obituaryPrecededList: bad }).obituaryPrecededList).toBeNull();
+    expect(parseFlowDetails(toFlowDetails({ obituarySurvivorList: long }))).not.toBeNull();
+  });
+
+  it('an input with only the old keys is still valid', () => {
+    const out = toFlowDetails({ serviceTime: '10am' });
+    expect(parseFlowDetails(out)).not.toBeNull();
+    expect(out.obituaryGivenName).toBeNull();
+  });
+
   it('strips NUL', () => {
     expect(toFlowDetails({ serviceNotes: 'a\u0000b' }).serviceNotes).toBe('ab');
   });
@@ -289,6 +372,22 @@ describe('payload size', () => {
     for (const key of FLOW_DETAIL_TEXT_KEYS) {
       full[key] = '一'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
     }
+    // The pronoun and the two lists must be valid values; use the longest that fit their caps.
+    full.obituaryPronoun = 'they';
+    const fullList = (relation: string, cap: number) => {
+      const rows: unknown[] = [];
+      // 3-byte characters in name and city; add rows while the JSON still fits the cap.
+      while (rows.length < 40) {
+        const next = [...rows, { name: '一'.repeat(20), city: '一'.repeat(10), relation }];
+        if (JSON.stringify(next).length > cap) {
+          break;
+        }
+        rows.push(next[next.length - 1]);
+      }
+      return JSON.stringify(rows);
+    };
+    full.obituarySurvivorList = fullList('great-grandchild', FLOW_DETAIL_MAX_LENGTH.obituarySurvivorList);
+    full.obituaryPrecededList = fullList('spouse', FLOW_DETAIL_MAX_LENGTH.obituaryPrecededList);
     for (const key of FLOW_STATUS_KEYS) {
       full[key] = 'in_progress';
     }
@@ -297,8 +396,8 @@ describe('payload size', () => {
     expect(parseFlowDetails(split?.details)).not.toBeNull();
     const bytes = new TextEncoder().encode(JSON.stringify(full)).length;
     expect(bytes).toBeLessThan(128 * 1024);
-    // 3 bytes per CJK character: the true worst case, 83,492 bytes with the JSON overhead.
-    expect(bytes).toBeGreaterThan(80 * 1024);
+    // 3 bytes per CJK character: the true worst case, with the JSON overhead (112,990 bytes now; it was 83,492 before the 26 obituary keys).
+    expect(bytes).toBeGreaterThan(100 * 1024);
   });
 });
 

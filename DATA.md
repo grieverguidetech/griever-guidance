@@ -195,6 +195,14 @@ started). Rules: for the four message keys (`serviceMessage`, `announcementMessa
 and `''` stays `''`; for every other text key a blank value is sent as null and comes back as `''`.
 Caps are in `FLOW_DETAIL_MAX_LENGTH`; text above a cap is cut on save.
 
+The obituary list keys `obituarySurvivorList` (cap 3000) and `obituaryPrecededList` (cap 2000)
+hold one list as JSON text: an array of at most 40 rows, each exactly
+`{"name": string, "city": string, "relation": string}`, or `''` for no rows. Survivor relations:
+spouse, child, grandchild, great-grandchild, 2nd great-grandchild, sibling, parent. Preceded
+relations: spouse, child, sibling, parent. They are never cut on save: a list over its cap, or one
+that does not parse, is sent as null. `obituaryPronoun` is `he`, `she`, `they` or null. Any text
+with a lone surrogate is refused.
+
 The editor saves to the same list (`gg.sessions.v1`). The fields are additive and optional: an
 older list loads with its values unchanged.
 
@@ -204,6 +212,11 @@ older list loads with its values unchanged.
   birthDate, serviceType, serviceTime, servicePlace, serviceAddress, serviceNotes,
   serviceMessage, announcementMessage, obituaryText, obituaryCity, obituaryCareer,
   obituarySurvivors, obituaryNote, thanksMessage,
+  // Obituary fields (#772, all optional text, all sync)
+  obituaryGivenName, obituaryMiddleName, obituarySurname, obituaryAge, obituaryState, obituaryDeathPlace,
+  obituaryFuneralHome, obituaryChurch, obituaryCemeteryLocation, obituaryBirthPlace, obituaryMotherName, obituaryFatherName, obituaryHighSchool,
+  obituaryGradYear, obituaryDegree, obituaryCollege, obituaryJobTitle, obituaryCompany, obituaryJobYears, obituaryHobbies,
+  obituaryAwards, obituaryOrganizations, obituaryPronoun, obituarySurvivorList, obituaryPrecededList, obituaryMemorial,
   sectionStatus: { service: "in_progress" },   // 'in_progress' | 'ready'; a missing key = Not started
   // ServiceEventFields
   visitationDate, visitationTime, visitationPlace, serviceOfficiant,
@@ -552,12 +565,13 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - obituary URL
 - obituary publisher
 - service ready
-- detail fields (`FLOW_DETAIL_KEYS` in `libs/shared/src/flowDetails.ts`, 30 keys): birth date;
+- detail fields (`FLOW_DETAIL_KEYS` in `libs/shared/src/flowDetails.ts`, 56 keys): birth date;
   service type, time, place, address, notes; visitation date, time, place; service officiant;
   burial date, time, place and `burialPrivate`; reception date, time, place; the four messages
-  (service, announcement, obituary text, thank-you); obituary city, career, survivors, note; and
-  the five section statuses. Last saved wins per field. Survivors' names reach the server
-  (ADR 0001).
+  (service, announcement, obituary text, thank-you); obituary city, career, survivors, note; the 26
+  obituary fields from #772 (obituaryGivenName, obituaryMiddleName, obituarySurname, obituaryAge, obituaryState, obituaryDeathPlace, obituaryFuneralHome, obituaryChurch, obituaryCemeteryLocation, obituaryBirthPlace, obituaryMotherName, obituaryFatherName, obituaryHighSchool, obituaryGradYear, obituaryDegree, obituaryCollege, obituaryJobTitle, obituaryCompany, obituaryJobYears, obituaryHobbies, obituaryAwards, obituaryOrganizations, obituaryPronoun, obituarySurvivorList, obituaryPrecededList, obituaryMemorial); and
+  the five section statuses. Last saved wins per field. Third-party names (survivors, parents, people who died before, with cities) reach the server
+  (ADR 0001 and its 2026-11-09 addendum).
 
 **What never syncs:**
 

@@ -548,6 +548,10 @@ describe.runIf(up)('detail keys on DynamoDB Local', () => {
     for (const key of FLOW_DETAIL_TEXT_KEYS) {
       big[key] = '一'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
     }
+    // The pronoun and the two lists only accept valid values (#772).
+    big['obituaryPronoun'] = 'they';
+    big['obituarySurvivorList'] = JSON.stringify([{ name: '一'.repeat(20), city: '一'.repeat(10), relation: 'child' }]);
+    big['obituaryPrecededList'] = JSON.stringify([{ name: '一'.repeat(20), city: '一'.repeat(10), relation: 'spouse' }]);
     expect(
       (await createFlow(doc, table, caller(D_OWNER), id, { ...facts, ...big }, clock))
         .ok,

@@ -56,6 +56,32 @@ const DETAIL_KEY_NAMES = [
   'receptionDate',
   'receptionTime',
   'receptionPlace',
+  'obituaryGivenName',
+  'obituaryMiddleName',
+  'obituarySurname',
+  'obituaryAge',
+  'obituaryState',
+  'obituaryDeathPlace',
+  'obituaryFuneralHome',
+  'obituaryChurch',
+  'obituaryCemeteryLocation',
+  'obituaryBirthPlace',
+  'obituaryMotherName',
+  'obituaryFatherName',
+  'obituaryHighSchool',
+  'obituaryGradYear',
+  'obituaryDegree',
+  'obituaryCollege',
+  'obituaryJobTitle',
+  'obituaryCompany',
+  'obituaryJobYears',
+  'obituaryHobbies',
+  'obituaryAwards',
+  'obituaryOrganizations',
+  'obituaryPronoun',
+  'obituarySurvivorList',
+  'obituaryPrecededList',
+  'obituaryMemorial',
   'burialPrivate',
   'personStatus',
   'announcementStatus',
@@ -64,9 +90,20 @@ const DETAIL_KEY_NAMES = [
   'thanksStatus',
 ];
 
+// A value each key accepts: the pronoun and the two lists have their own rules.
+function detailTestValue(key: string): string {
+  if (key === 'obituaryPronoun') {
+    return 'she';
+  }
+  if (key === 'obituarySurvivorList' || key === 'obituaryPrecededList') {
+    return JSON.stringify([{ name: 'Ann', city: 'Tulsa', relation: 'spouse' }]);
+  }
+  return `sample ${key.slice(-6)}`;
+}
+
 describe('flow codec', () => {
-  it('has the 30 detail keys', () => {
-    expect(DETAIL_KEY_NAMES).toHaveLength(30);
+  it('has the 56 detail keys', () => {
+    expect(DETAIL_KEY_NAMES).toHaveLength(56);
     expect([...FLOW_DETAIL_KEYS].sort()).toEqual([...DETAIL_KEY_NAMES].sort());
   });
 
@@ -151,7 +188,7 @@ describe('flow codec', () => {
           ? true
           : key.endsWith('Status')
             ? 'ready'
-            : `value of ${key}`;
+            : detailTestValue(key);
       const item = { ...flow, details: { ...emptyDetails(), [key]: value } };
       const encoded = encodeFlow(item);
       expect(encoded[key]).toBe(value);
@@ -169,6 +206,30 @@ describe('flow codec', () => {
     expect(decoded.details.serviceTime).toBeNull();
     expect(decoded.details.personStatus).toBeNull();
     expect(decoded.details.burialPrivate).toBe(false);
+  });
+
+  it('decodes a stored item that has none of the 26 obituary keys (all null)', () => {
+    const old = encodeFlow(flow);
+    for (const key of FLOW_DETAIL_TEXT_KEYS) {
+      if (key.startsWith('obituary') && !['obituaryText', 'obituaryCity', 'obituaryCareer', 'obituarySurvivors', 'obituaryNote'].includes(key)) {
+        delete old[key];
+      }
+    }
+    const decoded = decodeFlow(old);
+    expect(decoded.details.obituaryGivenName).toBeNull();
+    expect(decoded.details.obituarySurvivorList).toBeNull();
+    expect(decoded.details.obituaryPronoun).toBeNull();
+  });
+
+  it('round-trips a new obituary item, and refuses a bad pronoun or list', () => {
+    const item = {
+      ...flow,
+      details: { ...emptyDetails(), obituaryGivenName: 'Margaret', obituaryPronoun: 'she', obituaryPrecededList: detailTestValue('obituaryPrecededList') },
+    };
+    expect(decodeFlow(encodeFlow(item))).toEqual(item);
+    for (const bad of [{ obituaryPronoun: 'it' }, { obituarySurvivorList: 'junk' }, { obituaryGivenName: 'a\ud83db' }]) {
+      expect(() => encodeFlow({ ...flow, details: { ...emptyDetails(), ...bad } })).toThrow('Flow details are invalid.');
+    }
   });
 
   it('round-trips a full set of details, including an empty message', () => {
@@ -206,12 +267,27 @@ describe('flow codec', () => {
     for (const key of FLOW_DETAIL_TEXT_KEYS) {
       details[key] = '一'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
     }
+    details.obituaryPronoun = 'they';
+    details.obituarySurvivorList = detailTestValue('obituarySurvivorList');
+    details.obituaryPrecededList = detailTestValue('obituaryPrecededList');
     const big = { ...flow, details: details as FlowItem['details'] };
     expect(decodeFlow(encodeFlow(big))).toEqual(big);
   });
 });
 
 describe('parseFlowInput', () => {
+  it('accepts an input with only old keys and one with new keys', () => {
+    expect(parseFlowInput({ serviceTime: '2pm', obituaryNote: 'x' })).toEqual({
+      facts: {},
+      details: { serviceTime: '2pm', obituaryNote: 'x' },
+    });
+    expect(parseFlowInput({ obituaryGivenName: 'Margaret', obituaryPronoun: 'she' })).toEqual({
+      facts: {},
+      details: { obituaryGivenName: 'Margaret', obituaryPronoun: 'she' },
+    });
+    expect(parseFlowInput({ obituaryPronoun: 'it' })).toBeNull();
+  });
+
   it('accepts details alone, facts alone, and both', () => {
     expect(parseFlowInput({ serviceTime: '2pm' })).toEqual({
       facts: {},
