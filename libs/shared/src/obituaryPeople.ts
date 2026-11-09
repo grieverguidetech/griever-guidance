@@ -1,4 +1,4 @@
-import { parseLooseDate } from './dates.js';
+import { parseCompleteDate } from './dates.js';
 
 export const SURVIVOR_RELATIONS = [
   'spouse',
@@ -95,17 +95,13 @@ export function splitPersonName(full: string): { given: string; middle: string; 
   };
 }
 
-const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Calendar parts as the family typed them. ISO date-only text parses as UTC, the rest as local. */
+/** Calendar parts of a complete typed date. Partial text gives null, so an age is never invented. */
 function calendarParts(text: string): { y: number; m: number; d: number } | null {
-  const date = parseLooseDate(text);
+  const date = parseCompleteDate(text, { minYear: 1800, maxYear: 2100 });
   if (!date) {
     return null;
   }
-  return ISO_DATE_ONLY.test(text.trim())
-    ? { y: date.getUTCFullYear(), m: date.getUTCMonth(), d: date.getUTCDate() }
-    : { y: date.getFullYear(), m: date.getMonth(), d: date.getDate() };
+  return { y: date.getFullYear(), m: date.getMonth(), d: date.getDate() };
 }
 
 /** Whole years between two typed dates, as a string. '' when either is unreadable or death is first. */

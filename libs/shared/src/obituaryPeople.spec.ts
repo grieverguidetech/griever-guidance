@@ -36,6 +36,16 @@ describe('serializePeople / parsePeople', () => {
     expect(parsePeople(serializePeople(many), SURVIVOR_RELATIONS)).toHaveLength(OBITUARY_PEOPLE_MAX_ROWS);
   });
 
+  it('keeps the first 40 full rows after empty rows are dropped', () => {
+    const rows = [
+      ...Array.from({ length: 5 }, () => row('')),
+      ...Array.from({ length: 40 }, (_, i) => row(`P${i}`)),
+    ];
+    const parsed = parsePeople(serializePeople(rows), SURVIVOR_RELATIONS);
+    expect(parsed).toHaveLength(40);
+    expect(parsed?.[0].name).toBe('P0');
+  });
+
   it('parses "" as an empty list', () => {
     expect(parsePeople('', SURVIVOR_RELATIONS)).toEqual([]);
   });
@@ -53,7 +63,7 @@ describe('serializePeople / parsePeople', () => {
     ['unknown key', JSON.stringify([{ name: 'A', city: 'B', rel: 'child' }])],
     ['non-string value', JSON.stringify([{ ...good, city: 5 }])],
     ['relation outside list', JSON.stringify([{ ...good, relation: 'cousin' }])],
-    ['__proto__ key', '[{"name":"A","city":"B","__proto__":"child"}]'],
+    ['__proto__ key', '[{"name":"A","city":"B","relation":"child","__proto__":{}}]'],
   ])('refuses %s', (_label, text) => {
     expect(parsePeople(text, SURVIVOR_RELATIONS)).toBeNull();
   });
@@ -92,6 +102,15 @@ describe('ageFrom', () => {
   it('returns "" when death is before birth', () => {
     expect(ageFrom('2000-01-02', '2000-01-01')).toBe('');
     expect(ageFrom('2001-01-01', '2000-12-31')).toBe('');
+  });
+
+  it.each(['6/12', 'May 2', '12', '1940', '1940-06', '6/12/40'])('returns "" for partial text %s', (partial) => {
+    expect(ageFrom(partial, '2026-06-15')).toBe('');
+    expect(ageFrom('1940-06-15', partial)).toBe('');
+  });
+
+  it('reads full slash dates', () => {
+    expect(ageFrom('6/12/1940', 'June 12, 2026')).toBe('86');
   });
 
   it('returns "" when a text is unreadable', () => {
