@@ -203,6 +203,11 @@ test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps 
   await openSection(page, 'Announcement', 'Announcement');
   await expect(page.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'true');
   await expect(nudge).toHaveCount(0);
+  // Got it hides the nudge only until the section is marked ready again (#761).
+  await page.getByRole('button', { name: 'Mark as ready' }).click();
+  await expect(page.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Mark as ready' }).click();
+  await expect(nudge).toBeFocused();
 });
 
 test.describe('no sync while signed out (#520)', () => {

@@ -6,8 +6,10 @@ const copy = screenCopy('cmsShell');
 export type PhoneNudgeSection = 'service' | 'announcement' | 'obituary' | 'thanks';
 
 /** Device-only, never synced (WEB-13). Stored shape: a JSON array of the PhoneNudgeSection names
- * the family dismissed on this device, for every person, e.g. `["announcement"]`. */
-export const PHONE_NUDGE_KEY = 'gg.cmsPhoneNudge.v1';
+ * the family dismissed on this device, for every person, e.g. `["announcement"]`. v2 (#761): Got it
+ * lasts only until the section is marked ready again. Values saved under v1 are never read. */
+export const PHONE_NUDGE_KEY = 'gg.cmsPhoneNudge.v2';
+const OLD_PHONE_NUDGE_KEY = 'gg.cmsPhoneNudge.v1';
 
 const LINES: Record<PhoneNudgeSection, string> = {
   announcement: copy.phoneNudgeAnnouncement,
@@ -49,9 +51,16 @@ export function saveDismissedNudges(dismissed: PhoneNudgeSection[]) {
   dismissed.forEach((name) => sessionDismissed.add(name));
   try {
     window.localStorage.setItem(PHONE_NUDGE_KEY, JSON.stringify(dismissed));
+    window.localStorage.removeItem(OLD_PHONE_NUDGE_KEY);
   } catch {
     // The choice still lasts this visit (sessionDismissed), just not past it.
   }
+}
+
+/** Forgets one section's dismissal (state of the visit and storage). The other sections stay as they are. */
+export function clearDismissedNudge(section: PhoneNudgeSection) {
+  sessionDismissed.delete(section);
+  saveDismissedNudges(readDismissedNudges().filter((name) => name !== section));
 }
 
 interface Props {

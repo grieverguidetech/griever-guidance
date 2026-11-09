@@ -187,12 +187,44 @@ describe('MarkReady', () => {
       render(<Harness start />);
       await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
       expect(screen.queryByRole('region')).toBeNull();
-      await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v1')).toBe('["announcement"]');
+      await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v2')).toBe('["announcement"]');
       expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
     });
 
-    it('keeps a dismissed section hidden after remount while another still shows', () => {
+    it('Got it, then un-mark and re-mark shows the nudge again with focus', async () => {
+      render(<Harness start />);
+      await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+      const toggle = screen.getByRole('button', { name: 'Mark as ready' });
+      await userEvent.click(toggle);
+      await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v2')).toBe('[]');
+      await userEvent.click(toggle);
+      expect(screen.getByRole('region', { name: 'The announcement is ready.' })).toHaveFocus();
+    });
+
+    it('un-marking one section leaves another dismissed section dismissed', async () => {
+      window.localStorage.setItem('gg.cmsPhoneNudge.v2', '["announcement","service"]');
+      render(<Harness phoneNudge="service" start />);
+      await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+      await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v2')).toBe('["announcement"]');
+    });
+
+    it('ignores a dismissal saved under v1', () => {
       window.localStorage.setItem('gg.cmsPhoneNudge.v1', '["announcement"]');
+      render(<Harness start />);
+      expect(screen.getByRole('region')).toBeInTheDocument();
+    });
+
+    it('puts 24px between the nudge and the Next button (12px gap plus mt-3), and only then', async () => {
+      render(<Harness start onNext={() => undefined} />);
+      const next = screen.getByRole('button', { name: /^(Next|Back to Overview)/ });
+      expect(next).toHaveClass('mt-3');
+      expect(next.parentElement).toHaveClass('gap-3');
+      await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+      expect(next).not.toHaveClass('mt-3');
+    });
+
+    it('keeps a dismissed section hidden after remount while another still shows', () => {
+      window.localStorage.setItem('gg.cmsPhoneNudge.v2', '["announcement"]');
       const { unmount } = render(<Harness start />);
       expect(screen.queryByRole('region')).toBeNull();
       unmount();

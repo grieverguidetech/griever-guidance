@@ -537,6 +537,6 @@ describe('ServiceSection phone nudge', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(screen.queryByRole('region', { name: 'The service details are ready.' })).toBeNull();
-    await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v1')).toBe('["service"]');
+    await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v2')).toBe('["service"]');
   });
 });
