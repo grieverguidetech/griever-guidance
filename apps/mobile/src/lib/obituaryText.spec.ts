@@ -29,6 +29,11 @@ describe('obituaryTextFor', () => {
     expect(text).toContain('Funeral service will be held at Oak Chapel on May 5, 2026 at 2:00 PM with [OFFICIANT]');
   });
 
+  it('writes a private burial', () => {
+    const text = obituaryTextFor({ ...empty, personName: 'Anna', servicePlace: 'Oak Chapel', burialPrivate: true });
+    expect(text).toContain('Burial will be private.');
+  });
+
   it('returns empty when the person has no text and no fields', () => {
     expect(obituaryTextFor(empty)).toBe('');
   });

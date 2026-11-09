@@ -10,7 +10,7 @@ export type ObituaryTextSource = Pick<
   Partial<
     Pick<
       Session,
-      'servicePlace' | 'serviceDate' | 'serviceTime' | 'serviceOfficiant' | 'burialPlace' | 'visitationPlace' | 'visitationDate' | 'visitationTime'
+      'servicePlace' | 'serviceDate' | 'serviceTime' | 'serviceOfficiant' | 'burialPlace' | 'burialPrivate' | 'visitationPlace' | 'visitationDate' | 'visitationTime'
     >
   >;
 

@@ -119,34 +119,37 @@ function cleanEnd(value: string | undefined): string {
 
 /**
  * Fill the obituary template (five paragraphs, separated by a blank line). A field that is empty or
- * only spaces keeps its [BRACKET] from the copy, so the family sees what is missing. The final note
- * is trimmed only, because the template adds no full stop after it.
+ * only spaces keeps its [BRACKET] from the copy, so the family sees what is missing. A value in the
+ * middle of a sentence is trimmed only ("2:00 p.m." keeps its stop). A value that the template
+ * follows with a full stop loses one typed full stop (`cleanEnd`), so there is no "..". The final
+ * note is trimmed only, because the template adds nothing after it.
  */
 export function buildObituaryDraft(fields: ObituaryDraftFields, copy: ScreenCopy<'obituaryDraft'>): string {
   const { blanks } = copy;
-  const or = (value: string | undefined, blank: string): string => cleanEnd(value) || blank;
+  const mid = (value: string | undefined, blank: string): string => value?.trim() || blank;
+  const last = (value: string | undefined, blank: string): string => cleanEnd(value) || blank;
   const name = fields.personName?.trim() ?? '';
 
   const burial = fields.burialPrivate
     ? copy.burialPrivate
-    : fill(copy.burialSentence, { burialPlace: or(fields.burialPlace, blanks.burialPlace) });
+    : fill(copy.burialSentence, { burialPlace: mid(fields.burialPlace, blanks.burialPlace) });
 
   const values = {
     fullName: name || blanks.fullName,
     name: name || blanks.name,
-    city: or(fields.obituaryCity, blanks.city),
-    dateOfPassing: or(fields.dateOfPassing, blanks.dateOfPassing),
-    servicePlace: or(fields.servicePlace, blanks.servicePlace),
-    serviceDate: or(fields.serviceDate, blanks.serviceDate),
-    serviceTime: or(fields.serviceTime, blanks.serviceTime),
-    officiant: or(fields.serviceOfficiant, blanks.officiant),
+    city: mid(fields.obituaryCity, blanks.city),
+    dateOfPassing: mid(fields.dateOfPassing, blanks.dateOfPassing),
+    servicePlace: mid(fields.servicePlace, blanks.servicePlace),
+    serviceDate: mid(fields.serviceDate, blanks.serviceDate),
+    serviceTime: mid(fields.serviceTime, blanks.serviceTime),
+    officiant: mid(fields.serviceOfficiant, blanks.officiant),
     burial,
-    visitationPlace: or(fields.visitationPlace, blanks.visitationPlace),
-    visitationDate: or(fields.visitationDate, blanks.visitationDate),
-    visitationTime: or(fields.visitationTime, blanks.visitationTime),
-    birthDate: or(fields.birthDate, blanks.birthDate),
-    career: or(fields.obituaryCareer, blanks.career),
-    survivors: or(fields.obituarySurvivors, blanks.survivors),
+    visitationPlace: mid(fields.visitationPlace, blanks.visitationPlace),
+    visitationDate: mid(fields.visitationDate, blanks.visitationDate),
+    visitationTime: last(fields.visitationTime, blanks.visitationTime),
+    birthDate: last(fields.birthDate, blanks.birthDate),
+    career: last(fields.obituaryCareer, blanks.career),
+    survivors: last(fields.obituarySurvivors, blanks.survivors),
     note: fields.obituaryNote?.trim() || blanks.note,
   };
 

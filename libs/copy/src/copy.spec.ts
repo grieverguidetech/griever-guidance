@@ -50,7 +50,8 @@ describe('screen copy is calm (C7)', () => {
     for (const text of allStrings(readJson(join(SCREENS_DIR, file)))) {
       expect(text, text).not.toContain('!');
       // Obituary template brackets such as [DATE OF DEATH] are capitals on purpose.
-      expect(text.replace(/\[[^\]]*\]/g, ''), text).not.toMatch(/\b[A-Z]{4,}\b/);
+      const shown = file === 'obituaryDraft.json' ? text.replace(/\[[^\]]*\]/g, '') : text;
+      expect(shown, text).not.toMatch(/\b[A-Z]{4,}\b/);
     }
   });
 });
@@ -259,6 +260,16 @@ describe('buildObituaryDraft', () => {
     const draft = buildObituaryDraft({ ...filled, obituaryCity: 'Boston.', obituarySurvivors: 'her husband.', obituaryCareer: 'a nurse.' }, copy);
     expect(draft).not.toContain('..');
     expect(draft).toContain('is survived by her husband.');
+  });
+
+  it('keeps a full stop typed inside a sentence and does not double one before the template full stop', () => {
+    const draft = buildObituaryDraft(
+      { ...filled, serviceTime: '2:00 p.m.', serviceOfficiant: 'Reverend John Cole Sr.', visitationTime: '6 p.m.' },
+      copy,
+    );
+    expect(draft).toContain('at 2:00 p.m. with Reverend John Cole Sr. of [PLACE OF WORSHIP]');
+    expect(draft).toContain('at 6 p.m. [NAME OF FUNERAL HOME]');
+    expect(draft).not.toContain('..');
   });
 
   it('treats fields with only spaces as empty', () => {
