@@ -1,6 +1,5 @@
-import { useId } from 'react';
+import { useId, type Ref } from 'react';
 import { screenCopy } from '@griever/copy';
-import { sectionTintClass } from '../sectionTint';
 
 const copy = screenCopy('cmsShell');
 
@@ -15,6 +14,13 @@ const LINES: Record<PhoneNudgeSection, string> = {
   service: copy.phoneNudgeService,
   obituary: copy.phoneNudgeObituary,
   thanks: copy.phoneNudgeThanks,
+};
+
+const HEADINGS: Record<PhoneNudgeSection, string> = {
+  announcement: copy.phoneNudgeAnnouncementHeading,
+  service: copy.phoneNudgeServiceHeading,
+  obituary: copy.phoneNudgeObituaryHeading,
+  thanks: copy.phoneNudgeThanksHeading,
 };
 
 /** Dismissals made this visit. Kept so a dismissal lasts the visit even when storage throws. */
@@ -51,16 +57,32 @@ export function saveDismissedNudges(dismissed: PhoneNudgeSection[]) {
 interface Props {
   section: PhoneNudgeSection;
   onDismiss: () => void;
+  /** Lets the parent move focus here when the section turns ready. */
+  nudgeRef?: Ref<HTMLDivElement>;
 }
 
-/** One calm line, in the section's tint, saying where the sending happens. The primary button has its own
- * fill, so nothing depends on contrast against the tint; the card's padding leaves room for the focus ring. */
-export function PhoneNudge({ section, onDismiss }: Props) {
+/** One blue card for every section: a heading, one line saying where the sending happens, and Got it at the right.
+ * A labelled region the parent focuses when it appears, so the heading and line are announced once. The
+ * focus ring (.gg-phone-nudge:focus in styles.css) shows after a mouse click too. */
+export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
+  const headingId = useId();
   const lineId = useId();
   return (
-    <div className={`${sectionTintClass(section)} flex flex-col items-start gap-3 p-4 gg-enter`}>
-      <p id={lineId}>{LINES[section]}</p>
-      <button type="button" aria-describedby={lineId} className="gg-btn gg-btn-primary min-h-[44px]" onClick={onDismiss}>
+    <div
+      ref={nudgeRef}
+      role="region"
+      tabIndex={-1}
+      aria-labelledby={headingId}
+      aria-describedby={lineId}
+      className="gg-phone-nudge flex w-full flex-wrap items-end gap-x-4 gap-y-3 p-4 gg-enter"
+    >
+      <div className="flex min-w-[14rem] flex-1 flex-col gap-1">
+        <h2 id={headingId} className="text-base font-semibold">
+          {HEADINGS[section]}
+        </h2>
+        <p id={lineId}>{LINES[section]}</p>
+      </div>
+      <button type="button" className="gg-btn gg-btn-primary ml-auto min-h-[44px]" onClick={onDismiss}>
         {copy.phoneNudgeDismiss}
       </button>
     </div>

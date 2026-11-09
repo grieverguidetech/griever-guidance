@@ -525,18 +525,18 @@ describe('ServiceSection phone nudge', () => {
 
   it('shows its own line once marked ready and hides it when un-marked', async () => {
     renderReadyToggle();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The service details are ready.' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toHaveTextContent('You will share the service details from the Grievers Guidance phone app, signed in to this account.');
+    expect(screen.getByRole('region', { name: 'The service details are ready.' })).toHaveTextContent('begin sharing them with your loved ones');
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The service details are ready.' })).toBeNull();
   });
 
   it('Got it saves only the service dismissal', async () => {
     renderReadyToggle();
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
     await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The service details are ready.' })).toBeNull();
     await expect.poll(() => window.localStorage.getItem('gg.cmsPhoneNudge.v1')).toBe('["service"]');
   });
 });

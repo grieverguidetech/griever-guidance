@@ -115,10 +115,10 @@ describe('ThanksSection phone nudge', () => {
 
   it('shows its own line once marked ready and hides it when un-marked', async () => {
     renderReadyToggle();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The thank-you notes are ready.' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toHaveTextContent('You will send the thank-yous from the Grievers Guidance phone app, signed in to this account.');
+    expect(screen.getByRole('region', { name: 'The thank-you notes are ready.' })).toHaveTextContent('begin sending them to the people who helped');
     await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('region', { name: 'The thank-you notes are ready.' })).toBeNull();
   });
 });

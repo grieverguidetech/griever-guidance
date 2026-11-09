@@ -100,6 +100,15 @@ describe('visible focus (#162)', () => {
     }
   });
 
+  it('the phone nudge ring shows on :focus and clears 3:1 on every background (#757)', () => {
+    const declarations = rule('.gg-phone-nudge:focus,\n.gg-phone-nudge:focus-visible');
+    expect(declarations).not.toMatch(/outline:\s*(none|2px solid transparent)/);
+    const ring = token(colourIn(declarations, 'outline'));
+    for (const [name, bg] of Object.entries(backgrounds)) {
+      expect({ name, ratio: contrast(ring, bg) >= 3 }).toEqual({ name, ratio: true });
+    }
+  });
+
   it('a focused field gets a ring that clears 3:1 against the field, the page and its old border', () => {
     const declarations = rule('.gg-input:focus-visible');
     expect(declarations).not.toMatch(/outline:\s*none/);

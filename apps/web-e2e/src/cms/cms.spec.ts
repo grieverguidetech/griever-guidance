@@ -159,23 +159,26 @@ test('Ready leads on: The person ready, Next opens Announcement with its h1; no 
   await expect(heading).toBeFocused();
 });
 
-test('Announcement phone nudge: shows when Ready, Got it keeps focus on the toggle and stays hidden after reload; axe clean (WEB-13)', async ({ page }) => {
+test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps focus on the toggle and stays hidden after reload; axe clean (WEB-13)', async ({ page }) => {
   await startPerson(page);
   await page.getByLabel('Their name').fill('Margaret Hayes');
   await openSection(page, 'Announcement', 'Announcement');
-  const line = page.getByText('You will send the announcement from the Grievers Guidance phone app, signed in to this account.');
-  await expect(line).toHaveCount(0);
+  const nudge = page.getByRole('region', { name: 'The announcement is ready.' });
+  const line = page.getByText('Open the Grievers Guidance phone app to begin sending it to your loved ones.');
+  await expect(nudge).toHaveCount(0);
   const toggle = page.getByRole('button', { name: 'Mark as ready' });
   await toggle.click();
+  await expect(page.getByRole('heading', { level: 2, name: 'The announcement is ready.' })).toBeVisible();
   await expect(line).toBeVisible();
+  await expect(nudge).toBeFocused();
   expect(await violations(page)).toEqual([]);
   await page.getByRole('button', { name: 'Got it' }).click();
-  await expect(line).toHaveCount(0);
+  await expect(nudge).toHaveCount(0);
   await expect(toggle).toBeFocused();
   await page.reload();
   await openSection(page, 'Announcement', 'Announcement');
   await expect(page.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(line).toHaveCount(0);
+  await expect(nudge).toHaveCount(0);
 });
 
 test.describe('no sync while signed out (#520)', () => {

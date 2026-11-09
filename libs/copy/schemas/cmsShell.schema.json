@@ -31,9 +31,13 @@
     "comingLater",
     "markReady",
     "readyHint",
+    "phoneNudgeAnnouncementHeading",
     "phoneNudgeAnnouncement",
+    "phoneNudgeServiceHeading",
     "phoneNudgeService",
+    "phoneNudgeObituaryHeading",
     "phoneNudgeObituary",
+    "phoneNudgeThanksHeading",
     "phoneNudgeThanks",
     "phoneNudgeDismiss",
     "peopleTitle",
@@ -149,13 +153,25 @@
     "markReady": {
       "$ref": "#/$defs/text"
     },
+    "phoneNudgeAnnouncementHeading": {
+      "$ref": "#/$defs/text"
+    },
     "phoneNudgeAnnouncement": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneNudgeServiceHeading": {
       "$ref": "#/$defs/text"
     },
     "phoneNudgeService": {
       "$ref": "#/$defs/text"
     },
+    "phoneNudgeObituaryHeading": {
+      "$ref": "#/$defs/text"
+    },
     "phoneNudgeObituary": {
+      "$ref": "#/$defs/text"
+    },
+    "phoneNudgeThanksHeading": {
       "$ref": "#/$defs/text"
     },
     "phoneNudgeThanks": {

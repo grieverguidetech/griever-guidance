@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { PHONE_NUDGE_KEY, PhoneNudge, readDismissedNudges, resetSessionDismissed, saveDismissedNudges } from './PhoneNudge';
@@ -11,31 +11,43 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const CASES = [
+  ['announcement', 'The announcement is ready.', 'Open the Grievers Guidance phone app to begin sending it to your loved ones. Sign in with this same account to find it there.'],
+  ['service', 'The service details are ready.', 'Open the Grievers Guidance phone app to begin sharing them with your loved ones. Sign in with this same account to find them there.'],
+  ['obituary', 'The obituary is ready.', 'Open the Grievers Guidance phone app to begin sharing it with your loved ones. Sign in with this same account to find it there.'],
+  ['thanks', 'The thank-you notes are ready.', 'Open the Grievers Guidance phone app to begin sending them to the people who helped. Sign in with this same account to find them there.'],
+] as const;
+
 describe('PhoneNudge', () => {
-  it.each([
-    ['announcement', 'You will send the announcement from the Grievers Guidance phone app, signed in to this account.', 'gg-tint-announcement'],
-    ['service', 'You will share the service details from the Grievers Guidance phone app, signed in to this account.', 'gg-tint-service'],
-    ['obituary', 'You will share the obituary from the Grievers Guidance phone app, signed in to this account.', 'gg-tint-obituary'],
-    ['thanks', 'You will send the thank-yous from the Grievers Guidance phone app, signed in to this account.', 'gg-tint-thanks'],
-  ] as const)('shows the %s line in its tint', (section, line, tint) => {
+  it.each(CASES)('shows the %s heading (level 2) and line in the one blue card', (section, heading, line) => {
     render(<PhoneNudge section={section} onDismiss={() => undefined} />);
-    expect(screen.getByText(line).parentElement).toHaveClass('gg-tint-card', tint);
+    expect(screen.getByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
+    const card = screen.getByRole('region', { name: heading });
+    expect(card).toHaveTextContent(line);
+    expect(card).toHaveClass('gg-phone-nudge');
+    expect(card.className).not.toMatch(/gg-tint-/);
+    expect(card).toHaveAttribute('tabindex', '-1');
+    expect(card).toHaveAccessibleDescription(line);
   });
 
-  it('has a Got it button at least 44px tall that calls onDismiss', async () => {
+  it('keeps every body line under 200 characters and every text free of exclamation points', () => {
+    for (const [section, heading, line] of CASES) {
+      render(<PhoneNudge section={section} onDismiss={() => undefined} />);
+      expect(line.length).toBeLessThan(200);
+      expect(heading).not.toContain('!');
+      expect(line).not.toContain('!');
+      cleanup();
+    }
+  });
+
+  it('has a Got it button at least 44px tall, last in the card, that calls onDismiss', async () => {
     const onDismiss = vi.fn();
     render(<PhoneNudge section="announcement" onDismiss={onDismiss} />);
     const button = screen.getByRole('button', { name: 'Got it' });
     expect(button).toHaveClass('gg-btn-primary', 'min-h-[44px]');
+    expect(screen.getByRole('region').lastElementChild).toBe(button);
     await userEvent.click(button);
     expect(onDismiss).toHaveBeenCalledTimes(1);
-  });
-
-  it('describes Got it with the line and keeps Got it as its name', () => {
-    render(<PhoneNudge section="service" onDismiss={() => undefined} />);
-    const button = screen.getByRole('button', { name: 'Got it' });
-    expect(button).toHaveAccessibleDescription(/You will share the service details/);
-    expect(button).not.toHaveAttribute('aria-label');
   });
 
   it('holds no hard-coded copy', () => {
