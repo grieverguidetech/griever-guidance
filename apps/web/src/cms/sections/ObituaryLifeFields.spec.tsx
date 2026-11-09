@@ -86,6 +86,14 @@ describe('ObituaryLifeFields', () => {
     expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Lee');
   });
 
+  it('announces once, in a polite status line, that the name was filled', async () => {
+    setup({ personName: 'Ann Lee' });
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('');
+    await userEvent.click(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
+    expect(status).toHaveTextContent(copy.nameFilled);
+  });
+
   it('hides the name button without a name', () => {
     setup({ personName: '  ' });
     expect(screen.queryByRole('button', { name: copy.useNameFromPersonLabel })).toBeNull();
@@ -100,17 +108,33 @@ describe('ObituaryLifeFields', () => {
       expect(patches).toEqual([]);
     });
 
-    it('can be typed over, and returns when cleared', async () => {
+    it('shows only what was typed while focused, and the worked-out age again on blur', async () => {
       const patches = setup(dates);
       const age = screen.getByLabelText(copy.ageLabel);
-      await userEvent.clear(age);
-      expect(patches.at(-1)).toEqual({ obituaryAge: '' });
-      expect(age).toHaveValue('86');
-      await userEvent.type(age, '9', { initialSelectionStart: 0, initialSelectionEnd: 2 });
+      await userEvent.click(age);
+      expect(age).toHaveValue('');
+      expect(patches).toEqual([]);
+      await userEvent.type(age, '9');
       expect(patches.at(-1)).toEqual({ obituaryAge: '9' });
       expect(age).toHaveValue('9');
       await userEvent.clear(age);
+      expect(patches.at(-1)).toEqual({ obituaryAge: '' });
+      expect(age).toHaveValue('');
+      await userEvent.tab();
       expect(age).toHaveValue('86');
+    });
+
+    it('shows the hint only while the worked-out age is shown', async () => {
+      setup(dates);
+      const age = screen.getByLabelText(copy.ageLabel);
+      expect(screen.getByText(copy.ageHint)).toBeInTheDocument();
+      expect(age).toHaveAccessibleDescription(copy.ageHint);
+      await userEvent.click(age);
+      expect(screen.queryByText(copy.ageHint)).toBeNull();
+      expect(age).not.toHaveAccessibleDescription(copy.ageHint);
+      await userEvent.type(age, '{Backspace}');
+      await userEvent.tab();
+      expect(screen.getByText(copy.ageHint)).toBeInTheDocument();
     });
 
     it('shows a saved age over the worked-out one', () => {

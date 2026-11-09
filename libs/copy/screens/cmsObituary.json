@@ -72,5 +72,6 @@
   "readyPlaceholders": "Some placeholder text is still in [brackets]. Replace it before you mark this ready.",
   "personRowField": "{field}, person {n}",
   "peopleLimit": "This list holds up to 40 people.",
-  "removePersonUnnamed": "Remove person {n}"
+  "removePersonUnnamed": "Remove person {n}",
+  "nameFilled": "Name filled in from The person."
 }

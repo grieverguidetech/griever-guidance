@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import {
   FLOW_DETAIL_MAX_LENGTH,
@@ -102,6 +102,8 @@ const pronounChoices = [
 /** The name parts, age, places, school, work, interests and pronoun of the obituary. Controlled; it does not save. */
 export function ObituaryLifeFields({ values, onChange }: Props) {
   const id = useId();
+  const [ageFocused, setAgeFocused] = useState(false);
+  const [nameFilled, setNameFilled] = useState(false);
   const personName = values.personName?.trim() ?? '';
   const derivedAge = ageFrom(values.birthDate ?? '', values.dateOfPassing ?? '');
 
@@ -109,10 +111,12 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
     const isAge = spec.key === 'obituaryAge';
     const typed = values[spec.key] ?? '';
     const hintId = `${id}-${spec.key}-hint`;
+    // While the age has focus it shows only what was typed; otherwise the worked-out age fills an empty field.
+    const showsDerived = isAge && typed === '' && !ageFocused && derivedAge !== '';
     return (
       <div className="gg-field" key={spec.key}>
         <label htmlFor={`${id}-${spec.key}`}>{spec.label}</label>
-        {isAge && (
+        {showsDerived && (
           <p id={hintId} className="gg-hint">
             {copy.ageHint}
           </p>
@@ -124,8 +128,10 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
           autoComplete="off"
           inputMode={spec.numeric ? 'numeric' : undefined}
           maxLength={FLOW_DETAIL_MAX_LENGTH[spec.key]}
-          aria-describedby={isAge ? hintId : undefined}
-          value={isAge && typed === '' ? derivedAge : typed}
+          aria-describedby={showsDerived ? hintId : undefined}
+          value={showsDerived ? derivedAge : typed}
+          onFocus={isAge ? () => setAgeFocused(true) : undefined}
+          onBlur={isAge ? () => setAgeFocused(false) : undefined}
           onChange={(e) => onChange({ [spec.key]: e.target.value })}
         />
       </div>
@@ -150,6 +156,7 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
       onClick={() => {
         const { given, middle, surname } = splitPersonName(personName);
         onChange({ obituaryGivenName: given, obituaryMiddleName: middle, obituarySurname: surname });
+        setNameFilled(true);
       }}
     >
       {copy.useNameFromPersonLabel}
@@ -176,6 +183,9 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
 
   return (
     <>
+      <p role="status" className="sr-only">
+        {nameFilled ? copy.nameFilled : ''}
+      </p>
       {renderGroup(copy.groupNameHeading, nameFields, useName, pronoun)}
       {renderGroup(copy.groupLifeHeading, lifeFields)}
       {renderGroup(copy.groupFamilyHeading, familyFields)}
