@@ -275,6 +275,7 @@ describe('MarkReady', () => {
       render(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
       const ids = (toggle().getAttribute('aria-describedby') ?? '').split(' ');
       expect(ids).toHaveLength(2);
+      expect(document.getElementById(ids[0])).toHaveTextContent('Mark as ready when these details are settled');
       expect(document.getElementById(ids[1])).toHaveTextContent(reason);
     });
 
@@ -289,6 +290,14 @@ describe('MarkReady', () => {
       await userEvent.click(toggle());
       expect(region.textContent?.trim()).toBe(reason);
       expect(region.textContent).not.toBe(first);
+    });
+
+    it('keeps the live region empty after ready turns off until a press', async () => {
+      const { rerender } = render(<MarkReady ready onChange={() => undefined} blockedMessage={reason} />);
+      rerender(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      await userEvent.click(toggle());
+      expect(screen.getByRole('status').textContent?.trim()).toBe(reason);
     });
 
     it('never blocks once ready, and shows no message', async () => {

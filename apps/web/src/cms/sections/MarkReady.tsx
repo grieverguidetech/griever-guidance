@@ -30,6 +30,11 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
   // The live region text. A trailing no-break space on every second press makes a repeat press change the text, so it is read again.
   const [announced, setAnnounced] = useState('');
   const pressesRef = useRef(0);
+  // A stale message must not be spoken without a press, so clear it when the block or its text changes.
+  useEffect(() => {
+    setAnnounced('');
+    pressesRef.current = 0;
+  }, [blocked, blockedMessage]);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const nudgeRef = useRef<HTMLDivElement>(null);
   // Set by the toggle click that turns ready, so focus moves to the nudge then and not on mount.
@@ -103,17 +108,17 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
         <p id={hintId} className="gg-hint">
           {copy.readyHint}
         </p>
-    </div>
+      </div>
       {blocked ? (
-        <p id={blockedId} className="m-0 text-[13px] font-semibold leading-[1.5]">
+        <p id={blockedId} className="m-0 text-[13px] font-semibold leading-[1.5] text-[var(--color-error)]">
           {blockedMessage}
         </p>
       ) : null}
       {blockedMessage ? (
         <p role="status" aria-live="polite" className="sr-only">
           {blocked ? announced : ''}
-          </p>
-        ) : null}
+        </p>
+      ) : null}
       {showNudge && phoneNudge ? <PhoneNudge section={phoneNudge} nudgeRef={nudgeRef} onDismiss={() => dismissNudge(phoneNudge)} /> : null}
       {ready && onNext ? (
         <button type="button" className={`gg-btn gg-btn-primary gg-enter min-h-[44px]${showNudge ? ' mt-3' : ''}`}

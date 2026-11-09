@@ -50,6 +50,9 @@
   --color-accent-2-900: #4b1528;
 
   --color-success-700: #2a7048;
+  /* Error text. Contrast (WCAG luminance, computed): 5.85:1 on --color-bg, 5.39:1 on --color-surface,
+     6.54:1 on white, 6.02:1 on --color-accent-100. Clears AA 4.5:1 for 13px semibold. The file has one theme (no dark). */
+  --color-error: #b3261e;
 }
 
 /* Non-colour tokens + aliases for the component layer below. Plain custom
@@ -470,6 +473,10 @@ h1, h2, h3, h4, h5, h6 {
   }
   .gg-chip:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
   .gg-chip:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+  /* A refused toggle (aria-disabled) stays focusable and full strength: no hover or active shading, no opacity drop. */
+  .gg-chip[aria-disabled='true'] { cursor: not-allowed; }
+  .gg-chip[aria-disabled='true']:hover { background: transparent; }
+  .gg-chip[aria-disabled='true']:active { background: transparent; }
   .gg-chip[aria-pressed='true'] {
     background: var(--color-accent-100);
     box-shadow: inset 0 0 0 2px var(--color-accent-700);
