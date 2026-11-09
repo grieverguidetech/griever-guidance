@@ -20,7 +20,64 @@
     "textHint",
     "textBlanks",
     "textHintEdited",
-    "useDetails"
+    "useDetails",
+    "groupNameHeading",
+    "groupLifeHeading",
+    "groupFamilyHeading",
+    "groupServiceHeading",
+    "givenNameLabel",
+    "middleNameLabel",
+    "surnameLabel",
+    "useNameFromPersonLabel",
+    "ageLabel",
+    "ageHint",
+    "stateLabel",
+    "deathPlaceLabel",
+    "funeralHomeLabel",
+    "churchLabel",
+    "cemeteryLabel",
+    "birthPlaceLabel",
+    "motherNameLabel",
+    "fatherNameLabel",
+    "highSchoolLabel",
+    "graduationYearLabel",
+    "degreeLabel",
+    "collegeLabel",
+    "jobTitleLabel",
+    "companyLabel",
+    "yearsLabel",
+    "hobbiesLabel",
+    "awardsLabel",
+    "charitiesLabel",
+    "pronounLabel",
+    "pronounHe",
+    "pronounShe",
+    "pronounThey",
+    "pronounNone",
+    "serviceDetailsHeading",
+    "serviceDetailsHint",
+    "changeOnService",
+    "survivedByHeading",
+    "precededByHeading",
+    "personNameColumn",
+    "personCityColumn",
+    "personRelationColumn",
+    "relationSpouse",
+    "relationChild",
+    "relationGrandchild",
+    "relationGreatGrandchild",
+    "relationSecondGreatGrandchild",
+    "relationSibling",
+    "relationParent",
+    "addPerson",
+    "removePerson",
+    "addMemorial",
+    "memorialLabel",
+    "memorialHint",
+    "readyPlaceholders",
+    "personRowField",
+    "peopleLimit",
+    "removePersonUnnamed"
   ],
   "properties": {
     "intro": {
@@ -72,6 +129,177 @@
       "$ref": "#/$defs/text"
     },
     "useDetails": {
+      "$ref": "#/$defs/text"
+    },
+    "groupNameHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "groupLifeHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "groupFamilyHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "groupServiceHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "givenNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "middleNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "surnameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "useNameFromPersonLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "ageLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "ageHint": {
+      "$ref": "#/$defs/text"
+    },
+    "stateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "deathPlaceLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "funeralHomeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "churchLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "cemeteryLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "birthPlaceLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "motherNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "fatherNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "highSchoolLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "graduationYearLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "degreeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "collegeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "jobTitleLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "companyLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "yearsLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "hobbiesLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "awardsLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "charitiesLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "pronounLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "pronounHe": {
+      "$ref": "#/$defs/text"
+    },
+    "pronounShe": {
+      "$ref": "#/$defs/text"
+    },
+    "pronounThey": {
+      "$ref": "#/$defs/text"
+    },
+    "pronounNone": {
+      "$ref": "#/$defs/text"
+    },
+    "serviceDetailsHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "serviceDetailsHint": {
+      "$ref": "#/$defs/text"
+    },
+    "changeOnService": {
+      "$ref": "#/$defs/text"
+    },
+    "survivedByHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "precededByHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "personNameColumn": {
+      "$ref": "#/$defs/text"
+    },
+    "personCityColumn": {
+      "$ref": "#/$defs/text"
+    },
+    "personRelationColumn": {
+      "$ref": "#/$defs/text"
+    },
+    "relationSpouse": {
+      "$ref": "#/$defs/text"
+    },
+    "relationChild": {
+      "$ref": "#/$defs/text"
+    },
+    "relationGrandchild": {
+      "$ref": "#/$defs/text"
+    },
+    "relationGreatGrandchild": {
+      "$ref": "#/$defs/text"
+    },
+    "relationSecondGreatGrandchild": {
+      "$ref": "#/$defs/text"
+    },
+    "relationSibling": {
+      "$ref": "#/$defs/text"
+    },
+    "relationParent": {
+      "$ref": "#/$defs/text"
+    },
+    "addPerson": {
+      "$ref": "#/$defs/text"
+    },
+    "removePerson": {
+      "$ref": "#/$defs/text"
+    },
+    "addMemorial": {
+      "$ref": "#/$defs/text"
+    },
+    "memorialLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "memorialHint": {
+      "$ref": "#/$defs/text"
+    },
+    "readyPlaceholders": {
+      "$ref": "#/$defs/text"
+    },
+    "personRowField": {
+      "$ref": "#/$defs/text"
+    },
+    "peopleLimit": {
+      "$ref": "#/$defs/text"
+    },
+    "removePersonUnnamed": {
       "$ref": "#/$defs/text"
     }
   },

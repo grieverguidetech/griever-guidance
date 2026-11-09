@@ -74,6 +74,10 @@
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 
+  /* Error text. Contrast (WCAG luminance, computed): 5.85:1 on --color-bg, 5.39:1 on --color-surface,
+     6.54:1 on white, 6.02:1 on --color-accent-100. Clears AA 4.5:1 for 13px semibold. One theme only (no dark). Lives in :root, not @theme, so it stays web-only and apart from @griever/tokens. */
+  --color-error: #b3261e;
+
   /* Every text tone clears WCAG AA 4.5:1 on --color-bg, --color-surface and
      --color-accent-100. Measured: 72% is 5.9:1+, 68% is 5.25:1 on the darkest of them
      (--color-surface). Below ~62% fails. */
@@ -470,6 +474,10 @@ h1, h2, h3, h4, h5, h6 {
   }
   .gg-chip:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
   .gg-chip:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+  /* A refused toggle (aria-disabled) stays focusable and full strength: no hover or active shading, no opacity drop. */
+  .gg-chip[aria-disabled='true'] { cursor: not-allowed; }
+  .gg-chip[aria-disabled='true']:hover { background: transparent; }
+  .gg-chip[aria-disabled='true']:active { background: transparent; }
   .gg-chip[aria-pressed='true'] {
     background: var(--color-accent-100);
     box-shadow: inset 0 0 0 2px var(--color-accent-700);
