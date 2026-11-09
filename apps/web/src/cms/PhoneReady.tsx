@@ -56,7 +56,7 @@ export function PhoneReadyCard({ ready }: Props) {
     return null;
   }
   return (
-    <section className="gg-panel flex flex-col gap-3" aria-labelledby="phone-ready-heading">
+    <section className="flex flex-col gap-3" aria-labelledby="phone-ready-heading">
       <h2 id="phone-ready-heading" className="text-[16px] m-0">
         {shell.phoneReadyHeading}
       </h2>
