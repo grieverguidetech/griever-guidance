@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { ObituarySection, type ObituaryPatch } from './ObituarySection';
+import { resetSessionDismissed } from './PhoneNudge';
 
 type Values = Parameters<typeof ObituarySection>[0]['values'];
 
@@ -93,5 +94,35 @@ describe('ObituarySection', () => {
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'ObituarySection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsObituary')).toEqual([]);
+  });
+});
+
+describe('ObituarySection phone nudge', () => {
+  afterEach(() => {
+    resetSessionDismissed();
+    window.localStorage.clear();
+  });
+
+  function renderReadyToggle() {
+    function Ready() {
+      const [ready, setReady] = useState(false);
+      return (
+        <ObituarySection
+          values={{ sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
+          onChange={() => undefined}
+          onReadyChange={setReady}
+        />
+      );
+    }
+    render(<Ready />);
+  }
+
+  it('shows its own line once marked ready and hides it when un-marked', async () => {
+    renderReadyToggle();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toHaveTextContent('You will share the obituary from the Grievers Guidance phone app, signed in to this account.');
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 });

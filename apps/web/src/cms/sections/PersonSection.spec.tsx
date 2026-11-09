@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
@@ -124,6 +125,24 @@ describe('PersonSection', () => {
     expect(button).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(button);
     expect(onReadyChange).toHaveBeenCalledWith(false);
+  });
+
+  it('shows no phone nudge after Mark as ready', async () => {
+    function Harness() {
+      const [ready, setReady] = useState(false);
+      return (
+        <PersonSection
+          values={{ sectionStatus: { person: ready ? 'ready' : 'in_progress' } }}
+          onChange={vi.fn()}
+          onReadyChange={setReady}
+        />
+      );
+    }
+    render(<Harness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
   });
 
   it('is not ready when the section is in progress or missing', () => {

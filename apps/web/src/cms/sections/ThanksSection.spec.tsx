@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { ThanksSection, type ThanksPatch } from './ThanksSection';
+import { resetSessionDismissed } from './PhoneNudge';
 
 type Values = Parameters<typeof ThanksSection>[0]['values'];
 
@@ -89,5 +90,35 @@ describe('ThanksSection', () => {
   it('has no hard-coded copy in the source', () => {
     const source = readFileSync(join(__dirname, 'ThanksSection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsThanks')).toEqual([]);
+  });
+});
+
+describe('ThanksSection phone nudge', () => {
+  afterEach(() => {
+    resetSessionDismissed();
+    window.localStorage.clear();
+  });
+
+  function renderReadyToggle() {
+    function Ready() {
+      const [ready, setReady] = useState(false);
+      return (
+        <ThanksSection
+          values={{ sectionStatus: { thanks: ready ? 'ready' : 'in_progress' } }}
+          onChange={() => undefined}
+          onReadyChange={setReady}
+        />
+      );
+    }
+    render(<Ready />);
+  }
+
+  it('shows its own line once marked ready and hides it when un-marked', async () => {
+    renderReadyToggle();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toHaveTextContent('You will send the thank-yous from the Grievers Guidance phone app, signed in to this account.');
+    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 });

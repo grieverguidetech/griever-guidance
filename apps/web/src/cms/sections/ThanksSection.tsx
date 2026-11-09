@@ -66,6 +66,7 @@ export function ThanksSection({ values, onChange, onReadyChange, nextSection, on
         onChange={onReadyChange}
         nextSection={nextSection}
         onNext={onNext}
+        phoneNudge="thanks"
       />
     </div>
   );
