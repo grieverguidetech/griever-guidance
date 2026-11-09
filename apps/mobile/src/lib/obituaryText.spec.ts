@@ -18,12 +18,20 @@ describe('obituaryTextFor', () => {
 
   it('builds the same draft as web from fields only', () => {
     const person = { ...empty, personName: 'Anna Lee', dateOfPassing: 'May 1, 2026', birthDate: 'June 2, 1950', obituaryCity: 'Tulsa', obituaryCareer: 'a nurse', obituarySurvivors: 'her sons', obituaryNote: 'She sang.' };
-    const web = buildObituaryDraft(
-      { fullName: 'Anna Lee', dateOfBirth: 'June 2, 1950', dateOfPassing: 'May 1, 2026', cityOfResidence: 'Tulsa', career: 'a nurse', survivors: 'her sons', personalNote: 'She sang.' },
-      screenCopy('obituaryDraft'),
-    );
+    const web = buildObituaryDraft(person, screenCopy('obituaryDraft'));
     expect(obituaryTextFor(person)).toBe(web.trim());
-    expect(web).toContain('Anna Lee');
+    expect(web).toContain('Anna Lee, [AGE], of Tulsa, [STATE], passed away on May 1, 2026');
+    expect(web).toContain('[He/She] worked as a nurse.');
+  });
+
+  it('builds a draft from the Service fields alone', () => {
+    const text = obituaryTextFor({ ...empty, personName: 'Anna', servicePlace: 'Oak Chapel', serviceDate: 'May 5, 2026', serviceTime: '2:00 PM' });
+    expect(text).toContain('Funeral service will be held at Oak Chapel on May 5, 2026 at 2:00 PM with [OFFICIANT]');
+  });
+
+  it('writes a private burial', () => {
+    const text = obituaryTextFor({ ...empty, personName: 'Anna', servicePlace: 'Oak Chapel', burialPrivate: true });
+    expect(text).toContain('Burial will be private.');
   });
 
   it('returns empty when the person has no text and no fields', () => {

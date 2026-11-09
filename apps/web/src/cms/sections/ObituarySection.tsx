@@ -1,15 +1,25 @@
 import { useId, useRef } from 'react';
 import { buildObituaryDraft, screenCopy } from '@griever/copy';
-import type { SectionFields, SectionKey, SessionDetails } from '@griever/shared';
+import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { MarkReady } from './MarkReady';
 
 const copy = screenCopy('cmsObituary');
 const draftCopy = screenCopy('obituaryDraft');
 
-type ObituaryValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
+/** The Service fields are only read, to fill the template. They are edited in the Service section. */
+type ObituaryValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing' | 'serviceDate'>> &
+  Partial<ServiceEventFields> &
   Pick<
     SectionFields,
-    'birthDate' | 'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote' | 'sectionStatus'
+    | 'birthDate'
+    | 'obituaryText'
+    | 'obituaryCity'
+    | 'obituaryCareer'
+    | 'obituarySurvivors'
+    | 'obituaryNote'
+    | 'sectionStatus'
+    | 'servicePlace'
+    | 'serviceTime'
   >;
 
 /** The name and dates are edited in The person, so they are not in the patch. */
@@ -37,15 +47,7 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const prefill = buildObituaryDraft(
-    {
-      fullName: values.personName ?? '',
-      dateOfBirth: values.birthDate,
-      dateOfPassing: values.dateOfPassing ?? undefined,
-      cityOfResidence: values.obituaryCity,
-      career: values.obituaryCareer,
-      survivors: values.obituarySurvivors,
-      personalNote: values.obituaryNote,
-    },
+    { ...values, dateOfPassing: values.dateOfPassing ?? undefined },
     draftCopy,
   );
   const edited = values.obituaryText !== undefined;

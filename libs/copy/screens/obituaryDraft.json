@@ -1,11 +1,27 @@
 {
-  "nameFallback": "our loved one",
-  "opening": "{fullName} has died.",
-  "openingWithDate": "{fullName} died on {dateOfPassing}.",
-  "born": "They were born on {dateOfBirth}.",
-  "city": "{fullName} lived in {cityOfResidence}.",
-  "career": "Their work: {career}.",
-  "memory": "{personalNote}",
-  "survivors": "Survived by {survivors}.",
-  "closing": "{fullName} will be remembered with love."
+  "paragraph1": "{fullName}, [AGE], of {city}, [STATE], passed away on {dateOfPassing} in [LOCATION OF DEATH].",
+  "paragraph2": "Funeral service will be held at {servicePlace} on {serviceDate} at {serviceTime} with {officiant} of [PLACE OF WORSHIP] officiating. {burial} Visitation will be held at {visitationPlace} on {visitationDate} at {visitationTime}. [NAME OF FUNERAL HOME] will be handling the funeral arrangements.",
+  "paragraph3": "{name} was born in [LOCATION OF BIRTH] to [PARENTS' NAMES] on {birthDate}. [He/She] went to high school at [SCHOOL NAME] and graduated in [YEAR]. [He/She] went on to earn a degree or certificate in [DEGREE TYPE] from [SCHOOL NAME]. [He/She] worked as {career}. [He/She] enjoyed [ACTIVITIES/HOBBIES]. [He/She] received [AWARDS/HONORS] and was involved in [CHARITIES/ORGANIZATIONS].",
+  "paragraph4": "{name} is survived by {survivors}. [He/She] is preceded in death by [his/her] [RELATION], [NAME].",
+  "paragraph5": "Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME]. {note}",
+  "burialSentence": "Burial will follow at {burialPlace}, [CEMETERY LOCATION].",
+  "burialPrivate": "Burial will be private.",
+  "blanks": {
+    "fullName": "[GIVEN NAME] [MIDDLE NAME (AND NICKNAME)] [SURNAME]",
+    "name": "[NAME]",
+    "city": "[CITY]",
+    "dateOfPassing": "[DATE OF DEATH]",
+    "servicePlace": "[LOCATION]",
+    "serviceDate": "[DATE]",
+    "serviceTime": "[TIME]",
+    "officiant": "[OFFICIANT]",
+    "burialPlace": "[CEMETERY NAME]",
+    "visitationPlace": "[LOCATION]",
+    "visitationDate": "[DATE]",
+    "visitationTime": "[TIME]",
+    "birthDate": "[DATE OF BIRTH]",
+    "career": "a [JOB TYPE] for [COMPANY] for [NUMBER OF YEARS]",
+    "survivors": "[his/her] [RELATION], [NAME] of [CITY]",
+    "note": "[FINAL WORDS]"
+  }
 }

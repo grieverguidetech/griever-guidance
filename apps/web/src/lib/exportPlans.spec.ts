@@ -72,8 +72,8 @@ describe('buildPlansText', () => {
     );
     expect(text).toContain('Obituary\n--------\n');
     expect(text.split('Obituary\n--------\n')[1]).toContain('Sam Reed');
-    expect(text).toContain('Reno');
-    expect(text).toContain('teacher');
+    expect(text).toContain('Sam Reed, [AGE], of Reno, [STATE], passed away on 2026-05-29');
+    expect(text).toContain('worked as a teacher.');
     expect(text).not.toContain('undefined');
   });
 

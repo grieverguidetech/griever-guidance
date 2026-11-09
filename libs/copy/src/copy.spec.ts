@@ -49,7 +49,9 @@ describe('screen copy is calm (C7)', () => {
   it.each(screenFiles)('%s has no exclamation points and no all-caps shouting', (file) => {
     for (const text of allStrings(readJson(join(SCREENS_DIR, file)))) {
       expect(text, text).not.toContain('!');
-      expect(text, text).not.toMatch(/\b[A-Z]{4,}\b/);
+      // Obituary template brackets such as [DATE OF DEATH] are capitals on purpose.
+      const shown = file === 'obituaryDraft.json' ? text.replace(/\[[^\]]*\]/g, '') : text;
+      expect(shown, text).not.toMatch(/\b[A-Z]{4,}\b/);
     }
   });
 });
@@ -202,110 +204,81 @@ describe('sendLabel', () => {
 describe('buildObituaryDraft', () => {
   const copy = screenCopy('obituaryDraft');
 
-  it('writes every sentence when every field is filled', () => {
-    const draft = buildObituaryDraft(
-      {
-        fullName: 'Margaret Ellen Hayes',
-        dateOfBirth: 'March 2, 1941',
-        dateOfPassing: 'June 7, 2025',
-        cityOfResidence: 'Boston, MA',
-        career: 'retired schoolteacher',
-        survivors: 'husband John, two daughters',
-        personalNote: 'She made everyone feel at home.',
-      },
-      copy,
-    );
-    expect(draft).toBe(
+  it('keeps every bracket when all fields are empty', () => {
+    expect(buildObituaryDraft({}, copy)).toBe(
       [
-        'Margaret Ellen Hayes died on June 7, 2025. They were born on March 2, 1941.',
-        'Margaret Ellen Hayes lived in Boston, MA. Their work: retired schoolteacher. She made everyone feel at home.',
-        'Survived by husband John, two daughters. Margaret Ellen Hayes will be remembered with love.',
+        '[GIVEN NAME] [MIDDLE NAME (AND NICKNAME)] [SURNAME], [AGE], of [CITY], [STATE], passed away on [DATE OF DEATH] in [LOCATION OF DEATH].',
+        "Funeral service will be held at [LOCATION] on [DATE] at [TIME] with [OFFICIANT] of [PLACE OF WORSHIP] officiating. Burial will follow at [CEMETERY NAME], [CEMETERY LOCATION]. Visitation will be held at [LOCATION] on [DATE] at [TIME]. [NAME OF FUNERAL HOME] will be handling the funeral arrangements.",
+        "[NAME] was born in [LOCATION OF BIRTH] to [PARENTS' NAMES] on [DATE OF BIRTH]. [He/She] went to high school at [SCHOOL NAME] and graduated in [YEAR]. [He/She] went on to earn a degree or certificate in [DEGREE TYPE] from [SCHOOL NAME]. [He/She] worked as a [JOB TYPE] for [COMPANY] for [NUMBER OF YEARS]. [He/She] enjoyed [ACTIVITIES/HOBBIES]. [He/She] received [AWARDS/HONORS] and was involved in [CHARITIES/ORGANIZATIONS].",
+        '[NAME] is survived by [his/her] [RELATION], [NAME] of [CITY]. [He/She] is preceded in death by [his/her] [RELATION], [NAME].',
+        'Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME]. [FINAL WORDS]',
       ].join('\n\n'),
     );
   });
 
-  it('writes only the name, the opening and the closing line', () => {
-    expect(buildObituaryDraft({ fullName: 'Margaret Ellen Hayes' }, copy)).toBe(
-      'Margaret Ellen Hayes has died.\n\nMargaret Ellen Hayes will be remembered with love.',
+  const filled = {
+    personName: 'Margaret Ellen Hayes',
+    obituaryCity: 'Boston',
+    dateOfPassing: 'June 7, 2025',
+    servicePlace: 'St. Mark Church',
+    serviceDate: 'June 10, 2025',
+    serviceTime: '2:00 PM',
+    serviceOfficiant: 'Reverend John Cole',
+    burialPlace: 'Oak Hill Cemetery',
+    visitationPlace: 'Hayes Home',
+    visitationDate: 'June 9, 2025',
+    visitationTime: '6:00 PM',
+    birthDate: 'March 2, 1941',
+    obituaryCareer: 'a teacher for Boston Schools for 30 years',
+    obituarySurvivors: 'her husband, John of Boston',
+    obituaryNote: 'She will be missed.',
+  };
+
+  it('leaves only the brackets that have no source field when every field is filled', () => {
+    const draft = buildObituaryDraft(filled, copy);
+    expect(draft).toContain('Margaret Ellen Hayes, [AGE], of Boston, [STATE], passed away on June 7, 2025 in [LOCATION OF DEATH].');
+    expect(draft).toContain(
+      'Funeral service will be held at St. Mark Church on June 10, 2025 at 2:00 PM with Reverend John Cole of [PLACE OF WORSHIP] officiating. Burial will follow at Oak Hill Cemetery, [CEMETERY LOCATION]. Visitation will be held at Hayes Home on June 9, 2025 at 6:00 PM.',
     );
+    expect(draft).toContain('Margaret Ellen Hayes was born in [LOCATION OF BIRTH] to [PARENTS\' NAMES] on March 2, 1941.');
+    expect(draft).toContain('[He/She] worked as a teacher for Boston Schools for 30 years.');
+    expect(draft).toContain('Margaret Ellen Hayes is survived by her husband, John of Boston.');
+    expect(draft.endsWith('[ORGANIZATION/NAME]. She will be missed.')).toBe(true);
+    for (const blank of ['[GIVEN NAME]', '[CITY]', '[DATE OF DEATH]', '[LOCATION]', '[DATE]', '[TIME]', '[OFFICIANT]', '[CEMETERY NAME]', '[DATE OF BIRTH]', '[JOB TYPE]', '[FINAL WORDS]']) {
+      expect(draft).not.toContain(blank);
+    }
   });
 
-  it('falls back to "Our loved one" when there is no name', () => {
-    expect(buildObituaryDraft({ fullName: '  ' }, copy)).toBe(
-      'Our loved one has died.\n\nOur loved one will be remembered with love.',
-    );
+  it('writes "Burial will be private." when the burial is private', () => {
+    const draft = buildObituaryDraft({ ...filled, burialPrivate: true }, copy);
+    expect(draft).toContain('officiating. Burial will be private. Visitation');
+    expect(draft).not.toContain('Oak Hill Cemetery');
+    expect(draft).not.toContain('[CEMETERY');
   });
 
-  it('adds both dates when the name and both dates are given', () => {
-    expect(
-      buildObituaryDraft(
-        { fullName: 'Margaret Ellen Hayes', dateOfBirth: 'March 2, 1941', dateOfPassing: 'June 7, 2025' },
-        copy,
-      ),
-    ).toBe(
-      'Margaret Ellen Hayes died on June 7, 2025. They were born on March 2, 1941.\n\nMargaret Ellen Hayes will be remembered with love.',
-    );
+  it('does not double a full stop typed at the end of a field', () => {
+    const draft = buildObituaryDraft({ ...filled, obituaryCity: 'Boston.', obituarySurvivors: 'her husband.', obituaryCareer: 'a nurse.' }, copy);
+    expect(draft).not.toContain('..');
+    expect(draft).toContain('is survived by her husband.');
   });
 
-  it('keeps the birth date when the date of passing is missing', () => {
-    expect(buildObituaryDraft({ fullName: 'Margaret Ellen Hayes', dateOfBirth: 'March 2, 1941' }, copy)).toBe(
-      'Margaret Ellen Hayes has died. They were born on March 2, 1941.\n\nMargaret Ellen Hayes will be remembered with love.',
+  it('keeps a full stop typed inside a sentence and does not double one before the template full stop', () => {
+    const draft = buildObituaryDraft(
+      { ...filled, serviceTime: '2:00 p.m.', serviceOfficiant: 'Reverend John Cole Sr.', visitationTime: '6 p.m.' },
+      copy,
     );
-  });
-
-  it('writes survivors when there is no career', () => {
-    expect(
-      buildObituaryDraft(
-        { fullName: 'Margaret Ellen Hayes', cityOfResidence: 'Boston, MA', survivors: 'husband John, two daughters' },
-        copy,
-      ),
-    ).toBe(
-      'Margaret Ellen Hayes has died.\n\nMargaret Ellen Hayes lived in Boston, MA.\n\nSurvived by husband John, two daughters. Margaret Ellen Hayes will be remembered with love.',
-    );
+    expect(draft).toContain('at 2:00 p.m. with Reverend John Cole Sr. of [PLACE OF WORSHIP]');
+    expect(draft).toContain('at 6 p.m. [NAME OF FUNERAL HOME]');
+    expect(draft).not.toContain('..');
   });
 
   it('treats fields with only spaces as empty', () => {
-    expect(
-      buildObituaryDraft(
-        {
-          fullName: 'Margaret Ellen Hayes',
-          dateOfBirth: '  ',
-          dateOfPassing: '\t',
-          cityOfResidence: ' ',
-          career: '\n',
-          survivors: '   ',
-          personalNote: ' ',
-        },
-        copy,
-      ),
-    ).toBe('Margaret Ellen Hayes has died.\n\nMargaret Ellen Hayes will be remembered with love.');
+    const spaces = Object.fromEntries(Object.keys(filled).map((key) => [key, ' \t\n ']));
+    expect(buildObituaryDraft(spaces, copy)).toBe(buildObituaryDraft({}, copy));
   });
 
-  it('adds a full stop to a memory the person did not end', () => {
-    expect(buildObituaryDraft({ fullName: 'Margaret Ellen Hayes', personalNote: 'She loved to garden' }, copy)).toContain(
-      'She loved to garden.',
-    );
-  });
-
-  it('does not double a full stop the person typed at the end of a field', () => {
-    expect(
-      buildObituaryDraft(
-        {
-          fullName: 'Margaret Ellen Hayes',
-          dateOfBirth: 'March 2, 1941.',
-          dateOfPassing: 'June 7, 2025.',
-          cityOfResidence: 'Boston, MA.',
-          career: 'retired schoolteacher.',
-          survivors: 'husband John.',
-        },
-        copy,
-      ),
-    ).toBe(
-      [
-        'Margaret Ellen Hayes died on June 7, 2025. They were born on March 2, 1941.',
-        'Margaret Ellen Hayes lived in Boston, MA. Their work: retired schoolteacher.',
-        'Survived by husband John. Margaret Ellen Hayes will be remembered with love.',
-      ].join('\n\n'),
-    );
+  it('never writes the template instruction notes into the text', () => {
+    const draft = buildObituaryDraft(filled, copy);
+    expect(draft).not.toMatch(/list all|list predeceased/i);
   });
 });

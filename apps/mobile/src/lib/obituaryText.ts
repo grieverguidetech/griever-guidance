@@ -6,13 +6,21 @@ const draftCopy = screenCopy('obituaryDraft');
 export type ObituaryTextSource = Pick<
   Session,
   'personName' | 'dateOfPassing' | 'birthDate' | 'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote'
->;
+> &
+  Partial<
+    Pick<
+      Session,
+      'servicePlace' | 'serviceDate' | 'serviceTime' | 'serviceOfficiant' | 'burialPlace' | 'burialPrivate' | 'visitationPlace' | 'visitationDate' | 'visitationTime'
+    >
+  >;
 
-/** True when any detail beyond the name is filled in, so a draft says more than the name alone. */
+/** True when any detail the template reads, beyond the name, is filled in. Otherwise a draft is only brackets. */
 function hasFields(s: ObituaryTextSource): boolean {
-  return [s.dateOfPassing, s.birthDate, s.obituaryCity, s.obituaryCareer, s.obituarySurvivors, s.obituaryNote].some(
-    (v) => (v ?? '').trim() !== '',
-  );
+  return [
+    s.dateOfPassing, s.birthDate, s.obituaryCity, s.obituaryCareer, s.obituarySurvivors, s.obituaryNote,
+    s.servicePlace, s.serviceDate, s.serviceTime, s.serviceOfficiant, s.burialPlace,
+    s.visitationPlace, s.visitationDate, s.visitationTime,
+  ].some((v) => (v ?? '').trim() !== '');
 }
 
 /**
@@ -27,16 +35,5 @@ export function obituaryTextFor(s: ObituaryTextSource): string {
   if (s.obituaryText !== undefined || !hasFields(s)) {
     return '';
   }
-  return buildObituaryDraft(
-    {
-      fullName: s.personName ?? '',
-      dateOfBirth: s.birthDate,
-      dateOfPassing: s.dateOfPassing ?? undefined,
-      cityOfResidence: s.obituaryCity,
-      career: s.obituaryCareer,
-      survivors: s.obituarySurvivors,
-      personalNote: s.obituaryNote,
-    },
-    draftCopy,
-  ).trim();
+  return buildObituaryDraft({ ...s, dateOfPassing: s.dateOfPassing ?? undefined }, draftCopy).trim();
 }

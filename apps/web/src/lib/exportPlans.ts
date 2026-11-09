@@ -139,18 +139,7 @@ function messages(person: PlanPerson) {
       }),
     obituary:
       person.obituaryText ??
-      buildObituaryDraft(
-        {
-          fullName: name,
-          dateOfBirth: person.birthDate,
-          dateOfPassing: person.dateOfPassing ?? undefined,
-          cityOfResidence: person.obituaryCity,
-          career: person.obituaryCareer,
-          survivors: person.obituarySurvivors,
-          personalNote: person.obituaryNote,
-        },
-        obituaryDraftCopy,
-      ),
+      buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy),
     thanks: person.thanksMessage ?? fill(thanksCopy.template, { deceasedName: name.trim() || thanksCopy.nameFallback }),
   };
 }
