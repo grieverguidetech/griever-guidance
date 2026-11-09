@@ -230,10 +230,42 @@ const isMessageKey = (key: FlowDetailTextKey): key is FlowMessageKey =>
 
 const PRONOUNS: readonly string[] = ['he', 'she', 'they'];
 
-/** A high surrogate with no low one after it, or a low one with no high one before it. */
-const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
-const stripLoneSurrogates = (value: string): string =>
-  value.replace(new RegExp(LONE_SURROGATE.source, 'g'), '');
+/** Index of the first lone surrogate (a high one with no low one after it, or a low one alone), or -1. */
+function loneSurrogateAt(value: string): number {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        i++;
+      } else {
+        return i;
+      }
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+const hasLoneSurrogate = (value: string): boolean => loneSurrogateAt(value) !== -1;
+
+// No regex lookbehind: Hermes (mobile) may not support it.
+function stripLoneSurrogates(value: string): string {
+  let out = value;
+  let at = loneSurrogateAt(out);
+  while (at !== -1) {
+    out = out.slice(0, at) + out.slice(at + 1);
+    at = loneSurrogateAt(out);
+  }
+  return out;
+}
+
+/**
+ * The 26 keys added in #772 refuse a lone surrogate. The first 24 do not: an old stored value
+ * could hold one, and refusing it would make the data function throw when it lists flows.
+ */
+const STRICT_SURROGATE_KEYS: ReadonlySet<string> = new Set(FLOW_DETAIL_TEXT_KEYS.slice(24));
 
 /** The two list keys hold JSON, so they are never cut: they are kept whole or not at all. */
 const LIST_RELATIONS = {
@@ -365,7 +397,7 @@ function validDetail(key: FlowDetailKey, value: unknown): boolean {
     typeof value !== 'string' ||
     value.length > max ||
     CONTROL_CHARS.test(value) ||
-    LONE_SURROGATE.test(value)
+    (STRICT_SURROGATE_KEYS.has(textKey) && hasLoneSurrogate(value))
   ) {
     return false;
   }

@@ -63,16 +63,16 @@ That makes 50 text keys and 56 detail keys. No existing key is removed or rename
 
 **Rules.** `obituaryPronoun` is `he`, `she`, `they` or null. The two list keys hold JSON rows of
 `{ name, city, relation }` (at most 40 rows) and are checked with `parsePeople`; a list that is too
-long or does not parse is sent as null, never cut mid-JSON. Every text value with a lone surrogate
-is refused (and stripped on save).
+long or does not parse is sent as null, never cut mid-JSON. The 26 new keys refuse a lone surrogate; the 24 old keys do not, because one old stored value
+would make the data function throw when it lists flows. Every key strips lone surrogates on save.
 
 **Third-party names reach the server.** Parents' names, survivors with their cities, and people who
 died before now reach the data function, as `obituarySurvivors` already did. The reason is the
 same: the family must not retype them on the phone. They are not contact data (no numbers, no ids),
 and they are shared only with the owner's members. The product owner accepted this.
 
-**Payload.** The worst case with every new key at its cap, plus full lists, in 3-byte characters, is
-112,990 bytes (it was 83,492), under the 128 KB limit. The payload test in
+**Payload.** The worst case with every new key at its cap, plus the largest valid lists, in 3-byte characters, is
+118,388 bytes (it was 83,492), under the 131,072-byte (128 KB) limit. Each list is one row whose name fills its cap in 3-byte characters. The payload test in
 `libs/shared/src/flowDetails.spec.ts` computes it.
 
 **Deploy order.** The data function refuses unknown keys, and it is deployed by hand

@@ -200,8 +200,8 @@ hold one list as JSON text: an array of at most 40 rows, each exactly
 `{"name": string, "city": string, "relation": string}`, or `''` for no rows. Survivor relations:
 spouse, child, grandchild, great-grandchild, 2nd great-grandchild, sibling, parent. Preceded
 relations: spouse, child, sibling, parent. They are never cut on save: a list over its cap, or one
-that does not parse, is sent as null. `obituaryPronoun` is `he`, `she`, `they` or null. Any text
-with a lone surrogate is refused.
+that does not parse, is sent as null. `obituaryPronoun` is `he`, `she`, `they` or null. The 26 new keys refuse text with a lone
+surrogate (the old keys do not); every key strips them on save.
 
 The editor saves to the same list (`gg.sessions.v1`). The fields are additive and optional: an
 older list loads with its values unchanged.

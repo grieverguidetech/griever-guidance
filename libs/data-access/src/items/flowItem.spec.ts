@@ -221,6 +221,12 @@ describe('flow codec', () => {
     expect(decoded.details.obituaryPronoun).toBeNull();
   });
 
+  it('still decodes an old item whose old key holds a lone surrogate', () => {
+    const stored = encodeFlow(flow);
+    stored['serviceNotes'] = 'a\ud83db';
+    expect(decodeFlow(stored).details.serviceNotes).toBe('a\ud83db');
+  });
+
   it('round-trips a new obituary item, and refuses a bad pronoun or list', () => {
     const item = {
       ...flow,

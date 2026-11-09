@@ -81,8 +81,13 @@ describe('parseFlowDetails', () => {
         [key]: 'a'.repeat(max),
       });
       expect(parseFlowDetails({ [key]: 'a'.repeat(max + 1) })).toBeNull();
-      expect(parseFlowDetails({ [key]: `a${'\ud83d'}b` })).toBeNull();
-      expect(parseFlowDetails({ [key]: `a${'\ude00'}b` })).toBeNull();
+      if (FLOW_DETAIL_TEXT_KEYS.indexOf(key) >= 24) {
+        expect(parseFlowDetails({ [key]: `a${'\ud83d'}b` })).toBeNull();
+        expect(parseFlowDetails({ [key]: `a${'\ude00'}b` })).toBeNull();
+      } else {
+        // Old keys keep accepting it, so an old stored value never breaks a read.
+        expect(parseFlowDetails({ [key]: `a${'\ud83d'}b` })).not.toBeNull();
+      }
       expect(parseFlowDetails({ [key]: 'a😀b' })).not.toBeNull();
       expect(parseFlowDetails({ [key]: null })).toEqual({ [key]: null });
       expect(parseFlowDetails({ [key]: 'a\u0000b' })).toBeNull();
@@ -372,22 +377,16 @@ describe('payload size', () => {
     for (const key of FLOW_DETAIL_TEXT_KEYS) {
       full[key] = '一'.repeat(FLOW_DETAIL_MAX_LENGTH[key]);
     }
-    // The pronoun and the two lists must be valid values; use the longest that fit their caps.
+    // The pronoun and the two lists must be valid values. Each list is one row whose name fills
+    // the cap in 3-byte characters (city empty): the largest list that still parses.
     full.obituaryPronoun = 'they';
-    const fullList = (relation: string, cap: number) => {
-      const rows: unknown[] = [];
-      // 3-byte characters in name and city; add rows while the JSON still fits the cap.
-      while (rows.length < 40) {
-        const next = [...rows, { name: '一'.repeat(20), city: '一'.repeat(10), relation }];
-        if (JSON.stringify(next).length > cap) {
-          break;
-        }
-        rows.push(next[next.length - 1]);
-      }
-      return JSON.stringify(rows);
+    const oneRowList = (relation: string, cap: number) => {
+      const overhead = JSON.stringify([{ name: '', city: '', relation }]).length;
+      return JSON.stringify([{ name: '一'.repeat(cap - overhead), city: '', relation }]);
     };
-    full.obituarySurvivorList = fullList('great-grandchild', FLOW_DETAIL_MAX_LENGTH.obituarySurvivorList);
-    full.obituaryPrecededList = fullList('spouse', FLOW_DETAIL_MAX_LENGTH.obituaryPrecededList);
+    full.obituarySurvivorList = oneRowList('great-grandchild', FLOW_DETAIL_MAX_LENGTH.obituarySurvivorList);
+    full.obituaryPrecededList = oneRowList('spouse', FLOW_DETAIL_MAX_LENGTH.obituaryPrecededList);
+    expect((full.obituarySurvivorList as string).length).toBe(FLOW_DETAIL_MAX_LENGTH.obituarySurvivorList);
     for (const key of FLOW_STATUS_KEYS) {
       full[key] = 'in_progress';
     }
@@ -396,7 +395,7 @@ describe('payload size', () => {
     expect(parseFlowDetails(split?.details)).not.toBeNull();
     const bytes = new TextEncoder().encode(JSON.stringify(full)).length;
     expect(bytes).toBeLessThan(128 * 1024);
-    // 3 bytes per CJK character: the true worst case, with the JSON overhead (112,990 bytes now; it was 83,492 before the 26 obituary keys).
+    // 3 bytes per CJK character: the true worst case, with the JSON overhead (118,388 bytes now; it was 83,492 before the 26 obituary keys).
     expect(bytes).toBeGreaterThan(100 * 1024);
   });
 });
