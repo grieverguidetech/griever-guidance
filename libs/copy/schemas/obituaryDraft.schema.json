@@ -6,6 +6,7 @@
   "required": [
     "paragraph1",
     "deathClause",
+    "churchClause",
     "paragraph2",
     "funeralHomeSentence",
     "paragraph3",
@@ -30,6 +31,10 @@
       "pattern": "^(?=.*\\{fullName\\})(?=.*\\{city\\})(?=.*\\{dateOfPassing\\})"
     },
     "deathClause": {
+      "type": "string",
+      "minLength": 1
+    },
+    "churchClause": {
       "type": "string",
       "minLength": 1
     },
@@ -228,7 +233,6 @@
         "serviceDate",
         "serviceTime",
         "officiant",
-        "church",
         "burialPlace",
         "cemeteryLocation",
         "visitationPlace",
@@ -290,10 +294,6 @@
           "minLength": 1
         },
         "officiant": {
-          "type": "string",
-          "minLength": 1
-        },
-        "church": {
           "type": "string",
           "minLength": 1
         },

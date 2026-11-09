@@ -64,11 +64,40 @@ function cleanEnd(value: string | undefined): string {
   return (value ?? '').trim().replace(/\.$/, '').trim();
 }
 
-function article(word: string): string {
-  return /^[aeiou]/i.test(word) ? 'an' : 'a';
+/** Sounds that start with a vowel letter but read "a" ("a university"), and with a silent h but read "an". */
+const VOWEL_LETTER_SAYS_A = /^(uni|use|usu|eu|one)/i;
+const SILENT_H_SAYS_AN = /^(hour|honest|honou?r|heir)/i;
+
+/**
+ * The value with "a" or "an" in front, for a typed job title or degree. Nothing is added when the
+ * family already typed an article ("a nurse", "the dean"), or when the first word is in capitals
+ * ("MBA"), because we cannot tell how a set of letters is said.
+ */
+function withArticle(value: string): string {
+  if (/^(a|an|the)\s/i.test(value)) {
+    return value;
+  }
+  const firstWord = value.split(/\s+/)[0];
+  if (firstWord.length > 1 && firstWord === firstWord.toUpperCase() && /[A-Z]/.test(firstWord)) {
+    return value;
+  }
+  const an = SILENT_H_SAYS_AN.test(value) || (/^[aeiou]/i.test(value) && !VOWEL_LETTER_SAYS_A.test(value));
+  return `${an ? 'an' : 'a'} ${value}`;
 }
 
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+
+/** Month number (0 to 11) of a typed name: the full name, its exact 3-letter form, or "sept". Else -1. */
+function monthIndex(name: string): number {
+  const lower = name.toLowerCase();
+  if (lower === 'sept') {
+    return 8;
+  }
+  return MONTHS.findIndex((month) => month === lower || (lower.length === 3 && month.startsWith(lower)));
+}
 
 /** Year, month (0 to 11) and day of a complete typed date: 2026-05-29, 5/29/2026 or May 29, 2026. Else null. */
 function completeDate(text: string): { y: number; m: number; d: number } | null {
@@ -82,7 +111,7 @@ function completeDate(text: string): { y: number; m: number; d: number } | null 
   } else if ((match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value))) {
     [m, d, y] = [Number(match[1]) - 1, Number(match[2]), Number(match[3])];
   } else if ((match = /^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(value))) {
-    [m, d, y] = [MONTHS.indexOf(match[1].slice(0, 3).toLowerCase()), Number(match[2]), Number(match[3])];
+    [m, d, y] = [monthIndex(match[1]), Number(match[2]), Number(match[3])];
   } else {
     return null;
   }
@@ -93,7 +122,8 @@ function completeDate(text: string): { y: number; m: number; d: number } | null 
 
 /**
  * Whole years between two typed dates, as text. '' when either is unreadable or death comes first.
- * Kept in step with `ageFrom` in libs/shared (this lib cannot import shared: shared depends on it).
+ * Reads dates the way `parseCompleteDate` and `ageFrom` in libs/shared do (years 1800 to 2100). This lib
+ * cannot import shared, because shared depends on it; libs/shared/src/obituaryAgeParity.spec.ts keeps the two equal.
  */
 function ageBetween(birthText: string | undefined, deathText: string | undefined): string {
   const birth = completeDate(birthText ?? '');
@@ -110,7 +140,7 @@ function pronounOf(value: string | undefined): ObituaryPronoun | 'unset' {
   return value === 'he' || value === 'she' || value === 'they' ? value : 'unset';
 }
 
-/** "30" reads "30 years" ("1" reads "1 year"); anything else is kept as typed. */
+/** "30" reads "30 years" ("1" reads "1 year"). Text that has no "year" word gets " years"; "thirty years" is kept. */
 function yearsPhrase(value: string, blank: string): string {
   if (value === '') {
     return blank;
@@ -118,7 +148,7 @@ function yearsPhrase(value: string, blank: string): string {
   if (/^\d+$/.test(value)) {
     return `${value} ${Number(value) === 1 ? 'year' : 'years'}`;
   }
-  return value;
+  return /\byears?\b/i.test(value) ? value : `${value} years`;
 }
 
 /**
@@ -146,6 +176,7 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
       : [given || blanks.givenName, middle, surname || blanks.surname].filter(Boolean).join(' ');
   const name = given || personName || blanks.name;
 
+  const church = cleanEnd(fields.obituaryChurch);
   const deathPlace = cleanEnd(fields.obituaryDeathPlace);
   const funeralHome = cleanEnd(fields.obituaryFuneralHome);
   const burial = fields.burialPrivate
@@ -157,7 +188,7 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
 
   const degree = cleanEnd(fields.obituaryDegree);
   const college = cleanEnd(fields.obituaryCollege);
-  const degreePhrase = degree === '' ? `a ${blanks.degree}` : `${article(degree)} ${degree}`;
+  const degreePhrase = degree === '' ? `a ${blanks.degree}` : withArticle(degree);
   const collegeSentence =
     degree === '' && college === ''
       ? ''
@@ -173,7 +204,7 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
   } else {
     jobSentence = fillSlots(copy.jobSentence, {
       ...pronoun,
-      jobTitle: jobTitle === '' ? `a ${blanks.jobTitle}` : `${article(jobTitle)} ${jobTitle}`,
+      jobTitle: jobTitle === '' ? `a ${blanks.jobTitle}` : withArticle(jobTitle),
       company: company || blanks.company,
       jobYears: yearsPhrase(jobYears, blanks.jobYears),
     });
@@ -206,7 +237,7 @@ export function buildObituaryDraft(fields: ObituaryDraftFields, copy: DraftCopy)
     serviceDate: mid(fields.serviceDate, blanks.serviceDate),
     serviceTime: mid(fields.serviceTime, blanks.serviceTime),
     officiant: mid(fields.serviceOfficiant, blanks.officiant),
-    church: mid(fields.obituaryChurch, blanks.church),
+    churchClause: church === '' ? '' : fillSlots(copy.churchClause, { church }),
     burial,
     visitationPlace: mid(fields.visitationPlace, blanks.visitationPlace),
     visitationDate: mid(fields.visitationDate, blanks.visitationDate),

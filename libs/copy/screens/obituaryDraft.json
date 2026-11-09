@@ -1,7 +1,8 @@
 {
   "paragraph1": "{fullName}, {age}, of {city}, {state}, passed away on {dateOfPassing}{deathClause}.",
   "deathClause": " in {deathPlace}",
-  "paragraph2": "Funeral service will be held at {servicePlace} on {serviceDate} at {serviceTime} with {officiant} of {church} officiating. {burial} Visitation will be held at {visitationPlace} on {visitationDate} at {visitationTime}.{funeralHomeSentence}",
+  "churchClause": " of {church}",
+  "paragraph2": "Funeral service will be held at {servicePlace} on {serviceDate} at {serviceTime} with {officiant}{churchClause} officiating. {burial} Visitation will be held at {visitationPlace} on {visitationDate} at {visitationTime}.{funeralHomeSentence}",
   "funeralHomeSentence": " {funeralHome} will be handling the funeral arrangements.",
   "paragraph3": "{name} was born in {birthPlace} to {mother} and {father} on {birthDate}. {They} went to high school at {highSchool} and graduated in {gradYear}.{collegeSentence}{jobSentence}{hobbiesSentence}{awardsSentence}",
   "collegeSentence": " {They} went on to earn {degree} from {college}.",
@@ -33,7 +34,6 @@
     "serviceDate": "[SERVICE DATE]",
     "serviceTime": "[SERVICE TIME]",
     "officiant": "[OFFICIANT]",
-    "church": "[CHURCH]",
     "burialPlace": "[CEMETERY NAME]",
     "cemeteryLocation": "[CEMETERY LOCATION]",
     "visitationPlace": "[VISITATION LOCATION]",

@@ -47,7 +47,7 @@ describe('buildObituaryDraft: empty', () => {
     expect(build({})).toBe(
       [
         '[GIVEN NAME] [SURNAME], [AGE], of [CITY], [STATE], passed away on [DATE OF DEATH].',
-        "Funeral service will be held at [SERVICE LOCATION] on [SERVICE DATE] at [SERVICE TIME] with [OFFICIANT] of [CHURCH] officiating. Burial will follow at [CEMETERY NAME], [CEMETERY LOCATION]. Visitation will be held at [VISITATION LOCATION] on [VISITATION DATE] at [VISITATION TIME].",
+        "Funeral service will be held at [SERVICE LOCATION] on [SERVICE DATE] at [SERVICE TIME] with [OFFICIANT] officiating. Burial will follow at [CEMETERY NAME], [CEMETERY LOCATION]. Visitation will be held at [VISITATION LOCATION] on [VISITATION DATE] at [VISITATION TIME].",
         "[NAME] was born in [BIRTH PLACE] to [MOTHER'S NAME] and [FATHER'S NAME] on [DATE OF BIRTH]. [He/She] went to high school at [HIGH SCHOOL] and graduated in [GRADUATION YEAR]. [He/She] worked as a [JOB TITLE] for [COMPANY] for [NUMBER OF YEARS].",
         '[NAME] is survived by [his/her] [RELATION], [NAME] of [CITY]. [He/She] is preceded in death by [his/her] [RELATION], [NAME].',
         'Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME]. [FINAL WORDS]',
@@ -223,10 +223,64 @@ describe('buildObituaryDraft: older values', () => {
 });
 
 describe('job years', () => {
-  it('reads a number as years, and a typed phrase as typed', () => {
+  it('reads a number as years, and adds "years" to words that lack it', () => {
     expect(build({ obituaryJobYears: '1' })).toContain('for 1 year.');
     expect(build({ obituaryJobYears: '12' })).toContain('for 12 years.');
-    expect(build({ obituaryJobYears: 'over thirty years' })).toContain('for over thirty years.');
+    expect(build({ obituaryJobYears: 'thirty' })).toContain('for thirty years.');
+    expect(build({ obituaryJobYears: 'over thirty' })).toContain('for over thirty years.');
+  });
+
+  it('keeps the word "years" when the family typed it', () => {
+    expect(build({ obituaryJobYears: 'thirty years' })).toContain('for thirty years.');
+    expect(build({ obituaryJobYears: '30 years' })).toContain('for 30 years.');
+    expect(build({ obituaryJobYears: 'one year' })).toContain('for one year.');
+    expect(build({ obituaryJobYears: 'thirty years' })).not.toContain('years years');
+  });
+});
+
+describe('church', () => {
+  it('drops " of [church]" when empty and keeps the officiant', () => {
+    const p2 = paragraphs({ ...filled, obituaryChurch: '' })[1];
+    expect(p2).toContain('with Pastor John Cole officiating.');
+    expect(p2).not.toContain(' of St. Mark');
+  });
+
+  it('keeps [OFFICIANT] when the officiant is empty', () => {
+    expect(paragraphs({ ...filled, serviceOfficiant: '' })[1]).toContain('with [OFFICIANT] of St. Mark officiating.');
+  });
+});
+
+describe('articles before a job title or degree', () => {
+  const job = (obituaryJobTitle: string): string => build({ obituaryJobTitle });
+  const degree = (obituaryDegree: string): string => build({ obituaryDegree });
+
+  it('adds a or an by the first letter', () => {
+    expect(job('teacher')).toContain('worked as a teacher for');
+    expect(job('electrician')).toContain('worked as an electrician for');
+    expect(degree('Associate degree')).toContain('earn an Associate degree from');
+    expect(degree('Bachelor of Arts')).toContain('earn a Bachelor of Arts from');
+  });
+
+  it('adds nothing when the family typed an article', () => {
+    expect(job('a nurse')).toContain('worked as a nurse for');
+    expect(job('An engineer')).toContain('worked as An engineer for');
+    expect(job('the dean')).toContain('worked as the dean for');
+    expect(job('The dean')).not.toContain('a The');
+    expect(job('A nurse')).not.toContain('an A');
+  });
+
+  it('adds nothing before a word in capitals', () => {
+    expect(degree('MBA')).toContain('earn MBA from');
+    expect(degree('MBA')).not.toMatch(/an? MBA/);
+    expect(degree('RN')).not.toMatch(/an? RN/);
+  });
+
+  it('reads "a" before a u that says "you", and "an" before a silent h', () => {
+    expect(degree('university diploma')).toContain('earn a university diploma');
+    expect(job('union rep')).toContain('worked as a union rep');
+    expect(job('hour keeper')).toContain('worked as an hour keeper');
+    expect(job('hairdresser')).toContain('worked as a hairdresser');
+    expect(job('umpire')).toContain('worked as an umpire');
   });
 });
 
@@ -238,7 +292,7 @@ describe('findTemplateBlanks and hasTemplateBlanks', () => {
   });
 
   it('finds the new words', () => {
-    expect(findTemplateBlanks('Died in [SERVICE LOCATION] with [CHURCH].', copy)).toEqual(['[SERVICE LOCATION]', '[CHURCH]']);
+    expect(findTemplateBlanks('Died in [SERVICE LOCATION] with [COLLEGE].', copy)).toEqual(['[SERVICE LOCATION]', '[COLLEGE]']);
   });
 
   it('still finds every bracket word from the Step 1 template', () => {
