@@ -65,12 +65,14 @@
   "relationSibling": "Sibling",
   "relationParent": "Parent",
   "addPerson": "Add a person",
-  "removePerson": "Remove {name}",
+  "removePerson": "Remove {name}, person {n}",
   "addMemorial": "Add Memorial",
   "memorialLabel": "Memorial",
   "memorialHint": "Replace the placeholder text with the memorial details.",
   "readyPlaceholders": "Some placeholder text is still in [brackets]. Replace it before you mark this ready.",
   "personRowField": "{field}, person {n}",
   "peopleLimit": "This list holds up to 40 people.",
-  "removePersonUnnamed": "Remove person {n}"
+  "removePersonUnnamed": "Remove person {n}",
+  "personRemoved": "{name} removed.",
+  "personRemovedUnnamed": "Person {n} removed."
 }
