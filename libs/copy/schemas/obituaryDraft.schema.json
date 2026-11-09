@@ -1,41 +1,383 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for the obituary template: five paragraphs, and the bracket shown for each empty field",
+  "title": "Copy for the obituary template: the paragraphs, the sentences that drop out when empty, the pronouns, and the bracket shown for each empty field",
   "type": "object",
   "additionalProperties": false,
-  "required": ["paragraph1", "paragraph2", "paragraph3", "paragraph4", "paragraph5", "burialSentence", "burialPrivate", "blanks"],
+  "required": [
+    "paragraph1",
+    "deathClause",
+    "churchClause",
+    "paragraph2",
+    "funeralHomeSentence",
+    "paragraph3",
+    "collegeSentence",
+    "jobSentence",
+    "jobFallbackSentence",
+    "hobbiesSentence",
+    "awardsSentence",
+    "involvedSentence",
+    "awardsAndInvolvedSentence",
+    "paragraph4",
+    "paragraph5",
+    "burialSentence",
+    "burialPrivate",
+    "pronouns",
+    "blanks",
+    "legacyBlanks"
+  ],
   "properties": {
-    "paragraph1": { "type": "string", "pattern": "^(?=.*\\{fullName\\})(?=.*\\{city\\})(?=.*\\{dateOfPassing\\})" },
-    "paragraph2": { "type": "string", "pattern": "\\{burial\\}" },
-    "paragraph3": { "type": "string", "pattern": "^(?=.*\\{name\\})(?=.*\\{birthDate\\})(?=.*\\{career\\})" },
-    "paragraph4": { "type": "string", "pattern": "^(?=.*\\{name\\})(?=.*\\{survivors\\})" },
-    "paragraph5": { "type": "string", "pattern": "\\{note\\}" },
-    "burialSentence": { "type": "string", "pattern": "\\{burialPlace\\}" },
-    "burialPrivate": { "type": "string", "minLength": 1 },
+    "paragraph1": {
+      "type": "string",
+      "pattern": "^(?=.*\\{fullName\\})(?=.*\\{city\\})(?=.*\\{dateOfPassing\\})"
+    },
+    "deathClause": {
+      "type": "string",
+      "minLength": 1
+    },
+    "churchClause": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paragraph2": {
+      "type": "string",
+      "pattern": "\\{burial\\}"
+    },
+    "funeralHomeSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paragraph3": {
+      "type": "string",
+      "pattern": "^(?=.*\\{name\\})(?=.*\\{birthDate\\})(?=.*\\{jobSentence\\})"
+    },
+    "collegeSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jobSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jobFallbackSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hobbiesSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "awardsSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "involvedSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "awardsAndInvolvedSentence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paragraph4": {
+      "type": "string",
+      "pattern": "^(?=.*\\{name\\})(?=.*\\{survivors\\})"
+    },
+    "paragraph5": {
+      "type": "string",
+      "pattern": "\\{note\\}"
+    },
+    "burialSentence": {
+      "type": "string",
+      "pattern": "\\{burialPlace\\}"
+    },
+    "burialPrivate": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pronouns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "he",
+        "she",
+        "they",
+        "unset"
+      ],
+      "properties": {
+        "he": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "They",
+            "their",
+            "is",
+            "was"
+          ],
+          "properties": {
+            "They": {
+              "type": "string",
+              "minLength": 1
+            },
+            "their": {
+              "type": "string",
+              "minLength": 1
+            },
+            "is": {
+              "type": "string",
+              "minLength": 1
+            },
+            "was": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "she": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "They",
+            "their",
+            "is",
+            "was"
+          ],
+          "properties": {
+            "They": {
+              "type": "string",
+              "minLength": 1
+            },
+            "their": {
+              "type": "string",
+              "minLength": 1
+            },
+            "is": {
+              "type": "string",
+              "minLength": 1
+            },
+            "was": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "they": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "They",
+            "their",
+            "is",
+            "was"
+          ],
+          "properties": {
+            "They": {
+              "type": "string",
+              "minLength": 1
+            },
+            "their": {
+              "type": "string",
+              "minLength": 1
+            },
+            "is": {
+              "type": "string",
+              "minLength": 1
+            },
+            "was": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "unset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "They",
+            "their",
+            "is",
+            "was"
+          ],
+          "properties": {
+            "They": {
+              "type": "string",
+              "minLength": 1
+            },
+            "their": {
+              "type": "string",
+              "minLength": 1
+            },
+            "is": {
+              "type": "string",
+              "minLength": 1
+            },
+            "was": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
     "blanks": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "fullName", "name", "city", "dateOfPassing", "servicePlace", "serviceDate", "serviceTime", "officiant",
-        "burialPlace", "visitationPlace", "visitationDate", "visitationTime", "birthDate", "career", "survivors", "note"
+        "givenName",
+        "surname",
+        "name",
+        "age",
+        "city",
+        "state",
+        "dateOfPassing",
+        "servicePlace",
+        "serviceDate",
+        "serviceTime",
+        "officiant",
+        "burialPlace",
+        "cemeteryLocation",
+        "visitationPlace",
+        "visitationDate",
+        "visitationTime",
+        "birthPlace",
+        "mother",
+        "father",
+        "birthDate",
+        "highSchool",
+        "gradYear",
+        "degree",
+        "college",
+        "jobTitle",
+        "company",
+        "jobYears",
+        "survivors",
+        "note"
       ],
       "properties": {
-        "fullName": { "type": "string", "minLength": 1 },
-        "name": { "type": "string", "minLength": 1 },
-        "city": { "type": "string", "minLength": 1 },
-        "dateOfPassing": { "type": "string", "minLength": 1 },
-        "servicePlace": { "type": "string", "minLength": 1 },
-        "serviceDate": { "type": "string", "minLength": 1 },
-        "serviceTime": { "type": "string", "minLength": 1 },
-        "officiant": { "type": "string", "minLength": 1 },
-        "burialPlace": { "type": "string", "minLength": 1 },
-        "visitationPlace": { "type": "string", "minLength": 1 },
-        "visitationDate": { "type": "string", "minLength": 1 },
-        "visitationTime": { "type": "string", "minLength": 1 },
-        "birthDate": { "type": "string", "minLength": 1 },
-        "career": { "type": "string", "minLength": 1 },
-        "survivors": { "type": "string", "minLength": 1 },
-        "note": { "type": "string", "minLength": 1 }
+        "givenName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "age": {
+          "type": "string",
+          "minLength": 1
+        },
+        "city": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dateOfPassing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "servicePlace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serviceDate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serviceTime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "officiant": {
+          "type": "string",
+          "minLength": 1
+        },
+        "burialPlace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cemeteryLocation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visitationPlace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visitationDate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visitationTime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "birthPlace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mother": {
+          "type": "string",
+          "minLength": 1
+        },
+        "father": {
+          "type": "string",
+          "minLength": 1
+        },
+        "birthDate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "highSchool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gradYear": {
+          "type": "string",
+          "minLength": 1
+        },
+        "degree": {
+          "type": "string",
+          "minLength": 1
+        },
+        "college": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobTitle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "company": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jobYears": {
+          "type": "string",
+          "minLength": 1
+        },
+        "survivors": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "legacyBlanks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\[.+\\]$"
       }
     }
   }

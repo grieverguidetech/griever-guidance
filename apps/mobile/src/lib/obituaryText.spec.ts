@@ -20,7 +20,7 @@ describe('obituaryTextFor', () => {
     const person = { ...empty, personName: 'Anna Lee', dateOfPassing: 'May 1, 2026', birthDate: 'June 2, 1950', obituaryCity: 'Tulsa', obituaryCareer: 'a nurse', obituarySurvivors: 'her sons', obituaryNote: 'She sang.' };
     const web = buildObituaryDraft(person, screenCopy('obituaryDraft'));
     expect(obituaryTextFor(person)).toBe(web.trim());
-    expect(web).toContain('Anna Lee, [AGE], of Tulsa, [STATE], passed away on May 1, 2026');
+    expect(web).toContain('Anna Lee, 75, of Tulsa, [STATE], passed away on May 1, 2026');
     expect(web).toContain('[He/She] worked as a nurse.');
   });
 

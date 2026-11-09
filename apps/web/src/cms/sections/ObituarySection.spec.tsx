@@ -48,10 +48,10 @@ describe('ObituarySection', () => {
 
   it('starts the text from the template, with brackets for what is missing, and follows new details until edited', async () => {
     setup(person);
-    expect(text().value).toContain('Ann Lee, [AGE], of [CITY], [STATE], passed away on June 1, 2026 in [LOCATION OF DEATH].');
-    expect(text().value).toContain('Ann Lee was born in [LOCATION OF BIRTH] to [PARENTS\' NAMES] on May 2, 1940.');
+    expect(text().value).toContain('Ann Lee, 86, of [CITY], [STATE], passed away on June 1, 2026.');
+    expect(text().value).toContain('Ann Lee was born in [BIRTH PLACE] to [MOTHER\'S NAME] and [FATHER\'S NAME] on May 2, 1940.');
     await userEvent.type(screen.getByLabelText(/City where they lived/), 'Tulsa');
-    expect(text().value).toContain('Ann Lee, [AGE], of Tulsa, [STATE]');
+    expect(text().value).toContain('Ann Lee, 86, of Tulsa, [STATE]');
     await userEvent.type(screen.getByLabelText(/Their work/), 'a teacher');
     expect(text().value).toContain('[He/She] worked as a teacher.');
     await userEvent.type(screen.getByLabelText(/Survived by/), 'her sons');
@@ -73,7 +73,7 @@ describe('ObituarySection', () => {
       visitationTime: '6:00 PM',
     });
     expect(text().value).toContain(
-      'Funeral service will be held at Oak Chapel on June 5, 2026 at 2:00 PM with Reverend Sam Cole of [PLACE OF WORSHIP] officiating. Burial will follow at Oak Hill, [CEMETERY LOCATION]. Visitation will be held at Oak Chapel on June 4, 2026 at 6:00 PM.',
+      'Funeral service will be held at Oak Chapel on June 5, 2026 at 2:00 PM with Reverend Sam Cole officiating. Burial will follow at Oak Hill, [CEMETERY LOCATION]. Visitation will be held at Oak Chapel on June 4, 2026 at 6:00 PM.',
     );
   });
 
@@ -86,7 +86,7 @@ describe('ObituarySection', () => {
     expect(text().value).not.toContain('Tulsa');
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
     expect(patches.at(-1)).toEqual({ obituaryText: undefined });
-    expect(text().value).toContain('Ann Lee, [AGE], of Tulsa, [STATE]');
+    expect(text().value).toContain('Ann Lee, 86, of Tulsa, [STATE]');
     expect(text()).toHaveFocus();
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
