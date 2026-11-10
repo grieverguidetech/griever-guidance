@@ -193,7 +193,7 @@ describe('ObituarySection', () => {
     it('refuses an edited text that still has a legacy Step 1 word', async () => {
       const { onReadyChange } = setup(person);
       await userEvent.clear(text());
-      await userEvent.type(text(), 'Ann Lee loved gardens [[FINAL WORDS].');
+      await userEvent.type(text(), 'Ann Lee loved gardens [[SCHOOL NAME].');
       expect(toggle()).toHaveAttribute('aria-disabled', 'true');
       await userEvent.click(toggle());
       expect(onReadyChange).not.toHaveBeenCalled();
@@ -236,7 +236,7 @@ describe('ObituarySection', () => {
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
 
-    it('always lets Ready be turned off, and stays Ready if a bracket comes back', async () => {
+    it('always lets Ready be turned off', async () => {
       const onReadyChange = vi.fn();
       render(
         <ObituarySection
@@ -247,8 +247,18 @@ describe('ObituarySection', () => {
       );
       expect(toggle()).toHaveAttribute('aria-pressed', 'true');
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      expect(screen.queryByText(message)).not.toBeInTheDocument();
       await userEvent.click(toggle());
       expect(onReadyChange).toHaveBeenCalledWith(false);
+    });
+
+    it('stays Ready when a bracket comes back', async () => {
+      setup({ ...person, obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: 'ready' } });
+      await userEvent.type(text(), ' [[SCHOOL NAME]');
+      expect(text().value).toContain('[SCHOOL NAME]');
+      expect(toggle()).toHaveAttribute('aria-pressed', 'true');
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      expect(screen.queryByText(message)).not.toBeInTheDocument();
     });
   });
 
@@ -258,6 +268,7 @@ describe('ObituarySection', () => {
     expect(screen.queryByLabelText(/Where it is published/)).toBeNull();
   });
 
+  // The text is seeded: the untouched template has [BRACKETS], so Ready would be refused (#779).
   it('marks ready through MarkReady', async () => {
     const { onReadyChange } = setup({ obituaryText: 'Ann Lee loved gardens.' });
     await userEvent.click(screen.getByRole('button', { name: /ready/i }));
@@ -358,6 +369,7 @@ describe('ObituarySection phone nudge', () => {
     window.localStorage.clear();
   });
 
+  // The text is seeded so the untouched template (which is blocked) does not stop these tests from marking ready.
   function renderReadyToggle() {
     function Ready() {
       const [ready, setReady] = useState(false);
