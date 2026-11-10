@@ -81,6 +81,8 @@
     "memorialLabel",
     "memorialHint",
     "readyPlaceholders",
+    "readyPlaceholdersMemorial",
+    "readyPlaceholdersBoth",
     "personRowField",
     "peopleLimit",
     "removePersonUnnamed",
@@ -318,6 +320,12 @@
       "$ref": "#/$defs/text"
     },
     "readyPlaceholders": {
+      "$ref": "#/$defs/text"
+    },
+    "readyPlaceholdersMemorial": {
+      "$ref": "#/$defs/text"
+    },
+    "readyPlaceholdersBoth": {
       "$ref": "#/$defs/text"
     },
     "personRowField": {

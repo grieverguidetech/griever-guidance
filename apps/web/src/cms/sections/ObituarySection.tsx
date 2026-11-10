@@ -1,27 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import {
-  buildObituaryDraft,
-  hasTemplateBlanks,
-  screenCopy,
-} from '@griever/copy';
-import {
-  FLOW_DETAIL_MAX_LENGTH,
-  PRECEDED_RELATIONS,
-  SURVIVOR_RELATIONS,
-} from '@griever/shared';
-import type {
-  ServiceEventFields,
-  SectionFields,
-  SectionKey,
-  SessionDetails,
-} from '@griever/shared';
+import { buildObituaryDraft, hasTemplateBlanks, screenCopy } from '@griever/copy';
+import { FLOW_DETAIL_MAX_LENGTH, PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '@griever/shared';
+import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { AccordionSection } from '../AccordionSection';
 import { MarkReady } from './MarkReady';
-import {
-  ObituaryLifeFields,
-  type ObituaryLifeKey,
-  type ObituaryLifeValues,
-} from './ObituaryLifeFields';
+import { ObituaryLifeFields, type ObituaryLifeKey, type ObituaryLifeValues } from './ObituaryLifeFields';
 import { ObituaryPeople } from './ObituaryPeople';
 
 const copy = screenCopy('cmsObituary');
@@ -47,14 +30,7 @@ type ObituaryValues = ObituaryLifeValues &
 
 /** The name and dates are edited in The person, so they are not in the patch. */
 export type ObituaryPatch = Partial<
-  Pick<
-    SectionFields,
-    | 'obituaryText'
-    | 'obituaryMemorial'
-    | 'obituarySurvivorList'
-    | 'obituaryPrecededList'
-    | ObituaryLifeKey
-  >
+  Pick<SectionFields, 'obituaryText' | 'obituaryMemorial' | 'obituarySurvivorList' | 'obituaryPrecededList' | ObituaryLifeKey>
 >;
 
 interface Props {
@@ -72,15 +48,7 @@ interface Props {
 }
 
 /** The obituary template fields, and the obituary text. The text follows the fields until edited. */
-export function ObituarySection({
-  values,
-  onChange,
-  onReadyChange,
-  nextSection,
-  onNext,
-  onOpenPerson,
-  onOpenService,
-}: Props) {
+export function ObituarySection({ values, onChange, onReadyChange, nextSection, onNext, onOpenPerson, onOpenService }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const memorialRef = useRef<HTMLTextAreaElement>(null);
@@ -103,9 +71,11 @@ export function ObituarySection({
   });
   const edited = values.obituaryText !== undefined;
   const shownText = values.obituaryText ?? prefill;
-  const blanksLeft =
-    hasTemplateBlanks(shownText, draftCopy) ||
-    hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
+  const textBlanks = hasTemplateBlanks(shownText, draftCopy);
+  const memorialBlanks = hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
+  const blanksLeft = textBlanks || memorialBlanks;
+  // The memorial can be closed, so name it when its blanks are what blocks Ready.
+  const blockedMessage = memorialBlanks ? (textBlanks ? copy.readyPlaceholdersBoth : copy.readyPlaceholdersMemorial) : copy.readyPlaceholders;
   const facts = [
     { label: copy.nameLabel, value: values.personName },
     { label: copy.bornLabel, value: values.birthDate },
@@ -133,26 +103,17 @@ export function ObituarySection({
             {copy.detailsHeading}
           </h2>
           {facts.length > 0 && (
-            <dl
-              aria-labelledby={`${id}-details`}
-              className="flex flex-col gap-1"
-            >
+            <dl aria-labelledby={`${id}-details`} className="flex flex-col gap-1">
               {facts.map((f) => (
                 <div key={f.label} className="flex flex-wrap gap-x-2">
                   <dt className="font-medium">{f.label}</dt>
-                  <dd className="min-w-0 [overflow-wrap:anywhere]">
-                    {f.value}
-                  </dd>
+                  <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
                 </div>
               ))}
             </dl>
           )}
           {onOpenPerson && (
-            <button
-              type="button"
-              className="gg-btn gg-btn-secondary self-start"
-              onClick={onOpenPerson}
-            >
+            <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenPerson}>
               {copy.changeDetails}
             </button>
           )}
@@ -177,19 +138,13 @@ export function ObituarySection({
               {serviceFacts.map((f) => (
                 <div key={f.label} className="flex flex-wrap gap-x-2">
                   <dt className="font-medium">{f.label}</dt>
-                  <dd className="min-w-0 [overflow-wrap:anywhere]">
-                    {f.value}
-                  </dd>
+                  <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
                 </div>
               ))}
             </dl>
           )}
           {onOpenService && (
-            <button
-              type="button"
-              className="gg-btn gg-btn-secondary self-start"
-              onClick={onOpenService}
-            >
+            <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenService}>
               {copy.changeOnService}
             </button>
           )}
@@ -212,9 +167,7 @@ export function ObituarySection({
       </div>
       <div className="gg-field">
         <label htmlFor={`${id}-text`}>{copy.textLabel}</label>
-        <p id={`${id}-text-hint`}>
-          {edited ? copy.textHintEdited : copy.textHint}
-        </p>
+        <p id={`${id}-text-hint`}>{edited ? copy.textHintEdited : copy.textHint}</p>
         <textarea
           id={`${id}-text`}
           ref={textRef}
@@ -287,7 +240,7 @@ export function ObituarySection({
         nextSection={nextSection}
         onNext={onNext}
         phoneNudge="obituary"
-        blockedMessage={blanksLeft ? copy.readyPlaceholders : undefined}
+        blockedMessage={blanksLeft ? blockedMessage : undefined}
       />
     </div>
   );

@@ -1520,6 +1520,7 @@ function AppBody({
             />
           ) : cmsSection === 'obituary' ? (
             <ObituarySection
+              key={active.id}
               values={active}
               onChange={(patch) => sessions.updateSection(active.id, 'obituary', patch)}
               onReadyChange={readyChange('obituary')}
