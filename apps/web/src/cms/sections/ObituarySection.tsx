@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { buildObituaryDraft, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import { PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '@griever/shared';
 import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
@@ -16,6 +16,7 @@ type ObituaryValues = ObituaryLifeValues &
   Pick<
     SectionFields,
     | 'obituaryText'
+    | 'obituaryMemorial'
     | 'obituaryCareer'
     | 'obituarySurvivors'
     | 'obituaryNote'
@@ -28,7 +29,7 @@ type ObituaryValues = ObituaryLifeValues &
 
 /** The name and dates are edited in The person, so they are not in the patch. */
 export type ObituaryPatch = Partial<
-  Pick<SectionFields, 'obituaryText' | 'obituarySurvivorList' | 'obituaryPrecededList' | ObituaryLifeKey>
+  Pick<SectionFields, 'obituaryText' | 'obituaryMemorial' | 'obituarySurvivorList' | 'obituaryPrecededList' | ObituaryLifeKey>
 >;
 
 interface Props {
@@ -49,10 +50,23 @@ interface Props {
 export function ObituarySection({ values, onChange, onReadyChange, nextSection, onNext, onOpenPerson, onOpenService }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const memorialRef = useRef<HTMLTextAreaElement>(null);
+  const addMemorialRef = useRef<HTMLButtonElement>(null);
+  // Set when the memorial box or its button swaps, so focus follows after the render.
+  const focusNext = useRef<'memorial' | 'add' | null>(null);
   const prefill = buildObituaryDraft(
     { ...values, dateOfPassing: values.dateOfPassing ?? undefined },
     draftCopy,
   );
+  const memorialBlank = (values.obituaryMemorial ?? '').trim() === '';
+  useEffect(() => {
+    if (focusNext.current === 'memorial') {
+      memorialRef.current?.focus();
+    } else if (focusNext.current === 'add') {
+      addMemorialRef.current?.focus();
+    }
+    focusNext.current = null;
+  });
   const edited = values.obituaryText !== undefined;
   const shownText = values.obituaryText ?? prefill;
   const blanksLeft = hasTemplateBlanks(shownText, draftCopy);
@@ -174,6 +188,38 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
           </button>
         )}
       </div>
+      {memorialBlank ? (
+        <button
+          type="button"
+          ref={addMemorialRef}
+          className="gg-btn gg-btn-primary self-start"
+          onClick={() => {
+            focusNext.current = 'memorial';
+            onChange({ obituaryMemorial: draftCopy.memorial });
+          }}
+        >
+          {copy.addMemorial}
+        </button>
+      ) : (
+        <div className="gg-field">
+          <label htmlFor={`${id}-memorial`}>{copy.memorialLabel}</label>
+          <p id={`${id}-memorial-hint`}>{copy.memorialHint}</p>
+          <textarea
+            id={`${id}-memorial`}
+            ref={memorialRef}
+            aria-describedby={`${id}-memorial-hint`}
+            className="gg-input"
+            rows={4}
+            value={values.obituaryMemorial ?? ''}
+            onChange={(e) => {
+              if (e.target.value.trim() === '') {
+                focusNext.current = 'add';
+              }
+              onChange({ obituaryMemorial: e.target.value });
+            }}
+          />
+        </div>
+      )}
       <MarkReady
         ready={values.sectionStatus?.obituary === 'ready'}
         onChange={onReadyChange}

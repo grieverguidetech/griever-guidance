@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { findHardCodedCopy } from '@griever/copy';
+import { findHardCodedCopy, screenCopy } from '@griever/copy';
 import { ObituarySection, type ObituaryPatch } from './ObituarySection';
 import { resetSessionDismissed } from './PhoneNudge';
 
@@ -205,6 +205,45 @@ describe('ObituarySection', () => {
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'ObituarySection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsObituary')).toEqual([]);
+  });
+});
+
+describe('ObituarySection memorial', () => {
+  const addButton = () => screen.queryByRole('button', { name: 'Add Memorial' });
+  const prefill = screenCopy('obituaryDraft').memorial;
+
+  it('shows the Add Memorial button while the memorial is blank, with the primary style', () => {
+    setup({ ...person, obituaryMemorial: '   ' });
+    expect(addButton()).toHaveClass('gg-btn', 'gg-btn-primary');
+    expect(screen.queryByLabelText('Memorial')).toBeNull();
+  });
+
+  it('saves the prefill, shows the labelled box with its hint and focuses it', async () => {
+    const { patches } = setup(person);
+    await userEvent.click(addButton()!);
+    expect(patches).toEqual([{ obituaryMemorial: prefill }]);
+    const box = screen.getByLabelText('Memorial') as HTMLTextAreaElement;
+    expect(box.value).toBe(prefill);
+    expect(box).toHaveFocus();
+    expect(box).toHaveAccessibleDescription('Replace the placeholder text with the memorial details.');
+    expect(addButton()).toBeNull();
+  });
+
+  it('sends edits as obituaryMemorial and never changes the obituary text', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts to the library.' });
+    const before = text().value;
+    await userEvent.type(screen.getByLabelText('Memorial'), 'X');
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: 'Gifts to the library.X' });
+    expect(patches.every((p) => !('obituaryText' in p))).toBe(true);
+    expect(text().value).toBe(before);
+    expect(text().value).not.toContain('library');
+  });
+
+  it('brings the button back with focus when the memorial is cleared', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    await userEvent.clear(screen.getByLabelText('Memorial'));
+    expect(screen.queryByLabelText('Memorial')).toBeNull();
+    expect(addButton()).toHaveFocus();
   });
 });
 
