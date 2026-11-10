@@ -5,11 +5,6 @@
   "additionalProperties": false,
   "required": [
     "intro",
-    "detailsHeading",
-    "nameLabel",
-    "bornLabel",
-    "diedLabel",
-    "changeDetails",
     "cityLabel",
     "textLabel",
     "textHint",
@@ -23,7 +18,6 @@
     "givenNameLabel",
     "middleNameLabel",
     "surnameLabel",
-    "useNameFromPersonLabel",
     "ageLabel",
     "ageHint",
     "stateLabel",
@@ -31,6 +25,8 @@
     "funeralHomeLabel",
     "churchLabel",
     "cemeteryLabel",
+    "nameFromPersonHint",
+    "personSharedHint",
     "serviceSharedHint",
     "birthPlaceLabel",
     "motherNameLabel",
@@ -75,26 +71,10 @@
     "peopleLimit",
     "removePersonUnnamed",
     "personRemoved",
-    "personRemovedUnnamed",
-    "nameFilled"
+    "personRemovedUnnamed"
   ],
   "properties": {
     "intro": {
-      "$ref": "#/$defs/text"
-    },
-    "detailsHeading": {
-      "$ref": "#/$defs/text"
-    },
-    "nameLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "bornLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "diedLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "changeDetails": {
       "$ref": "#/$defs/text"
     },
     "cityLabel": {
@@ -136,9 +116,6 @@
     "surnameLabel": {
       "$ref": "#/$defs/text"
     },
-    "useNameFromPersonLabel": {
-      "$ref": "#/$defs/text"
-    },
     "ageLabel": {
       "$ref": "#/$defs/text"
     },
@@ -158,6 +135,12 @@
       "$ref": "#/$defs/text"
     },
     "cemeteryLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "nameFromPersonHint": {
+      "$ref": "#/$defs/text"
+    },
+    "personSharedHint": {
       "$ref": "#/$defs/text"
     },
     "serviceSharedHint": {
@@ -293,9 +276,6 @@
       "$ref": "#/$defs/text"
     },
     "personRemovedUnnamed": {
-      "$ref": "#/$defs/text"
-    },
-    "nameFilled": {
       "$ref": "#/$defs/text"
     }
   },

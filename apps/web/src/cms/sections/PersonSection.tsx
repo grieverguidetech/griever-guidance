@@ -2,23 +2,10 @@ import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
 import { dateNote, type SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { DateField, todayISO } from '../../lib/DateField';
+import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { MarkReady } from './MarkReady';
 
 const copy = screenCopy('cmsPerson');
-
-/** The unreadable note waits for the field to lose focus; the others show at once. */
-function noteProps(kind: ReturnType<typeof dateNote>) {
-  if (kind === 'unreadable') {
-    return { noteOnBlur: copy.dateUnreadable };
-  }
-  if (kind === 'birthAfterPassing') {
-    return { note: copy.birthAfterPassing };
-  }
-  if (kind === 'futurePassing') {
-    return { note: copy.futurePassing };
-  }
-  return {};
-}
 
 type PersonValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
   Pick<SectionFields, 'birthDate' | 'sectionStatus'>;

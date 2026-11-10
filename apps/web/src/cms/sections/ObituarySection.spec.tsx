@@ -13,8 +13,8 @@ type Values = Parameters<typeof ObituarySection>[0]['values'];
 function setup(initial: Values = {}) {
   const patches: ObituaryPatch[] = [];
   const servicePatches: Record<string, unknown>[] = [];
+  const personPatches: Record<string, unknown>[] = [];
   const onReadyChange = vi.fn();
-  const onOpenPerson = vi.fn();
   function Harness() {
     const [values, setValues] = useState<Values>(initial);
     return (
@@ -28,28 +28,36 @@ function setup(initial: Values = {}) {
           servicePatches.push(patch);
           setValues((v) => ({ ...v, ...patch }));
         }}
+        onPersonChange={(patch) => {
+          personPatches.push(patch);
+          setValues((v) => ({ ...v, ...patch }));
+        }}
         onReadyChange={onReadyChange}
-        onOpenPerson={onOpenPerson}
       />
     );
   }
   render(<Harness />);
-  return { patches, servicePatches, onReadyChange, onOpenPerson };
+  return { patches, servicePatches, personPatches, onReadyChange };
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
 const person = { personName: 'Ann Lee', dateOfPassing: 'June 1, 2026', birthDate: 'May 2, 1940' };
 
 describe('ObituarySection', () => {
-  it('shows the name and dates read-only, with a button to change them in The person', async () => {
-    const { onOpenPerson } = setup(person);
-    expect(screen.getByText('Ann Lee')).toBeInTheDocument();
-    expect(screen.getByText('May 2, 1940')).toBeInTheDocument();
-    expect(screen.getByText('June 1, 2026')).toBeInTheDocument();
-    expect(screen.getByText('Details from The person')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Change these on The person' }));
-    expect(onOpenPerson).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull();
+  it('has no Details from The person card and no button to open The person', () => {
+    setup(person);
+    expect(screen.queryByText('Details from The person')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change these on The person' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use the name from The person' })).toBeNull();
+  });
+
+  it('shows the person dates as editable fields and sends only the typed one through onPersonChange', async () => {
+    const { personPatches, patches } = setup(person);
+    expect(screen.getByLabelText('Date of birth (optional)')).toHaveValue('May 2, 1940');
+    expect(screen.getByLabelText('Date they passed (optional)')).toHaveValue('June 1, 2026');
+    await userEvent.type(screen.getByLabelText('Date of birth (optional)'), '1');
+    expect(personPatches).toEqual([{ birthDate: 'May 2, 19401' }]);
+    expect(patches).toEqual([]);
   });
 
   it('starts the text from the template, with brackets for what is missing, and follows new details until edited', async () => {
@@ -83,15 +91,9 @@ describe('ObituarySection', () => {
     expect(screen.getByLabelText('Visitation or calling hours Place')).toHaveValue('Hall');
   });
 
-  it('makes the person panel label a level 2 heading', () => {
-    setup(person);
-    expect(screen.getByRole('heading', { level: 2, name: 'Details from The person' })).toBeInTheDocument();
-  });
-
-  it('puts the details in order: The person, then the life fields and people', () => {
+  it('puts the details in order: the life fields, then the people, then the text', () => {
     setup({ ...person, servicePlace: 'Oak Chapel' });
     const top = [
-      screen.getByText('Details from The person'),
       screen.getByLabelText(/Given name/),
       screen.getByText('Survived by'),
       screen.getByText('Preceded in death by'),
@@ -122,7 +124,7 @@ describe('ObituarySection', () => {
   });
 
   it('typing a given name updates the text and saves at once', async () => {
-    const { patches } = setup(person);
+    const { patches } = setup({ ...person, personName: '' });
     await userEvent.type(screen.getByLabelText(/Given name/), 'Annie');
     expect(patches.at(-1)).toEqual({ obituaryGivenName: 'Annie' });
     expect(text().value).toContain('Annie');
@@ -277,6 +279,7 @@ describe('ObituarySection', () => {
           values={{ ...person, sectionStatus: { obituary: 'ready' } }}
           onChange={() => undefined}
           onServiceChange={() => undefined}
+          onPersonChange={() => undefined}
           onReadyChange={onReadyChange}
         />,
       );
@@ -323,13 +326,6 @@ describe('ObituarySection', () => {
 });
 
 describe('ObituarySection layout and groups', () => {
-  it('puts The person in one panel, full width', () => {
-    setup(person);
-    const personHeading = screen.getByRole('heading', { level: 2, name: 'Details from The person' });
-    expect(personHeading.closest('.gg-panel')).not.toBeNull();
-    expect(personHeading.closest('.grid')).toBeNull();
-  });
-
   it("opens The person's name on first render and leaves the other groups closed", () => {
     setup(person);
     expect(screen.getByRole('button', { name: "The person's name" })).toHaveAttribute('aria-expanded', 'true');
@@ -433,8 +429,13 @@ describe('ObituarySection memorial', () => {
 
   it('does not take focus on load, saved or blank', () => {
     const { unmount } = render(
-      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined}
-          onServiceChange={() => undefined} onReadyChange={() => undefined} />,
+      <ObituarySection
+        values={{ ...person, obituaryMemorial: 'Gifts' }}
+        onChange={() => undefined}
+        onServiceChange={() => undefined}
+        onPersonChange={() => undefined}
+        onReadyChange={() => undefined}
+      />,
     );
     expect(document.body).toHaveFocus();
     unmount();
@@ -464,6 +465,7 @@ describe('ObituarySection phone nudge', () => {
           values={{ obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
           onChange={() => undefined}
           onServiceChange={() => undefined}
+          onPersonChange={() => undefined}
           onReadyChange={setReady}
         />
       );

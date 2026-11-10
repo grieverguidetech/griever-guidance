@@ -11,6 +11,7 @@ import {
   ObituaryLifeFields,
   type ObituaryLifeKey,
   type ObituaryLifePatch,
+  type PersonSharedPatch,
   type ServiceSharedPatch,
 } from './ObituaryLifeFields';
 
@@ -19,6 +20,7 @@ type Values = Parameters<typeof ObituaryLifeFields>[0]['values'];
 function setup(initial: Values = {}) {
   const patches: ObituaryLifePatch[] = [];
   const servicePatches: ServiceSharedPatch[] = [];
+  const personPatches: PersonSharedPatch[] = [];
   function Harness() {
     const [values, setValues] = useState<Values>(initial);
     return (
@@ -32,15 +34,22 @@ function setup(initial: Values = {}) {
           servicePatches.push(patch);
           setValues((v) => ({ ...v, ...patch }));
         }}
+        onPersonChange={(patch) => {
+          personPatches.push(patch);
+          setValues((v) => ({ ...v, ...patch }));
+        }}
       />
     );
   }
   render(<Harness />);
-  return { patches, servicePatches };
+  return { patches, servicePatches, personPatches };
 }
 
 const copy = screenCopy('cmsObituary');
 const serviceCopy = screenCopy('cmsService');
+const personCopy = screenCopy('cmsPerson');
+const birthLabel = `${personCopy.dateOfBirthLabel} ${personCopy.optional}`;
+const passingLabel = `${personCopy.dateOfPassingLabel} ${personCopy.optional}`;
 
 const fields: [ObituaryLifeKey, string][] = [
   ['obituaryGivenName', copy.givenNameLabel],
@@ -90,26 +99,122 @@ describe('ObituaryLifeFields', () => {
     expect(patches.at(-1)).toEqual({ obituaryJobYears: 'about 30' });
   });
 
-  it('fills given, middle and surname from a three-word name in one patch', async () => {
-    const { patches } = setup({ personName: 'Ann Marie Lee' });
-    await userEvent.click(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
-    expect(patches).toEqual([
-      { obituaryGivenName: 'Ann', obituaryMiddleName: 'Marie', obituarySurname: 'Lee' },
-    ]);
-    expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Lee');
+  describe('name parts from The person', () => {
+    it('shows the split person name while all three parts are empty, without saving', () => {
+      const { patches, personPatches } = setup({ personName: 'Ann Marie Lee' });
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Ann');
+      expect(screen.getByLabelText(copy.middleNameLabel)).toHaveValue('Marie');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Lee');
+      expect(patches).toEqual([]);
+      expect(personPatches).toEqual([]);
+    });
+
+    it('saves all three parts when one is typed over the shown name, and never the person name', async () => {
+      const { patches, personPatches } = setup({ personName: 'Ann Marie Lee' });
+      await userEvent.type(screen.getByLabelText(copy.surnameLabel), 'x');
+      expect(patches).toEqual([
+        { obituaryGivenName: 'Ann', obituaryMiddleName: 'Marie', obituarySurname: 'Leex' },
+      ]);
+      expect(personPatches).toEqual([]);
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Ann');
+    });
+
+    it('sends only the typed key once a part is saved', async () => {
+      const { patches } = setup({ personName: 'Ann Lee', obituaryGivenName: 'Anne' });
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('');
+      await userEvent.type(screen.getByLabelText(copy.surnameLabel), 'L');
+      expect(patches).toEqual([{ obituarySurname: 'L' }]);
+    });
+
+    it('keeps a cleared part cleared and does not bring the person name back', async () => {
+      setup({ personName: 'Mom' });
+      const given = screen.getByLabelText(copy.givenNameLabel);
+      expect(given).toHaveValue('Mom');
+      await userEvent.clear(given);
+      expect(given).toHaveValue('');
+      await userEvent.tab();
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('');
+    });
+
+    it('keeps two cleared parts cleared', async () => {
+      setup({ personName: 'Ann Lee' });
+      await userEvent.clear(screen.getByLabelText(copy.givenNameLabel));
+      await userEvent.clear(screen.getByLabelText(copy.surnameLabel));
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('');
+    });
+
+    it('shows a hint tied to the three name parts only while they show the person name', async () => {
+      setup({ personName: 'Ann Lee' });
+      expect(screen.getByText(copy.nameFromPersonHint)).toBeVisible();
+      for (const label of [copy.givenNameLabel, copy.middleNameLabel, copy.surnameLabel]) {
+        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(copy.nameFromPersonHint);
+      }
+      await userEvent.type(screen.getByLabelText(copy.middleNameLabel), 'M');
+      expect(screen.queryByText(copy.nameFromPersonHint)).toBeNull();
+      expect(screen.getByLabelText(copy.givenNameLabel)).not.toHaveAccessibleDescription();
+    });
+
+    it('shows no hint without a person name', () => {
+      setup();
+      expect(screen.queryByText(copy.nameFromPersonHint)).toBeNull();
+    });
+
+    it('has no name button and no status line', () => {
+      setup({ personName: 'Ann Lee' });
+      expect(screen.queryByRole('button', { name: /name from The person/i })).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
+    });
   });
 
-  it('announces once, in a polite status line, that the name was filled', async () => {
-    setup({ personName: 'Ann Lee' });
-    const status = screen.getByRole('status');
-    expect(status).toHaveTextContent('');
-    await userEvent.click(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
-    expect(status).toHaveTextContent(copy.nameFilled);
-  });
+  describe('shared Person dates', () => {
+    it('shows the saved dates', () => {
+      setup({ birthDate: 'June 15, 1940', dateOfPassing: 'November 2, 2026' });
+      expect(screen.getByLabelText(birthLabel)).toHaveValue('June 15, 1940');
+      expect(screen.getByLabelText(passingLabel)).toHaveValue('November 2, 2026');
+    });
 
-  it('hides the name button without a name', () => {
-    setup({ personName: '  ' });
-    expect(screen.queryByRole('button', { name: copy.useNameFromPersonLabel })).toBeNull();
+    it('sends only the typed date through onPersonChange', async () => {
+      const { patches, personPatches } = setup();
+      await userEvent.type(screen.getByLabelText(birthLabel), '5');
+      expect(personPatches).toEqual([{ birthDate: '5' }]);
+      await userEvent.type(screen.getByLabelText(passingLabel), '6');
+      expect(personPatches.at(-1)).toEqual({ dateOfPassing: '6' });
+      expect(patches).toEqual([]);
+    });
+
+    it('saves a complete date in the format The person uses', async () => {
+      const { personPatches } = setup();
+      await userEvent.type(screen.getByLabelText(birthLabel), '6/15/2001');
+      await userEvent.tab();
+      expect(personPatches.at(-1)).toEqual({ birthDate: 'June 15, 2001' });
+    });
+
+    it('shows The person notes', () => {
+      setup({ birthDate: 'June 15, 2030', dateOfPassing: 'November 2, 2026' });
+      expect(screen.getByText(personCopy.birthAfterPassing)).toBeInTheDocument();
+    });
+
+    it('shows the future-passing note', () => {
+      setup({ dateOfPassing: 'January 1, 2099' });
+      expect(screen.getByText(personCopy.futurePassing)).toBeInTheDocument();
+    });
+
+    it('shows the unreadable note only after leaving the field', async () => {
+      setup();
+      await userEvent.type(screen.getByLabelText(passingLabel), 'last tuesday');
+      expect(screen.queryByText(personCopy.dateUnreadable)).toBeNull();
+      await userEvent.tab();
+      expect(screen.getByText(personCopy.dateUnreadable)).toBeInTheDocument();
+    });
+
+    it('shows one hint, as the description of both date fields', () => {
+      setup();
+      expect(screen.getAllByText(copy.personSharedHint)).toHaveLength(1);
+      for (const label of [birthLabel, passingLabel]) {
+        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(expect.stringContaining(copy.personSharedHint));
+      }
+    });
   });
 
   describe('age', () => {
@@ -273,12 +378,13 @@ describe('ObituaryLifeFields', () => {
       ]);
     });
 
-    it('puts the name button above the grid, then Given, Middle, Surname, Pronoun', () => {
+    it('puts Given, Middle, Surname, Pronoun, then the two shared dates', () => {
       setup({ personName: 'Ann Lee' });
       const group = screen.getByRole('group', { name: copy.groupNameHeading });
-      expect(group.firstElementChild).toBe(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
       const order = Array.from(group.querySelectorAll('label')).map((l) => l.textContent);
-      expect(order).toEqual([copy.givenNameLabel, copy.middleNameLabel, copy.surnameLabel, copy.pronounLabel]);
+      expect(order).toEqual([
+        copy.givenNameLabel, copy.middleNameLabel, copy.surnameLabel, copy.pronounLabel, birthLabel, passingLabel,
+      ]);
     });
   });
 
@@ -413,6 +519,7 @@ describe('ObituaryLifeFields', () => {
                 servicePatches.push(patch);
                 setValues((v) => ({ ...v, ...patch }));
               }}
+              onPersonChange={() => undefined}
             />
           </PlacesProvider>
         );

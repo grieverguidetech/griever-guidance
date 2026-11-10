@@ -2,10 +2,13 @@ import { useId, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { AccordionSection } from '../AccordionSection';
 import { ANY_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
+import { DateInput, todayISO } from '../../lib/DateField';
+import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { EventFields } from './EventFields';
 import {
   FLOW_DETAIL_MAX_LENGTH,
   ageFrom,
+  dateNote,
   splitPersonName,
   type SectionFields,
   type ServiceEventFields,
@@ -15,6 +18,7 @@ import {
 const copy = screenCopy('cmsObituary');
 // The shared controls use Service's own labels, so the same value has the same name on both pages.
 const serviceCopy = screenCopy('cmsService');
+const personCopy = screenCopy('cmsPerson');
 
 type TextKey =
   | 'obituaryGivenName'
@@ -63,17 +67,24 @@ type ServiceSharedFields = ServiceEventFields & SectionFields & SessionDetails;
 
 export type ServiceSharedPatch = Partial<Pick<ServiceSharedFields, ServiceSharedKey>>;
 
-/** The life keys, plus the name and dates, which are only read. */
+/** The Person fields this component also writes. They are the same saved values as on The person. */
+export type PersonSharedKey = 'birthDate' | 'dateOfPassing';
+
+export type PersonSharedPatch = Partial<Pick<SectionFields & SessionDetails, PersonSharedKey>>;
+
+/** The life keys, the Service and Person shared keys, and the name, which is only read. */
 export type ObituaryLifeValues = Partial<Pick<SectionFields, ObituaryLifeKey | 'birthDate'>> &
   Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
   Partial<Pick<ServiceSharedFields, ServiceSharedKey>>;
 
 interface Props {
   values: ObituaryLifeValues;
-  /** Gets only the field that changed (the name button gives three keys at once). */
+  /** Gets only the field that changed (a name part typed over the shown person name gives all three parts). */
   onChange: (patch: ObituaryLifePatch) => void;
   /** Gets only the Service field that changed. It writes the same value Service shows. */
   onServiceChange: (patch: ServiceSharedPatch) => void;
+  /** Gets only the date that changed. It writes the same value The person shows. */
+  onPersonChange: (patch: PersonSharedPatch) => void;
 }
 
 interface FieldSpec {
@@ -132,10 +143,9 @@ const pronounChoices = [
 ];
 
 /** The name parts, age, places, school, work, interests and pronoun of the obituary. Controlled; it does not save. */
-export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props) {
+export function ObituaryLifeFields({ values, onChange, onServiceChange, onPersonChange }: Props) {
   const id = useId();
   const [ageFocused, setAgeFocused] = useState(false);
-  const [nameFilled, setNameFilled] = useState(false);
   // Open on load: the name only. Not remembered across loads.
   const [open, setOpen] = useState<Set<GroupKey>>(() => new Set<GroupKey>(['name']));
   function toggle(key: GroupKey) {
@@ -150,11 +160,23 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
     });
   }
   const personName = values.personName?.trim() ?? '';
+  const nameKeys = ['obituaryGivenName', 'obituaryMiddleName', 'obituarySurname'] as const;
+  // Only while no part was ever saved (all undefined). A cleared part is '' and stays cleared.
+  const derivedParts = nameKeys.every((k) => values[k] === undefined) && personName !== '' ? splitPersonName(personName) : null;
+  const derivedName: Record<string, string> = derivedParts
+    ? {
+        obituaryGivenName: derivedParts.given,
+        obituaryMiddleName: derivedParts.middle,
+        obituarySurname: derivedParts.surname,
+      }
+    : {};
+  const nameHintId = `${id}-name-derived-hint`;
   const derivedAge = ageFrom(values.birthDate ?? '', values.dateOfPassing ?? '');
 
   function renderField(spec: FieldSpec) {
     const isAge = spec.key === 'obituaryAge';
-    const typed = values[spec.key] ?? '';
+    const isNamePart = (nameKeys as readonly string[]).includes(spec.key);
+    const typed = derivedParts && isNamePart ? derivedName[spec.key] : (values[spec.key] ?? '');
     const hintId = `${id}-${spec.key}-hint`;
     // While the age has focus it shows only what was typed; otherwise the worked-out age fills an empty field.
     const showsDerived = isAge && typed === '' && !ageFocused && derivedAge !== '';
@@ -173,11 +195,13 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
           autoComplete="off"
           inputMode={spec.numeric ? 'numeric' : undefined}
           maxLength={FLOW_DETAIL_MAX_LENGTH[spec.key]}
-          aria-describedby={showsDerived ? hintId : undefined}
+          aria-describedby={showsDerived ? hintId : derivedParts && isNamePart ? nameHintId : undefined}
           value={showsDerived ? derivedAge : typed}
           onFocus={isAge ? () => setAgeFocused(true) : undefined}
           onBlur={isAge ? () => setAgeFocused(false) : undefined}
-          onChange={(e) => onChange({ [spec.key]: e.target.value })}
+          onChange={(e) =>
+            onChange(derivedParts ? { ...derivedName, [spec.key]: e.target.value } : { [spec.key]: e.target.value })
+          }
         />
       </div>
     );
@@ -205,8 +229,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
     key: GroupKey,
     heading: string,
     fields: FieldSpec[],
-    lead?: ReactNode,
-    tail?: ReactNode,
+    { lead, tail }: { lead?: ReactNode; tail?: ReactNode } = {},
   ) {
     const headingId = `${id}-${key}-heading`;
     return (
@@ -229,18 +252,42 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
     );
   }
 
-  const useName = personName !== '' && (
-    <button
-      type="button"
-      className="gg-link-button"
-      onClick={() => {
-        const { given, middle, surname } = splitPersonName(personName);
-        onChange({ obituaryGivenName: given, obituaryMiddleName: middle, obituarySurname: surname });
-        setNameFilled(true);
-      }}
-    >
-      {copy.useNameFromPersonLabel}
-    </button>
+  const personHintId = `${id}-person-shared-hint`;
+  const birthNote = dateNote(values.birthDate, { field: 'birth', dateOfPassing: values.dateOfPassing });
+  const passingNote = dateNote(values.dateOfPassing, { field: 'passing' });
+  // The same labels, props and notes as on The person, so values and date formats match.
+  const personDates = (
+    <div className="flex flex-col gap-4 md:col-span-2" data-group="person-shared">
+      <p id={personHintId} className="gg-hint">
+        {copy.personSharedHint}
+      </p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="gg-field">
+          <label htmlFor={`${id}-birthDate`}>{`${personCopy.dateOfBirthLabel} ${personCopy.optional}`}</label>
+          <DateInput
+            id={`${id}-birthDate`}
+            value={values.birthDate ?? ''}
+            max={todayISO()}
+            visibleHelp
+            describedBy={personHintId}
+            {...noteProps(birthNote)}
+            onChange={(birthDate) => onPersonChange({ birthDate })}
+          />
+        </div>
+        <div className="gg-field">
+          <label htmlFor={`${id}-dateOfPassing`}>{`${personCopy.dateOfPassingLabel} ${personCopy.optional}`}</label>
+          <DateInput
+            id={`${id}-dateOfPassing`}
+            value={values.dateOfPassing ?? ''}
+            max={todayISO()}
+            visibleHelp
+            describedBy={personHintId}
+            {...noteProps(passingNote)}
+            onChange={(dateOfPassing) => onPersonChange({ dateOfPassing })}
+          />
+        </div>
+      </div>
+    </div>
   );
 
   const pronoun = (
@@ -331,14 +378,23 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
 
   return (
     <>
-      <p role="status" className="sr-only">
-        {nameFilled ? copy.nameFilled : ''}
-      </p>
-      {renderGroup('name', copy.groupNameHeading, nameFields, useName, pronoun)}
+      {renderGroup('name', copy.groupNameHeading, nameFields, {
+        lead: derivedParts && (
+          <p id={nameHintId} className="gg-hint">
+            {copy.nameFromPersonHint}
+          </p>
+        ),
+        tail: (
+          <>
+            {pronoun}
+            {personDates}
+          </>
+        ),
+      })}
       {renderGroup('life', copy.groupLifeHeading, lifeFields)}
       {renderGroup('family', copy.groupFamilyHeading, familyFields)}
       {events}
-      {renderGroup('service', copy.groupServiceHeading, funeralFields, undefined, serviceTail)}
+      {renderGroup('service', copy.groupServiceHeading, funeralFields, { tail: serviceTail })}
     </>
   );
 }
