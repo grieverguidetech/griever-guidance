@@ -24,6 +24,8 @@ export interface PlaceInputProps {
   describedBy?: string;
   /** The longest text the field accepts, as for a plain input. */
   maxLength?: number;
+  /** The polite status after a pick that also filled another field. Defaults to the Service text. */
+  fillMessage?: string;
   value: string;
   onChange: (value: string) => void;
   /** Google place types to suggest. Without them the field is a plain text input. */
@@ -46,7 +48,7 @@ export interface PlaceInputProps {
  * The typed text is always the value. Suggestions only help; with none available, or on any
  * failure, it behaves as a plain input and shows no error.
  */
-export function PlaceInput({ id, labelledBy, describedBy, maxLength, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
+export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
   const { enabled, load } = usePlaces();
   // Set when Google could not load. The field then drops every combobox attribute.
   const [unavailable, setUnavailable] = useState(false);
@@ -224,7 +226,7 @@ export function PlaceInput({ id, labelledBy, describedBy, maxLength, value, onCh
     }
     setPicking(false);
     if (onPickRef.current?.(option, details) === true) {
-      setAnnouncement(copy.placesAddressFilled);
+      setAnnouncement(fillMessage ?? copy.placesAddressFilled);
     }
   };
 

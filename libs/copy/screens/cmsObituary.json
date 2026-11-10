@@ -23,6 +23,7 @@
   "nameFromPersonHint": "From The person. You can change it here.",
   "personSharedHint": "These are the same as on The person. A change here changes The person too.",
   "serviceSharedHint": "These are the same as on Service. A change here changes Service too.",
+  "cemeteryLocationFilled": "Cemetery location filled in",
   "birthPlaceLabel": "Where they were born (optional)",
   "motherNameLabel": "Mother's name (optional)",
   "fatherNameLabel": "Father's name (optional)",

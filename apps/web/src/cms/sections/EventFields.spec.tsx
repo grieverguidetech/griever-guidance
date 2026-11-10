@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
+import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { EventFields, type Suggestion } from './EventFields';
 
 const keys = { date: 'receptionDate', time: 'receptionTime', place: 'receptionPlace' } as const;
@@ -98,6 +99,18 @@ describe('EventFields', () => {
     expect(screen.getByLabelText('Place')).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByLabelText('Extra')).toHaveFocus();
+  });
+
+  it('limits the place to the saved length for its key', () => {
+    render(
+      <EventFields
+        legend="Service"
+        keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
+        values={{}}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Place')).toHaveAttribute('maxlength', String(FLOW_DETAIL_MAX_LENGTH.servicePlace));
   });
 
   it('lead comes right after the legend, before date', async () => {

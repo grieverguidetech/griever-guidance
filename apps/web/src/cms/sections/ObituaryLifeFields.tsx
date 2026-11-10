@@ -245,14 +245,18 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           labelledBy={labelId}
           describedBy={hintId}
           maxLength={FLOW_DETAIL_MAX_LENGTH.burialPlace}
+          fillMessage={copy.cemeteryLocationFilled}
           types={BURIAL_PLACE_TYPES}
           wantsDetails={(pick) => Boolean(pick.secondaryText && mayFillCemeteryLocation())}
           onPick={(pick, details) => {
             // The full address from the place itself; the prediction's short line if that failed.
-            const name = details?.name || pick.mainText;
-            const address = details?.address || pick.secondaryText;
+            // Cut to the saved length, as the server would, so a long pick is not lost on save.
+            const cut = (text: string, max: number) => text.slice(0, max);
+            const placeMax = FLOW_DETAIL_MAX_LENGTH.burialPlace;
+            const name = cut(details?.name || pick.mainText, placeMax);
+            const address = cut(details?.address || pick.secondaryText, FLOW_DETAIL_MAX_LENGTH.obituaryCemeteryLocation);
             if (!address) {
-              onServiceChange({ burialPlace: pick.text });
+              onServiceChange({ burialPlace: cut(pick.text, placeMax) });
               return false;
             }
             if (!mayFillCemeteryLocation()) {

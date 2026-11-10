@@ -421,9 +421,9 @@ describe('ObituaryLifeFields', () => {
 
     describe('cemetery search', () => {
       const detailsMock = vi.fn<PlacesClient['details']>();
-      async function placesHarness(initial: Values) {
+      async function placesHarness(initial: Values, load?: () => Promise<PlacesClient | null>, address = '5 Hill Rd, Springfield, MO 65801') {
         detailsMock.mockReset();
-        detailsMock.mockResolvedValue({ name: 'Oak Hill Cemetery', address: '5 Hill Rd, Springfield, MO 65801' });
+        detailsMock.mockResolvedValue({ name: 'Oak Hill Cemetery', address });
         const client: PlacesClient = {
           suggest: vi.fn<PlacesClient['suggest']>().mockResolvedValue([
             { id: 'c', text: 'Oak Hill Cemetery, 5 Hill Rd', mainText: 'Oak Hill Cemetery', secondaryText: '5 Hill Rd' },
@@ -436,7 +436,7 @@ describe('ObituaryLifeFields', () => {
         function Harness() {
           const [values, setValues] = useState<Values>(initial);
           return (
-            <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+            <PlacesProvider value={{ enabled: true, load: load ?? (() => Promise.resolve(client)) }}>
               <ObituaryLifeFields
                 values={values}
                 onChange={(p) => {
@@ -469,6 +469,36 @@ describe('ObituaryLifeFields', () => {
         expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveValue('Oak Hill Cemetery');
         expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Oak Hill Cemetery' });
         expect(patches).toEqual([{ obituaryCemeteryLocation: '5 Hill Rd, Springfield, MO 65801' }]);
+        expect(detailsMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('says the location was filled in the status region', async () => {
+        await placesHarness({});
+        await pick();
+        await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(copy.cemeteryLocationFilled));
+      });
+
+      it('says nothing when a typed location is kept', async () => {
+        await placesHarness({ obituaryCemeteryLocation: '9 My Road' });
+        await pick();
+        await waitFor(() =>
+          expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveValue('Oak Hill Cemetery'),
+        );
+        expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      });
+
+      it('cuts a long picked address to the saved length', async () => {
+        const { patches } = await placesHarness({}, undefined, 'A'.repeat(250));
+        await pick();
+        await waitFor(() => expect(patches).toHaveLength(1));
+        expect(patches[0].obituaryCemeteryLocation).toHaveLength(FLOW_DETAIL_MAX_LENGTH.obituaryCemeteryLocation);
+      });
+
+      it('still saves typed text when the places service fails to load', async () => {
+        const { patches, servicePatches } = await placesHarness({}, () => Promise.reject(new Error('offline')));
+        await userEvent.type(screen.getByRole('combobox', { name: serviceCopy.eventCemetery }), 'Rest');
+        expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Rest' });
+        expect(patches).toEqual([]);
       });
 
       it('does not overwrite a location the family typed', async () => {
