@@ -182,11 +182,15 @@ test.describe('Obituary section (WEB-6)', () => {
     };
     await expect.poll(rowGap).toBe(0);
 
-    // In Service and visitation, the date and time of the service share a row. The date has
-    // help text above its input, so the inputs' tops differ: check the time sits to the right.
+    // In Service and visitation, the date and time of the service share a row: the time sits
+    // to the right of the date.
     await openSection(page, 'Service and visitation');
-    const serviceDate = page.getByLabel('Funeral or memorial service Date', { exact: true });
-    const serviceTime = page.getByLabel('Funeral or memorial service Time', { exact: true });
+    // Find the inputs by their own label inside the event's fieldset, as the unit tests do.
+    const serviceGroup = page.locator('fieldset', {
+      has: page.getByText('Funeral or memorial service', { exact: true }),
+    });
+    const serviceDate = serviceGroup.getByLabel('Date', { exact: true });
+    const serviceTime = serviceGroup.getByLabel('Time', { exact: true });
     await expect(serviceDate).toBeVisible();
     await expect(serviceTime).toBeVisible();
     const timeRightOfDate = async () => {
