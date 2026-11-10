@@ -131,6 +131,17 @@ function section(heading: string, body: string[]): string[] {
   return [heading, '-'.repeat(heading.length), ...body, ''];
 }
 
+/** The obituary body, then the memorial. A blank body (cleared) leaves the part out, memorial or not. */
+function obituaryText(person: PlanPerson): string {
+  if (person.obituaryText !== undefined && person.obituaryText.trim() === '') {
+    return '';
+  }
+  const body =
+    person.obituaryText ??
+    buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy);
+  return obituaryShareText(body, person.obituaryMemorial ?? '');
+}
+
 /**
  * The four messages follow the person's details until the family edits them (undefined), so the
  * same builders the editor sections use fill in an unedited one. A string is the family's wording;
@@ -163,11 +174,7 @@ function messages(person: PlanPerson) {
         receptionTime: person.receptionTime,
         receptionPlace: person.receptionPlace,
       }),
-    obituary: obituaryShareText(
-      person.obituaryText ??
-        buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy),
-      person.obituaryMemorial ?? '',
-    ),
+    obituary: obituaryText(person),
     thanks: person.thanksMessage ?? fill(thanksCopy.template, { deceasedName: name.trim() || thanksCopy.nameFallback }),
   };
 }

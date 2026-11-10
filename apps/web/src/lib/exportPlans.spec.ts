@@ -95,6 +95,14 @@ describe('buildPlansText', () => {
     expect(plain).toContain('A kind man.\n\nThank-you message');
   });
 
+  it('leaves out a cleared obituary even when there is a memorial', () => {
+    const cleared = { personName: 'Sam', obituaryText: '' };
+    const plain = buildPlansText([cleared], copy);
+    expect(buildPlansText([{ ...cleared, obituaryMemorial: 'Gifts to the library.' }], copy)).toBe(plain);
+    expect(buildPlansText([{ ...cleared, obituaryText: '  ', obituaryMemorial: 'Gifts.' }], copy)).toBe(plain);
+    expect(plain).not.toContain('Obituary');
+  });
+
   it('builds the draft from the new fields', () => {
     const text = buildPlansText([{ personName: 'Samuel Reed', obituaryGivenName: 'Sam', obituarySurname: 'Reed' }], copy);
     expect(text.split('Obituary\n--------\n')[1]).toContain('Sam Reed');
