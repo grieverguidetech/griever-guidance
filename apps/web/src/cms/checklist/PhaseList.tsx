@@ -1,6 +1,4 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { CaretDown } from '@phosphor-icons/react/CaretDown';
-import { Check } from '@phosphor-icons/react/Check';
 import { screenCopy } from '@griever/copy';
 import { computeChecklist } from '@griever/hooks';
 import type {
@@ -8,6 +6,7 @@ import type {
   ChecklistItemId,
   ChecklistItemState,
 } from '@griever/shared';
+import { AccordionSection } from '../AccordionSection';
 import { ChecklistItemRow } from './ChecklistItemRow';
 
 const copy = screenCopy('cmsChecklist');
@@ -70,6 +69,7 @@ export function PhaseList({
       panelId={`${panelId}-${phase.key}`}
       onToggle={() => toggle(phase.key)}
       done={phase.done}
+      doneLabel={copy.done}
     >
       {phase.key === 'obituary' && <p>{copy.obituaryNote}</p>}
       <ul className="flex list-none flex-col gap-3 p-0">
@@ -106,66 +106,5 @@ export function PhaseList({
         phases.filter((phase) => phase.key === key),
       ).map(renderPhase)}
     </div>
-  );
-}
-
-interface SectionProps {
-  title: string;
-  open: boolean;
-  panelId: string;
-  onToggle: () => void;
-  done?: boolean;
-  children: ReactNode;
-}
-
-/** One heading with a disclosure button and its panel. Used by every phase and by Gather. */
-function AccordionSection({
-  title,
-  open,
-  panelId,
-  onToggle,
-  done = false,
-  children,
-}: SectionProps) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h3 className="m-0">
-        <button
-          type="button"
-          className="flex min-h-11 w-full items-center gap-2 text-left"
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={onToggle}
-        >
-          <CaretDown
-            size={16}
-            weight="bold"
-            aria-hidden="true"
-            data-chevron
-            className={`order-last ml-auto shrink-0 motion-safe:transition-transform ${open ? 'rotate-180' : ''}`}
-          />
-          {title}
-          {done && (
-            <>
-              {' '}
-              <Check
-                size={20}
-                weight="bold"
-                aria-hidden="true"
-                className="shrink-0 text-success-700"
-              />
-              <span className="sr-only">{copy.done}</span>
-            </>
-          )}
-        </button>
-      </h3>
-      <div
-        id={panelId}
-        hidden={!open}
-        className={open ? 'gg-enter' : undefined}
-      >
-        <div className="flex flex-col gap-3">{children}</div>
-      </div>
-    </section>
   );
 }

@@ -119,6 +119,25 @@ describe('ObituarySection', () => {
     }
   });
 
+  it('opens only the name section on load, and the six sections open independently', async () => {
+    setup(person);
+    const names = [
+      "The person's name",
+      'Their life',
+      'Their family',
+      'Funeral home and church',
+      'Survived by',
+      'Preceded in death by',
+    ];
+    const buttons = names.map((name) => screen.getByRole('button', { name: new RegExp(`^${name}`) }));
+    expect(buttons.map((b) => b.getAttribute('aria-expanded'))).toEqual([
+      'true', 'false', 'false', 'false', 'false', 'false',
+    ]);
+    await userEvent.click(buttons[1]);
+    expect(buttons[1]).toHaveAttribute('aria-expanded', 'true');
+    expect(buttons[0]).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('typing a given name updates the text and saves at once', async () => {
     const { patches } = setup(person);
     await userEvent.type(screen.getByLabelText(/Given name/), 'Annie');
@@ -128,6 +147,7 @@ describe('ObituarySection', () => {
 
   it('adding a survivor row updates paragraph 4', async () => {
     const { patches } = setup(person);
+    await userEvent.click(screen.getByRole('button', { name: 'Survived by' }));
     await userEvent.click(screen.getAllByRole('button', { name: 'Add a person' })[0]);
     await userEvent.type(screen.getByLabelText('Name, person 1'), 'Sam Lee');
     expect(patches.at(-1)).toHaveProperty('obituarySurvivorList');

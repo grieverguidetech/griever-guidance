@@ -44,13 +44,39 @@ async function pressBlockedMarkReady(page: Page) {
   await expect(page.getByRole('status').filter({ hasText: BLOCKED })).toHaveCount(1);
 }
 
+/** The obituary groups are accordion sections; only the name is open on load. Click the heading button to open one. */
+async function openSection(page: Page, name: string) {
+  const button = page.getByRole('button', { name, exact: true });
+  if ((await button.getAttribute('aria-expanded')) !== 'true') {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+}
+
+const SECTIONS = [
+  "The person's name",
+  'Their life',
+  'Their family',
+  'Funeral home and church',
+  'Survived by',
+  'Preceded in death by',
+];
+
+async function openAllSections(page: Page) {
+  for (const name of SECTIONS) {
+    await openSection(page, name);
+  }
+}
+
 /** Fills the name, life and survivor fields, adds the memorial, and presses Mark as ready with placeholders left. */
 async function fillFieldsAndAddMemorial(page: Page) {
   await page.getByRole('button', { name: 'Use the name from The person' }).click();
+  await openSection(page, 'Their life');
   await page.getByLabel('Age (optional)').fill('87');
   await page.getByLabel('City where they lived (optional)').fill('Springfield');
   await page.getByLabel('State where they lived (optional)').fill('Illinois');
 
+  await openSection(page, 'Survived by');
   const survivors = page.getByRole('group', { name: 'Survived by', exact: true });
   await survivors.getByRole('button', { name: 'Add a person' }).click();
   await survivors.getByLabel('Name, person 1', { exact: true }).fill('John Hayes');
@@ -73,6 +99,7 @@ test.describe('Obituary section (WEB-6)', () => {
     await expect(page.getByLabel('Middle name or nickname (optional)')).toHaveValue('');
     await expect(page.getByLabel('Surname (optional)')).toHaveValue('Hayes');
 
+    await openSection(page, 'Their life');
     await page.getByLabel('Age (optional)').fill('87');
     await page.getByLabel('City where they lived (optional)').fill('Springfield');
     await page.getByLabel('State where they lived (optional)').fill('Illinois');
@@ -80,6 +107,7 @@ test.describe('Obituary section (WEB-6)', () => {
 
     // No survivor yet: paragraph 4 keeps its placeholder. One row changes it.
     await expect(obituary(page)).toHaveValue(/Margaret is survived by \[his\/her\] \[RELATION\], \[SURVIVOR NAME\] of \[SURVIVOR CITY\]\./);
+    await openSection(page, 'Survived by');
     const survivors = page.getByRole('group', { name: 'Survived by', exact: true });
     await survivors.getByRole('button', { name: 'Add a person' }).click();
     await expect(survivors.getByLabel('Name, person 1', { exact: true })).toBeFocused();
@@ -121,6 +149,7 @@ test.describe('Obituary section (WEB-6)', () => {
   test('no WCAG A/AA violations with the fields filled, the memorial open and the Ready message showing (contrast checked separately)', async ({ page }) => {
     await openObituary(page);
     await fillFieldsAndAddMemorial(page);
+    await openAllSections(page);
     await expect(blockedLine(page)).toBeVisible();
     expect(await violations(page)).toEqual([]);
   });
@@ -128,7 +157,29 @@ test.describe('Obituary section (WEB-6)', () => {
   test('text meets AA contrast with the Ready message showing', async ({ page }) => {
     await openObituary(page);
     await fillFieldsAndAddMemorial(page);
+    await openAllSections(page);
     await expect(blockedLine(page)).toBeVisible();
     expect(await violations(page, { contrastOnly: true })).toEqual([]);
+  });
+
+  test('paired fields share a row at 1280px and nothing scrolls sideways at 375px', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openObituary(page);
+    await openSection(page, 'Their life');
+    // The panel slides in when it opens, so wait until both inputs have settled on the same row.
+    const rowGap = async () => {
+      const age = await page.getByLabel('Age (optional)').boundingBox();
+      const born = await page.getByLabel('Where they were born (optional)').boundingBox();
+      if (!age || !born) {
+        return null;
+      }
+      return Math.abs(age.y - born.y);
+    };
+    await expect.poll(rowGap).toBe(0);
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openAllSections(page);
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(375);
   });
 });
