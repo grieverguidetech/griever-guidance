@@ -76,10 +76,13 @@
     "relationParent",
     "addPerson",
     "removePerson",
+    "memorialHeading",
     "addMemorial",
     "memorialLabel",
     "memorialHint",
     "readyPlaceholders",
+    "readyPlaceholdersMemorial",
+    "readyPlaceholdersBoth",
     "personRowField",
     "peopleLimit",
     "removePersonUnnamed",
@@ -304,6 +307,9 @@
     "removePerson": {
       "$ref": "#/$defs/text"
     },
+    "memorialHeading": {
+      "$ref": "#/$defs/text"
+    },
     "addMemorial": {
       "$ref": "#/$defs/text"
     },
@@ -314,6 +320,12 @@
       "$ref": "#/$defs/text"
     },
     "readyPlaceholders": {
+      "$ref": "#/$defs/text"
+    },
+    "readyPlaceholdersMemorial": {
+      "$ref": "#/$defs/text"
+    },
+    "readyPlaceholdersBoth": {
       "$ref": "#/$defs/text"
     },
     "personRowField": {

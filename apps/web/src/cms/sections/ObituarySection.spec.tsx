@@ -125,7 +125,7 @@ describe('ObituarySection', () => {
       "The person's name",
       'Their life',
       'Their family',
-      'Funeral home and church',
+      'Funeral home and place of worship',
       'Survived by',
       'Preceded in death by',
     ];
@@ -194,6 +194,8 @@ describe('ObituarySection', () => {
 
   describe('Mark as ready with placeholders (#779)', () => {
     const message = 'Some placeholder text is still in [brackets]. Replace it before you mark this ready.';
+    const memorialMessage = 'Some placeholder text is still in [brackets] in the Memorial. Replace it before you mark this ready.';
+    const bothMessage = 'Some placeholder text is still in [brackets] in the obituary and in the Memorial. Replace it before you mark this ready.';
     const toggle = () => screen.getByRole('button', { name: 'Mark as ready' });
 
     it('refuses the untouched template, with the message in the toggle description', async () => {
@@ -243,9 +245,10 @@ describe('ObituarySection', () => {
     it('refuses once Add Memorial is pressed, and allows Ready after a real memorial is typed', async () => {
       const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
       await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
       expect(toggle()).toHaveAttribute('aria-disabled', 'true');
-      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(message));
+      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(memorialMessage));
       await userEvent.click(toggle());
       expect(onReadyChange).not.toHaveBeenCalled();
       const memorial = screen.getByLabelText('Memorial');
@@ -254,6 +257,24 @@ describe('ObituarySection', () => {
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
       await userEvent.click(toggle());
       expect(onReadyChange).toHaveBeenCalledWith(true);
+    });
+
+    it('names the Memorial in the blocked message even when its accordion is closed, and does not open it', async () => {
+      setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
+      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
+      expect(screen.getByRole('button', { name: 'Memorial (optional)' })).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(memorialMessage));
+      await userEvent.click(toggle());
+      expect(screen.getByRole('button', { name: 'Memorial (optional)' })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('names both when the obituary and the Memorial both have placeholders', async () => {
+      setup(person);
+      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
+      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(bothMessage));
     });
 
     it('always lets Ready be turned off', async () => {
@@ -307,18 +328,71 @@ describe('ObituarySection', () => {
   });
 });
 
+describe('ObituarySection layout and groups', () => {
+  it('puts both read-only panels in one row container, person first', () => {
+    setup(person);
+    const personHeading = screen.getByRole('heading', { level: 2, name: 'Details from The person' });
+    const serviceHeading = screen.getByRole('heading', { level: 2, name: 'Details from Service' });
+    const row = personHeading.closest('.grid')!;
+    expect(serviceHeading.closest('.grid')).toBe(row);
+    expect(row).toHaveClass('grid', 'grid-cols-1', 'md:grid-cols-2', 'gap-6', 'items-start');
+    expect(personHeading.compareDocumentPosition(serviceHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens The person's name on first render and leaves the other groups closed", () => {
+    setup(person);
+    expect(screen.getByRole('button', { name: "The person's name" })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Their life' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('does not block Ready for an empty memorial', () => {
+    setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).not.toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
 describe('ObituarySection memorial', () => {
   const addButton = () => screen.queryByRole('button', { name: 'Add Memorial' });
   const prefill = screenCopy('obituaryDraft').memorial;
 
-  it('shows the Add Memorial button while the memorial is blank, with the primary style', () => {
+  const accordion = () => screen.getByRole('button', { name: 'Memorial (optional)' });
+
+  it('is an h2 accordion, closed on load when blank, and toggles', async () => {
+    setup(person);
+    expect(screen.getByRole('heading', { level: 2, name: 'Memorial (optional)' })).toBeInTheDocument();
+    expect(accordion()).toHaveAttribute('aria-expanded', 'false');
+    expect(addButton()).toBeNull();
+    await userEvent.click(accordion());
+    expect(accordion()).toHaveAttribute('aria-expanded', 'true');
+    expect(addButton()).toBeInTheDocument();
+    await userEvent.click(accordion());
+    expect(accordion()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('is open on load when a memorial is saved', () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    expect(accordion()).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Memorial')).toBeVisible();
+  });
+
+  it('shows the Add Memorial button again after the box is cleared and the accordion is closed and reopened', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    await userEvent.clear(screen.getByLabelText('Memorial'));
+    await userEvent.click(accordion());
+    await userEvent.click(accordion());
+    expect(addButton()).toBeInTheDocument();
+  });
+
+  it('shows the Add Memorial button while the memorial is blank, with the primary style', async () => {
     setup({ ...person, obituaryMemorial: '   ' });
+    await userEvent.click(accordion());
     expect(addButton()).toHaveClass('gg-btn', 'gg-btn-primary');
     expect(screen.queryByLabelText('Memorial')).toBeNull();
   });
 
   it('saves the prefill, shows the labelled box with its hint and focuses it', async () => {
     const { patches } = setup(person);
+    await userEvent.click(accordion());
     await userEvent.click(addButton()!);
     expect(patches).toEqual([{ obituaryMemorial: prefill }]);
     const box = screen.getByLabelText('Memorial') as HTMLTextAreaElement;
@@ -374,7 +448,7 @@ describe('ObituarySection memorial', () => {
     unmount();
     setup(person);
     expect(document.body).toHaveFocus();
-    expect(addButton()).not.toHaveFocus();
+    expect(accordion()).not.toHaveFocus();
   });
 
   it('has the maxLength of its key', () => {

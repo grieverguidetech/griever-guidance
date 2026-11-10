@@ -7,7 +7,8 @@ import { expect, test, type Page } from '@playwright/test';
  */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-const BLOCKED = 'Some placeholder text is still in [brackets]. Replace it before you mark this ready.';
+// The start of the message. It goes on to name the Memorial when the Memorial has placeholders.
+const BLOCKED = 'Some placeholder text is still in [brackets]';
 
 async function violations(page: Page, { contrastOnly = false } = {}) {
   const builder = new AxeBuilder({ page });
@@ -57,9 +58,10 @@ const SECTIONS = [
   "The person's name",
   'Their life',
   'Their family',
-  'Funeral home and church',
+  'Funeral home and place of worship',
   'Survived by',
   'Preceded in death by',
+  'Memorial (optional)',
 ];
 
 async function openAllSections(page: Page) {
@@ -82,6 +84,7 @@ async function fillFieldsAndAddMemorial(page: Page) {
   await survivors.getByLabel('Name, person 1', { exact: true }).fill('John Hayes');
   await survivors.getByLabel('City, person 1', { exact: true }).fill('Austin');
 
+  await openSection(page, 'Memorial (optional)');
   await page.getByRole('button', { name: 'Add Memorial' }).click();
   await pressBlockedMarkReady(page);
 }
@@ -117,6 +120,7 @@ test.describe('Obituary section (WEB-6)', () => {
 
     // The memorial is its own box, added on request.
     await expect(memorial(page)).toHaveCount(0);
+    await openSection(page, 'Memorial (optional)');
     await page.getByRole('button', { name: 'Add Memorial' }).click();
     await expect(memorial(page)).toBeVisible();
     await expect(memorial(page)).toBeFocused();
@@ -177,7 +181,31 @@ test.describe('Obituary section (WEB-6)', () => {
     };
     await expect.poll(rowGap).toBe(0);
 
+    // The two read-only panels share a row.
+    const personHeading = page.getByRole('heading', { level: 2, name: 'Details from The person' });
+    const serviceHeading = page.getByRole('heading', { level: 2, name: 'Details from Service' });
+    const detailsGap = async () => {
+      const a = await personHeading.boundingBox();
+      const b = await serviceHeading.boundingBox();
+      if (!a || !b) {
+        return null;
+      }
+      return Math.abs(a.y - b.y);
+    };
+    await expect.poll(detailsGap).toBe(0);
+
     await page.setViewportSize({ width: 375, height: 812 });
+    // Below md they stack, The person first, with the same left edge.
+    await expect
+      .poll(async () => {
+        const a = await personHeading.boundingBox();
+        const b = await serviceHeading.boundingBox();
+        return a && b ? b.y - a.y : null;
+      })
+      .toBeGreaterThan(0);
+    const personBox = await personHeading.boundingBox();
+    const serviceBox = await serviceHeading.boundingBox();
+    expect(serviceBox?.x).toBe(personBox?.x);
     await openAllSections(page);
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(375);
