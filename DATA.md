@@ -224,6 +224,7 @@ older list loads with its values unchanged.
   receptionDate, receptionTime, receptionPlace }
 ```
 
+- A field is written in place from any page (the Obituary writes `burialPlace`, `burialPrivate` and `serviceOfficiant`); the owning section's status moves (`service` to `in_progress`), not the page's.
 - `serviceDate` stays the main service's date. Contact retention reads only `serviceDate`; no
   visitation, burial or reception date affects it.
 - Status is stored, not guessed. `updateSection(id, key, patch)` applies the patch and sets

@@ -1523,6 +1523,7 @@ function AppBody({
               key={active.id}
               values={active}
               onChange={(patch) => sessions.updateSection(active.id, 'obituary', patch)}
+              onServiceChange={(patch) => sessions.updateSection(active.id, 'service', patch)}
               onReadyChange={readyChange('obituary')}
               nextSection={nextSection}
               onNext={goNext}

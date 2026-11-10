@@ -6,6 +6,7 @@ import {
   ageFrom,
   splitPersonName,
   type SectionFields,
+  type ServiceEventFields,
   type SessionDetails,
 } from '@griever/shared';
 
@@ -41,14 +42,22 @@ export type ObituaryLifeKey = TextKey | 'obituaryPronoun';
 
 export type ObituaryLifePatch = Partial<Record<ObituaryLifeKey, string>>;
 
+/** The Service fields this component also writes. They are the same saved values as on Service. */
+export type ServiceSharedKey = 'burialPlace' | 'burialPrivate' | 'serviceOfficiant';
+
+export type ServiceSharedPatch = Partial<Pick<ServiceEventFields, ServiceSharedKey>>;
+
 /** The life keys, plus the name and dates, which are only read. */
 export type ObituaryLifeValues = Partial<Pick<SectionFields, ObituaryLifeKey | 'birthDate'>> &
-  Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>>;
+  Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
+  Partial<Pick<ServiceEventFields, ServiceSharedKey>>;
 
 interface Props {
   values: ObituaryLifeValues;
   /** Gets only the field that changed (the name button gives three keys at once). */
   onChange: (patch: ObituaryLifePatch) => void;
+  /** Gets only the Service field that changed. It writes the same value Service shows. */
+  onServiceChange: (patch: ServiceSharedPatch) => void;
 }
 
 interface FieldSpec {
@@ -90,11 +99,12 @@ const familyFields: FieldSpec[] = [
   { key: 'obituaryFatherName', label: copy.fatherNameLabel },
 ];
 
-const serviceFields: FieldSpec[] = [
+const funeralFields: FieldSpec[] = [
   { key: 'obituaryFuneralHome', label: copy.funeralHomeLabel },
   { key: 'obituaryChurch', label: copy.churchLabel },
-  { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel },
 ];
+
+const cemeteryLocationField: FieldSpec = { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel };
 
 type GroupKey = 'name' | 'life' | 'family' | 'service';
 
@@ -106,7 +116,7 @@ const pronounChoices = [
 ];
 
 /** The name parts, age, places, school, work, interests and pronoun of the obituary. Controlled; it does not save. */
-export function ObituaryLifeFields({ values, onChange }: Props) {
+export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props) {
   const id = useId();
   const [ageFocused, setAgeFocused] = useState(false);
   const [nameFilled, setNameFilled] = useState(false);
@@ -152,6 +162,23 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
           onFocus={isAge ? () => setAgeFocused(true) : undefined}
           onBlur={isAge ? () => setAgeFocused(false) : undefined}
           onChange={(e) => onChange({ [spec.key]: e.target.value })}
+        />
+      </div>
+    );
+  }
+
+  function renderServiceText(key: 'burialPlace' | 'serviceOfficiant', label: string) {
+    return (
+      <div className="gg-field" key={key}>
+        <label htmlFor={`${id}-${key}`}>{label}</label>
+        <input
+          id={`${id}-${key}`}
+          type="text"
+          className="gg-input"
+          autoComplete="off"
+          maxLength={FLOW_DETAIL_MAX_LENGTH[key]}
+          value={values[key] ?? ''}
+          onChange={(e) => onServiceChange({ [key]: e.target.value })}
         />
       </div>
     );
@@ -217,6 +244,27 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
     </div>
   );
 
+  const burialPrivate = values.burialPrivate === true;
+  const serviceLead = (
+    <p className="gg-hint">{copy.serviceSharedHint}</p>
+  );
+  const serviceTail = (
+    <>
+      {renderServiceText('serviceOfficiant', copy.officiantFieldLabel)}
+      <label className="gg-field flex min-h-[44px] cursor-pointer flex-row items-center gap-3 md:col-span-2">
+        <input
+          type="checkbox"
+          className="m-0 h-5 w-5"
+          checked={burialPrivate}
+          onChange={(e) => onServiceChange({ burialPrivate: e.target.checked })}
+        />
+        {copy.burialPrivateLabel}
+      </label>
+      {!burialPrivate && renderServiceText('burialPlace', copy.cemeteryNameLabel)}
+      {!burialPrivate && renderField(cemeteryLocationField)}
+    </>
+  );
+
   return (
     <>
       <p role="status" className="sr-only">
@@ -225,7 +273,7 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
       {renderGroup('name', copy.groupNameHeading, nameFields, useName, pronoun)}
       {renderGroup('life', copy.groupLifeHeading, lifeFields)}
       {renderGroup('family', copy.groupFamilyHeading, familyFields)}
-      {renderGroup('service', copy.groupServiceHeading, serviceFields)}
+      {renderGroup('service', copy.groupServiceHeading, funeralFields, serviceLead, serviceTail)}
     </>
   );
 }

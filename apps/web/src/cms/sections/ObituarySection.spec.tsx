@@ -12,6 +12,7 @@ type Values = Parameters<typeof ObituarySection>[0]['values'];
 
 function setup(initial: Values = {}) {
   const patches: ObituaryPatch[] = [];
+  const servicePatches: Record<string, unknown>[] = [];
   const onReadyChange = vi.fn();
   const onOpenPerson = vi.fn();
   const onOpenService = vi.fn();
@@ -24,6 +25,10 @@ function setup(initial: Values = {}) {
           patches.push(patch);
           setValues((v) => ({ ...v, ...patch }));
         }}
+        onServiceChange={(patch) => {
+          servicePatches.push(patch);
+          setValues((v) => ({ ...v, ...patch }));
+        }}
         onReadyChange={onReadyChange}
         onOpenPerson={onOpenPerson}
         onOpenService={onOpenService}
@@ -31,11 +36,13 @@ function setup(initial: Values = {}) {
     );
   }
   render(<Harness />);
-  return { patches, onReadyChange, onOpenPerson, onOpenService };
+  return { patches, servicePatches, onReadyChange, onOpenPerson, onOpenService };
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
 const person = { personName: 'Ann Lee', dateOfPassing: 'June 1, 2026', birthDate: 'May 2, 1940' };
+
+const copy = screenCopy('cmsObituary');
 
 describe('ObituarySection', () => {
   it('shows the name and dates read-only, with a button to change them in The person', async () => {
@@ -178,6 +185,16 @@ describe('ObituarySection', () => {
     );
   });
 
+  it('typing the cemetery goes to onServiceChange and removes [CEMETERY NAME] from the unedited text', async () => {
+    const { patches, servicePatches } = setup(person);
+    expect(text().value).toContain('[CEMETERY NAME]');
+    await userEvent.type(screen.getByLabelText(copy.cemeteryNameLabel), 'Oak Hill');
+    expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Oak Hill' });
+    expect(patches).toEqual([]);
+    expect(text().value).not.toContain('[CEMETERY NAME]');
+    expect(text().value).toContain('Oak Hill');
+  });
+
   it('keeps an edit, shows the edited hint, and resets with focus on the text', async () => {
     const { patches } = setup(person);
     await userEvent.type(text(), '!');
@@ -283,6 +300,7 @@ describe('ObituarySection', () => {
         <ObituarySection
           values={{ ...person, sectionStatus: { obituary: 'ready' } }}
           onChange={() => undefined}
+          onServiceChange={() => undefined}
           onReadyChange={onReadyChange}
         />,
       );
@@ -445,7 +463,8 @@ describe('ObituarySection memorial', () => {
 
   it('does not take focus on load, saved or blank', () => {
     const { unmount } = render(
-      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined} onReadyChange={() => undefined} />,
+      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined}
+          onServiceChange={() => undefined} onReadyChange={() => undefined} />,
     );
     expect(document.body).toHaveFocus();
     unmount();
@@ -474,6 +493,7 @@ describe('ObituarySection phone nudge', () => {
         <ObituarySection
           values={{ obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
           onChange={() => undefined}
+          onServiceChange={() => undefined}
           onReadyChange={setReady}
         />
       );

@@ -30,6 +30,10 @@
     "funeralHomeLabel",
     "churchLabel",
     "cemeteryLabel",
+    "cemeteryNameLabel",
+    "officiantFieldLabel",
+    "burialPrivateLabel",
+    "serviceSharedHint",
     "birthPlaceLabel",
     "motherNameLabel",
     "fatherNameLabel",
@@ -167,6 +171,18 @@
       "$ref": "#/$defs/text"
     },
     "cemeteryLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "cemeteryNameLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "officiantFieldLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "burialPrivateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "serviceSharedHint": {
       "$ref": "#/$defs/text"
     },
     "birthPlaceLabel": {

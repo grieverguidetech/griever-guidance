@@ -4,13 +4,18 @@ import { FLOW_DETAIL_MAX_LENGTH, PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '
 import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { AccordionSection } from '../AccordionSection';
 import { MarkReady } from './MarkReady';
-import { ObituaryLifeFields, type ObituaryLifeKey, type ObituaryLifeValues } from './ObituaryLifeFields';
+import {
+  ObituaryLifeFields,
+  type ObituaryLifeKey,
+  type ObituaryLifeValues,
+  type ServiceSharedPatch,
+} from './ObituaryLifeFields';
 import { ObituaryPeople } from './ObituaryPeople';
 
 const copy = screenCopy('cmsObituary');
 const draftCopy = screenCopy('obituaryDraft');
 
-/** The Service fields are only read, to fill the template. They are edited in the Service section. */
+/** The Service fields fill the template. Only cemetery, private burial and officiant are also written here. */
 type ObituaryValues = ObituaryLifeValues &
   Partial<Pick<SessionDetails, 'serviceDate'>> &
   Partial<ServiceEventFields> &
@@ -37,6 +42,8 @@ interface Props {
   values: ObituaryValues;
   /** Gets only the field that changed. There is no Save button; the editor saves as you go. */
   onChange: (patch: ObituaryPatch) => void;
+  /** Gets only the Service field that changed (cemetery, private burial, officiant). Service shows the same values. */
+  onServiceChange: (patch: ServiceSharedPatch) => void;
   onReadyChange: (ready: boolean) => void;
   /** The next section still to do, or null when none is left. */
   nextSection?: SectionKey | null;
@@ -48,7 +55,7 @@ interface Props {
 }
 
 /** The obituary template fields, and the obituary text. The text follows the fields until edited. */
-export function ObituarySection({ values, onChange, onReadyChange, nextSection, onNext, onOpenPerson, onOpenService }: Props) {
+export function ObituarySection({ values, onChange, onServiceChange, onReadyChange, nextSection, onNext, onOpenPerson, onOpenService }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const memorialRef = useRef<HTMLTextAreaElement>(null);
@@ -153,7 +160,7 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
         </div>
       </div>
       <div className="flex flex-col gap-6">
-        <ObituaryLifeFields values={values} onChange={onChange} />
+        <ObituaryLifeFields values={values} onChange={onChange} onServiceChange={onServiceChange} />
         <ObituaryPeople
           heading={copy.survivedByHeading}
           relations={SURVIVOR_RELATIONS}
