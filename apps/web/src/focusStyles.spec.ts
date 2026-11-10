@@ -100,13 +100,18 @@ describe('visible focus (#162)', () => {
     }
   });
 
-  it('the phone nudge ring shows on :focus and clears 3:1 on every background (#757)', () => {
+  it('the phone nudge takes focus with no visible ring and keeps its shadow (#803)', () => {
     const declarations = rule('.gg-phone-nudge:focus,\n.gg-phone-nudge:focus-visible');
-    expect(declarations).not.toMatch(/outline:\s*(none|2px solid transparent)/);
-    const ring = token(colourIn(declarations, 'outline'));
-    for (const [name, bg] of Object.entries(backgrounds)) {
-      expect({ name, ratio: contrast(ring, bg) >= 3 }).toEqual({ name, ratio: true });
-    }
+    expect(declarations).toMatch(/outline:\s*2px solid transparent/);
+    expect(declarations).toMatch(/box-shadow:\s*var\(--shadow-md\)/);
+    expect(declarations).not.toMatch(/accent-700/);
+  });
+
+  it('the phone nudge rule comes after the generic tabindex rule, since source order decides (#803)', () => {
+    const generic = CSS.indexOf("[tabindex='-1']:focus-visible {");
+    const nudge = CSS.indexOf('.gg-phone-nudge:focus,');
+    expect(generic).toBeGreaterThanOrEqual(0);
+    expect(nudge).toBeGreaterThan(generic);
   });
 
   it('a focused field gets a ring that clears 3:1 against the field, the page and its old border', () => {
