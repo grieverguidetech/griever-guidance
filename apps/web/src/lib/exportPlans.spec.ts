@@ -1,4 +1,4 @@
-import { screenCopy } from '@griever/copy';
+import { buildObituaryDraft, screenCopy } from '@griever/copy';
 import { buildPlansText, downloadPlans, plansFileName } from './exportPlans';
 import type { PlanPerson } from './exportPlans';
 
@@ -84,7 +84,23 @@ describe('buildPlansText', () => {
 
   it('adds the memorial after a built draft too', () => {
     const text = buildPlansText([{ personName: 'Sam Reed', obituaryMemorial: 'Gifts to the library.' }], copy);
-    expect(text).toContain('\n\nGifts to the library.\n');
+    const section = text.split('Obituary\n--------\n')[1].split('\n\nThank-you message')[0];
+    expect(section.endsWith('\n\nGifts to the library.')).toBe(true);
+    expect(section.split('\n\n').pop()).toBe('Gifts to the library.');
+    expect(text).toContain('Gifts to the library.\n\nThank-you message');
+  });
+
+  it('does not stack blank lines before the memorial when the typed text ends in newlines', () => {
+    const text = buildPlansText([{ personName: 'Sam', obituaryText: 'A kind man.\n\n\n', obituaryMemorial: 'Gifts.' }], copy);
+    expect(text).toContain('A kind man.\n\nGifts.\n');
+    expect(text).not.toContain('A kind man.\n\n\n');
+  });
+
+  it('writes a built draft with no memorial exactly as the builder returns it', () => {
+    const person = { personName: 'Sam Reed', obituaryGivenName: 'Sam', obituaryCity: 'Reno' };
+    const draft = buildObituaryDraft(person, screenCopy('obituaryDraft'));
+    const text = buildPlansText([person], copy);
+    expect(text.split('Obituary\n--------\n')[1].split('\n\nThank-you message')[0]).toBe(draft);
   });
 
   it('writes the obituary unchanged when there is no memorial', () => {

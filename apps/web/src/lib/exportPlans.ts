@@ -139,7 +139,7 @@ function obituaryText(person: PlanPerson): string {
   const body =
     person.obituaryText ??
     buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy);
-  return obituaryShareText(body, person.obituaryMemorial ?? '');
+  return obituaryShareText(body.trimEnd(), person.obituaryMemorial ?? '');
 }
 
 /**
