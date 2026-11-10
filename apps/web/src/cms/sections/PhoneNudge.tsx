@@ -72,7 +72,7 @@ interface Props {
 
 /** One blue card for every section: a heading, one line saying where the sending happens, and Got it at the right.
  * A labelled region the parent focuses when it appears, so the heading and line are announced once. The
- * focus ring (.gg-phone-nudge:focus in styles.css) shows after a mouse click too. */
+ * focus moves by script and shows no visible ring (#803, .gg-phone-nudge:focus in styles.css). */
 export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
   const headingId = useId();
   const lineId = useId();

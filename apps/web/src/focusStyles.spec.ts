@@ -107,6 +107,13 @@ describe('visible focus (#162)', () => {
     expect(declarations).not.toMatch(/accent-700/);
   });
 
+  it('the phone nudge rule comes after the generic tabindex rule, since source order decides (#803)', () => {
+    const generic = CSS.indexOf("[tabindex='-1']:focus-visible {");
+    const nudge = CSS.indexOf('.gg-phone-nudge:focus,');
+    expect(generic).toBeGreaterThanOrEqual(0);
+    expect(nudge).toBeGreaterThan(generic);
+  });
+
   it('a focused field gets a ring that clears 3:1 against the field, the page and its old border', () => {
     const declarations = rule('.gg-input:focus-visible');
     expect(declarations).not.toMatch(/outline:\s*none/);
