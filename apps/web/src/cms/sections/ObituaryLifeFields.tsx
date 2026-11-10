@@ -1,6 +1,8 @@
 import { useId, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { AccordionSection } from '../AccordionSection';
+import { ANY_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
+import { EventFields } from './EventFields';
 import {
   FLOW_DETAIL_MAX_LENGTH,
   ageFrom,
@@ -45,14 +47,26 @@ export type ObituaryLifeKey = TextKey | 'obituaryPronoun';
 export type ObituaryLifePatch = Partial<Record<ObituaryLifeKey, string>>;
 
 /** The Service fields this component also writes. They are the same saved values as on Service. */
-export type ServiceSharedKey = 'burialPlace' | 'burialPrivate' | 'serviceOfficiant';
+export type ServiceSharedKey =
+  | 'burialPlace'
+  | 'burialPrivate'
+  | 'serviceOfficiant'
+  | 'visitationPlace'
+  | 'visitationDate'
+  | 'visitationTime'
+  | 'servicePlace'
+  | 'serviceTime'
+  | 'serviceDate'
+  | 'serviceAddress';
 
-export type ServiceSharedPatch = Partial<Pick<ServiceEventFields, ServiceSharedKey>>;
+type ServiceSharedFields = ServiceEventFields & SectionFields & SessionDetails;
+
+export type ServiceSharedPatch = Partial<Pick<ServiceSharedFields, ServiceSharedKey>>;
 
 /** The life keys, plus the name and dates, which are only read. */
 export type ObituaryLifeValues = Partial<Pick<SectionFields, ObituaryLifeKey | 'birthDate'>> &
   Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
-  Partial<Pick<ServiceEventFields, ServiceSharedKey>>;
+  Partial<Pick<ServiceSharedFields, ServiceSharedKey>>;
 
 interface Props {
   values: ObituaryLifeValues;
@@ -108,7 +122,7 @@ const funeralFields: FieldSpec[] = [
 
 const cemeteryLocationField: FieldSpec = { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel, full: true };
 
-type GroupKey = 'name' | 'life' | 'family' | 'service';
+type GroupKey = 'name' | 'life' | 'family' | 'events' | 'service';
 
 const pronounChoices = [
   { value: '', label: copy.pronounNone },
@@ -273,6 +287,48 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
     </>
   );
 
+  const eventsHintId = `${id}-events-hint`;
+  // The same fields and props as on Service, so values and date formats match.
+  const events = (
+    <AccordionSection
+      title={copy.groupEventsHeading}
+      level={2}
+      headingId={`${id}-events-heading`}
+      open={open.has('events')}
+      panelId={`${id}-events-panel`}
+      onToggle={() => toggle('events')}
+    >
+      <div
+        role="group"
+        aria-labelledby={`${id}-events-heading`}
+        aria-describedby={eventsHintId}
+        className="flex flex-col gap-6"
+        data-group="events-shared"
+      >
+        <p id={eventsHintId} className="gg-hint">
+          {copy.serviceSharedHint}
+        </p>
+        <EventFields
+          legend={serviceCopy.eventFuneral}
+          keys={{ date: 'serviceDate', time: 'serviceTime', place: 'servicePlace' }}
+          values={values}
+          onChange={onServiceChange}
+          dateOfPassing={values.dateOfPassing}
+          placeTypes={SERVICE_PLACE_TYPES}
+          addressKey="serviceAddress"
+        />
+        <EventFields
+          legend={serviceCopy.eventVisitation}
+          keys={{ date: 'visitationDate', time: 'visitationTime', place: 'visitationPlace' }}
+          values={values}
+          onChange={onServiceChange}
+          dateOfPassing={values.dateOfPassing}
+          placeTypes={ANY_PLACE_TYPES}
+        />
+      </div>
+    </AccordionSection>
+  );
+
   return (
     <>
       <p role="status" className="sr-only">
@@ -281,6 +337,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
       {renderGroup('name', copy.groupNameHeading, nameFields, useName, pronoun)}
       {renderGroup('life', copy.groupLifeHeading, lifeFields)}
       {renderGroup('family', copy.groupFamilyHeading, familyFields)}
+      {events}
       {renderGroup('service', copy.groupServiceHeading, funeralFields, undefined, serviceTail)}
     </>
   );

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
@@ -15,7 +15,6 @@ function setup(initial: Values = {}) {
   const servicePatches: Record<string, unknown>[] = [];
   const onReadyChange = vi.fn();
   const onOpenPerson = vi.fn();
-  const onOpenService = vi.fn();
   function Harness() {
     const [values, setValues] = useState<Values>(initial);
     return (
@@ -31,12 +30,11 @@ function setup(initial: Values = {}) {
         }}
         onReadyChange={onReadyChange}
         onOpenPerson={onOpenPerson}
-        onOpenService={onOpenService}
       />
     );
   }
   render(<Harness />);
-  return { patches, servicePatches, onReadyChange, onOpenPerson, onOpenService };
+  return { patches, servicePatches, onReadyChange, onOpenPerson };
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
@@ -71,50 +69,29 @@ describe('ObituarySection', () => {
     expect(screen.queryByLabelText(/A personal note/)).toBeNull();
   });
 
-  it('shows only the filled Service details, read-only, and Change on Service opens Service', async () => {
-    const { onOpenService } = setup({
-      ...person,
-      servicePlace: 'Oak Chapel',
-      serviceOfficiant: 'Reverend Sam Cole',
-      burialPrivate: true,
-      burialPlace: 'Oak Hill',
-    });
-    expect(screen.getByText('Details from Service')).toBeInTheDocument();
-    expect(screen.getByText('Oak Chapel')).toBeInTheDocument();
-    // Officiant and burial are edited below, so they are not repeated in the read-only list.
-    const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
-    expect(within(list).queryByText('Officiant')).toBeNull();
-    expect(within(list).queryByText('Burial')).toBeNull();
-    expect(within(list).queryByText('Reverend Sam Cole')).toBeNull();
-    expect(screen.queryByText('Visitation date')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Change these on Service' }));
-    expect(onOpenService).toHaveBeenCalledTimes(1);
-  });
-
-  it('says so, once, when nothing is filled in on Service, and keeps the button', () => {
-    setup(person);
-    expect(screen.getByText('Nothing is filled in on Service yet.')).toBeInTheDocument();
-    expect(screen.queryByText(/We take these from the Service section/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Change these on Service' })).toBeInTheDocument();
-  });
-
-  it('ties the Service hint to the list of details', () => {
+  it('has no read-only Service card and no button to open Service', () => {
     setup({ ...person, servicePlace: 'Oak Chapel' });
-    const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
-    expect(list).toHaveAccessibleDescription(/We take these from the Service section/);
+    expect(screen.queryByText('Details from Service')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change these on Service' })).toBeNull();
+    expect(screen.queryByText('Nothing is filled in on Service yet.')).toBeNull();
   });
 
-  it('makes the two panel labels level 2 headings', () => {
+  it('shows the saved service and visitation values as editable fields', () => {
+    setup({ ...person, servicePlace: 'Oak Chapel', serviceTime: '2:00 PM', visitationPlace: 'Hall' });
+    expect(screen.getByLabelText('Funeral or memorial service Place')).toHaveValue('Oak Chapel');
+    expect(screen.getByLabelText('Funeral or memorial service Time')).toHaveValue('14:00');
+    expect(screen.getByLabelText('Visitation or calling hours Place')).toHaveValue('Hall');
+  });
+
+  it('makes the person panel label a level 2 heading', () => {
     setup(person);
     expect(screen.getByRole('heading', { level: 2, name: 'Details from The person' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Details from Service' })).toBeInTheDocument();
   });
 
-  it('puts the details in order: The person, Service, then the life fields and people', () => {
+  it('puts the details in order: The person, then the life fields and people', () => {
     setup({ ...person, servicePlace: 'Oak Chapel' });
     const top = [
       screen.getByText('Details from The person'),
-      screen.getByText('Details from Service'),
       screen.getByLabelText(/Given name/),
       screen.getByText('Survived by'),
       screen.getByText('Preceded in death by'),
@@ -346,17 +323,11 @@ describe('ObituarySection', () => {
 });
 
 describe('ObituarySection layout and groups', () => {
-  it('puts both read-only columns in one panel with a two-column grid, person first', () => {
+  it('puts The person in one panel, full width', () => {
     setup(person);
     const personHeading = screen.getByRole('heading', { level: 2, name: 'Details from The person' });
-    const serviceHeading = screen.getByRole('heading', { level: 2, name: 'Details from Service' });
-    const panel = personHeading.closest('.gg-panel')!;
-    expect(serviceHeading.closest('.gg-panel')).toBe(panel);
-    const row = personHeading.closest('.grid')!;
-    expect(serviceHeading.closest('.grid')).toBe(row);
-    expect(panel).toContainElement(row as HTMLElement);
-    expect(row).toHaveClass('grid', 'grid-cols-1', 'md:grid-cols-2', 'gap-6', 'items-start');
-    expect(personHeading.compareDocumentPosition(serviceHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(personHeading.closest('.gg-panel')).not.toBeNull();
+    expect(personHeading.closest('.grid')).toBeNull();
   });
 
   it("opens The person's name on first render and leaves the other groups closed", () => {

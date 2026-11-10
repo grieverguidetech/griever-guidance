@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
+import { PlacesProvider } from '../../lib/places/PlacesContext';
+import type { PlacesClient } from '../../lib/places/placesClient';
 import {
   ObituaryLifeFields,
   type ObituaryLifeKey,
@@ -187,17 +189,18 @@ describe('ObituaryLifeFields', () => {
       copy.groupNameHeading,
       copy.groupLifeHeading,
       copy.groupFamilyHeading,
+      copy.groupEventsHeading,
       copy.groupServiceHeading,
     ];
     const button = (name: string) => screen.getByRole('button', { name });
 
-    it('has four level 2 headings with a button each, and only the name open', () => {
+    it('has five level 2 headings with a button each, and only the name open', () => {
       setup();
       for (const heading of headings) {
         expect(screen.getByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
       }
       expect(headings.map((h) => button(h).getAttribute('aria-expanded'))).toEqual([
-        'true', 'false', 'false', 'false',
+        'true', 'false', 'false', 'false', 'false',
       ]);
     });
 
@@ -310,9 +313,11 @@ describe('ObituaryLifeFields', () => {
       expect(screen.getByLabelText(serviceCopy.eventCemetery)).toHaveValue('Oak Hill');
     });
 
-    it('shows one hint that these are the same as on Service', () => {
+    it('shows one hint in each group that these are the same as on Service', () => {
       setup();
-      expect(screen.getAllByText(copy.serviceSharedHint)).toHaveLength(1);
+      expect(screen.getAllByText(copy.serviceSharedHint)).toHaveLength(2);
+      const block = document.querySelector('[data-group="service-shared"]') as HTMLElement;
+      expect(block.querySelectorAll('p.gg-hint')).toHaveLength(1);
     });
 
     it('gives the hint as the description of the three shared controls, and not of the Obituary-only fields', () => {
@@ -336,6 +341,101 @@ describe('ObituaryLifeFields', () => {
 
     it('does not mark the cemetery location optional', () => {
       expect(copy.cemeteryLabel).not.toMatch(/optional/i);
+    });
+  });
+
+  describe('shared service and visitation fields', () => {
+    const service = 'Funeral or memorial service';
+    const visitation = 'Visitation or calling hours';
+
+    it('shows the saved values, with Service labels', () => {
+      setup({
+        servicePlace: 'Oak Chapel',
+        serviceDate: 'June 5, 2026',
+        serviceTime: '2:00 PM',
+        visitationPlace: 'Hall',
+        visitationDate: 'June 4, 2026',
+        visitationTime: '6:00 PM',
+      });
+      expect(screen.getByLabelText(`${service} Place`)).toHaveValue('Oak Chapel');
+      expect(screen.getByLabelText(`${service} Date`)).toHaveValue('June 5, 2026');
+      expect(screen.getByLabelText(`${service} Time`)).toHaveValue('14:00');
+      expect(screen.getByLabelText(`${visitation} Place`)).toHaveValue('Hall');
+      expect(screen.getByLabelText(`${visitation} Date`)).toHaveValue('June 4, 2026');
+      expect(screen.getByLabelText(`${visitation} Time`)).toHaveValue('18:00');
+    });
+
+    it('sends only the typed key through onServiceChange', async () => {
+      const { patches, servicePatches } = setup();
+      // The time control speaks 24-hour; the saved value is the Service format.
+      fireEvent.change(screen.getByLabelText(`${service} Time`), { target: { value: '14:00' } });
+      await userEvent.type(screen.getByLabelText(`${visitation} Place`), 'H');
+      expect(servicePatches).toEqual([{ serviceTime: '2:00 PM' }, { visitationPlace: 'H' }]);
+      expect(patches).toEqual([]);
+    });
+
+    it('saves a typed date in the Service display format', async () => {
+      const { servicePatches } = setup();
+      const date = screen.getByLabelText(`${service} Date`);
+      await userEvent.type(date, '6/5/2026');
+      await userEvent.tab();
+      expect(servicePatches.at(-1)).toEqual({ serviceDate: 'June 5, 2026' });
+      expect(date).toHaveValue('June 5, 2026');
+    });
+
+    it('shows the quiet note when the service date is before the date of passing', () => {
+      setup({ serviceDate: 'May 1, 2026', dateOfPassing: 'June 1, 2026' });
+      expect(screen.getByLabelText(`${service} Date`)).toHaveAccessibleDescription(
+        new RegExp(serviceCopy.beforePassing.slice(0, 20)),
+      );
+    });
+
+    it('a picked service place also writes the address', async () => {
+      const client: PlacesClient = {
+        suggest: vi.fn<PlacesClient['suggest']>().mockResolvedValue([
+          { id: 'a', text: 'Oak Funeral Home, 1 Main St', mainText: 'Oak Funeral Home', secondaryText: '1 Main St' },
+        ]),
+        newToken: () => ({}),
+        details: vi.fn<PlacesClient['details']>().mockResolvedValue({
+          name: 'Oak Funeral Home',
+          address: '1 Main St, Springfield, MO 65801',
+        }),
+      };
+      const servicePatches: ServiceSharedPatch[] = [];
+      function Harness() {
+        const [values, setValues] = useState<Values>({});
+        return (
+          <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+            <ObituaryLifeFields
+              values={values}
+              onChange={() => undefined}
+              onServiceChange={(patch) => {
+                servicePatches.push(patch);
+                setValues((v) => ({ ...v, ...patch }));
+              }}
+            />
+          </PlacesProvider>
+        );
+      }
+      render(<Harness />);
+      await userEvent.click(screen.getByRole('button', { name: copy.groupEventsHeading }));
+      const place = screen.getByRole('combobox', { name: `${service} Place` });
+      await userEvent.type(place, 'oak');
+      await userEvent.click(await screen.findByRole('option', { name: /Oak Funeral Home/ }));
+      await waitFor(() =>
+        expect(servicePatches).toContainEqual({
+          servicePlace: 'Oak Funeral Home',
+          serviceAddress: '1 Main St, Springfield, MO 65801',
+        }),
+      );
+    });
+
+    it('gives the group the hint as its description', async () => {
+      setup();
+      await userEvent.click(screen.getByRole('button', { name: copy.groupEventsHeading }));
+      expect(screen.getByRole('group', { name: copy.groupEventsHeading })).toHaveAccessibleDescription(
+        copy.serviceSharedHint,
+      );
     });
   });
 
