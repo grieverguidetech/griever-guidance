@@ -1,4 +1,4 @@
-import { buildObituaryDraft, findTemplateBlanks, hasTemplateBlanks, screenCopy } from './index';
+import { buildObituaryDraft, findTemplateBlanks, hasTemplateBlanks, obituaryShareText, screenCopy } from './index';
 import type { ObituaryDraftFields } from './index';
 
 const copy = screenCopy('obituaryDraft');
@@ -49,8 +49,7 @@ describe('buildObituaryDraft: empty', () => {
         '[GIVEN NAME] [SURNAME], [AGE], of [CITY], [STATE], passed away on [DATE OF DEATH].',
         "Funeral service will be held at [SERVICE LOCATION] on [SERVICE DATE] at [SERVICE TIME] with [OFFICIANT] officiating. Burial will follow at [CEMETERY NAME], [CEMETERY LOCATION]. Visitation will be held at [VISITATION LOCATION] on [VISITATION DATE] at [VISITATION TIME].",
         "[NAME] was born in [BIRTH PLACE] to [MOTHER'S NAME] and [FATHER'S NAME] on [DATE OF BIRTH]. [He/She] went to high school at [HIGH SCHOOL] and graduated in [GRADUATION YEAR]. [He/She] worked as a [JOB TITLE] for [COMPANY] for [NUMBER OF YEARS].",
-        '[NAME] is survived by [his/her] [RELATION], [NAME] of [CITY]. [He/She] is preceded in death by [his/her] [RELATION], [NAME].',
-        'Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME]. [FINAL WORDS]',
+        '[NAME] is survived by [his/her] [RELATION], [SURVIVOR NAME] of [SURVIVOR CITY].',
       ].join('\n\n'),
     );
   });
@@ -61,8 +60,7 @@ describe('buildObituaryDraft: empty', () => {
   });
 
   it('gives each slot its own bracket word', () => {
-    const { survivors: _survivors, note: _note, ...slots } = copy.blanks;
-    const words = Object.values(slots);
+    const words = Object.values(copy.blanks);
     expect(new Set(words).size).toBe(words.length);
   });
 });
@@ -159,28 +157,32 @@ describe('buildObituaryDraft: age', () => {
   });
 });
 
+const people = (...rows: [relation: string, name: string, city: string][]): string =>
+  JSON.stringify(rows.map(([relation, name, city]) => ({ name, city, relation })));
+const preceded = people(['spouse', 'Tom', 'Salem']);
+
 describe('buildObituaryDraft: pronoun', () => {
   const { obituaryPronoun: _pronoun, ...noPronoun } = filled;
 
   it('uses He for he and She for she', () => {
     expect(paragraphs({ ...filled, obituaryPronoun: 'he' })[2]).toContain('He went to high school');
     expect(paragraphs({ ...filled, obituaryPronoun: 'he' })[2]).toContain('He received the Teacher of the Year award and was involved in');
-    expect(paragraphs({ ...filled, obituaryPronoun: 'she' })[3]).toContain('She is preceded in death by her [RELATION]');
+    expect(paragraphs({ ...filled, obituaryPronoun: 'she', obituaryPrecededList: preceded })[3]).toContain('She is preceded in death by her spouse, Tom');
   });
 
   it('uses They with verbs that agree', () => {
-    const [, , p3, p4] = paragraphs({ ...filled, obituaryPronoun: 'they' });
+    const [, , p3, p4] = paragraphs({ ...filled, obituaryPronoun: 'they', obituaryPrecededList: preceded });
     expect(p3).toContain('They went to high school');
     expect(p3).toContain('They received the Teacher of the Year award and were involved in the parish choir.');
-    expect(p4).toContain('They are preceded in death by their [RELATION]');
+    expect(p4).toContain('They are preceded in death by their spouse, Tom');
   });
 
   it('keeps [He/She] and [his/her] when no pronoun is set, and when the value is unknown', () => {
     for (const fields of [noPronoun, { ...noPronoun, obituaryPronoun: 'it' }]) {
-      const [, , p3, p4] = paragraphs(fields);
+      const [, , p3, p4] = paragraphs({ ...fields, obituaryPrecededList: preceded });
       expect(p3).toContain('[He/She] went to high school');
       expect(p3).toContain('and was involved in');
-      expect(p4).toContain('[He/She] is preceded in death by [his/her] [RELATION]');
+      expect(p4).toContain('[He/She] is preceded in death by [his/her] spouse, Tom');
     }
   });
 });
@@ -218,7 +220,110 @@ describe('buildObituaryDraft: older values', () => {
   it('writes the older survivors and note text', () => {
     const text = build({ personName: 'Anna Lee', obituarySurvivors: 'her husband, John of Boston.', obituaryNote: 'She will be missed.' });
     expect(text).toContain('Anna Lee is survived by her husband, John of Boston.');
-    expect(text.endsWith('She will be missed.')).toBe(true);
+  });
+
+  it('keeps the older note as the last paragraph, trimmed, and adds none when blank', () => {
+    const text = build({ personName: 'Anna Lee', obituaryNote: '  She will be missed.\n' });
+    expect(text.endsWith('\n\nShe will be missed.')).toBe(true);
+    expect(text.split('\n\n')).toHaveLength(5);
+    expect(build({ personName: 'Anna Lee', obituaryNote: ' \n' }).split('\n\n')).toHaveLength(4);
+  });
+});
+
+describe('paragraph 4: survivors and preceded', () => {
+  const p4 = (fields: ObituaryDraftFields): string => paragraphs(fields)[3];
+  const base = { obituaryGivenName: 'Anna' };
+  const one = people(['spouse', 'Ann', 'Boston']);
+  const several = people(['spouse', 'Ann', 'Boston'], ['child', 'Bo', ''], ['child', 'Cy', 'Salem']);
+
+  it('writes one survivor for he, she, they and unset', () => {
+    expect(p4({ ...base, obituaryPronoun: 'he', obituarySurvivorList: one })).toBe('Anna is survived by his spouse, Ann of Boston.');
+    expect(p4({ ...base, obituaryPronoun: 'she', obituarySurvivorList: one })).toBe('Anna is survived by her spouse, Ann of Boston.');
+    expect(p4({ ...base, obituaryPronoun: 'they', obituarySurvivorList: one })).toBe('Anna is survived by their spouse, Ann of Boston.');
+    expect(p4({ ...base, obituarySurvivorList: one })).toBe('Anna is survived by [his/her] spouse, Ann of Boston.');
+  });
+
+  it('groups several survivors, joins with "and" before the last, and leaves out "of" without a city', () => {
+    expect(p4({ ...base, obituaryPronoun: 'he', obituarySurvivorList: several })).toBe(
+      'Anna is survived by his spouse, Ann of Boston; and his children, Bo, and Cy of Salem.',
+    );
+    const three = people(['sibling', 'Al', ''], ['sibling', 'Bea', ''], ['sibling', 'Cal', '']);
+    expect(p4({ ...base, obituaryPronoun: 'they', obituarySurvivorList: three })).toBe('Anna is survived by their siblings, Al, Bea and Cal.');
+  });
+
+  it('joins one, two and three groups, with and without cities, in both lists', () => {
+    const cases: [string, string][] = [
+      [people(['child', 'Bo', 'Salem'], ['child', 'Cy', '']), 'his children, Bo of Salem, and Cy'],
+      [people(['child', 'Bo', ''], ['child', 'Cy', '']), 'his children, Bo and Cy'],
+      [people(['spouse', 'Ann', ''], ['child', 'Bo', '']), 'his spouse, Ann; and his child, Bo'],
+      [people(['spouse', 'Ann', 'Boston'], ['child', 'Bo', 'Lynn']), 'his spouse, Ann of Boston; and his child, Bo of Lynn'],
+      [
+        people(['spouse', 'Ann', 'Boston'], ['child', 'Bo', ''], ['child', 'Cy', 'Salem'], ['sibling', 'Di', '']),
+        'his spouse, Ann of Boston; his children, Bo, and Cy of Salem; and his sibling, Di',
+      ],
+    ];
+    for (const [list, expected] of cases) {
+      expect(p4({ ...base, obituaryPronoun: 'he', obituarySurvivorList: list })).toBe(`Anna is survived by ${expected}.`);
+      expect(p4({ ...base, obituaryPronoun: 'he', obituaryPrecededList: list })).toContain(`He is preceded in death by ${expected}.`);
+    }
+  });
+
+  it('keeps the bracket when there are no rows, and for a list that does not parse', () => {
+    const bracket = 'Anna is survived by [his/her] [RELATION], [SURVIVOR NAME] of [SURVIVOR CITY].';
+    for (const list of [undefined, '', '[]', 'not json', '{"a":1}', people(['uncle', 'X', ''])]) {
+      expect(p4({ ...base, obituarySurvivorList: list }), String(list)).toBe(bracket);
+    }
+  });
+
+  it('writes the older free text only when there are no survivor rows', () => {
+    expect(p4({ ...base, obituarySurvivors: 'her husband, John.' })).toBe('Anna is survived by her husband, John.');
+    expect(p4({ ...base, obituarySurvivors: 'her husband, John.', obituarySurvivorList: one, obituaryPronoun: 'she' })).toBe(
+      'Anna is survived by her spouse, Ann of Boston.',
+    );
+  });
+
+  it('writes the preceded sentence with agreeing verbs, and drops it when empty', () => {
+    const list = people(['parent', 'Joe', ''], ['parent', 'Sue', ''], ['child', 'Max', 'Lynn']);
+    expect(p4({ ...base, obituaryPronoun: 'he', obituaryPrecededList: list })).toBe(
+      'Anna is survived by his [RELATION], [SURVIVOR NAME] of [SURVIVOR CITY]. He is preceded in death by his parents, Joe and Sue; and his child, Max of Lynn.',
+    );
+    expect(p4({ ...base, obituaryPronoun: 'they', obituarySurvivorList: one, obituaryPrecededList: preceded })).toContain(
+      ' They are preceded in death by their spouse, Tom of Salem.',
+    );
+    for (const empty of [undefined, '', '[]', 'bad', people(['grandchild', 'X', ''])]) {
+      expect(p4({ ...base, obituaryPrecededList: empty }), String(empty)).not.toContain('preceded');
+    }
+  });
+
+  it('uses a blank name for a row without one', () => {
+    expect(p4({ ...base, obituaryPronoun: 'he', obituarySurvivorList: people(['child', '', 'Boston']) })).toBe(
+      'Anna is survived by his child, [SURVIVOR NAME] of Boston.',
+    );
+  });
+
+  it('has no "!" and no double space', () => {
+    const text = p4({ ...base, obituarySurvivorList: several, obituaryPrecededList: preceded });
+    expect(text).not.toMatch(/!|  /);
+  });
+});
+
+describe('memorial and obituaryShareText', () => {
+  it('has the memorial words, and findTemplateBlanks finds them', () => {
+    expect(copy.memorial).toBe(
+      'Memorial donations may be made to [ORGANIZATION NAME], [MAILING ADDRESS]. The family wishes to extend their gratitude to [ORGANIZATION/NAME] [FINAL WORDS].',
+    );
+    expect(findTemplateBlanks(copy.memorial, copy)).toEqual(['[ORGANIZATION NAME]', '[MAILING ADDRESS]', '[ORGANIZATION/NAME]', '[FINAL WORDS]']);
+    expect(copy.memorial).not.toContain('!');
+  });
+
+  it('adds a memorial as the last paragraph', () => {
+    expect(obituaryShareText('Body.', 'Gifts to the library.')).toBe('Body.\n\nGifts to the library.');
+    expect(obituaryShareText('Body.', '  Gifts.  \n')).toBe('Body.\n\nGifts.');
+  });
+
+  it('adds nothing for a blank memorial', () => {
+    expect(obituaryShareText('Body.', '')).toBe('Body.');
+    expect(obituaryShareText('Body.', ' \n\t ')).toBe('Body.');
   });
 });
 

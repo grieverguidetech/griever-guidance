@@ -18,12 +18,16 @@
     "involvedSentence",
     "awardsAndInvolvedSentence",
     "paragraph4",
-    "paragraph5",
     "burialSentence",
     "burialPrivate",
     "pronouns",
     "blanks",
-    "legacyBlanks"
+    "legacyBlanks",
+    "precededSentence",
+    "personRow",
+    "personWithCity",
+    "relations",
+    "memorial"
   ],
   "properties": {
     "paragraph1": {
@@ -80,11 +84,7 @@
     },
     "paragraph4": {
       "type": "string",
-      "pattern": "^(?=.*\\{name\\})(?=.*\\{survivors\\})"
-    },
-    "paragraph5": {
-      "type": "string",
-      "pattern": "\\{note\\}"
+      "pattern": "^(?=.*\\{name\\})(?=.*\\{survivors\\})(?=.*\\{precededSentence\\})"
     },
     "burialSentence": {
       "type": "string",
@@ -249,8 +249,9 @@
         "jobTitle",
         "company",
         "jobYears",
-        "survivors",
-        "note"
+        "relation",
+        "personName",
+        "personCity"
       ],
       "properties": {
         "givenName": {
@@ -361,11 +362,15 @@
           "type": "string",
           "minLength": 1
         },
-        "survivors": {
+        "relation": {
           "type": "string",
           "minLength": 1
         },
-        "note": {
+        "personName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "personCity": {
           "type": "string",
           "minLength": 1
         }
@@ -379,6 +384,163 @@
         "type": "string",
         "pattern": "^\\[.+\\]$"
       }
+    },
+    "precededSentence": {
+      "type": "string",
+      "pattern": "\\{preceded\\}"
+    },
+    "personRow": {
+      "type": "string",
+      "pattern": "^(?=.*\\{their\\})(?=.*\\{relation\\})(?=.*\\{person\\})"
+    },
+    "personWithCity": {
+      "type": "string",
+      "pattern": "^(?=.*\\{personName\\})(?=.*\\{personCity\\})"
+    },
+    "relations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spouse",
+        "child",
+        "grandchild",
+        "great-grandchild",
+        "2nd great-grandchild",
+        "sibling",
+        "parent"
+      ],
+      "properties": {
+        "spouse": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "child": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "grandchild": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "great-grandchild": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "2nd great-grandchild": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "sibling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "parent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one",
+            "many"
+          ],
+          "properties": {
+            "one": {
+              "type": "string",
+              "minLength": 1
+            },
+            "many": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "memorial": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }
