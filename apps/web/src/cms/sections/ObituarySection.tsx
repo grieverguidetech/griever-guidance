@@ -92,10 +92,6 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
     { label: copy.servicePlaceLabel, value: values.servicePlace },
     { label: copy.serviceDateLabel, value: values.serviceDate },
     { label: copy.serviceTimeLabel, value: values.serviceTime },
-    { label: copy.officiantLabel, value: values.serviceOfficiant },
-    values.burialPrivate
-      ? { label: copy.burialLabel, value: copy.burialPrivateValue }
-      : { label: copy.burialPlaceLabel, value: values.burialPlace },
     { label: copy.visitationPlaceLabel, value: values.visitationPlace },
     { label: copy.visitationDateLabel, value: values.visitationDate },
     { label: copy.visitationTimeLabel, value: values.visitationTime },

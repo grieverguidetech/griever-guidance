@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
@@ -42,8 +42,6 @@ function setup(initial: Values = {}) {
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
 const person = { personName: 'Ann Lee', dateOfPassing: 'June 1, 2026', birthDate: 'May 2, 1940' };
 
-const copy = screenCopy('cmsObituary');
-
 describe('ObituarySection', () => {
   it('shows the name and dates read-only, with a button to change them in The person', async () => {
     const { onOpenPerson } = setup(person);
@@ -83,11 +81,12 @@ describe('ObituarySection', () => {
     });
     expect(screen.getByText('Details from Service')).toBeInTheDocument();
     expect(screen.getByText('Oak Chapel')).toBeInTheDocument();
-    expect(screen.getByText('Reverend Sam Cole')).toBeInTheDocument();
-    expect(screen.getByText('Burial').nextElementSibling).toHaveTextContent('Will be private');
-    expect(screen.queryByText('Oak Hill')).toBeNull();
+    // Officiant and burial are edited below, so they are not repeated in the read-only list.
+    const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
+    expect(within(list).queryByText('Officiant')).toBeNull();
+    expect(within(list).queryByText('Burial')).toBeNull();
+    expect(within(list).queryByText('Reverend Sam Cole')).toBeNull();
     expect(screen.queryByText('Visitation date')).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Officiant' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Change these on Service' }));
     expect(onOpenService).toHaveBeenCalledTimes(1);
   });
@@ -188,7 +187,7 @@ describe('ObituarySection', () => {
   it('typing the cemetery goes to onServiceChange and removes [CEMETERY NAME] from the unedited text', async () => {
     const { patches, servicePatches } = setup(person);
     expect(text().value).toContain('[CEMETERY NAME]');
-    await userEvent.type(screen.getByLabelText(copy.cemeteryNameLabel), 'Oak Hill');
+    await userEvent.type(screen.getByLabelText(screenCopy('cmsService').eventCemetery), 'Oak Hill');
     expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Oak Hill' });
     expect(patches).toEqual([]);
     expect(text().value).not.toContain('[CEMETERY NAME]');

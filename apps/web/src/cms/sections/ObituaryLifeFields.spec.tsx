@@ -14,8 +14,6 @@ import {
 
 type Values = Parameters<typeof ObituaryLifeFields>[0]['values'];
 
-let servicePatchLog: ServiceSharedPatch[] = [];
-
 function setup(initial: Values = {}) {
   const patches: ObituaryLifePatch[] = [];
   const servicePatches: ServiceSharedPatch[] = [];
@@ -36,12 +34,11 @@ function setup(initial: Values = {}) {
     );
   }
   render(<Harness />);
-  // A second list for the Service keys; the tests read `servicePatches` off the first.
-  servicePatchLog = servicePatches;
-  return patches;
+  return { patches, servicePatches };
 }
 
 const copy = screenCopy('cmsObituary');
+const serviceCopy = screenCopy('cmsService');
 
 const fields: [ObituaryLifeKey, string][] = [
   ['obituaryGivenName', copy.givenNameLabel],
@@ -71,7 +68,7 @@ const fields: [ObituaryLifeKey, string][] = [
 
 describe('ObituaryLifeFields', () => {
   it.each(fields)('%s is found by its label and sends only its own key', async (key, label) => {
-    const patches = setup();
+    const { patches } = setup();
     await userEvent.type(screen.getByLabelText(label), 'x');
     expect(patches).toEqual([{ [key]: 'x' }]);
   });
@@ -83,7 +80,7 @@ describe('ObituaryLifeFields', () => {
   });
 
   it('uses the numeric keypad for year and number fields but accepts text', async () => {
-    const patches = setup();
+    const { patches } = setup();
     for (const label of [copy.graduationYearLabel, copy.yearsLabel, copy.ageLabel]) {
       expect(screen.getByLabelText(label)).toHaveAttribute('inputMode', 'numeric');
     }
@@ -92,7 +89,7 @@ describe('ObituaryLifeFields', () => {
   });
 
   it('fills given, middle and surname from a three-word name in one patch', async () => {
-    const patches = setup({ personName: 'Ann Marie Lee' });
+    const { patches } = setup({ personName: 'Ann Marie Lee' });
     await userEvent.click(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
     expect(patches).toEqual([
       { obituaryGivenName: 'Ann', obituaryMiddleName: 'Marie', obituarySurname: 'Lee' },
@@ -117,13 +114,13 @@ describe('ObituaryLifeFields', () => {
     const dates = { birthDate: 'June 15, 1940', dateOfPassing: 'November 2, 2026' };
 
     it('starts from the dates without saving', () => {
-      const patches = setup(dates);
+      const { patches } = setup(dates);
       expect(screen.getByLabelText(copy.ageLabel)).toHaveValue('86');
       expect(patches).toEqual([]);
     });
 
     it('shows only what was typed while focused, and the worked-out age again on blur', async () => {
-      const patches = setup(dates);
+      const { patches } = setup(dates);
       const age = screen.getByLabelText(copy.ageLabel);
       await userEvent.click(age);
       expect(age).toHaveValue('');
@@ -176,7 +173,7 @@ describe('ObituaryLifeFields', () => {
     });
 
     it('sends the choice, and an empty value for not chosen', async () => {
-      const patches = setup({ obituaryPronoun: 'she' });
+      const { patches } = setup({ obituaryPronoun: 'she' });
       const select = screen.getByLabelText(copy.pronounLabel);
       expect(select).toHaveValue('she');
       await userEvent.selectOptions(select, 'they');
@@ -285,37 +282,56 @@ describe('ObituaryLifeFields', () => {
   describe('shared Service fields', () => {
     it('shows the saved cemetery, officiant and private choice', () => {
       setup({ burialPlace: 'Oak Hill', serviceOfficiant: 'Rev. Cole' });
-      expect(screen.getByLabelText(copy.cemeteryNameLabel)).toHaveValue('Oak Hill');
-      expect(screen.getByLabelText(copy.officiantFieldLabel)).toHaveValue('Rev. Cole');
-      expect(screen.getByLabelText(copy.burialPrivateLabel)).not.toBeChecked();
+      expect(screen.getByLabelText(serviceCopy.eventCemetery)).toHaveValue('Oak Hill');
+      expect(screen.getByLabelText(serviceCopy.eventOfficiant)).toHaveValue('Rev. Cole');
+      expect(screen.getByLabelText(serviceCopy.eventPrivateFamily)).not.toBeChecked();
     });
 
     it('sends only the cemetery through onServiceChange', async () => {
-      const patches = setup();
-      await userEvent.type(screen.getByLabelText(copy.cemeteryNameLabel), 'x');
-      expect(servicePatchLog).toEqual([{ burialPlace: 'x' }]);
+      const { patches, servicePatches } = setup();
+      await userEvent.type(screen.getByLabelText(serviceCopy.eventCemetery), 'x');
+      expect(servicePatches).toEqual([{ burialPlace: 'x' }]);
       expect(patches).toEqual([]);
     });
 
     it('sends only the officiant through onServiceChange', async () => {
-      setup();
-      await userEvent.type(screen.getByLabelText(copy.officiantFieldLabel), 'y');
-      expect(servicePatchLog).toEqual([{ serviceOfficiant: 'y' }]);
+      const { servicePatches } = setup();
+      await userEvent.type(screen.getByLabelText(serviceCopy.eventOfficiant), 'y');
+      expect(servicePatches).toEqual([{ serviceOfficiant: 'y' }]);
     });
 
     it('hides the cemetery fields when burial is private, and shows them again when cleared', async () => {
-      setup({ burialPlace: 'Oak Hill' });
-      await userEvent.click(screen.getByLabelText(copy.burialPrivateLabel));
-      expect(servicePatchLog).toEqual([{ burialPrivate: true }]);
-      expect(screen.queryByLabelText(copy.cemeteryNameLabel)).not.toBeInTheDocument();
+      const { servicePatches } = setup({ burialPlace: 'Oak Hill' });
+      await userEvent.click(screen.getByLabelText(serviceCopy.eventPrivateFamily));
+      expect(servicePatches).toEqual([{ burialPrivate: true }]);
+      expect(screen.queryByLabelText(serviceCopy.eventCemetery)).not.toBeInTheDocument();
       expect(screen.queryByLabelText(copy.cemeteryLabel)).not.toBeInTheDocument();
-      await userEvent.click(screen.getByLabelText(copy.burialPrivateLabel));
-      expect(screen.getByLabelText(copy.cemeteryNameLabel)).toHaveValue('Oak Hill');
+      await userEvent.click(screen.getByLabelText(serviceCopy.eventPrivateFamily));
+      expect(screen.getByLabelText(serviceCopy.eventCemetery)).toHaveValue('Oak Hill');
     });
 
     it('shows one hint that these are the same as on Service', () => {
       setup();
       expect(screen.getAllByText(copy.serviceSharedHint)).toHaveLength(1);
+    });
+
+    it('gives the hint as the description of the three shared controls, and not of the Obituary-only fields', () => {
+      setup();
+      for (const label of [serviceCopy.eventOfficiant, serviceCopy.eventPrivateFamily, serviceCopy.eventCemetery]) {
+        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(copy.serviceSharedHint);
+      }
+      for (const label of [copy.funeralHomeLabel, copy.churchLabel, copy.cemeteryLabel]) {
+        expect(screen.getByLabelText(label)).not.toHaveAccessibleDescription(copy.serviceSharedHint);
+      }
+    });
+
+    it('keeps the funeral home, church and cemetery location outside the shared block', () => {
+      setup();
+      const block = document.querySelector('[data-group="service-shared"]') as HTMLElement;
+      expect(block).toContainElement(screen.getByLabelText(serviceCopy.eventCemetery));
+      for (const label of [copy.funeralHomeLabel, copy.churchLabel, copy.cemeteryLabel]) {
+        expect(block).not.toContainElement(screen.getByLabelText(label));
+      }
     });
 
     it('does not mark the cemetery location optional', () => {

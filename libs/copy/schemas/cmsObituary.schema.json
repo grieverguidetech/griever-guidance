@@ -30,9 +30,6 @@
     "funeralHomeLabel",
     "churchLabel",
     "cemeteryLabel",
-    "cemeteryNameLabel",
-    "officiantFieldLabel",
-    "burialPrivateLabel",
     "serviceSharedHint",
     "birthPlaceLabel",
     "motherNameLabel",
@@ -59,10 +56,6 @@
     "servicePlaceLabel",
     "serviceDateLabel",
     "serviceTimeLabel",
-    "officiantLabel",
-    "burialPlaceLabel",
-    "burialLabel",
-    "burialPrivateValue",
     "visitationPlaceLabel",
     "visitationDateLabel",
     "visitationTimeLabel",
@@ -173,15 +166,6 @@
     "cemeteryLabel": {
       "$ref": "#/$defs/text"
     },
-    "cemeteryNameLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "officiantFieldLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "burialPrivateLabel": {
-      "$ref": "#/$defs/text"
-    },
     "serviceSharedHint": {
       "$ref": "#/$defs/text"
     },
@@ -258,18 +242,6 @@
       "$ref": "#/$defs/text"
     },
     "serviceTimeLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "officiantLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "burialPlaceLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "burialLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "burialPrivateValue": {
       "$ref": "#/$defs/text"
     },
     "visitationPlaceLabel": {

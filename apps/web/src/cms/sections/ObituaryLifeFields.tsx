@@ -11,6 +11,8 @@ import {
 } from '@griever/shared';
 
 const copy = screenCopy('cmsObituary');
+// The shared controls use Service's own labels, so the same value has the same name on both pages.
+const serviceCopy = screenCopy('cmsService');
 
 type TextKey =
   | 'obituaryGivenName'
@@ -104,7 +106,7 @@ const funeralFields: FieldSpec[] = [
   { key: 'obituaryChurch', label: copy.churchLabel },
 ];
 
-const cemeteryLocationField: FieldSpec = { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel };
+const cemeteryLocationField: FieldSpec = { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel, full: true };
 
 type GroupKey = 'name' | 'life' | 'family' | 'service';
 
@@ -167,7 +169,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
     );
   }
 
-  function renderServiceText(key: 'burialPlace' | 'serviceOfficiant', label: string) {
+  function renderServiceText(key: 'burialPlace' | 'serviceOfficiant', label: string, hintId: string) {
     return (
       <div className="gg-field" key={key}>
         <label htmlFor={`${id}-${key}`}>{label}</label>
@@ -177,6 +179,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
           className="gg-input"
           autoComplete="off"
           maxLength={FLOW_DETAIL_MAX_LENGTH[key]}
+          aria-describedby={hintId}
           value={values[key] ?? ''}
           onChange={(e) => onServiceChange({ [key]: e.target.value })}
         />
@@ -245,22 +248,27 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
   );
 
   const burialPrivate = values.burialPrivate === true;
-  const serviceLead = (
-    <p className="gg-hint">{copy.serviceSharedHint}</p>
-  );
+  const sharedHintId = `${id}-service-shared-hint`;
+  // Funeral home and church are Obituary-only. The block holds the three values Service shares.
   const serviceTail = (
     <>
-      {renderServiceText('serviceOfficiant', copy.officiantFieldLabel)}
-      <label className="gg-field flex min-h-[44px] cursor-pointer flex-row items-center gap-3 md:col-span-2">
-        <input
-          type="checkbox"
-          className="m-0 h-5 w-5"
-          checked={burialPrivate}
-          onChange={(e) => onServiceChange({ burialPrivate: e.target.checked })}
-        />
-        {copy.burialPrivateLabel}
-      </label>
-      {!burialPrivate && renderServiceText('burialPlace', copy.cemeteryNameLabel)}
+      <div className="flex flex-col gap-4 md:col-span-2" data-group="service-shared">
+        <p id={sharedHintId} className="gg-hint">
+          {copy.serviceSharedHint}
+        </p>
+        {renderServiceText('serviceOfficiant', serviceCopy.eventOfficiant, sharedHintId)}
+        <label className="flex min-h-[44px] cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            className="m-0 h-5 w-5"
+            checked={burialPrivate}
+            aria-describedby={sharedHintId}
+            onChange={(e) => onServiceChange({ burialPrivate: e.target.checked })}
+          />
+          {serviceCopy.eventPrivateFamily}
+        </label>
+        {!burialPrivate && renderServiceText('burialPlace', serviceCopy.eventCemetery, sharedHintId)}
+      </div>
       {!burialPrivate && renderField(cemeteryLocationField)}
     </>
   );
@@ -273,7 +281,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange }: Props)
       {renderGroup('name', copy.groupNameHeading, nameFields, useName, pronoun)}
       {renderGroup('life', copy.groupLifeHeading, lifeFields)}
       {renderGroup('family', copy.groupFamilyHeading, familyFields)}
-      {renderGroup('service', copy.groupServiceHeading, funeralFields, serviceLead, serviceTail)}
+      {renderGroup('service', copy.groupServiceHeading, funeralFields, undefined, serviceTail)}
     </>
   );
 }
