@@ -166,11 +166,16 @@ test.describe('Obituary section (WEB-6)', () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await openObituary(page);
     await openSection(page, 'Their life');
-    const age = await page.getByLabel('Age (optional)').boundingBox();
-    const born = await page.getByLabel('Where they were born (optional)').boundingBox();
-    expect(age).not.toBeNull();
-    expect(born).not.toBeNull();
-    expect(age?.y).toBe(born?.y);
+    // The panel slides in when it opens, so wait until both inputs have settled on the same row.
+    const rowGap = async () => {
+      const age = await page.getByLabel('Age (optional)').boundingBox();
+      const born = await page.getByLabel('Where they were born (optional)').boundingBox();
+      if (!age || !born) {
+        return null;
+      }
+      return Math.abs(age.y - born.y);
+    };
+    await expect.poll(rowGap).toBe(0);
 
     await page.setViewportSize({ width: 375, height: 812 });
     await openAllSections(page);
