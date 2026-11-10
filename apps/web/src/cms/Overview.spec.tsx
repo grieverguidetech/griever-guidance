@@ -120,6 +120,12 @@ describe('Overview', () => {
     const second = setup({ obituaryCity: 'Austin' });
     expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Draft started');
     second.unmount();
+    const third = setup({ obituaryGivenName: 'Ann' });
+    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Draft started');
+    third.unmount();
+    const fourth = setup({ obituarySurvivorList: '[{"name":"Sam","city":"","relation":"child"}]' });
+    expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Draft started');
+    fourth.unmount();
     setup({ obituaryText: 'Text', obituaryPublisher: 'The Daily News' });
     expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Published in The Daily News');
   });

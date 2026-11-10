@@ -1,7 +1,7 @@
 import { fill, screenCopy } from '@griever/copy';
 import { computeChecklist, computeSections } from '@griever/hooks';
 import type { OverviewStatus } from '@griever/hooks';
-import { parseCompleteDate, SECTION_ORDER } from '@griever/shared';
+import { FLOW_DETAIL_TEXT_KEYS, parseCompleteDate, SECTION_ORDER } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { navTitle } from './SideNav';
 
@@ -20,13 +20,20 @@ const STATUS_COPY: Record<OverviewStatus, string> = {
 const PHASE_COPY: Record<ChecklistPhaseKey, string> = checklist.phases;
 const ITEM_COPY: Record<ChecklistItemId, string> = checklist.items;
 
+/** Every obituary text field: the text, the older fields and the new ones. */
+type ObituaryKey = Extract<keyof SectionFields, `obituary${string}`>;
+const OBITUARY_KEYS = FLOW_DETAIL_TEXT_KEYS.filter((key): key is ObituaryKey & typeof key =>
+  key.startsWith('obituary'),
+);
+
 type OverviewSession = Pick<SectionFields, 'sectionStatus' | 'serviceType' | 'servicePlace'> &
   Partial<
     Pick<
       SectionFields,
-      'announcementMessage' | 'obituaryText' | 'obituaryCity' | 'obituaryCareer' | 'obituarySurvivors' | 'obituaryNote' | 'thanksMessage'
+      'announcementMessage' | 'thanksMessage'
     >
   > &
+  Partial<Pick<SectionFields, ObituaryKey>> &
   Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing' | 'serviceDate' | 'obituaryPublisher'>>;
 
 interface Props {
@@ -98,13 +105,7 @@ function obituarySummary(session: OverviewSession): string {
   if (publisher) {
     return fill(shell.summaryObituaryPublisher, { publisher });
   }
-  const started = [
-    session.obituaryText,
-    session.obituaryCity,
-    session.obituaryCareer,
-    session.obituarySurvivors,
-    session.obituaryNote,
-  ].some((value) => present(value));
+  const started = OBITUARY_KEYS.some((key) => present(session[key]));
   return started ? shell.summaryObituaryDraft : shell.summaryObituaryEmpty;
 }
 

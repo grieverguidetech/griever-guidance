@@ -1526,6 +1526,7 @@ function AppBody({
               nextSection={nextSection}
               onNext={goNext}
               onOpenPerson={() => setCmsSection('person')}
+              onOpenService={() => setCmsSection('service')}
             />
           ) : (
             <ThanksSection
