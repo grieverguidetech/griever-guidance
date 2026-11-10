@@ -2,7 +2,7 @@
  * #395: the web editor wired into the real App behind CMS_ENABLED. Real localStorage; a "remount" is
  * an unmount and a fresh <App /> over the same storage. The flag is mocked per test.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -239,6 +239,21 @@ describe('editor on (#395)', () => {
     await user.click(nav.getByRole('button', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     expect(screen.getByLabelText('Cemetery')).toHaveValue('Oak Hill');
+  });
+
+  it('a service time typed on Obituary shows on Service', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    await user.click(screen.getByRole('button', { name: 'Service and visitation' }));
+    fireEvent.change(screen.getByLabelText('Funeral or memorial service Time'), { target: { value: '14:00' } });
+    expect(stored()[0]).toMatchObject({ serviceTime: '2:00 PM' });
+    expect(stored()[0].sectionStatus?.['service']).toBe('in_progress');
+    await user.click(nav.getByRole('button', { name: /^Service/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Service' });
+    expect(screen.getByLabelText('Funeral or memorial service Time')).toHaveValue('14:00');
   });
 
   it('a cemetery typed on Service shows on Obituary', async () => {

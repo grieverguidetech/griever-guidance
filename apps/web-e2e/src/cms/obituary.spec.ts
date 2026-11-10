@@ -58,6 +58,7 @@ const SECTIONS = [
   "The person's name",
   'Their life',
   'Their family',
+  'Service and visitation',
   'Funeral home and place of worship',
   'Survived by',
   'Preceded in death by',
@@ -181,31 +182,29 @@ test.describe('Obituary section (WEB-6)', () => {
     };
     await expect.poll(rowGap).toBe(0);
 
-    // The two read-only panels share a row.
-    const personHeading = page.getByRole('heading', { level: 2, name: 'Details from The person' });
-    const serviceHeading = page.getByRole('heading', { level: 2, name: 'Details from Service' });
-    const detailsGap = async () => {
-      const a = await personHeading.boundingBox();
-      const b = await serviceHeading.boundingBox();
+    // In Service and visitation, the date and time of the service share a row.
+    await openSection(page, 'Service and visitation');
+    const serviceDate = page.getByLabel('Funeral or memorial service Date', { exact: true });
+    const serviceTime = page.getByLabel('Funeral or memorial service Time', { exact: true });
+    const dateTimeGap = async () => {
+      const a = await serviceDate.boundingBox();
+      const b = await serviceTime.boundingBox();
       if (!a || !b) {
         return null;
       }
       return Math.abs(a.y - b.y);
     };
-    await expect.poll(detailsGap).toBe(0);
+    await expect.poll(dateTimeGap).toBe(0);
 
     await page.setViewportSize({ width: 375, height: 812 });
-    // Below md they stack, The person first, with the same left edge.
+    // Below sm they stack, date first.
     await expect
       .poll(async () => {
-        const a = await personHeading.boundingBox();
-        const b = await serviceHeading.boundingBox();
+        const a = await serviceDate.boundingBox();
+        const b = await serviceTime.boundingBox();
         return a && b ? b.y - a.y : null;
       })
       .toBeGreaterThan(0);
-    const personBox = await personHeading.boundingBox();
-    const serviceBox = await serviceHeading.boundingBox();
-    expect(serviceBox?.x).toBe(personBox?.x);
     await openAllSections(page);
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(375);

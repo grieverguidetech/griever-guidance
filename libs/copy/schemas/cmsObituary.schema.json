@@ -18,6 +18,7 @@
     "groupNameHeading",
     "groupLifeHeading",
     "groupFamilyHeading",
+    "groupEventsHeading",
     "groupServiceHeading",
     "givenNameLabel",
     "middleNameLabel",
@@ -49,16 +50,6 @@
     "pronounShe",
     "pronounThey",
     "pronounNone",
-    "serviceDetailsHeading",
-    "serviceDetailsHint",
-    "serviceDetailsEmpty",
-    "changeOnService",
-    "servicePlaceLabel",
-    "serviceDateLabel",
-    "serviceTimeLabel",
-    "visitationPlaceLabel",
-    "visitationDateLabel",
-    "visitationTimeLabel",
     "survivedByHeading",
     "precededByHeading",
     "personNameColumn",
@@ -128,6 +119,9 @@
       "$ref": "#/$defs/text"
     },
     "groupFamilyHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "groupEventsHeading": {
       "$ref": "#/$defs/text"
     },
     "groupServiceHeading": {
@@ -221,36 +215,6 @@
       "$ref": "#/$defs/text"
     },
     "pronounNone": {
-      "$ref": "#/$defs/text"
-    },
-    "serviceDetailsHeading": {
-      "$ref": "#/$defs/text"
-    },
-    "serviceDetailsHint": {
-      "$ref": "#/$defs/text"
-    },
-    "serviceDetailsEmpty": {
-      "$ref": "#/$defs/text"
-    },
-    "changeOnService": {
-      "$ref": "#/$defs/text"
-    },
-    "servicePlaceLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "serviceDateLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "serviceTimeLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "visitationPlaceLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "visitationDateLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "visitationTimeLabel": {
       "$ref": "#/$defs/text"
     },
     "survivedByHeading": {

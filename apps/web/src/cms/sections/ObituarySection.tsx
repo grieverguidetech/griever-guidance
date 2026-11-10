@@ -50,12 +50,10 @@ interface Props {
   onNext?: () => void;
   /** Opens The person, where the name and dates are edited. */
   onOpenPerson?: () => void;
-  /** Opens Service, where the service details are edited. */
-  onOpenService?: () => void;
 }
 
 /** The obituary template fields, and the obituary text. The text follows the fields until edited. */
-export function ObituarySection({ values, onChange, onServiceChange, onReadyChange, nextSection, onNext, onOpenPerson, onOpenService }: Props) {
+export function ObituarySection({ values, onChange, onServiceChange, onReadyChange, nextSection, onNext, onOpenPerson }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const memorialRef = useRef<HTMLTextAreaElement>(null);
@@ -88,21 +86,12 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
     { label: copy.bornLabel, value: values.birthDate },
     { label: copy.diedLabel, value: values.dateOfPassing },
   ].filter((f) => f.value && f.value.trim() !== '');
-  const serviceFacts = [
-    { label: copy.servicePlaceLabel, value: values.servicePlace },
-    { label: copy.serviceDateLabel, value: values.serviceDate },
-    { label: copy.serviceTimeLabel, value: values.serviceTime },
-    { label: copy.visitationPlaceLabel, value: values.visitationPlace },
-    { label: copy.visitationDateLabel, value: values.visitationDate },
-    { label: copy.visitationTimeLabel, value: values.visitationTime },
-  ].filter((f) => f.value && f.value.trim() !== '');
 
   return (
     <div className="flex flex-col gap-6">
       <p>{copy.intro}</p>
       <div className="gg-panel">
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
-          <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
             <h2 id={`${id}-details`} className="font-semibold">
               {copy.detailsHeading}
             </h2>
@@ -121,38 +110,6 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
                 {copy.changeDetails}
               </button>
             )}
-          </div>
-          <div className="flex flex-col gap-4">
-            <h2 id={`${id}-service`} className="font-semibold">
-              {copy.serviceDetailsHeading}
-            </h2>
-            {serviceFacts.length > 0 ? (
-              <p id={`${id}-service-hint`} className="gg-hint">
-                {copy.serviceDetailsHint}
-              </p>
-            ) : (
-              <p className="gg-hint">{copy.serviceDetailsEmpty}</p>
-            )}
-            {serviceFacts.length > 0 && (
-              <dl
-                aria-labelledby={`${id}-service`}
-                aria-describedby={`${id}-service-hint`}
-                className="flex flex-col gap-1"
-              >
-                {serviceFacts.map((f) => (
-                  <div key={f.label} className="flex flex-wrap gap-x-2">
-                    <dt className="font-medium">{f.label}</dt>
-                    <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-            {onOpenService && (
-              <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenService}>
-                {copy.changeOnService}
-              </button>
-            )}
-          </div>
         </div>
       </div>
       <div className="flex flex-col gap-6">
