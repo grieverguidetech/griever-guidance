@@ -171,7 +171,13 @@ test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps 
   await expect(page.getByRole('heading', { level: 2, name: 'The announcement is ready.' })).toBeVisible();
   await expect(line).toBeVisible();
   await expect(nudge).toBeFocused();
-  expect(await nudge.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+  // #803: focus moves to the card with no visible ring and no left bar.
+  const focusStyle = await nudge.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { outlineColor: style.outlineColor, boxShadow: style.boxShadow };
+  });
+  expect(focusStyle.outlineColor).toBe('rgba(0, 0, 0, 0)');
+  expect(focusStyle.boxShadow).not.toContain('-4px 0px 0px 0px');
   expect(await violations(page)).toEqual([]);
   const desktop = page.viewportSize();
   if (!desktop) {

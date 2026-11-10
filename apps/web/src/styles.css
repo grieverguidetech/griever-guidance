@@ -118,14 +118,12 @@ h1, h2, h3, h4, h5, h6 {
    The transparent outline shows in forced-colors mode, which drops box-shadow.
    Guarded by focusStyles.spec.ts. Never add an inline `outline: 'none'` to these targets. */
 [tabindex='-1']:focus-visible { outline: 2px solid transparent; box-shadow: -4px 0 0 0 var(--color-accent-700); }
-/* #757 phone nudge: focused by script when it appears, often after a mouse click, so the ring shows on
-   :focus, not only :focus-visible. A 3px accent-700 outline with a 2px gap (outline-offset), so the ring
-   sits on what is around the card: the page (--color-bg 5.72:1) or a panel (--color-surface 5.28:1).
-   The gap shows that same colour between ring and card; the card itself (--color-accent-100) is 5.89:1
-   against the ring. All three clear the 3:1 non-text bar (WCAG 1.4.11).
-   Keeps the card's drop shadow, which the generic [tabindex='-1'] bar would replace. Guarded by focusStyles.spec.ts. */
+/* #757, #803 phone nudge: focused by script when it appears so screen readers read the card, but it
+   shows no ring (a heavy ring around the whole card was noise). The transparent outline keeps a
+   forced-colors cue. Keep this rule: without it the generic [tabindex='-1'] bar above comes back
+   and replaces the card's drop shadow. Guarded by focusStyles.spec.ts. */
 .gg-phone-nudge:focus,
-.gg-phone-nudge:focus-visible { outline: 3px solid var(--color-accent-700); outline-offset: 2px; box-shadow: var(--shadow-md); }
+.gg-phone-nudge:focus-visible { outline: 2px solid transparent; box-shadow: var(--shadow-md); }
 /* Fields: a 2px accent-700 ring (the 1px border plus a 1px outline right outside it).
    accent-700 is 5.28:1 on the field (--color-surface), 5.72:1 on the page and 3.87:1 against
    the unfocused border, so the change of state clears 3:1 too. The base accent (#0088b0) was
