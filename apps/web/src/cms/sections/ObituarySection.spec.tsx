@@ -13,6 +13,7 @@ function setup(initial: Values = {}) {
   const patches: ObituaryPatch[] = [];
   const onReadyChange = vi.fn();
   const onOpenPerson = vi.fn();
+  const onOpenService = vi.fn();
   function Harness() {
     const [values, setValues] = useState<Values>(initial);
     return (
@@ -24,11 +25,12 @@ function setup(initial: Values = {}) {
         }}
         onReadyChange={onReadyChange}
         onOpenPerson={onOpenPerson}
+        onOpenService={onOpenService}
       />
     );
   }
   render(<Harness />);
-  return { patches, onReadyChange, onOpenPerson };
+  return { patches, onReadyChange, onOpenPerson, onOpenService };
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
@@ -52,12 +54,90 @@ describe('ObituarySection', () => {
     expect(text().value).toContain('Ann Lee was born in [BIRTH PLACE] to [MOTHER\'S NAME] and [FATHER\'S NAME] on May 2, 1940.');
     await userEvent.type(screen.getByLabelText(/City where they lived/), 'Tulsa');
     expect(text().value).toContain('Ann Lee, 86, of Tulsa, [STATE]');
-    await userEvent.type(screen.getByLabelText(/Their work/), 'a teacher');
-    expect(text().value).toContain('[He/She] worked as a teacher.');
-    await userEvent.type(screen.getByLabelText(/Survived by/), 'her sons');
-    expect(text().value).toContain('Ann Lee is survived by her sons.');
-    await userEvent.type(screen.getByLabelText(/A personal note/), 'She loved gardens.');
-    expect(text().value).toMatch(/She loved gardens\.$/);
+    await userEvent.type(screen.getByLabelText(/Job title/), 'teacher');
+    expect(text().value).toContain('worked as a teacher');
+  });
+
+  it('removes the old work, survivors and note inputs', () => {
+    setup(person);
+    expect(screen.queryByLabelText(/Their work/)).toBeNull();
+    expect(screen.queryByLabelText(/Survived by \(optional\)/)).toBeNull();
+    expect(screen.queryByLabelText(/A personal note/)).toBeNull();
+  });
+
+  it('shows only the filled Service details, read-only, and Change on Service opens Service', async () => {
+    const { onOpenService } = setup({
+      ...person,
+      servicePlace: 'Oak Chapel',
+      serviceOfficiant: 'Reverend Sam Cole',
+      burialPrivate: true,
+      burialPlace: 'Oak Hill',
+    });
+    expect(screen.getByText('Details from Service')).toBeInTheDocument();
+    expect(screen.getByText('Oak Chapel')).toBeInTheDocument();
+    expect(screen.getByText('Reverend Sam Cole')).toBeInTheDocument();
+    expect(screen.getByText('Burial').nextElementSibling).toHaveTextContent('Will be private');
+    expect(screen.queryByText('Oak Hill')).toBeNull();
+    expect(screen.queryByText('Visitation date')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Officiant' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Change these on Service' }));
+    expect(onOpenService).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so, once, when nothing is filled in on Service, and keeps the button', () => {
+    setup(person);
+    expect(screen.getByText('Nothing is filled in on Service yet.')).toBeInTheDocument();
+    expect(screen.queryByText(/We take these from the Service section/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change these on Service' })).toBeInTheDocument();
+  });
+
+  it('ties the Service hint to the list of details', () => {
+    setup({ ...person, servicePlace: 'Oak Chapel' });
+    const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
+    expect(list).toHaveAccessibleDescription(/We take these from the Service section/);
+  });
+
+  it('makes the two panel labels level 2 headings', () => {
+    setup(person);
+    expect(screen.getByRole('heading', { level: 2, name: 'Details from The person' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Details from Service' })).toBeInTheDocument();
+  });
+
+  it('puts the details in order: The person, Service, then the life fields and people', () => {
+    setup({ ...person, servicePlace: 'Oak Chapel' });
+    const top = [
+      screen.getByText('Details from The person'),
+      screen.getByText('Details from Service'),
+      screen.getByLabelText(/Given name/),
+      screen.getByText('Survived by'),
+      screen.getByText('Preceded in death by'),
+      text(),
+    ];
+    for (let i = 0; i < top.length - 1; i += 1) {
+      expect(top[i].compareDocumentPosition(top[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('typing a given name updates the text and saves at once', async () => {
+    const { patches } = setup(person);
+    await userEvent.type(screen.getByLabelText(/Given name/), 'Annie');
+    expect(patches.at(-1)).toEqual({ obituaryGivenName: 'Annie' });
+    expect(text().value).toContain('Annie');
+  });
+
+  it('adding a survivor row updates paragraph 4', async () => {
+    const { patches } = setup(person);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add a person' })[0]);
+    await userEvent.type(screen.getByLabelText('Name, person 1'), 'Sam Lee');
+    expect(patches.at(-1)).toHaveProperty('obituarySurvivorList');
+    expect(text().value.split('\n\n')[3]).toContain('Sam Lee');
+  });
+
+  it('never saves the worked-out age', async () => {
+    const { patches } = setup(person);
+    expect(screen.getByLabelText(/^Age/)).toHaveValue('86');
+    await userEvent.type(screen.getByLabelText(/Given name/), 'A');
+    expect(patches.some((p) => 'obituaryAge' in p)).toBe(false);
   });
 
   it('fills the service and visitation parts from the Service fields', () => {
@@ -96,7 +176,8 @@ describe('ObituarySection', () => {
     const line = 'Parts in [brackets] are still to fill in. Type over them, or delete what you don\'t need.';
     expect(screen.getByText(line)).toBeInTheDocument();
     expect(text()).toHaveAccessibleDescription(expect.stringContaining(line));
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByText(line)).not.toHaveAttribute('role');
+    expect(screen.getByText(line)).not.toHaveAttribute('aria-live');
     await userEvent.clear(text());
     await userEvent.type(text(), 'Ann Lee loved gardens [[my note].');
     expect(screen.queryByText(line)).toBeNull();

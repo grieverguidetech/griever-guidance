@@ -11,11 +11,6 @@
     "diedLabel",
     "changeDetails",
     "cityLabel",
-    "careerLabel",
-    "survivorsLabel",
-    "survivorsHint",
-    "noteLabel",
-    "noteHint",
     "textLabel",
     "textHint",
     "textBlanks",
@@ -56,7 +51,18 @@
     "pronounNone",
     "serviceDetailsHeading",
     "serviceDetailsHint",
+    "serviceDetailsEmpty",
     "changeOnService",
+    "servicePlaceLabel",
+    "serviceDateLabel",
+    "serviceTimeLabel",
+    "officiantLabel",
+    "burialPlaceLabel",
+    "burialLabel",
+    "burialPrivateValue",
+    "visitationPlaceLabel",
+    "visitationDateLabel",
+    "visitationTimeLabel",
     "survivedByHeading",
     "precededByHeading",
     "personNameColumn",
@@ -102,21 +108,6 @@
       "$ref": "#/$defs/text"
     },
     "cityLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "careerLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "survivorsLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "survivorsHint": {
-      "$ref": "#/$defs/text"
-    },
-    "noteLabel": {
-      "$ref": "#/$defs/text"
-    },
-    "noteHint": {
       "$ref": "#/$defs/text"
     },
     "textLabel": {
@@ -239,7 +230,40 @@
     "serviceDetailsHint": {
       "$ref": "#/$defs/text"
     },
+    "serviceDetailsEmpty": {
+      "$ref": "#/$defs/text"
+    },
     "changeOnService": {
+      "$ref": "#/$defs/text"
+    },
+    "servicePlaceLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "serviceDateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "serviceTimeLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "officiantLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "burialPlaceLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "burialLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "burialPrivateValue": {
+      "$ref": "#/$defs/text"
+    },
+    "visitationPlaceLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "visitationDateLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "visitationTimeLabel": {
       "$ref": "#/$defs/text"
     },
     "survivedByHeading": {
