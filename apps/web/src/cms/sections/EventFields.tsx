@@ -1,6 +1,6 @@
 import { useId, useRef, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
-import { dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
+import { FLOW_DETAIL_MAX_LENGTH, dateNote, type FlowDetailTextKey, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
 import { DateInput } from '../../lib/DateField';
 import { TimeInput } from '../../lib/TimeField';
 import { PlaceInput } from '../../lib/places/PlaceInput';
@@ -27,7 +27,8 @@ export interface EventKeys<K extends EventKey = EventKey> {
 interface Props<K extends EventKey> {
   /** Names the group for a screen reader, the event name. */
   legend: string;
-  keys: EventKeys<K>;
+  /** The place key must also be a saved text key, so its length limit is known. */
+  keys: EventKeys<K> & { place: FlowDetailTextKey };
   values: Partial<Record<K, string>>;
   /** Gets only the key that changed. */
   onChange: (patch: Partial<Record<K, string>>) => void;
@@ -46,7 +47,7 @@ interface Props<K extends EventKey> {
   /** Google place types to suggest in the place field. Without them it is a plain text input. */
   placeTypes?: readonly string[];
   /** A separate address field of this event. A picked place then fills Place with its name and this with its address. */
-  addressKey?: EventKey;
+  addressKey?: EventKey & FlowDetailTextKey;
   /** The date of passing as typed. A date before it gets a quiet note. */
   dateOfPassing?: string | null;
 }
@@ -165,13 +166,19 @@ export function EventFields<K extends EventKey>({
           id={`${id}-place`}
           labelledBy={`${legendId} ${id}-place-label`}
           types={placeTypes}
+          maxLength={FLOW_DETAIL_MAX_LENGTH[keys.place]}
           wantsDetails={(pick) => Boolean(addressKey && pick.secondaryText && mayFillAddress())}
           onPick={(pick, details) => {
             // The full street address from the place itself; the prediction's short line if that failed.
-            const name = details?.name || pick.mainText;
-            const address = details?.address || pick.secondaryText;
+            // Cut to the saved length, as the server would, so a long pick is not lost on save.
+            const placeMax = FLOW_DETAIL_MAX_LENGTH[keys.place];
+            const name = (details?.name || pick.mainText).slice(0, placeMax);
+            const address = (details?.address || pick.secondaryText).slice(
+              0,
+              addressKey ? FLOW_DETAIL_MAX_LENGTH[addressKey] : 0,
+            );
             if (!addressKey || !address) {
-              onChange({ [keys.place]: pick.text } as Partial<Record<K, string>>);
+              onChange({ [keys.place]: pick.text.slice(0, placeMax) } as Partial<Record<K, string>>);
               return false;
             }
             if (!mayFillAddress()) {
