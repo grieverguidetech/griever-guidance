@@ -68,7 +68,7 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
   });
   const edited = values.obituaryText !== undefined;
   const shownText = values.obituaryText ?? prefill;
-  const blanksLeft = hasTemplateBlanks(shownText, draftCopy);
+  const blanksLeft = hasTemplateBlanks(shownText, draftCopy) || hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
   const facts = [
     { label: copy.nameLabel, value: values.personName },
     { label: copy.bornLabel, value: values.birthDate },
@@ -162,17 +162,12 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
         <textarea
           id={`${id}-text`}
           ref={textRef}
-          aria-describedby={blanksLeft ? `${id}-text-hint ${id}-text-blanks` : `${id}-text-hint`}
+          aria-describedby={`${id}-text-hint`}
           className="gg-input"
           rows={10}
           value={shownText}
           onChange={(e) => onChange({ obituaryText: e.target.value })}
         />
-        {blanksLeft && (
-          <p id={`${id}-text-blanks`} className="gg-hint">
-            {copy.textBlanks}
-          </p>
-        )}
         {edited && (
           <button
             type="button"
@@ -228,6 +223,7 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
         nextSection={nextSection}
         onNext={onNext}
         phoneNudge="obituary"
+        blockedMessage={blanksLeft ? copy.readyPlaceholders : undefined}
       />
     </div>
   );

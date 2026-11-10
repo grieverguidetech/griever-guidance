@@ -172,17 +172,68 @@ describe('ObituarySection', () => {
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
 
-  it('shows one calm line while [brackets] remain, as part of the text description, and hides it when none remain', async () => {
-    setup(person);
-    const line = 'Parts in [brackets] are still to fill in. Type over them, or delete what you don\'t need.';
-    expect(screen.getByText(line)).toBeInTheDocument();
-    expect(text()).toHaveAccessibleDescription(expect.stringContaining(line));
-    expect(screen.getByText(line)).not.toHaveAttribute('role');
-    expect(screen.getByText(line)).not.toHaveAttribute('aria-live');
-    await userEvent.clear(text());
-    await userEvent.type(text(), 'Ann Lee loved gardens [[my note].');
-    expect(screen.queryByText(line)).toBeNull();
-    expect(text()).not.toHaveAccessibleDescription(expect.stringContaining('Parts in'));
+  describe('Mark as ready with placeholders (#779)', () => {
+    const message = 'Some placeholder text is still in [brackets]. Replace it before you mark this ready.';
+    const toggle = () => screen.getByRole('button', { name: 'Mark as ready' });
+
+    it('refuses the untouched template, with the message in the toggle description', async () => {
+      const { onReadyChange } = setup(person);
+      expect(toggle()).toHaveAttribute('aria-disabled', 'true');
+      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(message));
+      await userEvent.click(toggle());
+      expect(onReadyChange).not.toHaveBeenCalled();
+    });
+
+    it('has no hint line under the text', () => {
+      setup(person);
+      expect(screen.queryByText(/still to fill in/)).toBeNull();
+      expect(text()).not.toHaveAccessibleDescription(expect.stringContaining('brackets'));
+    });
+
+    it('refuses an edited text that still has a legacy Step 1 word', async () => {
+      const { onReadyChange } = setup(person);
+      await userEvent.clear(text());
+      await userEvent.type(text(), 'Ann Lee loved gardens [[FINAL WORDS].');
+      expect(toggle()).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(toggle());
+      expect(onReadyChange).not.toHaveBeenCalled();
+    });
+
+    it('refuses a placeholder in the memorial', async () => {
+      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.', obituaryMemorial: 'Gifts to [CHARITIES/ORGANIZATIONS].' });
+      expect(toggle()).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(toggle());
+      expect(onReadyChange).not.toHaveBeenCalled();
+    });
+
+    it('does not block a fully typed text and memorial', async () => {
+      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.', obituaryMemorial: 'Gifts to the garden club.' });
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(toggle());
+      expect(onReadyChange).toHaveBeenCalledWith(true);
+    });
+
+    it("does not block a family's own brackets", async () => {
+      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens [[my note].', obituaryMemorial: 'See [[the club].' });
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(toggle());
+      expect(onReadyChange).toHaveBeenCalledWith(true);
+    });
+
+    it('always lets Ready be turned off, and stays Ready if a bracket comes back', async () => {
+      const onReadyChange = vi.fn();
+      render(
+        <ObituarySection
+          values={{ ...person, sectionStatus: { obituary: 'ready' } }}
+          onChange={() => undefined}
+          onReadyChange={onReadyChange}
+        />,
+      );
+      expect(toggle()).toHaveAttribute('aria-pressed', 'true');
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(toggle());
+      expect(onReadyChange).toHaveBeenCalledWith(false);
+    });
   });
 
   it('has no where-it-is-published inputs', () => {
@@ -192,7 +243,7 @@ describe('ObituarySection', () => {
   });
 
   it('marks ready through MarkReady', async () => {
-    const { onReadyChange } = setup();
+    const { onReadyChange } = setup({ obituaryText: 'Ann Lee loved gardens.' });
     await userEvent.click(screen.getByRole('button', { name: /ready/i }));
     expect(onReadyChange).toHaveBeenCalledWith(true);
   });
@@ -296,7 +347,7 @@ describe('ObituarySection phone nudge', () => {
       const [ready, setReady] = useState(false);
       return (
         <ObituarySection
-          values={{ sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
+          values={{ obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
           onChange={() => undefined}
           onReadyChange={setReady}
         />
