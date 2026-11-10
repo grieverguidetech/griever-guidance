@@ -51,6 +51,7 @@
     "pronounNone",
     "serviceDetailsHeading",
     "serviceDetailsHint",
+    "serviceDetailsEmpty",
     "changeOnService",
     "servicePlaceLabel",
     "serviceDateLabel",
@@ -227,6 +228,9 @@
       "$ref": "#/$defs/text"
     },
     "serviceDetailsHint": {
+      "$ref": "#/$defs/text"
+    },
+    "serviceDetailsEmpty": {
       "$ref": "#/$defs/text"
     },
     "changeOnService": {

@@ -78,15 +78,15 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
     <div className="flex flex-col gap-6">
       <p>{copy.intro}</p>
       <div className="gg-panel flex flex-col gap-4">
-        <p id={`${id}-details`} className="font-semibold">
+        <h2 id={`${id}-details`} className="font-semibold">
           {copy.detailsHeading}
-        </p>
+        </h2>
         {facts.length > 0 && (
           <dl aria-labelledby={`${id}-details`} className="flex flex-col gap-1">
             {facts.map((f) => (
-              <div key={f.label} className="flex gap-2">
+              <div key={f.label} className="flex flex-wrap gap-x-2">
                 <dt className="font-medium">{f.label}</dt>
-                <dd>{f.value}</dd>
+                <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
               </div>
             ))}
           </dl>
@@ -98,16 +98,26 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
         )}
       </div>
       <div className="gg-panel flex flex-col gap-4">
-        <p id={`${id}-service`} className="font-semibold">
+        <h2 id={`${id}-service`} className="font-semibold">
           {copy.serviceDetailsHeading}
-        </p>
-        <p className="gg-hint">{copy.serviceDetailsHint}</p>
+        </h2>
+        {serviceFacts.length > 0 ? (
+          <p id={`${id}-service-hint`} className="gg-hint">
+            {copy.serviceDetailsHint}
+          </p>
+        ) : (
+          <p className="gg-hint">{copy.serviceDetailsEmpty}</p>
+        )}
         {serviceFacts.length > 0 && (
-          <dl aria-labelledby={`${id}-service`} className="flex flex-col gap-1">
+          <dl
+            aria-labelledby={`${id}-service`}
+            aria-describedby={`${id}-service-hint`}
+            className="flex flex-col gap-1"
+          >
             {serviceFacts.map((f) => (
-              <div key={f.label} className="flex gap-2">
+              <div key={f.label} className="flex flex-wrap gap-x-2">
                 <dt className="font-medium">{f.label}</dt>
-                <dd>{f.value}</dd>
+                <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
               </div>
             ))}
           </dl>
@@ -118,7 +128,7 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
           </button>
         )}
       </div>
-      <div className="gg-panel flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <ObituaryLifeFields values={values} onChange={onChange} />
         <ObituaryPeople
           heading={copy.survivedByHeading}

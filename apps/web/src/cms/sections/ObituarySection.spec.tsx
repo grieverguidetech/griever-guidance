@@ -76,12 +76,31 @@ describe('ObituarySection', () => {
     expect(screen.getByText('Details from Service')).toBeInTheDocument();
     expect(screen.getByText('Oak Chapel')).toBeInTheDocument();
     expect(screen.getByText('Reverend Sam Cole')).toBeInTheDocument();
-    expect(screen.getByText('Burial will be private')).toBeInTheDocument();
+    expect(screen.getByText('Burial').nextElementSibling).toHaveTextContent('Will be private');
     expect(screen.queryByText('Oak Hill')).toBeNull();
     expect(screen.queryByText('Visitation date')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Officiant' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Change these on Service' }));
     expect(onOpenService).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so, once, when nothing is filled in on Service, and keeps the button', () => {
+    setup(person);
+    expect(screen.getByText('Nothing is filled in on Service yet.')).toBeInTheDocument();
+    expect(screen.queryByText(/We take these from the Service section/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change these on Service' })).toBeInTheDocument();
+  });
+
+  it('ties the Service hint to the list of details', () => {
+    setup({ ...person, servicePlace: 'Oak Chapel' });
+    const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
+    expect(list).toHaveAccessibleDescription(/We take these from the Service section/);
+  });
+
+  it('makes the two panel labels level 2 headings', () => {
+    setup(person);
+    expect(screen.getByRole('heading', { level: 2, name: 'Details from The person' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Details from Service' })).toBeInTheDocument();
   });
 
   it('puts the details in order: The person, Service, then the life fields and people', () => {
@@ -158,6 +177,7 @@ describe('ObituarySection', () => {
     expect(screen.getByText(line)).toBeInTheDocument();
     expect(text()).toHaveAccessibleDescription(expect.stringContaining(line));
     expect(screen.getByText(line)).not.toHaveAttribute('role');
+    expect(screen.getByText(line)).not.toHaveAttribute('aria-live');
     await userEvent.clear(text());
     await userEvent.type(text(), 'Ann Lee loved gardens [[my note].');
     expect(screen.queryByText(line)).toBeNull();
