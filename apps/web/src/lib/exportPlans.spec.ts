@@ -1,4 +1,4 @@
-import { screenCopy } from '@griever/copy';
+import { buildObituaryDraft, screenCopy } from '@griever/copy';
 import { buildPlansText, downloadPlans, plansFileName } from './exportPlans';
 import type { PlanPerson } from './exportPlans';
 
@@ -75,6 +75,54 @@ describe('buildPlansText', () => {
     expect(text).toContain('Sam Reed, [AGE], of Reno, [STATE], passed away on 2026-05-29');
     expect(text).toContain('worked as a teacher.');
     expect(text).not.toContain('undefined');
+  });
+
+  it('ends the obituary with the memorial as its own last paragraph', () => {
+    const text = buildPlansText([{ personName: 'Sam', obituaryText: 'A kind man.', obituaryMemorial: '  Gifts to the library.  ' }], copy);
+    expect(text).toContain('Obituary\n--------\nA kind man.\n\nGifts to the library.\n');
+  });
+
+  it('adds the memorial after a built draft too', () => {
+    const text = buildPlansText([{ personName: 'Sam Reed', obituaryMemorial: 'Gifts to the library.' }], copy);
+    const section = text.split('Obituary\n--------\n')[1].split('\n\nThank-you message')[0];
+    expect(section.endsWith('\n\nGifts to the library.')).toBe(true);
+    expect(section.split('\n\n').pop()).toBe('Gifts to the library.');
+    expect(text).toContain('Gifts to the library.\n\nThank-you message');
+  });
+
+  it('does not stack blank lines before the memorial when the typed text ends in newlines', () => {
+    const text = buildPlansText([{ personName: 'Sam', obituaryText: 'A kind man.\n\n\n', obituaryMemorial: 'Gifts.' }], copy);
+    expect(text).toContain('A kind man.\n\nGifts.\n');
+    expect(text).not.toContain('A kind man.\n\n\n');
+  });
+
+  it('writes a built draft with no memorial exactly as the builder returns it', () => {
+    const person = { personName: 'Sam Reed', obituaryGivenName: 'Sam', obituaryCity: 'Reno' };
+    const draft = buildObituaryDraft(person, screenCopy('obituaryDraft'));
+    const text = buildPlansText([person], copy);
+    expect(text.split('Obituary\n--------\n')[1].split('\n\nThank-you message')[0]).toBe(draft);
+  });
+
+  it('writes the obituary unchanged when there is no memorial', () => {
+    const base = { personName: 'Sam', obituaryText: 'A kind man.' };
+    const plain = buildPlansText([base], copy);
+    expect(buildPlansText([{ ...base, obituaryMemorial: '   ' }], copy)).toBe(plain);
+    expect(plain).toContain('Obituary\n--------\nA kind man.\n');
+    expect(plain).toContain('A kind man.\n\nThank-you message');
+  });
+
+  it('leaves out a cleared obituary even when there is a memorial', () => {
+    const cleared = { personName: 'Sam', obituaryText: '' };
+    const plain = buildPlansText([cleared], copy);
+    expect(buildPlansText([{ ...cleared, obituaryMemorial: 'Gifts to the library.' }], copy)).toBe(plain);
+    expect(buildPlansText([{ ...cleared, obituaryText: '  ', obituaryMemorial: 'Gifts.' }], copy)).toBe(plain);
+    expect(plain).not.toContain('Obituary');
+  });
+
+  it('builds the draft from the new fields', () => {
+    const text = buildPlansText([{ personName: 'Samuel Reed', obituaryGivenName: 'Sam', obituarySurname: 'Reed' }], copy);
+    expect(text.split('Obituary\n--------\n')[1]).toContain('Sam Reed');
+    expect(text).not.toContain('[GIVEN NAME]');
   });
 
   it('writes the service message the editor shows when it was never edited', () => {

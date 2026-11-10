@@ -1,5 +1,5 @@
 import type { Session } from '@griever/hooks';
-import { buildObituaryDraft, fill, screenCopy } from '@griever/copy';
+import { buildObituaryDraft, fill, obituaryShareText, screenCopy } from '@griever/copy';
 import { announcePassing, defaultServiceEventsMessage, parseCompleteDate } from '@griever/shared';
 
 const thanksCopy = screenCopy('cmsThanks');
@@ -43,6 +43,32 @@ export type PlanPerson = Partial<
     | 'obituaryCareer'
     | 'obituarySurvivors'
     | 'obituaryNote'
+    | 'obituaryGivenName'
+    | 'obituaryMiddleName'
+    | 'obituarySurname'
+    | 'obituaryAge'
+    | 'obituaryState'
+    | 'obituaryDeathPlace'
+    | 'obituaryFuneralHome'
+    | 'obituaryChurch'
+    | 'obituaryCemeteryLocation'
+    | 'obituaryBirthPlace'
+    | 'obituaryMotherName'
+    | 'obituaryFatherName'
+    | 'obituaryHighSchool'
+    | 'obituaryGradYear'
+    | 'obituaryDegree'
+    | 'obituaryCollege'
+    | 'obituaryJobTitle'
+    | 'obituaryCompany'
+    | 'obituaryJobYears'
+    | 'obituaryHobbies'
+    | 'obituaryAwards'
+    | 'obituaryOrganizations'
+    | 'obituaryPronoun'
+    | 'obituarySurvivorList'
+    | 'obituaryPrecededList'
+    | 'obituaryMemorial'
     | 'dateOfPassing'
     | 'birthDate'
     | 'serviceType'
@@ -105,6 +131,17 @@ function section(heading: string, body: string[]): string[] {
   return [heading, '-'.repeat(heading.length), ...body, ''];
 }
 
+/** The obituary body, then the memorial. A blank body (cleared) leaves the part out, memorial or not. */
+function obituaryText(person: PlanPerson): string {
+  if (person.obituaryText !== undefined && person.obituaryText.trim() === '') {
+    return '';
+  }
+  const body =
+    person.obituaryText ??
+    buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy);
+  return obituaryShareText(body.trimEnd(), person.obituaryMemorial ?? '');
+}
+
 /**
  * The four messages follow the person's details until the family edits them (undefined), so the
  * same builders the editor sections use fill in an unedited one. A string is the family's wording;
@@ -137,9 +174,7 @@ function messages(person: PlanPerson) {
         receptionTime: person.receptionTime,
         receptionPlace: person.receptionPlace,
       }),
-    obituary:
-      person.obituaryText ??
-      buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy),
+    obituary: obituaryText(person),
     thanks: person.thanksMessage ?? fill(thanksCopy.template, { deceasedName: name.trim() || thanksCopy.nameFallback }),
   };
 }
