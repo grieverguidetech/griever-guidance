@@ -1,9 +1,6 @@
 import type { ReactNode } from 'react';
 import { CaretDown } from '@phosphor-icons/react/CaretDown';
 import { Check } from '@phosphor-icons/react/Check';
-import { screenCopy } from '@griever/copy';
-
-const copy = screenCopy('cmsChecklist');
 
 interface Props {
   title: string;
@@ -11,6 +8,8 @@ interface Props {
   panelId: string;
   onToggle: () => void;
   done?: boolean;
+  /** The hidden text read after the title when done is true. */
+  doneLabel?: string;
   /** The heading level: h3 in the checklist panel, h2 on a page of its own. */
   level?: 2 | 3;
   /** An id for the heading, so a group inside the panel can be named by it. */
@@ -25,6 +24,7 @@ export function AccordionSection({
   panelId,
   onToggle,
   done = false,
+  doneLabel,
   level = 3,
   headingId,
   children,
@@ -35,7 +35,7 @@ export function AccordionSection({
       <Heading id={headingId} className="m-0">
         <button
           type="button"
-          className="flex min-h-11 w-full items-center gap-2 text-left"
+          className="flex min-h-11 w-full items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           aria-expanded={open}
           aria-controls={panelId}
           onClick={onToggle}
@@ -57,7 +57,7 @@ export function AccordionSection({
                 aria-hidden="true"
                 className="shrink-0 text-success-700"
               />
-              <span className="sr-only">{copy.done}</span>
+              <span className="sr-only">{doneLabel}</span>
             </>
           )}
         </button>

@@ -176,7 +176,7 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
       >
         <div role="group" aria-labelledby={headingId} className="flex flex-col gap-4">
           {lead}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-2">
             {fields.map(renderField)}
             {tail}
           </div>

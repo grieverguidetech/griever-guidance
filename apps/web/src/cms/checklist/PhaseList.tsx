@@ -69,6 +69,7 @@ export function PhaseList({
       panelId={`${panelId}-${phase.key}`}
       onToggle={() => toggle(phase.key)}
       done={phase.done}
+      doneLabel={copy.done}
     >
       {phase.key === 'obituary' && <p>{copy.obituaryNote}</p>}
       <ul className="flex list-none flex-col gap-3 p-0">

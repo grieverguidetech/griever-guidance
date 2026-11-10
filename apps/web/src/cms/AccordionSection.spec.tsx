@@ -1,10 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { screenCopy } from '@griever/copy';
 import { AccordionSection } from './AccordionSection';
-
-const copy = screenCopy('cmsChecklist');
 
 function Harness({
   level,
@@ -26,6 +23,7 @@ function Harness({
       onToggle={() => setOpen((v) => !v)}
       level={level}
       done={done}
+      doneLabel="Done"
       headingId="head"
     >
       {children}
@@ -36,10 +34,14 @@ function Harness({
 describe('AccordionSection', () => {
   it('is a level 3 heading by default and level 2 when asked', () => {
     const { unmount } = render(<Harness />);
-    expect(screen.getByRole('heading', { level: 3, name: 'Their life' })).toHaveAttribute('id', 'head');
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Their life' }),
+    ).toHaveAttribute('id', 'head');
     unmount();
     render(<Harness level={2} />);
-    expect(screen.getByRole('heading', { level: 2, name: 'Their life' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Their life' }),
+    ).toBeInTheDocument();
   });
 
   it('has aria-expanded and aria-controls, and hides the panel while closed', () => {
@@ -77,9 +79,9 @@ describe('AccordionSection', () => {
 
   it('shows a hidden-text check only when done', () => {
     const { unmount } = render(<Harness />);
-    expect(screen.queryByText(copy.done)).toBeNull();
+    expect(screen.queryByText('Done')).toBeNull();
     unmount();
     render(<Harness done />);
-    expect(screen.getByText(copy.done)).toHaveClass('sr-only');
+    expect(screen.getByText('Done')).toHaveClass('sr-only');
   });
 });

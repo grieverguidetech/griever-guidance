@@ -58,7 +58,10 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
 
   function fromValue(text: string): Row[] {
     const parsed = parsePeople(text, relations);
-    return (parsed ?? []).map((person) => ({ ...person, key: nextKey.current++ }));
+    return (parsed ?? []).map((person) => ({
+      ...person,
+      key: nextKey.current++,
+    }));
   }
 
   // Empty rows are not in the text, so the rows live here until the text changes from outside.
@@ -101,8 +104,13 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
       return;
     }
     pendingFocus.current = { kind: 'name', index: rows.length };
-    setMessage(rows.length + 1 >= OBITUARY_PEOPLE_MAX_ROWS ? copy.peopleLimit : '');
-    setRows([...rows, { key: nextKey.current++, name: '', city: '', relation: relations[0] }]);
+    setMessage(
+      rows.length + 1 >= OBITUARY_PEOPLE_MAX_ROWS ? copy.peopleLimit : '',
+    );
+    setRows([
+      ...rows,
+      { key: nextKey.current++, name: '', city: '', relation: relations[0] },
+    ]);
   }
 
   function removeRow(index: number) {
@@ -113,7 +121,8 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
         ? fill(copy.personRemovedUnnamed, { n: index + 1 })
         : fill(copy.personRemoved, { name: removed }),
     );
-    pendingFocus.current = index < next.length ? { kind: 'name', index } : { kind: 'add' };
+    pendingFocus.current =
+      index < next.length ? { kind: 'name', index } : { kind: 'add' };
     update(next);
   }
 
@@ -128,80 +137,96 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
       panelId={`${id}-panel`}
       onToggle={() => setOpen((before) => !before)}
     >
-    <div role="group" aria-labelledby={`${id}-heading`} className="flex flex-col gap-4 min-w-0">
-      {rows.map((row, index) => {
-        const n = String(index + 1);
-        const field = (label: string) => fill(copy.personRowField, { field: label, n });
-        const removeName =
-          row.name.trim() === ''
-            ? fill(copy.removePersonUnnamed, { n })
-            : fill(copy.removePerson, { name: row.name.trim(), n });
-        return (
-          <div key={row.key} className="gg-panel grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="gg-field">
-              <label htmlFor={`${id}-${row.key}-name`}>{field(copy.personNameColumn)}</label>
-              <input
-                id={`${id}-${row.key}-name`}
-                ref={(el) => {
-                  nameRefs.current[index] = el;
-                }}
-                type="text"
-                className="gg-input"
-                autoComplete="off"
-                value={row.name}
-                onChange={(e) => changeRow(index, { name: e.target.value })}
-              />
-            </div>
-            <div className="gg-field">
-              <label htmlFor={`${id}-${row.key}-city`}>{field(copy.personCityColumn)}</label>
-              <input
-                id={`${id}-${row.key}-city`}
-                type="text"
-                className="gg-input"
-                autoComplete="off"
-                value={row.city}
-                onChange={(e) => changeRow(index, { city: e.target.value })}
-              />
-            </div>
-            <div className="gg-field">
-              <label htmlFor={`${id}-${row.key}-relation`}>{field(copy.personRelationColumn)}</label>
-              <select
-                id={`${id}-${row.key}-relation`}
-                className="gg-input"
-                value={row.relation}
-                onChange={(e) => changeRow(index, { relation: e.target.value })}
-              >
-                {relations.map((relation) => (
-                  <option key={relation} value={relation}>
-                    {RELATION_LABELS[relation as SurvivorRelation]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              className="gg-btn gg-btn-secondary self-start md:col-span-2 min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
-              onClick={() => removeRow(index)}
+      <div
+        role="group"
+        aria-labelledby={`${id}-heading`}
+        className="flex flex-col gap-4 min-w-0"
+      >
+        {rows.map((row, index) => {
+          const n = String(index + 1);
+          const field = (label: string) =>
+            fill(copy.personRowField, { field: label, n });
+          const removeName =
+            row.name.trim() === ''
+              ? fill(copy.removePersonUnnamed, { n })
+              : fill(copy.removePerson, { name: row.name.trim(), n });
+          return (
+            <div
+              key={row.key}
+              className="gg-panel grid grid-cols-1 gap-3 md:grid-cols-2"
             >
-              {removeName}
-            </button>
-          </div>
-        );
-      })}
-      <p role="status" aria-live="polite">
-        {message || (atLimit ? copy.peopleLimit : '')}
-      </p>
-      {atLimit ? null : (
-        <button
-          type="button"
-          ref={addRef}
-          className="gg-btn gg-btn-secondary self-start min-h-[44px]"
-          onClick={addRow}
-        >
-          {copy.addPerson}
-        </button>
-      )}
-    </div>
+              <div className="gg-field">
+                <label htmlFor={`${id}-${row.key}-name`}>
+                  {field(copy.personNameColumn)}
+                </label>
+                <input
+                  id={`${id}-${row.key}-name`}
+                  ref={(el) => {
+                    nameRefs.current[index] = el;
+                  }}
+                  type="text"
+                  className="gg-input"
+                  autoComplete="off"
+                  value={row.name}
+                  onChange={(e) => changeRow(index, { name: e.target.value })}
+                />
+              </div>
+              <div className="gg-field">
+                <label htmlFor={`${id}-${row.key}-city`}>
+                  {field(copy.personCityColumn)}
+                </label>
+                <input
+                  id={`${id}-${row.key}-city`}
+                  type="text"
+                  className="gg-input"
+                  autoComplete="off"
+                  value={row.city}
+                  onChange={(e) => changeRow(index, { city: e.target.value })}
+                />
+              </div>
+              <div className="gg-field">
+                <label htmlFor={`${id}-${row.key}-relation`}>
+                  {field(copy.personRelationColumn)}
+                </label>
+                <select
+                  id={`${id}-${row.key}-relation`}
+                  className="gg-input"
+                  value={row.relation}
+                  onChange={(e) =>
+                    changeRow(index, { relation: e.target.value })
+                  }
+                >
+                  {relations.map((relation) => (
+                    <option key={relation} value={relation}>
+                      {RELATION_LABELS[relation as SurvivorRelation]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="gg-btn gg-btn-secondary justify-self-start md:col-span-2 min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
+                onClick={() => removeRow(index)}
+              >
+                {removeName}
+              </button>
+            </div>
+          );
+        })}
+        <p role="status" aria-live="polite">
+          {message || (atLimit ? copy.peopleLimit : '')}
+        </p>
+        {atLimit ? null : (
+          <button
+            type="button"
+            ref={addRef}
+            className="gg-btn gg-btn-secondary self-start min-h-[44px]"
+            onClick={addRow}
+          >
+            {copy.addPerson}
+          </button>
+        )}
+      </div>
     </AccordionSection>
   );
 }

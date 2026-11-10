@@ -119,7 +119,7 @@ describe('ObituarySection', () => {
     }
   });
 
-  it('opens only the name section on load, and the six sections open one at a time', async () => {
+  it('opens only the name section on load, and the six sections open independently', async () => {
     setup(person);
     const names = [
       "The person's name",

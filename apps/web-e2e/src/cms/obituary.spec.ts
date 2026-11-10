@@ -53,6 +53,21 @@ async function openSection(page: Page, name: string) {
   await expect(button).toHaveAttribute('aria-expanded', 'true');
 }
 
+const SECTIONS = [
+  "The person's name",
+  'Their life',
+  'Their family',
+  'Funeral home and church',
+  'Survived by',
+  'Preceded in death by',
+];
+
+async function openAllSections(page: Page) {
+  for (const name of SECTIONS) {
+    await openSection(page, name);
+  }
+}
+
 /** Fills the name, life and survivor fields, adds the memorial, and presses Mark as ready with placeholders left. */
 async function fillFieldsAndAddMemorial(page: Page) {
   await page.getByRole('button', { name: 'Use the name from The person' }).click();
@@ -134,6 +149,7 @@ test.describe('Obituary section (WEB-6)', () => {
   test('no WCAG A/AA violations with the fields filled, the memorial open and the Ready message showing (contrast checked separately)', async ({ page }) => {
     await openObituary(page);
     await fillFieldsAndAddMemorial(page);
+    await openAllSections(page);
     await expect(blockedLine(page)).toBeVisible();
     expect(await violations(page)).toEqual([]);
   });
@@ -141,7 +157,24 @@ test.describe('Obituary section (WEB-6)', () => {
   test('text meets AA contrast with the Ready message showing', async ({ page }) => {
     await openObituary(page);
     await fillFieldsAndAddMemorial(page);
+    await openAllSections(page);
     await expect(blockedLine(page)).toBeVisible();
     expect(await violations(page, { contrastOnly: true })).toEqual([]);
+  });
+
+  test('paired fields share a row at 1280px and nothing scrolls sideways at 375px', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openObituary(page);
+    await openSection(page, 'Their life');
+    const age = await page.getByLabel('Age (optional)').boundingBox();
+    const born = await page.getByLabel('Where they were born (optional)').boundingBox();
+    expect(age).not.toBeNull();
+    expect(born).not.toBeNull();
+    expect(age?.y).toBe(born?.y);
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openAllSections(page);
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(375);
   });
 });
