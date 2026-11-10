@@ -76,6 +76,7 @@
     "relationParent",
     "addPerson",
     "removePerson",
+    "memorialHeading",
     "addMemorial",
     "memorialLabel",
     "memorialHint",
@@ -302,6 +303,9 @@
       "$ref": "#/$defs/text"
     },
     "removePerson": {
+      "$ref": "#/$defs/text"
+    },
+    "memorialHeading": {
       "$ref": "#/$defs/text"
     },
     "addMemorial": {

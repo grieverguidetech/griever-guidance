@@ -35,7 +35,11 @@ function setup(initial: Values = {}) {
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
-const person = { personName: 'Ann Lee', dateOfPassing: 'June 1, 2026', birthDate: 'May 2, 1940' };
+const person = {
+  personName: 'Ann Lee',
+  dateOfPassing: 'June 1, 2026',
+  birthDate: 'May 2, 1940',
+};
 
 describe('ObituarySection', () => {
   it('shows the name and dates read-only, with a button to change them in The person', async () => {
@@ -44,16 +48,25 @@ describe('ObituarySection', () => {
     expect(screen.getByText('May 2, 1940')).toBeInTheDocument();
     expect(screen.getByText('June 1, 2026')).toBeInTheDocument();
     expect(screen.getByText('Details from The person')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Change these on The person' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change these on The person' }),
+    );
     expect(onOpenPerson).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull();
   });
 
   it('starts the text from the template, with brackets for what is missing, and follows new details until edited', async () => {
     setup(person);
-    expect(text().value).toContain('Ann Lee, 86, of [CITY], [STATE], passed away on June 1, 2026.');
-    expect(text().value).toContain('Ann Lee was born in [BIRTH PLACE] to [MOTHER\'S NAME] and [FATHER\'S NAME] on May 2, 1940.');
-    await userEvent.type(screen.getByLabelText(/City where they lived/), 'Tulsa');
+    expect(text().value).toContain(
+      'Ann Lee, 86, of [CITY], [STATE], passed away on June 1, 2026.',
+    );
+    expect(text().value).toContain(
+      "Ann Lee was born in [BIRTH PLACE] to [MOTHER'S NAME] and [FATHER'S NAME] on May 2, 1940.",
+    );
+    await userEvent.type(
+      screen.getByLabelText(/City where they lived/),
+      'Tulsa',
+    );
     expect(text().value).toContain('Ann Lee, 86, of Tulsa, [STATE]');
     await userEvent.type(screen.getByLabelText(/Job title/), 'teacher');
     expect(text().value).toContain('worked as a teacher');
@@ -77,31 +90,50 @@ describe('ObituarySection', () => {
     expect(screen.getByText('Details from Service')).toBeInTheDocument();
     expect(screen.getByText('Oak Chapel')).toBeInTheDocument();
     expect(screen.getByText('Reverend Sam Cole')).toBeInTheDocument();
-    expect(screen.getByText('Burial').nextElementSibling).toHaveTextContent('Will be private');
+    expect(screen.getByText('Burial').nextElementSibling).toHaveTextContent(
+      'Will be private',
+    );
     expect(screen.queryByText('Oak Hill')).toBeNull();
     expect(screen.queryByText('Visitation date')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Officiant' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Change these on Service' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change these on Service' }),
+    );
     expect(onOpenService).toHaveBeenCalledTimes(1);
   });
 
   it('says so, once, when nothing is filled in on Service, and keeps the button', () => {
     setup(person);
-    expect(screen.getByText('Nothing is filled in on Service yet.')).toBeInTheDocument();
-    expect(screen.queryByText(/We take these from the Service section/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Change these on Service' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Nothing is filled in on Service yet.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/We take these from the Service section/),
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Change these on Service' }),
+    ).toBeInTheDocument();
   });
 
   it('ties the Service hint to the list of details', () => {
     setup({ ...person, servicePlace: 'Oak Chapel' });
     const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
-    expect(list).toHaveAccessibleDescription(/We take these from the Service section/);
+    expect(list).toHaveAccessibleDescription(
+      /We take these from the Service section/,
+    );
   });
 
   it('makes the two panel labels level 2 headings', () => {
     setup(person);
-    expect(screen.getByRole('heading', { level: 2, name: 'Details from The person' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Details from Service' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'Details from The person',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Details from Service' }),
+    ).toBeInTheDocument();
   });
 
   it('puts the details in order: The person, Service, then the life fields and people', () => {
@@ -115,7 +147,10 @@ describe('ObituarySection', () => {
       text(),
     ];
     for (let i = 0; i < top.length - 1; i += 1) {
-      expect(top[i].compareDocumentPosition(top[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        top[i].compareDocumentPosition(top[i + 1]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     }
   });
 
@@ -129,9 +164,16 @@ describe('ObituarySection', () => {
       'Survived by',
       'Preceded in death by',
     ];
-    const buttons = names.map((name) => screen.getByRole('button', { name: new RegExp(`^${name}`) }));
+    const buttons = names.map((name) =>
+      screen.getByRole('button', { name: new RegExp(`^${name}`) }),
+    );
     expect(buttons.map((b) => b.getAttribute('aria-expanded'))).toEqual([
-      'true', 'false', 'false', 'false', 'false', 'false',
+      'true',
+      'false',
+      'false',
+      'false',
+      'false',
+      'false',
     ]);
     await userEvent.click(buttons[1]);
     expect(buttons[1]).toHaveAttribute('aria-expanded', 'true');
@@ -148,7 +190,9 @@ describe('ObituarySection', () => {
   it('adding a survivor row updates paragraph 4', async () => {
     const { patches } = setup(person);
     await userEvent.click(screen.getByRole('button', { name: 'Survived by' }));
-    await userEvent.click(screen.getAllByRole('button', { name: 'Add a person' })[0]);
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Add a person' })[0],
+    );
     await userEvent.type(screen.getByLabelText('Name, person 1'), 'Sam Lee');
     expect(patches.at(-1)).toHaveProperty('obituarySurvivorList');
     expect(text().value.split('\n\n')[3]).toContain('Sam Lee');
@@ -183,23 +227,33 @@ describe('ObituarySection', () => {
     await userEvent.type(text(), '!');
     expect(patches.at(-1)).toHaveProperty('obituaryText');
     expect(screen.getByText(/You changed the obituary/)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/City where they lived/), 'Tulsa');
+    await userEvent.type(
+      screen.getByLabelText(/City where they lived/),
+      'Tulsa',
+    );
     expect(text().value).not.toContain('Tulsa');
-    await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use the details above' }),
+    );
     expect(patches.at(-1)).toEqual({ obituaryText: undefined });
     expect(text().value).toContain('Ann Lee, 86, of Tulsa, [STATE]');
     expect(text()).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Use the details above' }),
+    ).toBeNull();
   });
 
   describe('Mark as ready with placeholders (#779)', () => {
-    const message = 'Some placeholder text is still in [brackets]. Replace it before you mark this ready.';
+    const message =
+      'Some placeholder text is still in [brackets]. Replace it before you mark this ready.';
     const toggle = () => screen.getByRole('button', { name: 'Mark as ready' });
 
     it('refuses the untouched template, with the message in the toggle description', async () => {
       const { onReadyChange } = setup(person);
       expect(toggle()).toHaveAttribute('aria-disabled', 'true');
-      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(message));
+      expect(toggle()).toHaveAccessibleDescription(
+        expect.stringContaining(message),
+      );
       await userEvent.click(toggle());
       expect(onReadyChange).not.toHaveBeenCalled();
     });
@@ -207,7 +261,9 @@ describe('ObituarySection', () => {
     it('has no hint line under the text', () => {
       setup(person);
       expect(screen.queryByText(/still to fill in/)).toBeNull();
-      expect(text()).not.toHaveAccessibleDescription(expect.stringContaining('brackets'));
+      expect(text()).not.toHaveAccessibleDescription(
+        expect.stringContaining('brackets'),
+      );
     });
 
     it('refuses an edited text that still has a legacy Step 1 word', async () => {
@@ -220,32 +276,54 @@ describe('ObituarySection', () => {
     });
 
     it('refuses a placeholder in the memorial', async () => {
-      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.', obituaryMemorial: 'Gifts to [CHARITIES/ORGANIZATIONS].' });
+      const { onReadyChange } = setup({
+        ...person,
+        obituaryText: 'Ann Lee loved gardens.',
+        obituaryMemorial: 'Gifts to [CHARITIES/ORGANIZATIONS].',
+      });
       expect(toggle()).toHaveAttribute('aria-disabled', 'true');
       await userEvent.click(toggle());
       expect(onReadyChange).not.toHaveBeenCalled();
     });
 
     it('does not block a fully typed text and memorial', async () => {
-      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.', obituaryMemorial: 'Gifts to the garden club.' });
+      const { onReadyChange } = setup({
+        ...person,
+        obituaryText: 'Ann Lee loved gardens.',
+        obituaryMemorial: 'Gifts to the garden club.',
+      });
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
       await userEvent.click(toggle());
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
 
     it("does not block a family's own brackets", async () => {
-      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens [[my note].', obituaryMemorial: 'See [[the club].' });
+      const { onReadyChange } = setup({
+        ...person,
+        obituaryText: 'Ann Lee loved gardens [[my note].',
+        obituaryMemorial: 'See [[the club].',
+      });
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
       await userEvent.click(toggle());
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
 
     it('refuses once Add Memorial is pressed, and allows Ready after a real memorial is typed', async () => {
-      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
+      const { onReadyChange } = setup({
+        ...person,
+        obituaryText: 'Ann Lee loved gardens.',
+      });
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
-      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Memorial (optional)' }),
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Add Memorial' }),
+      );
       expect(toggle()).toHaveAttribute('aria-disabled', 'true');
-      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(message));
+      expect(toggle()).toHaveAccessibleDescription(
+        expect.stringContaining(message),
+      );
       await userEvent.click(toggle());
       expect(onReadyChange).not.toHaveBeenCalled();
       const memorial = screen.getByLabelText('Memorial');
@@ -273,7 +351,11 @@ describe('ObituarySection', () => {
     });
 
     it('stays Ready when a bracket comes back', async () => {
-      setup({ ...person, obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: 'ready' } });
+      setup({
+        ...person,
+        obituaryText: 'Ann Lee loved gardens.',
+        sectionStatus: { obituary: 'ready' },
+      });
       await userEvent.type(text(), ' [[SCHOOL NAME]');
       expect(text().value).toContain('[SCHOOL NAME]');
       expect(toggle()).toHaveAttribute('aria-pressed', 'true');
@@ -298,42 +380,125 @@ describe('ObituarySection', () => {
   it('has no heading level 1, no delete and no send', () => {
     setup(person);
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
-    expect(screen.queryByRole('button', { name: /delete|remove|send|share/i })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /delete|remove|send|share/i }),
+    ).toBeNull();
   });
 
   it('holds no hard-coded copy', () => {
-    const source = readFileSync(join(import.meta.dirname, 'ObituarySection.tsx'), 'utf8');
+    const source = readFileSync(
+      join(import.meta.dirname, 'ObituarySection.tsx'),
+      'utf8',
+    );
     expect(findHardCodedCopy(source, 'cmsObituary')).toEqual([]);
   });
 });
 
+describe('ObituarySection layout and groups', () => {
+  it('puts both read-only panels in one row container, person first', () => {
+    setup(person);
+    const personHeading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Details from The person',
+    });
+    const serviceHeading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Details from Service',
+    });
+    const row = personHeading.parentElement!.parentElement!;
+    expect(serviceHeading.parentElement!.parentElement).toBe(row);
+    expect(row).toHaveClass(
+      'grid',
+      'grid-cols-1',
+      'md:grid-cols-2',
+      'gap-6',
+      'items-start',
+    );
+    expect(
+      personHeading.compareDocumentPosition(serviceHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("opens The person's name on first render and leaves the other groups closed", () => {
+    setup(person);
+    expect(
+      screen.getByRole('button', { name: "The person's name" }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Their life' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('does not block Ready for an empty memorial', () => {
+    setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
+    expect(
+      screen.getByRole('button', { name: 'Mark as ready' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
 describe('ObituarySection memorial', () => {
-  const addButton = () => screen.queryByRole('button', { name: 'Add Memorial' });
+  const addButton = () =>
+    screen.queryByRole('button', { name: 'Add Memorial' });
   const prefill = screenCopy('obituaryDraft').memorial;
 
-  it('shows the Add Memorial button while the memorial is blank, with the primary style', () => {
+  const accordion = () =>
+    screen.getByRole('button', { name: 'Memorial (optional)' });
+
+  it('is an h2 accordion, closed on load when blank, and toggles', async () => {
+    setup(person);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Memorial (optional)' }),
+    ).toBeInTheDocument();
+    expect(accordion()).toHaveAttribute('aria-expanded', 'false');
+    expect(addButton()).toBeNull();
+    await userEvent.click(accordion());
+    expect(accordion()).toHaveAttribute('aria-expanded', 'true');
+    expect(addButton()).toBeInTheDocument();
+    await userEvent.click(accordion());
+    expect(accordion()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('is open on load when a memorial is saved', () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    expect(accordion()).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Memorial')).toBeVisible();
+  });
+
+  it('shows the Add Memorial button while the memorial is blank, with the primary style', async () => {
     setup({ ...person, obituaryMemorial: '   ' });
+    await userEvent.click(accordion());
     expect(addButton()).toHaveClass('gg-btn', 'gg-btn-primary');
     expect(screen.queryByLabelText('Memorial')).toBeNull();
   });
 
   it('saves the prefill, shows the labelled box with its hint and focuses it', async () => {
     const { patches } = setup(person);
+    await userEvent.click(accordion());
     await userEvent.click(addButton()!);
     expect(patches).toEqual([{ obituaryMemorial: prefill }]);
     const box = screen.getByLabelText('Memorial') as HTMLTextAreaElement;
     expect(box.value).toBe(prefill);
     expect(box.value).toMatch(/^Memorial donations may be made to/);
     expect(box).toHaveFocus();
-    expect(box).toHaveAccessibleDescription('Replace the placeholder text with the memorial details.');
+    expect(box).toHaveAccessibleDescription(
+      'Replace the placeholder text with the memorial details.',
+    );
     expect(addButton()).toBeNull();
   });
 
   it('sends edits as obituaryMemorial and never changes the obituary text', async () => {
-    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts to the library.' });
+    const { patches } = setup({
+      ...person,
+      obituaryMemorial: 'Gifts to the library.',
+    });
     const before = text().value;
     await userEvent.type(screen.getByLabelText('Memorial'), 'X');
-    expect(patches.at(-1)).toEqual({ obituaryMemorial: 'Gifts to the library.X' });
+    expect(patches.at(-1)).toEqual({
+      obituaryMemorial: 'Gifts to the library.X',
+    });
     expect(patches.every((p) => !('obituaryText' in p))).toBe(true);
     expect(text().value).toBe(before);
     expect(text().value).not.toContain('library');
@@ -368,18 +533,24 @@ describe('ObituarySection memorial', () => {
 
   it('does not take focus on load, saved or blank', () => {
     const { unmount } = render(
-      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined} onReadyChange={() => undefined} />,
+      <ObituarySection
+        values={{ ...person, obituaryMemorial: 'Gifts' }}
+        onChange={() => undefined}
+        onReadyChange={() => undefined}
+      />,
     );
     expect(document.body).toHaveFocus();
     unmount();
     setup(person);
     expect(document.body).toHaveFocus();
-    expect(addButton()).not.toHaveFocus();
   });
 
   it('has the maxLength of its key', () => {
     setup({ ...person, obituaryMemorial: 'Gifts' });
-    expect(screen.getByLabelText('Memorial')).toHaveAttribute('maxLength', String(FLOW_DETAIL_MAX_LENGTH.obituaryMemorial));
+    expect(screen.getByLabelText('Memorial')).toHaveAttribute(
+      'maxLength',
+      String(FLOW_DETAIL_MAX_LENGTH.obituaryMemorial),
+    );
   });
 });
 
@@ -395,7 +566,10 @@ describe('ObituarySection phone nudge', () => {
       const [ready, setReady] = useState(false);
       return (
         <ObituarySection
-          values={{ obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
+          values={{
+            obituaryText: 'Ann Lee loved gardens.',
+            sectionStatus: { obituary: ready ? 'ready' : 'in_progress' },
+          }}
           onChange={() => undefined}
           onReadyChange={setReady}
         />
@@ -406,10 +580,20 @@ describe('ObituarySection phone nudge', () => {
 
   it('shows its own line once marked ready and hides it when un-marked', async () => {
     renderReadyToggle();
-    expect(screen.queryByRole('region', { name: 'The obituary is ready.' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.getByRole('region', { name: 'The obituary is ready.' })).toHaveTextContent('begin sharing it with your loved ones');
-    await userEvent.click(screen.getByRole('button', { name: 'Mark as ready' }));
-    expect(screen.queryByRole('region', { name: 'The obituary is ready.' })).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'The obituary is ready.' }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Mark as ready' }),
+    );
+    expect(
+      screen.getByRole('region', { name: 'The obituary is ready.' }),
+    ).toHaveTextContent('begin sharing it with your loved ones');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Mark as ready' }),
+    );
+    expect(
+      screen.queryByRole('region', { name: 'The obituary is ready.' }),
+    ).toBeNull();
   });
 });
