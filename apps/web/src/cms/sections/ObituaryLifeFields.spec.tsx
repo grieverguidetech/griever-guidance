@@ -126,6 +126,40 @@ describe('ObituaryLifeFields', () => {
       expect(patches).toEqual([{ obituarySurname: 'L' }]);
     });
 
+    it('keeps a cleared part cleared and does not bring the person name back', async () => {
+      setup({ personName: 'Mom' });
+      const given = screen.getByLabelText(copy.givenNameLabel);
+      expect(given).toHaveValue('Mom');
+      await userEvent.clear(given);
+      expect(given).toHaveValue('');
+      await userEvent.tab();
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('');
+    });
+
+    it('keeps two cleared parts cleared', async () => {
+      setup({ personName: 'Ann Lee' });
+      await userEvent.clear(screen.getByLabelText(copy.givenNameLabel));
+      await userEvent.clear(screen.getByLabelText(copy.surnameLabel));
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('');
+    });
+
+    it('shows a hint tied to the three name parts only while they show the person name', async () => {
+      setup({ personName: 'Ann Lee' });
+      expect(screen.getByText(copy.nameFromPersonHint)).toBeVisible();
+      for (const label of [copy.givenNameLabel, copy.middleNameLabel, copy.surnameLabel]) {
+        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(copy.nameFromPersonHint);
+      }
+      await userEvent.type(screen.getByLabelText(copy.middleNameLabel), 'M');
+      expect(screen.queryByText(copy.nameFromPersonHint)).toBeNull();
+      expect(screen.getByLabelText(copy.givenNameLabel)).not.toHaveAccessibleDescription();
+    });
+
+    it('shows no hint without a person name', () => {
+      setup();
+      expect(screen.queryByText(copy.nameFromPersonHint)).toBeNull();
+    });
+
     it('has no name button and no status line', () => {
       setup({ personName: 'Ann Lee' });
       expect(screen.queryByRole('button', { name: /name from The person/i })).toBeNull();
@@ -159,6 +193,19 @@ describe('ObituaryLifeFields', () => {
     it('shows The person notes', () => {
       setup({ birthDate: 'June 15, 2030', dateOfPassing: 'November 2, 2026' });
       expect(screen.getByText(personCopy.birthAfterPassing)).toBeInTheDocument();
+    });
+
+    it('shows the future-passing note', () => {
+      setup({ dateOfPassing: 'January 1, 2099' });
+      expect(screen.getByText(personCopy.futurePassing)).toBeInTheDocument();
+    });
+
+    it('shows the unreadable note only after leaving the field', async () => {
+      setup();
+      await userEvent.type(screen.getByLabelText(passingLabel), 'last tuesday');
+      expect(screen.queryByText(personCopy.dateUnreadable)).toBeNull();
+      await userEvent.tab();
+      expect(screen.getByText(personCopy.dateUnreadable)).toBeInTheDocument();
     });
 
     it('shows one hint, as the description of both date fields', () => {

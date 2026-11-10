@@ -3,8 +3,8 @@ import { screenCopy } from '@griever/copy';
 import { AccordionSection } from '../AccordionSection';
 import { ANY_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
 import { DateInput, todayISO } from '../../lib/DateField';
+import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { EventFields } from './EventFields';
-import { noteProps } from './PersonSection';
 import {
   FLOW_DETAIL_MAX_LENGTH,
   ageFrom,
@@ -160,26 +160,23 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
     });
   }
   const personName = values.personName?.trim() ?? '';
-  const nameParts: Record<string, string> = {
-    obituaryGivenName: values.obituaryGivenName ?? '',
-    obituaryMiddleName: values.obituaryMiddleName ?? '',
-    obituarySurname: values.obituarySurname ?? '',
-  };
-  // While no part is saved, the parts show the person's name split. Typing saves all three; personName is never written.
-  const derivedParts = Object.values(nameParts).every((v) => v === '') && personName !== '' ? splitPersonName(personName) : null;
+  const nameKeys = ['obituaryGivenName', 'obituaryMiddleName', 'obituarySurname'] as const;
+  // Only while no part was ever saved (all undefined). A cleared part is '' and stays cleared.
+  const derivedParts = nameKeys.every((k) => values[k] === undefined) && personName !== '' ? splitPersonName(personName) : null;
   const derivedName: Record<string, string> = derivedParts
     ? {
         obituaryGivenName: derivedParts.given,
         obituaryMiddleName: derivedParts.middle,
         obituarySurname: derivedParts.surname,
       }
-    : nameParts;
+    : {};
+  const nameHintId = `${id}-name-derived-hint`;
   const derivedAge = ageFrom(values.birthDate ?? '', values.dateOfPassing ?? '');
 
   function renderField(spec: FieldSpec) {
     const isAge = spec.key === 'obituaryAge';
-    const isNamePart = spec.key in nameParts;
-    const typed = isNamePart ? derivedName[spec.key] : (values[spec.key] ?? '');
+    const isNamePart = (nameKeys as readonly string[]).includes(spec.key);
+    const typed = derivedParts && isNamePart ? derivedName[spec.key] : (values[spec.key] ?? '');
     const hintId = `${id}-${spec.key}-hint`;
     // While the age has focus it shows only what was typed; otherwise the worked-out age fills an empty field.
     const showsDerived = isAge && typed === '' && !ageFocused && derivedAge !== '';
@@ -198,7 +195,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           autoComplete="off"
           inputMode={spec.numeric ? 'numeric' : undefined}
           maxLength={FLOW_DETAIL_MAX_LENGTH[spec.key]}
-          aria-describedby={showsDerived ? hintId : undefined}
+          aria-describedby={showsDerived ? hintId : derivedParts && isNamePart ? nameHintId : undefined}
           value={showsDerived ? derivedAge : typed}
           onFocus={isAge ? () => setAgeFocused(true) : undefined}
           onBlur={isAge ? () => setAgeFocused(false) : undefined}
@@ -232,8 +229,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
     key: GroupKey,
     heading: string,
     fields: FieldSpec[],
-    lead?: ReactNode,
-    tail?: ReactNode,
+    { lead, tail }: { lead?: ReactNode; tail?: ReactNode } = {},
   ) {
     const headingId = `${id}-${key}-heading`;
     return (
@@ -382,16 +378,23 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
 
   return (
     <>
-      {renderGroup('name', copy.groupNameHeading, nameFields, undefined, (
-        <>
-          {pronoun}
-          {personDates}
-        </>
-      ))}
+      {renderGroup('name', copy.groupNameHeading, nameFields, {
+        lead: derivedParts && (
+          <p id={nameHintId} className="gg-hint">
+            {copy.nameFromPersonHint}
+          </p>
+        ),
+        tail: (
+          <>
+            {pronoun}
+            {personDates}
+          </>
+        ),
+      })}
       {renderGroup('life', copy.groupLifeHeading, lifeFields)}
       {renderGroup('family', copy.groupFamilyHeading, familyFields)}
       {events}
-      {renderGroup('service', copy.groupServiceHeading, funeralFields, undefined, serviceTail)}
+      {renderGroup('service', copy.groupServiceHeading, funeralFields, { tail: serviceTail })}
     </>
   );
 }

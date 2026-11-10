@@ -25,6 +25,7 @@
     "funeralHomeLabel",
     "churchLabel",
     "cemeteryLabel",
+    "nameFromPersonHint",
     "personSharedHint",
     "serviceSharedHint",
     "birthPlaceLabel",
@@ -134,6 +135,9 @@
       "$ref": "#/$defs/text"
     },
     "cemeteryLabel": {
+      "$ref": "#/$defs/text"
+    },
+    "nameFromPersonHint": {
       "$ref": "#/$defs/text"
     },
     "personSharedHint": {

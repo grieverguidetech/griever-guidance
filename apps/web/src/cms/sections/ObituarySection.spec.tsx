@@ -278,7 +278,8 @@ describe('ObituarySection', () => {
         <ObituarySection
           values={{ ...person, sectionStatus: { obituary: 'ready' } }}
           onChange={() => undefined}
-          onServiceChange={() => undefined} onPersonChange={() => undefined}
+          onServiceChange={() => undefined}
+          onPersonChange={() => undefined}
           onReadyChange={onReadyChange}
         />,
       );
@@ -428,8 +429,13 @@ describe('ObituarySection memorial', () => {
 
   it('does not take focus on load, saved or blank', () => {
     const { unmount } = render(
-      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined}
-          onServiceChange={() => undefined} onPersonChange={() => undefined} onReadyChange={() => undefined} />,
+      <ObituarySection
+        values={{ ...person, obituaryMemorial: 'Gifts' }}
+        onChange={() => undefined}
+        onServiceChange={() => undefined}
+        onPersonChange={() => undefined}
+        onReadyChange={() => undefined}
+      />,
     );
     expect(document.body).toHaveFocus();
     unmount();
@@ -458,7 +464,8 @@ describe('ObituarySection phone nudge', () => {
         <ObituarySection
           values={{ obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
           onChange={() => undefined}
-          onServiceChange={() => undefined} onPersonChange={() => undefined}
+          onServiceChange={() => undefined}
+          onPersonChange={() => undefined}
           onReadyChange={setReady}
         />
       );
