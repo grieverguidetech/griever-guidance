@@ -34,10 +34,14 @@ const obituary = (page: Page) => page.getByRole('textbox', { name: 'Obituary', e
 const memorial = (page: Page) => page.getByRole('textbox', { name: 'Memorial', exact: true });
 const markReady = (page: Page) => page.getByRole('button', { name: 'Mark as ready' });
 
-/** Presses the toggle the way a keyboard user does. Playwright's click() waits forever on an aria-disabled button. */
-async function pressMarkReady(page: Page) {
+/** The visible red line, not the screen-reader status node that carries the same words. */
+const blockedLine = (page: Page) => page.locator('p:not([role="status"])', { hasText: BLOCKED });
+
+/** Playwright's click() waits on an aria-disabled button until the timeout, so press it with the keyboard. Then check the press landed: the status is written only on a blocked press. */
+async function pressBlockedMarkReady(page: Page) {
   await markReady(page).focus();
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: BLOCKED })).toHaveCount(1);
 }
 
 /** Fills the name, life and survivor fields, adds the memorial, and presses Mark as ready with placeholders left. */
@@ -53,7 +57,7 @@ async function fillFieldsAndAddMemorial(page: Page) {
   await survivors.getByLabel('City, person 1', { exact: true }).fill('Austin');
 
   await page.getByRole('button', { name: 'Add Memorial' }).click();
-  await pressMarkReady(page);
+  await pressBlockedMarkReady(page);
 }
 
 test.describe('Obituary section (WEB-6)', () => {
@@ -94,11 +98,11 @@ test.describe('Obituary section (WEB-6)', () => {
     // Placeholders are left in both boxes: Ready is refused and says why.
     const toggle = markReady(page);
     await expect(toggle).toHaveAttribute('aria-disabled', 'true');
-    await expect(page.getByText(BLOCKED).first()).toBeVisible();
-    await pressMarkReady(page);
+    await expect(blockedLine(page)).toBeVisible();
+    await pressBlockedMarkReady(page);
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(toggle).toHaveAttribute('aria-disabled', 'true');
-    await expect(page.getByText(BLOCKED).first()).toBeVisible();
+    await expect(blockedLine(page)).toBeVisible();
 
     // Typed text without the template words, in the obituary only: the memorial still blocks Ready.
     await obituary(page).fill(
@@ -117,14 +121,14 @@ test.describe('Obituary section (WEB-6)', () => {
   test('no WCAG A/AA violations with the fields filled, the memorial open and the Ready message showing (contrast checked separately)', async ({ page }) => {
     await openObituary(page);
     await fillFieldsAndAddMemorial(page);
-    await expect(page.getByText(BLOCKED).first()).toBeVisible();
+    await expect(blockedLine(page)).toBeVisible();
     expect(await violations(page)).toEqual([]);
   });
 
   test('text meets AA contrast with the Ready message showing', async ({ page }) => {
     await openObituary(page);
     await fillFieldsAndAddMemorial(page);
-    await expect(page.getByText(BLOCKED).first()).toBeVisible();
+    await expect(blockedLine(page)).toBeVisible();
     expect(await violations(page, { contrastOnly: true })).toEqual([]);
   });
 });
