@@ -251,6 +251,7 @@ describe('editor on (#395)', () => {
     fireEvent.change(screen.getByLabelText('Funeral or memorial service Time'), { target: { value: '14:00' } });
     expect(stored()[0]).toMatchObject({ serviceTime: '2:00 PM' });
     expect(stored()[0].sectionStatus?.['service']).toBe('in_progress');
+    expect((screen.getByLabelText('Obituary') as HTMLTextAreaElement).value).toContain('2:00 PM');
     await user.click(nav.getByRole('button', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     expect(screen.getByLabelText('Funeral or memorial service Time')).toHaveValue('14:00');

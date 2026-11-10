@@ -15,7 +15,7 @@ import { ObituaryPeople } from './ObituaryPeople';
 const copy = screenCopy('cmsObituary');
 const draftCopy = screenCopy('obituaryDraft');
 
-/** The Service fields fill the template. Only cemetery, private burial and officiant are also written here. */
+/** The Service fields fill the template. Officiant, burial, and the service and visitation place, date and time (plus serviceAddress) are also written here, through onServiceChange. */
 type ObituaryValues = ObituaryLifeValues &
   Partial<Pick<SessionDetails, 'serviceDate'>> &
   Partial<ServiceEventFields> &
@@ -92,24 +92,24 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
       <p>{copy.intro}</p>
       <div className="gg-panel">
         <div className="flex flex-col gap-4">
-            <h2 id={`${id}-details`} className="font-semibold">
-              {copy.detailsHeading}
-            </h2>
-            {facts.length > 0 && (
-              <dl aria-labelledby={`${id}-details`} className="flex flex-col gap-1">
-                {facts.map((f) => (
-                  <div key={f.label} className="flex flex-wrap gap-x-2">
-                    <dt className="font-medium">{f.label}</dt>
-                    <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-            {onOpenPerson && (
-              <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenPerson}>
-                {copy.changeDetails}
-              </button>
-            )}
+          <h2 id={`${id}-details`} className="font-semibold">
+            {copy.detailsHeading}
+          </h2>
+          {facts.length > 0 && (
+            <dl aria-labelledby={`${id}-details`} className="flex flex-col gap-1">
+              {facts.map((f) => (
+                <div key={f.label} className="flex flex-wrap gap-x-2">
+                  <dt className="font-medium">{f.label}</dt>
+                  <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {onOpenPerson && (
+            <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenPerson}>
+              {copy.changeDetails}
+            </button>
+          )}
         </div>
       </div>
       <div className="flex flex-col gap-6">
