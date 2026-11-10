@@ -77,6 +77,30 @@ describe('buildPlansText', () => {
     expect(text).not.toContain('undefined');
   });
 
+  it('ends the obituary with the memorial as its own last paragraph', () => {
+    const text = buildPlansText([{ personName: 'Sam', obituaryText: 'A kind man.', obituaryMemorial: '  Gifts to the library.  ' }], copy);
+    expect(text).toContain('Obituary\n--------\nA kind man.\n\nGifts to the library.\n');
+  });
+
+  it('adds the memorial after a built draft too', () => {
+    const text = buildPlansText([{ personName: 'Sam Reed', obituaryMemorial: 'Gifts to the library.' }], copy);
+    expect(text).toContain('\n\nGifts to the library.\n');
+  });
+
+  it('writes the obituary unchanged when there is no memorial', () => {
+    const base = { personName: 'Sam', obituaryText: 'A kind man.' };
+    const plain = buildPlansText([base], copy);
+    expect(buildPlansText([{ ...base, obituaryMemorial: '   ' }], copy)).toBe(plain);
+    expect(plain).toContain('Obituary\n--------\nA kind man.\n');
+    expect(plain).toContain('A kind man.\n\nThank-you message');
+  });
+
+  it('builds the draft from the new fields', () => {
+    const text = buildPlansText([{ personName: 'Samuel Reed', obituaryGivenName: 'Sam', obituarySurname: 'Reed' }], copy);
+    expect(text.split('Obituary\n--------\n')[1]).toContain('Sam Reed');
+    expect(text).not.toContain('[GIVEN NAME]');
+  });
+
   it('writes the service message the editor shows when it was never edited', () => {
     const text = buildPlansText(
       [{ personName: 'Sam Reed', serviceDate: '2026-06-06', serviceTime: '2:00 PM', servicePlace: 'Oak Hall' }],

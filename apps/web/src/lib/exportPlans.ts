@@ -1,5 +1,5 @@
 import type { Session } from '@griever/hooks';
-import { buildObituaryDraft, fill, screenCopy } from '@griever/copy';
+import { buildObituaryDraft, fill, obituaryShareText, screenCopy } from '@griever/copy';
 import { announcePassing, defaultServiceEventsMessage, parseCompleteDate } from '@griever/shared';
 
 const thanksCopy = screenCopy('cmsThanks');
@@ -43,6 +43,32 @@ export type PlanPerson = Partial<
     | 'obituaryCareer'
     | 'obituarySurvivors'
     | 'obituaryNote'
+    | 'obituaryGivenName'
+    | 'obituaryMiddleName'
+    | 'obituarySurname'
+    | 'obituaryAge'
+    | 'obituaryState'
+    | 'obituaryDeathPlace'
+    | 'obituaryFuneralHome'
+    | 'obituaryChurch'
+    | 'obituaryCemeteryLocation'
+    | 'obituaryBirthPlace'
+    | 'obituaryMotherName'
+    | 'obituaryFatherName'
+    | 'obituaryHighSchool'
+    | 'obituaryGradYear'
+    | 'obituaryDegree'
+    | 'obituaryCollege'
+    | 'obituaryJobTitle'
+    | 'obituaryCompany'
+    | 'obituaryJobYears'
+    | 'obituaryHobbies'
+    | 'obituaryAwards'
+    | 'obituaryOrganizations'
+    | 'obituaryPronoun'
+    | 'obituarySurvivorList'
+    | 'obituaryPrecededList'
+    | 'obituaryMemorial'
     | 'dateOfPassing'
     | 'birthDate'
     | 'serviceType'
@@ -137,9 +163,11 @@ function messages(person: PlanPerson) {
         receptionTime: person.receptionTime,
         receptionPlace: person.receptionPlace,
       }),
-    obituary:
+    obituary: obituaryShareText(
       person.obituaryText ??
-      buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy),
+        buildObituaryDraft({ ...person, dateOfPassing: person.dateOfPassing ?? undefined }, obituaryDraftCopy),
+      person.obituaryMemorial ?? '',
+    ),
     thanks: person.thanksMessage ?? fill(thanksCopy.template, { deceasedName: name.trim() || thanksCopy.nameFallback }),
   };
 }
