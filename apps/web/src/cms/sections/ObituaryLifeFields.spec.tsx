@@ -499,6 +499,14 @@ describe('ObituaryLifeFields', () => {
         expect(patches).toEqual([]);
       });
 
+      it('limits the cemetery to the saved length', async () => {
+        await placesHarness({});
+        expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveAttribute(
+          'maxlength',
+          String(FLOW_DETAIL_MAX_LENGTH.burialPlace),
+        );
+      });
+
       it('keeps the shared hint as the description', async () => {
         await placesHarness({});
         expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveAccessibleDescription(

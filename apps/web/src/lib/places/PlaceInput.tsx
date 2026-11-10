@@ -22,6 +22,8 @@ export interface PlaceInputProps {
   labelledBy: string;
   /** Ids of the elements that describe the field (a hint). */
   describedBy?: string;
+  /** The longest text the field accepts, as for a plain input. */
+  maxLength?: number;
   value: string;
   onChange: (value: string) => void;
   /** Google place types to suggest. Without them the field is a plain text input. */
@@ -44,7 +46,7 @@ export interface PlaceInputProps {
  * The typed text is always the value. Suggestions only help; with none available, or on any
  * failure, it behaves as a plain input and shows no error.
  */
-export function PlaceInput({ id, labelledBy, describedBy, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
+export function PlaceInput({ id, labelledBy, describedBy, maxLength, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
   const { enabled, load } = usePlaces();
   // Set when Google could not load. The field then drops every combobox attribute.
   const [unavailable, setUnavailable] = useState(false);
@@ -273,6 +275,7 @@ export function PlaceInput({ id, labelledBy, describedBy, value, onChange, types
         id={id}
         aria-labelledby={labelledBy}
         aria-describedby={describedBy}
+        maxLength={maxLength}
         type="text"
         {...comboboxProps}
         className={`gg-input ${suggesting ? 'pe-9' : ''}`}

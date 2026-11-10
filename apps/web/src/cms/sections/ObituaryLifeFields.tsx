@@ -244,6 +244,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           id={fieldId}
           labelledBy={labelId}
           describedBy={hintId}
+          maxLength={FLOW_DETAIL_MAX_LENGTH.burialPlace}
           types={BURIAL_PLACE_TYPES}
           wantsDetails={(pick) => Boolean(pick.secondaryText && mayFillCemeteryLocation())}
           onPick={(pick, details) => {

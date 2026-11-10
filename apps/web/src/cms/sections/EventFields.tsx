@@ -1,6 +1,6 @@
 import { useId, useRef, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
-import { dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
+import { FLOW_DETAIL_MAX_LENGTH, dateNote, type SectionFields, type ServiceEventFields, type SessionDetails } from '@griever/shared';
 import { DateInput } from '../../lib/DateField';
 import { TimeInput } from '../../lib/TimeField';
 import { PlaceInput } from '../../lib/places/PlaceInput';
@@ -165,6 +165,7 @@ export function EventFields<K extends EventKey>({
           id={`${id}-place`}
           labelledBy={`${legendId} ${id}-place-label`}
           types={placeTypes}
+          maxLength={(FLOW_DETAIL_MAX_LENGTH as Partial<Record<string, number>>)[keys.place]}
           wantsDetails={(pick) => Boolean(addressKey && pick.secondaryText && mayFillAddress())}
           onPick={(pick, details) => {
             // The full street address from the place itself; the prediction's short line if that failed.
