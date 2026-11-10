@@ -12,7 +12,7 @@ import { colors } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
-import { obituaryTextFor } from '../lib/obituaryText';
+import { obituaryShareTextFor, obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
 const textCopy = screenCopy('phoneObituary');
@@ -176,7 +176,9 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
 
   const linkValid = isValidObituaryLink(session.obituaryUrl);
   const name = session.personName.trim() || copy.nameFallback;
-  const obituaryText = obituaryTextFor(session);
+  // The body is what the editor holds; the full text adds the memorial as the last paragraph.
+  const obituaryBody = obituaryTextFor(session);
+  const obituaryText = obituaryShareTextFor(session);
 
   const addressCheck = checkPublisherEmail(address);
   const addressError = addressCheck.ok ? undefined : addressCheck.reason === 'many' ? copy.publisherEmailMany : copy.publisherEmailInvalid;
@@ -188,10 +190,10 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     void savePublisherEmail(session.id, value);
   };
 
-  latest.current = { editing, value: editValue, shown: obituaryText, onChange };
+  latest.current = { editing, value: editValue, shown: obituaryBody, onChange };
 
   const startEdit = () => {
-    setEditValue(obituaryText);
+    setEditValue(obituaryBody);
     setNote(undefined);
     setEditing(true);
   };

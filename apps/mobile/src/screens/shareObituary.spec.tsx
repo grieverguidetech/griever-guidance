@@ -908,3 +908,64 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
     expect(screen.getByRole('button', DONE)).toBeTruthy();
   });
 });
+
+describe('ShareObituaryScreen with a memorial (#781)', () => {
+  const memorial = 'In lieu of flowers, please give to the library.';
+  const withMemorial = { ...base, obituaryText: 'Anna loved the garden.', obituaryMemorial: memorial } as Session;
+  const full = `Anna loved the garden.\n\n${memorial}`;
+
+  it('shows the full text, with the memorial last', () => {
+    setup(withMemorial);
+    expect(screen.getByText(full)).toBeTruthy();
+  });
+
+  it('Email puts the memorial in the body', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    setup(withMemorial);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    expect(open).toHaveBeenCalledWith(expect.stringContaining('Anna%20loved%20the%20garden.%0D%0A%0D%0AIn%20lieu%20of%20flowers'));
+  });
+
+  it('Copy puts the memorial on the clipboard', async () => {
+    jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    setup(withMemorial);
+    fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
+    await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith(full));
+  });
+
+  it('the share sheet gets the memorial too', async () => {
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no mail'));
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as never);
+    setup(withMemorial);
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    expect((share.mock.calls[0][0] as { message: string }).message).toBe(full);
+  });
+
+  it('editing holds the body only, and saving never writes the memorial', () => {
+    const onPatch = setupLive(withMemorial);
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    const box = screen.getByLabelText(BOX);
+    expect(box.props.value).toBe('Anna loved the garden.');
+    fireEvent.changeText(box, 'Anna loved her roses.');
+    fireEvent.press(screen.getByRole('button', { name: SAVE }));
+    expect(onPatch).toHaveBeenCalledTimes(1);
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Anna loved her roses.' });
+    expect(screen.getByText(`Anna loved her roses.\n\n${memorial}`)).toBeTruthy();
+  });
+
+  it('saving the body unchanged writes nothing even with a memorial', () => {
+    const onPatch = setupLive(withMemorial);
+    fireEvent.press(screen.getByRole('button', { name: EDIT }));
+    fireEvent.press(screen.getByRole('button', { name: SAVE }));
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('shows the blanks line for a memorial placeholder, and keeps the buttons enabled', () => {
+    setup({ ...withMemorial, obituaryMemorial: 'Gifts may go to the library. [FINAL WORDS]' } as Session);
+    expect(screen.getByText('Some parts are still in [brackets]. Fill them in or delete them before you send.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState?.disabled).toBeFalsy();
+    expect(screen.getByRole('button', { name: 'Copy the text' }).props.accessibilityState?.disabled).toBeFalsy();
+  });
+});

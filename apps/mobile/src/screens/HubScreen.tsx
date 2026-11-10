@@ -14,6 +14,7 @@ import { PAYMENTS_ENABLED } from '../lib/features';
 import { NameSwitcher } from '../components/NameSwitcher';
 import { personLabel } from '../components/PersonSwitcher';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
+import { NEW_OBITUARY_KEYS } from '../lib/obituaryText';
 import type { SentNoteText } from '../lib/sendNote';
 import { barMoment, nextMoment } from '../lib/nextMoment';
 
@@ -73,7 +74,7 @@ function obituarySummary(session: Session): string {
   if (publisher) {
     return fill(shell.summaryObituaryPublisher, { publisher });
   }
-  const started = [session.obituaryText, session.obituaryCity, session.obituaryCareer, session.obituarySurvivors, session.obituaryNote].some((value) => present(value));
+  const started = [session.obituaryText, session.obituaryCity, session.obituaryCareer, session.obituarySurvivors, session.obituaryNote, ...NEW_OBITUARY_KEYS.map((key) => session[key]), session.obituaryMemorial].some((value) => present(value));
   return started ? shell.summaryObituaryDraft : shell.summaryObituaryEmpty;
 }
 
