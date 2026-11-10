@@ -8,6 +8,7 @@ import {
   ObituaryLifeFields,
   type ObituaryLifeKey,
   type ObituaryLifeValues,
+  type PersonSharedPatch,
   type ServiceSharedPatch,
 } from './ObituaryLifeFields';
 import { ObituaryPeople } from './ObituaryPeople';
@@ -15,7 +16,7 @@ import { ObituaryPeople } from './ObituaryPeople';
 const copy = screenCopy('cmsObituary');
 const draftCopy = screenCopy('obituaryDraft');
 
-/** The Service fields fill the template. Officiant, burial, and the service and visitation place, date and time (plus serviceAddress) are also written here, through onServiceChange. */
+/** The Service fields fill the template. Officiant, burial, and the service and visitation place, date and time (plus serviceAddress) are also written here, through onServiceChange; birth date and date of passing through onPersonChange. */
 type ObituaryValues = ObituaryLifeValues &
   Partial<Pick<SessionDetails, 'serviceDate'>> &
   Partial<ServiceEventFields> &
@@ -33,7 +34,7 @@ type ObituaryValues = ObituaryLifeValues &
     | 'serviceTime'
   >;
 
-/** The name and dates are edited in The person, so they are not in the patch. */
+/** The name is edited in The person, and the dates go through onPersonChange, so they are not in the patch. */
 export type ObituaryPatch = Partial<
   Pick<SectionFields, 'obituaryText' | 'obituaryMemorial' | 'obituarySurvivorList' | 'obituaryPrecededList' | ObituaryLifeKey>
 >;
@@ -48,12 +49,12 @@ interface Props {
   /** The next section still to do, or null when none is left. */
   nextSection?: SectionKey | null;
   onNext?: () => void;
-  /** Opens The person, where the name and dates are edited. */
-  onOpenPerson?: () => void;
+  /** Gets only the date that changed (birth, passing). The person shows the same values. */
+  onPersonChange: (patch: PersonSharedPatch) => void;
 }
 
 /** The obituary template fields, and the obituary text. The text follows the fields until edited. */
-export function ObituarySection({ values, onChange, onServiceChange, onReadyChange, nextSection, onNext, onOpenPerson }: Props) {
+export function ObituarySection({ values, onChange, onServiceChange, onReadyChange, nextSection, onNext, onPersonChange }: Props) {
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const memorialRef = useRef<HTMLTextAreaElement>(null);
@@ -81,39 +82,11 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
   const blanksLeft = textBlanks || memorialBlanks;
   // The memorial can be closed, so name it when its blanks are what blocks Ready.
   const blockedMessage = memorialBlanks ? (textBlanks ? copy.readyPlaceholdersBoth : copy.readyPlaceholdersMemorial) : copy.readyPlaceholders;
-  const facts = [
-    { label: copy.nameLabel, value: values.personName },
-    { label: copy.bornLabel, value: values.birthDate },
-    { label: copy.diedLabel, value: values.dateOfPassing },
-  ].filter((f) => f.value && f.value.trim() !== '');
-
   return (
     <div className="flex flex-col gap-6">
       <p>{copy.intro}</p>
-      <div className="gg-panel">
-        <div className="flex flex-col gap-4">
-          <h2 id={`${id}-details`} className="font-semibold">
-            {copy.detailsHeading}
-          </h2>
-          {facts.length > 0 && (
-            <dl aria-labelledby={`${id}-details`} className="flex flex-col gap-1">
-              {facts.map((f) => (
-                <div key={f.label} className="flex flex-wrap gap-x-2">
-                  <dt className="font-medium">{f.label}</dt>
-                  <dd className="min-w-0 [overflow-wrap:anywhere]">{f.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          {onOpenPerson && (
-            <button type="button" className="gg-btn gg-btn-secondary self-start" onClick={onOpenPerson}>
-              {copy.changeDetails}
-            </button>
-          )}
-        </div>
-      </div>
       <div className="flex flex-col gap-6">
-        <ObituaryLifeFields values={values} onChange={onChange} onServiceChange={onServiceChange} />
+        <ObituaryLifeFields values={values} onChange={onChange} onServiceChange={onServiceChange} onPersonChange={onPersonChange} />
         <ObituaryPeople
           heading={copy.survivedByHeading}
           relations={SURVIVOR_RELATIONS}

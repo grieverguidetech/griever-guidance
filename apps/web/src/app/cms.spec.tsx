@@ -271,6 +271,26 @@ describe('editor on (#395)', () => {
     expect(screen.getByLabelText('Cemetery')).toHaveValue('Elm Rest');
   });
 
+  it('a birth date set on Obituary shows on The person, and the reverse', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    fireEvent.change(screen.getByLabelText('Date of birth (optional)'), { target: { value: 'May 2, 1940' } });
+    expect(stored()[0]).toMatchObject({ birthDate: 'May 2, 1940' });
+    expect(stored()[0].sectionStatus?.['person']).toBe('in_progress');
+    // The person is opened from the Overview, not the side nav.
+    await user.click(nav.getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^The person/ }));
+    await screen.findByRole('heading', { level: 1, name: 'The person' });
+    expect(screen.getByLabelText('Date of birth (optional)')).toHaveValue('May 2, 1940');
+    fireEvent.change(screen.getByLabelText('Date they passed (optional)'), { target: { value: 'June 1, 2026' } });
+    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    expect(screen.getByLabelText('Date they passed (optional)')).toHaveValue('June 1, 2026');
+  });
+
   it('"Your people" in the nav keeps a named person', async () => {
     const user = userEvent.setup();
     await openMargaret();

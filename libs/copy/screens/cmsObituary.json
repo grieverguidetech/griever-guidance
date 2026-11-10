@@ -1,10 +1,5 @@
 {
   "intro": "We start the obituary from the details below. You can change any of it.",
-  "detailsHeading": "Details from The person",
-  "nameLabel": "Name",
-  "bornLabel": "Born",
-  "diedLabel": "Died",
-  "changeDetails": "Change these on The person",
   "cityLabel": "City where they lived (optional)",
   "textLabel": "Obituary",
   "textHint": "We start it from the details above. You can change it.",
@@ -18,7 +13,6 @@
   "givenNameLabel": "Given name (optional)",
   "middleNameLabel": "Middle name or nickname (optional)",
   "surnameLabel": "Surname (optional)",
-  "useNameFromPersonLabel": "Use the name from The person",
   "ageLabel": "Age (optional)",
   "ageHint": "We work this out from the dates. You can change it.",
   "stateLabel": "State where they lived (optional)",
@@ -26,6 +20,7 @@
   "funeralHomeLabel": "Funeral home (optional)",
   "churchLabel": "Church or place of worship (optional)",
   "cemeteryLabel": "Cemetery location",
+  "personSharedHint": "These are the same as on The person. A change here changes The person too.",
   "serviceSharedHint": "These are the same as on Service. A change here changes Service too.",
   "birthPlaceLabel": "Where they were born (optional)",
   "motherNameLabel": "Mother's name (optional)",
@@ -70,6 +65,5 @@
   "peopleLimit": "This list holds up to 40 people.",
   "removePersonUnnamed": "Remove person {n}",
   "personRemoved": "{name} removed.",
-  "personRemovedUnnamed": "Person {n} removed.",
-  "nameFilled": "Name filled in from The person."
+  "personRemovedUnnamed": "Person {n} removed."
 }

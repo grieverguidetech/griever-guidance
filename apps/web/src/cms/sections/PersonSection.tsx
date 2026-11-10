@@ -7,7 +7,7 @@ import { MarkReady } from './MarkReady';
 const copy = screenCopy('cmsPerson');
 
 /** The unreadable note waits for the field to lose focus; the others show at once. */
-function noteProps(kind: ReturnType<typeof dateNote>) {
+export function noteProps(kind: ReturnType<typeof dateNote>) {
   if (kind === 'unreadable') {
     return { noteOnBlur: copy.dateUnreadable };
   }

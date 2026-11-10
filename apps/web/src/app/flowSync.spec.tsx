@@ -280,7 +280,7 @@ describe('background sync in the app (#520)', () => {
     await act(async () => {
       answer(new Response(JSON.stringify([record]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     });
-    await waitFor(() => expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByLabelText(/Given name/)).toHaveValue('Margaret'));
     expect(screen.getByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "Start with someone I've lost" })).toBeNull();
     expect(screen.getByText('A person is here now. Their page is open.')).toBeInTheDocument();

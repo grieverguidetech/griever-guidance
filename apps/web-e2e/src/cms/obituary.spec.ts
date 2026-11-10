@@ -73,7 +73,6 @@ async function openAllSections(page: Page) {
 
 /** Fills the name, life and survivor fields, adds the memorial, and presses Mark as ready with placeholders left. */
 async function fillFieldsAndAddMemorial(page: Page) {
-  await page.getByRole('button', { name: 'Use the name from The person' }).click();
   await openSection(page, 'Their life');
   await page.getByLabel('Age (optional)').fill('87');
   await page.getByLabel('City where they lived (optional)').fill('Springfield');
@@ -91,17 +90,29 @@ async function fillFieldsAndAddMemorial(page: Page) {
 }
 
 test.describe('Obituary section (WEB-6)', () => {
+  test('birth date and date of passing are the same values as on The person', async ({ page }) => {
+    await openObituary(page);
+    await page.getByLabel('Date of birth (optional)', { exact: true }).fill('May 2, 1940');
+    await page.getByLabel('Date they passed (optional)', { exact: true }).fill('June 1, 2026');
+    await page.getByRole('navigation').getByRole('button', { name: /^Overview/ }).click();
+    await page.getByRole('main').getByRole('button', { name: /^The person/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
+    await expect(page.getByLabel('Date of birth (optional)', { exact: true })).toHaveValue('May 2, 1940');
+    await expect(page.getByLabel('Date they passed (optional)', { exact: true })).toHaveValue('June 1, 2026');
+  });
+
   test('fields fill the text, the memorial is added, and Ready is refused until no placeholder is left', async ({ page }) => {
     await openObituary(page);
 
     // Nothing typed yet: the name from The person is in paragraph 1, the rest are placeholders.
     await expect(obituary(page)).toHaveValue(/^Margaret Hayes, \[AGE\], of \[CITY\], \[STATE\], passed away on/);
-    await expect(page.getByLabel('Given name (optional)')).toHaveValue('');
 
-    await page.getByRole('button', { name: 'Use the name from The person' }).click();
+    // The name parts show The person's name split, with no button to press.
     await expect(page.getByLabel('Given name (optional)')).toHaveValue('Margaret');
     await expect(page.getByLabel('Middle name or nickname (optional)')).toHaveValue('');
     await expect(page.getByLabel('Surname (optional)')).toHaveValue('Hayes');
+    await expect(page.getByRole('button', { name: 'Use the name from The person' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Details from The person' })).toHaveCount(0);
 
     await openSection(page, 'Their life');
     await page.getByLabel('Age (optional)').fill('87');
