@@ -33,6 +33,7 @@ async function openObituary(page: Page) {
 
 const obituary = (page: Page) => page.getByRole('textbox', { name: 'Obituary', exact: true });
 const memorial = (page: Page) => page.getByRole('textbox', { name: 'Memorial', exact: true });
+const memorialSwitch = (page: Page) => page.getByRole('switch', { name: 'Add Memorial' });
 const markReady = (page: Page) => page.getByRole('button', { name: 'Mark as ready' });
 
 /** The visible red line, not the screen-reader status node that carries the same words. */
@@ -62,7 +63,6 @@ const SECTIONS = [
   'Funeral home and place of worship',
   'Survived by',
   'Preceded in death by',
-  'Memorial (optional)',
 ];
 
 async function openAllSections(page: Page) {
@@ -84,8 +84,7 @@ async function fillFieldsAndAddMemorial(page: Page) {
   await survivors.getByLabel('Name, person 1', { exact: true }).fill('John Hayes');
   await survivors.getByLabel('City, person 1', { exact: true }).fill('Austin');
 
-  await openSection(page, 'Memorial (optional)');
-  await page.getByRole('button', { name: 'Add Memorial' }).click();
+  await memorialSwitch(page).click();
   await pressBlockedMarkReady(page);
 }
 
@@ -130,14 +129,14 @@ test.describe('Obituary section (WEB-6)', () => {
     await survivors.getByLabel('City, person 1', { exact: true }).fill('Austin');
     await expect(obituary(page)).toHaveValue(/Margaret is survived by \[his\/her\] spouse, John Hayes of Austin\./);
 
-    // The memorial is its own box, added on request.
+    // The memorial is its own box, switched on by request.
     await expect(memorial(page)).toHaveCount(0);
-    await openSection(page, 'Memorial (optional)');
-    await page.getByRole('button', { name: 'Add Memorial' }).click();
+    await expect(memorialSwitch(page)).toHaveAttribute('aria-checked', 'false');
+    await memorialSwitch(page).click();
+    await expect(memorialSwitch(page)).toHaveAttribute('aria-checked', 'true');
     await expect(memorial(page)).toBeVisible();
     await expect(memorial(page)).toBeFocused();
     await expect(memorial(page)).toHaveValue(/^Memorial donations may be made to \[ORGANIZATION NAME\]/);
-    await expect(page.getByRole('button', { name: 'Add Memorial' })).toHaveCount(0);
 
     // Placeholders are left in both boxes: Ready is refused and says why.
     const toggle = markReady(page);

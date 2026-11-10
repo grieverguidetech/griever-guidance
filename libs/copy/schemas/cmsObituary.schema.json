@@ -62,6 +62,8 @@
     "removePerson",
     "memorialHeading",
     "addMemorial",
+    "memorialRemoved",
+    "undoMemorialRemoved",
     "memorialLabel",
     "memorialHint",
     "readyPlaceholders",
@@ -246,6 +248,12 @@
       "$ref": "#/$defs/text"
     },
     "addMemorial": {
+      "$ref": "#/$defs/text"
+    },
+    "memorialRemoved": {
+      "$ref": "#/$defs/text"
+    },
+    "undoMemorialRemoved": {
       "$ref": "#/$defs/text"
     },
     "memorialLabel": {
