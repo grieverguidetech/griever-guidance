@@ -44,13 +44,24 @@ async function pressBlockedMarkReady(page: Page) {
   await expect(page.getByRole('status').filter({ hasText: BLOCKED })).toHaveCount(1);
 }
 
+/** The obituary groups are accordion sections; only the name is open on load. Click the heading button to open one. */
+async function openSection(page: Page, name: string) {
+  const button = page.getByRole('button', { name, exact: true });
+  if ((await button.getAttribute('aria-expanded')) !== 'true') {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+}
+
 /** Fills the name, life and survivor fields, adds the memorial, and presses Mark as ready with placeholders left. */
 async function fillFieldsAndAddMemorial(page: Page) {
   await page.getByRole('button', { name: 'Use the name from The person' }).click();
+  await openSection(page, 'Their life');
   await page.getByLabel('Age (optional)').fill('87');
   await page.getByLabel('City where they lived (optional)').fill('Springfield');
   await page.getByLabel('State where they lived (optional)').fill('Illinois');
 
+  await openSection(page, 'Survived by');
   const survivors = page.getByRole('group', { name: 'Survived by', exact: true });
   await survivors.getByRole('button', { name: 'Add a person' }).click();
   await survivors.getByLabel('Name, person 1', { exact: true }).fill('John Hayes');
@@ -73,6 +84,7 @@ test.describe('Obituary section (WEB-6)', () => {
     await expect(page.getByLabel('Middle name or nickname (optional)')).toHaveValue('');
     await expect(page.getByLabel('Surname (optional)')).toHaveValue('Hayes');
 
+    await openSection(page, 'Their life');
     await page.getByLabel('Age (optional)').fill('87');
     await page.getByLabel('City where they lived (optional)').fill('Springfield');
     await page.getByLabel('State where they lived (optional)').fill('Illinois');
@@ -80,6 +92,7 @@ test.describe('Obituary section (WEB-6)', () => {
 
     // No survivor yet: paragraph 4 keeps its placeholder. One row changes it.
     await expect(obituary(page)).toHaveValue(/Margaret is survived by \[his\/her\] \[RELATION\], \[SURVIVOR NAME\] of \[SURVIVOR CITY\]\./);
+    await openSection(page, 'Survived by');
     const survivors = page.getByRole('group', { name: 'Survived by', exact: true });
     await survivors.getByRole('button', { name: 'Add a person' }).click();
     await expect(survivors.getByLabel('Name, person 1', { exact: true })).toBeFocused();

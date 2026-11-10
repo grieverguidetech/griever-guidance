@@ -8,6 +8,7 @@ import {
   type ObituaryPerson,
   type SurvivorRelation,
 } from '@griever/shared';
+import { AccordionSection } from '../AccordionSection';
 
 const copy = screenCopy('cmsObituary');
 
@@ -52,6 +53,8 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
   const addRef = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef<Focus | null>(null);
   const [message, setMessage] = useState('');
+  // Closed on load. Rows keep their values while it is closed.
+  const [open, setOpen] = useState(false);
 
   function fromValue(text: string): Row[] {
     const parsed = parsePeople(text, relations);
@@ -117,8 +120,15 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
   const atLimit = rows.length >= OBITUARY_PEOPLE_MAX_ROWS;
 
   return (
-    <fieldset className="flex flex-col gap-4 min-w-0">
-      <legend className="font-semibold">{heading}</legend>
+    <AccordionSection
+      title={heading}
+      level={2}
+      headingId={`${id}-heading`}
+      open={open}
+      panelId={`${id}-panel`}
+      onToggle={() => setOpen((before) => !before)}
+    >
+    <div role="group" aria-labelledby={`${id}-heading`} className="flex flex-col gap-4 min-w-0">
       {rows.map((row, index) => {
         const n = String(index + 1);
         const field = (label: string) => fill(copy.personRowField, { field: label, n });
@@ -127,7 +137,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
             ? fill(copy.removePersonUnnamed, { n })
             : fill(copy.removePerson, { name: row.name.trim(), n });
         return (
-          <div key={row.key} className="gg-panel flex flex-col gap-3">
+          <div key={row.key} className="gg-panel grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="gg-field">
               <label htmlFor={`${id}-${row.key}-name`}>{field(copy.personNameColumn)}</label>
               <input
@@ -170,7 +180,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
             </div>
             <button
               type="button"
-              className="gg-btn gg-btn-secondary self-start min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
+              className="gg-btn gg-btn-secondary self-start md:col-span-2 min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
               onClick={() => removeRow(index)}
             >
               {removeName}
@@ -191,6 +201,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
           {copy.addPerson}
         </button>
       )}
-    </fieldset>
+    </div>
+    </AccordionSection>
   );
 }

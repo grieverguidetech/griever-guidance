@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { findHardCodedCopy } from '@griever/copy';
 import { PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '@griever/shared';
 import { ObituaryPeople } from './ObituaryPeople';
 
-function setup(initial = '', relations: readonly string[] = SURVIVOR_RELATIONS) {
+function setup(initial = '', relations: readonly string[] = SURVIVOR_RELATIONS, { open = true } = {}) {
   const calls: string[] = [];
   function Harness() {
     const [value, setValue] = useState(initial);
@@ -24,7 +24,11 @@ function setup(initial = '', relations: readonly string[] = SURVIVOR_RELATIONS) 
     );
   }
   render(<Harness />);
-  return { calls, user: userEvent.setup() };
+  const toggle = () => screen.getByRole('button', { name: 'Survived by' });
+  if (open) {
+    fireEvent.click(toggle());
+  }
+  return { calls, user: userEvent.setup(), toggle };
 }
 
 const two = JSON.stringify([
@@ -33,9 +37,36 @@ const two = JSON.stringify([
 ]);
 
 describe('ObituaryPeople', () => {
-  it('is a fieldset with the heading as its legend', () => {
+  it('is a group named by its level 2 heading, which is shown once', () => {
     setup();
+    expect(screen.getByRole('heading', { level: 2, name: 'Survived by' })).toBeInTheDocument();
+    expect(screen.getAllByText('Survived by')).toHaveLength(1);
     expect(screen.getByRole('group', { name: 'Survived by' })).toBeInTheDocument();
+  });
+
+  it('starts closed, then opens and closes from the heading button without moving focus', async () => {
+    const { user, toggle } = setup(two, SURVIVOR_RELATIONS, { open: false });
+    const button = toggle();
+    const panel = document.getElementById(button.getAttribute('aria-controls') ?? '');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).toHaveAttribute('hidden');
+    await user.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(button).toHaveFocus();
+    await user.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).toHaveAttribute('hidden');
+    expect(button).toHaveFocus();
+  });
+
+  it('keeps the rows and their values while closed', async () => {
+    const { user, toggle } = setup(two);
+    await user.type(screen.getByRole('textbox', { name: 'City, person 2' }), 'Rome');
+    await user.click(toggle());
+    await user.click(toggle());
+    expect(screen.getByRole('textbox', { name: 'Name, person 1' })).toHaveValue('Ann');
+    expect(screen.getByRole('textbox', { name: 'City, person 2' })).toHaveValue('Rome');
   });
 
   it('adds a row, focuses its Name, and writes the serialized JSON', async () => {
@@ -121,7 +152,8 @@ describe('ObituaryPeople', () => {
 
   it('gives remove and add buttons a 44 px minimum height', () => {
     setup(two);
-    for (const b of screen.getAllByRole('button')) {
+    // The heading button is the accordion toggle; it is min-h-11 (44 px) in AccordionSection.
+    for (const b of screen.getAllByRole('button').filter((el) => !el.hasAttribute('aria-expanded'))) {
       expect(b.className).toContain('min-h-[44px]');
     }
   });

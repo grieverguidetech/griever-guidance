@@ -171,11 +171,101 @@ describe('ObituaryLifeFields', () => {
     });
   });
 
-  it('shows the group headings', () => {
-    setup();
-    for (const heading of [copy.groupNameHeading, copy.groupLifeHeading, copy.groupFamilyHeading, copy.groupServiceHeading]) {
-      expect(screen.getByRole('group', { name: heading })).toBeInTheDocument();
-    }
+  describe('sections', () => {
+    const headings = [
+      copy.groupNameHeading,
+      copy.groupLifeHeading,
+      copy.groupFamilyHeading,
+      copy.groupServiceHeading,
+    ];
+    const button = (name: string) => screen.getByRole('button', { name });
+
+    it('has four level 2 headings with a button each, and only the name open', () => {
+      setup();
+      for (const heading of headings) {
+        expect(screen.getByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
+      }
+      expect(headings.map((h) => button(h).getAttribute('aria-expanded'))).toEqual([
+        'true', 'false', 'false', 'false',
+      ]);
+    });
+
+    it('points each button at a panel that is hidden while closed', () => {
+      setup();
+      for (const heading of headings) {
+        const panel = document.getElementById(button(heading).getAttribute('aria-controls') ?? '');
+        expect(panel).not.toBeNull();
+        expect(panel?.hasAttribute('hidden')).toBe(heading !== copy.groupNameHeading);
+      }
+    });
+
+    it('opens and closes on click without moving focus, and the caret turns', async () => {
+      setup();
+      const life = button(copy.groupLifeHeading);
+      const caret = life.querySelector('[data-chevron]');
+      expect(caret).not.toHaveClass('rotate-180');
+      await userEvent.click(life);
+      expect(life).toHaveAttribute('aria-expanded', 'true');
+      expect(life).toHaveFocus();
+      expect(caret).toHaveClass('rotate-180');
+      await userEvent.click(life);
+      expect(life).toHaveAttribute('aria-expanded', 'false');
+      expect(life).toHaveFocus();
+    });
+
+    it('names each group by its heading, and shows the heading once', async () => {
+      setup();
+      for (const heading of headings.slice(1)) {
+        await userEvent.click(button(heading));
+      }
+      for (const heading of headings) {
+        expect(screen.getByRole('group', { name: heading })).toBeInTheDocument();
+        expect(screen.getAllByText(heading)).toHaveLength(1);
+      }
+    });
+
+    it('keeps typed values while a section is closed', async () => {
+      setup();
+      const life = button(copy.groupLifeHeading);
+      await userEvent.click(life);
+      await userEvent.type(screen.getByLabelText(copy.hobbiesLabel), 'chess');
+      await userEvent.click(life);
+      await userEvent.click(life);
+      expect(screen.getByLabelText(copy.hobbiesLabel)).toHaveValue('chess');
+    });
+
+    it('lays the fields out row by row, with the half-width and full-width cells', async () => {
+      setup();
+      await userEvent.click(button(copy.groupLifeHeading));
+      const group = screen.getByRole('group', { name: copy.groupLifeHeading });
+      const grid = group.querySelector('.grid');
+      expect(grid).toHaveClass('grid-cols-1', 'md:grid-cols-2');
+      const labels = Array.from(grid?.children ?? []).map((cell) => ({
+        label: cell.querySelector('label')?.textContent,
+        full: cell.classList.contains('md:col-span-2'),
+      }));
+      expect(labels.map((l) => l.label)).toEqual([
+        copy.ageLabel, copy.birthPlaceLabel,
+        copy.cityLabel, copy.stateLabel,
+        copy.deathPlaceLabel,
+        copy.highSchoolLabel, copy.graduationYearLabel,
+        copy.collegeLabel, copy.degreeLabel,
+        copy.jobTitleLabel, copy.companyLabel,
+        copy.yearsLabel,
+        copy.hobbiesLabel, copy.awardsLabel, copy.charitiesLabel,
+      ]);
+      expect(labels.filter((l) => l.full).map((l) => l.label)).toEqual([
+        copy.deathPlaceLabel, copy.hobbiesLabel, copy.awardsLabel, copy.charitiesLabel,
+      ]);
+    });
+
+    it('puts the name button above the grid, then Given, Middle, Surname, Pronoun', () => {
+      setup({ personName: 'Ann Lee' });
+      const group = screen.getByRole('group', { name: copy.groupNameHeading });
+      expect(group.firstElementChild).toBe(screen.getByRole('button', { name: copy.useNameFromPersonLabel }));
+      const order = Array.from(group.querySelectorAll('label')).map((l) => l.textContent);
+      expect(order).toEqual([copy.givenNameLabel, copy.middleNameLabel, copy.surnameLabel, copy.pronounLabel]);
+    });
   });
 
   it('holds no hard-coded copy', () => {

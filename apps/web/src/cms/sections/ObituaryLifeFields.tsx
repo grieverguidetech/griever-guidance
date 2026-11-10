@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
+import { AccordionSection } from '../AccordionSection';
 import {
   FLOW_DETAIL_MAX_LENGTH,
   ageFrom,
@@ -55,6 +56,8 @@ interface FieldSpec {
   label: string;
   /** Year and number fields get the numeric keypad but still accept text. */
   numeric?: boolean;
+  /** Takes both columns from the md breakpoint. Without it the field takes one. */
+  full?: boolean;
 }
 
 const nameFields: FieldSpec[] = [
@@ -63,22 +66,23 @@ const nameFields: FieldSpec[] = [
   { key: 'obituarySurname', label: copy.surnameLabel },
 ];
 
+// Listed row by row: the DOM order is the visual order, so Tab follows what the user sees.
 const lifeFields: FieldSpec[] = [
   { key: 'obituaryAge', label: copy.ageLabel, numeric: true },
+  { key: 'obituaryBirthPlace', label: copy.birthPlaceLabel },
   { key: 'obituaryCity', label: copy.cityLabel },
   { key: 'obituaryState', label: copy.stateLabel },
-  { key: 'obituaryBirthPlace', label: copy.birthPlaceLabel },
-  { key: 'obituaryDeathPlace', label: copy.deathPlaceLabel },
+  { key: 'obituaryDeathPlace', label: copy.deathPlaceLabel, full: true },
   { key: 'obituaryHighSchool', label: copy.highSchoolLabel },
   { key: 'obituaryGradYear', label: copy.graduationYearLabel, numeric: true },
-  { key: 'obituaryDegree', label: copy.degreeLabel },
   { key: 'obituaryCollege', label: copy.collegeLabel },
+  { key: 'obituaryDegree', label: copy.degreeLabel },
   { key: 'obituaryJobTitle', label: copy.jobTitleLabel },
   { key: 'obituaryCompany', label: copy.companyLabel },
   { key: 'obituaryJobYears', label: copy.yearsLabel, numeric: true },
-  { key: 'obituaryHobbies', label: copy.hobbiesLabel },
-  { key: 'obituaryAwards', label: copy.awardsLabel },
-  { key: 'obituaryOrganizations', label: copy.charitiesLabel },
+  { key: 'obituaryHobbies', label: copy.hobbiesLabel, full: true },
+  { key: 'obituaryAwards', label: copy.awardsLabel, full: true },
+  { key: 'obituaryOrganizations', label: copy.charitiesLabel, full: true },
 ];
 
 const familyFields: FieldSpec[] = [
@@ -92,6 +96,8 @@ const serviceFields: FieldSpec[] = [
   { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel },
 ];
 
+type GroupKey = 'name' | 'life' | 'family' | 'service';
+
 const pronounChoices = [
   { value: '', label: copy.pronounNone },
   { value: 'he', label: copy.pronounHe },
@@ -104,6 +110,19 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
   const id = useId();
   const [ageFocused, setAgeFocused] = useState(false);
   const [nameFilled, setNameFilled] = useState(false);
+  // Open on load: the name only. Not remembered across loads.
+  const [open, setOpen] = useState<Set<GroupKey>>(() => new Set<GroupKey>(['name']));
+  function toggle(key: GroupKey) {
+    setOpen((before) => {
+      const next = new Set(before);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
   const personName = values.personName?.trim() ?? '';
   const derivedAge = ageFrom(values.birthDate ?? '', values.dateOfPassing ?? '');
 
@@ -114,7 +133,7 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
     // While the age has focus it shows only what was typed; otherwise the worked-out age fills an empty field.
     const showsDerived = isAge && typed === '' && !ageFocused && derivedAge !== '';
     return (
-      <div className="gg-field" key={spec.key}>
+      <div className={spec.full ? 'gg-field md:col-span-2' : 'gg-field'} key={spec.key}>
         <label htmlFor={`${id}-${spec.key}`}>{spec.label}</label>
         {showsDerived && (
           <p id={hintId} className="gg-hint">
@@ -138,14 +157,31 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
     );
   }
 
-  function renderGroup(heading: string, fields: FieldSpec[], lead?: ReactNode, tail?: ReactNode) {
+  function renderGroup(
+    key: GroupKey,
+    heading: string,
+    fields: FieldSpec[],
+    lead?: ReactNode,
+    tail?: ReactNode,
+  ) {
+    const headingId = `${id}-${key}-heading`;
     return (
-      <fieldset className="flex flex-col gap-4 border-0 p-0 m-0 min-w-0">
-        <legend className="mb-2 p-0 font-semibold">{heading}</legend>
-        {lead}
-        {fields.map(renderField)}
-        {tail}
-      </fieldset>
+      <AccordionSection
+        title={heading}
+        level={2}
+        headingId={headingId}
+        open={open.has(key)}
+        panelId={`${id}-${key}-panel`}
+        onToggle={() => toggle(key)}
+      >
+        <div role="group" aria-labelledby={headingId} className="flex flex-col gap-4">
+          {lead}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {fields.map(renderField)}
+            {tail}
+          </div>
+        </div>
+      </AccordionSection>
     );
   }
 
@@ -186,10 +222,10 @@ export function ObituaryLifeFields({ values, onChange }: Props) {
       <p role="status" className="sr-only">
         {nameFilled ? copy.nameFilled : ''}
       </p>
-      {renderGroup(copy.groupNameHeading, nameFields, useName, pronoun)}
-      {renderGroup(copy.groupLifeHeading, lifeFields)}
-      {renderGroup(copy.groupFamilyHeading, familyFields)}
-      {renderGroup(copy.groupServiceHeading, serviceFields)}
+      {renderGroup('name', copy.groupNameHeading, nameFields, useName, pronoun)}
+      {renderGroup('life', copy.groupLifeHeading, lifeFields)}
+      {renderGroup('family', copy.groupFamilyHeading, familyFields)}
+      {renderGroup('service', copy.groupServiceHeading, serviceFields)}
     </>
   );
 }
