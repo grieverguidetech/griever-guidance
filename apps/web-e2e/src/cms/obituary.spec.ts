@@ -182,19 +182,20 @@ test.describe('Obituary section (WEB-6)', () => {
     };
     await expect.poll(rowGap).toBe(0);
 
-    // In Service and visitation, the date and time of the service share a row.
+    // In Service and visitation, the date and time of the service share a row. The date has
+    // help text above its input, so the inputs' tops differ: check the time sits to the right.
     await openSection(page, 'Service and visitation');
     const serviceDate = page.getByLabel('Funeral or memorial service Date', { exact: true });
     const serviceTime = page.getByLabel('Funeral or memorial service Time', { exact: true });
-    const dateTimeGap = async () => {
+    const timeRightOfDate = async () => {
       const a = await serviceDate.boundingBox();
       const b = await serviceTime.boundingBox();
       if (!a || !b) {
         return null;
       }
-      return Math.abs(a.y - b.y);
+      return b.x >= a.x + a.width;
     };
-    await expect.poll(dateTimeGap).toBe(0);
+    await expect.poll(timeRightOfDate).toBe(true);
 
     await page.setViewportSize({ width: 375, height: 812 });
     // Below sm they stack, date first.
