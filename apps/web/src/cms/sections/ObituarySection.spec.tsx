@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
@@ -12,6 +12,7 @@ type Values = Parameters<typeof ObituarySection>[0]['values'];
 
 function setup(initial: Values = {}) {
   const patches: ObituaryPatch[] = [];
+  const servicePatches: Record<string, unknown>[] = [];
   const onReadyChange = vi.fn();
   const onOpenPerson = vi.fn();
   const onOpenService = vi.fn();
@@ -24,6 +25,10 @@ function setup(initial: Values = {}) {
           patches.push(patch);
           setValues((v) => ({ ...v, ...patch }));
         }}
+        onServiceChange={(patch) => {
+          servicePatches.push(patch);
+          setValues((v) => ({ ...v, ...patch }));
+        }}
         onReadyChange={onReadyChange}
         onOpenPerson={onOpenPerson}
         onOpenService={onOpenService}
@@ -31,7 +36,7 @@ function setup(initial: Values = {}) {
     );
   }
   render(<Harness />);
-  return { patches, onReadyChange, onOpenPerson, onOpenService };
+  return { patches, servicePatches, onReadyChange, onOpenPerson, onOpenService };
 }
 
 const text = () => screen.getByLabelText('Obituary') as HTMLTextAreaElement;
@@ -76,11 +81,12 @@ describe('ObituarySection', () => {
     });
     expect(screen.getByText('Details from Service')).toBeInTheDocument();
     expect(screen.getByText('Oak Chapel')).toBeInTheDocument();
-    expect(screen.getByText('Reverend Sam Cole')).toBeInTheDocument();
-    expect(screen.getByText('Burial').nextElementSibling).toHaveTextContent('Will be private');
-    expect(screen.queryByText('Oak Hill')).toBeNull();
+    // Officiant and burial are edited below, so they are not repeated in the read-only list.
+    const list = screen.getByText('Oak Chapel').closest('dl') as HTMLElement;
+    expect(within(list).queryByText('Officiant')).toBeNull();
+    expect(within(list).queryByText('Burial')).toBeNull();
+    expect(within(list).queryByText('Reverend Sam Cole')).toBeNull();
     expect(screen.queryByText('Visitation date')).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Officiant' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Change these on Service' }));
     expect(onOpenService).toHaveBeenCalledTimes(1);
   });
@@ -176,6 +182,16 @@ describe('ObituarySection', () => {
     expect(text().value).toContain(
       'Funeral service will be held at Oak Chapel on June 5, 2026 at 2:00 PM with Reverend Sam Cole officiating. Burial will follow at Oak Hill, [CEMETERY LOCATION]. Visitation will be held at Oak Chapel on June 4, 2026 at 6:00 PM.',
     );
+  });
+
+  it('typing the cemetery goes to onServiceChange and removes [CEMETERY NAME] from the unedited text', async () => {
+    const { patches, servicePatches } = setup(person);
+    expect(text().value).toContain('[CEMETERY NAME]');
+    await userEvent.type(screen.getByLabelText(screenCopy('cmsService').eventCemetery), 'Oak Hill');
+    expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Oak Hill' });
+    expect(patches).toEqual([]);
+    expect(text().value).not.toContain('[CEMETERY NAME]');
+    expect(text().value).toContain('Oak Hill');
   });
 
   it('keeps an edit, shows the edited hint, and resets with focus on the text', async () => {
@@ -283,6 +299,7 @@ describe('ObituarySection', () => {
         <ObituarySection
           values={{ ...person, sectionStatus: { obituary: 'ready' } }}
           onChange={() => undefined}
+          onServiceChange={() => undefined}
           onReadyChange={onReadyChange}
         />,
       );
@@ -445,7 +462,8 @@ describe('ObituarySection memorial', () => {
 
   it('does not take focus on load, saved or blank', () => {
     const { unmount } = render(
-      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined} onReadyChange={() => undefined} />,
+      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined}
+          onServiceChange={() => undefined} onReadyChange={() => undefined} />,
     );
     expect(document.body).toHaveFocus();
     unmount();
@@ -474,6 +492,7 @@ describe('ObituarySection phone nudge', () => {
         <ObituarySection
           values={{ obituaryText: 'Ann Lee loved gardens.', sectionStatus: { obituary: ready ? 'ready' : 'in_progress' } }}
           onChange={() => undefined}
+          onServiceChange={() => undefined}
           onReadyChange={setReady}
         />
       );

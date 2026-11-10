@@ -226,6 +226,35 @@ describe('editor on (#395)', () => {
     expect(stored()[0]).toMatchObject({ serviceReady: false });
   });
 
+  it('a cemetery typed on Obituary shows on Service', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    await user.click(screen.getByRole('button', { name: "Funeral home and place of worship" }));
+    await user.type(screen.getByLabelText('Cemetery'), 'Oak Hill');
+    expect(stored()[0]).toMatchObject({ burialPlace: 'Oak Hill' });
+    expect(stored()[0].sectionStatus?.['service']).toBe('in_progress');
+    await user.click(nav.getByRole('button', { name: /^Service/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Service' });
+    expect(screen.getByLabelText('Cemetery')).toHaveValue('Oak Hill');
+  });
+
+  it('a cemetery typed on Service shows on Obituary', async () => {
+    const user = userEvent.setup();
+    await openMargaret();
+    const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+    await user.click(nav.getByRole('button', { name: /^Service/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Service' });
+    await user.click(screen.getByRole('button', { name: /Add burial/ }));
+    await user.type(screen.getByLabelText('Cemetery'), 'Elm Rest');
+    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Obituary' });
+    await user.click(screen.getByRole('button', { name: 'Funeral home and place of worship' }));
+    expect(screen.getByLabelText('Cemetery')).toHaveValue('Elm Rest');
+  });
+
   it('"Your people" in the nav keeps a named person', async () => {
     const user = userEvent.setup();
     await openMargaret();
