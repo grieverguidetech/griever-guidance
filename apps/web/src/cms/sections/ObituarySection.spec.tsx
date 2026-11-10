@@ -220,6 +220,22 @@ describe('ObituarySection', () => {
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
 
+    it('refuses once Add Memorial is pressed, and allows Ready after a real memorial is typed', async () => {
+      const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
+      expect(toggle()).toHaveAttribute('aria-disabled', 'true');
+      expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(message));
+      await userEvent.click(toggle());
+      expect(onReadyChange).not.toHaveBeenCalled();
+      const memorial = screen.getByLabelText('Memorial');
+      await userEvent.clear(memorial);
+      await userEvent.type(memorial, 'Gifts to the garden club.');
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(toggle());
+      expect(onReadyChange).toHaveBeenCalledWith(true);
+    });
+
     it('always lets Ready be turned off, and stays Ready if a bracket comes back', async () => {
       const onReadyChange = vi.fn();
       render(
