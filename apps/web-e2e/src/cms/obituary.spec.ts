@@ -34,6 +34,12 @@ const obituary = (page: Page) => page.getByRole('textbox', { name: 'Obituary', e
 const memorial = (page: Page) => page.getByRole('textbox', { name: 'Memorial', exact: true });
 const markReady = (page: Page) => page.getByRole('button', { name: 'Mark as ready' });
 
+/** Presses the toggle the way a keyboard user does. Playwright's click() waits forever on an aria-disabled button. */
+async function pressMarkReady(page: Page) {
+  await markReady(page).focus();
+  await page.keyboard.press('Enter');
+}
+
 /** Fills the name, life and survivor fields, adds the memorial, and presses Mark as ready with placeholders left. */
 async function fillFieldsAndAddMemorial(page: Page) {
   await page.getByRole('button', { name: 'Use the name from The person' }).click();
@@ -47,7 +53,7 @@ async function fillFieldsAndAddMemorial(page: Page) {
   await survivors.getByLabel('City, person 1', { exact: true }).fill('Austin');
 
   await page.getByRole('button', { name: 'Add Memorial' }).click();
-  await markReady(page).click();
+  await pressMarkReady(page);
 }
 
 test.describe('Obituary section (WEB-6)', () => {
@@ -89,7 +95,7 @@ test.describe('Obituary section (WEB-6)', () => {
     const toggle = markReady(page);
     await expect(toggle).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByText(BLOCKED).first()).toBeVisible();
-    await toggle.click();
+    await pressMarkReady(page);
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(toggle).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByText(BLOCKED).first()).toBeVisible();
