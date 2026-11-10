@@ -187,6 +187,8 @@ test.describe('Obituary section (WEB-6)', () => {
     await openSection(page, 'Service and visitation');
     const serviceDate = page.getByLabel('Funeral or memorial service Date', { exact: true });
     const serviceTime = page.getByLabel('Funeral or memorial service Time', { exact: true });
+    await expect(serviceDate).toBeVisible();
+    await expect(serviceTime).toBeVisible();
     const timeRightOfDate = async () => {
       const a = await serviceDate.boundingBox();
       const b = await serviceTime.boundingBox();
