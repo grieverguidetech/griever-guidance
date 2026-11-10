@@ -940,7 +940,7 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
     setup(withMemorial);
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await waitFor(() => expect(share).toHaveBeenCalled());
-    expect(JSON.stringify(share.mock.calls[0])).toContain(memorial);
+    expect((share.mock.calls[0][0] as { message: string }).message).toBe(full);
   });
 
   it('editing holds the body only, and saving never writes the memorial', () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { buildObituaryDraft, screenCopy } from '@griever/copy';
-import { obituaryShareTextFor, obituaryTextFor } from './obituaryText';
+import { FLOW_DETAIL_TEXT_KEYS } from '@griever/shared';
+import { NEW_OBITUARY_KEYS, obituaryShareTextFor, obituaryTextFor } from './obituaryText';
 import type { ObituaryTextSource } from './obituaryText';
 
 const empty = { personName: '', dateOfPassing: '' } as ObituaryTextSource;
@@ -90,5 +91,13 @@ describe('obituaryShareTextFor', () => {
 
   it('is empty when the typed text was cleared to blank, memorial or not', () => {
     expect(obituaryShareTextFor({ ...empty, obituaryText: '  ', obituaryMemorial: 'Gifts.' })).toBe('');
+  });
+});
+
+describe('NEW_OBITUARY_KEYS', () => {
+  it('holds every obituary text key the gate does not already check', () => {
+    const olderOrOther = ['obituaryText', 'obituaryMemorial', 'obituaryCity', 'obituaryCareer', 'obituarySurvivors', 'obituaryNote'];
+    const expected = FLOW_DETAIL_TEXT_KEYS.filter((key) => key.startsWith('obituary') && !olderOrOther.includes(key));
+    expect([...NEW_OBITUARY_KEYS].sort()).toEqual([...expected].sort());
   });
 });

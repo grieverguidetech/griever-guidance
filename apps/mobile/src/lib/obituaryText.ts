@@ -1,4 +1,5 @@
 import { buildObituaryDraft, obituaryShareText, screenCopy } from '@griever/copy';
+import type { ObituaryDraftFields } from '@griever/copy';
 import type { Session } from '@griever/hooks';
 
 const draftCopy = screenCopy('obituaryDraft');
@@ -10,7 +11,7 @@ export const NEW_OBITUARY_KEYS = [
   'obituaryFatherName', 'obituaryHighSchool', 'obituaryGradYear', 'obituaryDegree', 'obituaryCollege', 'obituaryJobTitle',
   'obituaryCompany', 'obituaryJobYears', 'obituaryHobbies', 'obituaryAwards', 'obituaryOrganizations', 'obituaryPronoun',
   'obituarySurvivorList', 'obituaryPrecededList',
-] as const;
+] as const satisfies readonly (keyof ObituaryDraftFields)[];
 
 export type ObituaryTextSource = Pick<
   Session,
