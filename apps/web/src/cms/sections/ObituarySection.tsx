@@ -62,8 +62,13 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
     { ...values, dateOfPassing: values.dateOfPassing ?? undefined },
     draftCopy,
   );
-  // The switch is on at load only when a memorial is already saved. Not remembered across loads.
-  const [memorialOn, setMemorialOn] = useState(() => (values.obituaryMemorial ?? '').trim() !== '');
+  const memorialBlank = (values.obituaryMemorial ?? '').trim() === '';
+  // On whenever a memorial is saved (also one synced from another member), or when the user switched it on and has not typed yet.
+  const [switchedOn, setSwitchedOn] = useState(false);
+  const memorialOn = !memorialBlank || switchedOn;
+  // The text removed by the last switch-off, kept so Undo can restore it.
+  const removedMemorial = useRef('');
+  const [showUndo, setShowUndo] = useState(false);
   // Relies on onChange updating state synchronously (useSessions updateSection).
   useEffect(() => {
     if (focusMemorial.current) {
@@ -74,8 +79,7 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
   const edited = values.obituaryText !== undefined;
   const shownText = values.obituaryText ?? prefill;
   const textBlanks = hasTemplateBlanks(shownText, draftCopy);
-  const memorialBlank = (values.obituaryMemorial ?? '').trim() === '';
-  const memorialBlanks = memorialOn && hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
+  const memorialBlanks = !memorialBlank && hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
   const blanksLeft = textBlanks || memorialBlanks;
   // The memorial can be switched off, so name it when its blanks are what blocks Ready.
   const blockedMessage = memorialBlanks ? (textBlanks ? copy.readyPlaceholdersBoth : copy.readyPlaceholdersMemorial) : copy.readyPlaceholders;
@@ -123,8 +127,8 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
           </button>
         )}
       </div>
-      <section className="flex flex-col gap-3">
-        <h2 className="m-0">{copy.memorialHeading}</h2>
+      <section aria-labelledby={`${id}-memorial-heading`} className="flex flex-col gap-3">
+        <h2 id={`${id}-memorial-heading`} className="m-0">{copy.memorialHeading}</h2>
         <button
           type="button"
           role="switch"
@@ -133,11 +137,14 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
           onClick={() => {
             if (memorialOn) {
               // Off: the memorial is left out. Focus stays on this switch.
-              setMemorialOn(false);
+              removedMemorial.current = values.obituaryMemorial ?? '';
+              setShowUndo(removedMemorial.current.trim() !== '');
+              setSwitchedOn(false);
               onChange({ obituaryMemorial: '' });
               return;
             }
-            setMemorialOn(true);
+            setShowUndo(false);
+            setSwitchedOn(true);
             focusMemorial.current = true;
             if (memorialBlank) {
               onChange({ obituaryMemorial: draftCopy.memorial });
@@ -149,6 +156,25 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
           </span>
           {copy.addMemorial}
         </button>
+        <div role="status" className="flex flex-wrap items-center gap-3">
+          {showUndo && (
+            <>
+              <span>{copy.memorialRemoved}</span>
+              <button
+                type="button"
+                className="gg-btn gg-btn-secondary"
+                onClick={() => {
+                  setShowUndo(false);
+                  setSwitchedOn(true);
+                  focusMemorial.current = true;
+                  onChange({ obituaryMemorial: removedMemorial.current });
+                }}
+              >
+                {copy.undoMemorialRemoved}
+              </button>
+            </>
+          )}
+        </div>
         {memorialOn && (
           <div className="gg-field">
             <label htmlFor={`${id}-memorial`}>{copy.memorialLabel}</label>
@@ -161,7 +187,11 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
               rows={4}
               maxLength={FLOW_DETAIL_MAX_LENGTH.obituaryMemorial}
               value={values.obituaryMemorial ?? ''}
-              onChange={(e) => onChange({ obituaryMemorial: e.target.value })}
+              onChange={(e) => {
+                // Keep the box open while it is cleared; only the switch closes it.
+                setSwitchedOn(true);
+                onChange({ obituaryMemorial: e.target.value.trim() === '' ? '' : e.target.value });
+              }}
             />
           </div>
         )}

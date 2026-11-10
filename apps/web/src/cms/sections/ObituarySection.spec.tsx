@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
@@ -384,6 +384,63 @@ describe('ObituarySection memorial', () => {
     await userEvent.click(memorialSwitch());
     expect(screen.getByLabelText('Memorial')).toHaveValue(prefill);
     expect(screen.getByLabelText('Memorial')).toHaveFocus();
+  });
+
+  it('works with the Space key', async () => {
+    setup(person);
+    memorialSwitch().focus();
+    await userEvent.keyboard(' ');
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
+    memorialSwitch().focus();
+    await userEvent.keyboard(' ');
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('is named by the h2 and turns on when a memorial arrives from elsewhere, blocking Ready', () => {
+    const props = {
+      onChange: () => undefined,
+      onServiceChange: () => undefined,
+      onPersonChange: () => undefined,
+      onReadyChange: () => undefined,
+    };
+    const base = { ...person, obituaryText: 'Ann Lee loved gardens.' };
+    const { rerender } = render(<ObituarySection values={base} {...props} />);
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('region', { name: 'Memorial (optional)' })).toBeInTheDocument();
+    rerender(<ObituarySection values={{ ...base, obituaryMemorial: prefill }} {...props} />);
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Memorial')).toHaveValue(prefill);
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAccessibleDescription(
+      expect.stringContaining('in the Memorial. Replace it'),
+    );
+  });
+
+  it('off with text shows Memorial removed and Undo, which restores the text, turns on and focuses the box', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts to the library.' });
+    await userEvent.click(memorialSwitch());
+    expect(within(screen.getByRole('region', { name: 'Memorial (optional)' })).getByRole('status')).toHaveTextContent('Memorial removed.');
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: 'Gifts to the library.' });
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Memorial')).toHaveValue('Gifts to the library.');
+    expect(screen.getByLabelText('Memorial')).toHaveFocus();
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+  });
+
+  it('hides Undo when the switch is turned on again', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    await userEvent.click(memorialSwitch());
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    await userEvent.click(memorialSwitch());
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+  });
+
+  it('saves an empty string when the box holds only spaces', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'G' });
+    await userEvent.clear(screen.getByLabelText('Memorial'));
+    await userEvent.type(screen.getByLabelText('Memorial'), '  ');
+    expect(patches.every((p) => p.obituaryMemorial === '' || p.obituaryMemorial === 'G' || p.obituaryMemorial === undefined)).toBe(true);
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: '' });
   });
 
   it('works from the keyboard', async () => {

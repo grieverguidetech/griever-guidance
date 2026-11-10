@@ -57,6 +57,8 @@
   "removePerson": "Remove {name}, person {n}",
   "memorialHeading": "Memorial (optional)",
   "addMemorial": "Add Memorial",
+  "memorialRemoved": "Memorial removed.",
+  "undoMemorialRemoved": "Undo",
   "memorialLabel": "Memorial",
   "memorialHint": "Replace the placeholder text with the memorial details.",
   "readyPlaceholders": "Some placeholder text is still in [brackets]. Replace it before you mark this ready.",
