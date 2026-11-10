@@ -13,7 +13,6 @@
     "cityLabel",
     "textLabel",
     "textHint",
-    "textBlanks",
     "textHintEdited",
     "useDetails",
     "groupNameHeading",
@@ -114,9 +113,6 @@
       "$ref": "#/$defs/text"
     },
     "textHint": {
-      "$ref": "#/$defs/text"
-    },
-    "textBlanks": {
       "$ref": "#/$defs/text"
     },
     "textHintEdited": {
