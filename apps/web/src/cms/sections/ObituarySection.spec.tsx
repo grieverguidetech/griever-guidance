@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { findHardCodedCopy } from '@griever/copy';
+import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
+import { findHardCodedCopy, screenCopy } from '@griever/copy';
 import { ObituarySection, type ObituaryPatch } from './ObituarySection';
 import { resetSessionDismissed } from './PhoneNudge';
 
@@ -205,6 +206,82 @@ describe('ObituarySection', () => {
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'ObituarySection.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsObituary')).toEqual([]);
+  });
+});
+
+describe('ObituarySection memorial', () => {
+  const addButton = () => screen.queryByRole('button', { name: 'Add Memorial' });
+  const prefill = screenCopy('obituaryDraft').memorial;
+
+  it('shows the Add Memorial button while the memorial is blank, with the primary style', () => {
+    setup({ ...person, obituaryMemorial: '   ' });
+    expect(addButton()).toHaveClass('gg-btn', 'gg-btn-primary');
+    expect(screen.queryByLabelText('Memorial')).toBeNull();
+  });
+
+  it('saves the prefill, shows the labelled box with its hint and focuses it', async () => {
+    const { patches } = setup(person);
+    await userEvent.click(addButton()!);
+    expect(patches).toEqual([{ obituaryMemorial: prefill }]);
+    const box = screen.getByLabelText('Memorial') as HTMLTextAreaElement;
+    expect(box.value).toBe(prefill);
+    expect(box.value).toMatch(/^Memorial donations may be made to/);
+    expect(box).toHaveFocus();
+    expect(box).toHaveAccessibleDescription('Replace the placeholder text with the memorial details.');
+    expect(addButton()).toBeNull();
+  });
+
+  it('sends edits as obituaryMemorial and never changes the obituary text', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts to the library.' });
+    const before = text().value;
+    await userEvent.type(screen.getByLabelText('Memorial'), 'X');
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: 'Gifts to the library.X' });
+    expect(patches.every((p) => !('obituaryText' in p))).toBe(true);
+    expect(text().value).toBe(before);
+    expect(text().value).not.toContain('library');
+  });
+
+  it('keeps the box and its focus while it is cleared', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    const box = screen.getByLabelText('Memorial');
+    await userEvent.clear(box);
+    expect(screen.getByLabelText('Memorial')).toHaveFocus();
+    expect(addButton()).toBeNull();
+    await userEvent.type(screen.getByLabelText('Memorial'), '   ');
+    expect(screen.getByLabelText('Memorial')).toBeInTheDocument();
+  });
+
+  it('on blur while blank shows the button and does not move focus to it', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts' });
+    await userEvent.clear(screen.getByLabelText('Memorial'));
+    await userEvent.type(screen.getByLabelText('Memorial'), '  ');
+    await userEvent.tab();
+    expect(screen.queryByLabelText('Memorial')).toBeNull();
+    expect(addButton()).not.toHaveFocus();
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: '' });
+  });
+
+  it('on blur with text keeps the box', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    screen.getByLabelText('Memorial').focus();
+    await userEvent.tab();
+    expect(screen.getByLabelText('Memorial')).toHaveValue('Gifts');
+  });
+
+  it('does not take focus on load, saved or blank', () => {
+    const { unmount } = render(
+      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined} onReadyChange={() => undefined} />,
+    );
+    expect(document.body).toHaveFocus();
+    unmount();
+    setup(person);
+    expect(document.body).toHaveFocus();
+    expect(addButton()).not.toHaveFocus();
+  });
+
+  it('has the maxLength of its key', () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    expect(screen.getByLabelText('Memorial')).toHaveAttribute('maxLength', String(FLOW_DETAIL_MAX_LENGTH.obituaryMemorial));
   });
 });
 
