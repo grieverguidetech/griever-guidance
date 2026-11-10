@@ -1,9 +1,10 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
 import { AccordionSection } from '../AccordionSection';
-import { ANY_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
+import { ANY_PLACE_TYPES, BURIAL_PLACE_TYPES, SERVICE_PLACE_TYPES } from '../../lib/places/placesClient';
 import { DateInput, todayISO } from '../../lib/DateField';
 import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
+import { PlaceInput } from '../../lib/places/PlaceInput';
 import { EventFields } from './EventFields';
 import {
   FLOW_DETAIL_MAX_LENGTH,
@@ -146,6 +147,12 @@ const pronounChoices = [
 export function ObituaryLifeFields({ values, onChange, onServiceChange, onPersonChange }: Props) {
   const id = useId();
   const [ageFocused, setAgeFocused] = useState(false);
+  // The address the last cemetery pick wrote, so a later pick may replace it but never a typed one.
+  const pickedCemeteryLocation = useRef<string | null>(null);
+  const mayFillCemeteryLocation = () => {
+    const current = values.obituaryCemeteryLocation ?? '';
+    return current === '' || current === pickedCemeteryLocation.current;
+  };
   // Open on load: the name only. Not remembered across loads.
   const [open, setOpen] = useState<Set<GroupKey>>(() => new Set<GroupKey>(['name']));
   function toggle(key: GroupKey) {
@@ -207,7 +214,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
     );
   }
 
-  function renderServiceText(key: 'burialPlace' | 'serviceOfficiant', label: string, hintId: string) {
+  function renderServiceText(key: 'serviceOfficiant', label: string, hintId: string) {
     return (
       <div className="gg-field" key={key}>
         <label htmlFor={`${id}-${key}`}>{label}</label>
@@ -220,6 +227,44 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           aria-describedby={hintId}
           value={values[key] ?? ''}
           onChange={(e) => onServiceChange({ [key]: e.target.value })}
+        />
+      </div>
+    );
+  }
+
+  function renderCemetery(label: string, hintId: string) {
+    const fieldId = `${id}-burialPlace`;
+    const labelId = `${fieldId}-label`;
+    return (
+      <div className="gg-field" key="burialPlace">
+        <label id={labelId} htmlFor={fieldId}>
+          {label}
+        </label>
+        <PlaceInput
+          id={fieldId}
+          labelledBy={labelId}
+          describedBy={hintId}
+          types={BURIAL_PLACE_TYPES}
+          wantsDetails={(pick) => Boolean(pick.secondaryText && mayFillCemeteryLocation())}
+          onPick={(pick, details) => {
+            // The full address from the place itself; the prediction's short line if that failed.
+            const name = details?.name || pick.mainText;
+            const address = details?.address || pick.secondaryText;
+            if (!address) {
+              onServiceChange({ burialPlace: pick.text });
+              return false;
+            }
+            if (!mayFillCemeteryLocation()) {
+              onServiceChange({ burialPlace: name });
+              return false;
+            }
+            pickedCemeteryLocation.current = address;
+            onServiceChange({ burialPlace: name });
+            onChange({ obituaryCemeteryLocation: address });
+            return true;
+          }}
+          value={values.burialPlace ?? ''}
+          onChange={(burialPlace) => onServiceChange({ burialPlace })}
         />
       </div>
     );
@@ -328,7 +373,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           />
           {serviceCopy.eventPrivateFamily}
         </label>
-        {!burialPrivate && renderServiceText('burialPlace', serviceCopy.eventCemetery, sharedHintId)}
+        {!burialPrivate && renderCemetery(serviceCopy.eventCemetery, sharedHintId)}
       </div>
       {!burialPrivate && renderField(cemeteryLocationField)}
     </>

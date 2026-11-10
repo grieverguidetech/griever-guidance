@@ -419,6 +419,101 @@ describe('ObituaryLifeFields', () => {
       expect(screen.getByLabelText(serviceCopy.eventCemetery)).toHaveValue('Oak Hill');
     });
 
+    describe('cemetery search', () => {
+      const detailsMock = vi.fn<PlacesClient['details']>();
+      async function placesHarness(initial: Values) {
+        detailsMock.mockReset();
+        detailsMock.mockResolvedValue({ name: 'Oak Hill Cemetery', address: '5 Hill Rd, Springfield, MO 65801' });
+        const client: PlacesClient = {
+          suggest: vi.fn<PlacesClient['suggest']>().mockResolvedValue([
+            { id: 'c', text: 'Oak Hill Cemetery, 5 Hill Rd', mainText: 'Oak Hill Cemetery', secondaryText: '5 Hill Rd' },
+          ]),
+          newToken: () => ({}),
+          details: detailsMock,
+        };
+        const patches: ObituaryLifePatch[] = [];
+        const servicePatches: ServiceSharedPatch[] = [];
+        function Harness() {
+          const [values, setValues] = useState<Values>(initial);
+          return (
+            <PlacesProvider value={{ enabled: true, load: () => Promise.resolve(client) }}>
+              <ObituaryLifeFields
+                values={values}
+                onChange={(p) => {
+                  patches.push(p);
+                  setValues((v) => ({ ...v, ...p }));
+                }}
+                onServiceChange={(p) => {
+                  servicePatches.push(p);
+                  setValues((v) => ({ ...v, ...p }));
+                }}
+                onPersonChange={vi.fn()}
+              />
+            </PlacesProvider>
+          );
+        }
+        render(<Harness />);
+        await userEvent.click(screen.getByRole('button', { name: copy.groupServiceHeading }));
+        return { patches, servicePatches };
+      }
+      const pick = async () => {
+        await userEvent.type(screen.getByRole('combobox', { name: serviceCopy.eventCemetery }), 'oak');
+        await userEvent.click(await screen.findByRole('option', { name: /Oak Hill Cemetery/ }));
+      };
+      const location = () => screen.getByLabelText(copy.cemeteryLabel);
+
+      it('a pick saves the name to the cemetery and the full address to the location', async () => {
+        const { patches, servicePatches } = await placesHarness({});
+        await pick();
+        await waitFor(() => expect(location()).toHaveValue('5 Hill Rd, Springfield, MO 65801'));
+        expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveValue('Oak Hill Cemetery');
+        expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Oak Hill Cemetery' });
+        expect(patches).toEqual([{ obituaryCemeteryLocation: '5 Hill Rd, Springfield, MO 65801' }]);
+      });
+
+      it('does not overwrite a location the family typed', async () => {
+        const { patches } = await placesHarness({ obituaryCemeteryLocation: '9 My Road' });
+        await pick();
+        await waitFor(() =>
+          expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveValue('Oak Hill Cemetery'),
+        );
+        expect(location()).toHaveValue('9 My Road');
+        expect(patches).toEqual([]);
+        expect(detailsMock).not.toHaveBeenCalled();
+      });
+
+      it('replaces the address an earlier pick wrote', async () => {
+        await placesHarness({});
+        await pick();
+        await waitFor(() => expect(location()).toHaveValue('5 Hill Rd, Springfield, MO 65801'));
+        detailsMock.mockResolvedValue({ name: 'Oak Hill Cemetery', address: '7 New Rd, Springfield, MO 65801' });
+        await userEvent.clear(screen.getByRole('combobox', { name: serviceCopy.eventCemetery }));
+        await pick();
+        await waitFor(() => expect(location()).toHaveValue('7 New Rd, Springfield, MO 65801'));
+      });
+
+      it('saves typed text without a pick and leaves the location alone', async () => {
+        const { patches, servicePatches } = await placesHarness({});
+        await userEvent.type(screen.getByRole('combobox', { name: serviceCopy.eventCemetery }), 'Rest');
+        expect(servicePatches.at(-1)).toEqual({ burialPlace: 'Rest' });
+        expect(patches).toEqual([]);
+      });
+
+      it('keeps the shared hint as the description', async () => {
+        await placesHarness({});
+        expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveAccessibleDescription(
+          copy.serviceSharedHint,
+        );
+      });
+
+      it('hides both fields when burial is private', async () => {
+        await placesHarness({});
+        await userEvent.click(screen.getByLabelText(serviceCopy.eventPrivateFamily));
+        expect(screen.queryByRole('combobox', { name: serviceCopy.eventCemetery })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(copy.cemeteryLabel)).not.toBeInTheDocument();
+      });
+    });
+
     it('shows one hint in each group that these are the same as on Service', () => {
       setup();
       expect(screen.getAllByText(copy.serviceSharedHint)).toHaveLength(2);
