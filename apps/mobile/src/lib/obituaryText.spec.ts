@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { buildObituaryDraft, screenCopy } from '@griever/copy';
-import { obituaryTextFor } from './obituaryText';
+import { obituaryShareTextFor, obituaryTextFor } from './obituaryText';
 import type { ObituaryTextSource } from './obituaryText';
 
 const empty = { personName: '', dateOfPassing: '' } as ObituaryTextSource;
@@ -46,5 +46,49 @@ describe('obituaryTextFor', () => {
 describe('obituaryTextFor name only', () => {
   it('returns empty for a name with nothing else, so the calm line still shows', () => {
     expect(obituaryTextFor({ ...empty, personName: 'Anna' })).toBe('');
+  });
+});
+
+describe('new obituary fields', () => {
+  it('drafts from a new field alone', () => {
+    const text = obituaryTextFor({ ...empty, personName: 'Anna', obituaryHobbies: 'gardening' });
+    expect(text).toContain('gardening');
+  });
+
+  it('drafts from a given name alone, and from the pronoun and people lists', () => {
+    expect(obituaryTextFor({ ...empty, obituaryGivenName: 'Anna' })).not.toBe('');
+    expect(obituaryTextFor({ ...empty, personName: 'Anna', obituarySurvivorList: '[{"relation":"son","name":"Sam"}]' })).not.toBe('');
+  });
+
+  it('does not draft from the memorial alone', () => {
+    expect(obituaryTextFor({ ...empty, personName: 'Anna', obituaryMemorial: 'Gifts to the library.' })).toBe('');
+    expect(obituaryShareTextFor({ ...empty, personName: 'Anna', obituaryMemorial: 'Gifts to the library.' })).toBe('');
+  });
+});
+
+describe('obituaryShareTextFor', () => {
+  const person = { ...empty, personName: 'Anna', obituaryHobbies: 'gardening' };
+
+  it('adds the memorial as the last paragraph', () => {
+    const body = obituaryTextFor(person);
+    expect(obituaryShareTextFor({ ...person, obituaryMemorial: ' In lieu of flowers, give to the library. ' })).toBe(
+      `${body}\n\nIn lieu of flowers, give to the library.`,
+    );
+  });
+
+  it('is the body when the memorial is missing or blank', () => {
+    const body = obituaryTextFor(person);
+    expect(obituaryShareTextFor(person)).toBe(body);
+    expect(obituaryShareTextFor({ ...person, obituaryMemorial: '   ' })).toBe(body);
+  });
+
+  it('puts the memorial after an edited text', () => {
+    expect(obituaryShareTextFor({ ...empty, obituaryText: 'Anna loved the garden.', obituaryMemorial: 'Gifts to the library.' })).toBe(
+      'Anna loved the garden.\n\nGifts to the library.',
+    );
+  });
+
+  it('is empty when the typed text was cleared to blank, memorial or not', () => {
+    expect(obituaryShareTextFor({ ...empty, obituaryText: '  ', obituaryMemorial: 'Gifts.' })).toBe('');
   });
 });

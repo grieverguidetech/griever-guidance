@@ -1,7 +1,16 @@
-import { buildObituaryDraft, screenCopy } from '@griever/copy';
+import { buildObituaryDraft, obituaryShareText, screenCopy } from '@griever/copy';
 import type { Session } from '@griever/hooks';
 
 const draftCopy = screenCopy('obituaryDraft');
+
+/** The fields the builder reads beyond the older ones, so a person with only these gets a draft. */
+export const NEW_OBITUARY_KEYS = [
+  'obituaryGivenName', 'obituaryMiddleName', 'obituarySurname', 'obituaryAge', 'obituaryState', 'obituaryDeathPlace',
+  'obituaryFuneralHome', 'obituaryChurch', 'obituaryCemeteryLocation', 'obituaryBirthPlace', 'obituaryMotherName',
+  'obituaryFatherName', 'obituaryHighSchool', 'obituaryGradYear', 'obituaryDegree', 'obituaryCollege', 'obituaryJobTitle',
+  'obituaryCompany', 'obituaryJobYears', 'obituaryHobbies', 'obituaryAwards', 'obituaryOrganizations', 'obituaryPronoun',
+  'obituarySurvivorList', 'obituaryPrecededList',
+] as const;
 
 export type ObituaryTextSource = Pick<
   Session,
@@ -10,7 +19,9 @@ export type ObituaryTextSource = Pick<
   Partial<
     Pick<
       Session,
-      'servicePlace' | 'serviceDate' | 'serviceTime' | 'serviceOfficiant' | 'burialPlace' | 'burialPrivate' | 'visitationPlace' | 'visitationDate' | 'visitationTime'
+      | (typeof NEW_OBITUARY_KEYS)[number]
+      | 'obituaryMemorial'
+      | 'servicePlace' | 'serviceDate' | 'serviceTime' | 'serviceOfficiant' | 'burialPlace' | 'burialPrivate' | 'visitationPlace' | 'visitationDate' | 'visitationTime'
     >
   >;
 
@@ -20,12 +31,13 @@ function hasFields(s: ObituaryTextSource): boolean {
     s.dateOfPassing, s.birthDate, s.obituaryCity, s.obituaryCareer, s.obituarySurvivors, s.obituaryNote,
     s.servicePlace, s.serviceDate, s.serviceTime, s.serviceOfficiant, s.burialPlace,
     s.visitationPlace, s.visitationDate, s.visitationTime,
+    ...NEW_OBITUARY_KEYS.map((key) => s[key]),
   ].some((v) => (v ?? '').trim() !== '');
 }
 
 /**
- * The obituary text to send: the hand-edited text when there is one, else the draft built from the
- * fields (the same function and copy as web). Empty when neither has content.
+ * The obituary body: the hand-edited text when there is one, else the draft built from the fields
+ * (the same function and copy as web). This is what "Edit the text" holds. Empty when neither has content.
  */
 export function obituaryTextFor(s: ObituaryTextSource): string {
   const edited = s.obituaryText?.trim() ?? '';
@@ -36,4 +48,16 @@ export function obituaryTextFor(s: ObituaryTextSource): string {
     return '';
   }
   return buildObituaryDraft({ ...s, dateOfPassing: s.dateOfPassing ?? undefined }, draftCopy).trim();
+}
+
+/**
+ * The full text to show, email, copy and share: the body, with the memorial as the last paragraph.
+ * Empty when the body is empty, so a memorial alone (or a cleared text) is not sent as an obituary.
+ */
+export function obituaryShareTextFor(s: ObituaryTextSource): string {
+  const body = obituaryTextFor(s);
+  if (body === '') {
+    return '';
+  }
+  return obituaryShareText(body, s.obituaryMemorial ?? '');
 }

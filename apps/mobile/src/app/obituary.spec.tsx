@@ -47,6 +47,16 @@ const openObituary = async () => {
   await screen.findByRole('heading', { name: 'Share the obituary' });
 };
 
+describe('the hub obituary summary (#781)', () => {
+  it('counts a new obituary field as a started draft', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryHobbies: 'gardening', obituaryUrl: 'https://paper.test/anna' }]));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    await screen.findByRole('button', { name: /Share the obituary/ });
+    expect(screen.getByText('Draft started')).toBeTruthy();
+  });
+});
+
 describe('sharing the obituary on mobile', () => {
   it('opens from the hub, with no "Not in the app yet" and no drafting card', async () => {
     await openObituary();
