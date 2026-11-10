@@ -58,7 +58,7 @@ const SECTIONS = [
   "The person's name",
   'Their life',
   'Their family',
-  'Funeral home and church',
+  'Funeral home and place of worship',
   'Survived by',
   'Preceded in death by',
   'Memorial (optional)',
