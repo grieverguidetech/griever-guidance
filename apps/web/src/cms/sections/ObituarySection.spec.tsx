@@ -237,11 +237,10 @@ describe('ObituarySection', () => {
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
 
-    it('refuses once Add Memorial is pressed, and allows Ready after a real memorial is typed', async () => {
+    it('refuses once the Add Memorial switch is on, and allows Ready after a real memorial is typed', async () => {
       const { onReadyChange } = setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
       expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
-      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
-      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
+      await userEvent.click(screen.getByRole('switch', { name: 'Add Memorial' }));
       expect(toggle()).toHaveAttribute('aria-disabled', 'true');
       expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(memorialMessage));
       await userEvent.click(toggle());
@@ -254,21 +253,17 @@ describe('ObituarySection', () => {
       expect(onReadyChange).toHaveBeenCalledWith(true);
     });
 
-    it('names the Memorial in the blocked message even when its accordion is closed, and does not open it', async () => {
+    it('stops naming the Memorial when the switch is turned off, so Ready is allowed', async () => {
       setup({ ...person, obituaryText: 'Ann Lee loved gardens.' });
-      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
-      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
-      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
-      expect(screen.getByRole('button', { name: 'Memorial (optional)' })).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(screen.getByRole('switch', { name: 'Add Memorial' }));
       expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(memorialMessage));
-      await userEvent.click(toggle());
-      expect(screen.getByRole('button', { name: 'Memorial (optional)' })).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(screen.getByRole('switch', { name: 'Add Memorial' }));
+      expect(toggle()).not.toHaveAttribute('aria-disabled', 'true');
     });
 
     it('names both when the obituary and the Memorial both have placeholders', async () => {
       setup(person);
-      await userEvent.click(screen.getByRole('button', { name: 'Memorial (optional)' }));
-      await userEvent.click(screen.getByRole('button', { name: 'Add Memorial' }));
+      await userEvent.click(screen.getByRole('switch', { name: 'Add Memorial' }));
       expect(toggle()).toHaveAccessibleDescription(expect.stringContaining(bothMessage));
     });
 
@@ -339,55 +334,63 @@ describe('ObituarySection layout and groups', () => {
 });
 
 describe('ObituarySection memorial', () => {
-  const addButton = () => screen.queryByRole('button', { name: 'Add Memorial' });
   const prefill = screenCopy('obituaryDraft').memorial;
+  const memorialSwitch = () => screen.getByRole('switch', { name: 'Add Memorial' });
 
-  const accordion = () => screen.getByRole('button', { name: 'Memorial (optional)' });
-
-  it('is an h2 accordion, closed on load when blank, and toggles', async () => {
+  it('has an h2 and an Add Memorial switch that is off on load when blank, with no box', () => {
     setup(person);
     expect(screen.getByRole('heading', { level: 2, name: 'Memorial (optional)' })).toBeInTheDocument();
-    expect(accordion()).toHaveAttribute('aria-expanded', 'false');
-    expect(addButton()).toBeNull();
-    await userEvent.click(accordion());
-    expect(accordion()).toHaveAttribute('aria-expanded', 'true');
-    expect(addButton()).toBeInTheDocument();
-    await userEvent.click(accordion());
-    expect(accordion()).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('is open on load when a memorial is saved', () => {
-    setup({ ...person, obituaryMemorial: 'Gifts' });
-    expect(accordion()).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByLabelText('Memorial')).toBeVisible();
-  });
-
-  it('shows the Add Memorial button again after the box is cleared and the accordion is closed and reopened', async () => {
-    setup({ ...person, obituaryMemorial: 'Gifts' });
-    await userEvent.clear(screen.getByLabelText('Memorial'));
-    await userEvent.click(accordion());
-    await userEvent.click(accordion());
-    expect(addButton()).toBeInTheDocument();
-  });
-
-  it('shows the Add Memorial button while the memorial is blank, with the primary style', async () => {
-    setup({ ...person, obituaryMemorial: '   ' });
-    await userEvent.click(accordion());
-    expect(addButton()).toHaveClass('gg-btn', 'gg-btn-primary');
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'false');
+    expect(memorialSwitch()).toHaveClass('min-h-11');
     expect(screen.queryByLabelText('Memorial')).toBeNull();
   });
 
-  it('saves the prefill, shows the labelled box with its hint and focuses it', async () => {
+  it('is on at load when a memorial is saved', () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Memorial')).toBeVisible();
+  });
+
+  it('is off at load when the saved memorial is only spaces', () => {
+    setup({ ...person, obituaryMemorial: '   ' });
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByLabelText('Memorial')).toBeNull();
+  });
+
+  it('on: saves the prefill, shows the labelled box with its hint and focuses it', async () => {
     const { patches } = setup(person);
-    await userEvent.click(accordion());
-    await userEvent.click(addButton()!);
+    await userEvent.click(memorialSwitch());
     expect(patches).toEqual([{ obituaryMemorial: prefill }]);
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
     const box = screen.getByLabelText('Memorial') as HTMLTextAreaElement;
     expect(box.value).toBe(prefill);
     expect(box.value).toMatch(/^Memorial donations may be made to/);
     expect(box).toHaveFocus();
     expect(box).toHaveAccessibleDescription('Replace the placeholder text with the memorial details.');
-    expect(addButton()).toBeNull();
+  });
+
+  it('off: clears the memorial, hides the box and keeps focus on the switch', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts' });
+    await userEvent.click(memorialSwitch());
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: '' });
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'false');
+    expect(memorialSwitch()).toHaveFocus();
+    expect(screen.queryByLabelText('Memorial')).toBeNull();
+  });
+
+  it('on again after off brings the template back', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    await userEvent.click(memorialSwitch());
+    await userEvent.click(memorialSwitch());
+    expect(screen.getByLabelText('Memorial')).toHaveValue(prefill);
+    expect(screen.getByLabelText('Memorial')).toHaveFocus();
+  });
+
+  it('works from the keyboard', async () => {
+    setup(person);
+    memorialSwitch().focus();
+    await userEvent.keyboard('{Enter}');
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
   });
 
   it('sends edits as obituaryMemorial and never changes the obituary text', async () => {
@@ -400,31 +403,12 @@ describe('ObituarySection memorial', () => {
     expect(text().value).not.toContain('library');
   });
 
-  it('keeps the box and its focus while it is cleared', async () => {
+  it('keeps the box while it is cleared, even after leaving it', async () => {
     setup({ ...person, obituaryMemorial: 'Gifts' });
-    const box = screen.getByLabelText('Memorial');
-    await userEvent.clear(box);
-    expect(screen.getByLabelText('Memorial')).toHaveFocus();
-    expect(addButton()).toBeNull();
-    await userEvent.type(screen.getByLabelText('Memorial'), '   ');
-    expect(screen.getByLabelText('Memorial')).toBeInTheDocument();
-  });
-
-  it('on blur while blank shows the button and does not move focus to it', async () => {
-    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts' });
     await userEvent.clear(screen.getByLabelText('Memorial'));
-    await userEvent.type(screen.getByLabelText('Memorial'), '  ');
     await userEvent.tab();
-    expect(screen.queryByLabelText('Memorial')).toBeNull();
-    expect(addButton()).not.toHaveFocus();
-    expect(patches.at(-1)).toEqual({ obituaryMemorial: '' });
-  });
-
-  it('on blur with text keeps the box', async () => {
-    setup({ ...person, obituaryMemorial: 'Gifts' });
-    screen.getByLabelText('Memorial').focus();
-    await userEvent.tab();
-    expect(screen.getByLabelText('Memorial')).toHaveValue('Gifts');
+    expect(screen.getByLabelText('Memorial')).toBeInTheDocument();
+    expect(memorialSwitch()).toHaveAttribute('aria-checked', 'true');
   });
 
   it('does not take focus on load, saved or blank', () => {
@@ -441,7 +425,7 @@ describe('ObituarySection memorial', () => {
     unmount();
     setup(person);
     expect(document.body).toHaveFocus();
-    expect(accordion()).not.toHaveFocus();
+    expect(memorialSwitch()).not.toHaveFocus();
   });
 
   it('has the maxLength of its key', () => {

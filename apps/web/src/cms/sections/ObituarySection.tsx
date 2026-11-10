@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { buildObituaryDraft, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH, PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '@griever/shared';
 import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
-import { AccordionSection } from '../AccordionSection';
 import { MarkReady } from './MarkReady';
 import {
   ObituaryLifeFields,
@@ -58,16 +57,13 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const memorialRef = useRef<HTMLTextAreaElement>(null);
-  // True while the memorial box has focus, so a cleared box stays until the user leaves it.
-  const [memorialFocused, setMemorialFocused] = useState(false);
   const focusMemorial = useRef(false);
   const prefill = buildObituaryDraft(
     { ...values, dateOfPassing: values.dateOfPassing ?? undefined },
     draftCopy,
   );
-  const memorialBlank = (values.obituaryMemorial ?? '').trim() === '';
-  // Open on load only when a memorial is already saved. Not remembered across loads.
-  const [memorialOpen, setMemorialOpen] = useState(() => !memorialBlank);
+  // The switch is on at load only when a memorial is already saved. Not remembered across loads.
+  const [memorialOn, setMemorialOn] = useState(() => (values.obituaryMemorial ?? '').trim() !== '');
   // Relies on onChange updating state synchronously (useSessions updateSection).
   useEffect(() => {
     if (focusMemorial.current) {
@@ -78,9 +74,10 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
   const edited = values.obituaryText !== undefined;
   const shownText = values.obituaryText ?? prefill;
   const textBlanks = hasTemplateBlanks(shownText, draftCopy);
-  const memorialBlanks = hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
+  const memorialBlank = (values.obituaryMemorial ?? '').trim() === '';
+  const memorialBlanks = memorialOn && hasTemplateBlanks(values.obituaryMemorial ?? '', draftCopy);
   const blanksLeft = textBlanks || memorialBlanks;
-  // The memorial can be closed, so name it when its blanks are what blocks Ready.
+  // The memorial can be switched off, so name it when its blanks are what blocks Ready.
   const blockedMessage = memorialBlanks ? (textBlanks ? copy.readyPlaceholdersBoth : copy.readyPlaceholdersMemorial) : copy.readyPlaceholders;
   return (
     <div className="flex flex-col gap-6">
@@ -126,25 +123,33 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
           </button>
         )}
       </div>
-      <AccordionSection
-        title={copy.memorialHeading}
-        level={2}
-        open={memorialOpen}
-        panelId={`${id}-memorial-panel`}
-        onToggle={() => setMemorialOpen((o) => !o)}
-      >
-        {memorialBlank && !memorialFocused ? (
-          <button
-            type="button"
-            className="gg-btn gg-btn-primary self-start"
-            onClick={() => {
-              focusMemorial.current = true;
+      <section className="flex flex-col gap-3">
+        <h2 className="m-0">{copy.memorialHeading}</h2>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={memorialOn}
+          className="flex min-h-11 items-center gap-3 self-start text-left"
+          onClick={() => {
+            if (memorialOn) {
+              // Off: the memorial is left out. Focus stays on this switch.
+              setMemorialOn(false);
+              onChange({ obituaryMemorial: '' });
+              return;
+            }
+            setMemorialOn(true);
+            focusMemorial.current = true;
+            if (memorialBlank) {
               onChange({ obituaryMemorial: draftCopy.memorial });
-            }}
-          >
-            {copy.addMemorial}
-          </button>
-        ) : (
+            }
+          }}
+        >
+          <span aria-hidden="true" className={`gg-switch ${memorialOn ? 'gg-switch-on' : ''}`}>
+            <span />
+          </span>
+          {copy.addMemorial}
+        </button>
+        {memorialOn && (
           <div className="gg-field">
             <label htmlFor={`${id}-memorial`}>{copy.memorialLabel}</label>
             <p id={`${id}-memorial-hint`}>{copy.memorialHint}</p>
@@ -156,19 +161,11 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
               rows={4}
               maxLength={FLOW_DETAIL_MAX_LENGTH.obituaryMemorial}
               value={values.obituaryMemorial ?? ''}
-              onFocus={() => setMemorialFocused(true)}
-              onBlur={(e) => {
-                setMemorialFocused(false);
-                // Blank on leaving means "not added": the button comes back, focus stays where the user put it.
-                if (e.target.value.trim() === '') {
-                  onChange({ obituaryMemorial: '' });
-                }
-              }}
               onChange={(e) => onChange({ obituaryMemorial: e.target.value })}
             />
           </div>
         )}
-      </AccordionSection>
+      </section>
       <MarkReady
         ready={values.sectionStatus?.obituary === 'ready'}
         onChange={onReadyChange}
