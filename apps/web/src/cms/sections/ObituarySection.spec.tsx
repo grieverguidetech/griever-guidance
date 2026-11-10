@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { findHardCodedCopy, screenCopy } from '@griever/copy';
 import { ObituarySection, type ObituaryPatch } from './ObituarySection';
 import { resetSessionDismissed } from './PhoneNudge';
@@ -224,6 +225,7 @@ describe('ObituarySection memorial', () => {
     expect(patches).toEqual([{ obituaryMemorial: prefill }]);
     const box = screen.getByLabelText('Memorial') as HTMLTextAreaElement;
     expect(box.value).toBe(prefill);
+    expect(box.value).toMatch(/^Memorial donations may be made to/);
     expect(box).toHaveFocus();
     expect(box).toHaveAccessibleDescription('Replace the placeholder text with the memorial details.');
     expect(addButton()).toBeNull();
@@ -239,11 +241,47 @@ describe('ObituarySection memorial', () => {
     expect(text().value).not.toContain('library');
   });
 
-  it('brings the button back with focus when the memorial is cleared', async () => {
+  it('keeps the box and its focus while it is cleared', async () => {
     setup({ ...person, obituaryMemorial: 'Gifts' });
+    const box = screen.getByLabelText('Memorial');
+    await userEvent.clear(box);
+    expect(screen.getByLabelText('Memorial')).toHaveFocus();
+    expect(addButton()).toBeNull();
+    await userEvent.type(screen.getByLabelText('Memorial'), '   ');
+    expect(screen.getByLabelText('Memorial')).toBeInTheDocument();
+  });
+
+  it('on blur while blank shows the button and does not move focus to it', async () => {
+    const { patches } = setup({ ...person, obituaryMemorial: 'Gifts' });
     await userEvent.clear(screen.getByLabelText('Memorial'));
+    await userEvent.type(screen.getByLabelText('Memorial'), '  ');
+    await userEvent.tab();
     expect(screen.queryByLabelText('Memorial')).toBeNull();
-    expect(addButton()).toHaveFocus();
+    expect(addButton()).not.toHaveFocus();
+    expect(patches.at(-1)).toEqual({ obituaryMemorial: '' });
+  });
+
+  it('on blur with text keeps the box', async () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    screen.getByLabelText('Memorial').focus();
+    await userEvent.tab();
+    expect(screen.getByLabelText('Memorial')).toHaveValue('Gifts');
+  });
+
+  it('does not take focus on load, saved or blank', () => {
+    const { unmount } = render(
+      <ObituarySection values={{ ...person, obituaryMemorial: 'Gifts' }} onChange={() => undefined} onReadyChange={() => undefined} />,
+    );
+    expect(document.body).toHaveFocus();
+    unmount();
+    setup(person);
+    expect(document.body).toHaveFocus();
+    expect(addButton()).not.toHaveFocus();
+  });
+
+  it('has the maxLength of its key', () => {
+    setup({ ...person, obituaryMemorial: 'Gifts' });
+    expect(screen.getByLabelText('Memorial')).toHaveAttribute('maxLength', String(FLOW_DETAIL_MAX_LENGTH.obituaryMemorial));
   });
 });
 

@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { buildObituaryDraft, hasTemplateBlanks, screenCopy } from '@griever/copy';
-import { PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '@griever/shared';
+import { FLOW_DETAIL_MAX_LENGTH, PRECEDED_RELATIONS, SURVIVOR_RELATIONS } from '@griever/shared';
 import type { ServiceEventFields, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { MarkReady } from './MarkReady';
 import { ObituaryLifeFields, type ObituaryLifeKey, type ObituaryLifeValues } from './ObituaryLifeFields';
@@ -51,21 +51,20 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
   const id = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const memorialRef = useRef<HTMLTextAreaElement>(null);
-  const addMemorialRef = useRef<HTMLButtonElement>(null);
-  // Set when the memorial box or its button swaps, so focus follows after the render.
-  const focusNext = useRef<'memorial' | 'add' | null>(null);
+  // True while the memorial box has focus, so a cleared box stays until the user leaves it.
+  const [memorialFocused, setMemorialFocused] = useState(false);
+  const focusMemorial = useRef(false);
   const prefill = buildObituaryDraft(
     { ...values, dateOfPassing: values.dateOfPassing ?? undefined },
     draftCopy,
   );
   const memorialBlank = (values.obituaryMemorial ?? '').trim() === '';
+  // Relies on onChange updating state synchronously (useSessions updateSection).
   useEffect(() => {
-    if (focusNext.current === 'memorial') {
+    if (focusMemorial.current) {
       memorialRef.current?.focus();
-    } else if (focusNext.current === 'add') {
-      addMemorialRef.current?.focus();
     }
-    focusNext.current = null;
+    focusMemorial.current = false;
   });
   const edited = values.obituaryText !== undefined;
   const shownText = values.obituaryText ?? prefill;
@@ -188,13 +187,12 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
           </button>
         )}
       </div>
-      {memorialBlank ? (
+      {memorialBlank && !memorialFocused ? (
         <button
           type="button"
-          ref={addMemorialRef}
           className="gg-btn gg-btn-primary self-start"
           onClick={() => {
-            focusNext.current = 'memorial';
+            focusMemorial.current = true;
             onChange({ obituaryMemorial: draftCopy.memorial });
           }}
         >
@@ -210,13 +208,17 @@ export function ObituarySection({ values, onChange, onReadyChange, nextSection, 
             aria-describedby={`${id}-memorial-hint`}
             className="gg-input"
             rows={4}
+            maxLength={FLOW_DETAIL_MAX_LENGTH.obituaryMemorial}
             value={values.obituaryMemorial ?? ''}
-            onChange={(e) => {
+            onFocus={() => setMemorialFocused(true)}
+            onBlur={(e) => {
+              setMemorialFocused(false);
+              // Blank on leaving means "not added": the button comes back, focus stays where the user put it.
               if (e.target.value.trim() === '') {
-                focusNext.current = 'add';
+                onChange({ obituaryMemorial: '' });
               }
-              onChange({ obituaryMemorial: e.target.value });
             }}
+            onChange={(e) => onChange({ obituaryMemorial: e.target.value })}
           />
         </div>
       )}
