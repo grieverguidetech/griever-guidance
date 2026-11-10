@@ -329,12 +329,15 @@ describe('ObituarySection', () => {
 });
 
 describe('ObituarySection layout and groups', () => {
-  it('puts both read-only panels in one row container, person first', () => {
+  it('puts both read-only columns in one panel with a two-column grid, person first', () => {
     setup(person);
     const personHeading = screen.getByRole('heading', { level: 2, name: 'Details from The person' });
     const serviceHeading = screen.getByRole('heading', { level: 2, name: 'Details from Service' });
+    const panel = personHeading.closest('.gg-panel')!;
+    expect(serviceHeading.closest('.gg-panel')).toBe(panel);
     const row = personHeading.closest('.grid')!;
     expect(serviceHeading.closest('.grid')).toBe(row);
+    expect(panel).toContainElement(row as HTMLElement);
     expect(row).toHaveClass('grid', 'grid-cols-1', 'md:grid-cols-2', 'gap-6', 'items-start');
     expect(personHeading.compareDocumentPosition(serviceHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
