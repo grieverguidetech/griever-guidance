@@ -37,7 +37,7 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const NAV = ['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account'];
+const NAV = ['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your people', 'Your account'];
 const CREATE = "Start with someone I've lost";
 const MEMBER_LINE = 'This page fills in when someone shares a person with you.';
 const MEMBER_PREVIEW_LINE = 'Your ticks are kept once someone shares a person with you.';

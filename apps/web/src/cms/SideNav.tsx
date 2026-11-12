@@ -79,11 +79,11 @@ function StatusMark({ status }: { status: SectionStatus | 'not_started' }) {
   return <NotStartedIcon name={copy.statusNotStarted} />;
 }
 
-/** The nav order: Overview, Your people, the sections in their real-world order (a person's details are reached from Your people), then the account. */
+/** The nav order: Overview, the sections in their real-world order, Your people (a person's details are reached from Your people), then the account. */
 export const NAV_ORDER: readonly CmsNavKey[] = [
   'overview',
-  'people',
   ...SECTION_ORDER.filter((key) => key !== 'person'),
+  'people',
   'account',
 ];
 
