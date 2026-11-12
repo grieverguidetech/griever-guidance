@@ -100,6 +100,11 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   const detailsFields = detailsFieldsFor(flow);
   const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
   const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
+  // Once the service fields have shown, keep them: typing the last missing character must not unmount the field.
+  const [keepServiceFields, setKeepServiceFields] = useState(false);
+  if (detailsMissing && !keepServiceFields) {
+    setKeepServiceFields(true);
+  }
 
   // The shared text has no greeting, no per-person note and nothing is recorded: it is not a send.
   async function shareElsewhere() {
@@ -164,7 +169,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
         greeting={recipientCount > 0 ? { label: copy.greetingSwitch, value: flow.greeting, onChange: toggleGreeting } : undefined}
         details={
           // Share the service has no toggle: its fields show only while a required detail is missing.
-          showDetails && (!isService || detailsMissing)
+          showDetails && (!isService || detailsMissing || keepServiceFields)
             ? {
                 label: isService ? undefined : isAnnouncement ? ready.addNote : ready.changeThanks,
                 startOpen: detailsMissing,

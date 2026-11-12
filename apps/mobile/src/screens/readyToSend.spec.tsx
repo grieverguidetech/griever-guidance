@@ -203,6 +203,13 @@ describe('Ready to send (Share the service)', () => {
       expect(primary().props.accessibilityState?.disabled).toBeFalsy();
     });
 
+    it('keeps the field on screen once the last missing detail is typed, and unblocks send', () => {
+      render(<Harness fields={{ serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: '' }} />);
+      fireEvent.changeText(screen.getByLabelText('Location, Needed'), 'Oak Chapel');
+      expect(screen.getByDisplayValue('Oak Chapel')).toBeTruthy();
+      expect(primary().props.accessibilityState?.disabled).toBeFalsy();
+    });
+
     it('has no toggle and no fields when every detail is filled', () => {
       render(<Harness />);
       expect(screen.queryByRole('button', { name: 'Change date, time or place' })).toBeNull();
