@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { findHardCodedCopy, screenCopy } from '@griever/copy';
+import { fill, findHardCodedCopy, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { PlacesProvider } from '../../lib/places/PlacesContext';
 import type { PlacesClient } from '../../lib/places/placesClient';
@@ -461,6 +461,9 @@ describe('ObituaryLifeFields', () => {
         await userEvent.click(await screen.findByRole('option', { name: /Oak Hill Cemetery/ }));
       };
       const location = () => screen.getByLabelText(copy.cemeteryLabel);
+      // Each place field has its own status region; this is the cemetery's.
+      const cemeteryStatus = () =>
+        within(screen.getByRole('combobox', { name: serviceCopy.eventCemetery }).parentElement as HTMLElement).getByRole('status');
 
       it('a pick saves the name to the cemetery and the full address to the location', async () => {
         const { patches, servicePatches } = await placesHarness({});
@@ -475,7 +478,7 @@ describe('ObituaryLifeFields', () => {
       it('says the location was filled in the status region', async () => {
         await placesHarness({});
         await pick();
-        await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(copy.cemeteryLocationFilled));
+        await waitFor(() => expect(cemeteryStatus()).toHaveTextContent(copy.cemeteryLocationFilled));
       });
 
       it('says nothing when a typed location is kept', async () => {
@@ -484,7 +487,7 @@ describe('ObituaryLifeFields', () => {
         await waitFor(() =>
           expect(screen.getByRole('combobox', { name: serviceCopy.eventCemetery })).toHaveValue('Oak Hill Cemetery'),
         );
-        expect(screen.getByRole('status')).toBeEmptyDOMElement();
+        expect(cemeteryStatus()).toBeEmptyDOMElement();
       });
 
       it('cuts a long picked address to the saved length', async () => {
@@ -676,6 +679,113 @@ describe('ObituaryLifeFields', () => {
       expect(screen.getByRole('group', { name: copy.groupEventsHeading })).toHaveAccessibleDescription(
         copy.serviceSharedHint,
       );
+    });
+  });
+
+  describe('funeral home and place of worship search', () => {
+    const suggestMock = vi.fn<PlacesClient['suggest']>();
+    const detailsMock = vi.fn<PlacesClient['details']>();
+    async function harness(initial: Values, load?: () => Promise<PlacesClient | null>) {
+      suggestMock.mockReset();
+      detailsMock.mockReset();
+      suggestMock.mockResolvedValue([
+        { id: 'p', text: 'Smith Funeral Home, 1 Main St', mainText: 'Smith Funeral Home', secondaryText: '1 Main St' },
+      ]);
+      const client: PlacesClient = { suggest: suggestMock, newToken: () => ({}), details: detailsMock };
+      const patches: ObituaryLifePatch[] = [];
+      function Harness() {
+        const [values, setValues] = useState<Values>(initial);
+        return (
+          <PlacesProvider value={{ enabled: true, load: load ?? (() => Promise.resolve(client)) }}>
+            <ObituaryLifeFields
+              values={values}
+              onChange={(p) => {
+                patches.push(p);
+                setValues((v) => ({ ...v, ...p }));
+              }}
+              onServiceChange={vi.fn()}
+              onPersonChange={vi.fn()}
+            />
+          </PlacesProvider>
+        );
+      }
+      render(<Harness />);
+      await userEvent.click(screen.getByRole('button', { name: copy.groupServiceHeading }));
+      return { patches };
+    }
+    const cases: ['obituaryFuneralHome' | 'obituaryChurch', string, string[]][] = [
+      ['obituaryFuneralHome', copy.funeralHomeLabel, ['funeral_home']],
+      ['obituaryChurch', copy.churchLabel, ['church', 'synagogue', 'mosque', 'hindu_temple']],
+    ];
+
+    it.each(cases)('%s is a combobox with its label and maxlength', async (key, label) => {
+      await harness({});
+      expect(screen.getByRole('combobox', { name: label })).toHaveAttribute(
+        'maxLength',
+        String(FLOW_DETAIL_MAX_LENGTH[key]),
+      );
+    });
+
+    it.each(cases)('%s suggests only its place types', async (_key, label, types) => {
+      await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'smith');
+      await screen.findByRole('option', { name: /Smith Funeral Home/ });
+      expect(suggestMock.mock.calls.at(-1)?.[1]).toEqual(types);
+    });
+
+    it.each(cases)('%s: a pick saves the name only, without a details call', async (key, label) => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'smith');
+      await userEvent.click(await screen.findByRole('option', { name: /Smith Funeral Home/ }));
+      await waitFor(() => expect(screen.getByRole('combobox', { name: label })).toHaveValue('Smith Funeral Home'));
+      expect(patches.at(-1)).toEqual({ [key]: 'Smith Funeral Home' });
+      expect(detailsMock).not.toHaveBeenCalled();
+    });
+
+    it.each(cases)('%s: a pick says the name in that field status only', async (_key, label) => {
+      await harness({});
+      const box = screen.getByRole('combobox', { name: label });
+      await userEvent.type(box, 'smith');
+      await userEvent.click(await screen.findByRole('option', { name: /Smith Funeral Home/ }));
+      const statusOf = (el: HTMLElement) => within(el.parentElement as HTMLElement).getByRole('status');
+      await waitFor(() => expect(statusOf(box)).toHaveTextContent(fill(copy.placePicked, { name: 'Smith Funeral Home' })));
+      const other = screen.getByRole('combobox', { name: label === copy.churchLabel ? copy.funeralHomeLabel : copy.churchLabel });
+      expect(statusOf(other)).toBeEmptyDOMElement();
+    });
+
+    it('never sends a patch over the limit for a long pick', async () => {
+      const { patches } = await harness({});
+      const long = 'F'.repeat(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome + 20);
+      suggestMock.mockResolvedValue([{ id: 'l', text: long, mainText: long, secondaryText: '' }]);
+      await userEvent.type(screen.getByRole('combobox', { name: copy.funeralHomeLabel }), 'fff');
+      await userEvent.click(await screen.findByRole('option', { name: /^FFFF/ }));
+      await waitFor(() => expect(patches.at(-1)?.obituaryFuneralHome).toHaveLength(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome));
+      for (const patch of patches) {
+        expect(patch.obituaryFuneralHome?.length ?? 0).toBeLessThanOrEqual(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome);
+      }
+    });
+
+    it('cuts a long picked name to the saved length', async () => {
+      const { patches } = await harness({});
+      const long = 'F'.repeat(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome + 20);
+      suggestMock.mockResolvedValue([{ id: 'l', text: long, mainText: long, secondaryText: '' }]);
+      await userEvent.type(screen.getByRole('combobox', { name: copy.funeralHomeLabel }), 'fff');
+      await userEvent.click(await screen.findByRole('option', { name: /^FFFF/ }));
+      await waitFor(() => expect(patches.at(-1)?.obituaryFuneralHome).toHaveLength(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome));
+    });
+
+    it.each(cases)('%s: typed text saves', async (key, label) => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'Joe');
+      expect(patches.at(-1)).toEqual({ [key]: 'Joe' });
+    });
+
+    it('saves typed text when places are unavailable', async () => {
+      const { patches } = await harness({}, () => Promise.resolve(null));
+      await userEvent.type(screen.getByLabelText(copy.churchLabel), 'First Church');
+      expect(patches.at(-1)).toEqual({ obituaryChurch: 'First Church' });
+      await waitFor(() => expect(screen.queryByRole('combobox', { name: copy.churchLabel })).not.toBeInTheDocument());
+      expect(screen.getByLabelText(copy.churchLabel)).toHaveValue('First Church');
     });
   });
 
