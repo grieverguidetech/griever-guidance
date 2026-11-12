@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, TextInput } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Text } from 'react-native';
 import { ReadyToSend } from './ReadyToSend';
@@ -52,11 +52,11 @@ const handleForText = (text: string): number => {
   return found;
 };
 
-const copy = screenCopy('review');
+const copy = { ...screenCopy('review'), messageCaption: screenCopy('phoneReady').messageCaption };
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
-function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
+function Harness({ details, lead }: { details?: ReadyToSendProps['details']; lead?: string } = {}) {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
@@ -65,6 +65,7 @@ function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
       heading="Announce the passing"
       kind="announcement"
       details={details}
+      lead={lead}
       message={message}
       onMessageChange={setOverride}
       edited={override !== null}
@@ -111,11 +112,10 @@ describe('ReadyToSend: Change details', () => {
     focus.mockRestore();
   });
 
-  it('Edit wording reads expanded or not', () => {
+  it('has no Edit wording or Done editing button', () => {
     render(<Harness />);
-    expect(screen.getByRole('button', { name: 'Edit wording' }).props.accessibilityState).toMatchObject({ expanded: false });
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
-    expect(screen.getByRole('button', { name: 'Done editing' }).props.accessibilityState).toMatchObject({ expanded: true });
+    expect(screen.queryByRole('button', { name: 'Edit wording' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Done editing' })).toBeNull();
   });
 });
 
@@ -127,7 +127,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
 
   it('restores the last edit after "Use the suggested wording"', () => {
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
     expect(screen.queryByText('My own words.')).toBeNull();
@@ -138,7 +137,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
 
   it('goes away at the next edit', () => {
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
     expect(screen.getByRole('button', { name: 'Bring back my words' })).toBeTruthy();
@@ -149,7 +147,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
   it('moves focus to Bring back after Use suggested, and back to Use suggested after Bring back', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
@@ -165,7 +162,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
   it('says what changed, politely', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     announce.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
@@ -174,5 +170,50 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Bring back my words' }));
     expect(announce).toHaveBeenLastCalledWith('Your words are back.');
     announce.mockRestore();
+  });
+});
+
+describe('ReadyToSend: the message is always an editable box (#823)', () => {
+  it('shows the message in a multiline box with its label and the caption under it', () => {
+    render(<Harness />);
+    const box = screen.getByLabelText('Your message');
+    expect(box.props.value).toBe(SUGGESTED);
+    expect(box.props.multiline).toBe(true);
+    expect(screen.getByText('Read it one last time and make any last changes.')).toBeTruthy();
+  });
+
+  it('is not focused on arrival, so no keyboard opens', () => {
+    render(<Harness />);
+    expect(screen.getByLabelText('Your message').props.autoFocus).toBeFalsy();
+    expect(screen.getByLabelText('Your message')).not.toHaveProp('focused', true);
+  });
+
+  it('keeps the tone and greeting extras under the box at all times', () => {
+    render(<Harness />);
+    expect(screen.getByRole('button', { name: 'Softer tone' })).toBeTruthy();
+  });
+
+  it('typing changes the message', () => {
+    render(<Harness />);
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+    expect(screen.getByRole('button', { name: 'Use the suggested wording' })).toBeTruthy();
+  });
+
+  it('reads in order: heading, label, box, caption, extras, then the actions', () => {
+    render(<Harness lead="Dee," details={{ label: 'Change details', startOpen: false, render: () => null }} />);
+    const text = JSON.stringify(screen.toJSON());
+    const at = (needle: string) => text.indexOf(needle);
+    const order = ['Your message', 'Dee,', 'Read it one last time', 'Softer tone', 'Change details'].map(at);
+    expect(order.every((n) => n >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('tapping the visible label focuses the box', () => {
+    render(<Harness />);
+    const focus = jest.fn();
+    (screen.UNSAFE_getByType(TextInput).instance as unknown as { focus: () => void }).focus = focus;
+    fireEvent.press(screen.getByText('Your message'));
+    expect(focus).toHaveBeenCalledTimes(1);
   });
 });

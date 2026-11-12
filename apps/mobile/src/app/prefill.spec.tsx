@@ -66,7 +66,7 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceDate: 'June 14', serviceTime: '2:00 PM', servicePlace: 'St. Mary', serviceMessage: 'Please join us at two.' } as Session);
     await openPeople();
     await toConfirm();
-    expect(await screen.findByText('Please join us at two.')).toBeTruthy();
+    expect(await screen.findByDisplayValue('Please join us at two.')).toBeTruthy();
   });
 
   it('never overwrites a draft in progress', async () => {
@@ -89,7 +89,7 @@ describe('send flow starts from the planned details', () => {
     await openMoment({ ...base, senderName: 'The Hayes Family', thanksMessage: 'Thank you all.' } as Session, /thank-yous/);
     await openPeople();
     await toConfirm();
-    expect(await screen.findByText('Thank you all.')).toBeTruthy();
+    expect(await screen.findByDisplayValue('Thank you all.')).toBeTruthy();
   });
 
   // Rewritten on purpose (#630, MOB-9, #559 Decision 4). It used to pin that the full obituaryText
@@ -103,8 +103,8 @@ describe('send flow starts from the planned details', () => {
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
-    expect(screen.getByText('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
-    expect(screen.queryByText(/Anna loved the garden/)).toBeNull();
+    expect(screen.getByDisplayValue('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
+    expect(screen.queryByDisplayValue(/Anna loved the garden/)).toBeNull();
   });
 
   // The obituary moment opens on its own screen (the link is on the person), then the contacts step.
@@ -128,8 +128,8 @@ describe('send flow starts from the planned details', () => {
     );
     await toConfirmFromObituary();
     await screen.findByRole('heading', { name: 'Share the obituary' });
-    expect(screen.getByText('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
-    expect(screen.queryByText('Anna loved the garden.')).toBeNull();
+    expect(screen.getByDisplayValue('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
+    expect(screen.queryByDisplayValue('Anna loved the garden.')).toBeNull();
   });
 
   it('keeps a hand edit on the obituary message through to Confirm', async () => {
@@ -139,7 +139,7 @@ describe('send flow starts from the planned details', () => {
     );
     await toConfirmFromObituary();
     await screen.findByRole('heading', { name: 'Share the obituary' });
-    expect(screen.getByText('Here is her obituary, with love.')).toBeTruthy();
+    expect(screen.getByDisplayValue('Here is her obituary, with love.')).toBeTruthy();
   });
 
   it('leaves a draft with an emptied message alone', async () => {
@@ -151,7 +151,6 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceTime: '2:00 PM', drafts: { service: draft } } as unknown as Session);
     await openPeople();
     await toConfirm();
-    fireEvent.press(await screen.findByRole('button', { name: 'Edit wording' }));
     expect(await screen.findByDisplayValue('')).toBeTruthy();
     expect(screen.queryByDisplayValue('2:00 PM')).toBeNull();
   });
@@ -164,12 +163,12 @@ describe('send flow starts from the planned details', () => {
       flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: 'Our own words.',
     };
     await openMoment({ ...base, drafts: { aftercare: draft } } as unknown as Session, /Send thank-yous/);
-    expect(await screen.findByText('Our own words.')).toBeTruthy();
+    expect(await screen.findByDisplayValue('Our own words.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
     await screen.findByRole('heading', { name: 'Who should get this?' });
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
-    expect(screen.getByText('Our own words.')).toBeTruthy();
+    expect(screen.getByLabelText('Your message').props.value).toBe('Our own words.');
   });
 
   it('saves a service date typed on Confirm to the person', async () => {
@@ -202,7 +201,7 @@ describe('send flow starts from the planned details', () => {
       await openMoment({ ...base, dateOfPassing: 'May 2, 2026' } as Session, /^Announce the passing, .*Continue$/, 'Anna, passed May 2, 2026');
       await openPeople();
       await toConfirm();
-      expect(await screen.findByText(/Anna passed away on May 2, 2026/)).toBeTruthy();
+      expect(await screen.findByDisplayValue(/Anna passed away on May 2, 2026/)).toBeTruthy();
       await new Promise((r) => setTimeout(r, 100));
       const [saved] = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName?: string; dateOfPassing?: string }[];
       expect(saved?.personName).toBe('Anna');
@@ -219,7 +218,7 @@ describe('send flow starts from the planned details', () => {
       expect(await openPeople()).toBeTruthy();
       expect(screen.queryByLabelText(/Anything you'd like to add/)).toBeNull();
       await toConfirm();
-      expect(await screen.findByText(/She was at peace\./)).toBeTruthy();
+      expect(await screen.findByDisplayValue(/She was at peace\./)).toBeTruthy();
     });
   });
 });
@@ -258,7 +257,7 @@ describe('the thank-you name from the account (#695)', () => {
   it('fills nothing with no account, and the message shows the blank', async () => {
     const field = await toThanks();
     expect(field.props.value ?? '').toBe('');
-    expect(screen.getByText(/______/)).toBeTruthy();
+    expect(screen.getByDisplayValue(/______/)).toBeTruthy();
   });
 
   it('fills nothing when the account has no name', async () => {
@@ -285,7 +284,7 @@ describe('the thank-you name from the account (#695)', () => {
   it('keeps a hand-edited message', async () => {
     mockProfile = account({ senderName: 'Sam' });
     await openMoment({ ...base, drafts: { aftercare: thanksDraft({}, 'Our own words.') } } as unknown as Session, /Send thank-yous/);
-    expect(await screen.findByText('Our own words.')).toBeTruthy();
+    expect(await screen.findByDisplayValue('Our own words.')).toBeTruthy();
     // The details row stays hidden while the wording is edited: the prefill did not touch the form.
     expect(screen.queryByRole('button', { name: 'Change details' })).toBeNull();
     expect(screen.queryByLabelText(NAME_LABEL)).toBeNull();
@@ -305,11 +304,11 @@ describe('the thank-you name from the account (#695)', () => {
     await openMoment({ ...base, thanksMessage: 'Thank you all.' } as Session, /Send thank-yous/);
     await openPeople();
     await toConfirm();
-    expect(await screen.findByText('Thank you all.')).toBeTruthy();
+    expect(await screen.findByDisplayValue('Thank you all.')).toBeTruthy();
     // The details row is hidden while the wording is edited, so the saved draft shows the name went in.
     // Filling it must not have cleared the wording.
     await waitForDraftName('Sam');
-    expect(screen.getByText('Thank you all.')).toBeTruthy();
+    expect(screen.getByLabelText('Your message').props.value).toBe('Thank you all.');
   });
 
   it('does not write the account name to the person', async () => {

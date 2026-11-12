@@ -14,14 +14,12 @@ import { Body } from '../Text';
 import { Status } from '../Status';
 import { useSerifStyle } from '../typography';
 
-type TextInputNode = ComponentRef<typeof TextInput>;
-
 /** The words the screen needs. The keys come from libs/copy/screens/review.json (read by web too) and phoneReady.json. */
 export interface ReadyToSendCopy {
   back: string;
   messageLabel: string;
-  edit: string;
-  doneEditing: string;
+  /** The small line under the message box (phoneReady.json). */
+  messageCaption: string;
   softer: string;
   /** Why the tone button is unavailable once the words are edited. */
   toneKept: string;
@@ -43,7 +41,7 @@ export interface ReadyToSendProps {
   /** The moment's name. */
   heading: string;
   headingRef?: HeadingProps['headingRef'];
-  /** `announcement` has the tone switch in Edit wording. */
+  /** `announcement` has the tone switch under the message box. */
   kind: 'announcement' | 'service' | 'other';
   /** The first-name line, for example "Dee,". Shown above the message when the greeting is on. */
   lead?: string;
@@ -56,7 +54,7 @@ export interface ReadyToSendProps {
   /** `softer` or `plain`. */
   tone: string;
   onToneChange: (tone: 'softer' | 'plain') => void;
-  /** The first-name switch, inside Edit wording. Leave unset when no one is picked. */
+  /** The first-name switch, under the message box. Leave unset when no one is picked. */
   greeting?: { label: string; value: boolean; onChange: () => void };
   /** The Details link and the row it opens in place. Leave unset to hide both (hand-edited text). */
   details?: { label: string; startOpen: boolean; /** Draws the row. `headingRef` goes on its heading, where focus lands when the row opens. */ render: (headingRef: Ref<ComponentRef<typeof RNText>>) => ReactNode };
@@ -95,13 +93,9 @@ export const BAR_TEST_ID = 'ready-action-bar';
  * what is open lives here.
  */
 export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef }: ReadyToSendProps) {
-  const [editing, setEditing] = useState(false);
-  const [returnFocus, setReturnFocus] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
   const [focusDetails, setFocusDetails] = useState(false);
   const detailsRef = useRef<ComponentRef<typeof RNText>>(null);
-  const fieldRef = useRef<TextInputNode>(null);
-  const editRef = useRef<ButtonNode>(null);
   const toneReasonId = useId();
   // The words dropped by "Use the suggested wording", kept until the next edit.
   const [dropped, setDropped] = useState<string | null>(null);
@@ -116,16 +110,6 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const shareErrorId = useId();
   const shareReason = blank ? copy.shareBlank : blockedReason;
   const reason = hasRecipients ? (blank ? copy.blank : blockedReason) : undefined;
-
-  // Focus follows the field: into it when Edit wording opens, back to the toggle when it closes.
-  useEffect(() => {
-    if (editing) {
-      fieldRef.current?.focus();
-    } else if (returnFocus) {
-      focusNode(editRef.current);
-      setReturnFocus(false);
-    }
-  }, [editing, returnFocus]);
 
   // Opening Change details moves the screen reader to the row, so the new inputs are found.
   useEffect(() => {
@@ -168,13 +152,6 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
     }
   };
 
-  const toggleEditing = () => {
-    if (editing) {
-      setReturnFocus(true);
-    }
-    setEditing(!editing);
-  };
-
   const changePeopleRow = hasRecipients ? (
     <View style={styles.to}>
       <Button label={changePeople.label} variant="tertiary" buttonRef={peopleButtonRef} onPress={changePeople.onPress} />
@@ -212,15 +189,45 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           {heading}
         </Heading>
         <Card>
-          {lead ? <Body tone="strong">{lead}</Body> : null}
-          {editing ? (
-            <MessageField label={copy.messageLabel} value={message} onChangeText={changeMessage} inputRef={fieldRef} />
-          ) : (
-            <Body>{message}</Body>
-          )}
+          <MessageField label={copy.messageLabel} lead={lead} caption={copy.messageCaption} value={message} onChangeText={changeMessage} />
         </Card>
+        <View style={styles.actions}>
+          {kind === 'announcement' ? (
+            <>
+              <Button
+                label={copy.softer}
+                variant="ghost"
+                pressed={tone === 'softer'}
+                ariaDisabled={edited}
+                announceDisabled
+                describedBy={edited ? toneReasonId : undefined}
+                hint={edited ? copy.toneKept : undefined}
+                onPress={() => {
+                  if (!edited) {
+                    onToneChange(tone === 'softer' ? 'plain' : 'softer');
+                  }
+                }}
+              />
+              <Status id={toneReasonId} message={edited ? copy.toneKept : undefined} />
+            </>
+          ) : null}
+          {greeting ? (
+            <Pressable
+              style={styles.greetingRow}
+              onPress={greeting.onChange}
+              accessibilityRole="switch"
+              accessibilityLabel={greeting.label}
+              accessibilityState={{ checked: greeting.value }}
+            >
+              <Body hidden>{greeting.label}</Body>
+              <Switch value={greeting.value} onValueChange={greeting.onChange} trackColor={{ true: colors['accent-700'] }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden />
+            </Pressable>
+          ) : null}
+          {edited ? <Button label={copy.useSuggested} variant="ghost" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}
+          {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
+          <Status id={swapNoteId} message={swapNote} />
+        </View>
         <View style={styles.links}>
-          <Button label={editing ? copy.doneEditing : copy.edit} variant="tertiary" expanded={editing} buttonRef={editRef} onPress={toggleEditing} />
           {details ? (
             <Button
               label={details.label}
@@ -233,44 +240,6 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             />
           ) : null}
         </View>
-        {editing ? (
-          <View style={styles.actions}>
-            {kind === 'announcement' ? (
-              <>
-                <Button
-                  label={copy.softer}
-                  variant="ghost"
-                  pressed={tone === 'softer'}
-                  ariaDisabled={edited}
-                  announceDisabled
-                  describedBy={edited ? toneReasonId : undefined}
-                  hint={edited ? copy.toneKept : undefined}
-                  onPress={() => {
-                    if (!edited) {
-                      onToneChange(tone === 'softer' ? 'plain' : 'softer');
-                    }
-                  }}
-                />
-                <Status id={toneReasonId} message={edited ? copy.toneKept : undefined} />
-              </>
-            ) : null}
-            {greeting ? (
-              <Pressable
-                style={styles.greetingRow}
-                onPress={greeting.onChange}
-                accessibilityRole="switch"
-                accessibilityLabel={greeting.label}
-                accessibilityState={{ checked: greeting.value }}
-              >
-                <Body hidden>{greeting.label}</Body>
-                <Switch value={greeting.value} onValueChange={greeting.onChange} trackColor={{ true: colors['accent-700'] }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden />
-              </Pressable>
-            ) : null}
-            {edited ? <Button label={copy.useSuggested} variant="ghost" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}
-            {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
-            <Status id={swapNoteId} message={swapNote} />
-          </View>
-        ) : null}
         {details && detailsOpen ? details.render(detailsRef) : null}
         {shareRow}
         {changePeopleRow}
@@ -293,22 +262,27 @@ const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
 
 interface MessageFieldProps {
   label: string;
+  /** The first-name line. Read after the label, before the box. */
+  lead?: string;
+  caption: string;
   value: string;
   onChangeText: (value: string) => void;
-  inputRef: Ref<TextInputNode>;
 }
 
-function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProps) {
+function MessageField({ label, lead, caption, value, onChangeText }: MessageFieldProps) {
+  const input = useRef<ComponentRef<typeof TextInput> | null>(null);
   const font = useSerifStyle('regular');
   const labelId = useId();
+  const captionId = useId();
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
-      <Body tone="strong" id={labelId}>
+      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
         {label}
       </Body>
+      {lead ? <Body tone="strong">{lead}</Body> : null}
       <TextInput
-        ref={inputRef}
+        ref={input}
         style={[styles.input, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -316,11 +290,16 @@ function MessageField({ label, value, onChangeText, inputRef }: MessageFieldProp
         // Web names the field from the visible label; native reads the label text directly.
         aria-labelledby={labelId}
         accessibilityLabel={label}
+        accessibilityHint={caption}
+        aria-describedby={captionId}
         multiline
         numberOfLines={6}
         value={value}
         onChangeText={onChangeText}
       />
+      <Body tone="muted" small id={captionId}>
+        {caption}
+      </Body>
     </View>
   );
 }

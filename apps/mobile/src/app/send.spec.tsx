@@ -93,12 +93,12 @@ describe('picking an announcement', () => {
     expect(screen.queryByText(/She was peaceful\./)).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Add a personal note' }));
     fireEvent.changeText(await screen.findByLabelText("Anything you'd like to add (optional)"), 'She was peaceful.');
-    expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./));
     // Going to the people and back keeps the note.
     fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
     await screen.findByText('Done · 1 chosen');
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
-    expect(await screen.findByText(/She was peaceful\./)).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./));
   });
 
   it('lets people be picked on Who should get this?, and the picked people reach Review', async () => {
@@ -225,17 +225,15 @@ describe('Ready to send (announcement)', () => {
 
   it('changes the message when the tone changes', async () => {
     await toReview();
-    const plain = screen.getByText(/passed away/).props.children;
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
+    const plain = screen.getByLabelText('Your message').props.value;
+    expect(plain).toMatch(/passed away/);
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
-    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
-    expect(screen.queryByText(plain)).toBeNull();
+    expect(screen.getByLabelText('Your message').props.value).not.toBe(plain);
   });
 
   it('keeps edited words: tone is unavailable until the suggested wording is back', async () => {
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.disabled).toBe(true);
@@ -250,7 +248,6 @@ describe('Ready to send (announcement)', () => {
   it('sends the edited words to the sending step', async () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
     fireEvent.press(await screen.findByText('Text Dee'));
@@ -265,12 +262,11 @@ describe('Ready to send (announcement)', () => {
 
   it('keeps the edited words and the people when Back leaves and the moment is started again', async () => {
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     await startMoment('Announce the passing');
-    expect(await screen.findByText('My own words.')).toBeTruthy();
+    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
   });
@@ -289,7 +285,6 @@ describe('Ready to send (announcement)', () => {
 
   it('keeps hand-edited wording when Change opens the people sheet and Close shuts it', async () => {
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
     await screen.findByRole('heading', { name: 'Who should get this?' });

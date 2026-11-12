@@ -12,5 +12,6 @@
   "placesNone": "No matches. You can type the place.",
   "placesUnavailable": "Suggestions are not available right now. You can type the place.",
   "placeFilled": "Place filled in",
-  "placesHint": "Suggestions appear below as you type"
+  "placesHint": "Suggestions appear below as you type",
+  "messageCaption": "Read it one last time and make any last changes."
 }

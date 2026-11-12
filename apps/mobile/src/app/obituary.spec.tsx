@@ -99,7 +99,7 @@ describe('sharing the obituary on mobile', () => {
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
-    expect(screen.getByText(sent)).toBeTruthy();
+    expect(screen.getByDisplayValue(sent)).toBeTruthy();
   });
 
   it('takes the link through Who should get this? to Review, with the link in the message', async () => {
@@ -110,7 +110,7 @@ describe('sharing the obituary on mobile', () => {
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByText(/^Done/));
     await screen.findByRole('heading', { name: 'Share the obituary' });
-    expect(screen.getByText(/https:\/\/legacy\.com\/anna/)).toBeTruthy();
+    expect(screen.getByDisplayValue(/https:\/\/legacy\.com\/anna/)).toBeTruthy();
     await waitFor(async () => {
       const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { obituaryUrl: string }[];
       expect(saved[0].obituaryUrl).toBe('https://legacy.com/anna');

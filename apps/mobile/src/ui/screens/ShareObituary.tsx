@@ -65,22 +65,15 @@ export interface ShareObituaryCopy {
   pasted?: string;
   /** The obituary text card (mobile, from libs/copy/screens/phoneObituary.json). All optional; the card shows only with `textEditor`. */
   textTitle?: string;
-  editHelp?: string;
-  editButton?: string;
-  /** The same button when there is no text yet. */
-  writeButton?: string;
+  /** The small line under the box. */
+  textCaption?: string;
   editLabel?: string;
   editPlaceholder?: string;
-  saveButton?: string;
-  cancelButton?: string;
-  saved?: string;
   /** The optional publisher address field in step 1 (mobile, from phoneObituary.json). */
   publisherEmailLabel?: string;
   publisherEmailPlaceholder?: string;
   /** Muted line under the field: where the address is kept. */
   publisherEmailHint?: string;
-  /** Calm line after clearing the box: the text follows the details again. */
-  followsDetails?: string;
   /** Label above the link field (mobile "Step 2: ..."). */
   linkStepLabel?: string;
   /** "Paste link" beside the link field. */
@@ -118,23 +111,15 @@ export interface PublisherEmail {
   copyFailed?: boolean;
 }
 
-/** The obituary text on the phone: shown as plain text, or edited in one multiline box. */
+/** The obituary text on the phone: always one editable multiline box. The screen saves it when the user leaves. */
 export interface ObituaryTextEditor {
-  /** The saved text (or the draft built from the details). Empty when there is none. */
-  text: string;
-  editing: boolean;
-  /** What is in the box while editing. Kept by the screen, so closing the keyboard loses nothing. */
+  /** What is in the box. Kept by the screen, so closing the keyboard loses nothing. */
   value: string;
   onValueChange: (value: string) => void;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
   /** The longest text the app keeps (libs/shared), so a save is never cut after the fact. */
   maxLength?: number;
-  /** The calm line after leaving the box: saved, or cleared so the text follows the details again. */
-  note?: 'saved' | 'follows';
-  /** For returning screen-reader focus to the Edit button after Save or Cancel. */
-  editRef?: Ref<ButtonNode>;
+  /** The memorial paragraph, sent after the text. Read-only here; edited in the details. */
+  memorial?: string;
 }
 
 export interface ShareObituaryProps {
@@ -166,8 +151,7 @@ export interface ShareObituaryProps {
   /** Step 1 (mobile). Leave unset to hide the card, as the web does. */
   publisherEmail?: PublisherEmail;
   /**
-   * true once the user's email went out (mail or share, never a cancel). Shows the bottom bar button,
-   * hidden while the text is being edited. Needs `onDone`.
+   * true once the user's email went out (mail or share, never a cancel). Shows the bottom bar button. Needs `onDone`.
    */
   emailed?: boolean;
   /** true while the keyboard is open: the bar then drops the bottom safe-area inset, so no gap shows above the keyboard. */
@@ -199,13 +183,12 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const addressErrorId = useId();
   const addressHintId = useId();
   const pasteId = useId();
-  const savedId = useId();
   const empty = link.trim() === '';
   const showError = touched && !empty && !linkValid;
   const reason = empty ? copy.needLink : undefined;
   const blockedBy = reason ?? (linkValid ? undefined : copy.invalidLink);
 
-  const showDone = Boolean(emailed && onDone && copy.doneButton && !textEditor?.editing);
+  const showDone = Boolean(emailed && onDone && copy.doneButton);
 
   return (
     <>
@@ -223,8 +206,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         </Heading>
         <Body tone="muted">{copy.intro}</Body>
       </View>
-      {textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} savedId={savedId} /> : null}
-      {publisherEmail && copy.emailButton && !textEditor?.editing ? (
+      {textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
+      {publisherEmail && copy.emailButton ? (
         <Card>
           {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
           {publisherEmail.hasText ? (
@@ -278,8 +261,6 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           ) : null}
         </Card>
       ) : null}
-      {textEditor?.editing ? null : (
-      <>
       {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
       <Field
         label={copy.linkLabel}
@@ -356,8 +337,6 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           <Status id={draftReasonId} message={draftUnavailable} />
         </Card>
       ) : null}
-      </>
-      )}
     </View>
     </ScrollView>
     {showDone && onDone ? (
@@ -370,53 +349,43 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   );
 }
 
-function TextCard({ copy, editor, savedId }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor; savedId: string }) {
-  const hasText = editor.text !== '';
-  const editLabelId = useId();
+function TextCard({ copy, editor }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor }) {
+  const labelId = useId();
+  const captionId = useId();
   const font = useSerifStyle('regular');
   const [focused, setFocused] = useState(false);
-  const label = hasText ? copy.editButton : copy.writeButton;
+  const input = useRef<TextInputNode | null>(null);
   return (
     <Card>
       <Heading level={2}>{copy.textTitle}</Heading>
-      {editor.editing ? (
-        <>
-          {copy.editHelp ? <Body tone="muted">{copy.editHelp}</Body> : null}
-          {/* Above the box, so they stay reachable at the largest text size with the keyboard open. */}
-          <View style={styles.editActions}>
-            {copy.saveButton ? <Button label={copy.saveButton} onPress={editor.onSave} /> : null}
-            {copy.cancelButton ? <Button label={copy.cancelButton} variant="secondary" onPress={editor.onCancel} /> : null}
-          </View>
-          <Body tone="strong" id={editLabelId}>
-            {copy.editLabel}
-          </Body>
-          <TextInput
-            style={[styles.textInput, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
-            {...webFieldHook}
-            aria-labelledby={editLabelId}
-            accessibilityLabel={copy.editLabel}
-            accessibilityHint={copy.editHelp}
-            multiline
-            autoFocus
-            maxLength={editor.maxLength}
-            textAlignVertical="top"
-            autoCapitalize="sentences"
-            placeholder={copy.editPlaceholder}
-            placeholderTextColor={colors['neutral-700']}
-            value={editor.value}
-            onChangeText={editor.onValueChange}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-          />
-        </>
-      ) : (
-        <>
-          {hasText ? <Body>{editor.text}</Body> : null}
-          {label ? <Button label={label} variant="secondary" buttonRef={editor.editRef} onPress={editor.onEdit} /> : null}
-        </>
-      )}
-      {/* Always mounted, so only its text changes and the change is announced. */}
-      <Status id={savedId} queue message={editor.note === 'saved' ? copy.saved : editor.note === 'follows' ? copy.followsDetails : undefined} />
+      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
+        {copy.editLabel}
+      </Body>
+      <TextInput
+        ref={input}
+        style={[styles.textInput, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
+        {...webFieldHook}
+        aria-labelledby={labelId}
+        aria-describedby={copy.textCaption ? captionId : undefined}
+        accessibilityLabel={copy.editLabel}
+        accessibilityHint={copy.textCaption}
+        multiline
+        maxLength={editor.maxLength}
+        textAlignVertical="top"
+        autoCapitalize="sentences"
+        placeholder={copy.editPlaceholder}
+        placeholderTextColor={colors['neutral-700']}
+        value={editor.value}
+        onChangeText={editor.onValueChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+      {copy.textCaption ? (
+        <Body tone="muted" small id={captionId}>
+          {copy.textCaption}
+        </Body>
+      ) : null}
+      {editor.memorial ? <Body>{editor.memorial}</Body> : null}
     </Card>
   );
 }
@@ -523,7 +492,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 16,
   },
-  editActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], alignItems: 'center' },
   // Last, so an invalid field keeps its error border while it has focus.
   inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).
