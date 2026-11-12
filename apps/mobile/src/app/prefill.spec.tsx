@@ -24,7 +24,7 @@ const openPeople = async () => {
 };
 
 const base = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -40,11 +40,6 @@ const openMoment = async (session: Session, moment: RegExp, label: string = 'Ann
 };
 const openService = (session: Session) => openMoment(session, /Share the service/);
 
-// A person with web wording gets it as the message, so the Details row is hidden (the wording is edited).
-// The planned details still reach the form; the saved draft shows them (#824: no web wording shows the nudge instead).
-type SavedDrafts = { drafts?: Record<string, { fields?: Record<string, string> }> };
-const savedFields = async (moment: string) => (JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as SavedDrafts[])[0]?.drafts?.[moment]?.fields;
-
 // Service and thank-you open on Who should get this?; the planned details are on the send screen.
 const toConfirm = async () => {
   fireEvent.press(await screen.findByText('Dee'));
@@ -56,16 +51,15 @@ describe('send flow starts from the planned details', () => {
     await openService({ ...base, serviceTime: '2:00 PM', servicePlace: 'St. Mary', serviceAddress: '12 Main St' } as Session);
     expect(await openPeople()).toBeTruthy();
     await toConfirm();
-    expect(await screen.findByDisplayValue('Come as you are.')).toBeTruthy();
-    await waitFor(async () => expect(await savedFields('service')).toMatchObject({ serviceTime: '2:00 PM', serviceLocation: 'St. Mary, 12 Main St' }));
+    expect((await screen.findByLabelText('Time')).props.accessibilityValue.text).toBe('2:00 PM');
+    expect(screen.getByDisplayValue('St. Mary, 12 Main St')).toBeTruthy();
   });
 
   it('carries the planned date from the person to Confirm', async () => {
     await openService({ ...base, serviceDate: 'June 14' } as Session);
     await openPeople();
     await toConfirm();
-    expect(await screen.findByDisplayValue('Come as you are.')).toBeTruthy();
-    await waitFor(async () => expect(await savedFields('service')).toMatchObject({ serviceDate: 'June 14' }));
+    expect((await screen.findByLabelText('Service date')).props.accessibilityValue.text).toBe('June 14');
   });
 
   it('uses the edited service message as the message', async () => {
@@ -129,7 +123,7 @@ describe('send flow starts from the planned details', () => {
 
   it('drops an old obituary draft whose message is the obituary text', async () => {
     await openMoment(
-      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
+      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
       /Share the obituary/,
     );
     await toConfirmFromObituary();
@@ -140,7 +134,7 @@ describe('send flow starts from the planned details', () => {
 
   it('keeps a hand edit on the obituary message through to Confirm', async () => {
     await openMoment(
-      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
+      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
       /Share the obituary/,
     );
     await toConfirmFromObituary();
@@ -177,15 +171,8 @@ describe('send flow starts from the planned details', () => {
     expect(screen.getByLabelText('Your message').props.value).toBe('Our own words.');
   });
 
-  // A resumed draft with no edited wording, so the Details row is there (a fresh form with web wording hides it).
-  const serviceDraft = (fields: Record<string, string>) => ({
-    step: 'contacts', templateCategory: 'service', templateOverrideId: null, fields,
-    serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
-    flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
-  });
-
   it('saves a service date typed on Confirm to the person', async () => {
-    await openService({ ...base, drafts: { service: serviceDraft({ serviceTime: '2:00 PM' }) } } as unknown as Session);
+    await openService({ ...base } as Session);
     await openPeople();
     await toConfirm();
     fireEvent.press(await screen.findByLabelText(/Service date/));
@@ -198,7 +185,7 @@ describe('send flow starts from the planned details', () => {
   });
 
   it('leaves the saved service date alone when nothing is changed on Confirm', async () => {
-    await openService({ ...base, serviceDate: 'June 14', drafts: { service: serviceDraft({ serviceDate: 'June 14' }) } } as unknown as Session);
+    await openService({ ...base, serviceDate: 'June 14' } as Session);
     await openPeople();
     await toConfirm();
     expect((await screen.findByLabelText('Service date')).props.accessibilityValue.text).toBe('June 14');

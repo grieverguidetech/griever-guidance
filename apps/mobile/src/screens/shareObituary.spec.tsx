@@ -47,7 +47,7 @@ const base = {
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
 
-// Nothing written on the web shows the nudge (#824). These tests need the screen itself, so the person has a link.
+// Nothing started on the web shows the nudge (#824). These tests need the screen itself, so the person has a link.
 const linked = { ...base, obituaryUrl: 'https://legacy.com/anna' } as Session;
 
 const BUTTON = 'Email it to the paper or funeral home';
@@ -81,7 +81,7 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
   it('shows one calm line above Email while [brackets] remain, and Email and Copy still work', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
-    const session = { ...linked, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session;
+    const session = { ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session;
     setup(session);
     expect(screen.getByText('Some parts are still in [brackets]. Fill them in or delete them before you send.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
@@ -91,7 +91,7 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
   });
 
   it('gives the Email button the blanks line as its hint', () => {
-    setup({ ...linked, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session);
+    setup({ ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa' } as Session);
     expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityHint).toBe('Some parts are still in [brackets]. Fill them in or delete them before you send.');
   });
 
@@ -284,7 +284,7 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
 });
 
 describe('ShareObituaryScreen with fields only (#700)', () => {
-  const fieldsOnly = { ...linked, personName: 'Anna Lee', obituaryCity: 'Tulsa', obituaryCareer: 'a nurse' } as Session;
+  const fieldsOnly = { ...base, personName: 'Anna Lee', obituaryCity: 'Tulsa', obituaryCareer: 'a nurse' } as Session;
   const draft = obituaryTextFor(fieldsOnly);
 
   it('has a draft to send', () => {
@@ -425,7 +425,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   });
 
   it('shows the draft built from the details when nothing was edited', () => {
-    const session = { ...linked, obituaryCity: 'Boston', obituaryCareer: 'Teacher' } as Session;
+    const session = { ...base, obituaryCity: 'Boston', obituaryCareer: 'Teacher' } as Session;
     const draft = obituaryTextFor(session);
     expect(draft).not.toBe('');
     setup(session);
@@ -473,7 +473,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   });
 
   it('leaving with the draft unchanged writes nothing, so it keeps following the details', () => {
-    const session = { ...linked, obituaryCity: 'Boston' } as Session;
+    const session = { ...base, obituaryCity: 'Boston' } as Session;
     const onBack = jest.fn();
     const onPatch = setupLive(session, { onBack });
     expect(screen.getByLabelText(BOX).props.value).toBe(obituaryTextFor(session));
@@ -491,7 +491,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   });
 
   it('changing the draft freezes it as the edited text', () => {
-    const onPatch = setupLive({ ...linked, obituaryCity: 'Boston' } as Session);
+    const onPatch = setupLive({ ...base, obituaryCity: 'Boston' } as Session);
     fireEvent.changeText(screen.getByLabelText(BOX), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'My own words.' });
@@ -992,6 +992,14 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
     nudgeSetup(base, onBack);
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the normal screen with only a detail or a publisher, as the web Overview counts them', () => {
+    nudgeSetup({ ...base, obituaryCity: 'Tulsa' } as Session);
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+    screen.unmount();
+    nudgeSetup({ ...base, obituaryPublisher: 'The Tulsa Times' } as Session);
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
   });
 
   it('shows the normal screen with a link only, and with text only', () => {

@@ -9,7 +9,7 @@ import { SendingScreen } from './SendingScreen';
 
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '',
   // The family has written something on the web for every flow (without it the phone shows the nudge, #824).
-  announcementMessage: 'Margaret passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', obituaryText: 'Margaret loved the garden.' } as SessionDetails;
+  announcementMessage: 'Margaret passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Margaret loved the garden.' } as SessionDetails;
 const contacts = {
   contacts: [
     { contactId: 'c0', name: 'Dee', phone: '+15555550100' },
@@ -371,7 +371,7 @@ describe('the people-button focus hook (#673)', () => {
 
 // #824: nothing written on the web for the flow, so the phone shows a nudge instead of the message and send controls.
 describe('Ready to send with nothing written on the web (#824)', () => {
-  const EMPTY = { announcementMessage: undefined, serviceMessage: '   ', thanksMessage: '', obituaryText: '' };
+  const EMPTY = { announcementMessage: undefined, serviceMessage: '   ', serviceType: '', thanksMessage: '', obituaryText: '' };
   const cases = [
     ['service', {}, 'Share the service', 'Add the service details on the web first'],
     ['thanks', { thanks: true }, 'Send thank-yous', 'Write the thank-you note on the web first'],
