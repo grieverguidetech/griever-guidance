@@ -29,6 +29,7 @@
     "personSharedHint",
     "serviceSharedHint",
     "cemeteryLocationFilled",
+    "placePicked",
     "birthPlaceLabel",
     "motherNameLabel",
     "fatherNameLabel",
@@ -150,6 +151,9 @@
       "$ref": "#/$defs/text"
     },
     "cemeteryLocationFilled": {
+      "$ref": "#/$defs/text"
+    },
+    "placePicked": {
       "$ref": "#/$defs/text"
     },
     "birthPlaceLabel": {

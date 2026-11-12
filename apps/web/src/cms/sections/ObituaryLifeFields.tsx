@@ -191,6 +191,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
     const hintId = `${id}-${spec.key}-hint`;
     // While the age has focus it shows only what was typed; otherwise the worked-out age fills an empty field.
     const showsDerived = isAge && typed === '' && !ageFocused && derivedAge !== '';
+    // Place fields must not be name or age keys: those need the derived values above.
     if (spec.placeTypes) {
       const fieldId = `${id}-${spec.key}`;
       const labelId = `${fieldId}-label`;
@@ -204,6 +205,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
             id={fieldId}
             labelledBy={labelId}
             maxLength={max}
+            pickedMessage={copy.placePicked}
             types={spec.placeTypes}
             // Only the name is saved, so the paid details call is not needed.
             wantsDetails={() => false}

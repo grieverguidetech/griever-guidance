@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { findHardCodedCopy, screenCopy } from '@griever/copy';
+import { fill, findHardCodedCopy, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { PlacesProvider } from '../../lib/places/PlacesContext';
 import type { PlacesClient } from '../../lib/places/placesClient';
@@ -713,7 +713,7 @@ describe('ObituaryLifeFields', () => {
       await userEvent.click(screen.getByRole('button', { name: copy.groupServiceHeading }));
       return { patches };
     }
-    const cases: [ObituaryLifeKey, string, string[]][] = [
+    const cases: ['obituaryFuneralHome' | 'obituaryChurch', string, string[]][] = [
       ['obituaryFuneralHome', copy.funeralHomeLabel, ['funeral_home']],
       ['obituaryChurch', copy.churchLabel, ['church', 'synagogue', 'mosque', 'hindu_temple']],
     ];
@@ -722,7 +722,7 @@ describe('ObituaryLifeFields', () => {
       await harness({});
       expect(screen.getByRole('combobox', { name: label })).toHaveAttribute(
         'maxLength',
-        String(FLOW_DETAIL_MAX_LENGTH[key as keyof typeof FLOW_DETAIL_MAX_LENGTH]),
+        String(FLOW_DETAIL_MAX_LENGTH[key]),
       );
     });
 
@@ -740,6 +740,29 @@ describe('ObituaryLifeFields', () => {
       await waitFor(() => expect(screen.getByRole('combobox', { name: label })).toHaveValue('Smith Funeral Home'));
       expect(patches.at(-1)).toEqual({ [key]: 'Smith Funeral Home' });
       expect(detailsMock).not.toHaveBeenCalled();
+    });
+
+    it.each(cases)('%s: a pick says the name in that field status only', async (_key, label) => {
+      await harness({});
+      const box = screen.getByRole('combobox', { name: label });
+      await userEvent.type(box, 'smith');
+      await userEvent.click(await screen.findByRole('option', { name: /Smith Funeral Home/ }));
+      const statusOf = (el: HTMLElement) => within(el.parentElement as HTMLElement).getByRole('status');
+      await waitFor(() => expect(statusOf(box)).toHaveTextContent(fill(copy.placePicked, { name: 'Smith Funeral Home' })));
+      const other = screen.getByRole('combobox', { name: label === copy.churchLabel ? copy.funeralHomeLabel : copy.churchLabel });
+      expect(statusOf(other)).toBeEmptyDOMElement();
+    });
+
+    it('never sends a patch over the limit for a long pick', async () => {
+      const { patches } = await harness({});
+      const long = 'F'.repeat(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome + 20);
+      suggestMock.mockResolvedValue([{ id: 'l', text: long, mainText: long, secondaryText: '' }]);
+      await userEvent.type(screen.getByRole('combobox', { name: copy.funeralHomeLabel }), 'fff');
+      await userEvent.click(await screen.findByRole('option', { name: /^FFFF/ }));
+      await waitFor(() => expect(patches.at(-1)?.obituaryFuneralHome).toHaveLength(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome));
+      for (const patch of patches) {
+        expect(patch.obituaryFuneralHome?.length ?? 0).toBeLessThanOrEqual(FLOW_DETAIL_MAX_LENGTH.obituaryFuneralHome);
+      }
     });
 
     it('cuts a long picked name to the saved length', async () => {

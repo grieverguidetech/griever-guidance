@@ -26,6 +26,8 @@ export interface PlaceInputProps {
   maxLength?: number;
   /** The polite status after a pick that also filled another field. Defaults to the Service text. */
   fillMessage?: string;
+  /** Set: the polite status after a pick says this, with {name} replaced by the picked name. Without it, a pick that fills nothing else says nothing. */
+  pickedMessage?: string;
   value: string;
   onChange: (value: string) => void;
   /** Google place types to suggest. Without them the field is a plain text input. */
@@ -48,7 +50,7 @@ export interface PlaceInputProps {
  * The typed text is always the value. Suggestions only help; with none available, or on any
  * failure, it behaves as a plain input and shows no error.
  */
-export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
+export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage, pickedMessage, value, onChange, types, onPick, wantsDetails }: PlaceInputProps) {
   const { enabled, load } = usePlaces();
   // Set when Google could not load. The field then drops every combobox attribute.
   const [unavailable, setUnavailable] = useState(false);
@@ -198,8 +200,10 @@ export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage
       setOptions([]);
       return;
     }
+    // Cut to the field's limit first, so no change ever goes over it.
+    const name = maxLength === undefined ? option.mainText : option.mainText.slice(0, maxLength);
     // Show the place name at once; the full address follows when the details arrive.
-    onChange(option.mainText);
+    onChange(name);
     stop();
     setOptions([]);
     pickTicket.current += 1;
@@ -227,6 +231,8 @@ export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage
     setPicking(false);
     if (onPickRef.current?.(option, details) === true) {
       setAnnouncement(fillMessage ?? copy.placesAddressFilled);
+    } else if (pickedMessage) {
+      setAnnouncement(fill(pickedMessage, { name }));
     }
   };
 

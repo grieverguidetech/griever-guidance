@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALLOWED_PLACE_TYPES,
-  FUNERAL_HOME_PLACE_TYPES,
-  WORSHIP_PLACE_TYPES,
   BURIAL_PLACE_TYPES,
+  FUNERAL_HOME_PLACE_TYPES,
   PLACE_TYPES_MAX,
   SERVICE_PLACE_TYPES,
+  WORSHIP_PLACE_TYPES,
 } from './places.js';
 
 describe('place types', () => {
