@@ -11,6 +11,7 @@ import { ReadyToSend } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
+import { hasWebContent } from '../lib/hasWebContent';
 import { shareMessage } from '../lib/shareSheet';
 
 const copy = screenCopy('review');
@@ -18,6 +19,8 @@ const ready = screenCopy('phoneReady');
 const moments = screenCopy('pathLanding').moments;
 const sendingCopy = screenCopy('sending');
 const announceCopy = screenCopy('announce');
+const nudgeCopy = screenCopy('phoneNudge');
+const NUDGE_KEYS = { announcement: 'announcement', service: 'service', aftercare: 'thanks', obituary: 'obituary' } as const;
 
 interface Props extends FlowProps {
   /** Used to name the people picked and the first one's greeting. */
@@ -126,9 +129,17 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
     }
   }
 
+  // Nothing written on the web for this step: a nudge replaces the message and the send controls (#824).
+  const nudgeKey = NUDGE_KEYS[flow.templateCategory ?? 'announcement'];
+  const nudge =
+    flow.templateCategory && flow.session && !hasWebContent(flow.session, flow.templateCategory)
+      ? { title: nudgeCopy[`${nudgeKey}Title`], line: nudgeCopy[`${nudgeKey}Line`], button: nudgeCopy.gotIt, onGotIt: prevStep }
+      : undefined;
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <ReadyToSend
+        nudge={nudge}
         copy={{ ...copy, messageCaption: ready.messageCaption }}
         heading={moments[momentOf(flow.templateCategory)].title}
         headingRef={heading}

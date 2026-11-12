@@ -16,7 +16,7 @@ const openPeople = async () => {
 
 const person = (id: string, personName: string, lastOpenedAt: string, dateOfPassing = ''): Session =>
   ({
-    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing, senderName: '', obituaryUrl: '', createdAt: lastOpenedAt, lastOpenedAt,
+    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing, senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: lastOpenedAt, lastOpenedAt,
     drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
   }) as Session;
 
@@ -140,7 +140,8 @@ describe('the order in the app', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Ready to send');
     fireEvent.press(screen.getByRole('button', { name: /Send thank-yous/ }));
-    expect(await openPeople()).toBeTruthy();
+    // A new person has nothing written on the web, so Ready to send shows the nudge (#824); the form is still started from setup.
+    expect(await screen.findByRole('heading', { name: 'Write the thank-you note on the web first' })).toBeTruthy();
     await waitFor(async () => {
       const kept = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as { personName: string; drafts?: Record<string, { fields: Record<string, string> }> }[];
       expect(kept.find((p) => p.personName === 'Ben Cole')?.drafts?.['aftercare']?.fields['deceasedName']).toBe('Ben Cole');

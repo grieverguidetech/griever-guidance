@@ -15,7 +15,7 @@ const openPeople = async () => {
 };
 
 const anna = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -52,7 +52,15 @@ const NOTE = 'She was peaceful at home.';
 const toSending = async (pick: string[], note = '', told: string[] = []) => {
   jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
-  const seeded = told.length > 0 ? { ...anna, recipientsNotified: { announcement: told } } : anna;
+  // The note is on a draft resumed with no edited wording: a fresh form with web wording starts from that wording
+  // and has no Details row to type it in (#824: with no web wording the phone shows the nudge instead).
+  const noteDraft = {
+    step: 'contacts', templateCategory: 'announcement', templateOverrideId: null,
+    fields: { personalNote: note }, serviceDetailsKnown: null, selectedContactIds: [],
+    includeFlowers: false, customFlorist: '', flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
+  };
+  const withNote = note ? { ...anna, drafts: { announcement: noteDraft } } : anna;
+  const seeded = told.length > 0 ? { ...withNote, recipientsNotified: { announcement: told } } : withNote;
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([seeded]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
@@ -64,11 +72,6 @@ const toSending = async (pick: string[], note = '', told: string[] = []) => {
     fireEvent.press(await screen.findByText(name));
   }
   fireEvent.press(screen.getByText(/^Done/));
-  // The optional note is under Add a personal note on Ready to send.
-  if (note) {
-    fireEvent.press(await screen.findByRole('button', { name: 'Add a personal note' }));
-    fireEvent.changeText(await screen.findByLabelText(/Anything you'd like to add/), note);
-  }
   fireEvent.press(await screen.findByText(/^Text \d (person|people)$/));
 };
 

@@ -3,11 +3,13 @@ import { useEffect } from 'react';
 import { AccessibilityInfo, Linking, Share, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
-import type { SessionDetails } from '@griever/shared';
+import type { SectionFields, SessionDetails } from '@griever/shared';
 import { ReadyToSendScreen } from './ReadyToSendScreen';
 import { SendingScreen } from './SendingScreen';
 
-const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '' } as SessionDetails;
+const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '',
+  // The family has written something on the web for every flow (without it the phone shows the nudge, #824).
+  announcementMessage: 'Margaret passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', obituaryText: 'Margaret loved the garden.' } as SessionDetails;
 const contacts = {
   contacts: [
     { contactId: 'c0', name: 'Dee', phone: '+15555550100' },
@@ -24,9 +26,9 @@ const NONE: string[] = [];
 const FIVE = ['c0', 'c1', 'c2', 'c3', 'c4'];
 const TWO = ['c0', 'c1'];
 
-function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void } = {}) {
+function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, web = {} }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
   const flow = useSendFlow({
-    session: { ...session, ...(senderName === undefined ? {} : { senderName }) },
+    session: { ...session, ...(senderName === undefined ? {} : { senderName }), ...web },
     draft: freshDraft({
       templateCategory: category ?? (thanks ? 'aftercare' : 'service'),
       templateOverrideId: category ? undefined : thanks ? 'thank-you-note' : 'share-service',
@@ -364,5 +366,56 @@ describe('the people-button focus hook (#673)', () => {
     expect(hook.current).toEqual(expect.any(Function));
     unmount();
     expect(hook.current).toBeNull();
+  });
+});
+
+// #824: nothing written on the web for the flow, so the phone shows a nudge instead of the message and send controls.
+describe('Ready to send with nothing written on the web (#824)', () => {
+  const EMPTY = { announcementMessage: undefined, serviceMessage: '   ', thanksMessage: '', obituaryText: '' };
+  const cases = [
+    ['service', {}, 'Share the service', 'Add the service details on the web first'],
+    ['thanks', { thanks: true }, 'Send thank-yous', 'Write the thank-you note on the web first'],
+    ['announcement', { category: 'announcement' as const }, 'Announce the passing', 'Write the announcement on the web first'],
+  ] as const;
+
+  it.each(cases)('%s: shows the nudge under the moment heading, with no message box, no Send and nothing to fill in', (_name, props, title, nudge) => {
+    render(<Harness {...props} web={EMPTY} />);
+    expect(screen.getByRole('heading', { name: title })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: nudge })).toBeTruthy();
+    expect(screen.getByText(/web\.grieversguidance\.com/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.queryByLabelText('Your message')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Text \d/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Choose who to tell' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change who gets this' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Change date|Change details|Add a personal note/ })).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText(/!/)).toBeNull();
+  });
+
+  it('Got it goes back the way Back does', () => {
+    // The app's Back from Ready to send goes to the hub; here it is the flow's step back, once.
+    const back = jest.fn();
+    function Probe() {
+      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
+      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} onChoosePeople={() => undefined} />;
+    }
+    render(<Probe />);
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(back).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(back).toHaveBeenCalledTimes(2);
+  });
+
+  it('marks the nudge as one summary region', () => {
+    render(<Harness web={EMPTY} />);
+    // One region holds the heading, the line and the button, so it is announced once.
+    expect(screen.UNSAFE_getAllByProps({ accessibilityRole: 'summary' }).length).toBeGreaterThan(0);
+  });
+
+  it('shows the message box when only a different flow is empty', () => {
+    render(<Harness web={{ ...EMPTY, serviceMessage: 'Come as you are.' }} />);
+    expect(screen.getByLabelText('Your message')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
   });
 });

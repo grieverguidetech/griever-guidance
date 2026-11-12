@@ -87,16 +87,20 @@ describe('people kept on the phone', () => {
     expect(screen.getByLabelText('Their name, required').props.value).toBe('');
     await startWith('Ben');
     await openThankYous();
-    await findPicker();
+    // Someone new has nothing written on the web, so Ready to send shows the nudge (#824); the form is still started.
+    await screen.findByRole('heading', { name: 'Write the thank-you note on the web first' });
     // Only the new person's own name is in the draft; nothing carries over from Anna.
     await waitFor(async () => expect((await savedAftercare('Ben'))?.fields['deceasedName']).toBe('Ben'));
     expect((await savedAftercare('Anna'))?.fields['deceasedName']).not.toBe('Ben');
   });
 
   it('restores a half-finished draft, not just the names', async () => {
+    // Anna has thank-you wording from the web; with none, the people step is not reachable from the phone (#824).
+    const anna = { id: 's-1', flowId: 'flow-s-1', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', thanksMessage: 'Thank you for being there.', createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z', drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] };
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+    await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     const first = render(<App />);
-    await begin();
-    await startWith('Anna');
+    expect(await screen.findByText('For Anna')).toBeTruthy();
     await openThankYous();
     await findPicker();
     fireEvent.press(await screen.findByText('Dee'));
@@ -115,7 +119,7 @@ describe('people kept on the phone', () => {
 
   it('does not keep a finished send as a draft', async () => {
     const sent = { ...freshDraft({}), step: 'sent' as const, templateCategory: 'aftercare' as const, fields: { deceasedName: 'Anna' } };
-    const person = { id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x', draft: sent, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] };
+    const person = { id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: 'x', lastOpenedAt: 'x', draft: sent, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] };
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
     await AsyncStorage.setItem(ACTIVE_KEY, 's-1');
     const first = render(<App />);
@@ -136,7 +140,7 @@ describe('people kept on the phone', () => {
       ({ ...freshDraft({}), templateCategory, step, fields });
     const announcement = moment('announcement', 'review', { personalNote: 'Kept as it was' });
     const person = {
-      id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x',
+      id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: 'x', lastOpenedAt: 'x',
       drafts: { announcement, aftercare: moment('aftercare', 'details', { deceasedName: 'Anna Lee' }) },
       draftsUpdatedAt: { announcement: '2026-10-01T00:00:00.000Z', aftercare: '2026-10-02T00:00:00.000Z' },
       serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
@@ -159,7 +163,7 @@ describe('people kept on the phone', () => {
   it("reopens a moment left on the picker at that moment's first form (#99)", async () => {
     const onPicker = { ...freshDraft({}), templateCategory: 'aftercare' as const, step: 'template' as const, fields: { deceasedName: 'Anna Lee' } };
     const person = {
-      id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x',
+      id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: 'x', lastOpenedAt: 'x',
       drafts: { aftercare: onPicker }, draftsUpdatedAt: { aftercare: '2026-10-02T00:00:00.000Z' },
       serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
     };
@@ -177,7 +181,7 @@ describe('people kept on the phone', () => {
       ({ ...freshDraft({}), templateCategory, step, fields });
     const withDrafts = async (drafts: Record<string, unknown>) => {
       const person = {
-        id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x',
+        id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: 'x', lastOpenedAt: 'x',
         drafts, draftsUpdatedAt: { aftercare: '2026-10-02T00:00:00.000Z' },
         serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
       };
@@ -256,8 +260,8 @@ describe('people kept on the phone', () => {
 
 describe('when saved people cannot be read', () => {
   const saved = JSON.stringify([
-    { id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x', draft: null, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] },
-    { id: 's-2', personName: 'Ben', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: 'x', lastOpenedAt: 'x', draft: null, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] },
+    { id: 's-1', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: 'x', lastOpenedAt: 'x', draft: null, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] },
+    { id: 's-2', personName: 'Ben', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.', createdAt: 'x', lastOpenedAt: 'x', draft: null, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] },
   ]);
 
   it('never overwrites them after a failed read', async () => {
@@ -318,7 +322,7 @@ describe('opening the app on the last person', () => {
   });
 
   const person = (id: string, personName: string) => ({
-    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing: '', senderName: '', obituaryUrl: '',
+    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.',
     createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
     drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
   });

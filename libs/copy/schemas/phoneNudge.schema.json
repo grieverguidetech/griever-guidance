@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the phone nudge: a step with nothing written on the web yet (phone only)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["announcementTitle", "announcementLine", "serviceTitle", "serviceLine", "thanksTitle", "thanksLine", "obituaryTitle", "obituaryLine", "gotIt"],
+  "properties": {
+    "announcementTitle": { "$ref": "#/$defs/text" },
+    "announcementLine": { "$ref": "#/$defs/text" },
+    "serviceTitle": { "$ref": "#/$defs/text" },
+    "serviceLine": { "$ref": "#/$defs/text" },
+    "thanksTitle": { "$ref": "#/$defs/text" },
+    "thanksLine": { "$ref": "#/$defs/text" },
+    "obituaryTitle": { "$ref": "#/$defs/text" },
+    "obituaryLine": { "$ref": "#/$defs/text" },
+    "gotIt": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}

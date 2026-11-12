@@ -12,11 +12,13 @@ import { colors } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
+import { hasWebContent } from '../lib/hasWebContent';
 import { obituaryShareTextFor, obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
 const textCopy = screenCopy('phoneObituary');
 const draftCopy = screenCopy('obituaryDraft');
+const nudgeCopy = screenCopy('phoneNudge');
 const copy = {
   ...shareCopy,
   heading: shareCopy.mobileHeading,
@@ -265,6 +267,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ShareObituary
           copy={copy}
+          nudge={hasWebContent(session, 'obituary') ? undefined : { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) }}
           eyebrow={fill(copy.forName, { name })}
           eyebrowTone="accent2"
           link={session.obituaryUrl}

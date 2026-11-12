@@ -13,6 +13,8 @@ import { applyUrlInputMode } from '../inputMode';
 import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
 import { useSerifStyle } from '../typography';
+import { WebNudge } from '../WebNudge';
+import type { WebNudgeProps } from '../WebNudge';
 
 export type TextInputNode = ComponentRef<typeof TextInput>;
 
@@ -123,6 +125,8 @@ export interface ObituaryTextEditor {
 }
 
 export interface ShareObituaryProps {
+  /** Nothing is written on the web for the obituary: the nudge replaces everything under the heading. Back and the checklist stay. */
+  nudge?: WebNudgeProps;
   copy: ShareObituaryCopy;
   /** The eyebrow line, for example "For Margaret". */
   eyebrow: string;
@@ -168,7 +172,7 @@ export interface ShareObituaryProps {
  * "Who should know?". Mobile's own screen
  * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef, nudge }: ShareObituaryProps) {
   const insets = useSafeAreaInsets();
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
@@ -189,6 +193,26 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const blockedBy = reason ?? (linkValid ? undefined : copy.invalidLink);
 
   const showDone = Boolean(emailed && onDone && copy.doneButton);
+
+  if (nudge) {
+    return (
+      <ScrollView style={styles.flex} contentContainerStyle={[styles.content, { paddingBottom: spacing[3] + insets.bottom }]}>
+        <View style={styles.screen}>
+          <View style={styles.topBar}>
+            <Button label={copy.back} variant="header" onPress={onBack} />
+            <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          </View>
+          <View style={styles.head}>
+            <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>
+            <Heading level={1} headingRef={headingRef}>
+              {copy.heading}
+            </Heading>
+          </View>
+          <WebNudge {...nudge} />
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <>

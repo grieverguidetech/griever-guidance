@@ -29,7 +29,7 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 }));
 
 const anna = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceMessage: 'Come as you are.', thanksMessage: 'Thank you for being there.',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -55,19 +55,57 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const openAnna = async () => {
-  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+const openAnna = async (person: Session = anna) => {
+  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
   // The first App render in this file is slow on a loaded CI runner; give Home time to read storage.
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
 };
 
+// An announcement resumed with no edited wording: the message follows the form, so the tone and the Details row work.
+// A fresh form with web wording starts from that wording instead (edited), and with none shows the nudge (#824).
+const annaWithoutEditedWords = {
+  ...anna,
+  drafts: {
+    announcement: {
+      step: 'contacts', templateCategory: 'announcement', templateOverrideId: null, fields: { deceasedName: 'Anna' },
+      serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
+      flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
+    },
+  },
+} as unknown as Session;
+
 // The hub comes first: Start is the announcement; the other steps are rows named for the step.
 const startMoment = async (title: string) =>
   fireEvent.press(
     await screen.findByRole('button', { name: title === 'Announce the passing' ? /^Announce the passing, .*Continue$/ : new RegExp(title) }),
   );
+
+describe('a moment with nothing written on the web (#824)', () => {
+  const empty = { ...anna, announcementMessage: undefined, serviceMessage: '  ', thanksMessage: '' } as unknown as Session;
+
+  it('shows the nudge instead of the message and send controls, and Got it returns to the hub', async () => {
+    await openAnna(empty);
+    await startMoment('Announce the passing');
+    expect(await screen.findByRole('heading', { name: 'Write the announcement on the web first' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Announce the passing' })).toBeTruthy();
+    expect(screen.queryByLabelText('Your message')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Text \d/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    // The hub: the person's plan, with the row unchanged (still the lit next step).
+    expect(await screen.findByText('For Anna')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^Announce the passing, .*Continue$/ })).toBeTruthy();
+  });
+
+  it('a flow with web wording still opens the message', async () => {
+    await openAnna({ ...empty, serviceMessage: 'Come as you are.' } as unknown as Session);
+    await startMoment('Share the service');
+    expect(await screen.findByLabelText('Your message')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
+  });
+});
 
 describe('picking an announcement', () => {
   it('opens on Ready to send with the people sheet closed, never the old intro or the checklist', async () => {
@@ -84,7 +122,7 @@ describe('picking an announcement', () => {
   });
 
   it('puts the note typed under Add a personal note in the message, and keeps it on Change', async () => {
-    await openAnna();
+    await openAnna(annaWithoutEditedWords);
     await startMoment('Announce the passing');
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
@@ -215,7 +253,7 @@ describe('picking an announcement', () => {
 
 describe('Ready to send (announcement)', () => {
   const toReview = async () => {
-    await openAnna();
+    await openAnna(annaWithoutEditedWords);
     await startMoment('Announce the passing');
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
@@ -431,7 +469,7 @@ describe('the end of a send', () => {
   it('finishing the obituary lands on the hub with the note', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-    await openAnna();
+    await openAnna({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
     await startMoment('Share the obituary');
     fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));

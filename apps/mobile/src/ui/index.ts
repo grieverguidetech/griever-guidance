@@ -8,6 +8,8 @@ export { Eyebrow, Body } from './Text';
 export type { EyebrowProps, BodyProps, BodyTone } from './Text';
 export { SentNote } from './SentNote';
 export type { SentNoteProps } from './SentNote';
+export { WebNudge } from './WebNudge';
+export type { WebNudgeProps } from './WebNudge';
 export { Card } from './Card';
 export type { CardProps } from './Card';
 export { Row } from './Row';
