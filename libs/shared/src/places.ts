@@ -44,7 +44,9 @@ export interface PlaceDetailsRequest {
  * https://developers.google.com/maps/documentation/places/web-service/place-types
  * A request takes at most 5. Service: where a funeral or memorial can be held. Burial: where a person is buried.
  */
-export const SERVICE_PLACE_TYPES = ['funeral_home', 'church', 'synagogue', 'mosque', 'hindu_temple'] as const;
+export const FUNERAL_HOME_PLACE_TYPES = ['funeral_home'] as const;
+export const WORSHIP_PLACE_TYPES = ['church', 'synagogue', 'mosque', 'hindu_temple'] as const;
+export const SERVICE_PLACE_TYPES = [...FUNERAL_HOME_PLACE_TYPES, ...WORSHIP_PLACE_TYPES] as const;
 export const BURIAL_PLACE_TYPES = ['cemetery'] as const;
 /** Every type the gateway accepts. */
 export const ALLOWED_PLACE_TYPES: readonly string[] = [...SERVICE_PLACE_TYPES, ...BURIAL_PLACE_TYPES];

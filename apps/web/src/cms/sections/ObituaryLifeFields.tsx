@@ -8,6 +8,8 @@ import { PlaceInput } from '../../lib/places/PlaceInput';
 import { EventFields } from './EventFields';
 import {
   FLOW_DETAIL_MAX_LENGTH,
+  FUNERAL_HOME_PLACE_TYPES,
+  WORSHIP_PLACE_TYPES,
   ageFrom,
   dateNote,
   splitPersonName,
@@ -95,6 +97,8 @@ interface FieldSpec {
   numeric?: boolean;
   /** Takes both columns from the md breakpoint. Without it the field takes one. */
   full?: boolean;
+  /** Set: the field suggests these place types. A pick saves the place name only. */
+  placeTypes?: readonly string[];
 }
 
 const nameFields: FieldSpec[] = [
@@ -128,8 +132,8 @@ const familyFields: FieldSpec[] = [
 ];
 
 const funeralFields: FieldSpec[] = [
-  { key: 'obituaryFuneralHome', label: copy.funeralHomeLabel },
-  { key: 'obituaryChurch', label: copy.churchLabel },
+  { key: 'obituaryFuneralHome', label: copy.funeralHomeLabel, placeTypes: FUNERAL_HOME_PLACE_TYPES },
+  { key: 'obituaryChurch', label: copy.churchLabel, placeTypes: WORSHIP_PLACE_TYPES },
 ];
 
 const cemeteryLocationField: FieldSpec = { key: 'obituaryCemeteryLocation', label: copy.cemeteryLabel, full: true };
@@ -187,6 +191,32 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
     const hintId = `${id}-${spec.key}-hint`;
     // While the age has focus it shows only what was typed; otherwise the worked-out age fills an empty field.
     const showsDerived = isAge && typed === '' && !ageFocused && derivedAge !== '';
+    if (spec.placeTypes) {
+      const fieldId = `${id}-${spec.key}`;
+      const labelId = `${fieldId}-label`;
+      const max = FLOW_DETAIL_MAX_LENGTH[spec.key];
+      return (
+        <div className={spec.full ? 'gg-field md:col-span-2' : 'gg-field'} key={spec.key}>
+          <label id={labelId} htmlFor={fieldId}>
+            {spec.label}
+          </label>
+          <PlaceInput
+            id={fieldId}
+            labelledBy={labelId}
+            maxLength={max}
+            types={spec.placeTypes}
+            // Only the name is saved, so the paid details call is not needed.
+            wantsDetails={() => false}
+            onPick={(pick) => {
+              // Cut to the saved length, as the server would, so a long pick is not lost on save.
+              onChange({ [spec.key]: pick.mainText.slice(0, max) });
+            }}
+            value={typed}
+            onChange={(text) => onChange({ [spec.key]: text })}
+          />
+        </div>
+      );
+    }
     return (
       <div className={spec.full ? 'gg-field md:col-span-2' : 'gg-field'} key={spec.key}>
         <label htmlFor={`${id}-${spec.key}`}>{spec.label}</label>
