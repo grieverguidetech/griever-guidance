@@ -112,7 +112,8 @@ describe('picking an announcement', () => {
     expect(screen.getByText('Done · 2 chosen')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
-    expect(screen.getByText('To Dee and Eli · 2')).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
   });
 
   it('has no "Writing about" / Home bar on the people step', async () => {
@@ -198,14 +199,16 @@ describe('picking an announcement', () => {
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findByText('To Dee · 1')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
     expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     // The moment can be started again from the person screen, and it still does not open the sheet.
     await startMoment('Announce the passing');
-    expect(await screen.findByText('To Dee · 1')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
   });
 });
@@ -268,7 +271,8 @@ describe('Ready to send (announcement)', () => {
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     await startMoment('Announce the passing');
     expect(await screen.findByText('My own words.')).toBeTruthy();
-    expect(screen.getByText('To Dee · 1')).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
   });
 
   it('Change opens the people step with the ticks kept, and Continue returns to the message', async () => {
@@ -278,8 +282,9 @@ describe('Ready to send (announcement)', () => {
     expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
-    expect(await screen.findByText('To Dee and Eli · 2')).toBeTruthy();
-    expect(screen.getByText('Text 2 people')).toBeTruthy();
+    expect(await screen.findByText('Text 2 people')).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
   });
 
   it('keeps hand-edited wording when Change opens the people sheet and Close shuts it', async () => {
