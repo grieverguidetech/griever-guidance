@@ -72,7 +72,7 @@ function Harness({ details, lead }: { details?: ReadyToSendProps['details']; lea
       onUseSuggested={() => setOverride(null)}
       tone="plain"
       onToneChange={jest.fn()}
-      changePeople={{ label: 'Change who gets this', onPress: jest.fn() }}
+      changePeople={{ label: "Change who you're texting", onPress: jest.fn() }}
       sendLabel="Text 2 people"
       chooseLabel="Choose who to tell"
       note="One at a time, from your own number."
@@ -110,6 +110,12 @@ describe('ReadyToSend: Change details', () => {
     expect(screen.queryByText('Details row')).toBeNull();
     expect(focus).toHaveBeenCalledTimes(1);
     focus.mockRestore();
+  });
+
+  it('draws the row with no toggle when the details have no label', () => {
+    render(<Harness details={{ startOpen: true, render: details.render }} />);
+    expect(screen.getByText('Details row')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Change details' })).toBeNull();
   });
 
   it('has no Edit wording or Done editing button', () => {

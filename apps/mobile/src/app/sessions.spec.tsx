@@ -9,7 +9,7 @@ import { HYDRATE_TIMEOUT_MS } from '../lib/deviceCache';
 
 // Service and thank-you open on Who should get this?; their planned fields are kept in the saved draft.
 const findPicker = async () => {
-  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ }));
   return screen.findByRole('heading', { name: 'Who should get this?' });
 };
 async function savedAftercare(personName: string) {

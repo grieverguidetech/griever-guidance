@@ -8,9 +8,9 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
-// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+// ("Choose who to tell", or "Change who you're texting" when people are already picked) and waits for its heading.
 const openPeople = async () => {
-  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ }));
   return screen.findByRole('heading', { name: 'Who should get this?' });
 };
 

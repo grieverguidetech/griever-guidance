@@ -61,7 +61,7 @@ export interface ReadyToSendProps {
   /** The first-name switch, under the message box. Leave unset when no one is picked. */
   greeting?: { label: string; value: boolean; onChange: () => void };
   /** The Details link and the row it opens in place. Leave unset to hide both (hand-edited text). */
-  details?: { label: string; startOpen: boolean; /** Draws the row. `headingRef` goes on its heading, where focus lands when the row opens. */ render: (headingRef: Ref<ComponentRef<typeof RNText>>) => ReactNode };
+  details?: { /** Leave unset for no toggle: the row is always open. */ label?: string; startOpen: boolean; /** Draws the row. `headingRef` goes on its heading, where focus lands when the row opens. */ render: (headingRef: Ref<ComponentRef<typeof RNText>>) => ReactNode };
   /** Gets the button that opens the people step (Change, or the primary when nobody is picked) back its focus when the sheet closes. */
   peopleButtonRef?: Ref<ButtonNode>;
   /** The To row: its words, built by the app, and the link that opens the people step. */
@@ -98,6 +98,7 @@ export const BAR_TEST_ID = 'ready-action-bar';
  */
 export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef, nudge }: ReadyToSendProps) {
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
+  const detailsShown = details !== undefined && (details.label === undefined || detailsOpen);
   const [focusDetails, setFocusDetails] = useState(false);
   const detailsRef = useRef<ComponentRef<typeof RNText>>(null);
   const toneReasonId = useId();
@@ -248,7 +249,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           <Status id={swapNoteId} message={swapNote} />
         </View>
         <View style={styles.links}>
-          {details ? (
+          {details?.label !== undefined ? (
             <Button
               label={details.label}
               variant="tertiary"
@@ -260,9 +261,13 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             />
           ) : null}
         </View>
-        {details && detailsOpen ? details.render(detailsRef) : null}
-        {shareRow}
-        {changePeopleRow}
+        {details && detailsShown ? details.render(detailsRef) : null}
+        {shareRow || changePeopleRow ? (
+          <View style={styles.together}>
+            {shareRow}
+            {changePeopleRow}
+          </View>
+        ) : null}
       </ScrollView>
       <ActionBar
         testID={BAR_TEST_ID}
@@ -332,8 +337,9 @@ const styles = StyleSheet.create({
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   actions: { gap: spacing[1] },
   greetingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
-  to: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], alignItems: 'center', justifyContent: 'center' },
-  share: { alignItems: 'center' },
+  together: { alignSelf: 'flex-start', alignItems: 'flex-start', gap: spacing[1] },
+  to: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], alignItems: 'center' },
+  share: { alignItems: 'flex-start' },
   field: { gap: spacing[1] },
   input: {
     minHeight: 132,

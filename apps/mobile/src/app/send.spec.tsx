@@ -7,9 +7,9 @@ import { App, useSkipAnnounce } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
-// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+// ("Choose who to tell", or "Change who you're texting" when people are already picked) and waits for its heading.
 const openPeople = async () => {
-  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ }));
   return screen.findByRole('heading', { name: 'Who should get this?' });
 };
 
@@ -92,7 +92,7 @@ describe('a moment with nothing written on the web (#824)', () => {
     expect(screen.getByRole('heading', { name: 'Announce the passing' })).toBeTruthy();
     expect(screen.queryByLabelText('Your message')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Text \d/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
     // The hub: the person's plan, with the row unchanged (still the lit next step).
     expect(await screen.findByText('For Anna')).toBeTruthy();
@@ -211,7 +211,7 @@ describe('picking an announcement', () => {
     fireEvent.changeText(await screen.findByLabelText("Anything you'd like to add (optional)"), 'She was peaceful.');
     await waitFor(() => expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./));
     // Going to the people and back keeps the note.
-    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
     await screen.findByText('Done · 1 chosen');
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     await waitFor(() => expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./));
@@ -229,7 +229,7 @@ describe('picking an announcement', () => {
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "Change who you're texting" })).toBeTruthy();
   });
 
   it('has no "Writing about" / Home bar on the people step', async () => {
@@ -315,7 +315,7 @@ describe('picking an announcement', () => {
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
     await act(async () => new Promise((r) => setTimeout(r, 300)));
     expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
@@ -323,7 +323,7 @@ describe('picking an announcement', () => {
     expect(await screen.findByText('Ready to send')).toBeTruthy();
     // The moment can be started again from the person screen, and it still does not open the sheet.
     await startMoment('Announce the passing');
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
   });
@@ -384,25 +384,25 @@ describe('Ready to send (announcement)', () => {
     await startMoment('Announce the passing');
     expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "Change who you're texting" })).toBeTruthy();
   });
 
   it('Change opens the people step with the ticks kept, and Continue returns to the message', async () => {
     await toReview();
-    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
     expect(await screen.findByText('Done · 1 chosen')).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: /Dee/, checked: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('checkbox', { name: /Eli/ }));
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
     expect(await screen.findByText('Text 2 people')).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "Change who you're texting" })).toBeTruthy();
   });
 
   it('keeps hand-edited wording when Change opens the people sheet and Close shuts it', async () => {
     await toReview();
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
-    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
     await screen.findByRole('heading', { name: 'Who should get this?' });
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());

@@ -38,7 +38,7 @@ const draftAt = (category: string, step: string, ids: string[]) => ({
 describe('who starts picked (#674)', () => {
   it('opens the service on Ready to send with everyone you told, named as a group', async () => {
     await open({ ...base, recipientsNotified: toldDeeAndSam } as Session, /Share the service/);
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     // The names line is gone; the count is on the send button.
     expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.queryByText('Dee and Sam')).toBeNull();
@@ -47,7 +47,7 @@ describe('who starts picked (#674)', () => {
 
   it('leaves out a person who is in both the announcement and the service', async () => {
     await open({ ...base, recipientsNotified: { announcement: ['c1', 'c2'], service: ['c1'] } } as Session, /Share the service/);
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.getByRole('button', { name: 'Text 1 person' })).toBeTruthy();
   });
@@ -55,7 +55,7 @@ describe('who starts picked (#674)', () => {
   it('starts the obituary link with everyone you told', async () => {
     await open({ ...base, recipientsNotified: toldDeeAndSam } as Session, /Share the obituary/);
     fireEvent.press(await screen.findByRole('button', { name: 'Choose who to send it to' }));
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Text 2 people' })).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
   });
@@ -80,7 +80,7 @@ describe('who starts picked (#674)', () => {
 
   it('adds nothing to a draft that was resumed with its own people', async () => {
     await open({ ...base, recipientsNotified: toldDeeAndSam, drafts: { service: draftAt('service', 'review', ['c3']) } } as unknown as Session, /Share the service/);
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Text 1 person' })).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
   });
@@ -93,7 +93,7 @@ describe('who starts picked (#674)', () => {
 
   it('picks the people told but not yet sent on reopening after a partial send', async () => {
     await open({ ...base, recipientsNotified: { announcement: ['c1', 'c2'], service: ['c1'] }, drafts: { service: draftAt('service', 'sent', ['c1']) } } as unknown as Session, /Share the service/);
-    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: "Change who you're texting" })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Text 1 person' })).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
   });

@@ -25,7 +25,7 @@ const NUDGE_KEYS = { announcement: 'announcement', service: 'service', aftercare
 interface Props extends FlowProps {
   /** Used to name the people picked and the first one's greeting. */
   contacts?: UseContactsResult;
-  /** Opens the people step: the Change who gets this button, or the button when nobody is picked. */
+  /** Opens the people step: the change-people button, or the button when nobody is picked. */
   onChoosePeople: () => void;
   /** "Got it" on the nudge. Set by the app to go straight to the hub; unset it does what Back does. */
   onGotIt?: () => void;
@@ -163,9 +163,10 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
         onToneChange={flow.setTone}
         greeting={recipientCount > 0 ? { label: copy.greetingSwitch, value: flow.greeting, onChange: toggleGreeting } : undefined}
         details={
-          showDetails
+          // Share the service has no toggle: its fields show only while a required detail is missing.
+          showDetails && (!isService || detailsMissing)
             ? {
-                label: isService ? ready.changeService : isAnnouncement ? ready.addNote : ready.changeThanks,
+                label: isService ? undefined : isAnnouncement ? ready.addNote : ready.changeThanks,
                 startOpen: detailsMissing,
                 render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} headingRef={headingRef} />,
               }
