@@ -25,7 +25,7 @@ const NUDGE_KEYS = { announcement: 'announcement', service: 'service', aftercare
 interface Props extends FlowProps {
   /** Used to name the people picked and the first one's greeting. */
   contacts?: UseContactsResult;
-  /** Opens the people step: the Change who gets this button, or the button when nobody is picked. */
+  /** Opens the people step: the change-people button, or the button when nobody is picked. */
   onChoosePeople: () => void;
   /** "Got it" on the nudge. Set by the app to go straight to the hub; unset it does what Back does. */
   onGotIt?: () => void;
@@ -40,6 +40,9 @@ const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
 export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
+  // Set when the person types in a Share the service field, for this person and template. It keeps the field on screen
+  // after the last missing detail is typed, so the field (and the keyboard) do not vanish mid-typing.
+  const [editedServiceKey, setEditedServiceKey] = useState<string | null>(null);
   const shareButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof RNText>>(null);
   const peopleButton = useRef<ButtonNode>(null);
@@ -100,6 +103,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   const detailsFields = detailsFieldsFor(flow);
   const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
   const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
+  const serviceKey = `${flow.session?.personName ?? ''}:${selectedTemplate.id}`;
 
   // The shared text has no greeting, no per-person note and nothing is recorded: it is not a send.
   async function shareElsewhere() {
@@ -163,11 +167,17 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
         onToneChange={flow.setTone}
         greeting={recipientCount > 0 ? { label: copy.greetingSwitch, value: flow.greeting, onChange: toggleGreeting } : undefined}
         details={
-          showDetails
+          // Share the service has no toggle: its fields show only while a required detail is missing.
+          showDetails && (!isService || detailsMissing || editedServiceKey === serviceKey)
             ? {
-                label: isService ? ready.changeService : isAnnouncement ? ready.addNote : ready.changeThanks,
+                label: isService ? undefined : isAnnouncement ? ready.addNote : ready.changeThanks,
                 startOpen: detailsMissing,
-                render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} headingRef={headingRef} />,
+                render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={(key, value) => {
+                  if (isService) {
+                    setEditedServiceKey(serviceKey);
+                  }
+                  flow.setField(key, value);
+                }} headingRef={headingRef} />,
               }
             : undefined
         }

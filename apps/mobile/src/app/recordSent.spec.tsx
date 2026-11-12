@@ -8,9 +8,9 @@ import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
-// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+// ("Choose who to tell", or "Change who you're texting" when people are already picked) and waits for its heading.
 const openPeople = async () => {
-  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ }));
   return screen.findByRole('heading', { name: 'Who should get this?' });
 };
 
@@ -120,9 +120,9 @@ describe('recording who was messaged (#621)', () => {
     // Start the announcement again from its done row.
     fireEvent.press(screen.getByRole('button', { name: /^Announce the passing, .*, Sent$/ }));
     // It opens on Ready to send, with the people sheet closed, and stays there.
-    expect(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ })).toBeTruthy();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.getByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull();
   });
 

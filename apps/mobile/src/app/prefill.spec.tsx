@@ -17,9 +17,9 @@ beforeEach(() => {
   mockProfile = null;
 });
 // Arriving on a moment opens Ready to send, never the people list. This presses the button that opens the list
-// ("Choose who to tell", or "Change who gets this" when people are already picked) and waits for its heading.
+// ("Choose who to tell", or "Change who you're texting" when people are already picked) and waits for its heading.
 const openPeople = async () => {
-  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who gets this)/ }));
+  fireEvent.press(await screen.findByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ }));
   return screen.findByRole('heading', { name: 'Who should get this?' });
 };
 
@@ -80,8 +80,8 @@ describe('send flow starts from the planned details', () => {
     } as unknown as Session);
     await openPeople();
     await toConfirm();
-    fireEvent.press(await screen.findByRole('button', { name: 'Change date, time or place' }));
-    expect((await screen.findByLabelText('Time')).props.accessibilityValue.text).toBe('9:00 AM');
+    expect((await screen.findByLabelText('Your message')).props.value).toContain('9:00 AM');
+    expect(screen.queryByRole('button', { name: 'Change date, time or place' })).toBeNull();
     expect(screen.queryByText('Synced wording')).toBeNull();
   });
 
@@ -164,7 +164,7 @@ describe('send flow starts from the planned details', () => {
     };
     await openMoment({ ...base, drafts: { aftercare: draft } } as unknown as Session, /Send thank-yous/);
     expect(await screen.findByDisplayValue('Our own words.')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+    fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
     await screen.findByRole('heading', { name: 'Who should get this?' });
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());

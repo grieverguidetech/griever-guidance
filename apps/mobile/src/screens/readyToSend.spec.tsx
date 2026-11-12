@@ -26,9 +26,9 @@ const NONE: string[] = [];
 const FIVE = ['c0', 'c1', 'c2', 'c3', 'c4'];
 const TWO = ['c0', 'c1'];
 
-function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, web = {} }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
+function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, web = {}, loading = false }: { loading?: boolean; fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
   const flow = useSendFlow({
-    session: { ...session, ...(senderName === undefined ? {} : { senderName }), ...web },
+    session: loading ? null : { ...session, ...(senderName === undefined ? {} : { senderName }), ...web },
     draft: freshDraft({
       templateCategory: category ?? (thanks ? 'aftercare' : 'service'),
       templateOverrideId: category ? undefined : thanks ? 'thank-you-note' : 'share-service',
@@ -126,20 +126,28 @@ describe('Ready to send (Share the service)', () => {
     expect(screen.getByLabelText('Your message').props.value).toBe('   ');
   });
 
-  describe('Change who gets this and the button', () => {
-    it('has no names line, and puts Change who gets this just before the action bar', () => {
+  describe('The change-people button and the button', () => {
+    it('has no names line, and puts the change-people button just before the action bar', () => {
       render(<Harness ids={TWO} />);
       expect(screen.queryByText(/^To /)).toBeNull();
       expect(screen.queryByText(/Dee and Ana/)).toBeNull();
       expect(screen.queryByText('Change')).toBeNull();
       const tree = JSON.stringify(screen.toJSON());
-      expect(tree.indexOf('Change who gets this')).toBeGreaterThan(-1);
-      expect(tree.indexOf('Change who gets this')).toBeLessThan(tree.indexOf('Text 2 people'));
+      expect(tree.indexOf("Change who you're texting")).toBeGreaterThan(-1);
+      expect(tree.indexOf("Change who you're texting")).toBeLessThan(tree.indexOf('Text 2 people'));
       // The button is in the scrolling content, not in the bar.
       const bar = within(screen.getByTestId('ready-action-bar'));
-      expect(bar.queryByText('Change who gets this')).toBeNull();
+      expect(bar.queryByText("Change who you're texting")).toBeNull();
       expect(bar.getByText('Text 2 people')).toBeTruthy();
       expect(screen.getByText('One at a time, from your own number.')).toBeTruthy();
+    });
+
+    it('stacks Share with another app, then Change who you\'re texting, in one left-aligned group', () => {
+      render(<Harness ids={TWO} />);
+      const group = screen.getByTestId('ready-share-change');
+      expect(StyleSheet.flatten(group.props.style).alignSelf).toBe('flex-start');
+      const names = within(group).getAllByRole('button').map((b) => b.props.accessibilityLabel ?? within(b).getByText(/./).props.children);
+      expect(names).toEqual(['Share with another app', "Change who you're texting"]);
     });
 
     it('shows no names line for five people either, and the button count stays', () => {
@@ -154,7 +162,7 @@ describe('Ready to send (Share the service)', () => {
       render(<Harness category="announcement" ids={NONE} onChoose={onChoose} />);
       expect(screen.queryByText(/^Text /)).toBeNull();
       expect(screen.queryByText(/^To /)).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Change who gets this' })).toBeNull();
+      expect(screen.queryByRole('button', { name: "Change who you're texting" })).toBeNull();
       expect(screen.queryByText('One at a time, from your own number.')).toBeNull();
       fireEvent.press(screen.getByRole('button', { name: 'Choose who to tell' }));
       expect(onChoose).toHaveBeenCalledTimes(1);
@@ -163,7 +171,7 @@ describe('Ready to send (Share the service)', () => {
     it('Change opens the people step', () => {
       const onChoose = jest.fn();
       render(<Harness onChoose={onChoose} />);
-      fireEvent.press(screen.getByRole('button', { name: 'Change who gets this' }));
+      fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
       expect(onChoose).toHaveBeenCalledTimes(1);
     });
 
@@ -175,8 +183,7 @@ describe('Ready to send (Share the service)', () => {
 
   describe('Details row', () => {
     it('changes the message when the date changes', () => {
-      render(<Harness />);
-      fireEvent.press(screen.getByRole('button', { name: 'Change date, time or place' }));
+      render(<Harness fields={{ serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: '' }} />);
       expect(screen.getByLabelText('Service date').props.accessibilityValue.text).toBe('June 14');
       fireEvent.press(screen.getByLabelText('Service date'));
       fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 5, 20));
@@ -197,6 +204,32 @@ describe('Ready to send (Share the service)', () => {
       expect(primary().props.accessibilityState?.disabled).toBeFalsy();
     });
 
+    it('keeps the field on screen once the last missing detail is typed, and unblocks send', () => {
+      render(<Harness fields={{ serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: '' }} />);
+      fireEvent.changeText(screen.getByLabelText('Location, Needed'), 'Oak Chapel');
+      expect(screen.getByDisplayValue('Oak Chapel')).toBeTruthy();
+      expect(primary().props.accessibilityState?.disabled).toBeFalsy();
+    });
+
+    it('shows no service fields once the session loads with every detail filled', () => {
+      const { rerender } = render(<Harness loading />);
+      rerender(<Harness />);
+      expect(screen.queryByLabelText('Service date')).toBeNull();
+      expect(screen.queryByLabelText(/Needed/)).toBeNull();
+    });
+
+    it('has no toggle and no fields when every detail is filled', () => {
+      render(<Harness />);
+      expect(screen.queryByRole('button', { name: 'Change date, time or place' })).toBeNull();
+      expect(screen.queryByLabelText('Service date')).toBeNull();
+    });
+
+    it('shows the fields with no toggle while a detail is missing', () => {
+      render(<Harness fields={{ serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: '' }} />);
+      expect(screen.getByLabelText('Service date')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Change date, time or place' })).toBeNull();
+    });
+
     it('is hidden for hand-edited text, and Use the suggested wording brings it back', () => {
       render(<Harness />);
       fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
@@ -205,8 +238,6 @@ describe('Ready to send (Share the service)', () => {
       expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
       fireEvent.press(screen.getByText('Use the suggested wording'));
       expect(screen.getByLabelText('Your message').props.value).toContain('June 14');
-      fireEvent.press(screen.getByRole('button', { name: 'Change date, time or place' }));
-      expect(screen.getByLabelText('Service date')).toBeTruthy();
     });
   });
 
@@ -283,7 +314,7 @@ describe('Share elsewhere', () => {
   });
 
   const shared = { action: Share.sharedAction, activityType: undefined };
-  const shareButton = () => screen.getByRole('button', { name: 'Share elsewhere instead' });
+  const shareButton = () => screen.getByRole('button', { name: 'Share with another app' });
 
   it('shows on the service, and shares the message without a greeting', async () => {
     const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
@@ -297,8 +328,8 @@ describe('Share elsewhere', () => {
   it('comes before the action bar button when people are picked', () => {
     render(<Harness />);
     const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('Share elsewhere instead')).toBeLessThan(tree.indexOf('Text 1 person'));
-    expect(within(screen.getByTestId('ready-action-bar')).queryByText('Share elsewhere instead')).toBeNull();
+    expect(tree.indexOf('Share with another app')).toBeLessThan(tree.indexOf('Text 1 person'));
+    expect(within(screen.getByTestId('ready-action-bar')).queryByText('Share with another app')).toBeNull();
   });
 
   it('works with no one picked, and records nothing', async () => {
@@ -346,11 +377,11 @@ describe('Share elsewhere', () => {
 
   it('is not on the announcement or the thank-you, and the button is', () => {
     const { unmount } = render(<Harness category="announcement" />);
-    expect(screen.queryByText('Share elsewhere instead')).toBeNull();
+    expect(screen.queryByText('Share with another app')).toBeNull();
     expect(screen.getByText('Text 1 person')).toBeTruthy();
     unmount();
     render(<Harness thanks senderName="The Hayes Family" fields={{}} />);
-    expect(screen.queryByText('Share elsewhere instead')).toBeNull();
+    expect(screen.queryByText('Share with another app')).toBeNull();
     expect(screen.getByText('Text 1 person')).toBeTruthy();
   });
 });
@@ -387,7 +418,7 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(screen.queryByLabelText('Your message')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Text \d/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Choose who to tell' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Change who gets this' })).toBeNull();
+    expect(screen.queryByRole('button', { name: "Change who you're texting" })).toBeNull();
     expect(screen.queryByRole('button', { name: /Change date|Change details|Add a personal note/ })).toBeNull();
     expect(screen.queryByRole('switch')).toBeNull();
     expect(screen.queryByText(/!/)).toBeNull();
