@@ -129,7 +129,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <ReadyToSend
-        copy={copy}
+        copy={{ ...copy, messageCaption: ready.messageCaption }}
         heading={moments[momentOf(flow.templateCategory)].title}
         headingRef={heading}
         kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}

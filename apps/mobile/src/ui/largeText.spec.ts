@@ -26,7 +26,6 @@ const WRAPPING_ROWS: Array<[string, string]> = [
   ['screens/ContactSelectorScreen.tsx', 'topBar'],
   ['ui/screens/PersonSetup.tsx', 'topBar'],
   ['ui/screens/ShareObituary.tsx', 'topBar'],
-  ['ui/screens/ShareObituary.tsx', 'editActions'],
   ['ui/ActionBar.tsx', 'above'],
   ['components/ChecklistGroupPanel.tsx', 'header'],
 ];

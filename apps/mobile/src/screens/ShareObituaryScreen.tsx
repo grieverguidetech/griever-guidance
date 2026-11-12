@@ -56,12 +56,8 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [pasteMessage, setPasteMessage] = useState<string | undefined>(undefined);
-  const editButton = useRef<ButtonNode>(null);
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
-  const [note, setNote] = useState<'saved' | 'follows' | undefined>(undefined);
-  // Counts finished edits, so focus returns to the Edit button once it is back on screen.
-  const [editsEnded, setEditsEnded] = useState(0);
+  // What the user typed in the obituary box. null until they type, so the box follows the details until then.
+  const [editValue, setEditValue] = useState<string | null>(null);
   // The publisher's address is typed here and kept on this phone only, per person (never part of the session, so it never syncs: DS-7).
   const [address, setAddress] = useState('');
   // The error shows after the field is left or Email is pressed, and goes when the user types again.
@@ -69,7 +65,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const addressInput = useRef<TextInputNode | null>(null);
   const addressEdited = useRef(false);
   // What the exits need, kept in refs so Android Back and unmount see the latest typed text.
-  const latest = useRef({ editing: false, value: '', shown: '', onChange });
+  const latest = useRef<{ typed: string | null; shown: string; onChange: Props['onChange'] }>({ typed: null, shown: '', onChange });
   const emailRunning = useRef(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const sheetOpen = useRef(false);
@@ -115,8 +111,8 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
       if (sheetOpen.current) {
         return false;
       }
-      // While editing: the first Back closes the keyboard; with it closed, Back saves and goes back.
-      if (latest.current.editing && Keyboard.isVisible()) {
+      // The first Back closes the keyboard; with it closed, Back saves and goes back.
+      if (Keyboard.isVisible()) {
         Keyboard.dismiss();
         return true;
       }
@@ -127,36 +123,6 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     // leave is stable: it only reads refs and setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onBack]);
-
-  useEffect(() => {
-    if (editsEnded === 0) {
-      return;
-    }
-    const focusEdit = () => {
-      const handle = editButton.current ? findNodeHandle(editButton.current) : null;
-      if (handle) {
-        AccessibilityInfo.setAccessibilityFocus(handle);
-      }
-    };
-    // With the keyboard open, wait until it is gone, or focus lands while the screen is still moving.
-    if (Keyboard.isVisible()) {
-      let done = false;
-      const run = () => {
-        if (!done) {
-          done = true;
-          focusEdit();
-        }
-      };
-      const sub = Keyboard.addListener('keyboardDidHide', run);
-      const fallback = setTimeout(run, 800);
-      return () => {
-        sub.remove();
-        clearTimeout(fallback);
-      };
-    }
-    const timer = setTimeout(focusEdit, 0);
-    return () => clearTimeout(timer);
-  }, [editsEnded]);
 
   // iOS tells us when the sheet is gone; Android returns to the last focused view by itself.
   const focusChecklistButton = () => {
@@ -178,7 +144,9 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const name = session.personName.trim() || copy.nameFallback;
   // The body is what the editor holds; the full text adds the memorial as the last paragraph.
   const obituaryBody = obituaryTextFor(session);
-  const obituaryText = obituaryShareTextFor(session);
+  // What Email, Copy and the share sheet send: the box as it is now, even before it is saved on leaving.
+  const typedBody = editValue?.trim();
+  const obituaryText = obituaryShareTextFor(typedBody === undefined ? session : { ...session, obituaryText: typedBody === '' ? undefined : typedBody });
 
   const addressCheck = checkPublisherEmail(address);
   const addressError = addressCheck.ok ? undefined : addressCheck.reason === 'many' ? copy.publisherEmailMany : copy.publisherEmailInvalid;
@@ -190,48 +158,26 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     void savePublisherEmail(session.id, value);
   };
 
-  latest.current = { editing, value: editValue, shown: obituaryBody, onChange };
-
-  const startEdit = () => {
-    setEditValue(obituaryBody);
-    setNote(undefined);
-    setEditing(true);
-  };
+  latest.current = { typed: editValue, shown: obituaryBody, onChange };
 
   // Writes the typed text. Unchanged text writes nothing. An empty box clears it, so the text follows the details again.
-  // It only reads refs, so Android Back and unmount can call it too. Returns the line to show.
-  const commit = (): 'saved' | 'follows' | undefined => {
-    const { editing: wasEditing, value, shown, onChange: change } = latest.current;
-    latest.current.editing = false;
-    if (!wasEditing) {
-      return undefined;
+  // It only reads refs, so Android Back and unmount can call it too. It writes once per edit.
+  const commit = () => {
+    const { typed: value, shown, onChange: change } = latest.current;
+    if (value === null) {
+      return;
     }
+    latest.current.typed = null;
     const typed = value.trim();
-    if (typed === shown) {
-      return undefined;
+    if (typed !== shown) {
+      change({ obituaryText: typed === '' ? undefined : typed });
     }
-    change({ obituaryText: typed === '' ? undefined : typed });
-    return typed === '' ? 'follows' : 'saved';
   };
 
-  const saveEdit = () => {
-    setNote(commit());
-    setEditing(false);
-    setEditsEnded((n) => n + 1);
-  };
-
-  const cancelEdit = () => {
-    latest.current.editing = false;
-    setNote(undefined);
-    setEditing(false);
-    setEditsEnded((n) => n + 1);
-  };
-
-  // Every way out of the box saves first (no confirm dialog), then does its action.
+  // Every way out saves first (no confirm dialog), then does its action.
   const leave = (go: () => void) => {
-    if (latest.current.editing) {
-      saveEdit();
-    }
+    commit();
+    setEditValue(null);
     go();
   };
 
@@ -322,7 +268,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           onPasteLink={pasteLink}
           pasteMessage={pasteMessage}
           publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', hasBlanks: hasTemplateBlanks(obituaryText, draftCopy), onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
-          textEditor={{ text: obituaryText, editing, value: editValue, onValueChange: setEditValue, onEdit: startEdit, onSave: saveEdit, onCancel: cancelEdit, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, note, editRef: editButton }}
+          textEditor={{ value: editValue ?? obituaryBody, onValueChange: setEditValue, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText }}
           emailed={emailed}
           keyboardOpen={keyboardOpen}
           onDone={() => leave(onEmailed)}

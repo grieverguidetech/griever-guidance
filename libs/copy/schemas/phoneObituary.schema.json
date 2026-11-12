@@ -5,15 +5,9 @@
   "additionalProperties": false,
   "required": [
     "textTitle",
-    "editHelp",
-    "editButton",
-    "writeButton",
+    "textCaption",
     "editLabel",
     "editPlaceholder",
-    "saveButton",
-    "cancelButton",
-    "saved",
-    "followsDetails",
     "emailNoText",
     "emailBlanks",
     "publisherEmailLabel",
@@ -30,31 +24,10 @@
     "textTitle": {
       "$ref": "#/$defs/text"
     },
-    "editHelp": {
-      "$ref": "#/$defs/text"
-    },
-    "editButton": {
-      "$ref": "#/$defs/text"
-    },
-    "writeButton": {
-      "$ref": "#/$defs/text"
-    },
     "editLabel": {
       "$ref": "#/$defs/text"
     },
     "editPlaceholder": {
-      "$ref": "#/$defs/text"
-    },
-    "saveButton": {
-      "$ref": "#/$defs/text"
-    },
-    "cancelButton": {
-      "$ref": "#/$defs/text"
-    },
-    "saved": {
-      "$ref": "#/$defs/text"
-    },
-    "followsDetails": {
       "$ref": "#/$defs/text"
     },
     "emailNoText": {
@@ -88,6 +61,9 @@
       "$ref": "#/$defs/text"
     },
     "emailShared": {
+      "$ref": "#/$defs/text"
+    },
+    "textCaption": {
       "$ref": "#/$defs/text"
     }
   },

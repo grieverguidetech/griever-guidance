@@ -52,7 +52,7 @@ const handleForText = (text: string): number => {
   return found;
 };
 
-const copy = screenCopy('review');
+const copy = { ...screenCopy('review'), messageCaption: screenCopy('phoneReady').messageCaption };
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
@@ -111,11 +111,10 @@ describe('ReadyToSend: Change details', () => {
     focus.mockRestore();
   });
 
-  it('Edit wording reads expanded or not', () => {
+  it('has no Edit wording or Done editing button', () => {
     render(<Harness />);
-    expect(screen.getByRole('button', { name: 'Edit wording' }).props.accessibilityState).toMatchObject({ expanded: false });
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
-    expect(screen.getByRole('button', { name: 'Done editing' }).props.accessibilityState).toMatchObject({ expanded: true });
+    expect(screen.queryByRole('button', { name: 'Edit wording' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Done editing' })).toBeNull();
   });
 });
 
@@ -127,7 +126,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
 
   it('restores the last edit after "Use the suggested wording"', () => {
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
     expect(screen.queryByText('My own words.')).toBeNull();
@@ -138,7 +136,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
 
   it('goes away at the next edit', () => {
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
     expect(screen.getByRole('button', { name: 'Bring back my words' })).toBeTruthy();
@@ -149,7 +146,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
   it('moves focus to Bring back after Use suggested, and back to Use suggested after Bring back', () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
@@ -165,7 +161,6 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
   it('says what changed, politely', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
     render(<Harness />);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit wording' }));
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     announce.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
@@ -174,5 +169,33 @@ describe('ReadyToSend: Bring back my words (#654)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Bring back my words' }));
     expect(announce).toHaveBeenLastCalledWith('Your words are back.');
     announce.mockRestore();
+  });
+});
+
+describe('ReadyToSend: the message is always an editable box (#823)', () => {
+  it('shows the message in a multiline box with its label and the caption under it', () => {
+    render(<Harness />);
+    const box = screen.getByLabelText('Your message');
+    expect(box.props.value).toBe(SUGGESTED);
+    expect(box.props.multiline).toBe(true);
+    expect(screen.getByText('Read it one last time and make any last changes.')).toBeTruthy();
+  });
+
+  it('is not focused on arrival, so no keyboard opens', () => {
+    render(<Harness />);
+    expect(screen.getByLabelText('Your message').props.autoFocus).toBeFalsy();
+    expect(screen.getByLabelText('Your message')).not.toHaveProp('focused', true);
+  });
+
+  it('keeps the tone and greeting extras under the box at all times', () => {
+    render(<Harness />);
+    expect(screen.getByRole('button', { name: 'Softer tone' })).toBeTruthy();
+  });
+
+  it('typing changes the message', () => {
+    render(<Harness />);
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+    expect(screen.getByRole('button', { name: 'Use the suggested wording' })).toBeTruthy();
   });
 });

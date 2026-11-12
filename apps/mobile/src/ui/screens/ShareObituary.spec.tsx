@@ -71,7 +71,7 @@ function setup(over: Partial<ShareObituaryProps> = {}) {
 }
 
 describe('ShareObituary Done after emailing (#726)', () => {
-  const editor = { text: 'Anna loved the garden.', editing: false, value: '', onValueChange: jest.fn(), onEdit: jest.fn(), onSave: jest.fn(), onCancel: jest.fn() };
+  const editor = { value: 'Anna loved the garden.', onValueChange: jest.fn() };
   const email = { hasText: true, onPress: jest.fn() };
 
   it('shows no Done until the obituary was emailed', () => {
@@ -89,9 +89,11 @@ describe('ShareObituary Done after emailing (#726)', () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it('hides Done while the text is being edited', () => {
-    setup({ publisherEmail: email, emailed: true, onDone: jest.fn(), textEditor: { ...editor, editing: true } });
-    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+  it('keeps Done, the email card and Continue visible with the text box on screen', () => {
+    setup({ publisherEmail: email, emailed: true, onDone: jest.fn(), textEditor: editor, link: 'https://legacy.com/anna', linkValid: true });
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Email it to the paper or funeral home' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Choose who to send it to' })).toBeTruthy();
   });
 
   it('keeps Done on screen with the keyboard open (its inset is dropped by a negative margin)', () => {
@@ -177,45 +179,54 @@ describe('ShareObituary (mobile steps, #650)', () => {
   });
 });
 
-describe('ShareObituary text card (#701)', () => {
+describe('ShareObituary text box (#823)', () => {
   const editorCopy = {
     textTitle: 'The obituary text',
-    editHelp: 'Change anything you like.',
-    editButton: 'Edit the text',
-    writeButton: 'Write the text',
+    textCaption: 'Read it one last time and make any last changes.',
     editLabel: 'Obituary text',
     editPlaceholder: 'Write the obituary here.',
-    saveButton: 'Save the text',
-    cancelButton: 'Cancel',
-    saved: 'Saved.',
-    followsDetails: 'The text follows the details again.',
   };
-  const editor = (over = {}) => ({ text: 'Anna loved the garden.', editing: false, value: '', onValueChange: jest.fn(), onEdit: jest.fn(), onSave: jest.fn(), onCancel: jest.fn(), ...over });
+  const editor = (over = {}) => ({ value: 'Anna loved the garden.', onValueChange: jest.fn(), ...over });
+  const draw = (e: ReturnType<typeof editor>) =>
+    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
 
   it('shows no card without textEditor, as the web does', () => {
     setup();
     expect(screen.queryByText('The obituary text')).toBeNull();
   });
 
-  it('shows the text and calls onEdit', () => {
-    const e = editor();
-    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
-    expect(screen.getByText('Anna loved the garden.')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit the text' }));
-    expect(e.onEdit).toHaveBeenCalledTimes(1);
-  });
-
-  it('while editing shows one multiline box with the value, and Save and Cancel', () => {
-    const e = editor({ editing: true, value: 'Typed' });
-    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
+  it('always shows one labelled multiline box with the text and the caption under it', () => {
+    draw(editor());
     const box = screen.getByLabelText('Obituary text');
     expect(box.props.multiline).toBe(true);
-    expect(box.props.value).toBe('Typed');
+    expect(box.props.value).toBe('Anna loved the garden.');
+    expect(screen.getByText('Read it one last time and make any last changes.')).toBeTruthy();
+  });
+
+  it('does not take focus on arrival', () => {
+    draw(editor());
+    expect(screen.getByLabelText('Obituary text').props.autoFocus).toBeFalsy();
+  });
+
+  it('shows the box when there is no text yet, with its placeholder', () => {
+    draw(editor({ value: '' }));
+    expect(screen.getByLabelText('Obituary text').props.value).toBe('');
+    expect(screen.getByPlaceholderText('Write the obituary here.')).toBeTruthy();
+  });
+
+  it('passes typing to onValueChange and limits the length', () => {
+    const e = editor({ maxLength: 10000 });
+    draw(e);
+    const box = screen.getByLabelText('Obituary text');
+    expect(box.props.maxLength).toBe(10000);
     fireEvent.changeText(box, 'More');
     expect(e.onValueChange).toHaveBeenCalledWith('More');
-    fireEvent.press(screen.getByRole('button', { name: 'Save the text' }));
-    fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
-    expect(e.onSave).toHaveBeenCalledTimes(1);
-    expect(e.onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no Edit, Write, Save or Cancel button', () => {
+    draw(editor());
+    for (const name of ['Edit the text', 'Write the text', 'Save the text', 'Save', 'Cancel']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
   });
 });
