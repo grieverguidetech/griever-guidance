@@ -13,6 +13,8 @@ import { applyUrlInputMode } from '../inputMode';
 import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
 import { useSerifStyle } from '../typography';
+import { WebNudge } from '../WebNudge';
+import type { WebNudgeProps } from '../WebNudge';
 
 export type TextInputNode = ComponentRef<typeof TextInput>;
 
@@ -123,6 +125,8 @@ export interface ObituaryTextEditor {
 }
 
 export interface ShareObituaryProps {
+  /** Nothing started on the web for the obituary: the nudge replaces the text box, Email and Copy. The link field stays (the link is only added on the phone). */
+  nudge?: WebNudgeProps;
   copy: ShareObituaryCopy;
   /** The eyebrow line, for example "For Margaret". */
   eyebrow: string;
@@ -168,7 +172,7 @@ export interface ShareObituaryProps {
  * "Who should know?". Mobile's own screen
  * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef, nudge }: ShareObituaryProps) {
   const insets = useSafeAreaInsets();
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
@@ -206,8 +210,9 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         </Heading>
         <Body tone="muted">{copy.intro}</Body>
       </View>
-      {textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
-      {publisherEmail && copy.emailButton ? (
+      {/* The nudge takes the text card's place, so the link field below keeps its position while a link is typed. */}
+      {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
+      {!nudge && publisherEmail && copy.emailButton ? (
         <Card>
           {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
           {publisherEmail.hasText ? (

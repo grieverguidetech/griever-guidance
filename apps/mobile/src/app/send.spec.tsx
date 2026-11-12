@@ -29,7 +29,7 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 }));
 
 const anna = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -55,19 +55,135 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const openAnna = async () => {
-  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([anna]));
+const openAnna = async (person: Session = anna) => {
+  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
   render(<App />);
   // The first App render in this file is slow on a loaded CI runner; give Home time to read storage.
   fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
 };
 
+// An announcement resumed with no edited wording: the message follows the form, so the tone and the Details row work.
+// A fresh form with web wording starts from that wording instead (edited), and with none shows the nudge (#824).
+const annaWithoutEditedWords = {
+  ...anna,
+  drafts: {
+    announcement: {
+      step: 'contacts', templateCategory: 'announcement', templateOverrideId: null, fields: { deceasedName: 'Anna' },
+      serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
+      flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
+    },
+  },
+} as unknown as Session;
+
 // The hub comes first: Start is the announcement; the other steps are rows named for the step.
 const startMoment = async (title: string) =>
   fireEvent.press(
     await screen.findByRole('button', { name: title === 'Announce the passing' ? /^Announce the passing, .*Continue$/ : new RegExp(title) }),
   );
+
+describe('a moment with nothing written on the web (#824)', () => {
+  const empty = { ...anna, announcementMessage: undefined, serviceMessage: '  ', serviceType: '', thanksMessage: '' } as unknown as Session;
+
+  it('shows the nudge instead of the message and send controls, and Got it returns to the hub', async () => {
+    await openAnna(empty);
+    await startMoment('Announce the passing');
+    expect(await screen.findByRole('heading', { name: 'Write the announcement on the web first' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Announce the passing' })).toBeTruthy();
+    expect(screen.queryByLabelText('Your message')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Text \d/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(Choose who to tell|Change who gets this)/ })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    // The hub: the person's plan, with the row unchanged (still the lit next step).
+    expect(await screen.findByText('For Anna')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /^Announce the passing, .*Continue$/ })).toBeTruthy();
+  });
+
+  it('a flow with web wording still opens the message', async () => {
+    await openAnna({ ...empty, serviceMessage: 'Come as you are.' } as unknown as Session);
+    await startMoment('Share the service');
+    expect(await screen.findByLabelText('Your message')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
+  });
+
+  it('a service with only a date shows the message box (the web Overview counts it as started)', async () => {
+    await openAnna({ ...empty, serviceDate: 'June 14' } as unknown as Session);
+    await startMoment('Share the service');
+    expect(await screen.findByLabelText('Your message')).toBeTruthy();
+  });
+
+  it('does not strand a draft in progress: edited words with no web wording keep the message box', async () => {
+    const draft = {
+      step: 'review', templateCategory: 'announcement', templateOverrideId: null, fields: { deceasedName: 'Anna' },
+      serviceDetailsKnown: null, selectedContactIds: ['c1'], includeFlowers: false, customFlorist: '',
+      flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: 'My own words.',
+    };
+    await openAnna({ ...empty, drafts: { announcement: draft } } as unknown as Session);
+    await startMoment('Announce the passing');
+    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Write the announcement on the web first' })).toBeNull();
+  });
+
+  it('puts screen-reader focus on the screen heading, then reads heading, card heading, line and Got it in order', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna(empty);
+    focus.mockClear();
+    await startMoment('Announce the passing');
+    await screen.findByRole('heading', { name: 'Write the announcement on the web first' });
+    const nodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
+    expect(nodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'Announce the passing')).toBe(true);
+    const tree = JSON.stringify(screen.toJSON());
+    const at = (text: string) => tree.indexOf(text);
+    const order = ['Announce the passing', 'Write the announcement on the web first', 'Open web.grieversguidance.com', 'Got it'].map(at);
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    // No ancestor of the button is one accessible block: that would hide the button from the screen reader.
+    let node = screen.getByRole('button', { name: 'Got it' }).parent;
+    while (node) {
+      if (typeof node.type === 'string') {
+        expect(node.props?.accessible).not.toBe(true);
+      }
+      node = node.parent;
+    }
+  });
+
+  it.each([
+    ['Share the service', 'Add the service details on the web first'],
+    ['Send thank-yous', 'Write the thank-you note on the web first'],
+    ['Share the obituary', 'Write the obituary on the web first'],
+  ])('%s: Got it returns to the hub, with the row unchanged', async (moment, nudge) => {
+    await openAnna(empty);
+    await startMoment(moment);
+    await screen.findByRole('heading', { name: nudge });
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(await screen.findByText('For Anna')).toBeTruthy();
+    expect(screen.getByRole('button', { name: new RegExp(moment) })).toBeTruthy();
+  });
+
+  it('Got it reaches the hub while the people are still loading (the flow is on its people step)', async () => {
+    const real = AsyncStorage.getItem.bind(AsyncStorage);
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([empty]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    // The saved contacts never load, so the people step stays open under the nudge.
+    jest.spyOn(AsyncStorage, 'getItem').mockImplementation((key) => (key === 'gg.contacts.v1' ? new Promise(() => undefined) : real(key)));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+    fireEvent.press(await screen.findByRole('button', { name: /Share the service/ }));
+    fireEvent.press(await screen.findByRole('button', { name: 'Got it' }));
+    expect(await screen.findByText('For Anna')).toBeTruthy();
+  });
+
+  it('the obituary keeps its link field under the nudge, and a typed link brings the normal screen', async () => {
+    await openAnna(empty);
+    await startMoment('Share the obituary');
+    await screen.findByRole('heading', { name: 'Write the obituary on the web first' });
+    expect(screen.queryByLabelText(/^Your obituary|Obituary text/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Email it to the paper or funeral home' })).toBeNull();
+    fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull());
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+  });
+});
 
 describe('picking an announcement', () => {
   it('opens on Ready to send with the people sheet closed, never the old intro or the checklist', async () => {
@@ -84,7 +200,7 @@ describe('picking an announcement', () => {
   });
 
   it('puts the note typed under Add a personal note in the message, and keeps it on Change', async () => {
-    await openAnna();
+    await openAnna(annaWithoutEditedWords);
     await startMoment('Announce the passing');
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
@@ -215,7 +331,7 @@ describe('picking an announcement', () => {
 
 describe('Ready to send (announcement)', () => {
   const toReview = async () => {
-    await openAnna();
+    await openAnna(annaWithoutEditedWords);
     await startMoment('Announce the passing');
     await openPeople();
     fireEvent.press(await screen.findByText('Dee'));
@@ -431,7 +547,7 @@ describe('the end of a send', () => {
   it('finishing the obituary lands on the hub with the note', async () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-    await openAnna();
+    await openAnna({ ...anna, obituaryText: 'Anna loved the garden.' } as Session);
     await startMoment('Share the obituary');
     fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
     fireEvent.press(screen.getByRole('button', { name: 'Choose who to send it to' }));

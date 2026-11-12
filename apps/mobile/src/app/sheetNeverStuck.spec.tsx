@@ -22,7 +22,7 @@ jest.mock('../ui/Sheet', () => {
 });
 
 const session = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;

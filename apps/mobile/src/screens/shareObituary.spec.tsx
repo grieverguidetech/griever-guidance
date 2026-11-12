@@ -47,6 +47,9 @@ const base = {
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
 
+// Nothing started on the web shows the nudge (#824). These tests need the screen itself, so the person has a link.
+const linked = { ...base, obituaryUrl: 'https://legacy.com/anna' } as Session;
+
 const BUTTON = 'Email it to the paper or funeral home';
 const OPENED = "Opened in your email app. Tap Done when you have sent it.";
 const SHARED = "Shared from your phone. Tap Done when you have sent it.";
@@ -100,7 +103,7 @@ describe('ShareObituaryScreen step 1 (email the publisher)', () => {
   });
 
   it('with no text, says it can be written on the web and still lets the user continue to the link field', () => {
-    setup(base);
+    setup(linked);
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
     expect(screen.getByText("Write it above, or on the web.")).toBeTruthy();
     expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
@@ -203,14 +206,14 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
   it('paste fills the link field from the clipboard', async () => {
     jest.mocked(Clipboard.getStringAsync).mockResolvedValue('  https://paper.example/anna  ');
     const onChange = jest.fn();
-    setup(base, onChange);
+    setup(linked, onChange);
     fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ obituaryUrl: 'https://paper.example/anna' }));
   });
 
   it('paste says "Link pasted." after a good link', async () => {
     jest.mocked(Clipboard.getStringAsync).mockResolvedValue('https://paper.example/anna');
-    setup(base);
+    setup(linked);
     fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
     expect(await screen.findByText('Link pasted.')).toBeTruthy();
   });
@@ -218,7 +221,7 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
   it('paste leaves the field alone and says so when the clipboard is empty', async () => {
     jest.mocked(Clipboard.getStringAsync).mockResolvedValue('');
     const onChange = jest.fn();
-    setup(base, onChange);
+    setup(linked, onChange);
     fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
     expect(await screen.findByText("There's nothing to paste yet.")).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
@@ -227,7 +230,7 @@ describe('ShareObituaryScreen two steps, paste and copy', () => {
   it('paste leaves the field alone and says so when the clipboard is not a link', async () => {
     jest.mocked(Clipboard.getStringAsync).mockResolvedValue('see you at 3pm');
     const onChange = jest.fn();
-    setup(base, onChange);
+    setup(linked, onChange);
     fireEvent.press(screen.getByRole('button', { name: 'Paste link' }));
     expect(await screen.findByText(/doesn't look like a link/)).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
@@ -315,7 +318,7 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
   };
 
   it('opens the new checklist sheet only after a tap, not the old Gather-only sheet', () => {
-    setup(base);
+    setup(linked);
     expect(checklistModal().props.visible).toBe(false);
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     expect(checklistModal().props.visible).toBe(true);
@@ -326,7 +329,7 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
 
   it('saves a tick through onSetItem', () => {
     const onSetItem = jest.fn();
-    setup(base, jest.fn(), onSetItem);
+    setup(linked, jest.fn(), onSetItem);
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: /^Right away/ }));
     fireEvent.press(within(screen.getByTestId('checklist-sheet')).getAllByRole('checkbox')[0]);
@@ -340,7 +343,7 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
     const original = Platform.OS;
     Platform.OS = 'ios';
     try {
-      setup(base);
+      setup(linked);
       fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
       focus.mockClear();
       fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
@@ -359,7 +362,7 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
     const original = Platform.OS;
     Platform.OS = 'android';
     try {
-      setup(base);
+      setup(linked);
       fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
       focus.mockClear();
       fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
@@ -430,7 +433,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   });
 
   it('with no text, keeps the come-back line and shows an empty box', () => {
-    setup(base);
+    setup(linked);
     expect(screen.getByText('Write it above, or on the web.')).toBeTruthy();
     expect(screen.getByLabelText(BOX).props.value).toBe('');
   });
@@ -582,7 +585,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
     const original = Platform.OS;
     Platform.OS = 'android';
     try {
-      setup(base);
+      setup(linked);
       expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('height');
     } finally {
       Platform.OS = original;
@@ -590,7 +593,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   });
 
   it('writes from empty', () => {
-    const onPatch = setupLive(base);
+    const onPatch = setupLive(linked);
     fireEvent.changeText(screen.getByLabelText(BOX), 'Anna was kind.');
     // Email shows at once, with the typed text.
     expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
@@ -801,7 +804,7 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
   it('removes the app-state listener on unmount', () => {
     const remove = jest.fn();
     jest.spyOn(AppState, 'addEventListener').mockImplementation((() => ({ remove })) as never);
-    setupLive(base);
+    setupLive(linked);
     screen.unmount();
     expect(remove).toHaveBeenCalled();
   });
@@ -959,5 +962,54 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
     expect(screen.getByText('Some parts are still in [brackets]. Fill them in or delete them before you send.')).toBeTruthy();
     expect(screen.getByRole('button', { name: BUTTON }).props.accessibilityState?.disabled).toBeFalsy();
     expect(screen.getByRole('button', { name: 'Copy the text' }).props.accessibilityState?.disabled).toBeFalsy();
+  });
+});
+
+// #824: no obituary text and no link on the person, so the phone shows a nudge instead of the box and the buttons.
+describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
+  const nudgeSetup = (session: Session, onBack = jest.fn()) =>
+    render(
+      <SerifReadyContext.Provider value>
+        <ShareObituaryScreen session={session} onChange={jest.fn()} onSetItem={jest.fn()} onBack={onBack} onContinue={jest.fn()} onEmailed={jest.fn()} />
+      </SerifReadyContext.Provider>,
+    );
+
+  it('shows the nudge under the heading, with the link field but no text box, Email or Copy', () => {
+    nudgeSetup({ ...base, obituaryText: '  ', obituaryUrl: ' ' } as Session);
+    expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
+    expect(screen.getByText(/web\.grieversguidance\.com/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.queryByLabelText(BOX)).toBeNull();
+    expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy the text' })).toBeNull();
+    // The link is only added on the phone (C10), so its field and Paste stay.
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Paste link' })).toBeTruthy();
+    expect(screen.queryByText(/!/)).toBeNull();
+  });
+
+  it('Got it goes back the way Back does', () => {
+    const onBack = jest.fn();
+    nudgeSetup(base, onBack);
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the normal screen with only a detail or a publisher, as the web Overview counts them', () => {
+    nudgeSetup({ ...base, obituaryCity: 'Tulsa' } as Session);
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+    screen.unmount();
+    nudgeSetup({ ...base, obituaryPublisher: 'The Tulsa Times' } as Session);
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+  });
+
+  it('shows the normal screen with a link only, and with text only', () => {
+    nudgeSetup({ ...base, obituaryUrl: 'https://legacy.com/anna' } as Session);
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    screen.unmount();
+    nudgeSetup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
   });
 });

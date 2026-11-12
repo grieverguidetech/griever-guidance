@@ -7,6 +7,8 @@ import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
+import { WebNudge } from '../WebNudge';
+import type { WebNudgeProps } from '../WebNudge';
 import { focusNode } from '../focusNode';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
@@ -37,6 +39,8 @@ export interface ReadyToSendCopy {
 }
 
 export interface ReadyToSendProps {
+  /** Nothing is written on the web for this step: the nudge replaces the message and the send controls. Back and the heading stay. */
+  nudge?: WebNudgeProps;
   copy: ReadyToSendCopy;
   /** The moment's name. */
   heading: string;
@@ -92,7 +96,7 @@ export const BAR_TEST_ID = 'ready-action-bar';
  * button. Mobile's own screen (apps/mobile/src/ui). The message and tone live in the app; only
  * what is open lives here.
  */
-export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef }: ReadyToSendProps) {
+export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef, nudge }: ReadyToSendProps) {
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
   const [focusDetails, setFocusDetails] = useState(false);
   const detailsRef = useRef<ComponentRef<typeof RNText>>(null);
@@ -178,6 +182,22 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
       <Status id={shareErrorId} message={share.error} tone="danger" />
     </View>
   ) : null;
+
+  if (nudge) {
+    return (
+      <View style={styles.screen}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+          <View style={styles.topBar}>
+            <Button label={copy.back} variant="header" onPress={onBack} />
+          </View>
+          <Heading level={1} headingRef={headingRef}>
+            {heading}
+          </Heading>
+          <WebNudge {...nudge} />
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>

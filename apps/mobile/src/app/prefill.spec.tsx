@@ -24,7 +24,7 @@ const openPeople = async () => {
 };
 
 const base = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -123,7 +123,7 @@ describe('send flow starts from the planned details', () => {
 
   it('drops an old obituary draft whose message is the obituary text', async () => {
     await openMoment(
-      { ...base, obituaryUrl: 'https://legacy.com/anna', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
+      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
       /Share the obituary/,
     );
     await toConfirmFromObituary();
@@ -134,7 +134,7 @@ describe('send flow starts from the planned details', () => {
 
   it('keeps a hand edit on the obituary message through to Confirm', async () => {
     await openMoment(
-      { ...base, obituaryUrl: 'https://legacy.com/anna', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
+      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
       /Share the obituary/,
     );
     await toConfirmFromObituary();
@@ -198,7 +198,13 @@ describe('send flow starts from the planned details', () => {
   // carries the name and date from setup, and the saved name is never wiped by opening it.
   describe('the announcement without its intro (#671)', () => {
     it('carries the name and date of passing from setup to Ready to send, and keeps them saved', async () => {
-      await openMoment({ ...base, dateOfPassing: 'May 2, 2026' } as Session, /^Announce the passing, .*Continue$/, 'Anna, passed May 2, 2026');
+      // A draft with no edited wording, so the message follows the name and date (a fresh form with web wording shows that wording).
+      const draft = {
+        step: 'contacts', templateCategory: 'announcement', templateOverrideId: null,
+        fields: { personalNote: 'x' }, serviceDetailsKnown: null, selectedContactIds: [],
+        includeFlowers: false, customFlorist: '', flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null,
+      };
+      await openMoment({ ...base, dateOfPassing: 'May 2, 2026', drafts: { announcement: draft } } as unknown as Session, /^Announce the passing, .*Continue$/, 'Anna, passed May 2, 2026');
       await openPeople();
       await toConfirm();
       expect(await screen.findByDisplayValue(/Anna passed away on May 2, 2026/)).toBeTruthy();
@@ -233,10 +239,10 @@ describe('the thank-you name from the account (#695)', () => {
   });
   // The label gains ", Needed" while the field is empty.
   const NAME_LABEL = /^Your name or family name/;
-  const toThanks = async (session: Session = base) => {
+  // Resumed on Ready to send with no edited wording: the message follows the form, and the Details row is there.
+  // (A fresh form with web wording starts from that wording and hides the row; with none it shows the nudge, #824.)
+  const toThanks = async (session: Session = { ...base, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session) => {
     await openMoment(session, /Send thank-yous/);
-    await openPeople();
-    await toConfirm();
     return screen.findByLabelText(NAME_LABEL);
   };
   type SavedSession = { senderName?: string; drafts?: { aftercare?: { fields?: Record<string, string> } } };
