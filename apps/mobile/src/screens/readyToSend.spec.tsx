@@ -26,9 +26,9 @@ const NONE: string[] = [];
 const FIVE = ['c0', 'c1', 'c2', 'c3', 'c4'];
 const TWO = ['c0', 'c1'];
 
-function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, web = {} }: { fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
+function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, web = {}, loading = false }: { loading?: boolean; fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
   const flow = useSendFlow({
-    session: { ...session, ...(senderName === undefined ? {} : { senderName }), ...web },
+    session: loading ? null : { ...session, ...(senderName === undefined ? {} : { senderName }), ...web },
     draft: freshDraft({
       templateCategory: category ?? (thanks ? 'aftercare' : 'service'),
       templateOverrideId: category ? undefined : thanks ? 'thank-you-note' : 'share-service',
@@ -144,9 +144,10 @@ describe('Ready to send (Share the service)', () => {
 
     it('stacks Share with another app, then Change who you\'re texting, in one left-aligned group', () => {
       render(<Harness ids={TWO} />);
-      const tree = JSON.stringify(screen.toJSON());
-      expect(tree.indexOf('Share with another app')).toBeLessThan(tree.indexOf("Change who you're texting"));
-      expect(tree).toContain('"alignSelf":"flex-start"');
+      const group = screen.getByTestId('ready-share-change');
+      expect(StyleSheet.flatten(group.props.style).alignSelf).toBe('flex-start');
+      const names = within(group).getAllByRole('button').map((b) => b.props.accessibilityLabel ?? within(b).getByText(/./).props.children);
+      expect(names).toEqual(['Share with another app', "Change who you're texting"]);
     });
 
     it('shows no names line for five people either, and the button count stays', () => {
@@ -208,6 +209,13 @@ describe('Ready to send (Share the service)', () => {
       fireEvent.changeText(screen.getByLabelText('Location, Needed'), 'Oak Chapel');
       expect(screen.getByDisplayValue('Oak Chapel')).toBeTruthy();
       expect(primary().props.accessibilityState?.disabled).toBeFalsy();
+    });
+
+    it('shows no service fields once the session loads with every detail filled', () => {
+      const { rerender } = render(<Harness loading />);
+      rerender(<Harness />);
+      expect(screen.queryByLabelText('Service date')).toBeNull();
+      expect(screen.queryByLabelText(/Needed/)).toBeNull();
     });
 
     it('has no toggle and no fields when every detail is filled', () => {

@@ -40,6 +40,9 @@ const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
 export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
+  // Set when the person types in a Share the service field, for this person and template. It keeps the field on screen
+  // after the last missing detail is typed, so the field (and the keyboard) do not vanish mid-typing.
+  const [editedServiceKey, setEditedServiceKey] = useState<string | null>(null);
   const shareButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof RNText>>(null);
   const peopleButton = useRef<ButtonNode>(null);
@@ -100,11 +103,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   const detailsFields = detailsFieldsFor(flow);
   const showDetails = detailsFields.length > 0 && flow.messageOverride === null;
   const detailsMissing = showDetails && detailsFields.some((f) => isMissing(f, flow.composedFields));
-  // Once the service fields have shown, keep them: typing the last missing character must not unmount the field.
-  const [keepServiceFields, setKeepServiceFields] = useState(false);
-  if (detailsMissing && !keepServiceFields) {
-    setKeepServiceFields(true);
-  }
+  const serviceKey = `${flow.session?.personName ?? ''}:${selectedTemplate.id}`;
 
   // The shared text has no greeting, no per-person note and nothing is recorded: it is not a send.
   async function shareElsewhere() {
@@ -169,11 +168,16 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
         greeting={recipientCount > 0 ? { label: copy.greetingSwitch, value: flow.greeting, onChange: toggleGreeting } : undefined}
         details={
           // Share the service has no toggle: its fields show only while a required detail is missing.
-          showDetails && (!isService || detailsMissing || keepServiceFields)
+          showDetails && (!isService || detailsMissing || editedServiceKey === serviceKey)
             ? {
                 label: isService ? undefined : isAnnouncement ? ready.addNote : ready.changeThanks,
                 startOpen: detailsMissing,
-                render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={flow.setField} headingRef={headingRef} />,
+                render: (headingRef) => <DetailsRow copy={copy} fields={detailsFields} values={flow.composedFields} onChange={(key, value) => {
+                  if (isService) {
+                    setEditedServiceKey(serviceKey);
+                  }
+                  flow.setField(key, value);
+                }} headingRef={headingRef} />,
               }
             : undefined
         }

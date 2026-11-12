@@ -90,6 +90,7 @@ export interface ReadyToSendProps {
 }
 
 export const BAR_TEST_ID = 'ready-action-bar';
+export const TOGETHER_TEST_ID = 'ready-share-change';
 
 /**
  * "Ready to send": the message as it will go, edits as links under it, who it goes to, and one
@@ -248,8 +249,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
           <Status id={swapNoteId} message={swapNote} />
         </View>
-        <View style={styles.links}>
-          {details?.label !== undefined ? (
+        {details?.label !== undefined ? (
+          <View style={styles.links}>
             <Button
               label={details.label}
               variant="tertiary"
@@ -259,11 +260,11 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
                 setFocusDetails(!detailsOpen);
               }}
             />
-          ) : null}
-        </View>
-        {details && detailsShown ? details.render(detailsRef) : null}
+          </View>
+        ) : null}
+        {detailsShown ? details?.render(detailsRef) : null}
         {shareRow || changePeopleRow ? (
-          <View style={styles.together}>
+          <View testID={TOGETHER_TEST_ID} style={styles.together}>
             {shareRow}
             {changePeopleRow}
           </View>
