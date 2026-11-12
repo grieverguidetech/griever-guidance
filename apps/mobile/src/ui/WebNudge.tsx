@@ -14,12 +14,13 @@ export interface WebNudgeProps {
 
 /**
  * A step with nothing written on the web yet. Same look as the web PhoneNudge card: pale accent
- * background, ink text, one line, one primary button. It is a summary region, so a screen reader
- * announces it once when the screen opens (the screen's own heading takes focus first).
+ * background, ink text, one line, one primary button. Not one accessible block: a screen reader
+ * reads the heading, the line and the button one by one, after the screen's own heading (which takes
+ * focus on arrival). Do not add accessible or accessibilityLabel to the card: it would hide the button.
  */
 export function WebNudge({ title, line, button, onGotIt }: WebNudgeProps) {
   return (
-    <View style={styles.card} accessibilityRole="summary">
+    <View style={styles.card}>
       <Heading level={2}>{title}</Heading>
       <Body>{line}</Body>
       <Button label={button} variant="primary" onPress={onGotIt} />

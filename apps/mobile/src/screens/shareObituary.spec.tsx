@@ -974,16 +974,18 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
       </SerifReadyContext.Provider>,
     );
 
-  it('shows the nudge under the heading, and nothing that asks for input', () => {
+  it('shows the nudge under the heading, with the link field but no text box, Email or Copy', () => {
     nudgeSetup({ ...base, obituaryText: '  ', obituaryUrl: ' ' } as Session);
     expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
     expect(screen.getByText(/web\.grieversguidance\.com/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.queryByLabelText(BOX)).toBeNull();
-    expect(screen.queryByLabelText('Link to the obituary')).toBeNull();
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Choose who to send it to/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy the text' })).toBeNull();
+    // The link is only added on the phone (C10), so its field and Paste stay.
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Paste link' })).toBeTruthy();
     expect(screen.queryByText(/!/)).toBeNull();
   });
 

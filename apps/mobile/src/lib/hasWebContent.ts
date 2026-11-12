@@ -21,6 +21,7 @@ export function hasWebContent(person: WebContentSource, category: TemplateCatego
     case 'aftercare':
       return written(source.thanksMessage);
     case 'service':
+      // serviceMessage is a harmless superset of the web's serviceSummary (type, date, place): the web writes it only after an edit.
       return [source.serviceMessage, source.serviceType, source.serviceDate, source.servicePlace].some(written);
     case 'obituary':
       return written(source.obituaryPublisher) || written(source.obituaryUrl) || OBITUARY_KEYS.some((key) => written(source[key]));

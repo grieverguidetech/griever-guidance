@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ComponentRef } from 'react';
+import type { ComponentProps, ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, KeyboardAvoidingView, Platform, StyleSheet, Text as RNText } from 'react-native';
 import { fill, screenCopy, sendLabel } from '@griever/copy';
 import { MOMENT_CATEGORY } from '@griever/hooks';
@@ -27,6 +27,8 @@ interface Props extends FlowProps {
   contacts?: UseContactsResult;
   /** Opens the people step: the Change who gets this button, or the button when nobody is picked. */
   onChoosePeople: () => void;
+  /** "Got it" on the nudge. Set by the app to go straight to the hub; unset it does what Back does. */
+  onGotIt?: () => void;
   /** Set to a function that focuses the button that opens the people sheet; the sheet's onDismiss (iOS) calls it. */
   focusPeopleButton?: { current: (() => void) | null };
 }
@@ -35,7 +37,7 @@ const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
   (Object.keys(MOMENT_CATEGORY) as MomentKey[]).find((key) => MOMENT_CATEGORY[key] === category) ?? 'announce';
 
 /** The screen is the ReadyToSend in apps/mobile/src/ui; this holds what is mobile only: the share sheet and focus. */
-export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleButton }: Props) {
+export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
   const shareButton = useRef<ButtonNode>(null);
@@ -129,12 +131,20 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
     }
   }
 
-  // Nothing written on the web for this step: a nudge replaces the message and the send controls (#824).
-  const nudgeKey = NUDGE_KEYS[flow.templateCategory ?? 'announcement'];
-  const nudge =
-    flow.templateCategory && flow.session && !hasWebContent(flow.session, flow.templateCategory)
-      ? { title: nudgeCopy[`${nudgeKey}Title`], line: nudgeCopy[`${nudgeKey}Line`], button: nudgeCopy.gotIt, onGotIt: prevStep }
-      : undefined;
+  // Nothing started on the web for this step: a nudge replaces the message and the send controls (#824).
+  // A draft already in progress (edited words, or a send under way) keeps the normal screen, so it is never stranded.
+  const showNudge =
+    flow.templateCategory !== null &&
+    flow.session !== null &&
+    flow.session !== undefined &&
+    !hasWebContent(flow.session, flow.templateCategory) &&
+    !flow.messageOverride?.trim() &&
+    !flow.sendJob;
+  let nudge: ComponentProps<typeof ReadyToSend>['nudge'];
+  if (showNudge && flow.templateCategory) {
+    const key = NUDGE_KEYS[flow.templateCategory];
+    nudge = { title: nudgeCopy[`${key}Title`], line: nudgeCopy[`${key}Line`], button: nudgeCopy.gotIt, onGotIt: onGotIt ?? prevStep };
+  }
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>

@@ -125,7 +125,7 @@ export interface ObituaryTextEditor {
 }
 
 export interface ShareObituaryProps {
-  /** Nothing is written on the web for the obituary: the nudge replaces everything under the heading. Back and the checklist stay. */
+  /** Nothing started on the web for the obituary: the nudge replaces the text box, Email and Copy. The link field stays (the link is only added on the phone). */
   nudge?: WebNudgeProps;
   copy: ShareObituaryCopy;
   /** The eyebrow line, for example "For Margaret". */
@@ -194,26 +194,6 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
 
   const showDone = Boolean(emailed && onDone && copy.doneButton);
 
-  if (nudge) {
-    return (
-      <ScrollView style={styles.flex} contentContainerStyle={[styles.content, { paddingBottom: spacing[3] + insets.bottom }]}>
-        <View style={styles.screen}>
-          <View style={styles.topBar}>
-            <Button label={copy.back} variant="header" onPress={onBack} />
-            <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
-          </View>
-          <View style={styles.head}>
-            <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>
-            <Heading level={1} headingRef={headingRef}>
-              {copy.heading}
-            </Heading>
-          </View>
-          <WebNudge {...nudge} />
-        </View>
-      </ScrollView>
-    );
-  }
-
   return (
     <>
     {/* The bar sits outside the scrolling content; with no bar, the content clears the home indicator itself. */}
@@ -230,8 +210,9 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         </Heading>
         <Body tone="muted">{copy.intro}</Body>
       </View>
-      {textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
-      {publisherEmail && copy.emailButton ? (
+      {/* The nudge takes the text card's place, so the link field below keeps its position while a link is typed. */}
+      {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
+      {!nudge && publisherEmail && copy.emailButton ? (
         <Card>
           {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
           {publisherEmail.hasText ? (

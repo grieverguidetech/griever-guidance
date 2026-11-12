@@ -407,10 +407,29 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(back).toHaveBeenCalledTimes(2);
   });
 
-  it('marks the nudge as one summary region', () => {
+  it('reads heading, card heading, line, then Got it, and the card is not one accessible block', () => {
     render(<Harness web={EMPTY} />);
-    // One region holds the heading, the line and the button, so it is announced once.
-    expect(screen.UNSAFE_getAllByProps({ accessibilityRole: 'summary' }).length).toBeGreaterThan(0);
+    const tree = JSON.stringify(screen.toJSON());
+    const order = ['Share the service', 'Add the service details on the web first', 'Open web.grieversguidance.com', 'Got it'].map((t) => tree.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    let node = screen.getByRole('button', { name: 'Got it' }).parent;
+    while (node) {
+      if (typeof node.type === 'string') {
+        expect(node.props?.accessible).not.toBe(true);
+      }
+      node = node.parent;
+    }
+  });
+
+  it('keeps the normal screen when the words were already edited or a send is under way', () => {
+    function Resumed() {
+      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: { serviceDate: 'June 14' }, messageOverride: 'My own words.' }) });
+      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} />;
+    }
+    render(<Resumed />);
+    expect(screen.getByDisplayValue('My own words.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
   });
 
   it('shows the message box when only a different flow is empty', () => {
