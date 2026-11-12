@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { TextInput } from 'react-native';
 import { ShareObituary } from './ShareObituary';
 import type { ShareObituaryCopy, ShareObituaryProps } from './ShareObituary';
 
@@ -228,5 +229,29 @@ describe('ShareObituary text box (#823)', () => {
     for (const name of ['Edit the text', 'Write the text', 'Save the text', 'Save', 'Cancel']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
     }
+  });
+
+  it('shows the memorial as read-only text under the box when set, and not otherwise', () => {
+    draw(editor({ memorial: 'In lieu of flowers.' }));
+    expect(screen.getByText('In lieu of flowers.')).toBeTruthy();
+    screen.unmount();
+    draw(editor());
+    expect(screen.queryByText('In lieu of flowers.')).toBeNull();
+  });
+
+  it('describes the box by the caption only when the caption is drawn', () => {
+    draw(editor());
+    expect(screen.getByLabelText('Obituary text').props['aria-describedby']).toBeTruthy();
+    screen.unmount();
+    render(<ShareObituary copy={{ ...copy, ...editorCopy, textCaption: undefined }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={editor()} />);
+    expect(screen.getByLabelText('Obituary text').props['aria-describedby']).toBeUndefined();
+  });
+
+  it('tapping the visible label focuses the box', () => {
+    draw(editor());
+    const focus = jest.fn();
+    (screen.UNSAFE_getAllByType(TextInput).find((input) => input.props.accessibilityLabel === 'Obituary text')?.instance as unknown as { focus: () => void }).focus = focus;
+    fireEvent.press(screen.getByText('Obituary text'));
+    expect(focus).toHaveBeenCalledTimes(1);
   });
 });

@@ -118,6 +118,8 @@ export interface ObituaryTextEditor {
   onValueChange: (value: string) => void;
   /** The longest text the app keeps (libs/shared), so a save is never cut after the fact. */
   maxLength?: number;
+  /** The memorial paragraph, sent after the text. Read-only here; edited in the details. */
+  memorial?: string;
 }
 
 export interface ShareObituaryProps {
@@ -352,17 +354,19 @@ function TextCard({ copy, editor }: { copy: ShareObituaryCopy; editor: ObituaryT
   const captionId = useId();
   const font = useSerifStyle('regular');
   const [focused, setFocused] = useState(false);
+  const input = useRef<TextInputNode | null>(null);
   return (
     <Card>
       <Heading level={2}>{copy.textTitle}</Heading>
-      <Body tone="strong" id={labelId}>
+      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
         {copy.editLabel}
       </Body>
       <TextInput
+        ref={input}
         style={[styles.textInput, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
         {...webFieldHook}
         aria-labelledby={labelId}
-        aria-describedby={captionId}
+        aria-describedby={copy.textCaption ? captionId : undefined}
         accessibilityLabel={copy.editLabel}
         accessibilityHint={copy.textCaption}
         multiline
@@ -381,6 +385,7 @@ function TextCard({ copy, editor }: { copy: ShareObituaryCopy; editor: ObituaryT
           {copy.textCaption}
         </Body>
       ) : null}
+      {editor.memorial ? <Body>{editor.memorial}</Body> : null}
     </Card>
   );
 }

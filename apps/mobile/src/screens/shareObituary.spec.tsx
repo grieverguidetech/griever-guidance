@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
-import { AccessibilityInfo, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share, StyleSheet } from 'react-native';
+import { AccessibilityInfo, AppState, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Session } from '@griever/hooks';
@@ -773,6 +773,57 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
   const withText = { ...base, obituaryText: 'Anna loved the garden.' } as Session;
   const DONE = { name: 'Done' };
 
+  it('a cleared box sends nothing: Email is not offered, even with details to draft from', () => {
+    setupLive({ ...base, obituaryText: 'Old text.', obituaryCity: 'Austin', dateOfPassing: '2026-10-01' } as Session);
+    fireEvent.changeText(screen.getByLabelText(BOX), '');
+    expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    expect(screen.getByText('Write it above, or on the web.')).toBeTruthy();
+  });
+
+  it('saves the typed text when the app goes to the background, once', () => {
+    let onState: (state: string) => void = () => undefined;
+    const remove = jest.fn();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (state: string) => void) => {
+      onState = cb;
+      return { remove };
+    }) as never);
+    const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session);
+    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    onState('inactive');
+    expect(onPatch).not.toHaveBeenCalled();
+    onState('background');
+    expect(onPatch).toHaveBeenCalledTimes(1);
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
+    onState('background');
+    expect(onPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes the app-state listener on unmount', () => {
+    const remove = jest.fn();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((() => ({ remove })) as never);
+    setupLive(base);
+    screen.unmount();
+    expect(remove).toHaveBeenCalled();
+  });
+
+  it('Done saves the typed text once, then calls onEmailed once', async () => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const onPatch = jest.fn();
+    const onEmailed = jest.fn();
+    render(
+      <SerifReadyContext.Provider value>
+        <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={onEmailed} />
+      </SerifReadyContext.Provider>,
+    );
+    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    fireEvent.press(screen.getByRole('button', { name: BUTTON }));
+    await screen.findByText(OPENED);
+    fireEvent.press(screen.getByRole('button', DONE));
+    expect(onPatch).toHaveBeenCalledTimes(1);
+    expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
+    expect(onEmailed).toHaveBeenCalledTimes(1);
+  });
+
   it('shows no Done on arrival', () => {
     setup(withText);
     expect(screen.queryByRole('button', DONE)).toBeNull();
@@ -845,6 +896,13 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
   it('shows the full text, with the memorial last', () => {
     setup(withMemorial);
     expect(screen.getByLabelText(BOX).props.value).toBe('Anna loved the garden.');
+    // The memorial is sent, so it is shown: read-only, after the box.
+    expect(screen.getByText(memorial)).toBeTruthy();
+  });
+
+  it('shows no memorial line when none is set', () => {
+    setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
+    expect(screen.queryByText(memorial)).toBeNull();
   });
 
   it('Email puts the memorial in the body', async () => {

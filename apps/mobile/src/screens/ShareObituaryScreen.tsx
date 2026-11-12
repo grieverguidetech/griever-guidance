@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, BackHandler, findNodeHandle, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
+import { AccessibilityInfo, AppState, BackHandler, findNodeHandle, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 import { fill, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH, isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
@@ -145,8 +145,9 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   // The body is what the editor holds; the full text adds the memorial as the last paragraph.
   const obituaryBody = obituaryTextFor(session);
   // What Email, Copy and the share sheet send: the box as it is now, even before it is saved on leaving.
+  // A cleared box stays '' here (nothing to send); only the save rule below turns it back into the details draft.
   const typedBody = editValue?.trim();
-  const obituaryText = obituaryShareTextFor(typedBody === undefined ? session : { ...session, obituaryText: typedBody === '' ? undefined : typedBody });
+  const obituaryText = obituaryShareTextFor(typedBody === undefined ? session : { ...session, obituaryText: typedBody });
 
   const addressCheck = checkPublisherEmail(address);
   const addressError = addressCheck.ok ? undefined : addressCheck.reason === 'many' ? copy.publisherEmailMany : copy.publisherEmailInvalid;
@@ -173,6 +174,17 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
       change({ obituaryText: typed === '' ? undefined : typed });
     }
   };
+
+  // Backgrounding the app saves too: the phone may end the app before it returns. commit reads refs only.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') {
+        commit();
+      }
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Every way out saves first (no confirm dialog), then does its action.
   const leave = (go: () => void) => {
@@ -268,7 +280,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
           onPasteLink={pasteLink}
           pasteMessage={pasteMessage}
           publisherEmail={{ address: { value: address, onChange: changeAddress, onBlur: () => setAddressShown(true), inputRef: addressInput, error: addressShown ? addressError : undefined }, hasText: obituaryText !== '', hasBlanks: hasTemplateBlanks(obituaryText, draftCopy), onPress: emailPublisher, failed: emailFailed, busy: emailBusy, note: emailNote, onCopyText: copyObituary, copied, copyFailed }}
-          textEditor={{ value: editValue ?? obituaryBody, onValueChange: setEditValue, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText }}
+          textEditor={{ value: editValue ?? obituaryBody, onValueChange: setEditValue, maxLength: FLOW_DETAIL_MAX_LENGTH.obituaryText, memorial: obituaryText !== '' ? session.obituaryMemorial?.trim() || undefined : undefined }}
           emailed={emailed}
           keyboardOpen={keyboardOpen}
           onDone={() => leave(onEmailed)}

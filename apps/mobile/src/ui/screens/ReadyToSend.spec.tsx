@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, TextInput } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Text } from 'react-native';
 import { ReadyToSend } from './ReadyToSend';
@@ -56,7 +56,7 @@ const copy = { ...screenCopy('review'), messageCaption: screenCopy('phoneReady')
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
-function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
+function Harness({ details, lead }: { details?: ReadyToSendProps['details']; lead?: string } = {}) {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
@@ -65,6 +65,7 @@ function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
       heading="Announce the passing"
       kind="announcement"
       details={details}
+      lead={lead}
       message={message}
       onMessageChange={setOverride}
       edited={override !== null}
@@ -197,5 +198,22 @@ describe('ReadyToSend: the message is always an editable box (#823)', () => {
     fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
     expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
     expect(screen.getByRole('button', { name: 'Use the suggested wording' })).toBeTruthy();
+  });
+
+  it('reads in order: heading, label, box, caption, extras, then the actions', () => {
+    render(<Harness lead="Dee," details={{ label: 'Change details', startOpen: false, render: () => null }} />);
+    const text = JSON.stringify(screen.toJSON());
+    const at = (needle: string) => text.indexOf(needle);
+    const order = ['Your message', 'Dee,', 'Read it one last time', 'Softer tone', 'Change details'].map(at);
+    expect(order.every((n) => n >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('tapping the visible label focuses the box', () => {
+    render(<Harness />);
+    const focus = jest.fn();
+    (screen.UNSAFE_getByType(TextInput).instance as unknown as { focus: () => void }).focus = focus;
+    fireEvent.press(screen.getByText('Your message'));
+    expect(focus).toHaveBeenCalledTimes(1);
   });
 });

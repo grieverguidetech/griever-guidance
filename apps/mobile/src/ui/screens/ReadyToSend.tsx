@@ -189,22 +189,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           {heading}
         </Heading>
         <Card>
-          {lead ? <Body tone="strong">{lead}</Body> : null}
-          <MessageField label={copy.messageLabel} caption={copy.messageCaption} value={message} onChangeText={changeMessage} />
+          <MessageField label={copy.messageLabel} lead={lead} caption={copy.messageCaption} value={message} onChangeText={changeMessage} />
         </Card>
-        <View style={styles.links}>
-          {details ? (
-            <Button
-              label={details.label}
-              variant="tertiary"
-              expanded={detailsOpen}
-              onPress={() => {
-                setDetailsOpen(!detailsOpen);
-                setFocusDetails(!detailsOpen);
-              }}
-            />
-          ) : null}
-        </View>
         <View style={styles.actions}>
           {kind === 'announcement' ? (
             <>
@@ -241,6 +227,19 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
           <Status id={swapNoteId} message={swapNote} />
         </View>
+        <View style={styles.links}>
+          {details ? (
+            <Button
+              label={details.label}
+              variant="tertiary"
+              expanded={detailsOpen}
+              onPress={() => {
+                setDetailsOpen(!detailsOpen);
+                setFocusDetails(!detailsOpen);
+              }}
+            />
+          ) : null}
+        </View>
         {details && detailsOpen ? details.render(detailsRef) : null}
         {shareRow}
         {changePeopleRow}
@@ -263,22 +262,27 @@ const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
 
 interface MessageFieldProps {
   label: string;
+  /** The first-name line. Read after the label, before the box. */
+  lead?: string;
   caption: string;
   value: string;
   onChangeText: (value: string) => void;
 }
 
-function MessageField({ label, caption, value, onChangeText }: MessageFieldProps) {
+function MessageField({ label, lead, caption, value, onChangeText }: MessageFieldProps) {
+  const input = useRef<ComponentRef<typeof TextInput> | null>(null);
   const font = useSerifStyle('regular');
   const labelId = useId();
   const captionId = useId();
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
-      <Body tone="strong" id={labelId}>
+      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
         {label}
       </Body>
+      {lead ? <Body tone="strong">{lead}</Body> : null}
       <TextInput
+        ref={input}
         style={[styles.input, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}

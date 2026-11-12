@@ -38,7 +38,7 @@ function hasFields(s: ObituaryTextSource): boolean {
 
 /**
  * The obituary body: the hand-edited text when there is one, else the draft built from the fields
- * (the same function and copy as web). This is what "Edit the text" holds. Empty when neither has content.
+ * (the same function and copy as web). This is what the always-editable box holds. Empty when neither has content.
  */
 export function obituaryTextFor(s: ObituaryTextSource): string {
   const edited = s.obituaryText?.trim() ?? '';

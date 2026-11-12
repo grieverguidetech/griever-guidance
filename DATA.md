@@ -114,7 +114,7 @@ lives under that key.
    nowhere else. Every other screen reads it through a selector (`selectPerson(session)`). No
    copying — the README's whole session model collapses if two screens can disagree about a name.
 2. **`composedMessage` is never stored.** It is derived from L3 + A2/B1/B2 + the flowers toggle on
-   every render. The one exception is a user edit (B4 "Edit wording"), which pins the text into
+   every render. The one exception is a user edit (B4: typing in the always-editable message box), which pins the text into
    `screens.B4.values.messageOverride` and stops derivation (never synced in shared sync, §5).
 3. **`screen.status`** is one of `pending` · `active` · `complete` · `seen` · `skipped`. It is what
    C1's path view and the C2 gate read; it is never inferred by checking whether fields are empty.
