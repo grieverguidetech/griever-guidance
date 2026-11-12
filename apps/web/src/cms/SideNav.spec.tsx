@@ -13,11 +13,11 @@ function setup(props: Partial<Parameters<typeof SideNav>[0]> = {}) {
 }
 
 describe('SideNav', () => {
-  it('lists the 7 items in order, with Overview first, Your people under it, and no The person link, inside the Sections nav', () => {
+  it('lists the 7 items in order, with Overview first, Your people before the account, and no The person link, inside the Sections nav', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     const names = within(nav).getAllByRole('listitem').map((li) => li.textContent?.trim());
-    expect(names).toEqual(['Overview', 'Your people', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your account']);
+    expect(names).toEqual(['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your people', 'Your account']);
   });
 
   it('names the person in the landmark, and keeps Sections with no name', () => {
@@ -39,11 +39,11 @@ describe('SideNav', () => {
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
       'Overview',
-      'Your people',
       'Announcement',
       'Service',
       'Obituary',
       'Thank-yous',
+      'Your people',
       'Your account',
     ]);
   });
@@ -158,11 +158,11 @@ describe('SideNav', () => {
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
       'Overview',
-      'Your people',
       'Announcement',
       'Service',
       'Obituary',
       'Thank-yous',
+      'Your people',
       'Your account',
     ]);
     await userEvent.setup().click(screen.getByRole('button', { name: /^Obituary/ }));

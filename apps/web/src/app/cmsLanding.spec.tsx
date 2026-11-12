@@ -290,11 +290,11 @@ describe('landing with the editor on (#448)', () => {
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
       'Overview',
-      'Your people',
       'Announcement',
       'Service',
       'Obituary',
       'Thank-yous',
+      'Your people',
       'Your account',
     ]);
     expect(within(nav).getByRole('button', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
