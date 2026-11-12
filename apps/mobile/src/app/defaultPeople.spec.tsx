@@ -38,24 +38,26 @@ const draftAt = (category: string, step: string, ids: string[]) => ({
 describe('who starts picked (#674)', () => {
   it('opens the service on Ready to send with everyone you told, named as a group', async () => {
     await open({ ...base, recipientsNotified: toldDeeAndSam } as Session, /Share the service/);
-    expect(await screen.findByText(/^To everyone you told · 2/)).toBeTruthy();
-    // C1: the names stay visible, and the row reads both.
-    expect(screen.getByText('Dee and Sam')).toBeTruthy();
-    expect(screen.getByLabelText('To everyone you told · 2. Dee and Sam')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    // The names line is gone; the count is on the send button.
+    expect(screen.queryByText(/^To /)).toBeNull();
+    expect(screen.queryByText('Dee and Sam')).toBeNull();
     expect(screen.getByRole('button', { name: 'Text 2 people' })).toBeTruthy();
   });
 
   it('leaves out a person who is in both the announcement and the service', async () => {
     await open({ ...base, recipientsNotified: { announcement: ['c1', 'c2'], service: ['c1'] } } as Session, /Share the service/);
-    expect(await screen.findByText(/^To everyone you told · 1/)).toBeTruthy();
-    expect(screen.getByText('Sam')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.getByRole('button', { name: 'Text 1 person' })).toBeTruthy();
   });
 
   it('starts the obituary link with everyone you told', async () => {
     await open({ ...base, recipientsNotified: toldDeeAndSam } as Session, /Share the obituary/);
     fireEvent.press(await screen.findByRole('button', { name: 'Choose who to send it to' }));
-    expect(await screen.findByText(/^To everyone you told · 2/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Text 2 people' })).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
   });
 
   it('starts the thank-yous with nobody picked', async () => {
@@ -78,7 +80,9 @@ describe('who starts picked (#674)', () => {
 
   it('adds nothing to a draft that was resumed with its own people', async () => {
     await open({ ...base, recipientsNotified: toldDeeAndSam, drafts: { service: draftAt('service', 'review', ['c3']) } } as unknown as Session, /Share the service/);
-    expect(await screen.findByText(/^To Lou · 1/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Text 1 person' })).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
   });
 
   it('picks nobody on reopening after a send that reached everyone you told', async () => {
@@ -89,7 +93,8 @@ describe('who starts picked (#674)', () => {
 
   it('picks the people told but not yet sent on reopening after a partial send', async () => {
     await open({ ...base, recipientsNotified: { announcement: ['c1', 'c2'], service: ['c1'] }, drafts: { service: draftAt('service', 'sent', ['c1']) } } as unknown as Session, /Share the service/);
-    expect(await screen.findByText(/^To everyone you told · 1/)).toBeTruthy();
-    expect(screen.getByText('Sam')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Change who gets this' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Text 1 person' })).toBeTruthy();
+    expect(screen.queryByText(/^To /)).toBeNull();
   });
 });

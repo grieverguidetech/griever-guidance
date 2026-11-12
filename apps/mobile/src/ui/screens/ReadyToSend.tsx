@@ -63,7 +63,8 @@ export interface ReadyToSendProps {
   /** Gets the button that opens the people step (Change, or the primary when nobody is picked) back its focus when the sheet closes. */
   peopleButtonRef?: Ref<ButtonNode>;
   /** The To row: its words, built by the app, and the link that opens the people step. */
-  to: { text: string; /** Who they are, on the next line, when `text` names a group. */ detail?: string; changeLabel: string; /** The button's fuller name. It starts with `changeLabel`. */ changeName: string; onChange: () => void };
+  /** The quiet button above the action bar, shown only when people are picked. */
+  changePeople: { label: string; onPress: () => void };
   /** With no one picked the primary is `chooseLabel` and opens the people step. */
   hasRecipients: boolean;
   sendLabel: string;
@@ -93,7 +94,7 @@ export const BAR_TEST_ID = 'ready-action-bar';
  * button. Mobile's own screen (apps/mobile/src/ui). The message and tone live in the app; only
  * what is open lives here.
  */
-export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, to, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef }: ReadyToSendProps) {
+export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef }: ReadyToSendProps) {
   const [editing, setEditing] = useState(false);
   const [returnFocus, setReturnFocus] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
@@ -174,13 +175,9 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
     setEditing(!editing);
   };
 
-  const toRow = hasRecipients ? (
+  const changePeopleRow = hasRecipients ? (
     <View style={styles.to}>
-      <View accessible accessibilityLabel={to.detail ? `${to.text}. ${to.detail}` : to.text} style={styles.toText}>
-        <Body>{to.text}</Body>
-        {to.detail ? <Body>{to.detail}</Body> : null}
-      </View>
-      <Button label={to.changeLabel} accessibilityName={to.changeName} variant="tertiary" buttonRef={peopleButtonRef} onPress={to.onChange} />
+      <Button label={changePeople.label} variant="tertiary" buttonRef={peopleButtonRef} onPress={changePeople.onPress} />
     </View>
   ) : null;
   const shareRow = share ? (
@@ -275,8 +272,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           </View>
         ) : null}
         {details && detailsOpen ? details.render(detailsRef) : null}
-        {toRow}
         {shareRow}
+        {changePeopleRow}
       </ScrollView>
       <ActionBar
         testID={BAR_TEST_ID}
@@ -337,7 +334,6 @@ const styles = StyleSheet.create({
   actions: { gap: spacing[1] },
   greetingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   to: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], alignItems: 'center', justifyContent: 'center' },
-  toText: { alignItems: 'center' },
   share: { alignItems: 'center' },
   field: { gap: spacing[1] },
   input: {

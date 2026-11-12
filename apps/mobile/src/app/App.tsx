@@ -905,7 +905,7 @@ const Navigation = ({
               withPersonContext(
                 bar,
                 <>
-                  <ReadyToSendScreen flow={flow} contacts={contacts} notified={notified} onChoosePeople={onChoosePeople} focusPeopleButton={focusPeopleButton} />
+                  <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} focusPeopleButton={focusPeopleButton} />
                   <ContactSelectorScreen
                     flow={flow}
                     contacts={contacts}

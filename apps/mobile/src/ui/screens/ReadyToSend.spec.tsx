@@ -71,7 +71,7 @@ function Harness({ details }: { details?: ReadyToSendProps['details'] } = {}) {
       onUseSuggested={() => setOverride(null)}
       tone="plain"
       onToneChange={jest.fn()}
-      to={{ text: 'To Dee and Ana · 2', changeLabel: 'Change', changeName: 'Change who gets this', onChange: jest.fn() }}
+      changePeople={{ label: 'Change who gets this', onPress: jest.fn() }}
       sendLabel="Text 2 people"
       chooseLabel="Choose who to tell"
       note="One at a time, from your own number."

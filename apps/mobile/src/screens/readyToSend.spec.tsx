@@ -133,25 +133,26 @@ describe('Ready to send (Share the service)', () => {
     expect(screen.getByLabelText('Your message').props.value).toBe('   ');
   });
 
-  describe('To row and the button', () => {
-    it('puts the To row before the button in reading order, and the count with the button', () => {
+  describe('Change who gets this and the button', () => {
+    it('has no names line, and puts Change who gets this just before the action bar', () => {
       render(<Harness ids={TWO} />);
+      expect(screen.queryByText(/^To /)).toBeNull();
+      expect(screen.queryByText(/Dee and Ana/)).toBeNull();
+      expect(screen.queryByText('Change')).toBeNull();
       const tree = JSON.stringify(screen.toJSON());
-      expect(tree.indexOf('To Dee and Ana · 2')).toBeGreaterThan(-1);
-      expect(tree.indexOf('To Dee and Ana')).toBeLessThan(tree.indexOf('Text 2 people'));
       expect(tree.indexOf('Change who gets this')).toBeGreaterThan(-1);
-      expect(tree.indexOf('To Dee and Ana')).toBeLessThan(tree.indexOf('Change who gets this'));
       expect(tree.indexOf('Change who gets this')).toBeLessThan(tree.indexOf('Text 2 people'));
-      // The To row is in the scrolling content, not in the bar.
+      // The button is in the scrolling content, not in the bar.
       const bar = within(screen.getByTestId('ready-action-bar'));
-      expect(bar.queryByText(/^To /)).toBeNull();
+      expect(bar.queryByText('Change who gets this')).toBeNull();
       expect(bar.getByText('Text 2 people')).toBeTruthy();
       expect(screen.getByText('One at a time, from your own number.')).toBeTruthy();
     });
 
-    it('names the first 3 and says how many more', () => {
+    it('shows no names line for five people either, and the button count stays', () => {
       render(<Harness ids={FIVE} />);
-      expect(screen.getByText('To Dee, Ana, Ben and 2 more · 5')).toBeTruthy();
+      expect(screen.queryByText(/^To /)).toBeNull();
+      expect(screen.queryByText(/more · 5/)).toBeNull();
       expect(screen.getByText('Text 5 people')).toBeTruthy();
     });
 
@@ -304,10 +305,9 @@ describe('Share elsewhere', () => {
     await waitFor(() => expect(share).toHaveBeenCalledWith({ message: 'Come as you are.' }));
   });
 
-  it('comes after the To row and before the button when people are picked', () => {
+  it('comes before the action bar button when people are picked', () => {
     render(<Harness />);
     const tree = JSON.stringify(screen.toJSON());
-    expect(tree.indexOf('To Dee')).toBeLessThan(tree.indexOf('Share elsewhere instead'));
     expect(tree.indexOf('Share elsewhere instead')).toBeLessThan(tree.indexOf('Text 1 person'));
     expect(within(screen.getByTestId('ready-action-bar')).queryByText('Share elsewhere instead')).toBeNull();
   });
