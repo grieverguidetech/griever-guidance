@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
   getMembers: vi.fn(),
   sessions: null as null | { removeSession: (id: string) => boolean },
+  updateProfile: vi.fn(),
+  /** The account error the App saw last (#849: Back and Forward clear it). */
+  accountError: null as string | null,
 }));
 
 // Passes through, and keeps the latest sessions handle so a test can remove a person.
@@ -27,6 +30,11 @@ vi.mock('@griever/hooks', async (importOriginal) => {
     useSessions: (...args: Parameters<typeof actual.useSessions>) => {
       const result = actual.useSessions(...args);
       mocks.sessions = result;
+      return result;
+    },
+    useAccount: (...args: Parameters<typeof actual.useAccount>) => {
+      const result = actual.useAccount(...args);
+      mocks.accountError = result.error;
       return result;
     },
   };
@@ -53,7 +61,7 @@ vi.mock('../lib/authClient', async (importOriginal) => {
 });
 vi.mock('@griever/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@griever/api-client')>();
-  return { ...actual, getProfile: mocks.getProfile, getMembers: mocks.getMembers };
+  return { ...actual, getProfile: mocks.getProfile, getMembers: mocks.getMembers, updateProfile: mocks.updateProfile };
 });
 
 import { App } from './app';
@@ -62,6 +70,7 @@ const PEOPLE = 'Your people';
 const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
+const MISSING_LINE = "That page isn't here. Your people are below.";
 
 function person(id: string, name: string, openedAt: string, extra: Partial<Session> = {}) {
   return {
@@ -106,6 +115,15 @@ async function expectStaysOnPeople() {
   expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
 }
 
+/** Waits until the app has made no Back move for 200 ms. */
+async function walkSettled(back: { mock: { calls: unknown[] } }) {
+  let seen = -1;
+  while (seen !== back.mock.calls.length) {
+    seen = back.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
 function signedInAs(accountType: 'owner' | 'member') {
   mocks.auth = true;
   // The device list is already kept for this account, as it is after any earlier sign-in.
@@ -138,6 +156,8 @@ beforeEach(() => {
   mocks.loadClerk.mockReset();
   mocks.getProfile.mockReset();
   mocks.getMembers.mockReset();
+  mocks.updateProfile.mockReset();
+  mocks.accountError = null;
   window.localStorage.clear();
 });
 
@@ -569,8 +589,8 @@ describe('navigation (#566)', () => {
       window.history.back();
     });
     await waitFor(() => expect(back.mock.calls.length).toBeGreaterThanOrEqual(2));
-    // Let the last traversal finish, so it cannot leak into the next test.
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Let the walk finish (it may go on through older entries of this jsdom tab), so no traversal leaks into the next test.
+    await walkSettled(back);
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByText('Sign in with the test provider')).toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
@@ -630,6 +650,8 @@ describe('navigation (#566)', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Service' })).not.toBeInTheDocument();
+    // Removed on this device: no "That page isn't here" line (#849 S3).
+    expect(screen.queryByText(MISSING_LINE)).toBeNull();
     expect(push).not.toHaveBeenCalled();
     act(() => {
       window.history.forward();
@@ -747,5 +769,50 @@ describe('navigation (#566)', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await h1('Overview');
     expect(screen.queryByRole('heading', { level: 1, name: 'Account' })).toBeNull();
+  });
+
+  it('the Back walk past sign-in entries stops at 50 moves, and the last screen stays (#849 S1)', async () => {
+    // 120 entries with no state of ours: more than the cap, so an uncapped walk would go on past 50.
+    window.history.replaceState(null, '');
+    for (let i = 0; i < 119; i += 1) {
+      window.history.pushState(null, '');
+    }
+    signedInAs('owner');
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    renderApp(<App />);
+    await h1('Overview');
+    const back = vi.spyOn(window.history, 'back');
+    try {
+      for (let press = 0; press < 2; press += 1) {
+        act(() => {
+          window.history.back();
+        });
+        await walkSettled(back);
+      }
+      const byApp = back.mock.calls.length - 2;
+      expect(byApp).toBe(50);
+      expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+      expect(screen.queryByText('Sign in with the test provider')).toBeNull();
+    } finally {
+      back.mockRestore();
+    }
+  });
+
+  it('Back clears an account error, so it is not carried to another screen (#849 S2)', async () => {
+    signedInAs('owner');
+    mocks.updateProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
+    seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
+    const user = userEvent.setup();
+    renderApp(<App />);
+    await h1('Overview');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
+    await h1('Account');
+    await user.click(screen.getByRole('button', { name: 'Save details' }));
+    await waitFor(() => expect(mocks.accountError).not.toBeNull());
+    act(() => {
+      window.history.back();
+    });
+    await h1('Overview');
+    await waitFor(() => expect(mocks.accountError).toBeNull());
   });
 });

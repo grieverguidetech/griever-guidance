@@ -16,6 +16,7 @@ import {
   latestInProgressDraft,
   computeSections,
   useFlowSync,
+  readRemovedFlows,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { deleteFlow, getProfile } from '@griever/api-client';
@@ -369,7 +370,10 @@ interface Spot {
   item?: ChecklistItemId | null;
   /** The person for 'cms'. */
   person?: Session | null;
+  /** Your people after a person's page could not be opened by an unknown id: shows the calm line. */
   missing?: boolean;
+  /** Go to `/` rather than keep the current path (an id that names nobody here). */
+  leavePath?: boolean;
 }
 
 /**
@@ -384,7 +388,14 @@ function pagePathFor(person: Session, section: CmsSection): string | null {
   return pathForSpot({ flowId: person.flowId, section, item: null });
 }
 
+/** The state this app stored on the current history entry (React Router keeps it under `usr`). */
+function entryState(): unknown {
+  const raw: unknown = window.history.state;
+  return typeof raw === 'object' && raw !== null ? ((raw as { usr?: unknown }).usr ?? null) : null;
+}
+
 /** The App paths that are not editor pages: the landing target replaces them once per load. */
+// `/join` keeps today's behavior (the App lands from any of its paths); the join ticket must remove it.
 const LANDING_PATHS = ['/', '/sign-in', '/sign-up', '/join'];
 /** The paths Back walks past while signed in (Clerk's sign-in steps live there), as #566 did. */
 const WALK_PATHS = ['/', '/sign-in', '/sign-up'];
@@ -482,11 +493,13 @@ function AppBody({
 
   // Back after sign-in (#566, option (a) on #849): a POP onto `/`, `/sign-in` or `/sign-up` while signed
   // in is one of Clerk's sign-in steps (or the page before them). Go Back again, past all of them, and
-  // keep showing the last screen meanwhile, so the app is left like a site with no sign-in. Mid-walk, a
-  // page of a person who is not here (an entry from an earlier sign-in) is walked past too.
+  // keep showing the last screen meanwhile, so the app is left like a site with no sign-in. Past the sign-in
+  // steps, only a page of a person who is here stops the walk (see isForeign).
   // Known edge case: Forward from the previous site into those entries, when the browser restores this
   // page from its back/forward cache (no reload), is a POP too and walks Back again. MAX_WALK caps it.
   const walkMoves = useRef(0);
+  // True once this walk has stepped off a sign-in entry (see isForeign).
+  const walkedPastSignIn = useRef(false);
   const lastOwn = useRef<Location>(location);
   function isForeign(entryLocation: Location): boolean {
     if (!CMS_ENABLED || !landed.current || !isSignedIn) {
@@ -497,15 +510,22 @@ function AppBody({
     if (screen === 'noOne' && sortedSessions.length > 0) {
       return true;
     }
+    // Below the sign-in steps lies another site or an earlier sign-in in this tab: only a page of a person
+    // who is here stops the walk there. (Your people, Account and the empty pages are not news after a walk.)
+    if (walkedPastSignIn.current) {
+      const spot = spotFromPath(entryLocation.pathname);
+      return !spot?.flowId || !sessionList.some((s) => s.flowId === spot.flowId);
+    }
     if (WALK_PATHS.includes(entryLocation.pathname)) {
       return screen === null;
     }
-    const spot = spotFromPath(entryLocation.pathname);
-    return walkMoves.current > 0 && !!spot?.flowId && !sessionList.some((s) => s.flowId === spot.flowId);
+    return false;
   }
   // The load's own entry is never walked: it is where the landing starts, not a Back.
   const loadLocation = useRef(location);
   const walking = navigationType === 'POP' && location !== loadLocation.current && isForeign(location);
+  // Written during render on purpose: the screen to keep showing must be known in the same render that
+  // meets a foreign entry. It only ever holds the latest own location, so a repeated render writes the same value.
   if (!walking) {
     lastOwn.current = location;
   }
@@ -586,6 +606,17 @@ function AppBody({
   // Someone arriving on the empty page keeps the same key, so focus does not jump mid-read (they hear a polite note instead).
   const [arrivedQuietly, setArrivedQuietly] = useState(false);
   const [arrivalNote, setArrivalNote] = useState('');
+  // The calm line is also said once, from a region that is already in the page (filled a moment later).
+  const missingShown = view === 'people' && entry.missing;
+  const [missingAnnouncement, setMissingAnnouncement] = useState('');
+  useEffect(() => {
+    if (!missingShown) {
+      setMissingAnnouncement('');
+      return;
+    }
+    const timer = setTimeout(() => setMissingAnnouncement(cmsShellCopy.personMissing), 100);
+    return () => clearTimeout(timer);
+  }, [missingShown]);
   // The item opened from the panel on Your account, so Back returns there. It only counts while that
   // same item is open, and it is dropped whenever the item closes or history restores a screen.
   const itemFromAccount = useRef<ChecklistItemId | null>(null);
@@ -614,7 +645,7 @@ function AppBody({
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
       ? `empty:${cmsSection}:${cmsItem ?? ''}`
       : view === 'cms'
-        ? `cms:${cmsSection}:${cmsItem ?? ''}`
+        ? `cms:${pathPerson?.flowId ?? ''}:${cmsSection}:${cmsItem ?? ''}`
         : view,
   );
   // Must stay declared after the heading hook above: effects run in order, so this one lands
@@ -646,17 +677,18 @@ function AppBody({
   });
   const clearError = auth?.clearError;
 
-  function openProfile(asksName: boolean, from: AppView = 'home') {
+  /** Opens Your account. Returns false when it was already open (no move). */
+  function openProfile(asksName: boolean, from: AppView = 'home'): boolean {
     // A stale error from another screen would otherwise show here without being announced.
     clearError?.();
     setAskingName(asksName);
     setReturnTo(from);
     setNeedsName(false);
     if (CMS_ENABLED) {
-      go({ view: 'profile' });
-      return;
+      return go({ view: 'profile' });
     }
     setView('profile');
+    return true;
   }
 
   // Sign-in resolves asynchronously (the boot-time session check, or the Clerk form), so the
@@ -755,6 +787,9 @@ function AppBody({
       <div role="status" aria-live="polite" className="sr-only">
         {arrivalNote}
       </div>
+      <div role="status" aria-live="polite" className="sr-only">
+        {missingAnnouncement}
+      </div>
     </>
   );
 
@@ -808,29 +843,50 @@ function AppBody({
   /**
    * The one way the editor moves (#849). A person's page goes to its path; Your people, Account and the
    * empty pages (interim, see StateScreen) push the current path with their screen in the entry's state.
-   * The same screen again adds no entry.
+   * The same screen again adds no entry. Returns whether it moved.
    */
-  function go(spot: Spot, { replace = false }: { replace?: boolean } = {}) {
+  function go(spot: Spot, { replace = false }: { replace?: boolean } = {}): boolean {
     let pathname = location.pathname;
     let state: Record<string, unknown> | null;
     if (spot.view === 'cms') {
       const path = spot.person ? pagePathFor(spot.person, spot.section ?? 'overview') : null;
       if (!path) {
-        return;
+        return false;
       }
       pathname = path;
       state = spot.item ? { item: spot.item } : null;
     } else {
-      // Not found: the id leaves the address bar.
-      if (spot.missing) {
+      // A person's page that could not be opened: the id leaves the address bar.
+      if (spot.leavePath) {
         pathname = '/';
       }
       state = { screen: spot.view, section: spot.section ?? 'overview', item: spot.item ?? null, missing: spot.missing ?? false };
     }
     if (pathname === location.pathname && JSON.stringify(readEntry(state)) === JSON.stringify(readEntry(location.state))) {
-      return;
+      return false;
     }
     navigate(pathname, { replace, state });
+    return true;
+  }
+
+  // B1: pruning an unnamed person must wait until the move away from their page has committed. The
+  // router applies a location in a transition, so a prune first would show their old path with nobody
+  // behind it for a render, and the missing-person rule would answer it.
+  const pruneAfterMove = useRef(false);
+  useEffect(() => {
+    if (pruneAfterMove.current) {
+      pruneAfterMove.current = false;
+      sessions.pruneEmpty();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+  /** Runs `move`, then drops an unnamed person once the new screen is in place (at once if nothing moved). */
+  function moveThenPrune(move: () => boolean) {
+    pruneAfterMove.current = true;
+    if (!move()) {
+      pruneAfterMove.current = false;
+      sessions.pruneEmpty();
+    }
   }
 
   /** The current editor spot, to change one part of it. */
@@ -869,22 +925,52 @@ function AppBody({
     if (!personMissing || walking || waitingForSync || !isSignedIn) {
       return;
     }
-    go({ view: 'people', missing: true }, { replace: true });
+    // Removed on this device (or seen earlier in this load, then dropped): no line, it is not news.
+    const flowId = personPath?.flowId ?? '';
+    const removedHere = seenFlows.current.has(flowId) || (readRemovedFlows(browserStorage) ?? []).some((mark) => mark.id === flowId);
+    go({ view: 'people', missing: !removedHere, leavePath: true }, { replace: true });
   });
+  // Every person this load has shown, so a page of one who is gone since reads as removed, not unknown.
+  const seenFlows = useRef(new Set<string>());
+  useEffect(() => {
+    for (const s of sessionList) {
+      seenFlows.current.add(s.flowId);
+    }
+  }, [sessionList]);
 
-  // The Back walk past the sign-in entries (see `isForeign`).
+  // The Back walk past the sign-in entries (see `isForeign`). One step when the walk starts, then one
+  // more on each popstate that lands on another foreign entry. The router does not re-render between two
+  // foreign entries (same path, no state, key 'default'), so this listens to popstate itself and reads the
+  // entry directly; React Router keeps the state we passed under `usr`.
+  const isForeignRef = useRef(isForeign);
+  isForeignRef.current = isForeign;
   useEffect(() => {
     if (!walking) {
       walkMoves.current = 0;
+      walkedPastSignIn.current = false;
       return;
     }
-    if (walkMoves.current >= MAX_WALK) {
-      return;
+    function step() {
+      if (walkMoves.current >= MAX_WALK) {
+        return;
+      }
+      if (WALK_PATHS.includes(window.location.pathname) && readEntry(entryState()).screen === null) {
+        walkedPastSignIn.current = true;
+      }
+      walkMoves.current += 1;
+      // The same move as navigate(-1); the router reads the entry it lands on like any Back.
+      window.history.back();
     }
-    walkMoves.current += 1;
-    // The same move as navigate(-1); the router reads the entry it lands on like any Back.
-    window.history.back();
-  }, [location.key, walking]);
+    function onPop() {
+      if (isForeignRef.current({ ...location, pathname: window.location.pathname, state: entryState() })) {
+        step();
+      }
+    }
+    step();
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walking]);
 
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
@@ -1343,18 +1429,13 @@ function AppBody({
           // Your people is already open.
           onPeople={() => undefined}
           onAccount={() => {
-            sessions.pruneEmpty();
             accountFrom.current = 'people';
-            if (auth?.isSignedIn) {
-              openProfile(false, 'people');
-            } else {
-              go({ view: 'settings' });
-            }
+            moveThenPrune(() => (auth?.isSignedIn ? openProfile(false, 'people') : go({ view: 'settings' })));
           }}
           notice={endedNote}
         >
           {entry.missing ? (
-            <p role="status" className="m-0 text-[14px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="m-0 text-[14px]" style={{ color: 'var(--text-muted)' }}>
               {cmsShellCopy.personMissing}
             </p>
           ) : null}
@@ -1457,8 +1538,7 @@ function AppBody({
 
   /** "Your people" in the side nav: an unnamed person is dropped, then Your people opens. */
   function leaveCms() {
-    sessions.pruneEmpty();
-    go({ view: 'people' });
+    moveThenPrune(() => go({ view: 'people' }));
   }
 
   if (notFound) {
@@ -1626,13 +1706,8 @@ function AppBody({
           }}
           onPeople={leaveCms}
           onAccount={() => {
-            sessions.pruneEmpty();
             accountFrom.current = 'cms';
-            if (auth?.isSignedIn) {
-              openProfile(false);
-            } else {
-              go({ view: 'settings' });
-            }
+            moveThenPrune(() => (auth?.isSignedIn ? openProfile(false) : go({ view: 'settings' })));
           }}
           notice={endedNote}
         >

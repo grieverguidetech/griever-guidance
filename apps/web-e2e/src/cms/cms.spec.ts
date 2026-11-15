@@ -137,15 +137,15 @@ test('a typed name reaches the Overview, and "Private burial" keeps the Burial g
   await expect(burial).toBeVisible();
   await expect(burial.getByLabel(/Cemetery/)).toHaveCount(0);
 
-  // The choice is saved as you go.
+  // The choice is saved as you go. A reload keeps the page (#849): Service has its own address.
   await page.reload();
-  // A saved person: loading opens their Overview.
-  await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
-  await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
-  await openSection(page, 'Service', 'Service');
+  await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
   await expect(
     page.getByRole('group', { name: 'Burial', exact: true }).getByRole('checkbox', { name: 'Private burial, family only' }),
   ).toBeChecked();
+  // The saved name is still on the Overview.
+  await openSection(page, 'Overview', 'Overview');
+  await expect(page.getByText('Margaret Hayes', { exact: true }).first()).toBeVisible();
 });
 
 test('Ready leads on: The person ready, Next opens Announcement with its h1; no axe violations after Ready', async ({ page }) => {
