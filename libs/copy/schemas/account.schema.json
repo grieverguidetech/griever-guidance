@@ -128,6 +128,7 @@
     "removeConfirmAction",
     "removeDone",
     "removeOffline",
+    "removeOfflineHint",
     "removeFailed",
     "removeUnnamed",
     "removePending"
@@ -503,6 +504,9 @@
       "$ref": "#/$defs/text"
     },
     "removeOffline": {
+      "$ref": "#/$defs/text"
+    },
+    "removeOfflineHint": {
       "$ref": "#/$defs/text"
     },
     "removeFailed": {

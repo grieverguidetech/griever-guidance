@@ -16,7 +16,7 @@ import {
   useFlowSync,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
-import { getProfile } from '@griever/api-client';
+import { deleteFlow, getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
 import { SECTION_ORDER } from '@griever/shared';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
@@ -49,6 +49,8 @@ import { Profile } from '../screens/Profile';
 import { Settings } from '../screens/Settings';
 import { PeopleHelping } from '../screens/PeopleHelping';
 import { RemoveMember } from '../screens/RemoveMember';
+import { RemovePerson } from '../cms/RemovePerson';
+import { hasHiddenAccountPeople, removablePeople, removePerson } from '../lib/removePerson';
 import { lacksFirstName, markPrefilled, namesToPrefill, wasPrefilled } from '../lib/prefillNames';
 import type { ClerkNames } from '../lib/prefillNames';
 import { deleteAccountThenClear, removeEverythingFromDevice } from '../lib/removeFromDevice';
@@ -624,6 +626,28 @@ function AppBody({
     () => (CMS_ENABLED ? listableSessionsByRecent : namedSessionsByRecent)([...sessions.sessions]),
     [sessions.sessions],
   );
+
+  // Remove a person (Account only). The decisions live in lib/removePerson; this passes it the hooks.
+  function removeOnePerson(id: string) {
+    const target = sessionList.find((s) => s.id === id);
+    return removePerson({
+      syncOn,
+      flowId: target?.flowId,
+      getToken: memberToken,
+      deleteFlow,
+      removeLocal: () => sessions.removeSession(id),
+    });
+  }
+  const removablePeopleList = removablePeople(sortedSessions, syncOn);
+  const removeHint = auth === null && offline && hasHiddenAccountPeople(sortedSessions, syncOn);
+  const removePersonPanel = CMS_ENABLED ? (
+    <>
+      <RemovePerson people={removablePeopleList} scope={syncOn ? 'account' : 'device'} onRemove={removeOnePerson} />
+      {removeHint ? (
+        <p className="gg-panel gg-hint m-0">{accountCopy.removeOfflineHint}</p>
+      ) : null}
+    </>
+  ) : undefined;
 
   // Picks the most recent person when none is open. It never creates one: Home's "Create a new
   // one" is the only way to start a person.
@@ -1348,6 +1372,7 @@ function AppBody({
             : undefined
         }
         plans={sortedSessions}
+        removePerson={removePersonPanel}
         peopleHelping={
           sharingOn ? (
             <PeopleHelping
@@ -1547,6 +1572,7 @@ function AppBody({
     return renderAccount(
       accountCopy.title,
       <AccountSettingsSection
+        removePerson={removePersonPanel}
         removeMember={
           sharingOn && members.view?.role === 'owner' ? (
             <RemoveMember members={members.view.members} message={members.message} onRemove={members.remove} />
