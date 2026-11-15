@@ -492,7 +492,7 @@ function isText(value: unknown): value is string {
 // Checks the shape of backlog-review.json. Throws with a plain reason when it is wrong.
 export function parseBacklogReviews(raw: unknown): BacklogReviewFile {
   const data = raw as { reviewedAt?: unknown; reviews?: unknown } | null;
-  if (!data || !isText(data.reviewedAt) || !/^\d{4}-\d{2}-\d{2}$/.test(data.reviewedAt)) {
+  if (!data || !isText(data.reviewedAt) || !/^\d{4}-\d{2}-\d{2}$/.test(data.reviewedAt) || Number.isNaN(Date.parse(data.reviewedAt))) {
     throw new Error('reviewedAt must be a date like 2026-11-15');
   }
   if (!Array.isArray(data.reviews)) {

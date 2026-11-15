@@ -201,9 +201,7 @@ function renderDrift() {
 
 function reviewRow(row) {
   var tr = el("tr");
-  var num = el("td", null, "narrow");
-  num.appendChild(link("#" + row.number, row.url));
-  tr.appendChild(num);
+  tr.appendChild(el("td", "#" + row.number, "narrow"));
   var title = el("td");
   title.appendChild(link(row.title, row.url));
   tr.appendChild(title);
@@ -221,7 +219,7 @@ function renderBacklogReview() {
     }
     return;
   }
-  s.appendChild(el("p", "Reviewed " + review.reviewedAt + ". Reviews dropped because the issue is closed: " + review.dropped + ".", "muted"));
+  s.appendChild(el("p", "Reviewed " + review.reviewedAt + ". Reviews hidden because the issue is no longer open:" + review.dropped + ".", "muted"));
   if (review.rows.length === 0) {
     s.appendChild(el("p", "No open issues.", "muted"));
     return;

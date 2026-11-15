@@ -25,7 +25,7 @@ A missing or invalid file shows its reason in the section and does not break the
 ## Read-only
 
 The server only runs `gh` and `git` read commands (`issue list`, `pr list`, `run list`,
-`project item-list`, `worktree list`, `status`, `rev-list`) one GET to the health endpoint, and reads `backlog-review.json`.
+`project item-list`, `worktree list`, `status`, `rev-list`), one GET to the health endpoint, and a read of `backlog-review.json`.
 It never writes to GitHub or git, never fetches, and never reads `.env*` files.
 
 ## Drift rules
