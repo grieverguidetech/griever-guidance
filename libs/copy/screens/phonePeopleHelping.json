@@ -1,0 +1,10 @@
+{
+  "heading": "People helping you",
+  "intro": "They can see the people you're writing about and send their own messages from their own phone.",
+  "helpingHeading": "Helping you",
+  "invitedHeading": "Invited",
+  "invitedLine": "Invited · link works until {date}",
+  "memberLine": "You're helping {owner}.",
+  "someone": "someone",
+  "loading": "Loading…"
+}

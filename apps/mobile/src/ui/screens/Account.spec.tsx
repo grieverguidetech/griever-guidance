@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { AccessibilityInfo, Pressable, TextInput } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Account } from './Account';
+import { Heading } from '../Heading';
 import type { AccountCopy, AccountProps, DetailValues } from './Account';
 
 // Jest has no native view tree, so findNodeHandle returns null; the focus test needs a handle. Same replacement as screens/account.spec.tsx.
@@ -223,6 +224,15 @@ describe('Account sign-in, sign out and support (#718)', () => {
   it('gives every group a header role, in order: Profile, Sign-in and security, Sign out, Help and support', () => {
     setup({ email: 'sam@example.com', onManageSignIn: jest.fn() });
     expect(headings()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'Sign out', 'Help and support']);
+  });
+
+  it('puts a People helping you slot after Sign-in and security and before Sign out', () => {
+    setup({
+      email: 'sam@example.com',
+      onManageSignIn: jest.fn(),
+      peopleHelping: <Heading level={2}>People helping you</Heading>,
+    });
+    expect(headings()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'People helping you', 'Sign out', 'Help and support']);
   });
 
   it('hides the sign-in group until there is an email or a manage address', () => {

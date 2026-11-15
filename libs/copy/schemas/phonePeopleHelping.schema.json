@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for People helping you on the phone's Your account (read only: the same words as web)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["heading", "intro", "helpingHeading", "invitedHeading", "invitedLine", "memberLine", "someone", "loading"],
+  "properties": {
+    "heading": { "$ref": "#/$defs/text" },
+    "intro": { "$ref": "#/$defs/text" },
+    "helpingHeading": { "$ref": "#/$defs/text" },
+    "invitedHeading": { "$ref": "#/$defs/text" },
+    "invitedLine": { "$ref": "#/$defs/text" },
+    "memberLine": { "$ref": "#/$defs/text" },
+    "someone": { "$ref": "#/$defs/text" },
+    "loading": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}

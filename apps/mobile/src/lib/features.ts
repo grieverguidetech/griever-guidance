@@ -20,3 +20,10 @@ export const SYNC_ENABLED = process.env.EXPO_PUBLIC_FEATURE_SYNC === 'true';
  */
 // Dot access on purpose: Expo only inlines `process.env.EXPO_PUBLIC_*` when it is written this way.
 export const PAYMENTS_ENABLED = process.env.EXPO_PUBLIC_FEATURE_PAYMENTS === 'true';
+
+/**
+ * "People helping you" on Your account (read only). Off until web /join exists (#128), because an
+ * invitation link opens it. Off unless exactly "true"; it shows only when also signed in.
+ */
+// Dot access on purpose: Expo only inlines `process.env.EXPO_PUBLIC_*` when it is written this way.
+export const SHARING_ENABLED = process.env.EXPO_PUBLIC_FEATURE_SHARING === 'true';

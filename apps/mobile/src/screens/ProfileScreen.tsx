@@ -9,6 +9,7 @@ import { Account } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
 import type { DetailErrors, DetailField, DetailValues, FocusRequest } from '../ui/screens/Account';
 import { stateToCode } from '../components/AddressFields';
+import { PeopleHelping } from '../components/PeopleHelping';
 import { DateField } from '../components/DateField';
 import { DeleteCancelledError, DeleteNeedsSignInError, useSignInInfo } from '../lib/clerk';
 import { announceAccountDeleted } from '../lib/deleteLocalData';
@@ -334,6 +335,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
       onDeleteAccount={canDelete ? deleteAccount : undefined}
       offline={identity.offline}
       status={{ message, tone }}
+      peopleHelping={<PeopleHelping sessionEnded={sessionEnded === true} />}
       onBack={onBack}
       headingRef={heading}
     />
