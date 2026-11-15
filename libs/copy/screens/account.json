@@ -124,5 +124,6 @@
   "removeDone": "{name} has been removed.",
   "removeOffline": "You need a connection to remove {name}. Nothing has changed.",
   "removeFailed": "We could not remove {name} just now. Nothing has changed. Please try again.",
-  "removeUnnamed": "this person"
+  "removeUnnamed": "this person",
+  "removePending": "Removing {name}."
 }

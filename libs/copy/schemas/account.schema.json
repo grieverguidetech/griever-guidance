@@ -129,7 +129,8 @@
     "removeDone",
     "removeOffline",
     "removeFailed",
-    "removeUnnamed"
+    "removeUnnamed",
+    "removePending"
   ],
   "properties": {
     "heading": {
@@ -508,6 +509,9 @@
       "$ref": "#/$defs/text"
     },
     "removeUnnamed": {
+      "$ref": "#/$defs/text"
+    },
+    "removePending": {
       "$ref": "#/$defs/text"
     }
   },

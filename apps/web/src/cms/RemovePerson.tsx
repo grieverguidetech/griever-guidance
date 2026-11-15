@@ -14,6 +14,7 @@ interface Props {
 }
 
 type Result = { outcome: RemoveOutcome; name: string } | null;
+type Pending = { id: string; name: string } | null;
 type FocusTarget = { row: string } | 'heading' | 'confirm';
 
 function upperFirst(text: string): string {
@@ -26,33 +27,34 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
   const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const ConfirmHeading = headingLevel === 3 ? 'h4' : 'h3';
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<Pending>(null);
+  const [focusTick, setFocusTick] = useState(0);
+  const confirmingRef = useRef<string | null>(null);
   const [result, setResult] = useState<Result>(null);
   const confirmHeadingRef = useRef<HTMLHeadingElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const rowButtons = useRef(new Map<string, HTMLButtonElement>());
   const focusNext = useRef<FocusTarget | null>(null);
   const pendingRef = useRef(false);
-  // Once shown, the panel stays so the last removal can still be announced and hold focus.
-  const hadPeople = useRef(false);
-  if (people.length > 0) {
-    hadPeople.current = true;
-  }
+  // After a removal the panel stays, so the last removal can still be announced and hold focus.
+  const removedThisVisit = useRef(false);
 
   // Focus follows the swap: into the confirm step when it opens, out to the chosen target when it closes.
   useEffect(() => {
     const target = focusNext.current;
     focusNext.current = null;
-    if (confirmingId && (target === null || target === 'confirm')) {
+    if (target === null && confirmingId) {
+      confirmHeadingRef.current?.focus();
+    } else if (target === 'confirm') {
       confirmHeadingRef.current?.focus();
     } else if (target === 'heading') {
       headingRef.current?.focus();
     } else if (target && target !== 'confirm') {
       rowButtons.current.get(target.row)?.focus();
     }
-  }, [confirmingId, result]);
+  }, [confirmingId, focusTick]);
 
-  if (people.length === 0 && !hadPeople.current) {
+  if (people.length === 0 && !removedThisVisit.current) {
     return null;
   }
 
@@ -65,6 +67,7 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
       return;
     }
     focusNext.current = { row: personId };
+    confirmingRef.current = null;
     setConfirmingId(null);
   }
 
@@ -73,7 +76,7 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
       return;
     }
     pendingRef.current = true;
-    setPending(true);
+    setPending({ id: personId, name });
     setResult(null);
     let outcome: RemoveOutcome = 'failed';
     try {
@@ -82,29 +85,42 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
       outcome = 'failed';
     } finally {
       pendingRef.current = false;
-      setPending(false);
+      setPending(null);
     }
+    // The outcome belongs to the person it was for; a different open confirm is left alone.
+    const stillOpen = confirmingRef.current === personId;
     if (outcome === 'removed') {
-      focusNext.current = 'heading';
-      setConfirmingId(null);
-    } else {
+      removedThisVisit.current = true;
+      if (stillOpen) {
+        focusNext.current = 'heading';
+        confirmingRef.current = null;
+        setConfirmingId(null);
+      }
+    } else if (stillOpen) {
       focusNext.current = 'confirm';
+      setFocusTick((n) => n + 1);
     }
     setResult({ outcome, name });
   }
 
-  const status = result
-    ? upperFirst(
-        fill(
+  function sentence(template: string, name: string): string {
+    const text = fill(template, { name });
+    return name === copy.removeUnnamed ? upperFirst(text) : text;
+  }
+
+  const status = pending
+    ? sentence(copy.removePending, pending.name)
+    : result
+      ? sentence(
           result.outcome === 'removed'
             ? copy.removeDone
             : result.outcome === 'offline'
               ? copy.removeOffline
               : copy.removeFailed,
-          { name: result.name },
-        ),
-      )
-    : '';
+          result.name,
+        )
+      : '';
+  const busy = pending !== null;
 
   return (
     <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-heading`}>
@@ -137,15 +153,15 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
                       <button
                         type="button"
                         className="gg-btn gg-btn-primary"
-                        aria-disabled={pending}
+                        aria-disabled={busy}
                         onClick={() => keep(person.id)}
                       >
                         {fill(copy.removeKeep, { name })}
                       </button>
                       <button
                         type="button"
-                        className="gg-btn gg-btn-secondary"
-                        aria-disabled={pending}
+                        className={`gg-btn gg-btn-secondary ${busy ? '!opacity-100' : ''}`}
+                        aria-disabled={busy}
                         onClick={() => void remove(person.id, name)}
                       >
                         {fill(copy.removeConfirmAction, { name })}
@@ -163,8 +179,13 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
                       }
                     }}
                     className="gg-btn gg-btn-secondary"
+                    aria-disabled={busy}
                     onClick={() => {
+                      if (pendingRef.current) {
+                        return;
+                      }
                       setResult(null);
+                      confirmingRef.current = person.id;
                       setConfirmingId(person.id);
                     }}
                   >
