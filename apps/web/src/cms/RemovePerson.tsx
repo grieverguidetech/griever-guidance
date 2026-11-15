@@ -49,7 +49,7 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
       confirmHeadingRef.current?.focus();
     } else if (target === 'heading') {
       headingRef.current?.focus();
-    } else if (target && target !== 'confirm') {
+    } else if (target) {
       rowButtons.current.get(target.row)?.focus();
     }
   }, [confirmingId, focusTick]);
