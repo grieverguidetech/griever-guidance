@@ -1,3 +1,7 @@
+# Every path, including deep links such as /people/x (served as index.html by _redirects).
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+
 /sw.js
   Cache-Control: no-cache
 
@@ -5,6 +9,32 @@
   Cache-Control: no-cache
 
 /index.html
+  Cache-Control: no-cache
+
+# Deep links are served as index.html; keep them out of long-lived caches. Not set on /* because
+# Pages joins matching rules and that would corrupt the /assets/* immutable header.
+/people
+  Cache-Control: no-cache
+
+/people/*
+  Cache-Control: no-cache
+
+/start
+  Cache-Control: no-cache
+
+/start/*
+  Cache-Control: no-cache
+
+/sign-in*
+  Cache-Control: no-cache
+
+/sign-up
+  Cache-Control: no-cache
+
+/account
+  Cache-Control: no-cache
+
+/join
   Cache-Control: no-cache
 
 /assets/*

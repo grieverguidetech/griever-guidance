@@ -69,3 +69,12 @@ test.describe('Home and creating a person', () => {
     await expect(home(page)).toBeVisible();
   });
 });
+
+test.describe('Routing shell', () => {
+  test('an unknown path shows the not-found page, and / still loads the app', async ({ page }) => {
+    await page.goto('/no-such-page');
+    await expect(page.getByRole('heading', { level: 1, name: "We couldn't find that page." })).toBeFocused();
+    await page.getByRole('link', { name: 'Go to the start page' }).click();
+    await expect(home(page)).toBeVisible();
+  });
+});

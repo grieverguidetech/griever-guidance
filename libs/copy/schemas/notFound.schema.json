@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the page-not-found screen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "heading", "body", "link"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "heading": { "type": "string", "minLength": 1 },
+    "body": { "type": "string", "minLength": 1 },
+    "link": { "type": "string", "minLength": 1 }
+  }
+}
