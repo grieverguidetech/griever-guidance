@@ -12,7 +12,7 @@ import {
   type FlowRecord,
   type SyncedFields,
 } from '@griever/shared';
-import { ApiError, apiFetch } from './client.js';
+import { ApiError, apiFetch, apiFetchNoContent } from './client.js';
 
 export { pickFlowDetails };
 
@@ -165,4 +165,28 @@ export function patchFlow(
     return Promise.resolve({ ok: true, flow: null });
   }
   return send(accessToken, `/flows/${encodeURIComponent(id)}`, 'PATCH', body, signal);
+}
+
+/**
+ * Removes one of the caller's own people. A person you only help with answers `not_found`, the
+ * same as an unknown id. A bad id is `invalid` and nothing is sent.
+ */
+export async function deleteFlow(
+  accessToken: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | FlowsFailure> {
+  if (!isUuid(id)) {
+    return { ok: false, reason: 'invalid' };
+  }
+  try {
+    await apiFetchNoContent(
+      `/flows/${encodeURIComponent(id)}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } },
+      signal,
+    );
+    return { ok: true };
+  } catch (error) {
+    return failure(error);
+  }
 }

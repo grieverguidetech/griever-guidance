@@ -17,6 +17,7 @@ const EXPECTED_ROUTES = [
   'GET /flows',
   'POST /flows',
   'PATCH /flows/:id',
+  'DELETE /flows/:id',
   'POST /places/suggest',
   'POST /places/details',
 ];
@@ -64,6 +65,7 @@ describe('gateway route inventory (C8)', () => {
     ['GET', '/flows'],
     ['POST', '/flows'],
     ['PATCH', '/flows/00000000-0000-4000-8000-000000000000'],
+    ['DELETE', '/flows/00000000-0000-4000-8000-000000000000'],
   ])('%s %s refuses a request with no token', async (method, path) => {
     const app = await loadApp();
     const res = await app.request(path, { method, body: method === 'PUT' || method === 'POST' || method === 'PATCH' ? '{}' : undefined });
