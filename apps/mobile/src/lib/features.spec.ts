@@ -125,3 +125,43 @@ describe('AUTH_ENABLED', () => {
     expect(source).toMatch(/process\.env\.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY\b/);
   });
 });
+
+describe('SHARING_ENABLED', () => {
+  const originalSharing = process.env.EXPO_PUBLIC_FEATURE_SHARING;
+  afterEach(() => {
+    if (originalSharing === undefined) {
+      delete process.env.EXPO_PUBLIC_FEATURE_SHARING;
+    } else {
+      process.env.EXPO_PUBLIC_FEATURE_SHARING = originalSharing;
+    }
+  });
+  function sharingEnabled(value: string | undefined): boolean {
+    if (value === undefined) {
+      delete process.env.EXPO_PUBLIC_FEATURE_SHARING;
+    } else {
+      process.env.EXPO_PUBLIC_FEATURE_SHARING = value;
+    }
+    let result = true;
+    jest.isolateModules(() => {
+      result = (require('./features') as typeof import('./features')).SHARING_ENABLED;
+    });
+    return result;
+  }
+
+  it('is off when the variable is missing', () => {
+    expect(sharingEnabled(undefined)).toBe(false);
+  });
+
+  it('is on only for exactly "true"', () => {
+    expect(sharingEnabled('true')).toBe(true);
+  });
+
+  it.each(['false', '', 'TRUE', 'True', '1', ' true'])('is off for %j', (value) => {
+    expect(sharingEnabled(value)).toBe(false);
+  });
+
+  it('reads the variable with dot access, so Expo inlines it in the bundle', () => {
+    const source = readFileSync(join(__dirname, 'features.ts'), 'utf8');
+    expect(source).toMatch(/process\.env\.EXPO_PUBLIC_FEATURE_SHARING\b/);
+  });
+});

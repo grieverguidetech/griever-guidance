@@ -100,7 +100,9 @@ export interface AccountProps {
   onDeleteAccount?: () => Promise<DeleteOutcome>;
   onBack: () => void;
   headingRef?: HeadingProps['headingRef'];
-  /** Under the form, for example "People helping you". */
+  /** "People helping you": after Sign-in and security, before Sign out. Leave unset for none. */
+  peopleHelping?: ReactNode;
+  /** Under the form. */
   children?: ReactNode;
 }
 
@@ -130,6 +132,7 @@ export function Account({
   onDeleteAccount,
   onBack,
   headingRef,
+  peopleHelping,
   children,
 }: AccountProps) {
   const birthLabelId = useId();
@@ -269,6 +272,7 @@ export function Account({
           ) : null}
         </View>
       ) : null}
+      {peopleHelping}
       {onSignOut ? (
         <View style={styles.group}>
           <Heading level={2}>{copy.signOutHeading}</Heading>

@@ -4,7 +4,7 @@ import { AccessibilityInfo, Linking, Platform, StyleSheet, Text } from 'react-na
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import type { ProfileResult } from '@griever/api-client';
+import type { GetMembersResult, ProfileResult } from '@griever/api-client';
 import { screenCopy } from '@griever/copy';
 import type { AccountAuth, Address } from '@griever/shared';
 import { AccountScreen, resetUnsavedName } from './AccountScreen';
@@ -30,11 +30,21 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 const mockGetProfile = jest.fn<() => Promise<ProfileResult>>();
 type ProfileUpdate = { senderName?: string | null; firstName?: string | null; lastName?: string | null; birthDate?: string | null; address?: Address | null };
 const mockUpdateProfile = jest.fn<(token: string, u: ProfileUpdate) => Promise<ProfileResult>>();
+const mockGetMembers = jest.fn<(token: string) => Promise<GetMembersResult>>();
 jest.mock('@griever/api-client', () => ({
   ...jest.requireActual<object>('@griever/api-client'),
+  getMembers: (token: string) => mockGetMembers(token),
   getProfile: () => mockGetProfile(),
   updateProfile: (token: string, u: ProfileUpdate) => mockUpdateProfile(token, u),
 }));
+
+// People helping you is behind a flag; the real component runs, only the flag is switched here.
+const mockFlags = { sharing: false };
+jest.mock('../lib/features', () =>
+  Object.defineProperty({ ...jest.requireActual<object>('../lib/features') }, 'SHARING_ENABLED', {
+    get: () => mockFlags.sharing,
+  }),
+);
 
 // Clerk's screens-side hooks. `finalize` signs the fake auth in, the way Clerk's finalize starts the session.
 const mockAuthControl: { setSignedIn: (v: boolean) => void } = { setSignedIn: () => undefined };
@@ -116,6 +126,8 @@ beforeEach(async () => {
   mockReverify = async (fn, _options, args) => fn(...args);
   jest.restoreAllMocks();
   await AsyncStorage.clear();
+  mockFlags.sharing = false;
+  mockGetMembers.mockReset().mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
   mockGetProfile.mockReset().mockResolvedValue(noProfile);
   mockUpdateProfile.mockReset().mockImplementation(async (_t, u) => profileWith(u.senderName ?? u.firstName ?? '', u));
   mockSignIn.finalize.mockReset();
@@ -771,6 +783,26 @@ describe('sign-in details and support (#718)', () => {
     await screen.findByDisplayValue('Sam');
     expect(screen.getByText('sam@example.com')).toBeTruthy();
     expect(headingNames()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'Sign out', 'Help and support']);
+  });
+
+  it('with sharing on and signed in, shows People helping you between Sign-in and security and Sign out', async () => {
+    mockFlags.sharing = true;
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user', deleteAccount: null };
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    await waitFor(() => expect(mockGetMembers).toHaveBeenCalledWith('t'));
+    await screen.findByRole('heading', { name: 'People helping you' });
+    expect(headingNames()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'People helping you', 'Sign out', 'Help and support']);
+  });
+
+  it('with sharing off, never asks for members', async () => {
+    mockSignInInfo = { email: 'sam@example.com', manageUrl: 'https://accounts.example.com/user', deleteAccount: null };
+    mockGetProfile.mockResolvedValue(profileWith('Sam'));
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    expect(screen.queryByRole('heading', { name: 'People helping you' })).toBeNull();
+    expect(mockGetMembers).not.toHaveBeenCalled();
   });
 
   it('hides the sign-in group while the email has not loaded', async () => {
