@@ -224,7 +224,7 @@ describe('checklist in the editor (#421)', () => {
       within(screen.getByRole('main')).getByRole('button', { name: 'Done' }),
     );
     expect(stored().checklist).toEqual({ pronouncement: 'done' });
-    await user.click(screen.getByRole('button', { name: /^Service/ }));
+    await user.click(screen.getByRole('link', { name: /^Service/ }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Service' }),
     ).toHaveFocus();

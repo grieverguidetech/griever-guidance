@@ -1,6 +1,8 @@
 import { useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useLocation, useNavigate, useNavigationType } from 'react-router';
+import type { Location } from 'react-router';
 import {
   useContacts,
   useSessions,
@@ -42,7 +44,8 @@ import { AnnouncementSection } from '../cms/sections/AnnouncementSection';
 import { ObituarySection } from '../cms/sections/ObituarySection';
 import { ThanksSection } from '../cms/sections/ThanksSection';
 import type { CmsNavKey } from '../cms/SideNav';
-import { useNavHistory } from '../lib/navHistory';
+import { pathForSpot, spotFromPath } from '../routes/editorLocation';
+import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { Profile } from '../screens/Profile';
@@ -328,11 +331,53 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
 /** Views that need a person to be open; with nobody open Home is shown instead. */
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary', 'cms'];
 
-/** The sections Back can restore: Overview and the five sections (a person's details are reached from Overview). */
+/** Overview and the five sections. */
 const CMS_SECTIONS: CmsSection[] = ['overview', ...SECTION_ORDER];
+const ITEM_IDS = Object.keys(cmsItemLabels) as ChecklistItemId[];
 
-/** The screens Back walks through. */
-const TRACKED_VIEWS: AppView[] = ['cms', 'people', 'noOne', 'profile', 'settings'];
+/**
+ * INTERIM until R3 (#849 decisions): Your people, Account and the empty pages have no path yet, so
+ * they ride on the history entry's state at the current path. An open checklist item rides the same
+ * way on a person's path until R2b (#856) gives it `/guide/:itemId`.
+ */
+type StateScreen = 'people' | 'profile' | 'settings' | 'noOne';
+const STATE_SCREENS: StateScreen[] = ['people', 'profile', 'settings', 'noOne'];
+
+interface EntryState {
+  screen: StateScreen | null;
+  section: CmsSection;
+  item: ChecklistItemId | null;
+  /** Your people after a person's page could not be opened: a calm line, never the id. */
+  missing: boolean;
+}
+
+/** What this app stored on a history entry. Anything else (another app, a hand-made entry) reads as nothing. */
+function readEntry(state: unknown): EntryState {
+  const raw = typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
+  return {
+    screen: STATE_SCREENS.find((s) => s === raw['screen']) ?? null,
+    section: CMS_SECTIONS.find((s) => s === raw['section']) ?? 'overview',
+    item: ITEM_IDS.find((id) => id === raw['item']) ?? null,
+    missing: raw['missing'] === true,
+  };
+}
+
+/** Where the editor goes: a person's page (by path) or one of the interim state screens. */
+interface Spot {
+  view: 'cms' | StateScreen;
+  section?: CmsSection;
+  item?: ChecklistItemId | null;
+  /** The person for 'cms'. */
+  person?: Session | null;
+  missing?: boolean;
+}
+
+/** The App paths that are not editor pages: the landing target replaces them once per load. */
+const LANDING_PATHS = ['/', '/sign-in', '/sign-up', '/join'];
+/** The paths Back walks past while signed in (Clerk's sign-in steps live there), as #566 did. */
+const WALK_PATHS = ['/', '/sign-in', '/sign-up'];
+/** Most automatic Back moves in a row, so an odd history can never loop. */
+const MAX_WALK = 50;
 
 function isAccountView(view: AppView): boolean {
   return view === 'signIn';
@@ -402,27 +447,84 @@ function AppBody({
     applyRemoteFlows: sessions.applyRemoteFlows,
   });
 
-  const [view, setView] = useState<AppView>(() => {
+  // The screen for everything the URL does not decide: sign-in, the old flows (editor off), and the
+  // moment before the editor's landing. In the editor build the history entry decides the rest.
+  const [baseView, setView] = useState<AppView>(() => {
     if (offline) return 'home';
     if (AUTH_ENABLED) return 'signIn';
     // Home is always the first screen, with or without people (A2b); contacts come later in the walk.
     return 'home';
   });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigationType = useNavigationType();
+  const sortedSessions = useMemo(
+    () => (CMS_ENABLED ? listableSessionsByRecent : namedSessionsByRecent)([...sessions.sessions]),
+    [sessions.sessions],
+  );
+  // Set once per load (and again after a sign-out) when the editor has shown its first screen.
+  const landed = useRef(false);
+  // With sync on and nobody saved (a fresh device), the first pull may bring people: wait for it, for a short cap.
+  const [syncWaitOver, setSyncWaitOver] = useState(false);
+  const waitingForSync = syncOn && !flowSync.pulled && !syncWaitOver;
+
+  // Back after sign-in (#566, option (a) on #849): a POP onto `/`, `/sign-in` or `/sign-up` while signed
+  // in is one of Clerk's sign-in steps (or the page before them). Go Back again, past all of them, and
+  // keep showing the last screen meanwhile, so the app is left like a site with no sign-in. Mid-walk, a
+  // page of a person who is not here (an entry from an earlier sign-in) is walked past too.
+  // Known edge case: Forward from the previous site into those entries, when the browser restores this
+  // page from its back/forward cache (no reload), is a POP too and walks Back again. MAX_WALK caps it.
+  const walkMoves = useRef(0);
+  const lastOwn = useRef<Location>(location);
+  function isForeign(entryLocation: Location): boolean {
+    if (!CMS_ENABLED || !landed.current || !isSignedIn) {
+      return false;
+    }
+    const screen = readEntry(entryLocation.state).screen;
+    // An empty page once someone exists is gone: Back walks on past it (#597), as the old history hook did.
+    if (screen === 'noOne' && sortedSessions.length > 0) {
+      return true;
+    }
+    if (WALK_PATHS.includes(entryLocation.pathname)) {
+      return screen === null;
+    }
+    const spot = spotFromPath(entryLocation.pathname);
+    return walkMoves.current > 0 && !!spot?.flowId && !sessionList.some((s) => s.flowId === spot.flowId);
+  }
+  // The load's own entry is never walked: it is where the landing starts, not a Back.
+  const loadLocation = useRef(location);
+  const walking = navigationType === 'POP' && location !== loadLocation.current && isForeign(location);
+  if (!walking) {
+    lastOwn.current = location;
+  }
+  const shown = walking ? lastOwn.current : location;
+
+  // The editor's spot, derived from the entry shown (#849). R2a routes a person's pages; the rest is interim state.
+  const entry = readEntry(CMS_ENABLED ? shown.state : null);
+  const pathSpot = CMS_ENABLED ? spotFromPath(shown.pathname) : null;
+  const personPath = pathSpot?.flowId ? pathSpot : null;
+  const pathPerson = personPath ? (sessionList.find((s) => s.flowId === personPath.flowId) ?? null) : null;
+  const editorDecides = CMS_ENABLED && baseView !== 'signIn';
+  const view: AppView = editorDecides && entry.screen ? entry.screen : editorDecides && personPath ? 'cms' : baseView;
+  const cmsSection: CmsSection = entry.screen ? entry.section : (personPath?.section ?? 'overview');
+  const cmsItem: ChecklistItemId | null = entry.item;
+  // A person's page whose person is not on this device: deleted, another account's, or not pulled yet.
+  const personMissing = view === 'cms' && personPath !== null && pathPerson === null;
+  // An editor path the table refuses (or any editor path with the editor off).
+  const notFound = location.pathname.startsWith('/people/') && (!CMS_ENABLED || pathSpot === null);
+
   const firstView = useRef(view);
   // Shown once, on the first screen after a removal; leaving it ends it for good.
   const [showRemoved, setShowRemoved] = useState(removed);
   useEffect(() => {
     if (view !== firstView.current) setShowRemoved(false);
   }, [view]);
+  // The open person with the editor off. With it on, the URL names the person (see `active` below).
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
   // changed most recently.
   const [flowCategory, setFlowCategory] = useState<TemplateCategory | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
-  // Which section the editor shows (flag on only).
-  const [cmsSection, setCmsSection] = useState<CmsSection>('overview');
-  // The checklist item whose guidance fills the editor's main column (flag on only).
-  const [cmsItem, setCmsItem] = useState<ChecklistItemId | null>(null);
   // Where the open item was opened from, so Back can return to that button.
   const itemOpener = useRef<{ id: ChecklistItemId; region: 'main' | 'panel' | 'sheet' } | null>(null);
   const restoreOpener = useRef(false);
@@ -472,6 +574,30 @@ function AppBody({
   // Someone arriving on the empty page keeps the same key, so focus does not jump mid-read (they hear a polite note instead).
   const [arrivedQuietly, setArrivedQuietly] = useState(false);
   const [arrivalNote, setArrivalNote] = useState('');
+  // The item opened from the panel on Your account, so Back returns there. It only counts while that
+  // same item is open, and it is dropped whenever the item closes or history restores a screen.
+  const itemFromAccount = useRef<ChecklistItemId | null>(null);
+  // Same for an item opened from the preview panel with nobody saved: the screen to return to.
+  const itemFromEmpty = useRef<{ id: ChecklistItemId; view: 'people' | 'profile' | 'settings' } | null>(null);
+  // Back or Forward restored an entry: what onRestore did under the old history hook (#566). Declared
+  // before the heading hook, so a closed item hands focus back to its opener after the h1 took it.
+  const mounted = useRef(false);
+  const shownItem = useRef(cmsItem);
+  useEffect(() => {
+    if (mounted.current && navigationType === 'POP' && !walking) {
+      itemFromAccount.current = null;
+      itemFromEmpty.current = null;
+      // Back never lands in the name prompt, and an error from another screen is not carried over.
+      auth?.clearError();
+      setAskingName(false);
+      if (shownItem.current !== null && cmsItem === null) {
+        restoreOpener.current = true;
+      }
+    }
+    mounted.current = true;
+    shownItem.current = cmsItem;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
   useFocusHeadingOnChange(
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
       ? `empty:${cmsSection}:${cmsItem ?? ''}`
@@ -508,22 +634,23 @@ function AppBody({
   });
   const clearError = auth?.clearError;
 
-  const openProfile = useCallback(
-    (asksName: boolean, from: AppView = 'home') => {
-      // A stale error from another screen would otherwise show here without being announced.
-      clearError?.();
-      setAskingName(asksName);
-      setReturnTo(from);
-      setNeedsName(false);
-      setView('profile');
-    },
-    [clearError],
-  );
+  function openProfile(asksName: boolean, from: AppView = 'home') {
+    // A stale error from another screen would otherwise show here without being announced.
+    clearError?.();
+    setAskingName(asksName);
+    setReturnTo(from);
+    setNeedsName(false);
+    if (CMS_ENABLED) {
+      go({ view: 'profile' });
+      return;
+    }
+    setView('profile');
+  }
 
   // Sign-in resolves asynchronously (the boot-time session check, or the Clerk form), so the
   // next view can't be decided in useState's initializer. Everyone lands on Home.
   useEffect(() => {
-    if (!signedIn || !isAccountView(view)) return;
+    if (!signedIn || !isAccountView(baseView)) return;
     setFlowCategory(undefined);
     setView('home');
     // Ask in the background whether the account has a name. It never holds anyone back, and it
@@ -536,7 +663,7 @@ function AppBody({
         if (generation === accountGeneration.current) setNeedsName(lacks);
       });
     }
-  }, [signedIn, view, getAccessToken]);
+  }, [signedIn, baseView, getAccessToken]);
 
   // Orphan unnamed people from the old flow would otherwise sit on the device; tidy them once.
   const pruneEmpty = sessions.pruneEmpty;
@@ -565,6 +692,10 @@ function AppBody({
       setLeftOnPurpose(false);
       setFlowCategory(undefined);
       setView('signIn');
+      // The sign-in sits on `/`, so the next sign-in lands afresh instead of reopening Your account.
+      if (CMS_ENABLED) {
+        navigate('/', { replace: true });
+      }
     }
   }, [signedOut, leftOnPurpose, view]);
   const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view) && !deletingAccount;
@@ -618,15 +749,14 @@ function AppBody({
   async function removeEverything() {
     // Local only: ending the Clerk session deletes nothing on a server.
     await removeEverythingFromDevice(window.localStorage, endSession);
+    // The fresh app starts from `/`, as after a load, rather than on the screen this was pressed on.
+    if (CMS_ENABLED) {
+      navigate('/', { replace: true });
+    }
     onRemoved();
   }
 
   const canCreate = !(sharingOn && auth?.profile?.accountType === 'member');
-  const sortedSessions = useMemo(
-    () => (CMS_ENABLED ? listableSessionsByRecent : namedSessionsByRecent)([...sessions.sessions]),
-    [sessions.sessions],
-  );
-
   // Remove a person (Account only). The decisions live in lib/removePerson; this passes it the hooks.
   function removeOnePerson(id: string) {
     const target = sessionList.find((s) => s.id === id);
@@ -649,85 +779,99 @@ function AppBody({
     <RemovePerson people={removablePeopleList} scope={syncOn ? 'account' : 'device'} onRemove={removeOnePerson} note={removeNote} />
   ) : undefined;
 
-  // Picks the most recent person when none is open. It never creates one: Home's "Create a new
-  // one" is the only way to start a person.
+  // Editor off: picks the most recent person when none is open. It never creates one: Home's "Create
+  // a new one" is the only way to start a person.
   useEffect(() => {
-    if (!isSignedIn || activeId || sortedSessions.length === 0) return;
+    if (CMS_ENABLED || !isSignedIn || activeId || sortedSessions.length === 0) return;
     setActiveId(sortedSessions[0].id);
   }, [isSignedIn, activeId, sortedSessions]);
 
-  const active = useMemo<Session | null>(
-    () => sessions.sessions.find((s) => s.id === activeId) ?? null,
-    [sessions.sessions, activeId],
-  );
+  // Editor on: the person the URL names. Your people and the empty pages have none; the account
+  // screens keep the person whose page they were opened from, else the most recent one.
+  const editorActive =
+    view === 'cms' ? pathPerson : view === 'people' || view === 'noOne' ? null : (pathPerson ?? sortedSessions[0] ?? null);
+  const stateActive = sessions.sessions.find((s) => s.id === activeId) ?? null;
+  const active: Session | null = CMS_ENABLED ? editorActive : stateActive;
+
+  /**
+   * The one way the editor moves (#849). A person's page goes to its path; Your people, Account and the
+   * empty pages (interim, see StateScreen) push the current path with their screen in the entry's state.
+   * The same screen again adds no entry.
+   */
+  function go(spot: Spot, { replace = false }: { replace?: boolean } = {}) {
+    let pathname = location.pathname;
+    let state: Record<string, unknown> | null;
+    if (spot.view === 'cms') {
+      if (!spot.person) {
+        return;
+      }
+      pathname = pathForSpot({ flowId: spot.person.flowId, section: spot.section ?? 'overview', item: null });
+      state = spot.item ? { item: spot.item } : null;
+    } else {
+      // Not found: the id leaves the address bar.
+      if (spot.missing) {
+        pathname = '/';
+      }
+      state = { screen: spot.view, section: spot.section ?? 'overview', item: spot.item ?? null, missing: spot.missing ?? false };
+    }
+    if (pathname === location.pathname && JSON.stringify(readEntry(state)) === JSON.stringify(readEntry(location.state))) {
+      return;
+    }
+    navigate(pathname, { replace, state });
+  }
+
+  /** The current editor spot, to change one part of it. */
+  const here: Spot = { view: view === 'cms' || STATE_SCREENS.includes(view as StateScreen) ? (view as Spot['view']) : 'noOne', section: cmsSection, item: cmsItem, person: active };
+
+  /** The side nav's link for an item, when it has a path: a person's Overview and sections. */
+  function navHref(person: Session | null) {
+    return (key: CmsNavKey): string | null => {
+      if (!person || key === 'people' || key === 'account') {
+        return null;
+      }
+      return pathForSpot({ flowId: person.flowId, section: key, item: null });
+    };
+  }
 
   // With no one open these views have nothing to show, and Home stands in; keep the state honest.
+  // (Editor on, the URL names the person; a missing one is handled below.)
   useEffect(() => {
-    if (!active && NEEDS_PERSON.includes(view)) setView(CMS_ENABLED ? 'people' : 'home');
+    if (!CMS_ENABLED && !active && NEEDS_PERSON.includes(view)) setView('home');
   }, [active, view]);
 
   // Someone arrived (a sync, or a share) while the empty page was open: carry on in the editor, same section.
+  // Not while "Start" is making the person: that opens The person itself.
   useEffect(() => {
-    if (view === 'noOne' && sortedSessions.length > 0) {
-      setActiveId(sortedSessions[0].id);
+    if (view === 'noOne' && sortedSessions.length > 0 && !creatingNow.current) {
       setArrivedQuietly(true);
       setArrivalNote(cmsShellCopy.arrivedNote);
-      setView('cms');
+      go({ view: 'cms', person: sortedSessions[0], section: cmsSection }, { replace: true });
     }
-  }, [view, sortedSessions]);
-
-  // Back walks the editor's screens and never returns to the sign-in (#566).
-  useNavHistory({
-    // With no sign-in at all (auth off) Back walks the screens too; it only stays off while signed out.
-    enabled: CMS_ENABLED && (signedIn || auth === null),
-    trackable: TRACKED_VIEWS.includes(view),
-    userId: auth?.userId ?? '',
-    signedOut,
-    // Only a section has a subject; the most recent person being re-picked on Your people or the account screens must not add an entry.
-    spot: { view, section: cmsSection, item: cmsItem, personId: view === 'cms' ? activeId : null },
-    onRestore: (spot) => {
-      itemFromAccount.current = null;
-      itemFromEmpty.current = null;
-      // Only what this app could have written; anything else is refused.
-      const view = TRACKED_VIEWS.find((candidate) => candidate === spot.view);
-      const section = CMS_SECTIONS.find((candidate) => candidate === spot.section);
-      const item = spot.item === null ? null : (Object.keys(cmsItemLabels) as ChecklistItemId[]).find((id) => id === spot.item);
-      if (
-        !view ||
-        !section ||
-        item === undefined ||
-        (view === 'noOne' && section === 'person') ||
-        // Someone exists now, so the empty page is gone: refuse it and let Back walk on past it.
-        (view === 'noOne' && sortedSessions.length > 0)
-      ) {
-        return false;
-      }
-      // Back never lands in the name prompt, and an error from another screen is not carried over.
-      auth?.clearError();
-      setAskingName(false);
-      // The person was deleted since: a section of theirs goes straight to Your people rather than to nobody.
-      if (view === 'cms' && spot.personId && !sessions.sessions.some((p) => p.id === spot.personId)) {
-        setCmsItem(null);
-        setCmsSection(section);
-        setActiveId(null);
-        setView('people');
-        return { view: 'people', section, item: null, personId: null };
-      }
-      if (item === null && cmsItem !== null) {
-        // Same as closing an item by hand: focus returns to what opened it.
-        restoreOpener.current = true;
-      }
-      setView(view);
-      setCmsSection(section);
-      setCmsItem(item);
-      // Only a section has a subject; the other screens restore with none, and the whoever is open stays open.
-      const personId = view === 'cms' ? spot.personId : null;
-      if (view === 'cms') {
-        setActiveId(personId);
-      }
-      return { view, section, item, personId };
-    },
   });
+
+  // A person's page whose person is not here (#566 rules): wait for the first pull while it may still
+  // bring them, then replace the entry with Your people and a calm line. The id is never shown, and it
+  // leaves the address bar.
+  useEffect(() => {
+    if (!personMissing || walking || waitingForSync || !isSignedIn) {
+      return;
+    }
+    go({ view: 'people', missing: true }, { replace: true });
+  });
+
+  // The Back walk past the sign-in entries (see `isForeign`).
+  useEffect(() => {
+    if (!walking) {
+      walkMoves.current = 0;
+      return;
+    }
+    if (walkMoves.current >= MAX_WALK) {
+      return;
+    }
+    walkMoves.current += 1;
+    // The same move as navigate(-1); the router reads the entry it lands on like any Back.
+    window.history.back();
+  }, [location.key, walking]);
 
   const { updateDraft, updateSession, recordMomentComplete } = sessions;
   const onDraftChange = useCallback(
@@ -802,26 +946,24 @@ function AppBody({
       return;
     }
     if (active) {
-      setCmsSection('overview');
-      setView('cms');
+      go({ view: 'cms', person: active, section: 'overview' });
       return;
     }
-    setView('people');
+    go({ view: 'people' });
   }
 
   /** Makes this person the active one and opens their path. A half-written message shows "Started" there (#25). */
-  function openPerson(id: string) {
+  function openPerson(id: string, options?: { replace?: boolean }) {
     const person = sessions.sessions.find((s) => s.id === id);
     if (!person) return;
     setCreating(false);
     sessions.touchSession(id);
-    setActiveId(id);
     setFlowCategory(undefined);
     if (CMS_ENABLED) {
-      setCmsSection('overview');
-      setView('cms');
+      go({ view: 'cms', person, section: 'overview' }, options);
       return;
     }
+    setActiveId(id);
     setView('pathLanding');
   }
 
@@ -835,7 +977,7 @@ function AppBody({
   const creatingNow = useRef(false);
   useEffect(() => {
     creatingNow.current = false;
-  }, [view]);
+  }, [view, location.key]);
 
   /** "Create a new one" on Home: setup first, then the rest of the walk. */
   function startNewSession() {
@@ -849,10 +991,7 @@ function AppBody({
       setArrivalNote('');
       // The editor has no contacts step or who-hears-first: make the person and open The person, from any page.
       const created = sessions.createSession();
-      setActiveId(created.id);
-      setCmsItem(null);
-      setCmsSection('person');
-      setView('cms');
+      go({ view: 'cms', person: created, section: 'person' });
       return;
     }
     setCreating(true);
@@ -969,70 +1108,66 @@ function AppBody({
     setView('setup');
   }
 
-  function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', closeSheet?: () => void) {
+  function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', target: Spot, closeSheet?: () => void) {
     itemOpener.current = { id, region };
     itemFromAccount.current = null;
     itemFromEmpty.current = null;
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
     closeSheet?.();
-    setCmsItem(id);
+    go({ ...target, item: id });
   }
 
   function closeCmsItem() {
     const origin = itemFromEmpty.current;
     if (origin && origin.id === cmsItem) {
       itemFromEmpty.current = null;
-      setCmsItem(null);
       if (origin.view === 'profile') {
         openProfile(false, accountFrom.current);
       } else {
-        setView(origin.view);
+        go({ view: origin.view });
       }
       return;
     }
     if (itemFromAccount.current !== null && itemFromAccount.current === cmsItem) {
       // Opened from the panel on Your account: Back returns there.
       itemFromAccount.current = null;
-      setCmsItem(null);
       openProfile(false, accountFrom.current);
       return;
     }
     restoreOpener.current = true;
-    setCmsItem(null);
+    go({ ...here, item: null });
   }
 
-  // Editor on: the first time the app reaches Home after load or sign-in, open the most recent person's
-  // Overview, or "Your people" when nobody is saved. The ref makes it once per sign-in, so "Change" and Back
-  // from Settings or Profile stay put. Starting a person is always the user's choice, on Your people.
   // Where Your account was opened from (flag on): Back returns there.
   const accountFrom = useRef<'cms' | 'people' | 'noOne'>('cms');
-  // The item opened from the panel on Your account, so Back returns there. It only counts while that
-  // same item is open, and it is dropped whenever the item closes or history restores a screen.
-  const itemFromAccount = useRef<ChecklistItemId | null>(null);
-  // Same for an item opened from the preview panel with nobody saved: the screen to return to.
-  const itemFromEmpty = useRef<{ id: ChecklistItemId; view: 'people' | 'profile' | 'settings' } | null>(null);
   useEffect(() => {
     if (cmsItem === null) {
       itemFromAccount.current = null;
       itemFromEmpty.current = null;
     }
   }, [cmsItem]);
-  const landed = useRef(false);
   // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
   // is a real move to a new screen, so it asks for the h1 itself.
   const focusAfterLanding = useRef(false);
-  // The latest openPerson (re-made each render), so the effect below needn't list it.
-  const opens = useRef({ openPerson });
-  opens.current = { openPerson };
-  // With sync on and nobody saved (a fresh device), the first pull may bring people: wait for it, for a short cap.
-  const [syncWaitOver, setSyncWaitOver] = useState(false);
-  const waitingForSync = syncOn && !flowSync.pulled && !syncWaitOver;
+  // The latest openPerson and go (re-made each render), so the effect below needn't list them.
+  const opens = useRef({ openPerson, go });
+  opens.current = { openPerson, go };
+  // Editor on: once per load (and again after a sign-out), `/` and the sign-in paths are replaced by the
+  // most recent person's Overview, or the empty Overview when nobody is saved (#448, #603). A deep link,
+  // or an entry this app stored (a reload), wins over the landing. Starting a person is always the user's choice.
   useEffect(() => {
     if (signedOut) {
       landed.current = false;
       setSyncWaitOver(false);
     }
-    if (!CMS_ENABLED || landed.current || !isSignedIn || auth?.isLoading || view !== 'home') {
+    if (!CMS_ENABLED || landed.current || !isSignedIn || auth?.isLoading || baseView !== 'home') {
+      return;
+    }
+    if (entry.screen || personPath) {
+      landed.current = true;
+      return;
+    }
+    if (!LANDING_PATHS.includes(location.pathname)) {
       return;
     }
     if (sortedSessions.length === 0 && waitingForSync) {
@@ -1041,23 +1176,24 @@ function AppBody({
     landed.current = true;
     focusAfterLanding.current = true;
     if (sortedSessions.length > 0) {
-      opens.current.openPerson(sortedSessions[0].id);
+      opens.current.openPerson(sortedSessions[0].id, { replace: true });
       return;
     }
     // Nobody saved: the Overview's empty page, not Your people.
-    setCmsItem(null);
-    setCmsSection('overview');
-    setView('noOne');
-  }, [signedOut, isSignedIn, auth?.isLoading, view, sortedSessions, waitingForSync]);
+    opens.current.go({ view: 'noOne', section: 'overview' }, { replace: true });
+  });
 
+  // One boolean, so the list changing while it stays true does not restart the cap.
+  const mayArrive = sortedSessions.length === 0 || personMissing;
   useEffect(() => {
     // Any screen: a stalled pull must still end the wait, so creation is never held back for good.
-    if (!waitingForSync || !isSignedIn || sortedSessions.length > 0) {
+    // A person's page that is not here yet waits the same cap.
+    if (!waitingForSync || !isSignedIn || !mayArrive) {
       return;
     }
     const timer = setTimeout(() => setSyncWaitOver(true), LANDING_SYNC_WAIT_MS);
     return () => clearTimeout(timer);
-  }, [waitingForSync, isSignedIn, sortedSessions.length]);
+  }, [waitingForSync, isSignedIn, mayArrive]);
   // While the first pull may still bring people, offering "Start" could make a second copy of one.
   const creationHeld = waitingForSync && sortedSessions.length === 0;
 
@@ -1138,13 +1274,9 @@ function AppBody({
           onOpenItem={(id) => {
             auth?.clearError();
             setAskingName(false);
-            if (view !== 'noOne') {
-              setCmsSection('overview');
-            }
-            openCmsItem(id, inSheet ? 'sheet' : 'panel', closeSheet);
+            openCmsItem(id, inSheet ? 'sheet' : 'panel', { view: 'noOne', section: view === 'noOne' ? cmsSection : 'overview' }, closeSheet);
             // Back returns to the screen the panel was used on (Your people or Your account), not the empty Overview.
             itemFromEmpty.current = view === 'people' || view === 'profile' || view === 'settings' ? { id, view } : null;
-            setView('noOne');
           }}
         />
       );
@@ -1158,11 +1290,8 @@ function AppBody({
           auth?.clearError();
           setAskingName(false);
           sessions.touchSession(person.id);
-          setActiveId(person.id);
-          setCmsSection('overview');
-          openCmsItem(id, 'main', closeSheet);
+          openCmsItem(id, 'main', { view: 'cms', person, section: 'overview' }, closeSheet);
           itemFromAccount.current = id;
-          setView('cms');
         }}
       />
     );
@@ -1182,6 +1311,7 @@ function AppBody({
           personName={person?.personName ?? ''}
           section="people"
           statuses={person?.sectionStatus}
+          hrefFor={navHref(person)}
           // Your people is already here; a section opens that person there, like the Overview card.
           onSelect={(key) => {
             // CmsShell routes 'people' and 'account' to their own handlers; the extra checks only narrow the type.
@@ -1194,11 +1324,8 @@ function AppBody({
             }
             auth?.clearError();
             setAskingName(false);
-            setCmsItem(null);
-            setCmsSection(key);
             sessions.touchSession(person.id);
-            setActiveId(person.id);
-            setView('cms');
+            go({ view: 'cms', person, section: key });
           }}
           // Your people is already open.
           onPeople={() => undefined}
@@ -1208,11 +1335,16 @@ function AppBody({
             if (auth?.isSignedIn) {
               openProfile(false, 'people');
             } else {
-              setView('settings');
+              go({ view: 'settings' });
             }
           }}
           notice={endedNote}
         >
+          {entry.missing ? (
+            <p role="status" className="m-0 text-[14px]" style={{ color: 'var(--text-muted)' }}>
+              {cmsShellCopy.personMissing}
+            </p>
+          ) : null}
           <PeopleList sessions={sessionList} onOpen={openPerson} onCreate={() => startNewSession()} canCreate={canCreate} holding={creationHeld} />
         </CmsShell>
       </Shell>
@@ -1222,7 +1354,7 @@ function AppBody({
   /** Back from Settings or Your account: flag on, to where the person came from. */
   function backFromAccount() {
     if (CMS_ENABLED && (accountFrom.current === 'people' || accountFrom.current === 'noOne')) {
-      setView('people');
+      go({ view: 'people' });
       return;
     }
     goHome();
@@ -1258,6 +1390,7 @@ function AppBody({
           personName={person?.personName ?? ''}
           section="account"
           statuses={person?.sectionStatus}
+          hrefFor={navHref(person)}
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
               if (!person) {
@@ -1266,13 +1399,10 @@ function AppBody({
               }
               auth?.clearError();
               setAskingName(false);
-              setCmsItem(null);
-              setCmsSection(key);
-              if (person && person.id !== activeId) {
+              if (person.id !== active?.id) {
                 sessions.touchSession(person.id);
-                setActiveId(person.id);
               }
-              setView('cms');
+              go({ view: 'cms', person, section: key });
             }
           }}
           onPeople={() => {
@@ -1300,7 +1430,6 @@ function AppBody({
       <NameNote
         onOpenAccount={() => {
           accountFrom.current = view === 'noOne' ? 'noOne' : 'cms';
-          setCmsItem(null);
           openProfile(false);
         }}
       />
@@ -1310,17 +1439,17 @@ function AppBody({
   function openEmpty(section: CmsSection) {
     auth?.clearError();
     setAskingName(false);
-    setCmsItem(null);
-    setCmsSection(section);
-    setView('noOne');
+    go({ view: 'noOne', section });
   }
 
   /** "Your people" in the side nav: an unnamed person is dropped, then Your people opens. */
   function leaveCms() {
     sessions.pruneEmpty();
-    setCmsItem(null);
-    setActiveId(null);
-    setView('people');
+    go({ view: 'people' });
+  }
+
+  if (notFound) {
+    return <NotFound />;
   }
 
   // While Clerk is loading or a stored session is being checked, show nothing but the quiet status.
@@ -1457,10 +1586,8 @@ function AppBody({
       sessions.setSectionStatus(active.id, key, ready ? 'ready' : 'in_progress');
     const nextSection = computeSections(active, AVAILABLE_SECTIONS).next;
     // Ready leads on: the next section, or the Overview when nothing is left. The key hook moves focus to the h1.
-    const goNext = () => {
-      setCmsItem(null);
-      setCmsSection(nextSection ?? 'overview');
-    };
+    const toSection = (section: CmsSection) => go({ view: 'cms', person: active, section });
+    const goNext = () => toSection(nextSection ?? 'overview');
     return (
       <Shell wide>
         <CmsShell
@@ -1471,28 +1598,27 @@ function AppBody({
               checklist={active.checklist ?? {}}
               onSetItem={(id, state) => sessions.setChecklistItem(active.id, id, state)}
               currentItem={cmsItem}
-              onOpenItem={(id) => openCmsItem(id, inSheet ? 'sheet' : 'panel', closeSheet)}
+              onOpenItem={(id) => openCmsItem(id, inSheet ? 'sheet' : 'panel', here, closeSheet)}
             />
           )}
           personName={active.personName}
           section={cmsSection}
           statuses={active.sectionStatus}
+          hrefFor={navHref(active)}
           // The account item goes to onAccount, never here; the check only narrows the type.
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
-              setCmsItem(null);
-              setCmsSection(key);
+              toSection(key);
             }
           }}
           onPeople={leaveCms}
           onAccount={() => {
             sessions.pruneEmpty();
             accountFrom.current = 'cms';
-            setCmsItem(null);
             if (auth?.isSignedIn) {
               openProfile(false);
             } else {
-              setView('settings');
+              go({ view: 'settings' });
             }
           }}
           notice={endedNote}
@@ -1503,11 +1629,8 @@ function AppBody({
               state={active.checklist?.[cmsItem] ?? null}
               onSetState={(state) => sessions.setChecklistItem(active.id, cmsItem, state)}
               onBack={closeCmsItem}
-              onOpenSection={(section) => {
-                // The key hook moves focus to the section's h1.
-                setCmsItem(null);
-                setCmsSection(section);
-              }}
+              // The key hook moves focus to the section's h1.
+              onOpenSection={toSection}
             />
           ) : cmsSection === 'overview' ? (
             <>
@@ -1515,8 +1638,8 @@ function AppBody({
               <Overview
                 session={active}
                 checklist={active}
-                onOpen={setCmsSection}
-                onOpenItem={(id) => openCmsItem(id, 'main')}
+                onOpen={toSection}
+                onOpenItem={(id) => openCmsItem(id, 'main', here)}
               />
             </>
           ) : cmsSection === 'person' ? (
@@ -1761,7 +1884,9 @@ function AppBody({
   }
 
   // Landing is waiting for the first sync: a quiet status, not an empty "Your people" that then jumps.
-  if (CMS_ENABLED && view === 'home' && isSignedIn && !landed.current && waitingForSync && sortedSessions.length === 0) {
+  // A person's page that is not here yet waits the same way (the first pull may bring them).
+  const landingWaits = view === 'home' && isSignedIn && !landed.current && waitingForSync && sortedSessions.length === 0;
+  if (CMS_ENABLED && (landingWaits || (personMissing && waitingForSync))) {
     return (
       <Shell wide>
         <CmsShell
@@ -1776,13 +1901,13 @@ function AppBody({
               openEmpty(key);
             }
           }}
-          onPeople={() => setView('people')}
+          onPeople={() => go({ view: 'people' })}
           onAccount={() => {
             accountFrom.current = 'people';
             if (auth?.isSignedIn) {
               openProfile(false, 'people');
             } else {
-              setView('settings');
+              go({ view: 'settings' });
             }
           }}
           notice={endedNote}
@@ -1804,21 +1929,16 @@ function AppBody({
           section={cmsSection}
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
-              setCmsItem(null);
-              setCmsSection(key);
+              go({ view: 'noOne', section: key });
             }
           }}
-          onPeople={() => {
-            setCmsItem(null);
-            setView('people');
-          }}
+          onPeople={() => go({ view: 'people' })}
           onAccount={() => {
             accountFrom.current = 'noOne';
-            setCmsItem(null);
             if (auth?.isSignedIn) {
               openProfile(false, 'noOne');
             } else {
-              setView('settings');
+              go({ view: 'settings' });
             }
           }}
           notice={endedNote}
@@ -1830,10 +1950,7 @@ function AppBody({
               state={null}
               onSetState={() => undefined}
               onBack={closeCmsItem}
-              onOpenSection={(section) => {
-                setCmsItem(null);
-                setCmsSection(section);
-              }}
+              onOpenSection={(section) => go({ view: 'noOne', section })}
             />
           ) : (
             <>

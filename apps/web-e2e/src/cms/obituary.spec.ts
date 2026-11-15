@@ -27,7 +27,7 @@ async function openObituary(page: Page) {
   await page.getByRole('button', { name: "Start with someone I've lost" }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
   await page.getByLabel('Their name').fill('Margaret Hayes');
-  await page.getByRole('navigation').getByRole('button', { name: /^Obituary/ }).click();
+  await page.getByRole('navigation').getByRole('link', { name: /^Obituary/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Obituary' })).toBeVisible();
 }
 
@@ -93,7 +93,7 @@ test.describe('Obituary section (WEB-6)', () => {
     await openObituary(page);
     await page.getByLabel('Date of birth (optional)', { exact: true }).fill('May 2, 1940');
     await page.getByLabel('Date they passed (optional)', { exact: true }).fill('June 1, 2026');
-    await page.getByRole('navigation').getByRole('button', { name: /^Overview/ }).click();
+    await page.getByRole('navigation').getByRole('link', { name: /^Overview/ }).click();
     await page.getByRole('main').getByRole('button', { name: /^The person/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
     await expect(page.getByLabel('Date of birth (optional)', { exact: true })).toHaveValue('May 2, 1940');

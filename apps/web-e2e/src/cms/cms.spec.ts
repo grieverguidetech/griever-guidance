@@ -22,8 +22,10 @@ function nav(page: Page) {
   return page.getByRole('navigation');
 }
 
+/** A page with a URL is a link in the nav (#849); Your people and Your account stay buttons until they get one. */
 async function openSection(page: Page, name: string, heading: string) {
-  await nav(page).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  const role = name === 'Your people' || name === 'Your account' ? 'button' : 'link';
+  await nav(page).getByRole(role, { name: new RegExp(`^${name}`) }).click();
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
@@ -248,10 +250,10 @@ test.describe('navigation (#566)', () => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
     await openSection(page, 'Your account', 'Account');
-    await expect(nav(page).getByRole('button', { name: 'Overview' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Overview' })).toBeVisible();
     await openSection(page, 'Service', 'Service');
     await openSection(page, 'Your account', 'Account');
-    await expect(nav(page).getByRole('button', { name: 'Overview' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Overview' })).toBeVisible();
     await openSection(page, 'Your people', 'Your people');
     await expect(nav(page).getByRole('button', { name: 'Your account' })).toBeVisible();
     await expect(nav(page).getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
@@ -271,5 +273,55 @@ test.describe('navigation (#566)', () => {
     const overview = page.getByRole('heading', { level: 1, name: 'Overview' });
     await expect(overview).toBeVisible();
     await expect(overview).toBeFocused();
+  });
+});
+
+test.describe('editor URLs (#849)', () => {
+  const PERSON_PATH = /^\/people\/[0-9a-f-]{36}$/;
+  const SERVICE_PATH = /^\/people\/[0-9a-f-]{36}\/service$/;
+  const OBITUARY_PATH = /^\/people\/[0-9a-f-]{36}\/obituary$/;
+  const pathname = (page: Page) => new URL(page.url()).pathname;
+
+  test('a reload on Service stays on Service, and the address names the person by id, never the name', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Service', 'Service');
+    expect(pathname(page)).toMatch(SERVICE_PATH);
+    expect(page.url()).not.toContain('Margaret');
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
+    expect(pathname(page)).toMatch(SERVICE_PATH);
+    await expect(nav(page).getByRole('link', { name: /^Service/ })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('Back and Forward walk the sections by URL, with focus on each h1', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Overview', 'Overview');
+    expect(pathname(page)).toMatch(PERSON_PATH);
+    await openSection(page, 'Service', 'Service');
+    await openSection(page, 'Obituary', 'Obituary');
+    expect(pathname(page)).toMatch(OBITUARY_PATH);
+    await page.goBack();
+    const service = page.getByRole('heading', { level: 1, name: 'Service' });
+    await expect(service).toBeFocused();
+    expect(pathname(page)).toMatch(SERVICE_PATH);
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeFocused();
+    expect(pathname(page)).toMatch(PERSON_PATH);
+    await page.goForward();
+    await expect(service).toBeFocused();
+    expect(pathname(page)).toMatch(SERVICE_PATH);
+  });
+
+  test('a routed page opened from its address has no axe violations', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Service', 'Service');
+    const address = page.url();
+    await page.goto(address);
+    await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
+    expect(await violations(page)).toEqual([]);
+    expect(await violations(page, { contrastOnly: true })).toEqual([]);
   });
 });

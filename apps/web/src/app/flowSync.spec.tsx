@@ -258,6 +258,44 @@ describe('background sync in the app (#520)', () => {
     }
   });
 
+  it('a deep link to a person the first pull brings opens that page once they arrive (#849)', async () => {
+    window.localStorage.removeItem('gg.sessions.v1');
+    signedIn(true);
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
+  });
+
+  it('a deep link to a person not in this account waits the first-pull cap, then shows Your people with a calm line, never the id (#849)', async () => {
+    const other = '33333333-3333-4333-8333-333333333333';
+    signedIn(true);
+    // The device list is already kept for this account, as after any earlier sign-in.
+    window.localStorage.setItem('gg.sessionsAccount.v1', USER);
+    // The server never answers, so only the cap ends the wait.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    try {
+      renderApp(<App />, { path: `/people/${other}` });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1300);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'One moment' })).toBeInTheDocument();
+      expect(window.location.pathname).toBe(`/people/${other}`);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+      expect(screen.getByText("That page isn't here. Your people are below.")).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/');
+      expect(document.body.textContent).not.toContain(other);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a person arriving from the first sync while a section is empty opens in the same section, with a polite note and no focus jump (#597)', async () => {
     window.localStorage.removeItem('gg.sessions.v1');
     signedIn(true);

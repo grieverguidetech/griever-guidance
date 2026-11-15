@@ -71,7 +71,8 @@
     "emptyMember",
     "emptyHolding",
     "arrivedNote",
-    "loadingTitle"
+    "loadingTitle",
+    "personMissing"
   ],
   "properties": {
     "navOverview": {
@@ -276,6 +277,9 @@
       "$ref": "#/$defs/text"
     },
     "loadingTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "personMissing": {
       "$ref": "#/$defs/text"
     }
   },

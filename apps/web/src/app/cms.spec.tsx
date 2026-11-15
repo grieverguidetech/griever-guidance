@@ -153,7 +153,7 @@ describe('editor on (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     expect(stored()[0].sectionStatus).toEqual({ service: 'ready' });
-    await user.click(screen.getByRole('button', { name: /^Overview/ }));
+    await user.click(screen.getByRole('link', { name: /^Overview/ }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     expect(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ })).toHaveTextContent('Ready');
   });
@@ -206,7 +206,7 @@ describe('editor on (#395)', () => {
     renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
-    await user.click(screen.getByRole('button', { name: /^Service/ }));
+    await user.click(screen.getByRole('link', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.type(screen.getAllByLabelText('Date')[0], 'May 29, 2026');
     await user.click(peopleNav());
@@ -231,13 +231,13 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
     await user.click(screen.getByRole('button', { name: "Funeral home and place of worship" }));
     await user.type(screen.getByLabelText('Cemetery'), 'Oak Hill');
     expect(stored()[0]).toMatchObject({ burialPlace: 'Oak Hill' });
     expect(stored()[0].sectionStatus?.['service']).toBe('in_progress');
-    await user.click(nav.getByRole('button', { name: /^Service/ }));
+    await user.click(nav.getByRole('link', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     expect(screen.getByLabelText('Cemetery')).toHaveValue('Oak Hill');
   });
@@ -246,14 +246,14 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
     await user.click(screen.getByRole('button', { name: 'Service and visitation' }));
     fireEvent.change(screen.getByLabelText('Funeral or memorial service Time'), { target: { value: '14:00' } });
     expect(stored()[0]).toMatchObject({ serviceTime: '2:00 PM' });
     expect(stored()[0].sectionStatus?.['service']).toBe('in_progress');
     expect((screen.getByLabelText('Obituary') as HTMLTextAreaElement).value).toContain('2:00 PM');
-    await user.click(nav.getByRole('button', { name: /^Service/ }));
+    await user.click(nav.getByRole('link', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     expect(screen.getByLabelText('Funeral or memorial service Time')).toHaveValue('14:00');
   });
@@ -262,11 +262,11 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav.getByRole('button', { name: /^Service/ }));
+    await user.click(nav.getByRole('link', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
     await user.click(screen.getByRole('button', { name: /Add burial/ }));
     await user.type(screen.getByLabelText('Cemetery'), 'Elm Rest');
-    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
     await user.click(screen.getByRole('button', { name: 'Funeral home and place of worship' }));
     expect(screen.getByLabelText('Cemetery')).toHaveValue('Elm Rest');
@@ -276,18 +276,18 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
     fireEvent.change(screen.getByLabelText('Date of birth (optional)'), { target: { value: 'May 2, 1940' } });
     expect(stored()[0]).toMatchObject({ birthDate: 'May 2, 1940' });
     expect(stored()[0].sectionStatus?.['person']).toBe('in_progress');
     // The person is opened from the Overview, not the side nav.
-    await user.click(nav.getByRole('button', { name: /^Overview/ }));
+    await user.click(nav.getByRole('link', { name: /^Overview/ }));
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^The person/ }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(screen.getByLabelText('Date of birth (optional)')).toHaveValue('May 2, 1940');
     fireEvent.change(screen.getByLabelText('Date they passed (optional)'), { target: { value: 'June 1, 2026' } });
-    await user.click(nav.getByRole('button', { name: /^Obituary/ }));
+    await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
     expect(screen.getByLabelText('Date they passed (optional)')).toHaveValue('June 1, 2026');
   });
@@ -300,12 +300,12 @@ describe('editor on (#395)', () => {
     expect(stored()).toHaveLength(1);
   });
 
-  it('lists Announcement, Obituary and Thank-yous in the nav as buttons that open their editors', async () => {
+  it('lists Announcement, Obituary and Thank-yous in the nav as links that open their editors', async () => {
     const user = userEvent.setup();
     await openMargaret();
     for (const name of ['Announcement', 'Obituary', 'Thank-yous']) {
       const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-      await user.click(nav.getByRole('button', { name: new RegExp(`^${name}`) }));
+      await user.click(nav.getByRole('link', { name: new RegExp(`^${name}`) }));
       const focused5 = await screen.findByRole('heading', { level: 1, name });
       await waitFor(() => expect(focused5).toHaveFocus());
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
@@ -325,7 +325,7 @@ describe('editor on (#395)', () => {
     expect(stored()[0].sectionStatus).toEqual({ announcement: 'in_progress' });
     await user.click(screen.getByRole('button', { name: 'Mark as ready' }));
     expect(stored()[0].sectionStatus).toEqual({ announcement: 'ready' });
-    await user.click(screen.getByRole('button', { name: /^Overview/ }));
+    await user.click(screen.getByRole('link', { name: /^Overview/ }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     expect(within(screen.getByRole('main')).getByRole('button', { name: /^Announcement/ })).toHaveTextContent(
       'Ready Margaret died peacefully.',
@@ -336,7 +336,7 @@ describe('editor on (#395)', () => {
     const user = userEvent.setup();
     await openMargaret();
     for (const name of ['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous']) {
-      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: new RegExp(`^${name}`) }));
+      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: new RegExp(`^${name}`) }));
       await screen.findByRole('heading', { level: 1, name });
       expect(document.querySelector('a[href^="sms:"]')).toBeNull();
       expect(screen.queryByText(/Open Messages/i)).not.toBeInTheDocument();
@@ -350,7 +350,7 @@ describe('editor on (#395)', () => {
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^Service/ }));
     const focused6 = await screen.findByRole('heading', { level: 1, name: 'Service' });
     await waitFor(() => expect(focused6).toHaveFocus());
-    await user.click(screen.getByRole('button', { name: /^Overview/ }));
+    await user.click(screen.getByRole('link', { name: /^Overview/ }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: /^The person Not started .*Continue$/ }),
@@ -368,7 +368,7 @@ describe('editor on (#395)', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Remove everything from this device' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Overview/ }));
     const focused9 = await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await waitFor(() => expect(focused9).toHaveFocus());
   });
@@ -411,7 +411,7 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Overview/ }));
     const focused11 = await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await waitFor(() => expect(focused11).toHaveFocus());
   });

@@ -289,7 +289,9 @@ describe('landing with the editor on (#448)', () => {
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
+    // The pages are links (they have a URL); Your people and Your account stay buttons until R3.
+    expect(within(nav).getAllByRole('link')).toHaveLength(5);
+    expect(Array.from(nav.querySelectorAll('a, button')).map((b) => b.textContent?.trim())).toEqual([
       'Overview',
       'Announcement',
       'Service',
@@ -318,9 +320,9 @@ describe('landing with the editor on (#448)', () => {
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    expect(within(nav).getAllByRole('button')).toHaveLength(7);
+    expect(nav.querySelectorAll('a, button')).toHaveLength(7);
     expect(within(nav).getByRole('button', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('button', { name: 'Overview' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Sections for Margaret Hayes' })).toBeInTheDocument();
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
@@ -333,7 +335,7 @@ describe('landing with the editor on (#448)', () => {
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     expect(await h1('Service')).toBeInTheDocument();
   });
 
@@ -347,7 +349,7 @@ describe('landing with the editor on (#448)', () => {
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1(PEOPLE);
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     const service = await h1('Service');
     await waitFor(() => expect(service).toHaveFocus());
     expect(screen.getByRole('navigation', { name: 'Sections for Margaret Hayes' })).toBeInTheDocument();
@@ -387,7 +389,7 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /^Overview/ })).toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     const people = await h1(PEOPLE);
     await waitFor(() => expect(people).toHaveFocus());
@@ -422,7 +424,7 @@ describe('landing with the editor on (#448)', () => {
     await h1('Account');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(screen.getByRole('navigation', { name: 'Sections for Robert Hayes' })).toBeInTheDocument();
-    await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(nav).getByRole('link', { name: /^Overview/ }));
     const focused2 = await h1('Overview');
     await waitFor(() => expect(focused2).toHaveFocus());
     expect(screen.getAllByText('Robert Hayes').length).toBeGreaterThan(0);
@@ -439,7 +441,7 @@ describe('landing with the editor on (#448)', () => {
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    await user.click(within(nav).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(nav).getByRole('link', { name: /^Overview/ }));
     expect(await h1('Overview')).toBeInTheDocument();
   });
 
@@ -484,7 +486,7 @@ describe('landing with the editor on (#448)', () => {
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await h1('Account');
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Overview/ }));
     expect(await h1('Overview')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: PEOPLE })).not.toBeInTheDocument();
   });
@@ -521,13 +523,13 @@ describe('navigation (#566)', () => {
     const sections = () => screen.getByRole('navigation', { name: /^Sections/ });
     await user.click(within(sections()).getByRole('button', { name: 'Your account' }));
     await h1('Account');
-    expect(within(sections()).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
-    await user.click(within(sections()).getByRole('button', { name: /^Service/ }));
+    expect(within(sections()).getByRole('link', { name: /^Overview/ })).toBeInTheDocument();
+    await user.click(within(sections()).getByRole('link', { name: /^Service/ }));
     await h1('Service');
     await user.click(within(sections()).getByRole('button', { name: 'Your account' }));
     await h1('Account');
     expect(within(sections()).getByRole('button', { name: PEOPLE })).toBeInTheDocument();
-    expect(within(sections()).getByRole('button', { name: /^Overview/ })).toBeInTheDocument();
+    expect(within(sections()).getByRole('link', { name: /^Overview/ })).toBeInTheDocument();
     expect(within(sections()).queryByRole('button', { name: /^The person/ })).toBeNull();
   });
 
@@ -552,7 +554,7 @@ describe('navigation (#566)', () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     await h1('Service');
     const back = vi.spyOn(window.history, 'back');
     const push = vi.spyOn(window.history, 'pushState');
@@ -584,7 +586,7 @@ describe('navigation (#566)', () => {
       await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: PEOPLE }));
     }, PEOPLE],
     ['a section', async (user: ReturnType<typeof userEvent.setup>) => {
-      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
+      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     }, 'Service'],
   ])('Back then Forward on %s', (_label, go, heading) => {
     it('returns to Overview, then comes back to the screen, with focus on the h1', async () => {
@@ -613,7 +615,7 @@ describe('navigation (#566)', () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Service/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     await h1('Service');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: PEOPLE }));
     await h1(PEOPLE);
@@ -733,7 +735,7 @@ describe('navigation (#566)', () => {
     expect(itemY).toBeDefined();
     await user.click(itemY as HTMLElement);
     await waitFor(() => expect(document.querySelector('h1')?.textContent).not.toBe('Account'));
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Overview/ }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Overview/ }));
     await h1('Overview');
     // Browser Back: Overview, the panel item Y, Your account, then item X.
     for (const expected of [() => document.querySelector('h1')?.textContent !== 'Overview', () => document.querySelector('h1')?.textContent === 'Account', () => document.querySelector('h1')?.textContent === titleX]) {
