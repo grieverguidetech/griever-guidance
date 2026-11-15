@@ -249,3 +249,18 @@ describe('RemovePerson', () => {
     }
   });
 });
+
+describe('RemovePerson note', () => {
+  it('shows the note inside the labelled section before the list', () => {
+    setup({ note: 'A note.' });
+    const section = screen.getByRole('region', { name: 'Remove a person' });
+    expect(section).toHaveTextContent('A note.');
+    expect(section.querySelector('p.gg-hint')?.nextElementSibling?.tagName).toBe('UL');
+  });
+
+  it('keeps the section for a note when the list is empty', () => {
+    setup({ people: [], note: 'A note.' });
+    expect(screen.getByRole('region', { name: 'Remove a person' })).toHaveTextContent('A note.');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});

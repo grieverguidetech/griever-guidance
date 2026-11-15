@@ -129,6 +129,7 @@
     "removeDone",
     "removeOffline",
     "removeOfflineHint",
+    "removeSignInHint",
     "removeFailed",
     "removeUnnamed",
     "removePending"
@@ -507,6 +508,9 @@
       "$ref": "#/$defs/text"
     },
     "removeOfflineHint": {
+      "$ref": "#/$defs/text"
+    },
+    "removeSignInHint": {
       "$ref": "#/$defs/text"
     },
     "removeFailed": {

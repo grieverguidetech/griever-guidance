@@ -26,6 +26,10 @@ test('an owner removes a person from Account, and Your people no longer lists th
 
   await page.getByRole('button', { name: 'Yes, remove Margaret Hayes' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Margaret Hayes has been removed.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Remove a person' })).toBeFocused();
+
+  const emptied = await new AxeBuilder({ page }).withTags(WCAG).disableRules(['color-contrast']).analyze();
+  expect(emptied.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 
   await nav.getByRole('button', { name: /^Your people/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();

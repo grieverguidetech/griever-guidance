@@ -11,6 +11,8 @@ interface Props {
   scope: 'account' | 'device';
   onRemove: (id: string) => Promise<RemoveOutcome>;
   headingLevel?: 2 | 3;
+  /** A calm line shown under the heading, before the list. */
+  note?: string;
 }
 
 type Result = { outcome: RemoveOutcome; name: string } | null;
@@ -22,7 +24,7 @@ function upperFirst(text: string): string {
 }
 
 /** The remove panel: a button and a confirm step, never a swipe (C9). Presentational; the caller does the removal. */
-export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Props) {
+export function RemovePerson({ people, scope, onRemove, headingLevel = 2, note }: Props) {
   const id = useId();
   const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const ConfirmHeading = headingLevel === 3 ? 'h4' : 'h3';
@@ -54,7 +56,7 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
     }
   }, [confirmingId, focusTick]);
 
-  if (people.length === 0 && !removedThisVisit.current) {
+  if (people.length === 0 && !removedThisVisit.current && !note) {
     return null;
   }
 
@@ -130,6 +132,7 @@ export function RemovePerson({ people, scope, onRemove, headingLevel = 2 }: Prop
       <p role="status" aria-live="polite" className="m-0 text-[13px] font-semibold">
         {status}
       </p>
+      {note ? <p className="gg-hint m-0">{note}</p> : null}
       {people.length > 0 && (
         <ul className="flex flex-col gap-3 m-0 p-0 list-none">
           {people.map((person) => {

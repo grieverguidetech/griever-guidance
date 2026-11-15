@@ -13,8 +13,8 @@ export function isAccountTied(session: Pick<Session, 'ownerId' | 'heldFor'>): bo
 
 /**
  * The people the panel offers: owned ones only, never a person someone shared with you. When the
- * server cannot be reached (`syncOn` false), a person tied to an account is left out, because
- * removing them here alone would bring them back on the next pull.
+ * server cannot be reached (`syncOn` false), a person tied to an account is left out. The server
+ * copy stays for helpers and other devices, so removing them here alone would leave it behind.
  */
 export function removablePeople(
   sessions: readonly Removable[],
@@ -30,10 +30,7 @@ export function hasHiddenAccountPeople(sessions: readonly Removable[], syncOn: b
   return !syncOn && sessions.some((s) => s.role === 'owner' && isAccountTied(s));
 }
 
-/** Sync on: the server goes first. Sync off: the person is device-only and goes locally with no request. */
-export function needsServer(syncOn: boolean): boolean {
-  return syncOn;
-}
+const DELETE_TIMEOUT_MS = 15_000;
 
 export function resultFor(reason: FlowsFailure['reason']): RemoveResult {
   return reason === 'offline' ? 'offline' : 'failed';
@@ -44,7 +41,9 @@ interface RemoveDeps {
   /** The flow id the server knows the person by. */
   flowId: string | undefined;
   getToken: () => Promise<string | null>;
-  deleteFlow: (token: string, flowId: string) => Promise<{ ok: true } | FlowsFailure>;
+  deleteFlow: (token: string, flowId: string, signal?: AbortSignal) => Promise<{ ok: true } | FlowsFailure>;
+  /** Stops a slow request. Defaults to a 15 second timeout. */
+  signal?: AbortSignal;
   /** Removes on this device. false means the person was already gone or is not removable. */
   removeLocal: () => boolean;
 }
@@ -55,7 +54,8 @@ interface RemoveDeps {
  * Device-only: removed here, nothing is sent.
  */
 export async function removePerson(deps: RemoveDeps): Promise<RemoveResult> {
-  if (!needsServer(deps.syncOn)) {
+  // Sync off: the person is device-only, so it goes locally with no request.
+  if (!deps.syncOn) {
     deps.removeLocal();
     return 'removed';
   }
@@ -71,10 +71,12 @@ export async function removePerson(deps: RemoveDeps): Promise<RemoveResult> {
   if (!token) {
     return 'failed';
   }
-  const answer = await deps.deleteFlow(token, deps.flowId);
+  const signal = deps.signal ?? AbortSignal.timeout(DELETE_TIMEOUT_MS);
+  const answer = await deps.deleteFlow(token, deps.flowId, signal);
   if (answer.ok || answer.reason === 'not_found') {
     deps.removeLocal();
     return 'removed';
   }
-  return resultFor(answer.reason);
+  // A timeout is reported as a failure by the client; to the user it is the same as no connection.
+  return signal.aborted ? 'offline' : resultFor(answer.reason);
 }

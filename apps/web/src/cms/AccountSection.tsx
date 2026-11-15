@@ -325,11 +325,14 @@ function PlansPanel({ plans }: PlansPanelProps) {
 
 interface SettingsProps {
   removeMember?: ReactNode;
+}
+
+interface AccountSettingsProps extends SettingsProps {
   removePerson?: ReactNode;
 }
 
 /** Your account when nobody is signed in, or accounts are off: the remove-a-member section when there is one, then Help and support. */
-export function AccountSettingsSection({ removeMember, removePerson }: SettingsProps) {
+export function AccountSettingsSection({ removeMember, removePerson }: AccountSettingsProps) {
   return (
     <>
       {removeMember ? <div className="gg-panel flex flex-col gap-4">{removeMember}</div> : null}

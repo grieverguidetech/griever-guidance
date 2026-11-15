@@ -2,7 +2,7 @@
  * #222: "Remove a person" on Account, in the real App. The api-client is mocked, so no network.
  * Synced people go through deleteFlow first; device-only people never send a request.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
   getProfile: vi.fn(),
   deleteFlow: vi.fn(),
+  listFlows: vi.fn(),
 }));
 
 vi.mock('../lib/features', () => ({
@@ -36,7 +37,7 @@ vi.mock('../lib/authClient', async (importOriginal) => {
 vi.mock('@griever/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@griever/api-client')>();
   const quiet = async () => ({ ok: false, reason: 'offline' });
-  return { ...actual, getProfile: mocks.getProfile, deleteFlow: mocks.deleteFlow, listFlows: quiet, createFlow: quiet, patchFlow: quiet };
+  return { ...actual, getProfile: mocks.getProfile, deleteFlow: mocks.deleteFlow, listFlows: mocks.listFlows, createFlow: quiet, patchFlow: quiet };
 });
 
 import { App } from './app';
@@ -97,6 +98,8 @@ beforeEach(() => {
   mocks.loadClerk.mockReset();
   mocks.getProfile.mockReset();
   mocks.deleteFlow.mockReset();
+  mocks.listFlows.mockReset();
+  mocks.listFlows.mockResolvedValue({ ok: false, reason: 'offline' });
   mocks.getProfile.mockResolvedValue({
     ok: true,
     profile: { id: USER, senderName: 'Anna', contactSource: null, firstName: null, lastName: null, fullName: null, birthDate: null, address: null, accountType: 'owner', createdAt: '2026-10-11T00:00:00.000Z', updatedAt: '2026-10-11T00:00:00.000Z' },
@@ -119,7 +122,7 @@ describe('Remove a person on Account (#222)', () => {
 
     expect(await screen.findByText('Robert Hayes has been removed.')).toBeInTheDocument();
     expect(mocks.deleteFlow).toHaveBeenCalledTimes(1);
-    expect(mocks.deleteFlow).toHaveBeenCalledWith('tok', FLOW_B);
+    expect(mocks.deleteFlow).toHaveBeenCalledWith('tok', FLOW_B, expect.any(AbortSignal));
     expect(screen.queryByRole('button', { name: 'Remove Robert Hayes' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove Margaret Hayes' })).toBeInTheDocument();
     const stored = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]') as { id: string }[];
@@ -188,5 +191,48 @@ describe('Remove a person on Account (#222)', () => {
     expect(screen.getByRole('button', { name: 'Remove Device Dan' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove Margaret Hayes' })).not.toBeInTheDocument();
     expect(screen.getByText('You need a connection to remove someone saved to your account.')).toBeInTheDocument();
+  });
+
+  it('signed out with accounts on: account-tied people are hidden and the note says to sign in', async () => {
+    seed(synced.slice(0, 2));
+    const clerk = fakeClerk({ userId: USER });
+    mocks.loadClerk.mockResolvedValue(clerk.load);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    // The session ends somewhere else; the person stays where they are.
+    act(() => clerk.endElsewhere());
+    await user.click(await screen.findByRole('button', { name: 'Your account' }));
+    expect(await screen.findByText('Sign in to remove someone saved to your account.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Margaret Hayes' })).not.toBeInTheDocument();
+  });
+
+  it('a later pull that still returns the removed person does not bring them back', async () => {
+    seed(synced);
+    mocks.deleteFlow.mockResolvedValue({ ok: true });
+    const user = await startOnOverview();
+    await user.click(screen.getByRole('button', { name: 'Remove Robert Hayes' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, remove Robert Hayes' }));
+    await screen.findByText('Robert Hayes has been removed.');
+
+    const record = (id: string, name: string) => ({
+      id,
+      ownerId: USER,
+      role: 'owner',
+      facts: { personName: name, dateOfPassing: null, serviceDate: null, obituaryUrl: null, obituaryPublisher: null, serviceReady: false },
+      updatedAt: '2026-10-12T00:00:00.000Z',
+      updatedBy: null,
+    });
+    mocks.listFlows.mockResolvedValue({ ok: true, flows: [record(FLOW_A, 'Margaret Hayes'), record(FLOW_B, 'Robert Hayes')], dropped: 0 });
+    const before = mocks.listFlows.mock.calls.length;
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBeGreaterThan(before));
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(screen.queryByRole('button', { name: 'Remove Robert Hayes' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Margaret Hayes' })).toBeInTheDocument();
+    const stored = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]') as { flowId: string }[];
+    expect(stored.map((s) => s.flowId)).not.toContain(FLOW_B);
   });
 });

@@ -34,7 +34,7 @@ describe('removePerson', () => {
   it('sync on: deletes on the server, then removes locally', async () => {
     const d = deps();
     expect(await d.run()).toBe('removed');
-    expect(d.deleteFlow).toHaveBeenCalledWith('tok', 'f1');
+    expect(d.deleteFlow).toHaveBeenCalledWith('tok', 'f1', expect.any(AbortSignal));
     expect(d.removeLocal).toHaveBeenCalledOnce();
   });
 
@@ -80,6 +80,26 @@ describe('removePerson', () => {
     expect(boom.deleteFlow).not.toHaveBeenCalled();
     expect(none.removeLocal).not.toHaveBeenCalled();
     expect(boom.removeLocal).not.toHaveBeenCalled();
+  });
+
+  it('passes a signal, and a timeout abort keeps the person and says offline', async () => {
+    const controller = new AbortController();
+    const slow = vi.fn(async () => {
+      controller.abort();
+      return { ok: false as const, reason: 'failed' as const };
+    });
+    const d = deps({ deleteFlow: slow, signal: controller.signal });
+    expect(await d.run()).toBe('offline');
+    expect(slow).toHaveBeenCalledWith('tok', 'f1', controller.signal);
+    expect(d.removeLocal).not.toHaveBeenCalled();
+  });
+
+  it('uses a 15 second timeout signal by default', async () => {
+    const d = deps();
+    await d.run();
+    const signal = d.deleteFlow.mock.calls[0][2] as AbortSignal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal.aborted).toBe(false);
   });
 
   it('sync off: removes locally with no request', async () => {

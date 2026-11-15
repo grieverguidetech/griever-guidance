@@ -639,14 +639,14 @@ function AppBody({
     });
   }
   const removablePeopleList = removablePeople(sortedSessions, syncOn);
-  const removeHint = auth === null && offline && hasHiddenAccountPeople(sortedSessions, syncOn);
+  // Account-tied people are hidden while the server is out of reach; say why. Signed out: sign in. Anything else: a connection.
+  const removeNote = hasHiddenAccountPeople(sortedSessions, syncOn)
+    ? auth && !auth.isSignedIn && !auth.isLoading
+      ? accountCopy.removeSignInHint
+      : accountCopy.removeOfflineHint
+    : undefined;
   const removePersonPanel = CMS_ENABLED ? (
-    <>
-      <RemovePerson people={removablePeopleList} scope={syncOn ? 'account' : 'device'} onRemove={removeOnePerson} />
-      {removeHint ? (
-        <p className="gg-panel gg-hint m-0">{accountCopy.removeOfflineHint}</p>
-      ) : null}
-    </>
+    <RemovePerson people={removablePeopleList} scope={syncOn ? 'account' : 'device'} onRemove={removeOnePerson} note={removeNote} />
   ) : undefined;
 
   // Picks the most recent person when none is open. It never creates one: Home's "Create a new
