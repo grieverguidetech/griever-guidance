@@ -716,8 +716,8 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
 - **Deleting one person on the server (`deleteFlow`, #216).** Only the owner can delete a person. A
   member, a stranger, an unknown id, an already-deleted person and an expired one all get `not_found`,
   and nothing changes. The action sets `deletedAt` and `ttl` (now + 90 days, epoch seconds) on the flow,
-  and the same `ttl` on the `FLOW#<id>` guard, in one transaction. A deleted person is hidden from every
-  read (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict`) until DynamoDB
+  and the same `ttl` on the `FLOW#<id>` guard, in one transaction. A deleted person is hidden from the person reads
+  (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict`) until DynamoDB
   purges both items after 90 days. A joiner who owns only a deleted person is still refused (C11).
   The owner's other devices keep the person for now. Account deletion (below) still removes everything.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe

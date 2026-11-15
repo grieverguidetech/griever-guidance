@@ -104,7 +104,23 @@ describe.runIf(up)('deleteFlow on DynamoDB Local', () => {
         return { who: owner, id };
       },
       'an expired person': async () => {
+        const { owner, id } = await seedOwnerWithPerson({ ttl: NOW_SECONDS - 10 });
+        return { who: owner, id };
+      },
+      'a deleted and expired person': async () => {
         const { owner, id } = await seedOwnerWithPerson({ deletedAt: at(-HOUR), ttl: NOW_SECONDS - 10 });
+        return { who: owner, id };
+      },
+      'an owner whose id guard belongs to someone else': async () => {
+        const { owner, id } = await seedOwnerWithPerson();
+        await rawPut({ ...flowGuardKey(id), entity: 'FLOW_GUARD', ownerId: uid('other') });
+        return { who: owner, id };
+      },
+      'an owner whose id guard is missing': async () => {
+        const owner = uid('owner');
+        const id = randomUUID();
+        await profile(owner);
+        await rawPut(encodeFlow(flowItem(owner, id)));
         return { who: owner, id };
       },
     };

@@ -406,6 +406,7 @@ export async function deleteFlow(
     async () => {
       const now = clock.now();
       const nowSeconds = Math.floor(now.getTime() / 1000);
+      const purgeAt = nowSeconds + PURGE_DAYS * SECONDS_PER_DAY;
       const items: TransactItem[] = [
         {
           Update: {
@@ -417,7 +418,7 @@ export async function deleteFlow(
             ExpressionAttributeNames: { '#deletedAt': 'deletedAt', '#ttl': 'ttl' },
             ExpressionAttributeValues: {
               ':deletedAt': now.toISOString(),
-              ':ttl': nowSeconds + PURGE_DAYS * SECONDS_PER_DAY,
+              ':ttl': purgeAt,
               ':now': nowSeconds,
             },
           },
@@ -430,7 +431,7 @@ export async function deleteFlow(
             ConditionExpression: 'ownerId = :owner',
             ExpressionAttributeNames: { '#ttl': 'ttl' },
             ExpressionAttributeValues: {
-              ':ttl': nowSeconds + PURGE_DAYS * SECONDS_PER_DAY,
+              ':ttl': purgeAt,
               ':owner': caller.userId,
             },
           },
