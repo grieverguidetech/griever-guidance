@@ -554,8 +554,9 @@ online and someone is signed in (`syncOn`, `apps/web/src/app/app.tsx:391`). Prod
 `FEATURE_SYNC=true`. Mobile runs it when `EXPO_PUBLIC_FEATURE_SYNC` and `EXPO_PUBLIC_FEATURE_AUTH` are
 `"true"`, a Clerk publishable key is set, and someone is signed in
 (`apps/mobile/src/lib/useMobileFlowSync.ts`). Every `apps/mobile/eas.json` profile sets both flags.
-The sharing UI (People helping, invites, join, remove) is a separate flag, `FEATURE_SHARING`
-(`VITE_FEATURE_SHARING` on web), which is not set in production. Built by #116 (memberships and
+The sharing UI (People helping, invites, join, remove) is web only, behind a separate flag,
+`FEATURE_SHARING` (`VITE_FEATURE_SHARING`), which is not set in production. Mobile has no sharing UI
+yet. Built by #116 (memberships and
 invites), #117 (invite functions), #130 (flows), #131 (gateway routes), #132, #133, #134 (client
 sync), #135, #136 (turning it on). Supersedes the read-only snapshot idea in #39.
 
@@ -575,19 +576,23 @@ Memberships, invites and flows are items in it, not tables of their own:
 | `USER#<ownerId>` | `MEMBER#<memberId>` | A member of the owner's circle, in the owner's partition |
 | `USER#<memberId>` | `MEMBER_OF` | The member's marker, in the member's partition |
 | `USER#<ownerId>` | `INVITE#<id>` | An invite, in the owner's partition |
-| `TOKEN#<sha256>` | `TOKEN` | One-use guard for an invite token. Kept after a revoke, so a hash is never used again |
+| `TOKEN#<sha256>` | `TOKEN` | One-use guard for an invite token. Kept after a revoke or an accept, so a hash is never used again. Removed only when the owner's account is deleted |
 
 `gsi1` holds `REF#<userId>` on items that point at a user (a flow they last edited, an invite they
 accepted). Only account deletion reads it. Key strings are built only in
 `libs/data-access/src/keys.ts`; each builder checks its input, so no email or typed value can be
 part of a key.
 
-**Access rules.** The rules are one TypeScript module, `libs/data-access/src/rules/*`, run inside
+**Access rules.** The rules are one folder of TypeScript modules, `libs/data-access/src/rules/*`, run inside
 the Lambda `gg-app-data`. It replaced Supabase RLS. The gateway verifies the Clerk token, then
 forwards it in `x-gg-user-token` on a SigV4-signed call to the function URL (`AWS_IAM`). The data
-function verifies the same token again (`loadVerifier` in `lambda.ts`), and every rule runs as that
-caller. There is one endpoint, `POST /v1 {action, args}`. Its actions are exactly `DATA_ACTIONS`
-(`libs/shared/src/dataApi.ts`). Each action's args are checked before DynamoDB is touched (C8).
+function verifies the same token again (`loadVerifier` in `lambda.ts`), and every user action runs
+as that caller. There is one user endpoint, `POST /v1 {action, args}`. Its actions are exactly
+`DATA_ACTIONS` (`libs/shared/src/dataApi.ts`). Each action's args are checked before DynamoDB is
+touched (C8). A second route, `POST /internal/delete-user`, is the service path for account
+deletion (§7). It takes no user token: it needs the shared secret in `x-gg-service-secret`, and it
+answers 404 when `DATA_SERVICE_SECRET` is empty. Its rule, `deleteUser`, is the only one that does
+not run as a caller.
 
 **Where emails live.** The invitee's email is on the `INVITE#` item. A list of pending invites
 shows only `id`, `email`, `expiresAt` and `createdAt`, never the token hash. The email the member
@@ -613,7 +618,7 @@ deletion removes it. The profile holds no email (the email lives in Clerk).
 
 **What never syncs:**
 
-- drafts
+- send-flow drafts (the four planning messages do sync, see the list above)
 - edited wording (`messageOverride`)
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
@@ -624,7 +629,7 @@ deletion removes it. The profile holds no email (the email lives in Clerk).
 - the parser refuses these by name (`FORBIDDEN_SYNC_KEYS`), so a client that sends one gets an error
 
 This holds for the whole `gg-data` table, not only for flows. No item holds contact data or contact
-ids (C3), drafts, `messageOverride`, recipients or who was messaged, or checklist state. No `FLOW#`
+ids (C3), send-flow drafts, `messageOverride`, recipients or who was messaged, or checklist state. No `FLOW#`
 item holds a `FORBIDDEN_SYNC_KEYS` key. Two names on that list are used elsewhere in the table for
 other data: `senderName` on the `PROFILE` item, and `email` (the invitee's address, typed by the
 owner, never a contact's) on `INVITE#` and `MEMBER#`.
@@ -661,8 +666,9 @@ Rules:
   have at most 20 open at once. Only an owner with a verified email can invite.
 - **Joining** (`rules/acceptInvite.ts`). An invite works once, only for the invited email with
   `emailVerified`, and only while the inviter is an owner with no `MEMBER_OF`. A joiner who owns
-  people (deleted ones too), has members or is already a member gets `invite_conflict`. The
-  joiner's own open invites are revoked in the same transaction.
+  people (deleted ones too), has members or is already a member gets `invite_conflict`, but only
+  after the token checks pass; a bad token gets `unusable`. The joiner's own open, unexpired
+  invites are revoked in the same transaction.
 - Account actions (invite, join, remove) need a connection; the sync itself stays invisible and
   never blocks the app or a flow (§4.6 "Sync is invisible").
 
@@ -698,10 +704,13 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
 - The 90-day hard purge was a Convex cron. It was removed with Convex (#203).
 - **A server copy exists.** A signed-in person with sync on has their people's details in
   `gg-data` ("Shared people" in §5).
-- **"Delete everything"** (remove from device) in settings clears every local store on this device
-  only, including the outbox (`apps/web/src/lib/removeFromDevice.ts`). It sends no request to the
-  gateway or the data function; it only ends the Clerk session on this device. No 90-day window, no
-  tombstones, no confirmation-email round-trip. Someone asking for this is asking for it now.
+- **"Remove everything from this device"** (Settings, `apps/web/src/screens/Settings.tsx`) clears
+  every local store on this device only, including the outbox (`apps/web/src/lib/removeFromDevice.ts`).
+  It sends no request to the gateway or the data function; it only ends the Clerk session on this
+  device. No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for this
+  is asking for it now. It is only in the build with the editor off. With the editor on (production),
+  Settings does not offer it, and Account offers "Delete account", which deletes the account and
+  then clears this device (`deleteAccountThenClear`).
 - The server copy is removed only by account deletion (below). There is no server delete for one
   person yet (`deleteFlow` is #216). Flow items carry a `deletedAt` field, but no action sets it.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe

@@ -242,7 +242,7 @@ section in the same PR.
 
 ### What this is
 
-Grievers Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. Since 2026-10-30 the web is a planning editor (plan at a desk) and the mobile app does all sending. The web editor ships behind `VITE_FEATURE_CMS`, off in production; until a later round removes it, the old web send flow stays in the flag-off build. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
+Grievers Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. Since 2026-10-30 the web is a planning editor (plan at a desk) and the mobile app does all sending. The web editor ships behind `VITE_FEATURE_CMS`, on in production (`FEATURE_CMS=true`); until a later round removes it, the old web send flow stays in the flag-off build. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
 
 ---
 
@@ -259,7 +259,7 @@ apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
               Composes libs/identity, libs/gateway-messages, libs/gateway-flows and libs/gateway-places into
               one HTTP surface (CORS + routing) — this app owns no domain logic itself.
-  web/        React + Vite + Tailwind. Planning editor (behind VITE_FEATURE_CMS, off in production),
+  web/        React + Vite + Tailwind. Planning editor (behind VITE_FEATURE_CMS, on in production),
               account management, and the old browser send flow until a later round removes it.
   mobile/     Expo + React Native. The primary user surface — mobile-first, core RN only.
   marketing/  Astro. Public-facing site. No shared business logic.
@@ -272,8 +272,10 @@ libs/
                     Also owns the sms: deep-link builder (buildSmsLink) — see "The send flow".
   data-local/       IndexedDB-backed local storage (the screen-keyed session document, outbox,
                     contacts). Browser-only — see DATA.md.
-  data-sync/        The offline sync engine (outbox flush, cursor-based pull/push, merge) that
-                    has no live backend now that Convex is removed (#203). See DATA.md.
+  data-sync/        The old cursor sync engine (outbox flush, cursor-based pull/push, merge). It
+                    has no live backend since Convex was removed (#203), and no code imports it
+                    (apps/web still lists it as a dependency). Live person sync is useFlowSync in
+                    libs/hooks. See DATA.md.
   contacts/         Platform-agnostic contact-import logic shared by web and mobile: the
                     `ContactSource` adapter interface, normalize/dedupe/rank, and the
                     fetch → review → commit pipeline. Device-specific adapters (the web Contact
@@ -543,7 +545,7 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               Worker stays; to remove it: `wrangler secret delete RESEND_API_KEY --config
               apps/gateway/wrangler.toml`; with no key, POST /invites answers 503)
               DATA_FUNCTION_URL (wrangler var; deploy.yml sets it from the repo variable of the
-              same name; empty = /me/*, /flows*, /members and /invites* answer 503), DATA_FUNCTION_REGION (wrangler var, us-east-2;
+              same name; empty = /me/*, /flows*, /members* and /invites* answer 503), DATA_FUNCTION_REGION (wrangler var, us-east-2;
               no code default), DATA_FUNCTION_ACCESS_KEY_ID and DATA_FUNCTION_SECRET_ACCESS_KEY
               (Worker secrets, set by deploy.yml from the GitHub secrets; both skipped when
               either is empty; rotate every 90 days: docs/aws-data-function.md)
