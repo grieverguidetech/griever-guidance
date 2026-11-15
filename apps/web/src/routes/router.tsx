@@ -11,7 +11,7 @@ import { NotFound } from './NotFound';
 export const routes: RouteObject[] = [
   {
     element: <App />,
-    children: [{ index: true }, { path: 'sign-in' }, { path: 'join' }],
+    children: [{ index: true }, { path: 'sign-in' }, { path: 'sign-up' }, { path: 'join' }],
   },
   { path: '*', element: <NotFound /> },
 ];

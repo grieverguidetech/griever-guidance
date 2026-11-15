@@ -84,6 +84,8 @@ describe('safeNext', () => {
     '/people/f1/unknown',
     '/people/f1?x=1',
     '/people#frag',
+    '/sign-in',
+    '/sign-up',
     '/%2F%2Fevil.com',
     '%2F%2Fevil.com',
     '/people/%2e%2e/account',
@@ -93,5 +95,15 @@ describe('safeNext', () => {
     `/people/${'a'.repeat(600)}`,
   ])('returns "/" for %j', (raw) => {
     expect(safeNext(raw)).toBe('/');
+  });
+});
+
+describe('builders refuse bad ids', () => {
+  it.each(['', 'a/b', '../x', 'a b', 'a%2Fb', 'a?b', 'a'.repeat(129)])('%j', (bad) => {
+    expect(() => paths.person(bad)).toThrow();
+    expect(() => paths.personSection(bad, 'person')).toThrow();
+    expect(() => paths.personGuide('f1', bad)).toThrow();
+    expect(() => paths.personGuide(bad, 'i1')).toThrow();
+    expect(() => paths.startGuide(bad)).toThrow();
   });
 });

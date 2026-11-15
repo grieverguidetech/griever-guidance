@@ -129,7 +129,20 @@ export function safeNext(raw: string | null | undefined): string {
   if (!raw.startsWith('/') || raw.startsWith('//') || /[?#\\%\s\u0000-\u001f]/.test(raw)) {
     return '/';
   }
-  return matchPathname(raw) ? raw : '/';
+  const matched = matchPathname(raw);
+  // Sign-in and sign-up are never a destination: sending someone there after sign-in would loop.
+  if (!matched || matched.name === 'signIn' || matched.name === 'signUp') {
+    return '/';
+  }
+  return raw;
+}
+
+/** Builders refuse an id the parser would not accept, so a built path always parses. */
+function id(value: string): string {
+  if (!isId(value)) {
+    throw new Error(`Not a valid path id: ${JSON.stringify(value)}`);
+  }
+  return value;
 }
 
 export const paths = {
@@ -141,12 +154,12 @@ export const paths = {
   },
   signUp: () => '/sign-up',
   people: () => '/people',
-  person: (flowId: string) => `/people/${flowId}`,
-  personSection: (flowId: string, section: Section) => `/people/${flowId}/${section}`,
-  personGuide: (flowId: string, itemId: string) => `/people/${flowId}/guide/${itemId}`,
+  person: (flowId: string) => `/people/${id(flowId)}`,
+  personSection: (flowId: string, section: Section) => `/people/${id(flowId)}/${section}`,
+  personGuide: (flowId: string, itemId: string) => `/people/${id(flowId)}/guide/${id(itemId)}`,
   start: () => '/start',
   startSection: (section: Section) => `/start/${section}`,
-  startGuide: (itemId: string) => `/start/guide/${itemId}`,
+  startGuide: (itemId: string) => `/start/guide/${id(itemId)}`,
   account: () => '/account',
   join: () => '/join',
 } as const;
