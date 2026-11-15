@@ -6,5 +6,13 @@
   "invitedLine": "Invited · link works until {date}",
   "memberLine": "You're helping {owner}.",
   "someone": "someone",
-  "loading": "Loading…"
+  "loading": "Loading…",
+  "emailLabel": "Their email",
+  "sendButton": "Send an invitation",
+  "sending": "Sending…",
+  "emailInvalid": "That email doesn't look right.",
+  "sent": "Invitation sent.",
+  "cancelled": "Invitation cancelled.",
+  "cancelButton": "Cancel this invitation",
+  "cancelLabel": "Cancel this invitation for {email}"
 }
