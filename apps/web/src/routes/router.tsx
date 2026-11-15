@@ -13,13 +13,15 @@ import { SECTIONS } from './paths';
 export const routes: RouteObject[] = [
   {
     element: <App />,
+    // App draws every one of these itself; `element: null` says so, so React Router does not warn about an
+    // empty leaf on every render.
     children: [
-      { index: true },
-      { path: 'sign-in' },
-      { path: 'sign-up' },
-      { path: 'join' },
-      { path: 'people/:flowId' },
-      ...SECTIONS.map((section) => ({ path: `people/:flowId/${section}` })),
+      { index: true, element: null },
+      { path: 'sign-in', element: null },
+      { path: 'sign-up', element: null },
+      { path: 'join', element: null },
+      { path: 'people/:flowId', element: null },
+      ...SECTIONS.map((section) => ({ path: `people/:flowId/${section}`, element: null })),
     ],
   },
   { path: '*', element: <NotFound /> },

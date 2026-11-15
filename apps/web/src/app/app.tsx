@@ -372,6 +372,18 @@ interface Spot {
   missing?: boolean;
 }
 
+/**
+ * A person's page path, or null when their flowId is not a path id (it should always be one: a
+ * random UUID, made on load for people saved before sharing). Null keeps the editor usable rather
+ * than failing the whole render.
+ */
+function pagePathFor(person: Session, section: CmsSection): string | null {
+  if (spotFromPath(`/people/${person.flowId}`) === null) {
+    return null;
+  }
+  return pathForSpot({ flowId: person.flowId, section, item: null });
+}
+
 /** The App paths that are not editor pages: the landing target replaces them once per load. */
 const LANDING_PATHS = ['/', '/sign-in', '/sign-up', '/join'];
 /** The paths Back walks past while signed in (Clerk's sign-in steps live there), as #566 did. */
@@ -802,10 +814,11 @@ function AppBody({
     let pathname = location.pathname;
     let state: Record<string, unknown> | null;
     if (spot.view === 'cms') {
-      if (!spot.person) {
+      const path = spot.person ? pagePathFor(spot.person, spot.section ?? 'overview') : null;
+      if (!path) {
         return;
       }
-      pathname = pathForSpot({ flowId: spot.person.flowId, section: spot.section ?? 'overview', item: null });
+      pathname = path;
       state = spot.item ? { item: spot.item } : null;
     } else {
       // Not found: the id leaves the address bar.
@@ -829,7 +842,7 @@ function AppBody({
       if (!person || key === 'people' || key === 'account') {
         return null;
       }
-      return pathForSpot({ flowId: person.flowId, section: key, item: null });
+      return pagePathFor(person, key);
     };
   }
 

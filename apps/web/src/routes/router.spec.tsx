@@ -45,3 +45,19 @@ describe('App mounting', () => {
     expect(mounts.count).toBe(1);
   });
 });
+
+describe('route warnings', () => {
+  it.each(['/', '/sign-in', '/join', '/people/3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10/service'])(
+    '%s logs no "leaf route has no element" warning',
+    (path) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        visit(path);
+        const leafWarnings = warn.mock.calls.filter((args) => String(args[0]).includes('does not have an element or Component'));
+        expect(leafWarnings).toEqual([]);
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
+});
