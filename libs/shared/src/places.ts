@@ -39,8 +39,9 @@ export interface PlaceDetailsRequest {
 }
 
 /**
- * Google place types for includedPrimaryTypes. Only Table A types are valid there (a Table B type such
- * as place_of_worship makes the whole request fail):
+ * Google place types for includedPrimaryTypes. Autocomplete (New) takes up to 5 types from Table A or
+ * Table B, or one collection ((regions) or (cities)) alone; a collection cannot be mixed with other types.
+ * `locality` is Table A and `postal_town` is Table B; both are valid here, and neither is a collection.
  * https://developers.google.com/maps/documentation/places/web-service/place-types
  * A request takes at most 5. Service: where a funeral or memorial can be held. Burial: where a person is buried.
  */

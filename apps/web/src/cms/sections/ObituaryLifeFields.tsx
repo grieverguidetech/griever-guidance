@@ -101,7 +101,7 @@ interface FieldSpec {
   full?: boolean;
   /** Set: the field suggests these place types. A pick saves the place name only. */
   placeTypes?: readonly string[];
-  /** Set with placeTypes: a pick saves "City, State", and fills an empty State field with the state. */
+  /** Set with placeTypes: a pick saves "City, State". For where they lived it saves the city name only and fills an empty State field. */
   isCity?: boolean;
 }
 
@@ -213,19 +213,27 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
             types={spec.placeTypes}
             // Only the name (and for a city, the state in the suggestion) is saved, so the paid details call is not needed.
             wantsDetails={() => false}
+            fillMessage={copy.stateFilled}
             onPick={(pick) => {
               // Cut to the saved length, as the server would, so a long pick is not lost on save.
               if (!spec.isCity) {
                 onChange({ [spec.key]: pick.mainText.slice(0, max) });
-                return;
+                return false;
               }
               const { display, state } = cityPick(pick);
-              const patch: ObituaryLifePatch = { [spec.key]: display.slice(0, max) };
-              // The State field is filled from where they lived, and only while it is empty.
-              if (spec.key === 'obituaryCity' && state && (values.obituaryState ?? '') === '') {
+              // The template already says "of {city}, {state}", so where they lived saves the city name only.
+              if (spec.key !== 'obituaryCity') {
+                onChange({ [spec.key]: display.slice(0, max) });
+                return false;
+              }
+              const patch: ObituaryLifePatch = { obituaryCity: pick.mainText.slice(0, max) };
+              // The State field is filled from where they lived, and only while it is empty or only spaces.
+              const fillsState = state !== '' && (values.obituaryState ?? '').trim() === '';
+              if (fillsState) {
                 patch.obituaryState = state;
               }
               onChange(patch);
+              return fillsState;
             }}
             value={typed}
             onChange={(text) => onChange({ [spec.key]: text })}

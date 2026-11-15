@@ -11,7 +11,7 @@ import {
 } from './places.js';
 
 describe('place types', () => {
-  it('allows the union of the service and burial lists', () => {
+  it('allows the union of the service, burial and city lists', () => {
     expect([...ALLOWED_PLACE_TYPES].sort()).toEqual(
       [...SERVICE_PLACE_TYPES, ...BURIAL_PLACE_TYPES, ...CITY_PLACE_TYPES].sort(),
     );
@@ -54,5 +54,33 @@ describe('cityPick', () => {
   it('keeps the whole line and fills no state when the end is not a US state', () => {
     expect(cityPick(city('London, UK', 'London', 'UK'))).toEqual({ display: 'London, UK', state: '' });
     expect(cityPick(city('Paris', 'Paris', ''))).toEqual({ display: 'Paris', state: '' });
+  });
+
+  it('gives the whole line and no state for a Canadian city', () => {
+    expect(cityPick(city('Toronto, ON, Canada', 'Toronto', 'ON, Canada'))).toEqual({
+      display: 'Toronto, ON, Canada',
+      state: '',
+    });
+  });
+
+  it('knows DC as a state code', () => {
+    expect(cityPick(city('Washington, DC', 'Washington', 'DC'))).toEqual({
+      display: 'Washington, DC',
+      state: 'DC',
+    });
+  });
+
+  it('keeps the whole line when the secondary line is only "USA"', () => {
+    expect(cityPick(city('Springfield, USA', 'Springfield', 'USA'))).toEqual({
+      display: 'Springfield, USA',
+      state: '',
+    });
+  });
+
+  it('trims spaces around the state code', () => {
+    expect(cityPick(city('Springfield,  IL ', 'Springfield', ' IL '))).toEqual({
+      display: 'Springfield, IL',
+      state: 'IL',
+    });
   });
 });
