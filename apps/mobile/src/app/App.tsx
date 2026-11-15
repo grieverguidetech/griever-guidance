@@ -19,6 +19,7 @@ import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
 import { useAccountSenderName } from '../lib/accountName';
+import { useCanCreate } from '../lib/canCreate';
 import { AUTH_ENABLED } from '../lib/features';
 import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
@@ -55,9 +56,6 @@ const announceOpen = (name: string) => {
   }
   setTimeout(() => AccessibilityInfo.announceForAccessibility(spoken), 100);
 };
-
-/** The person screen's "Add someone" and Home's start button show only when the user may add a person (C11). */
-const CAN_CREATE = true;
 
 /** How long setup waits on the local contacts read before carrying on as if there are none (as web). */
 export const CONTACTS_CHECK_FALLBACK_MS = 1500;
@@ -427,6 +425,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
+  // The Home and switcher create buttons show unless the profile says member (C11; the server is the guard).
+  const canCreate = useCanCreate();
   const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, setChecklistItem, applyRemoteFlows, recordMomentComplete, recordObituaryEmailed } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
   useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
@@ -592,7 +592,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
           {(navigation) => (
             <HomeScreen
               sessions={sessions}
-              canCreate={CAN_CREATE}
+              canCreate={canCreate}
               onOpen={(id) => {
                 switchTo(id);
                 open();
@@ -739,7 +739,7 @@ const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) =>
               announceOpen(personLabel(picked));
             }}
             onAddSomeone={
-              CAN_CREATE
+              canCreate
                 ? () => {
                     setAddedFrom(active.id);
                     addPerson();

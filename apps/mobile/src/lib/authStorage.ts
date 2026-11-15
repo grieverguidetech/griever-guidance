@@ -11,9 +11,10 @@ const HYDRATED_KEYS = [PROFILE_STORAGE_KEY, SIGNED_IN_STORAGE_KEY, SIGN_OUT_PEND
 /**
  * `useAccount` reads its profile cache synchronously, but AsyncStorage is async. So the cache is a
  * small in-memory map that is filled from AsyncStorage once, before the hook mounts, and writes
- * through to AsyncStorage afterwards. The cache holds only the sender name, contact source and
- * the signed-in user id (never tokens, contacts or messages). Clerk keeps its own tokens in
- * secure storage.
+ * through to AsyncStorage afterwards. The cache holds the signed-in profile (id, sender name,
+ * first and last name, birth date, address, contact source and account type), the marker for whose
+ * profile it is, and the unfinished sign-out flag (never tokens, contacts or messages). Clerk
+ * keeps its own tokens in secure storage.
  */
 export function createProfileCache(): SendFlowStorage & { hydrate(): Promise<void> } {
   const memory = new Map<string, string>();
