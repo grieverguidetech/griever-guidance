@@ -129,12 +129,18 @@ describe('AUTH_ENABLED', () => {
 describe('SHARING_ENABLED', () => {
   const originalSharing = process.env.EXPO_PUBLIC_FEATURE_SHARING;
   afterEach(() => {
-    if (originalSharing === undefined) delete process.env.EXPO_PUBLIC_FEATURE_SHARING;
-    else process.env.EXPO_PUBLIC_FEATURE_SHARING = originalSharing;
+    if (originalSharing === undefined) {
+      delete process.env.EXPO_PUBLIC_FEATURE_SHARING;
+    } else {
+      process.env.EXPO_PUBLIC_FEATURE_SHARING = originalSharing;
+    }
   });
   function sharingEnabled(value: string | undefined): boolean {
-    if (value === undefined) delete process.env.EXPO_PUBLIC_FEATURE_SHARING;
-    else process.env.EXPO_PUBLIC_FEATURE_SHARING = value;
+    if (value === undefined) {
+      delete process.env.EXPO_PUBLIC_FEATURE_SHARING;
+    } else {
+      process.env.EXPO_PUBLIC_FEATURE_SHARING = value;
+    }
     let result = true;
     jest.isolateModules(() => {
       result = (require('./features') as typeof import('./features')).SHARING_ENABLED;

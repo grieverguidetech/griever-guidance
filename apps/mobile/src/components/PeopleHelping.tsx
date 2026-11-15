@@ -25,7 +25,7 @@ export function PeopleHelping({ sessionEnded }: { sessionEnded: boolean }) {
   if (!SHARING_ENABLED || sessionEnded || !auth || auth.status !== 'signed_in') {
     return null;
   }
-  return <PeopleHelpingSection getToken={auth.getToken} />;
+  return <PeopleHelpingSection key={auth.userId ?? ''} getToken={auth.getToken} />;
 }
 
 function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | null> }) {
@@ -35,37 +35,45 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
 
   return (
     <View style={styles.group}>
-      {view?.role === 'member' ? (
-        <Body>{fill(copy.memberLine, { owner: view.owner.name ?? copy.someone })}</Body>
-      ) : (
+      {view?.role === 'member' ? <Body>{fill(copy.memberLine, { owner: view.owner.name ?? copy.someone })}</Body> : null}
+      {owner ? (
         <>
           <Heading level={2}>{copy.heading}</Heading>
           <Body tone="muted">{copy.intro}</Body>
         </>
-      )}
+      ) : null}
       {!view && status === 'loading' ? <Body tone="muted">{copy.loading}</Body> : null}
       {owner && owner.members.length > 0 ? (
         <View style={styles.list}>
           <Heading level={3}>{copy.helpingHeading}</Heading>
-          {owner.members.map((member) => (
-            <Body key={member.id}>{member.name ?? member.email}</Body>
-          ))}
+          <View style={styles.list} role="list">
+            {owner.members.map((member) => (
+              <View key={member.id} role="listitem">
+                <Body>{member.name ?? member.email}</Body>
+              </View>
+            ))}
+          </View>
         </View>
       ) : null}
       {owner && owner.invites.length > 0 ? (
         <View style={styles.list}>
           <Heading level={3}>{copy.invitedHeading}</Heading>
-          {owner.invites.map((invite) => (
-            <View key={invite.id} style={styles.invite} accessible>
-              <Body>{invite.email}</Body>
-              <Body tone="muted" small>
-                {fill(copy.invitedLine, { date: formatDate(invite.expiresAt) })}
-              </Body>
-            </View>
-          ))}
+          <View style={styles.list} role="list">
+            {owner.invites.map((invite) => {
+              const line = fill(copy.invitedLine, { date: formatDate(invite.expiresAt) });
+              return (
+                <View key={invite.id} style={styles.invite} role="listitem" accessible accessibilityLabel={`${invite.email}, ${line}`}>
+                  <Body>{invite.email}</Body>
+                  <Body tone="muted" small>
+                    {line}
+                  </Body>
+                </View>
+              );
+            })}
+          </View>
         </View>
       ) : null}
-      <Status id={statusId} message={message ?? undefined} />
+      <Status id={statusId} message={message ?? undefined} queue />
     </View>
   );
 }

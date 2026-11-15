@@ -47,6 +47,11 @@ describe('PeopleHelping', () => {
     expect(screen.getByText('kim@example.com')).toBeTruthy();
     expect(screen.getByText('Invited · link works until December 5, 2026')).toBeTruthy();
     expect(headings()).toEqual(['People helping you', 'Helping you', 'Invited']);
+    expect(screen.getByLabelText('kim@example.com, Invited · link works until December 5, 2026')).toBeTruthy();
+    // Plain Views are not "accessible", so the role queries skip them; read the host nodes' role directly.
+    const withRole = (role: string) => screen.UNSAFE_root.findAll((node: { type: unknown; props: Record<string, unknown> }) => typeof node.type === 'string' && node.props.role === role);
+    expect(withRole('list')).toHaveLength(2);
+    expect(withRole('listitem')).toHaveLength(3);
     expect(screen.getByText(/They can see the people you're writing about/)).toBeTruthy();
     expect(mockGetMembers).toHaveBeenCalledWith('tok');
     expect(screen.queryByText('Loading…')).toBeNull();
@@ -81,6 +86,8 @@ describe('PeopleHelping', () => {
     mockGetMembers.mockResolvedValue({ ok: false, reason: 'offline' });
     render(<PeopleHelping sessionEnded={false} />);
     expect(await screen.findByText('You need a connection to do this. Nothing else is affected.')).toBeTruthy();
+    // A failed first load never shows the owner words, so a member does not see them either.
+    expect(screen.queryByText('People helping you')).toBeNull();
   });
 
   it('renders nothing and never asks when sharing is off', () => {
