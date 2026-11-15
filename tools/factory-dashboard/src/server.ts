@@ -12,6 +12,8 @@ import {
   boardTruncation,
   failedSources,
   isAllowedHost,
+  joinBacklogReview,
+  parseBacklogReviews,
   parsePort,
   countPorcelainLines,
   groupByStatus,
@@ -22,6 +24,7 @@ import {
   parseLeftRight,
   parseWorktrees,
   splitRuns,
+  type BacklogReviewFile,
   type BoardItem,
   type BoardTruncation,
   type SourceStatus,
@@ -37,6 +40,7 @@ const REPO_URL = `https://github.com/${REPO}`;
 const HEALTH_URL = 'https://api.grieversguidance.com/health';
 const CACHE_MS = 30_000;
 const HERE = dirname(fileURLToPath(import.meta.url));
+const REVIEW_FILE = join(HERE, '..', 'backlog-review.json');
 
 async function exec(command: string, args: string[], cwd?: string): Promise<string> {
   const { stdout } = await run(command, args, { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
@@ -127,6 +131,11 @@ function loadRuns(): Promise<Run[]> {
   return ghJson(['run', 'list', '--repo', REPO, '--limit', '15', '--json', fields]).then((data) => data as Run[]);
 }
 
+// Read on every refresh, so an edit shows without a restart.
+async function loadBacklogReviews(): Promise<BacklogReviewFile> {
+  return parseBacklogReviews(JSON.parse(await readFile(REVIEW_FILE, 'utf8')));
+}
+
 async function mainRepoRoot(): Promise<string> {
   const common = (await exec('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim();
   return dirname(common);
@@ -169,6 +178,9 @@ async function buildState() {
     guarded('worktrees', sources, [] as Worktree[], loadWorktrees),
     guarded('health', sources, null, loadHealth),
   ]);
+  const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
+  const backlogReview =
+    reviewFile && sources['openIssues']?.ok ? joinBacklogReview(reviewFile, openIssues) : null;
   const board = boardResult.items;
   const allIssues = [...openIssues, ...closedIssues];
   const labelsFor = (n: number | null): string[] => allIssues.find((issue) => issue.number === n)?.labels ?? [];
@@ -191,6 +203,7 @@ async function buildState() {
     health,
     drift: driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees }),
     driftBlockedBy,
+    backlogReview,
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

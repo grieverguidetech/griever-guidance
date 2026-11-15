@@ -4,6 +4,8 @@ import {
   boardTruncation,
   failedSources,
   isAllowedHost,
+  joinBacklogReview,
+  parseBacklogReviews,
   parsePort,
   ciStateFromChecks,
   computeDrift,
@@ -378,5 +380,70 @@ describe('boardTruncation', () => {
     expect(boardTruncation({ items: [{}, {}], totalCount: 2 })).toBeNull();
     expect(boardTruncation({ items: [{}] })).toBeNull();
     expect(boardTruncation(null)).toBeNull();
+  });
+});
+
+describe('backlog review', () => {
+  const issue = (number: number, title = `Issue ${number}`): Issue => ({
+    number,
+    title,
+    url: `https://github.com/x/y/issues/${number}`,
+    labels: [],
+    updatedAt: '2026-11-15T00:00:00Z',
+  });
+  const review = (number: number, action: 'close' | 'decide' | 'rewrite' | 'keep') => ({
+    number,
+    action,
+    recommendation: `rec ${number}`,
+    why: `why ${number}`,
+  });
+  const file = (reviews: ReturnType<typeof review>[]) => ({ reviewedAt: '2026-11-15', reviews });
+
+  it('joins a review with its open issue', () => {
+    const result = joinBacklogReview(file([review(1, 'close')]), [issue(1, 'Old thing')]);
+    expect(result.rows).toEqual([
+      {
+        number: 1,
+        title: 'Old thing',
+        url: 'https://github.com/x/y/issues/1',
+        action: 'close',
+        recommendation: 'rec 1',
+        why: 'why 1',
+      },
+    ]);
+    expect(result.reviewedAt).toBe('2026-11-15');
+  });
+
+  it('shows open issues with no review as Not reviewed', () => {
+    const [row] = joinBacklogReview(file([]), [issue(7)]).rows;
+    expect(row?.action).toBe('not-reviewed');
+    expect(row?.recommendation).toBe('Not reviewed');
+  });
+
+  it('drops reviews for closed issues and counts them', () => {
+    const result = joinBacklogReview(file([review(1, 'close'), review(2, 'keep')]), [issue(2)]);
+    expect(result.rows.map((row) => row.number)).toEqual([2]);
+    expect(result.dropped).toBe(1);
+  });
+
+  it('sorts close, decide, rewrite, not reviewed, keep, then by number', () => {
+    const reviews = [review(1, 'keep'), review(2, 'rewrite'), review(3, 'decide'), review(4, 'close'), review(6, 'close')];
+    const open = [issue(6), issue(5), issue(4), issue(3), issue(2), issue(1)];
+    const order = joinBacklogReview(file(reviews), open).rows.map((row) => row.number);
+    expect(order).toEqual([4, 6, 3, 2, 5, 1]);
+  });
+
+  it('accepts a good file', () => {
+    expect(parseBacklogReviews(file([review(1, 'keep')]))).toEqual(file([review(1, 'keep')]));
+  });
+
+  it('rejects bad files with a reason', () => {
+    expect(() => parseBacklogReviews(null)).toThrow('reviewedAt');
+    expect(() => parseBacklogReviews({ reviewedAt: 'today', reviews: [] })).toThrow('reviewedAt');
+    expect(() => parseBacklogReviews({ reviewedAt: '2026-11-15' })).toThrow('reviews must be a list');
+    expect(() => parseBacklogReviews(file([{ ...review(1, 'keep'), action: 'delete' as never }]))).toThrow('action');
+    expect(() => parseBacklogReviews(file([{ ...review(1, 'keep'), why: '' }]))).toThrow('why');
+    expect(() => parseBacklogReviews(file([{ ...review(0, 'keep') }]))).toThrow('number');
+    expect(() => parseBacklogReviews(file([review(1, 'keep'), review(1, 'close')]))).toThrow('twice');
   });
 });
