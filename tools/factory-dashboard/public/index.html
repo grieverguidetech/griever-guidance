@@ -36,6 +36,10 @@ ul.list li { background: var(--card); border: 1px solid var(--border); border-ra
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .column h3 { font-size: 14px; margin: 0 0 6px; }
 details summary { cursor: pointer; }
+table.review { width: 100%; border-collapse: collapse; background: var(--card); }
+table.review th, table.review td { text-align: left; vertical-align: top; padding: 8px 10px; border: 1px solid var(--border); overflow-wrap: anywhere; }
+table.review th.wide, table.review td.wide { width: 36%; font-size: 16px; }
+table.review td.narrow { white-space: nowrap; width: 1%; }
 </style>
 </head>
 <body>
@@ -195,6 +199,45 @@ function renderDrift() {
   });
 }
 
+function reviewRow(row) {
+  var tr = el("tr");
+  tr.appendChild(el("td", "#" + row.number, "narrow"));
+  var title = el("td");
+  title.appendChild(link(row.title, row.url));
+  tr.appendChild(title);
+  tr.appendChild(el("td", row.recommendation, "wide"));
+  tr.appendChild(el("td", row.why, "wide"));
+  return tr;
+}
+
+function renderBacklogReview() {
+  var s = section("Backlog review", "backlogReview");
+  var review = state.backlogReview;
+  if (!review) {
+    if (state.sources.backlogReview.ok) {
+      s.appendChild(el("p", "Empty: open issues failed to load, so reviews cannot be matched.", "error"));
+    }
+    return;
+  }
+  s.appendChild(el("p", "Reviewed " + review.reviewedAt + ". Reviews hidden because the issue is no longer open:" + review.dropped + ".", "muted"));
+  if (review.rows.length === 0) {
+    s.appendChild(el("p", "No open issues.", "muted"));
+    return;
+  }
+  var table = el("table", null, "review");
+  var head = el("tr");
+  [["#", ""], ["Title", ""], ["Recommendation", "wide"], ["Why", "wide"]].forEach(function (col) {
+    var th = el("th", col[0], col[1]);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  review.rows.forEach(function (row) {
+    table.appendChild(reviewRow(row));
+  });
+  s.appendChild(table);
+}
+
 function renderPrs() {
   var s = section("Open PRs", "prs");
   s.appendChild(listOf(state.prs.filter(visible), function (li, pr) {
@@ -290,6 +333,7 @@ function render() {
   areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
   renderNeedsYou();
   renderDrift();
+  renderBacklogReview();
   renderPrs();
   renderBoard();
   renderWorktrees();

@@ -449,3 +449,98 @@ export function boardTruncation(raw: unknown): BoardTruncation | null {
   }
   return { shown, total };
 }
+
+export type ReviewAction = 'close' | 'decide' | 'rewrite' | 'keep';
+export type RowAction = ReviewAction | 'not-reviewed';
+
+export interface Review {
+  number: number;
+  action: ReviewAction;
+  recommendation: string;
+  why: string;
+}
+
+export interface BacklogReviewFile {
+  reviewedAt: string;
+  reviews: Review[];
+}
+
+export interface BacklogRow {
+  number: number;
+  title: string;
+  url: string;
+  action: RowAction;
+  recommendation: string;
+  why: string;
+}
+
+export interface BacklogReview {
+  reviewedAt: string;
+  rows: BacklogRow[];
+  dropped: number;
+}
+
+const REVIEW_ACTIONS: string[] = ['close', 'decide', 'rewrite', 'keep'];
+// Sort order for the rows: the first action is the one Peter should look at first.
+const ACTION_ORDER: RowAction[] = ['close', 'decide', 'rewrite', 'not-reviewed', 'keep'];
+export const NOT_REVIEWED = 'Not reviewed';
+
+function isText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+// Checks the shape of backlog-review.json. Throws with a plain reason when it is wrong.
+export function parseBacklogReviews(raw: unknown): BacklogReviewFile {
+  const data = raw as { reviewedAt?: unknown; reviews?: unknown } | null;
+  if (!data || !isText(data.reviewedAt) || !/^\d{4}-\d{2}-\d{2}$/.test(data.reviewedAt) || Number.isNaN(Date.parse(data.reviewedAt))) {
+    throw new Error('reviewedAt must be a date like 2026-11-15');
+  }
+  if (!Array.isArray(data.reviews)) {
+    throw new Error('reviews must be a list');
+  }
+  const seen = new Set<number>();
+  const reviews = data.reviews.map((entry: unknown, index: number): Review => {
+    const item = entry as Partial<Record<keyof Review, unknown>> | null;
+    const where = `reviews[${index}]`;
+    if (!item || typeof item.number !== 'number' || !Number.isInteger(item.number) || item.number < 1) {
+      throw new Error(`${where}: number must be a positive integer`);
+    }
+    if (seen.has(item.number)) {
+      throw new Error(`${where}: #${item.number} is listed twice`);
+    }
+    seen.add(item.number);
+    if (typeof item.action !== 'string' || !REVIEW_ACTIONS.includes(item.action)) {
+      throw new Error(`${where}: action must be one of ${REVIEW_ACTIONS.join(', ')}`);
+    }
+    if (!isText(item.recommendation) || !isText(item.why)) {
+      throw new Error(`${where}: recommendation and why must be text`);
+    }
+    return {
+      number: item.number,
+      action: item.action as ReviewAction,
+      recommendation: item.recommendation,
+      why: item.why,
+    };
+  });
+  return { reviewedAt: data.reviewedAt, reviews };
+}
+
+// Joins the reviews with the live open issues. Reviews for closed issues are dropped and counted.
+export function joinBacklogReview(file: BacklogReviewFile, openIssues: Issue[]): BacklogReview {
+  const byNumber = new Map(file.reviews.map((review) => [review.number, review]));
+  const rows: BacklogRow[] = openIssues.map((issue) => {
+    const review = byNumber.get(issue.number);
+    return {
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      action: review ? review.action : 'not-reviewed',
+      recommendation: review ? review.recommendation : NOT_REVIEWED,
+      why: review ? review.why : 'No review has been written for this issue yet.',
+    };
+  });
+  rows.sort((a, b) => ACTION_ORDER.indexOf(a.action) - ACTION_ORDER.indexOf(b.action) || a.number - b.number);
+  const openNumbers = new Set(openIssues.map((issue) => issue.number));
+  const dropped = file.reviews.filter((review) => !openNumbers.has(review.number)).length;
+  return { reviewedAt: file.reviewedAt, rows, dropped };
+}
