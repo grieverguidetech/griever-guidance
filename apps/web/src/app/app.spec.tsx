@@ -3,7 +3,8 @@
  * default): the real App with real hooks, localStorage and an in-memory
  * IndexedDB. Nothing talks to the gateway.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { App } from './app';
 
@@ -23,7 +24,7 @@ async function reachContacts(user: ReturnType<typeof userEvent.setup>) {
 
 describe('App onboarding', () => {
   it('starts a first visit at Home with nobody listed and no account step', () => {
-    render(<App />);
+    renderApp(<App />);
     expect(screen.getByRole('heading', { level: 1, name: "Who you're writing about" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
@@ -33,7 +34,7 @@ describe('App onboarding', () => {
 
   it('only enables adding once both name and number are filled', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachContacts(user);
     const add = screen.getByRole('button', { name: 'Add and start another' });
     expect(add).toBeDisabled();
@@ -45,7 +46,7 @@ describe('App onboarding', () => {
 
   it('explains a bad number calmly and keeps what was typed', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachContacts(user);
     await addContact(user, 'Aunt Carol', '123');
     expect(screen.getByText("That number doesn't look right — check the area code and digits.")).toBeInTheDocument();
@@ -55,7 +56,7 @@ describe('App onboarding', () => {
 
   it('walks their details → contacts → who hears first → one next thing', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
 
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     expect(screen.getByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
@@ -86,7 +87,7 @@ describe('App onboarding', () => {
 
   it('sends a returning visitor to Home, then into their session when they pick it', async () => {
     const user = userEvent.setup();
-    const first = render(<App />);
+    const first = renderApp(<App />);
     await reachContacts(user);
     await addContact(user, 'Aunt Carol', '6175550148');
     await screen.findByText('Added so far — 1');
@@ -94,7 +95,7 @@ describe('App onboarding', () => {
     await user.click(screen.getByRole('button', { name: 'Save and continue' }));
     first.unmount();
 
-    render(<App />);
+    renderApp(<App />);
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: "Who you're writing about" })).toBeInTheDocument(),
     );
@@ -105,7 +106,7 @@ describe('App onboarding', () => {
 
   it('keeps contact names and numbers out of localStorage (they stay in IndexedDB)', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachContacts(user);
     await addContact(user, 'Aunt Carol', '6175550148');
     await screen.findByText('Added so far — 1');

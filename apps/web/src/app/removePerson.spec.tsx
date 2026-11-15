@@ -2,7 +2,8 @@
  * #222: "Remove a person" on Account, in the real App. The api-client is mocked, so no network.
  * Synced people go through deleteFlow first; device-only people never send a request.
  */
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -83,7 +84,7 @@ async function openAccount(user: ReturnType<typeof userEvent.setup>) {
 
 async function startOnOverview() {
   const user = userEvent.setup();
-  render(<App />);
+  renderApp(<App />);
   const open = await screen.findByRole('button', { name: 'Margaret Hayes' }).catch(() => null);
   if (open) {
     await user.click(open);
@@ -184,7 +185,7 @@ describe('Remove a person on Account (#222)', () => {
     seed([...synced.slice(0, 2), person('s4', '55555555-5555-4555-8555-555555555555', 'Device Dan', {})]);
     mocks.loadClerk.mockResolvedValue({ available: false } as unknown as ClerkLoadResult);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Device Dan' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await openAccount(user);
@@ -198,7 +199,7 @@ describe('Remove a person on Account (#222)', () => {
     const clerk = fakeClerk({ userId: USER });
     mocks.loadClerk.mockResolvedValue(clerk.load);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     // The session ends somewhere else; the person stays where they are.

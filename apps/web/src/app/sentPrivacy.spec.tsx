@@ -2,7 +2,8 @@
  * C2 (#82): once a message has been sent, its wording is not kept. The real App over real
  * localStorage: type a note, edit the wording, send, and look at everything the app saved.
  */
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { contactStore } from '@griever/data-local';
 import { freshDraft } from '@griever/hooks';
@@ -12,7 +13,7 @@ const note = 'She was peaceful and we were with her at the end.';
 const edited = 'My own private words for the family.';
 
 async function sendAnAnnouncement(user: ReturnType<typeof userEvent.setup>) {
-  render(<App />);
+  renderApp(<App />);
   await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
   await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
   await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -78,7 +79,7 @@ describe('after a Share the service send (C2, #195)', () => {
       serviceReady: true, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
     }]));
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await user.click(await screen.findByRole('button', { name: /Share the service/ }));
     const box = await screen.findByLabelText('Your message');

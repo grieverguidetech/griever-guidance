@@ -4,7 +4,8 @@
  * looked 30+ days past and wiped the list. Real App, real hooks, in-memory
  * IndexedDB; nothing talks to the gateway.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { contactStore } from '@griever/data-local';
 import { App } from './app';
@@ -41,7 +42,7 @@ describe('contact retention while a service date is being typed (#79)', () => {
     'keeps every saved contact at every keystroke of %s',
     async (date) => {
       const user = userEvent.setup();
-      render(<App />);
+      renderApp(<App />);
       const field = await reachServiceDateField(user);
       expect(await contactStore.list()).toHaveLength(2);
 

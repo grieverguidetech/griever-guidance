@@ -2,7 +2,8 @@
  * Family sharing wired into the real App (#127), with a fake Clerk and a stubbed profile and members
  * api-client. No network. Flags are mocked so each test picks its own setup.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { MembersView } from '@griever/shared';
 import type { ClerkLoadResult } from '../lib/authClient';
@@ -91,7 +92,7 @@ describe('owner, flags on', () => {
   it('shows People helping you on Profile and sends one invitation with the typed email', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openProfile(user);
     await screen.findByRole('heading', { name: 'People helping you' });
     await user.type(screen.getByLabelText('Their email'), 'Sam@Example.com');
@@ -103,7 +104,7 @@ describe('owner, flags on', () => {
   it('shows the remove section in Settings', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Settings' }));
     expect(await screen.findByRole('button', { name: 'Remove Ben' })).toBeInTheDocument();
   });
@@ -112,7 +113,7 @@ describe('owner, flags on', () => {
     signedInAs('owner');
     mocks.getMembers.mockReturnValue(new Promise(() => {}));
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
     await openProfile(user);
     expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
@@ -123,7 +124,7 @@ describe('owner, flags on', () => {
     signedInAs('owner');
     mocks.getMembers.mockReturnValue(new Promise(() => {}));
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Settings' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove Ben' })).not.toBeInTheDocument();
@@ -137,7 +138,7 @@ describe('member, flags on', () => {
   });
 
   it('has no "Create a new one" on Home', async () => {
-    render(<App />);
+    renderApp(<App />);
     // The member note only shows once the profile says member; the button is gone with it.
     expect(await screen.findByText(/the people you're helping will show here/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "Start with someone I've lost" })).not.toBeInTheDocument();
@@ -146,7 +147,7 @@ describe('member, flags on', () => {
 
   it("says who they are helping on Profile and offers no invite form or remove section", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openProfile(user);
     expect(await screen.findByText("You're helping Anna.")).toBeInTheDocument();
     expect(screen.queryByLabelText('Their email')).not.toBeInTheDocument();
@@ -161,7 +162,7 @@ describe('token cannot be had', () => {
   it('shows Profile and makes no members call (the token is the adapter\'s, and it is offline)', async () => {
     signedInAs('owner', { getToken: async () => ({ ok: false as const, reason: 'offline' as const }) });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openProfile(user);
     expect(await screen.findByRole('heading', { level: 1, name: 'Your account' })).toBeInTheDocument();
     expect(mocks.getMembers).not.toHaveBeenCalled();
@@ -172,7 +173,7 @@ describe('profile not known to be a member', () => {
   it('keeps "Create a new one" when the profile cannot be read', async () => {
     signedInAs('owner');
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'failed' });
-    render(<App />);
+    renderApp(<App />);
     expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
   });
 });
@@ -181,7 +182,7 @@ describe('sharing flag off', () => {
   it('keeps the create button for a member profile', async () => {
     mocks.sharing = false;
     signedInAs('member');
-    render(<App />);
+    renderApp(<App />);
     expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Your account' });
     expect(screen.queryByText(/the people you're helping will show here/)).not.toBeInTheDocument();
@@ -191,7 +192,7 @@ describe('sharing flag off', () => {
     mocks.sharing = false;
     signedInAs('owner');
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openProfile(user);
     await screen.findByRole('heading', { level: 1, name: 'Your account' });
     expect(screen.queryByRole('heading', { name: 'People helping you' })).not.toBeInTheDocument();

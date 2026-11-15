@@ -3,7 +3,8 @@
  * typed, and reopening the app puts the person back on that step. A "reload" here is an unmount and
  * a fresh <App /> over the same localStorage and IndexedDB, which is all a real reload keeps.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { App } from './app';
 
@@ -11,7 +12,7 @@ type User = ReturnType<typeof userEvent.setup>;
 
 function reload(view: { unmount: () => void }) {
   view.unmount();
-  return render(<App />);
+  return renderApp(<App />);
 }
 
 /** A reload now lands on Home (#112); the person is opened from there, on their path (#176). */
@@ -25,7 +26,7 @@ async function resume(user: User) {
 }
 
 async function onboardToLanding(user: User) {
-  const view = render(<App />);
+  const view = renderApp(<App />);
   await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
   await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
   await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -58,7 +59,7 @@ describe('saved as you go', () => {
 
   it('keeps the person and sender typed on the setup step', async () => {
     const user = userEvent.setup();
-    const view = render(<App />);
+    const view = renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
     await user.type(screen.getByLabelText(/Your name/), 'Peter');
@@ -190,7 +191,7 @@ describe('saved as you go', () => {
         { name: 'Older Person', openedAt: '2026-01-01T00:00:00.000Z', step: 'announce' },
         { name: 'Newer Person', openedAt: '2026-02-01T00:00:00.000Z', step: 'announce' },
       ]);
-      render(<App />);
+      renderApp(<App />);
       const names = (await screen.findAllByRole('listitem')).map((li) => li.textContent);
       expect(names).toEqual(['Newer Person', 'Older Person']);
       await user.click(screen.getByRole('button', { name: 'Older Person' }));
@@ -201,7 +202,7 @@ describe('saved as you go', () => {
     it('resumes a draft saved on the retired service question on the people step', async () => {
       const user = userEvent.setup();
       seed([{ name: 'Margaret Hayes', openedAt: '2026-02-01T00:00:00.000Z', step: 'serviceKnown' }]);
-      render(<App />);
+      renderApp(<App />);
       await openFromHome(user);
       await resume(user);
       expect(await screen.findByRole('heading', { name: 'Who should know?' })).toBeInTheDocument();
@@ -211,7 +212,7 @@ describe('saved as you go', () => {
     it('opens the landing when the last message was already sent', async () => {
       const user = userEvent.setup();
       seed([{ name: 'Margaret Hayes', openedAt: '2026-02-01T00:00:00.000Z', step: 'sent' }]);
-      render(<App />);
+      renderApp(<App />);
       await openFromHome(user);
       expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
     });

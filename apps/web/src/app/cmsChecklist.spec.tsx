@@ -3,7 +3,8 @@
  * audits: opening an item focuses the shell h1 (titled with the item), opening from the phone sheet
  * closes the sheet, and Back returns to the button that opened the item.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({ cms: true }));
@@ -50,7 +51,7 @@ function seed(checklist: Record<string, string> = {}) {
 }
 
 async function openOverview() {
-  render(<App />);
+  renderApp(<App />);
   // With the editor on, loading lands on the most recent person's Overview (#448).
   await screen.findByRole('heading', { level: 1, name: 'Overview' });
 }
@@ -265,7 +266,7 @@ describe('checklist in the editor (#421)', () => {
       ]),
     );
     const user = userEvent.setup();
-    const view = render(<App />);
+    const view = renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     const group = within(screen.getByRole('complementary')).getByRole('group', {
       name: ITEM,
@@ -273,7 +274,7 @@ describe('checklist in the editor (#421)', () => {
     await user.click(within(group).getByRole('button', { name: 'Done' }));
     expect(storedChecklist('s1')).toEqual({ pronouncement: 'done' });
     view.unmount();
-    render(<App />);
+    renderApp(<App />);
     // Loading lands on Margaret (just opened); "Change" returns to Home to pick Harold.
     await user.click(within(await screen.findByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await user.click(
@@ -294,7 +295,7 @@ describe('checklist in the editor (#421)', () => {
   it('shows no panel with the editor off', async () => {
     mocks.cms = false;
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(
       await screen.findByRole('button', { name: 'Margaret Hayes' }),
     );

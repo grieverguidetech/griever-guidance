@@ -2,7 +2,8 @@
  * #50: when the view or flow step changes, focus moves to the new screen's h1 so a screen reader
  * announces it. It never moves on first load. The real App over real localStorage.
  */
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { freshDraft } from '@griever/hooks';
 import { App } from './app';
@@ -29,14 +30,14 @@ function seedAnnouncementStep() {
 
 describe('focus follows the screen heading (#50)', () => {
   it('does not move focus on first load', () => {
-    render(<App />);
+    renderApp(<App />);
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(document.activeElement).toBe(document.body);
   });
 
   it('moves focus to the new h1 on Continue and back to the previous h1 on Back', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -59,7 +60,7 @@ describe('focus follows the screen heading (#50)', () => {
   it('moves focus to the new h1 when a flow step changes', async () => {
     seedAnnouncementStep();
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: "Who you're writing about" });
     expect(document.activeElement).toBe(document.body); // landing on Home never moves focus
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));

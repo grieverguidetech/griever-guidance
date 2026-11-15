@@ -2,7 +2,8 @@
  * #395: the web editor wired into the real App behind CMS_ENABLED. Real localStorage; a "remount" is
  * an unmount and a fresh <App /> over the same storage. The flag is mocked per test.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -90,7 +91,7 @@ async function expectPeople() {
 /** Loading with one saved person lands on their Overview (#448). */
 async function openMargaret() {
   seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-  render(<App />);
+  renderApp(<App />);
   return screen.findByRole('heading', { level: 1, name: 'Overview' });
 }
 
@@ -130,14 +131,14 @@ describe('editor on (#395)', () => {
 
   it('"Create a new one" opens The person directly, and a typed name survives a remount', async () => {
     const user = userEvent.setup();
-    const view = render(<App />);
+    const view = renderApp(<App />);
     // Nobody saved: loading opens the Overview's empty page (#603); starting a person is the user's choice.
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /contacts|who hears first/i })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Their name'), 'Harold Price');
     view.unmount();
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(peopleNav());
     await expectPeople();
@@ -190,7 +191,7 @@ describe('editor on (#395)', () => {
 
   it('"Your people" in the nav drops an unnamed person', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     expect(stored()).toHaveLength(1);
@@ -202,7 +203,7 @@ describe('editor on (#395)', () => {
 
   it('"Your people" in the nav keeps an unnamed person who has service data', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     await user.click(screen.getByRole('button', { name: /^Service/ }));
@@ -399,7 +400,7 @@ describe('editor on, signed in (#395)', () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
@@ -423,7 +424,7 @@ describe('editor on, signed in (#395)', () => {
     });
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
@@ -436,7 +437,7 @@ describe('editor on, signed in (#395)', () => {
 
   async function openYourAccount(user: ReturnType<typeof userEvent.setup>) {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
@@ -473,7 +474,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.loadClerk.mockResolvedValue(fakeClerk().load);
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
@@ -493,7 +494,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
     mocks.loadClerk.mockResolvedValue(fakeClerk().load);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Sign in with the test provider' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
@@ -509,7 +510,7 @@ describe('editor on, signed in (#395)', () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
@@ -522,7 +523,7 @@ describe('editor on, signed in (#395)', () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Thomas Hale', '2026-10-01T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(peopleNav());
     await screen.findByRole('heading', { level: 1, name: 'Your people' });
@@ -543,7 +544,7 @@ describe('editor on, signed in (#395)', () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
@@ -563,7 +564,7 @@ describe('editor on, signed in (#395)', () => {
     signedInAs('owner');
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('button', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
@@ -580,7 +581,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
     signedInAs('member');
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('button', { name: 'Your account' });
     await waitFor(() => expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument());
   });
@@ -589,7 +590,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     signedInAs('owner');
-    render(<App />);
+    renderApp(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
   });
 });
@@ -599,7 +600,7 @@ describe('editor off (#395)', () => {
     mocks.cms = false;
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await expectHome();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();

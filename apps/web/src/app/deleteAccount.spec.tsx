@@ -2,7 +2,8 @@
  * #575 Delete account in the real App with a fake Clerk (no network). The fake's deleteAccount
  * ends the session on success, as Clerk does.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { DeleteCancelledError } from '../lib/authClient';
 import type { ClerkLoadResult } from '../lib/authClient';
@@ -99,7 +100,7 @@ describe('delete account in the app (#575)', () => {
     await contactStore.put({ contactId: 'c1' } as never);
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: async () => undefined }).load);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openConfirm(user);
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     const focused1 = await screen.findByRole('heading', { level: 1, name: 'Your account is deleted' });
@@ -113,7 +114,7 @@ describe('delete account in the app (#575)', () => {
     await contactStore.put({ contactId: 'c2' } as never);
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: () => Promise.reject(new Error('not allowed')) }).load);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openConfirm(user);
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     await waitFor(() => expect(screen.getByText(/We could not finish deleting your account/)).toBeInTheDocument());
@@ -131,7 +132,7 @@ describe('delete account in the app (#575)', () => {
   it('verification cancelled: says the account was not deleted and keeps local data', async () => {
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: () => Promise.reject(new DeleteCancelledError()) }).load);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openConfirm(user);
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
     await screen.findByText('Your account was not deleted.');
@@ -149,7 +150,7 @@ describe('delete account in the app (#575)', () => {
     const pending = new Promise<void>((resolve) => (finish = resolve));
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: () => pending }).load);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openConfirm(user);
     await waitFor(() => expect(gets).toBeGreaterThan(0));
     await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));

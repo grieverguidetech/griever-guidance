@@ -3,7 +3,8 @@
  * page is titled "Account", Overview and Your people are different pages with nobody saved, "Start with
  * someone I've lost" always opens The person, and the side nav is the same in every state.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { identityErrorMessage } from '@griever/hooks';
@@ -104,7 +105,7 @@ beforeEach(() => {
 describe('landing and names (#603 1)', () => {
   it('a new sign-up lands on Overview, not the name screen, and saves the Clerk names once', async () => {
     signedIn({ firstName: 'Anna', lastName: 'Reyes' });
-    render(<App />);
+    renderApp(<App />);
     expect(await h1('Overview')).toBeInTheDocument();
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
     expect(mocks.updateProfile).toHaveBeenCalledWith('tok', { firstName: 'Anna', lastName: 'Reyes' });
@@ -114,7 +115,7 @@ describe('landing and names (#603 1)', () => {
 
   it('does not overwrite names the profile already has', async () => {
     signedIn({ firstName: 'Anna', lastName: 'Reyes' }, { firstName: 'Ann', lastName: null, senderName: 'Ann' });
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mocks.updateProfile).not.toHaveBeenCalled();
@@ -123,7 +124,7 @@ describe('landing and names (#603 1)', () => {
   it('with no first name anywhere, Overview shows one calm line with a link to Account', async () => {
     signedIn({ firstName: null, lastName: null });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     const note = await screen.findByRole('button', { name: NAME_NOTE });
     expect(note.className).toContain('gg-btn');
@@ -135,7 +136,7 @@ describe('landing and names (#603 1)', () => {
   it('shows the same line on a person\'s Overview', async () => {
     signedIn(undefined);
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     expect(await screen.findByRole('button', { name: NAME_NOTE })).toBeInTheDocument();
   });
@@ -148,7 +149,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
   it('sends nothing when the profile call is unavailable, and the note shows', async () => {
     signedIn(clerkNames);
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await settle();
     expect(mocks.updateProfile).not.toHaveBeenCalled();
@@ -162,7 +163,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
     mocks.getProfile.mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, profile: profile({ firstName: 'Ann', senderName: 'Ann' }) }), 120)),
     );
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(mocks.updateProfile).not.toHaveBeenCalled();
@@ -171,7 +172,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
   it('saves once; later navigation and re-renders send nothing more', async () => {
     signedIn(clerkNames);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
     const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
@@ -189,7 +190,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
     signedIn(clerkNames);
     mocks.updateProfile.mockResolvedValue({ ok: false, reason: 'unavailable' });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('button', { name: NAME_NOTE })).toBeInTheDocument();
@@ -206,7 +207,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
   it('a second mount with the marker sends nothing', async () => {
     signedIn(clerkNames);
     window.localStorage.setItem('gg.namesPrefilled.v1', JSON.stringify(['u1']));
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await settle();
     expect(mocks.updateProfile).not.toHaveBeenCalled();
@@ -216,7 +217,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
     signedIn(clerkNames);
     let finish: (value: unknown) => void = () => undefined;
     mocks.updateProfile.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
     await settle();
@@ -231,7 +232,7 @@ describe('Account page (#603 2)', () => {
   it('is titled Account with no name question and no Your people link', async () => {
     signedIn(undefined, { firstName: 'Anna', senderName: 'Anna' });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     await user.click(within(nav).getByRole('button', { name: 'Your account' }));
@@ -245,7 +246,7 @@ describe('Account page (#603 2)', () => {
 describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
   it('Overview shows its own empty page and Your people shows another, in both directions', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     expect(screen.getByText(/Nothing is here yet/)).toBeInTheDocument();
     expect(screen.queryByText('No one here yet.')).not.toBeInTheDocument();
@@ -260,7 +261,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
   });
 
   it('the nav shows the not-started circles for the four sections with nobody saved', async () => {
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getAllByRole('img', { name: 'Not started' })).toHaveLength(4);
@@ -271,7 +272,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
 
   it('"Start with someone I\'ve lost" opens The person from Overview', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await user.click(screen.getByRole('button', { name: CREATE }));
     expect(await h1('The person')).toBeInTheDocument();
@@ -279,7 +280,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
 
   it('"Start with someone I\'ve lost" opens The person from a section', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: /^Service/ }));
     await h1('Service');
@@ -289,7 +290,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
 
   it('"Start with someone I\'ve lost" opens The person from Your people', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your people' }));
     await h1('Your people');
@@ -301,7 +302,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
 describe('side nav (#603 6)', () => {
   it('has no Change button and no name line, but the landmark keeps the name', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     expect(screen.queryByRole('button', { name: /Change/ })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Sections for Margaret Hayes' });
