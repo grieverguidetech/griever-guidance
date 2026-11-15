@@ -126,19 +126,26 @@ export function issueFromPr(body: string | null | undefined, headRefName: string
 
 interface RawCheck {
   __typename?: string;
+  name?: string;
+  context?: string;
   status?: string;
   conclusion?: string;
   state?: string;
 }
 
+// The merge gate stays red until the ready-to-merge label is added, and the label is added only
+// after CI is green. Counting it would mark every PR as failing, so it is left out.
+const MERGE_GATE_CHECK = 'Ready to merge';
+
 const BAD_CONCLUSIONS = ['FAILURE', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'];
 const GOOD_CONCLUSIONS = ['SUCCESS', 'NEUTRAL', 'SKIPPED'];
 
 export function ciStateFromChecks(checks: RawCheck[] | null | undefined): CiState {
-  if (!checks || checks.length === 0) {
+  const counted = (checks ?? []).filter((check) => (check.name ?? check.context) !== MERGE_GATE_CHECK);
+  if (counted.length === 0) {
     return 'none';
   }
-  const states = checks.map(checkState);
+  const states = counted.map(checkState);
   if (states.includes('red')) {
     return 'red';
   }

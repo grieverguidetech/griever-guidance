@@ -156,6 +156,13 @@ describe('ciStateFromChecks', () => {
     ).toBe('red');
   });
 
+  it('ignores the merge gate check, which is red until the label is added', () => {
+    const gate = { __typename: 'CheckRun', name: 'Ready to merge', status: 'COMPLETED', conclusion: 'FAILURE' };
+    const passing = { __typename: 'CheckRun', name: 'Typecheck', status: 'COMPLETED', conclusion: 'SUCCESS' };
+    expect(ciStateFromChecks([passing, gate])).toBe('green');
+    expect(ciStateFromChecks([gate])).toBe('none');
+  });
+
   it('is pending when a check is still running', () => {
     expect(
       ciStateFromChecks([
