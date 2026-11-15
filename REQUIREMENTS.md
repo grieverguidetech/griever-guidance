@@ -242,7 +242,7 @@ section in the same PR.
 
 ### What this is
 
-Grievers Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. Since 2026-10-30 the web is a planning editor (plan at a desk) and the mobile app does all sending. The web editor ships behind `VITE_FEATURE_CMS`, off in production; until a later round removes it, the old web send flow stays in the flag-off build. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
+Grievers Guidance helps people who have just lost a loved one send funeral and service details to their contacts via SMS — texted from the griever's own phone number, one contact at a time, not a bulk send from a business number. Since 2026-10-30 the web is a planning editor (plan at a desk) and the mobile app does all sending. The web editor ships behind `VITE_FEATURE_CMS`, on in production (`FEATURE_CMS=true`); until a later round removes it, the old web send flow stays in the flag-off build. The user is in acute grief — likely sleep-deprived, overwhelmed, and on a phone. Every product and engineering decision should be evaluated against that reality. Speed, clarity, and reliability over cleverness.
 
 ---
 
@@ -259,7 +259,7 @@ apps/
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
               Composes libs/identity, libs/gateway-messages, libs/gateway-flows and libs/gateway-places into
               one HTTP surface (CORS + routing) — this app owns no domain logic itself.
-  web/        React + Vite + Tailwind. Planning editor (behind VITE_FEATURE_CMS, off in production),
+  web/        React + Vite + Tailwind. Planning editor (behind VITE_FEATURE_CMS, on in production),
               account management, and the old browser send flow until a later round removes it.
   mobile/     Expo + React Native. The primary user surface — mobile-first, core RN only.
   marketing/  Astro. Public-facing site. No shared business logic.
@@ -272,8 +272,10 @@ libs/
                     Also owns the sms: deep-link builder (buildSmsLink) — see "The send flow".
   data-local/       IndexedDB-backed local storage (the screen-keyed session document, outbox,
                     contacts). Browser-only — see DATA.md.
-  data-sync/        The offline sync engine (outbox flush, cursor-based pull/push, merge) that
-                    has no live backend now that Convex is removed (#203). See DATA.md.
+  data-sync/        The old cursor sync engine (outbox flush, cursor-based pull/push, merge). It
+                    has no live backend since Convex was removed (#203), and no code imports it
+                    (apps/web still lists it as a dependency). Live person sync is useFlowSync in
+                    libs/hooks. See DATA.md.
   contacts/         Platform-agnostic contact-import logic shared by web and mobile: the
                     `ContactSource` adapter interface, normalize/dedupe/rank, and the
                     fetch → review → commit pipeline. Device-specific adapters (the web Contact
@@ -283,13 +285,30 @@ libs/
                     See "Identity" below — this is who a user is, never their friends or contacts.
   gateway-messages/ The AI-drafted obituary route. No message-sending logic lives server-side —
                     sending happens entirely on-device (see "The send flow").
-  gateway-auth/     The one shared helper for the gateway's domain libs:
-                    Clerk token verification and the signed client for the AWS data function.
-  gateway-flows/    Invite and member routes (GET /members, POST /invites, POST /invites/accept,
-                    DELETE /invites/:id, DELETE /members/:memberId) and the invite mailer; mounted
-                    by apps/gateway. The /flows routes are planned (#131).
+  gateway-auth/     The one shared helper for the gateway's domain libs: Clerk token verification
+                    (clerkAuth, plus the verifier the data function imports via
+                    `@griever/gateway-auth/verify-token`), the per-user write rate limit
+                    (writeRateLimit), the data-function calls made as the caller (callData), and
+                    the service call callDeleteUser.
+  gateway-flows/    Person routes (GET /flows, POST /flows, PATCH /flows/:id), invite and member
+                    routes (GET /members, POST /invites, POST /invites/accept, DELETE /invites/:id,
+                    DELETE /members/:memberId) and the invite mailer; mounted by apps/gateway.
   gateway-places/   Place search proxy, POST /places/suggest and /places/details, to Google Places
                     API (New) with a server key; stores and logs nothing.
+  data-access/      The data function: the Lambda entry, POST /v1 and the service path, the access
+                    rules (src/rules), and the item encoders. Deployed as the Lambda gg-app-data.
+  data-aws/         AWS SDK clients and config, the local DynamoDB and SES stand-ins, and table
+                    setup and seed.
+  copy/             User-facing copy shared by web and mobile.
+  tokens/           Design tokens shared by web and mobile.
+  ui/               Web UI components. Mobile must not import it (see "UI is per app").
+
+infra/
+  aws/              CloudFormation. data.yml: the tables gg-data and gg-content, the Lambda, the
+                    function URL (AWS_IAM) and the Worker IAM user. Also artifacts.yml (the code
+                    bucket), github-oidc.yml, budgets.yml and anomaly.yml.
+  aws-local/        Local scripts: create the tables, seed them, and run the data function
+                    (pnpm aws:tables and dev:data, both run by pnpm dev:local; pnpm aws:seed).
 
   identity, gateway-messages, gateway-flows, and gateway-places each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
@@ -357,7 +376,7 @@ Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app 
 `apps/web` calls `apps/gateway`'s REST endpoints (and Clerk, with its public publishable key). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.)
 
 **2b. Identity, messages, and flows are separate libs — no cross-imports.**
-`libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Clerk token verification plus the signed calls to the data function), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` still never import each other.
+`libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Clerk token verification with `clerkAuth`, plus the verifier the data function imports via `@griever/gateway-auth/verify-token`; the per-user write rate limit `writeRateLimit`; the data-function calls made as the caller, `callData`; and the service call `callDeleteUser`), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` still never import each other.
 
 **3. Messages are sent from the user's own phone, never a backend.**
 There is no server-side SMS provider (no Twilio, no `libs/sms`) — a bulk send from a business number reads as impersonal for a grief app. Sending is an `sms:` deep link (`buildSmsLink()` in `libs/hooks`) that opens the device's native Messages app with one contact and the message pre-filled; the user taps Send themselves, one contact at a time. Service and obituary may also hand the text to the OS share sheet or to email compose (2026-11-01, #559); that is still the user's own action each time. Nothing in this repo may add a backend message-sending path or a bulk text.
@@ -441,8 +460,9 @@ single stored service date was removed (#85).
 **Auth is feature-flagged, and live on the web.** Accounts have been on in production since
 2026-10-11 (`FEATURE_AUTH=true`). `apps/web` shows sign-up/sign-in only when built with
 `VITE_FEATURE_AUTH=true` (`apps/web/src/lib/features.ts`), and `apps/mobile` only with
-`EXPO_PUBLIC_FEATURE_AUTH=true` (`apps/mobile/src/lib/features.ts`); anything else is off, and
-mobile is not switched on yet. With the flag off, onboarding starts at adding contacts, `useAccount` is not used, and sync
+`EXPO_PUBLIC_FEATURE_AUTH=true`; anything else is off. Every EAS profile in `apps/mobile/eas.json` sets
+`EXPO_PUBLIC_FEATURE_AUTH="true"`, and mobile accounts are on only when a Clerk publishable key
+(`EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`) is also set (`apps/mobile/src/lib/features.ts`). With the flag off, onboarding starts at adding contacts, `useAccount` is not used, and sync
 never starts (it needs a signed-in `userId`).
 
 Accounts are Clerk. The client signs up, signs in, and signs out through Clerk's own screens on web (they show Clerk's own sign-in error copy; `libs/hooks/src/accountCache.ts` holds only the app's own account-error copy). Mobile signs up with its own `SignUpScreen` using Clerk's `useSignUp`. The
@@ -460,18 +480,20 @@ Facebook's or Instagram's OAuth endpoints today.
 - Invitations: `POST /invites` creates the invite and emails the link (via Resend, from
   `INVITE_FROM_EMAIL`, pointing at `WEB_URL`); if the email cannot be sent the invite is revoked and
   the caller gets a calm 503. The routes live in `libs/gateway-flows`.
+- The Clerk `user.deleted` webhook (`POST /webhooks/clerk`, `libs/identity/src/clerkWebhook.ts`)
+  purges the user's server data through the data function's service path; see DATA.md §7.
 - Sign-in errors use one generic message whether the email exists or not, so a failed attempt never
   confirms which one (the copy lives in `libs/hooks/src/accountCache.ts`).
 - **The Convex `/sync/pull` and `/sync/push` routes were removed (#203).** They never worked in
-  production (`requireUser` dev stub, `GG_DEV_AUTH`). Person details sync through the AWS data function (`flows`, #130). Nothing in the web send flow
+  production (`requireUser` dev stub, `GG_DEV_AUTH`). Person details sync through the AWS data function (`FLOW#` items, #130). Nothing in the web send flow
   (`useSessions`, `useSendFlow`) writes into `libs/data-local`'s screen-keyed store, and the web app
   no longer registers any sync; see DATA.md.
-- **Family sharing (decided at G1, 2026-10-11; not built yet).** An owner adds members only by
+- **Family sharing (decided at G1, 2026-10-11; built, behind `FEATURE_SHARING`, off in production).** An owner adds members only by
   typing an email (C6). Still **no service-role key**: invites use our own single-use token, and a
   joiner redeems it through the data function under their own Clerk token. Members can't create a person (C11), enforced by the data function. Tickets: #116, #117, #121,
   #122, #128, #130.
 
-**Accounts live in the data function's `profiles` items** (see "Accounts boundary" under Database). The Convex
+**Accounts live in the data function's `PROFILE` item** (see "Accounts boundary" under Database). The Convex
 backend, with its `identities`, `profiles`, `sessions` and `counters` tables, was removed (#37,
 #203). Everything else in this repo reaches a user only by their opaque `userId`.
 
@@ -495,7 +517,9 @@ same PR. See `docs/adr/0001-person-details-sync.md`.
 ### Database
 
 DynamoDB, behind the AWS data function, is the only server database. Convex and Supabase were removed
-(#203, #326). See `DATA.md` for the data architecture (the screen-keyed local session document and
+(#203, #326). User data is in one table, `gg-data`. A second table, `gg-content` (checklist, samples,
+examples; no user data), is created by `infra/aws/data.yml` and seeded only locally (`pnpm aws:seed`).
+The function's role can only read it, and no action reads it yet. See `DATA.md` for the data architecture (the screen-keyed local session document and
 the shared-people design).
 
 Contact data is never sent to the gateway or the data function. Contact *ids* never appear in shared person
@@ -506,7 +530,8 @@ it is composed client-side and handed to the device's own Messages app at send t
 email lives in Clerk) is stored in DynamoDB by the data function, and a user reaches only their own
 profile, with no delete path (C9). Contacts, drafts and message content stay on the device and reach no
 server (C2 was dropped 2026-10-30 for planning text on the device; C3, C4); only person details sync. Shared people details live in the same table
-(`flows` plus memberships, #116, #130); see DATA.md "Shared people".
+(`FLOW#`, `FLOW`, `MEMBER#`, `MEMBER_OF`, `INVITE#` and `TOKEN#` items, #116, #130); see DATA.md
+"Shared people".
 
 ---
 
@@ -520,7 +545,7 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               Worker stays; to remove it: `wrangler secret delete RESEND_API_KEY --config
               apps/gateway/wrangler.toml`; with no key, POST /invites answers 503)
               DATA_FUNCTION_URL (wrangler var; deploy.yml sets it from the repo variable of the
-              same name, empty = /me/* answers 503), DATA_FUNCTION_REGION (wrangler var, us-east-2;
+              same name; empty = /me/*, /flows*, /members* and /invites* answer 503), DATA_FUNCTION_REGION (wrangler var, us-east-2;
               no code default), DATA_FUNCTION_ACCESS_KEY_ID and DATA_FUNCTION_SECRET_ACCESS_KEY
               (Worker secrets, set by deploy.yml from the GitHub secrets; both skipped when
               either is empty; rotate every 90 days: docs/aws-data-function.md)
@@ -529,16 +554,28 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               `wrangler secret delete GOOGLE_PLACES_SERVER_KEY --config apps/gateway/wrangler.toml`;
               a server key restricted to Places API (New), separate from the web browser key;
               with no key, POST /places/suggest and POST /places/details answer 503)
+              CLERK_WEBHOOK_SECRET (Worker secret; verifies POST /webhooks/clerk)
+              DATA_FUNCTION_SERVICE_SECRET (Worker secret; the shared secret for the account-delete
+              service path, same value as the data function's DATA_SERVICE_SECRET)
+              WRITE_RATE_LIMITER (binding, 120 requests per 60 s per user, writes under /flows* and /me*)
+              PLACES_RATE_LIMITER (binding, 60 requests per 60 s per IP, the /places routes)
+data function (Lambda gg-app-data; all set by infra/aws/data.yml)
+              GG_DATA_TABLE, GG_CONTENT_TABLE, DATA_AUTH_ISSUER, DATA_AUTH_JWKS_URL,
+              DATA_AUTH_AUTHORIZED_PARTIES, DATA_SERVICE_SECRET (empty = the delete path answers 404)
 apps/web      VITE_API_URL, VITE_FEATURE_AUTH ("true" enables sign-up/sign-in; default off),
               VITE_CLERK_PUBLISHABLE_KEY (read only when the flag is on)
               VITE_FEATURE_SHARING ("true" enables sharing; default off)
               VITE_FEATURE_OBITUARY_DRAFTING ("true" enables AI obituary drafting; default off)
               VITE_FEATURE_CMS ("true" enables the web editor, WEB-1 to WEB-8; default off; on in production)
-apps/mobile   EXPO_PUBLIC_API_URL
+              VITE_FEATURE_SYNC ("true" enables person sync, with VITE_FEATURE_CMS and VITE_FEATURE_AUTH;
+              default off; on in production)
+apps/mobile   EXPO_PUBLIC_API_URL, EXPO_PUBLIC_FEATURE_AUTH, EXPO_PUBLIC_FEATURE_SYNC (each "true" to
+              enable; set in every apps/mobile/eas.json profile), EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
+              (accounts stay off without it)
 ```
 
 Production repo variables (public, not secrets): `CLERK_ISSUER`, `CLERK_PUBLISHABLE_KEY`, `FEATURE_AUTH`, `FEATURE_SHARING`
-(off until the PO sets it to `true`), `DATA_FUNCTION_URL`. The gateway's Worker secrets are `RESEND_API_KEY`,
+(off until the PO sets it to `true`), `FEATURE_CMS`, `FEATURE_SYNC`, `DATA_FUNCTION_URL`. The gateway's Worker secrets are `RESEND_API_KEY`,
 `DATA_FUNCTION_ACCESS_KEY_ID`, `DATA_FUNCTION_SECRET_ACCESS_KEY`, `CLERK_WEBHOOK_SECRET`,
 `DATA_FUNCTION_SERVICE_SECRET` and `GOOGLE_PLACES_SERVER_KEY` (from the repo secrets of the same names).
 Web production has `FEATURE_AUTH=true` (since 2026-10-11). To turn accounts off or on again, change it

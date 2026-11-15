@@ -548,15 +548,57 @@ logs no request content.
 
 ### Shared people
 
-**Decided design (family-sharing G1, 2026-10-11). The client sync queue (`useFlowSync`, #134) is
-built; it is not turned on in either app yet (#135, #136).** Built by #116 (memberships and
-invites tables), #117 (invite functions), #130 (the `flows` table), #131 (gateway routes), #132, #133, #134 (client
+**Decided design (family-sharing G1, 2026-10-11). Sync is built and on behind a flag.** Web runs it
+when `VITE_FEATURE_SYNC`, `VITE_FEATURE_CMS` and `VITE_FEATURE_AUTH` are all `"true"`, the browser is
+online and someone is signed in (`syncOn`, `apps/web/src/app/app.tsx:391`). Production has
+`FEATURE_SYNC=true`. Mobile runs it when `EXPO_PUBLIC_FEATURE_SYNC` and `EXPO_PUBLIC_FEATURE_AUTH` are
+`"true"`, a Clerk publishable key is set, and someone is signed in
+(`apps/mobile/src/lib/useMobileFlowSync.ts`). Every `apps/mobile/eas.json` profile sets both flags.
+The sharing UI (People helping, invites, join, remove) is web only, behind a separate flag,
+`FEATURE_SHARING` (`VITE_FEATURE_SHARING`), which is not set in production. Mobile has no sharing UI
+yet. Built by #116 (memberships and
+invites), #117 (invite functions), #130 (flows), #131 (gateway routes), #132, #133, #134 (client
 sync), #135, #136 (turning it on). Supersedes the read-only snapshot idea in #39.
 
 An owner can invite family members by email. Members work on the owner's people. The shared
-record is a `flows` item in DynamoDB (written by the AWS data function), one per person, owned by
+record is a `FLOW#` item in DynamoDB (written by the AWS data function), one per person, owned by
 the owner's Clerk user id. The data function lets the owner and the owner's members read and write it;
 only an owner can create one (C11). This was Supabase Postgres until #325 and #326 moved it.
+
+**One table, `gg-data`** (`infra/aws/data.yml`). Keys are `pk` and `sk`, plus one index, `gsi1`.
+Memberships, invites and flows are items in it, not tables of their own:
+
+| `pk` | `sk` | What it is |
+|---|---|---|
+| `USER#<id>` | `PROFILE` | The account (see "The profile item" below) |
+| `USER#<ownerId>` | `FLOW#<id>` | One person, in the owner's partition |
+| `FLOW#<id>` | `FLOW` | Guard: one owner per flow id |
+| `USER#<ownerId>` | `MEMBER#<memberId>` | A member of the owner's circle, in the owner's partition |
+| `USER#<memberId>` | `MEMBER_OF` | The member's marker, in the member's partition |
+| `USER#<ownerId>` | `INVITE#<id>` | An invite, in the owner's partition |
+| `TOKEN#<sha256>` | `TOKEN` | One-use guard for an invite token. Kept after a revoke or an accept, so a hash is never used again. Removed only when the owner's account is deleted |
+
+`gsi1` holds `REF#<userId>` on items that point at a user (a flow they last edited, an invite they
+accepted). Only account deletion reads it. Key strings are built only in
+`libs/data-access/src/keys.ts`; each builder checks its input, so no email or typed value can be
+part of a key.
+
+**Access rules.** The rules are one folder of TypeScript modules, `libs/data-access/src/rules/*`, run inside
+the Lambda `gg-app-data`. It replaced Supabase RLS. The gateway verifies the Clerk token, then
+forwards it in `x-gg-user-token` on a SigV4-signed call to the function URL (`AWS_IAM`). The data
+function verifies the same token again (`loadVerifier` in `lambda.ts`), and every user action runs
+as that caller. There is one user endpoint, `POST /v1 {action, args}`. Its actions are exactly
+`DATA_ACTIONS` (`libs/shared/src/dataApi.ts`). Each action's args are checked before DynamoDB is
+touched (C8). A second route, `POST /internal/delete-user`, is the service path for account
+deletion (§7). It takes no user token: it needs the shared secret in `x-gg-service-secret`, and it
+answers 404 when `DATA_SERVICE_SECRET` is empty. Its rule, `deleteUser`, is the only one that does
+not run as a caller.
+
+**Where emails live.** The invitee's email is on the `INVITE#` item. A list of pending invites
+shows only `id`, `email`, `expiresAt` and `createdAt`, never the token hash. The email the member
+accepted with is copied onto `MEMBER#<memberId>`, and it is deleted with that item when the member
+is removed. The `INVITE#` item, with its email, has no expiry today: it is kept until #146. Account
+deletion removes it. The profile holds no email (the email lives in Clerk).
 
 **What syncs** (the six facts, plus the detail fields from DS-7 once #517 to #522 ship):
 
@@ -576,7 +618,7 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 
 **What never syncs:**
 
-- drafts
+- send-flow drafts (the four planning messages do sync, see the list above)
 - edited wording (`messageOverride`)
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
@@ -585,6 +627,12 @@ only an owner can create one (C11). This was Supabase Postgres until #325 and #3
 - the checklist state (phase ticks and "Doesn't apply" marks, WEB-10) and `account.checklistTicks`: not synced yet (B9); planned later
 - `hearsFirstIds`, `momentCompletedAt`, `remindersScheduled`
 - the parser refuses these by name (`FORBIDDEN_SYNC_KEYS`), so a client that sends one gets an error
+
+This holds for the whole `gg-data` table, not only for flows. No item holds contact data or contact
+ids (C3), send-flow drafts, `messageOverride`, recipients or who was messaged, or checklist state. No `FLOW#`
+item holds a `FORBIDDEN_SYNC_KEYS` key. Two names on that list are used elsewhere in the table for
+other data: `senderName` on the `PROFILE` item, and `email` (the invitee's address, typed by the
+owner, never a contact's) on `INVITE#` and `MEMBER#`.
 
 Rules:
 
@@ -614,8 +662,15 @@ Rules:
   pull with unreadable records (`dropped > 0`) removes nothing. Nothing is shown to the user (C5, dropped 2026-10-30; the sync still stays quiet).
   Nothing is sent until the first pull has worked (a failed pull holds back every send, not only
   creates), so a person the server already has is not created again.
+- **Invites** (`rules/invites.ts`) last 7 days. An owner can create at most 10 in any 24 hours and
+  have at most 20 open at once. Only an owner with a verified email can invite.
+- **Joining** (`rules/acceptInvite.ts`). An invite works once, only for the invited email with
+  `emailVerified`, and only while the inviter is an owner with no `MEMBER_OF`. A joiner who owns
+  people (deleted ones too), has members or is already a member gets `invite_conflict`, but only
+  after the token checks pass; a bad token gets `unusable`. The joiner's own open, unexpired
+  invites are revoked in the same transaction.
 - Account actions (invite, join, remove) need a connection; the sync itself stays invisible and
-  never blocks the app or a flow (C5 dropped 2026-10-30; §4.6).
+  never blocks the app or a flow (§4.6 "Sync is invisible").
 
 ### The profile item (DynamoDB, live)
 
@@ -646,11 +701,18 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
 
 - Deleting a session sets `deletedAt`, keeping the tombstone so the cursor pull can propagate the
   delete to the user's other devices (§4.2).
-- The 90-day hard purge was a Convex cron. It was removed with Convex (#203). No server holds
-  sessions now, so there is nothing to purge.
-- **"Delete everything"** in settings clears every local store including the
-  outbox. There is no server copy to purge (Convex was removed, #203). No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for
-  this is asking for it now.
+- The 90-day hard purge was a Convex cron. It was removed with Convex (#203).
+- **A server copy exists.** A signed-in person with sync on has their people's details in
+  `gg-data` ("Shared people" in §5).
+- **"Remove everything from this device"** (Settings, `apps/web/src/screens/Settings.tsx`) clears
+  every local store on this device only, including the outbox (`apps/web/src/lib/removeFromDevice.ts`).
+  It sends no request to the gateway or the data function; it only ends the Clerk session on this
+  device. No 90-day window, no tombstones, no confirmation-email round-trip. Someone asking for this
+  is asking for it now. It is only in the build with the editor off. With the editor on (production),
+  Settings does not offer it, and Account offers "Delete account", which deletes the account and
+  then clears this device (`deleteAccountThenClear`).
+- The server copy is removed only by account deletion (below). There is no server delete for one
+  person yet (`deleteFlow` is #216). Flow items carry a `deletedAt` field, but no action sets it.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe
   action on a session row. A mis-swipe here is unforgivable in a way it isn't in a mail app.
 
