@@ -641,6 +641,8 @@ Rules:
   (C9).
 - **Merge: last write per field wins**, but a field with a pending local edit on this device is
   kept until it has been pushed, so a pull never overwrites typing that has not left the phone.
+- **Deleting a person:** only the owner can. It disappears for members on their next sync, and the server
+  purges it after 90 days (section 7). The owner's other devices keep it for now.
 - **Removing a member:** that member's copy of the owner's people disappears on their next sync. Once they belong to no circle, their account becomes an owner again,
   so they can start their own person (#117).
 - **Sync queue (`useFlowSync`).** Edits are noticed by diffing each session's six facts against
@@ -711,8 +713,13 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   is asking for it now. It is only in the build with the editor off. With the editor on (production),
   Settings does not offer it, and Account offers "Delete account", which deletes the account and
   then clears this device (`deleteAccountThenClear`).
-- The server copy is removed only by account deletion (below). There is no server delete for one
-  person yet (`deleteFlow` is #216). Flow items carry a `deletedAt` field, but no action sets it.
+- **Deleting one person on the server (`deleteFlow`, #216).** Only the owner can delete a person. A
+  member, a stranger, an unknown id, an already-deleted person and an expired one all get `not_found`,
+  and nothing changes. The action sets `deletedAt` and `ttl` (now + 90 days, epoch seconds) on the flow,
+  and the same `ttl` on the `FLOW#<id>` guard, in one transaction. A deleted person is hidden from the person reads
+  (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict`) until DynamoDB
+  purges both items after 90 days. A joiner who owns only a deleted person is still refused (C11).
+  The owner's other devices keep the person for now. Account deletion (below) still removes everything.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe
   action on a session row. A mis-swipe here is unforgivable in a way it isn't in a mail app.
 

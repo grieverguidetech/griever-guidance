@@ -3,7 +3,7 @@ import { DATA_ACTIONS, DATA_USER_TOKEN_HEADER, type DataResult } from '@griever/
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
 import { encodeProfile } from '../items/profileItem.js';
 import { acceptInvite } from '../rules/acceptInvite.js';
-import { createFlow, listFlows, updateFlow } from '../rules/flows.js';
+import { createFlow, deleteFlow, listFlows, updateFlow } from '../rules/flows.js';
 import { createInvite, revokeInvite } from '../rules/invites.js';
 import { listMembers, removeMember } from '../rules/members.js';
 import { getProfile, putProfile } from '../rules/profiles.js';
@@ -35,6 +35,7 @@ const rules: DataRules = {
   listFlows,
   createFlow,
   updateFlow,
+  deleteFlow,
   createInvite,
   revokeInvite,
   listMembers,
@@ -140,6 +141,8 @@ describe('input checks (C8, no DynamoDB)', () => {
       { action: 'createFlow', args: { id: 'nope', facts: FACTS } },
       { action: 'updateFlow', args: { id: FLOW_ID, patch: { updatedBy: 'x' } } },
       { action: 'createInvite', args: { email: 'nope', tokenHash: HASH } },
+      { action: 'deleteFlow', args: { id: 'nope' } },
+      { action: 'deleteFlow', args: { id: FLOW_ID, extra: 1 } },
       { action: 'removeMember', args: { memberId: 'user#x' } },
       { action: 'acceptInvite', args: { tokenHash: 'abc' } },
       { action: 'listFlows', args: { ownerId: 'user_x' } },
@@ -215,6 +218,15 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
       });
     });
 
+    it('deleteFlow answers ok, then listFlows no longer has the person', async () => {
+      const id = '44444444-4444-4444-8444-444444444444';
+      await act('createFlow', { id, facts: FACTS });
+      expect(await act('deleteFlow', { id })).toEqual({ ok: true, data: null });
+      expect(await act('deleteFlow', { id })).toEqual({ ok: false, code: 'not_found' });
+      const listed = (await act('listFlows')) as { data: Array<{ id: string }> };
+      expect(listed.data.map((flow) => flow.id)).not.toContain(id);
+    });
+
     it('createInvite, listMembers and revokeInvite', async () => {
       const created = await act('createInvite', { email: 'Friend@Example.test', tokenHash: HASH });
       expect(created).toMatchObject({ ok: true, data: { email: 'friend@example.test' } });
@@ -244,7 +256,7 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
 
     it('has a happy path for every action in DATA_ACTIONS', () => {
       // Keep in step with the tests above: a new action needs a path here.
-      const covered = ['getProfile', 'putProfile', 'createFlow', 'listFlows', 'updateFlow', 'createInvite', 'listMembers', 'revokeInvite', 'removeMember', 'acceptInvite'];
+      const covered = ['getProfile', 'putProfile', 'createFlow', 'listFlows', 'updateFlow', 'deleteFlow', 'createInvite', 'listMembers', 'revokeInvite', 'removeMember', 'acceptInvite'];
       expect([...covered].sort()).toEqual([...DATA_ACTIONS].sort());
     });
   });

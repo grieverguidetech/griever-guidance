@@ -13,7 +13,7 @@ import type { Clock } from '../clock.js';
 import { BUSY_MESSAGE } from '../errors.js';
 import { parseFlowInput } from '../items/flowItem.js';
 import type { acceptInvite } from '../rules/acceptInvite.js';
-import type { createFlow, listFlows, updateFlow } from '../rules/flows.js';
+import type { createFlow, deleteFlow, listFlows, updateFlow } from '../rules/flows.js';
 import type { createInvite, revokeInvite } from '../rules/invites.js';
 import type { listMembers, removeMember } from '../rules/members.js';
 import { parseProfileFields, type getProfile, type putProfile } from '../rules/profiles.js';
@@ -28,6 +28,7 @@ export interface DataRules {
   listFlows: typeof listFlows;
   createFlow: typeof createFlow;
   updateFlow: typeof updateFlow;
+  deleteFlow: typeof deleteFlow;
   createInvite: typeof createInvite;
   revokeInvite: typeof revokeInvite;
   listMembers: typeof listMembers;
@@ -117,6 +118,13 @@ const PREPARE: Record<DataAction, Prepare> = {
     }
     const patch = args['patch'];
     return async (c) => toResult(await c.rules.updateFlow(c.doc, c.table, c.caller, id, patch, c.clock));
+  },
+  deleteFlow: (args) => {
+    const id = args['id'];
+    if (!hasExactKeys(args, ['id']) || !uuidArg(id)) {
+      return null;
+    }
+    return async (c) => toResult(await c.rules.deleteFlow(c.doc, c.table, c.caller, id, c.clock));
   },
   createInvite: (args) => {
     const { email, tokenHash } = args;

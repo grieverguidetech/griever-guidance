@@ -12,6 +12,7 @@ describe('dataApi', () => {
       'listFlows',
       'createFlow',
       'updateFlow',
+      'deleteFlow',
       'createInvite',
       'revokeInvite',
       'listMembers',

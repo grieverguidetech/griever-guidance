@@ -23,6 +23,7 @@ function stubRules() {
     listFlows: vi.fn(async () => []),
     createFlow: vi.fn(async () => ok),
     updateFlow: vi.fn(async () => ok),
+    deleteFlow: vi.fn(async () => ok),
     createInvite: vi.fn(async () => ok),
     revokeInvite: vi.fn(async () => ok),
     listMembers: vi.fn(async () => ({ role: 'owner' })),
@@ -46,6 +47,7 @@ const GOOD: Record<(typeof DATA_ACTIONS)[number], Record<string, unknown>> = {
   listFlows: {},
   createFlow: { id: ID, facts: FACTS },
   updateFlow: { id: ID, patch: { personName: 'Nana' } },
+  deleteFlow: { id: ID },
   createInvite: { email: 'Helper@Example.test', tokenHash: HASH },
   revokeInvite: { id: ID },
   listMembers: {},
@@ -100,6 +102,9 @@ describe('args validation (C8)', () => {
     ['updateFlow id is not a uuid', 'updateFlow', { id: 'nope', patch: {} }],
     ['updateFlow patch has an unknown key', 'updateFlow', { id: ID, patch: { ownerId: 'x' } }],
     ['updateFlow patch value is the wrong type', 'updateFlow', { id: ID, patch: { serviceReady: 'yes' } }],
+    ['deleteFlow id is not a uuid', 'deleteFlow', { id: 'nope' }],
+    ['deleteFlow id is a number', 'deleteFlow', { id: 1 }],
+    ['deleteFlow has a deletedAt key', 'deleteFlow', { id: ID, deletedAt: '2026-01-01' }],
     ['createInvite email is not an address', 'createInvite', { email: 'nope', tokenHash: HASH }],
     ['createInvite email is a number', 'createInvite', { email: 5, tokenHash: HASH }],
     ['createInvite hash is too short', 'createInvite', { email: 'a@example.test', tokenHash: 'a'.repeat(63) }],
@@ -126,6 +131,17 @@ describe('running an action', () => {
     expect(rules.createInvite).toHaveBeenCalledWith(c.doc, 'gg-test', caller, 'Helper@Example.test', HASH, c.clock);
     await prepareAction('acceptInvite', GOOD['acceptInvite']!)!(c);
     expect(rules.acceptInvite).toHaveBeenCalledWith(c.doc, 'gg-test', caller, HASH, c.clock);
+  });
+
+  it('deleteFlow passes the caller and the id to the rule, and refuses bad args without calling it', async () => {
+    const rules = stubRules();
+    const c = context(rules);
+    await prepareAction('deleteFlow', { id: ID })!(c);
+    expect(rules.deleteFlow).toHaveBeenCalledWith(c.doc, 'gg-test', caller, ID, c.clock);
+    for (const args of [{}, { id: 'nope' }, { id: ID, extra: 1 }]) {
+      expect(prepareAction('deleteFlow', args)).toBeNull();
+    }
+    expect(rules.deleteFlow).toHaveBeenCalledTimes(1);
   });
 
   it('accepts details on create and on update, and passes them through whole', async () => {

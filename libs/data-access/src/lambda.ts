@@ -4,7 +4,7 @@ import { createDataApp, type DataAppOptions } from './handler/app.js';
 import type { DataRules } from './handler/actions.js';
 import { createTokenVerifier } from '@griever/gateway-auth/verify-token';
 import { acceptInvite } from './rules/acceptInvite.js';
-import { createFlow, listFlows, updateFlow } from './rules/flows.js';
+import { createFlow, deleteFlow, listFlows, updateFlow } from './rules/flows.js';
 import { createInvite, revokeInvite } from './rules/invites.js';
 import { listMembers, removeMember } from './rules/members.js';
 import { deleteUser } from './rules/deleteUser.js';
@@ -23,6 +23,7 @@ export const wiredRules: DataRules = {
   listFlows,
   createFlow,
   updateFlow,
+  deleteFlow,
   createInvite,
   revokeInvite,
   listMembers,
