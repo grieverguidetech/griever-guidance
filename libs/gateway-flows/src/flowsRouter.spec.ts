@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Jwt } from 'hono/utils/jwt';
 import { clearClerkCache } from '@griever/gateway-auth';
 import { FORBIDDEN_SYNC_KEYS, FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
-import { FLOWS_BAD_BODY, FLOWS_CANNOT_ADD, FLOWS_TOO_LARGE, FLOWS_UNAVAILABLE, MAX_BODY_BYTES, createFlowsRouter, flowsFailureFor } from './flowsRouter.js';
+import { FLOWS_BAD_BODY, FLOWS_NOT_FOUND, FLOWS_CANNOT_ADD, FLOWS_TOO_LARGE, FLOWS_UNAVAILABLE, MAX_BODY_BYTES, createFlowsRouter, flowsFailureFor } from './flowsRouter.js';
 
 const ISSUER = 'https://clerk.example.test';
 const DATA = { url: 'http://127.0.0.1:3002' };
@@ -217,11 +217,14 @@ describe('flows router (real callData, fetch stubbed)', () => {
 
     it('is 404 with one calm body for every not-found case', async () => {
       dataAnswer = () => fail('not_found');
-      const first = await send('DELETE', `/flows/${FLOW_ID}`);
-      const second = await send('DELETE', '/flows/44444444-4444-4444-8444-444444444444');
-      expect(first.status).toBe(404);
-      expect(second.status).toBe(404);
-      expect(await first.json()).toEqual(await second.json());
+      const otherId = '44444444-4444-4444-8444-444444444444';
+      for (const id of [FLOW_ID, otherId]) {
+        const res = await send('DELETE', `/flows/${id}`);
+        expect(res.status).toBe(404);
+        const text = await res.text();
+        expect(JSON.parse(text)).toEqual({ error: FLOWS_NOT_FOUND });
+        expect(text).not.toContain(id);
+      }
     });
 
     it('is 503 for busy', async () => {
@@ -233,7 +236,9 @@ describe('flows router (real callData, fetch stubbed)', () => {
 
     it('is 503 when the data function is down', async () => {
       dataAnswer = () => new Response('boom', { status: 500 });
-      expect((await send('DELETE', `/flows/${FLOW_ID}`)).status).toBe(503);
+      const res = await send('DELETE', `/flows/${FLOW_ID}`);
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: FLOWS_UNAVAILABLE });
     });
 
     it('is 503 when the data function is not configured', async () => {

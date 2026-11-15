@@ -41,6 +41,7 @@ export const FLOWS_UNAVAILABLE = 'Your people are not available right now. Pleas
 export const FLOWS_BAD_BODY = 'That request could not be understood.';
 export const FLOWS_TOO_LARGE = 'That request is too large.';
 export const FLOWS_FORBIDDEN = "You can't change this person's details.";
+export const FLOWS_NOT_FOUND = 'That could not be found.';
 export const FLOWS_CANNOT_ADD = 'Only the person who owns this account can add someone.';
 
 type Failure = { status: 400 | 401 | 403 | 404 | 409 | 503; error: string };
@@ -55,7 +56,7 @@ export function flowsFailureFor(code: string): Failure {
     case 'forbidden':
       return { status: 403, error: FLOWS_FORBIDDEN };
     case 'not_found':
-      return { status: 404, error: 'That could not be found.' };
+      return { status: 404, error: FLOWS_NOT_FOUND };
     case 'conflict':
       return { status: 409, error: 'That person already exists.' };
     default:

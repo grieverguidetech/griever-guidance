@@ -207,9 +207,10 @@ aws iam simulate-principal-policy --policy-source-arn "$USER_ARN" --action-names
 Use this to ship new Lambda code only. Do not repeat step 4: it passes `ServiceSecret="${SERVICE_SECRET:-}"`,
 and in a fresh shell that sends an empty secret and turns off account deletion.
 
-1. Build and zip, then compute the key (step 2):
+1. Get the latest code, build and zip, then compute the key (step 2):
 
 ```text
+git switch main && git pull --ff-only && pnpm install --frozen-lockfile
 pnpm nx build data-access --skip-nx-cache
 mkdir -p .aws-build && (cd libs/data-access/dist && zip -q -j ../../../.aws-build/lambda.zip lambda.mjs)
 export CODE_KEY="lambda-$(shasum -a 256 .aws-build/lambda.zip | cut -c1-16).zip"
@@ -231,14 +232,21 @@ aws cloudformation deploy --stack-name gg-app-data --template-file infra/aws/dat
   --parameter-overrides CodeBucket="$CODE_BUCKET" CodeKey="$CODE_KEY"
 ```
 
-4. Check that the function updated:
+4. Wait for the update, then check it:
 
 ```text
+aws lambda wait function-updated --function-name gg-app-data --region us-east-2
 aws lambda get-function-configuration --function-name gg-app-data --region us-east-2 \
   --query "[LastModified,LastUpdateStatus]"
 ```
 
 `LastUpdateStatus` should read `Successful`.
+
+If the deploy says "No changes to deploy", this code is already live. Clean up the build folder:
+
+```text
+rm -rf .aws-build
+```
 
 ## If the signed call is denied
 

@@ -10,7 +10,7 @@ import {
   loadLocalConfig,
 } from '@griever/data-aws';
 import { DATA_USER_TOKEN_HEADER, type DataResult } from '@griever/shared';
-import { createFlowsRouter } from './flowsRouter.js';
+import { FLOWS_NOT_FOUND, createFlowsRouter } from './flowsRouter.js';
 import { createMembersRouter } from './membersRouter.js';
 
 // A random table pair on DynamoDB Local for this file. CI sets AWS_LOCAL_REQUIRED=true.
@@ -274,6 +274,7 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
     // A member cannot remove it, and the failed try changes nothing.
     const byMember = await call(member, 'DELETE', `/flows/${id}`);
     expect(byMember.status).toBe(404);
+    expect(await byMember.json()).toEqual({ error: FLOWS_NOT_FOUND });
     expect(await ids(owner)).toContain(id);
 
     const removed = await call(owner, 'DELETE', `/flows/${id}`);
@@ -282,8 +283,11 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
     expect(await ids(member)).not.toContain(id);
     expect(await ids(owner)).not.toContain(id);
 
-    expect((await call(member, 'DELETE', `/flows/${id}`)).status).toBe(404);
-    expect((await call(owner, 'DELETE', `/flows/${id}`)).status).toBe(404);
+    for (const token of [member, owner]) {
+      const again = await call(token, 'DELETE', `/flows/${id}`);
+      expect(again.status).toBe(404);
+      expect(await again.json()).toEqual({ error: FLOWS_NOT_FOUND });
+    }
   });
 
   it('answers 404 when removing someone who is not your member', async () => {
