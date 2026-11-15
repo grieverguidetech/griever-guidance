@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaOf,
+  boardTruncation,
+  failedSources,
+  isAllowedHost,
+  parsePort,
   ciStateFromChecks,
   computeDrift,
   computeNeedsYou,
@@ -242,6 +246,17 @@ describe('computeDrift', () => {
     expect(drift.filter((d) => d.rule === 'closed-not-done').map((d) => d.number)).toEqual([2, 3]);
   });
 
+  it('does not flag a closed issue that is not on the board', () => {
+    const drift = computeDrift({ ...base, board: [boardItem(1, 'Done')], closedIssues: [issue(1), issue(99)] });
+    expect(drift.filter((d) => d.rule === 'closed-not-done')).toEqual([]);
+  });
+
+  it('ignores PullRequest board items in In review', () => {
+    const prItem: BoardItem = { ...boardItem(900, 'In review'), type: 'PullRequest' };
+    const drift = computeDrift({ ...base, board: [prItem] });
+    expect(drift).toEqual([]);
+  });
+
   it('flags open issues with no status or not on the board', () => {
     const openIssues = [issue(1), issue(2), issue(3)];
     const board = [boardItem(1, 'Ready'), boardItem(2, null)];
@@ -306,5 +321,55 @@ describe('parseBoardItems', () => {
 
   it('handles missing items', () => {
     expect(parseBoardItems(null)).toEqual([]);
+  });
+});
+
+describe('parsePort', () => {
+  it('accepts integers from 1 to 65535', () => {
+    expect(parsePort('4318')).toBe(4318);
+    expect(parsePort('1')).toBe(1);
+    expect(parsePort('65535')).toBe(65535);
+  });
+
+  it('falls back to 4317 for anything else', () => {
+    for (const bad of [undefined, '', 'abc', '0', '65536', '-1', '43.5', '4317x', '1e3']) {
+      expect(parsePort(bad)).toBe(4317);
+    }
+  });
+});
+
+describe('isAllowedHost', () => {
+  it('allows only loopback names with the exact port', () => {
+    expect(isAllowedHost('127.0.0.1:4317', 4317)).toBe(true);
+    expect(isAllowedHost('localhost:4317', 4317)).toBe(true);
+  });
+
+  it('rejects other hosts, ports and a missing header', () => {
+    for (const bad of ['evil.example', 'evil.example:4317', '127.0.0.1', '127.0.0.1:4318', 'localhost.evil.com:4317', undefined]) {
+      expect(isAllowedHost(bad, 4317)).toBe(false);
+    }
+  });
+});
+
+describe('failedSources', () => {
+  it('names the sources that failed or are missing', () => {
+    const sources = { board: { ok: true }, prs: { ok: false, error: 'x' }, runs: { ok: false } };
+    expect(failedSources(sources, ['board', 'prs', 'openIssues'])).toEqual(['prs', 'openIssues']);
+  });
+
+  it('is empty when every named source loaded', () => {
+    expect(failedSources({ board: { ok: true } }, ['board'])).toEqual([]);
+  });
+});
+
+describe('boardTruncation', () => {
+  it('reports shown and total when they differ', () => {
+    expect(boardTruncation({ items: [{}, {}], totalCount: 5 })).toEqual({ shown: 2, total: 5 });
+  });
+
+  it('is null when the counts match or totalCount is missing', () => {
+    expect(boardTruncation({ items: [{}, {}], totalCount: 2 })).toBeNull();
+    expect(boardTruncation({ items: [{}] })).toBeNull();
+    expect(boardTruncation(null)).toBeNull();
   });
 });

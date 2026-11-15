@@ -365,11 +365,6 @@ function issueDrift(rule: string, issue: Issue, detail: string): DriftItem {
   };
 }
 
-export function worktreeLabels(tree: Worktree, issues: Issue[]): string[] {
-  const issue = issues.find((candidate) => candidate.number === tree.issueNumber);
-  return issue ? issue.labels : [];
-}
-
 export interface Run {
   databaseId: number;
   workflowName: string;
@@ -404,4 +399,46 @@ export function parseBoardItems(raw: unknown): BoardItem[] {
       labels: item.labels ?? [],
     };
   });
+}
+
+export const DEFAULT_PORT = 4317;
+
+// Accept only an integer from 1 to 65535. Anything else falls back to the default.
+export function parsePort(raw: string | undefined): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) {
+    return DEFAULT_PORT;
+  }
+  const value = Number(raw.trim());
+  return value >= 1 && value <= 65535 ? value : DEFAULT_PORT;
+}
+
+// Blocks DNS rebinding: only the loopback names with our own port may talk to the server.
+export function isAllowedHost(host: string | undefined, port: number): boolean {
+  return host === `127.0.0.1:${port}` || host === `localhost:${port}`;
+}
+
+export interface SourceStatus {
+  ok: boolean;
+  error?: string;
+}
+
+// Names of the sources, among `names`, that did not load. A missing source counts as failed.
+export function failedSources(sources: Record<string, SourceStatus>, names: string[]): string[] {
+  return names.filter((name) => sources[name]?.ok !== true);
+}
+
+export interface BoardTruncation {
+  shown: number;
+  total: number;
+}
+
+// `gh project item-list` reports `totalCount`. When it is larger than the items returned, the board is cut.
+export function boardTruncation(raw: unknown): BoardTruncation | null {
+  const data = raw as { items?: unknown[]; totalCount?: unknown } | null;
+  const shown = data?.items?.length ?? 0;
+  const total = data?.totalCount;
+  if (typeof total !== 'number' || total === shown) {
+    return null;
+  }
+  return { shown, total };
 }

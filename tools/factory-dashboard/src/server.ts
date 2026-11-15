@@ -9,6 +9,10 @@ import {
   ciStateFromChecks,
   computeDrift,
   computeNeedsYou,
+  boardTruncation,
+  failedSources,
+  isAllowedHost,
+  parsePort,
   countPorcelainLines,
   groupByStatus,
   issueFromBranch,
@@ -19,6 +23,8 @@ import {
   parseWorktrees,
   splitRuns,
   type BoardItem,
+  type BoardTruncation,
+  type SourceStatus,
   type Issue,
   type Pr,
   type Run,
@@ -31,8 +37,6 @@ const REPO_URL = `https://github.com/${REPO}`;
 const HEALTH_URL = 'https://api.grieversguidance.com/health';
 const CACHE_MS = 30_000;
 const HERE = dirname(fileURLToPath(import.meta.url));
-
-type SourceStatus = { ok: boolean; error?: string };
 
 async function exec(command: string, args: string[], cwd?: string): Promise<string> {
   const { stdout } = await run(command, args, { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
@@ -93,7 +97,7 @@ type RawPr = {
 async function loadPrs(): Promise<Pr[]> {
   const fields =
     'number,title,url,isDraft,headRefName,reviewDecision,statusCheckRollup,updatedAt,body';
-  const data = (await ghJson(['pr', 'list', '--repo', REPO, '--json', fields])) as RawPr[];
+  const data = (await ghJson(['pr', 'list', '--repo', REPO, '--limit', '200', '--json', fields])) as RawPr[];
   return data.map((pr) => ({
     number: pr.number,
     title: pr.title,
@@ -107,12 +111,15 @@ async function loadPrs(): Promise<Pr[]> {
   }));
 }
 
-async function loadBoard(): Promise<BoardItem[]> {
+type BoardResult = { items: BoardItem[]; truncated: BoardTruncation | null };
+
+async function loadBoard(): Promise<BoardResult> {
   const data = await ghJson(['project', 'item-list', '4', '--owner', 'ptums', '--format', 'json', '--limit', '500']);
-  return parseBoardItems(data).map((item) => ({
+  const items = parseBoardItems(data).map((item) => ({
     ...item,
     url: item.url ?? (item.number ? `${REPO_URL}/issues/${item.number}` : null),
   }));
+  return { items, truncated: boardTruncation(data) };
 }
 
 function loadRuns(): Promise<Run[]> {
@@ -127,7 +134,7 @@ async function mainRepoRoot(): Promise<string> {
 
 async function describeWorktree(tree: Worktree): Promise<Worktree> {
   const [status, counts] = await Promise.allSettled([
-    exec('git', ['-C', tree.path, 'status', '--porcelain']),
+    exec('git', ['-C', tree.path, '--no-optional-locks', 'status', '--porcelain']),
     exec('git', ['-C', tree.path, 'rev-list', '--left-right', '--count', 'origin/main...HEAD']),
   ]);
   const parsed = counts.status === 'fulfilled' ? parseLeftRight(counts.value) : null;
@@ -153,47 +160,70 @@ async function loadHealth(): Promise<{ status: number; ms: number; url: string }
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [board, openIssues, closedIssues, prs, runs, worktrees, health] = await Promise.all([
-    guarded('board', sources, [] as BoardItem[], loadBoard),
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health] = await Promise.all([
+    guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
-    guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 100)),
+    guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 1000)),
     guarded('prs', sources, [] as Pr[], loadPrs),
     guarded('runs', sources, [] as Run[], loadRuns),
     guarded('worktrees', sources, [] as Worktree[], loadWorktrees),
     guarded('health', sources, null, loadHealth),
   ]);
+  const board = boardResult.items;
   const allIssues = [...openIssues, ...closedIssues];
   const labelsFor = (n: number | null): string[] => allIssues.find((issue) => issue.number === n)?.labels ?? [];
   const treesWithLabels = worktrees.map((tree) => ({ ...tree, labels: labelsFor(tree.issueNumber) }));
   const prsWithLabels = prs.map((pr) => ({ ...pr, labels: labelsFor(pr.issueNumber) }));
   const runsWithLabels = runs.map((item) => ({ ...item, labels: labelsFor(issueFromBranch(item.headBranch)) }));
   const split = splitRuns(runsWithLabels);
+  const driftBlockedBy = failedSources(sources, ['board', 'openIssues', 'closedIssues', 'prs', 'worktrees']);
+  const needsYouBlockedBy = failedSources(sources, ['prs', 'openIssues']);
   return {
     generatedAt: new Date().toISOString(),
     sources,
-    needsYou: computeNeedsYou(prs, openIssues),
+    needsYou: needsYouBlockedBy.length > 0 ? null : computeNeedsYou(prs, openIssues),
+    needsYouBlockedBy,
+    boardTruncated: boardResult.truncated,
     board: { items: board, groups: groupByStatus(board) },
     prs: prsWithLabels,
     worktrees: treesWithLabels,
     runs: split,
     health,
-    drift: computeDrift({ board, openIssues, closedIssues, prs, worktrees }),
+    drift: driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees }),
+    driftBlockedBy,
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }
 
-let cache: { at: number; value: Awaited<ReturnType<typeof buildState>> } | null = null;
+type State = Awaited<ReturnType<typeof buildState>>;
+let cache: { at: number; value: State } | null = null;
+let inFlight: Promise<State> | null = null;
 
-async function getState(refresh: boolean) {
+// Concurrent requests share one load.
+function getState(refresh: boolean): Promise<State> {
   if (!refresh && cache && Date.now() - cache.at < CACHE_MS) {
-    return cache.value;
+    return Promise.resolve(cache.value);
   }
-  const value = await buildState();
-  cache = { at: Date.now(), value };
-  return value;
+  if (!inFlight) {
+    inFlight = buildState()
+      .then((value) => {
+        cache = { at: Date.now(), value };
+        return value;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
+  }
+  return inFlight;
 }
 
+const port = parsePort(process.env['FACTORY_PORT']);
+
 const server = createServer(async (request, response) => {
+  if (!isAllowedHost(request.headers.host, port)) {
+    response.writeHead(403).end('Forbidden');
+    return;
+  }
   const url = new URL(request.url ?? '/', 'http://127.0.0.1');
   if (request.method !== 'GET') {
     response.writeHead(405).end();
@@ -215,7 +245,6 @@ const server = createServer(async (request, response) => {
   }
 });
 
-const port = Number(process.env['FACTORY_PORT'] ?? 4317);
 server.listen(port, '127.0.0.1', () => {
   console.log(`Factory dashboard: http://127.0.0.1:${port}`);
 });
