@@ -118,7 +118,18 @@
     "zipRequired",
     "zipInvalid",
     "checkFields",
-    "loadingDetails"
+    "loadingDetails",
+    "removeHeading",
+    "removeOpen",
+    "removeConfirmHeading",
+    "removeBodyAccount",
+    "removeBodyDevice",
+    "removeKeep",
+    "removeConfirmAction",
+    "removeDone",
+    "removeOffline",
+    "removeFailed",
+    "removeUnnamed"
   ],
   "properties": {
     "heading": {
@@ -464,6 +475,39 @@
       "$ref": "#/$defs/text"
     },
     "loadingDetails": {
+      "$ref": "#/$defs/text"
+    },
+    "removeHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "removeOpen": {
+      "$ref": "#/$defs/text"
+    },
+    "removeConfirmHeading": {
+      "$ref": "#/$defs/text"
+    },
+    "removeBodyAccount": {
+      "$ref": "#/$defs/text"
+    },
+    "removeBodyDevice": {
+      "$ref": "#/$defs/text"
+    },
+    "removeKeep": {
+      "$ref": "#/$defs/text"
+    },
+    "removeConfirmAction": {
+      "$ref": "#/$defs/text"
+    },
+    "removeDone": {
+      "$ref": "#/$defs/text"
+    },
+    "removeOffline": {
+      "$ref": "#/$defs/text"
+    },
+    "removeFailed": {
+      "$ref": "#/$defs/text"
+    },
+    "removeUnnamed": {
       "$ref": "#/$defs/text"
     }
   },
