@@ -1,5 +1,5 @@
-import { StyleSheet, View } from 'react-native';
 import type { Text, TextInput } from 'react-native';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { fill, screenCopy } from '@griever/copy';
@@ -45,6 +45,7 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
   // What this section says itself (sent, cancelled). A failure shows the hook's own message.
   const [notice, setNotice] = useState<string | null>(null);
   const [cancelCount, setCancelCount] = useState(0);
+  const [cancellingIds, setCancellingIds] = useState<string[]>([]);
   const sendingRef = useRef(false);
   const cancelling = useRef(new Set<string>());
   const emailInput = useRef<ComponentRef<typeof TextInput> | null>(null);
@@ -67,7 +68,10 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
     setNotice(null);
     if (parseInviteEmail(email) === null) {
       setEmailError(copy.emailInvalid);
+      // The field's own line is a live region, which iOS ignores, so it is also announced here.
+      AccessibilityInfo.announceForAccessibility(copy.emailInvalid);
       emailInput.current?.focus();
+      focusNode(emailInput.current as unknown as ComponentRef<typeof Text> | null);
       return;
     }
     setEmailError(undefined);
@@ -87,14 +91,19 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
       return;
     }
     cancelling.current.add(inviteId);
+    setCancellingIds([...cancelling.current]);
     setNotice(null);
     const ok = await revoke(inviteId);
     cancelling.current.delete(inviteId);
+    setCancellingIds([...cancelling.current]);
     if (ok) {
       setNotice(copy.cancelled);
       setCancelCount((count) => count + 1);
     }
   }
+
+  // Both lines show: a sent or cancelled notice and a failed reload can be true together.
+  const statusLine = [notice, message].filter(Boolean).join(' ') || undefined;
 
   return (
     <View style={styles.group}>
@@ -162,6 +171,8 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
                     label={copy.cancelButton}
                     accessibilityName={fill(copy.cancelLabel, { email: invite.email })}
                     variant="tertiary"
+                    busy={cancellingIds.includes(invite.id)}
+                    busyLabel={copy.cancelling}
                     onPress={() => void cancel(invite.id)}
                   />
                 </View>
@@ -170,7 +181,7 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
           </View>
         </View>
       ) : null}
-      <Status id={statusId} message={notice ?? message ?? undefined} queue />
+      <Status id={statusId} message={statusLine} queue />
     </View>
   );
 }

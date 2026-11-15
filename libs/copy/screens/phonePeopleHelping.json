@@ -13,6 +13,7 @@
   "emailInvalid": "That email doesn't look right.",
   "sent": "Invitation sent.",
   "cancelled": "Invitation cancelled.",
+  "cancelling": "Cancelling…",
   "cancelButton": "Cancel this invitation",
   "cancelLabel": "Cancel this invitation for {email}"
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { TextInput } from 'react-native';
+import { AccessibilityInfo, TextInput } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { CreateInviteResult, GetMembersResult, RevokeInviteResult } from '@griever/api-client';
 import type { MembersView } from '@griever/shared';
@@ -50,25 +50,47 @@ describe('PeopleHelping: invite by typed email', () => {
     fireEvent.changeText(field(), '  Kim@Example.com ');
     fireEvent.press(sendButton());
     expect(await screen.findByText('Invitation sent.')).toBeTruthy();
+    expect(mockCreateInvite).toHaveBeenCalledTimes(1);
     expect(mockCreateInvite).toHaveBeenCalledWith('tok', 'kim@example.com');
     expect(field().props.value).toBe('');
     expect(await screen.findByText('kim@example.com')).toBeTruthy();
     expect(screen.getByText('Invited')).toBeTruthy();
   });
 
-  it('configures the field for a typed email and never reads contacts', async () => {
+  it('configures the field for a typed email', async () => {
     await renderOwner([]);
     expect(field().props).toMatchObject({ keyboardType: 'email-address', autoCapitalize: 'none', autoComplete: 'off', textContentType: 'none' });
   });
 
-  it('rejects a bad email with no request, shows the line under the field and focuses it', async () => {
-    await renderOwner([]);
-    const focus = jest.spyOn(screen.UNSAFE_getByType(TextInput).instance as { focus: () => void }, 'focus');
-    fireEvent.changeText(field(), 'not an email');
-    fireEvent.press(sendButton());
-    expect(screen.getByText("That email doesn't look right.")).toBeTruthy();
-    expect(mockCreateInvite).not.toHaveBeenCalled();
-    expect(focus).toHaveBeenCalled();
+  const submitPaths: [string, () => void][] = [
+    [
+      'the button',
+      () => {
+        fireEvent.press(sendButton());
+      },
+    ],
+    [
+      'the Return key',
+      () => {
+        fireEvent(field(), 'submitEditing');
+      },
+    ],
+  ];
+  describe.each(submitPaths)('a bad email from %s', (_name, submit) => {
+    it('makes no request, shows one line under the field, announces it and moves focus to the field', async () => {
+      await renderOwner([]);
+      const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+      const focus = jest.spyOn(screen.UNSAFE_getByType(TextInput).instance as { focus: () => void }, 'focus');
+      fireEvent.changeText(field(), 'not an email');
+      submit();
+      // One visible match: the field's own line, not the status line.
+      expect(screen.getAllByText("That email doesn't look right.")).toHaveLength(1);
+      expect(field().props.accessibilityHint).toBe("That email doesn't look right.");
+      expect(mockCreateInvite).not.toHaveBeenCalled();
+      expect(announce).toHaveBeenCalledWith("That email doesn't look right.");
+      expect(focus).toHaveBeenCalled();
+      expect(mockFocus).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('sends once when the button is tapped twice, and shows Sending… meanwhile', async () => {
@@ -82,6 +104,15 @@ describe('PeopleHelping: invite by typed email', () => {
     await act(async () => release({ ok: true, invite: invite('i9', 'kim@example.com') }));
     await waitFor(() => expect(screen.getByText('Send an invitation')).toBeTruthy());
     expect(mockCreateInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the sent line and a failed reload together', async () => {
+    await renderOwner([]);
+    mockGetMembers.mockResolvedValue({ ok: false, reason: 'offline' });
+    fireEvent.changeText(field(), 'kim@example.com');
+    fireEvent.press(sendButton());
+    expect(await screen.findByText(/Invitation sent\./)).toBeTruthy();
+    expect(screen.getByText(/You need a connection to do this/)).toBeTruthy();
   });
 
   it.each([
@@ -117,6 +148,28 @@ describe('PeopleHelping: cancel an invitation', () => {
     expect(mockFocus.mock.calls.at(-1)?.[0]?.props.children).toBe('People helping you');
   });
 
+  it('shows the cancelled line and a failed reload together', async () => {
+    await renderOwner([invite('i1', 'kim@example.com')]);
+    mockGetMembers.mockResolvedValue({ ok: false, reason: 'offline' });
+    fireEvent.press(screen.getByLabelText('Cancel this invitation for kim@example.com'));
+    expect(await screen.findByText(/Invitation cancelled\./)).toBeTruthy();
+    expect(screen.getByText(/You need a connection to do this/)).toBeTruthy();
+  });
+
+  it('shows Cancelling… and revokes once when the button is pressed twice', async () => {
+    await renderOwner([invite('i1', 'kim@example.com')]);
+    let release: (r: RevokeInviteResult) => void = () => undefined;
+    mockRevokeInvite.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const cancelButton = () => screen.getByLabelText('Cancel this invitation for kim@example.com');
+    fireEvent.press(cancelButton());
+    fireEvent.press(cancelButton());
+    expect(screen.getByText('Cancelling…')).toBeTruthy();
+    mockGetMembers.mockResolvedValue({ ok: true, view: view([]) });
+    await act(async () => release({ ok: true }));
+    expect(mockRevokeInvite).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Invitation cancelled.')).toBeTruthy();
+  });
+
   it('shows the hook message and moves no focus when the cancel fails', async () => {
     await renderOwner([invite('i1', 'kim@example.com')]);
     mockRevokeInvite.mockResolvedValue({ ok: false, reason: 'offline' });
@@ -127,8 +180,30 @@ describe('PeopleHelping: cancel an invitation', () => {
   });
 });
 
+describe('PeopleHelping: members and a failed load (C9)', () => {
+  const noOwnerControls = () => {
+    expect(screen.queryByText('Their email')).toBeNull();
+    expect(screen.queryByText('Send an invitation')).toBeNull();
+    expect(screen.queryByLabelText(/^Cancel this invitation/)).toBeNull();
+  };
+
+  it('shows a member no invite or cancel controls', async () => {
+    mockGetMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
+    render(<PeopleHelping sessionEnded={false} />);
+    await screen.findByText("You're helping Anna.");
+    noOwnerControls();
+  });
+
+  it('shows no invite or cancel controls when the first load failed', async () => {
+    mockGetMembers.mockResolvedValue({ ok: false, reason: 'offline' });
+    render(<PeopleHelping sessionEnded={false} />);
+    await screen.findByText('You need a connection to do this. Nothing else is affected.');
+    noOwnerControls();
+  });
+});
+
 describe('PeopleHelping: contacts', () => {
-  it('does not import expo-contacts', () => {
+  it('never reads contacts: the source does not import expo-contacts', () => {
     const source = readFileSync(join(__dirname, 'PeopleHelping.tsx'), 'utf8');
     expect(source).not.toMatch(/expo-contacts/);
   });
