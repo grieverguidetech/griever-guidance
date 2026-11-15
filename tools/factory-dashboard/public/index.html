@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory dashboard</title>
+<style>
+:root {
+  --bg: #f7f7f5; --card: #ffffff; --text: #1f2328; --muted: #59636e; --border: #d1d9e0;
+  --green: #1a7f37; --red: #cf222e; --amber: #9a6700; --grey: #6e7781; --link: #0550ae; --focus: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --card: #161b22; --text: #e6edf3; --muted: #9198a1; --border: #30363d;
+    --green: #3fb950; --red: #ff7b72; --amber: #d29922; --grey: #8b949e; --link: #79c0ff; --focus: #58a6ff;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
+h1 { font-size: 18px; margin: 0 auto 0 0; }
+main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px; }
+section { margin-top: 20px; }
+h2 { font-size: 16px; margin: 0 0 8px; }
+a { color: var(--link); }
+a:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button, select { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); }
+button { cursor: pointer; }
+ul.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+ul.list li { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.tag { display: inline-block; font-size: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; margin-right: 6px; color: var(--muted); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; background: var(--grey); }
+.dot.green { background: var(--green); } .dot.red { background: var(--red); } .dot.amber { background: var(--amber); }
+.error { border-left: 4px solid var(--red); padding: 6px 10px; background: var(--card); }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.column h3 { font-size: 14px; margin: 0 0 6px; }
+details summary { cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Factory dashboard</h1>
+  <span id="updated" class="muted" role="status">Loading</span>
+  <label>Area <select id="area"><option value="all">All areas</option></select></label>
+  <button id="refresh" type="button">Refresh</button>
+</header>
+<main id="main"></main>
+<script>
+"use strict";
+var state = null;
+var main = document.getElementById("main");
+var areaSelect = document.getElementById("area");
+
+function el(tag, text, className) {
+  var node = document.createElement(tag);
+  if (text !== undefined && text !== null) {
+    node.textContent = text;
+  }
+  if (className) {
+    node.className = className;
+  }
+  return node;
+}
+
+// Only https URLs become links. Anything else is plain text.
+function link(text, url) {
+  if (typeof url !== "string" || !/^https:\/\//.test(url)) {
+    return el("span", text);
+  }
+  var a = el("a", text);
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noreferrer noopener";
+  return a;
+}
+
+function areaOf(labels) {
+  var found = (labels || []).filter(function (n) {
+    return n.indexOf("area:") === 0;
+  })[0];
+  return found ? found.slice(5) : "none";
+}
+
+function visible(item) {
+  var chosen = areaSelect.value;
+  return chosen === "all" || areaOf(item.labels) === chosen;
+}
+
+function section(title, key) {
+  var s = el("section");
+  s.appendChild(el("h2", title));
+  var src = state.sources[key];
+  if (src && !src.ok) {
+    s.appendChild(el("p", "Could not load: " + src.error, "error"));
+  }
+  main.appendChild(s);
+  return s;
+}
+
+function couldNotCheck(s, failed) {
+  s.appendChild(el("p", "Could not check: " + failed.join(", ") + " failed to load.", "error"));
+}
+
+function listOf(items, build, emptyText) {
+  if (items.length === 0) {
+    return el("p", emptyText, "muted");
+  }
+  var ul = el("ul", null, "list");
+  items.forEach(function (item) {
+    var li = el("li");
+    build(li, item);
+    ul.appendChild(li);
+  });
+  return ul;
+}
+
+function ciDot(ci) {
+  var map = {
+    green: ["green", "Checks passing"],
+    red: ["red", "Checks failing"],
+    pending: ["amber", "Checks running"],
+    none: ["grey", "No checks"]
+  };
+  var pair = map[ci] || map.none;
+  var span = el("span");
+  span.appendChild(el("span", null, "dot " + pair[0]));
+  span.appendChild(document.createTextNode(pair[1]));
+  return span;
+}
+
+function runDot(run) {
+  var result = "none";
+  if (run.status !== "completed") {
+    result = "pending";
+  } else if (run.conclusion === "success") {
+    result = "green";
+  } else if (run.conclusion === "failure") {
+    result = "red";
+  }
+  return ciDot(result);
+}
+
+function itemText(item) {
+  return (item.number ? "#" + item.number + " " : "") + item.title;
+}
+
+function renderNeedsYou() {
+  var s = section("Needs you", "prs");
+  var labels = { "pr-green": "Ready for G2", blocked: "Blocked", "ready-for-human": "Ready for human" };
+  if (state.needsYou === null) {
+    couldNotCheck(s, state.needsYouBlockedBy);
+    return;
+  }
+  var items = state.needsYou.filter(visible);
+  s.appendChild(listOf(items, function (li, item) {
+    li.appendChild(el("span", labels[item.kind], "tag"));
+    li.appendChild(link("#" + item.number + " " + item.title, item.url));
+  }, "Nothing waits for you."));
+}
+
+function renderDrift() {
+  var s = section("Drift", "board");
+  if (state.drift === null) {
+    couldNotCheck(s, state.driftBlockedBy);
+    return;
+  }
+  var items = state.drift.filter(visible);
+  if (items.length === 0) {
+    s.appendChild(el("p", "No drift found.", "muted"));
+    return;
+  }
+  // Group by rule and collapse each group, so a long drift list does not bury the sections below.
+  var ruleNames = {
+    "in-review-no-pr": "In review, but no open PR",
+    "in-progress-no-work": "In progress, but no worktree or PR",
+    "closed-not-done": "Closed, but not in Done",
+    "open-no-status": "Open, but no board status",
+    "worktree-closed-issue": "Worktree for a closed issue"
+  };
+  Object.keys(ruleNames).forEach(function (rule) {
+    var group = items.filter(function (item) {
+      return item.rule === rule;
+    });
+    if (group.length === 0) {
+      return;
+    }
+    var d = el("details");
+    d.appendChild(el("summary", ruleNames[rule] + " (" + group.length + ")"));
+    d.appendChild(listOf(group, function (li, item) {
+      li.appendChild(link("#" + item.number + " " + item.title, item.url));
+      li.appendChild(el("div", item.detail, "muted"));
+    }, "None."));
+    s.appendChild(d);
+  });
+}
+
+function renderPrs() {
+  var s = section("Open PRs", "prs");
+  s.appendChild(listOf(state.prs.filter(visible), function (li, pr) {
+    li.appendChild(ciDot(pr.ci));
+    if (pr.isDraft) {
+      li.appendChild(el("span", "Draft", "tag"));
+    }
+    li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
+    var issue = pr.issueNumber ? " (issue #" + pr.issueNumber + ")" : "";
+    li.appendChild(el("div", pr.headRefName + issue, "muted"));
+  }, "No open PRs."));
+}
+
+function boardList(items) {
+  return listOf(items, function (li, item) {
+    li.appendChild(link(itemText(item), item.url));
+  }, "Empty.");
+}
+
+function renderBoard() {
+  var s = section("Board", "board");
+  if (state.boardTruncated) {
+    var note = "Board truncated: showing " + state.boardTruncated.shown + " of " + state.boardTruncated.total;
+    s.appendChild(el("p", note, "error"));
+  }
+  var wrap = el("div", null, "columns");
+  ["Backlog", "Ready", "In progress", "In review", "Blocked", "No status"].forEach(function (status) {
+    var items = (state.board.groups[status] || []).filter(visible);
+    var col = el("div", null, "column");
+    col.appendChild(el("h3", status + " (" + items.length + ")"));
+    col.appendChild(boardList(items));
+    wrap.appendChild(col);
+  });
+  s.appendChild(wrap);
+  var done = (state.board.groups["Done"] || []).filter(visible);
+  var d = el("details");
+  d.appendChild(el("summary", "Done (" + done.length + ")"));
+  d.appendChild(boardList(done));
+  s.appendChild(d);
+}
+
+function renderWorktrees() {
+  var s = section("Worktrees", "worktrees");
+  s.appendChild(listOf(state.worktrees.filter(visible), function (li, tree) {
+    var text = (tree.branch || "detached") + (tree.isMain ? " (main checkout)" : "");
+    var issueUrl = "https://github.com/grieverguidetech/griever-guidance/issues/" + tree.issueNumber;
+    li.appendChild(tree.issueNumber ? link(text, issueUrl) : el("span", text));
+    var dirty = tree.dirty === null ? "unknown" : String(tree.dirty);
+    var ahead = tree.ahead === null ? "unknown" : tree.ahead + " ahead, " + tree.behind + " behind";
+    li.appendChild(el("div", "Dirty files: " + dirty + ". " + ahead + ". " + tree.path, "muted"));
+  }, "No worktrees."));
+}
+
+function renderRuns() {
+  var s = section("Recent runs", "runs");
+  [["CI", state.runs.ci], ["Deploy", state.runs.deploy]].forEach(function (pair) {
+    s.appendChild(el("h3", pair[0]));
+    s.appendChild(listOf(pair[1].filter(visible), function (li, run) {
+      li.appendChild(runDot(run));
+      li.appendChild(link(run.workflowName + " on " + run.headBranch, run.url));
+      var outcome = run.status + (run.conclusion ? ", " + run.conclusion : "");
+      li.appendChild(el("div", outcome + " at " + new Date(run.createdAt).toLocaleString(), "muted"));
+    }, "No runs."));
+  });
+}
+
+function renderHealth() {
+  var s = section("Health", "health");
+  if (!state.health) {
+    return;
+  }
+  var ok = state.health.status >= 200 && state.health.status < 300;
+  var p = el("p");
+  p.appendChild(ciDot(ok ? "green" : "red"));
+  p.appendChild(link(state.health.url, state.health.url));
+  p.appendChild(document.createTextNode(" returned " + state.health.status + " in " + state.health.ms + " ms"));
+  s.appendChild(p);
+}
+
+function render() {
+  main.textContent = "";
+  document.getElementById("updated").textContent = "Updated " + new Date(state.generatedAt).toLocaleTimeString();
+  var current = areaSelect.value;
+  areaSelect.textContent = "";
+  var all = el("option", "All areas");
+  all.value = "all";
+  areaSelect.appendChild(all);
+  state.areas.forEach(function (a) {
+    var o = el("option", a);
+    o.value = a;
+    areaSelect.appendChild(o);
+  });
+  areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
+  renderNeedsYou();
+  renderDrift();
+  renderPrs();
+  renderBoard();
+  renderWorktrees();
+  renderRuns();
+  renderHealth();
+}
+
+function load(refresh) {
+  document.getElementById("updated").textContent = "Loading";
+  fetch("/api/state" + (refresh ? "?refresh=1" : ""))
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      state = data;
+      render();
+    })
+    .catch(function (e) {
+      document.getElementById("updated").textContent = "Could not load: " + e.message;
+    });
+}
+
+document.getElementById("refresh").addEventListener("click", function () {
+  load(true);
+});
+areaSelect.addEventListener("change", function () {
+  if (state) {
+    render();
+  }
+});
+load(false);
+</script>
+</body>
+</html>

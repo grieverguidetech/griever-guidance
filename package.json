@@ -6,6 +6,7 @@
     "dev:marketing": "pnpm nx serve marketing",
     "aws:up": "docker compose up -d --wait dynamodb ses",
     "aws:down": "docker compose down",
+    "factory": "node --conditions=@org/source --import jiti/register tools/factory-dashboard/src/server.ts",
     "aws:seed": "node --conditions=@org/source --import jiti/register infra/aws-local/seed.ts",
     "aws:tables": "node --conditions=@org/source --import jiti/register infra/aws-local/create-tables.ts",
     "typecheck": "pnpm nx run-many -t typecheck",
