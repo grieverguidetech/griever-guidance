@@ -20,6 +20,7 @@ export const DATA_ACTIONS = [
   'listFlows',
   'createFlow',
   'updateFlow',
+  'deleteFlow',
   'createInvite',
   'revokeInvite',
   'listMembers',
