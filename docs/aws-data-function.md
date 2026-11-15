@@ -204,7 +204,41 @@ aws iam simulate-principal-policy --policy-source-arn "$USER_ARN" --action-names
 
 ## Update the code later
 
-Repeat steps 2, 3 (upload only) and 4 with the new `CODE_KEY`.
+Use this to ship new Lambda code only. Do not repeat step 4: it passes `ServiceSecret="${SERVICE_SECRET:-}"`,
+and in a fresh shell that sends an empty secret and turns off account deletion.
+
+1. Build and zip, then compute the key (step 2):
+
+```text
+pnpm nx build data-access --skip-nx-cache
+mkdir -p .aws-build && (cd libs/data-access/dist && zip -q -j ../../../.aws-build/lambda.zip lambda.mjs)
+export CODE_KEY="lambda-$(shasum -a 256 .aws-build/lambda.zip | cut -c1-16).zip"
+```
+
+2. Read the bucket name and upload:
+
+```text
+export CODE_BUCKET=$(aws cloudformation describe-stacks --stack-name gg-artifacts --region us-east-2 \
+  --query "Stacks[0].Outputs[?OutputKey=='CodeBucketName'].OutputValue" --output text)
+aws s3 cp .aws-build/lambda.zip "s3://$CODE_BUCKET/$CODE_KEY" --region us-east-2
+```
+
+3. Deploy with only the two code parameters. Parameters you do not name keep their previous values:
+
+```text
+aws cloudformation deploy --stack-name gg-app-data --template-file infra/aws/data.yml \
+  --capabilities CAPABILITY_NAMED_IAM --region us-east-2 \
+  --parameter-overrides CodeBucket="$CODE_BUCKET" CodeKey="$CODE_KEY"
+```
+
+4. Check that the function updated:
+
+```text
+aws lambda get-function-configuration --function-name gg-app-data --region us-east-2 \
+  --query "[LastModified,LastUpdateStatus]"
+```
+
+`LastUpdateStatus` should read `Successful`.
 
 ## If the signed call is denied
 

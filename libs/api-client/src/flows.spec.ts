@@ -1,4 +1,4 @@
-import { createFlow, listFlows, patchFlow, pickFlowDetails } from './flows.js';
+import { createFlow, deleteFlow, listFlows, patchFlow, pickFlowDetails } from './flows.js';
 import { configureApiClient } from './client.js';
 import { pickFlowDetails as sharedPickFlowDetails, type FlowFacts } from '@griever/shared';
 
@@ -321,5 +321,46 @@ describe('round 2 behaviour', () => {
   it('maps an AbortError to failed, not offline', async () => {
     fetchMock.mockRejectedValue(new DOMException('aborted', 'AbortError'));
     expect(await listFlows(ACCESS)).toEqual({ ok: false, reason: 'failed' });
+  });
+});
+
+describe('deleteFlow', () => {
+  const noContent = () => new Response(null, { status: 204 });
+
+  it('sends DELETE /flows/<id> with the bearer header and maps 204 to ok', async () => {
+    fetchMock.mockResolvedValue(noContent());
+    expect(await deleteFlow(ACCESS, ID)).toEqual({ ok: true });
+    const { url, init, headers } = firstCall();
+    expect(init.method).toBe('DELETE');
+    expect(url).toBe(`http://gw/flows/${ID}`);
+    expect(headers['Authorization']).toBe(`Bearer ${ACCESS}`);
+    expect(url).not.toContain(ACCESS);
+  });
+
+  it.each([
+    [401, 'signed_out'],
+    [404, 'not_found'],
+    [429, 'rate_limited'],
+    [503, 'unavailable'],
+  ])('maps status %i to %s', async (status, reason) => {
+    fetchMock.mockResolvedValue(json(status, { error: 'x' }));
+    expect(await deleteFlow(ACCESS, ID)).toEqual({ ok: false, reason });
+  });
+
+  it('maps a network failure to offline', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    expect(await deleteFlow(ACCESS, ID)).toEqual({ ok: false, reason: 'offline' });
+  });
+
+  it('rejects a non-uuid id without making a request', async () => {
+    expect(await deleteFlow(ACCESS, '../members')).toEqual({ ok: false, reason: 'invalid' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('passes the signal to fetch', async () => {
+    fetchMock.mockResolvedValue(noContent());
+    const controller = new AbortController();
+    await deleteFlow(ACCESS, ID, controller.signal);
+    expect(firstCall().init.signal).toBe(controller.signal);
   });
 });

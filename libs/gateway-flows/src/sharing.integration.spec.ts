@@ -241,6 +241,51 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
     });
   });
 
+  it('owner removes a person: the member stops seeing it, and a repeat or a member delete is 404', async () => {
+    const ownerId = 'user_del_owner';
+    const memberId = 'user_del_member';
+    const owner = await signFor({ userId: ownerId, email: 'delowner@example.test', emailVerified: true });
+    const member = await signFor({ userId: memberId, email: 'delmember@example.test', emailVerified: true });
+    expect((await send(owner, 'POST', '/invites', { email: 'delmember@example.test' })).status).toBe(201);
+    const raw = /#t=([A-Za-z0-9_-]{43})/.exec(JSON.parse(emails.at(-1)!).text)![1]!;
+    expect((await send(member, 'POST', '/invites/accept', { token: raw })).status).toBe(200);
+
+    const id = '77777777-7777-4777-8777-777777777777';
+    const facts = {
+      personName: 'Walter Price',
+      dateOfPassing: null,
+      serviceDate: null,
+      obituaryUrl: null,
+      obituaryPublisher: null,
+      serviceReady: false,
+    };
+    const call = (token: string, method: string, path: string, body?: unknown) =>
+      flows.request(path, {
+        method,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    const ids = async (token: string) =>
+      ((await (await call(token, 'GET', '/flows')).json()) as { id: string }[]).map((f) => f.id);
+
+    expect((await call(owner, 'POST', '/flows', { id, ...facts })).status).toBe(201);
+    expect(await ids(member)).toContain(id);
+
+    // A member cannot remove it, and the failed try changes nothing.
+    const byMember = await call(member, 'DELETE', `/flows/${id}`);
+    expect(byMember.status).toBe(404);
+    expect(await ids(owner)).toContain(id);
+
+    const removed = await call(owner, 'DELETE', `/flows/${id}`);
+    expect(removed.status).toBe(204);
+    expect(await removed.text()).toBe('');
+    expect(await ids(member)).not.toContain(id);
+    expect(await ids(owner)).not.toContain(id);
+
+    expect((await call(member, 'DELETE', `/flows/${id}`)).status).toBe(404);
+    expect((await call(owner, 'DELETE', `/flows/${id}`)).status).toBe(404);
+  });
+
   it('answers 404 when removing someone who is not your member', async () => {
     expect((await send(ownerToken, 'DELETE', '/members/user_nobody')).status).toBe(404);
   });

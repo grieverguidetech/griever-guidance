@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Jwt } from 'hono/utils/jwt';
 import { clearClerkCache } from '@griever/gateway-auth';
 import { FORBIDDEN_SYNC_KEYS, FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
-import { FLOWS_CANNOT_ADD, FLOWS_TOO_LARGE, MAX_BODY_BYTES, createFlowsRouter, flowsFailureFor } from './flowsRouter.js';
+import { FLOWS_BAD_BODY, FLOWS_CANNOT_ADD, FLOWS_TOO_LARGE, FLOWS_UNAVAILABLE, MAX_BODY_BYTES, createFlowsRouter, flowsFailureFor } from './flowsRouter.js';
 
 const ISSUER = 'https://clerk.example.test';
 const DATA = { url: 'http://127.0.0.1:3002' };
@@ -90,6 +90,7 @@ describe('flows router (real callData, fetch stubbed)', () => {
       ['GET', '/flows', undefined],
       ['POST', '/flows', { id: FLOW_ID, ...FACTS }],
       ['PATCH', `/flows/${FLOW_ID}`, { personName: 'A' }],
+      ['DELETE', `/flows/${FLOW_ID}`, undefined],
     ])('%s %s is 401 without a token', async (method, path, body) => {
       const res = await send(method, path, body, false);
       expect(res.status).toBe(401);
@@ -193,6 +194,53 @@ describe('flows router (real callData, fetch stubbed)', () => {
     it('is 400 for an own __proto__ key', async () => {
       expect((await send('PATCH', `/flows/${FLOW_ID}`, '{"__proto__":{"personName":"A"}}')).status).toBe(400);
       expect(dataCalls).toHaveLength(0);
+    });
+  });
+
+  describe('DELETE /flows/:id', () => {
+    it('is 204 with an empty body, calling deleteFlow as the caller', async () => {
+      dataAnswer = () => ok(null);
+      const res = await send('DELETE', `/flows/${FLOW_ID}`);
+      expect(res.status).toBe(204);
+      expect(await res.text()).toBe('');
+      expect(dataCalls).toHaveLength(1);
+      expect(dataCalls[0]!.body).toEqual({ action: 'deleteFlow', args: { id: FLOW_ID } });
+      expect(dataCalls[0]!.headers['x-gg-user-token']).toBe(token);
+    });
+
+    it('is 400 for an id that is not a uuid, with no data call', async () => {
+      const res = await send('DELETE', '/flows/not-a-uuid');
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: FLOWS_BAD_BODY });
+      expect(dataCalls).toHaveLength(0);
+    });
+
+    it('is 404 with one calm body for every not-found case', async () => {
+      dataAnswer = () => fail('not_found');
+      const first = await send('DELETE', `/flows/${FLOW_ID}`);
+      const second = await send('DELETE', '/flows/44444444-4444-4444-8444-444444444444');
+      expect(first.status).toBe(404);
+      expect(second.status).toBe(404);
+      expect(await first.json()).toEqual(await second.json());
+    });
+
+    it('is 503 for busy', async () => {
+      dataAnswer = () => fail('busy');
+      const res = await send('DELETE', `/flows/${FLOW_ID}`);
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: FLOWS_UNAVAILABLE });
+    });
+
+    it('is 503 when the data function is down', async () => {
+      dataAnswer = () => new Response('boom', { status: 500 });
+      expect((await send('DELETE', `/flows/${FLOW_ID}`)).status).toBe(503);
+    });
+
+    it('is 503 when the data function is not configured', async () => {
+      dataConfigured = false;
+      const res = await send('DELETE', `/flows/${FLOW_ID}`);
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: FLOWS_UNAVAILABLE });
     });
   });
 

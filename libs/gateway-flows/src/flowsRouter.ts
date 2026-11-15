@@ -156,6 +156,22 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     return respond(c, await client.update(c.get('accessToken'), id, patch), 200);
   });
 
+  router.delete('/flows/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!isUuid(id)) {
+      return c.json({ error: FLOWS_BAD_BODY }, 400);
+    }
+    const result = await client.remove(c.get('accessToken'), id);
+    if (!result) {
+      return c.json({ error: FLOWS_UNAVAILABLE }, 503);
+    }
+    if (!result.ok) {
+      const { status, error } = flowsFailureFor(result.code);
+      return c.json({ error }, status);
+    }
+    return c.body(null, 204);
+  });
+
   return router;
 }
 

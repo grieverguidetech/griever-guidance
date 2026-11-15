@@ -19,6 +19,8 @@ export interface FlowsClient {
   create(userToken: string, id: string, fields: Record<string, unknown>): Promise<DataResult<FlowRecord> | null>;
   /** `patch` is the changed facts and detail keys, already validated. */
   update(userToken: string, id: string, patch: Record<string, unknown>): Promise<DataResult<FlowRecord> | null>;
+  /** Soft-deletes one of the caller's own people. `id` is already checked as a uuid. */
+  remove(userToken: string, id: string): Promise<DataResult<null> | null>;
 }
 
 export function createFlowsClient(config: FlowsClientConfig): FlowsClient {
@@ -26,7 +28,7 @@ export function createFlowsClient(config: FlowsClientConfig): FlowsClient {
 
   async function run<T>(
     userToken: string,
-    action: 'listFlows' | 'createFlow' | 'updateFlow',
+    action: 'listFlows' | 'createFlow' | 'updateFlow' | 'deleteFlow',
     args: Record<string, unknown>,
   ): Promise<DataResult<T> | null> {
     const data = config.getDataConfig();
@@ -44,5 +46,6 @@ export function createFlowsClient(config: FlowsClientConfig): FlowsClient {
     list: (userToken) => run<FlowRecord[]>(userToken, 'listFlows', {}),
     create: (userToken, id, fields) => run<FlowRecord>(userToken, 'createFlow', { id, facts: fields }),
     update: (userToken, id, patch) => run<FlowRecord>(userToken, 'updateFlow', { id, patch }),
+    remove: (userToken, id) => run<null>(userToken, 'deleteFlow', { id }),
   };
 }
