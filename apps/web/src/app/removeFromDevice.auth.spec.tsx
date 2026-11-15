@@ -3,7 +3,8 @@
  * a sign-out Clerk cannot finish offline, and the "accounts can't be reached, but a marker is
  * stored" path.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -84,7 +85,7 @@ describe('remove everything from this device, auth on (#51)', () => {
     await contactStore.put({ contactId: 'c1' } as never);
 
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Settings' }));
     await user.click(screen.getByRole('button', { name: 'Remove everything from this device' }));
     expect(screen.getByText(/You'll be signed out on this device\./)).toBeInTheDocument();
@@ -108,7 +109,7 @@ describe('remove everything from this device, auth on (#51)', () => {
     await contactStore.put({ contactId: 'c1' } as never);
 
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await removeFromSettings(user);
 
     await waitFor(() => expect(screen.getAllByText(REMOVED).length).toBeGreaterThan(0));
@@ -124,7 +125,7 @@ describe('remove everything from this device, auth on (#51)', () => {
     await contactStore.put({ contactId: 'c1' } as never);
 
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await removeFromSettings(user);
 
     expect(await screen.findByRole('heading', { name: "Accounts aren't available right now" })).toBeInTheDocument();

@@ -16,4 +16,5 @@ afterEach(() => {
   window.localStorage.clear();
   _resetDbConnectionForTests();
   globalThis.indexedDB = new IDBFactory();
+  window.history.replaceState(null, '', '/');
 });

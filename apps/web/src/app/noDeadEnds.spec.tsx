@@ -2,7 +2,8 @@
  * #597: an account with nobody saved still has the full side nav and the checklist panel (as a preview).
  * Each section opens a calm page with one next step. Real localStorage; the flags and Clerk are mocked.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -105,7 +106,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
   async function open() {
     signedInAs(kind);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     return user;
   }
@@ -215,7 +216,7 @@ describe('an empty owner account starts from a section (#597)', () => {
   it('creates the person and lands on The person, whichever page Start was pressed on (#603)', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     await h1('Obituary');
@@ -231,7 +232,7 @@ describe('an empty owner account starts from a section (#597)', () => {
   it('browser Back after Start leaves the empty page for Your people, with no arrival note', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await h1('Overview');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
     await h1('Your people');

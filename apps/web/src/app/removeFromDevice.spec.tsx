@@ -2,7 +2,8 @@
  * #51: "Remove everything from this device" lives in settings only (C9). Real App, real hooks,
  * in-memory IndexedDB. Confirming empties every store; keeping empties none; nothing is sent.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { contactStore, openDb, outboxStore, sendJobStore, accountStore, metaStore } from '@griever/data-local';
 import { App } from './app';
@@ -70,7 +71,7 @@ describe('remove everything from this device (#51)', () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     await fillEveryStore();
     expect(await snapshot()).toEqual({ contacts: 1, sessions: 1, outbox: 1, sendJobs: 1, account: 2, deviceId: 'dev-1' });
@@ -106,7 +107,7 @@ describe('remove everything from this device (#51)', () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     await fillEveryStore();
     const sessionsJson = window.localStorage.getItem('gg.sessions.v1');
@@ -124,7 +125,7 @@ describe('remove everything from this device (#51)', () => {
 
   it('says so, and lets Remove be tried again, when removing fails', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     await openRemoveConfirm(user);
     const failOnce = vi.spyOn(Storage.prototype, 'removeItem').mockImplementationOnce(() => {
@@ -141,7 +142,7 @@ describe('remove everything from this device (#51)', () => {
 
   it('moves focus to the warning, and back to the button on Keep', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     await openRemoveConfirm(user);
     expect(screen.getByRole('group')).toHaveFocus();
@@ -151,7 +152,7 @@ describe('remove everything from this device (#51)', () => {
 
   it('shows the note on the first screen only, not on a later return to it', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     await openRemoveConfirm(user);
     await user.click(screen.getByRole('button', { name: 'Remove everything' }));
@@ -167,7 +168,7 @@ describe('remove everything from this device (#51)', () => {
 
   it('does not mention an account when auth is off', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     await openRemoveConfirm(user);
     expect(screen.queryByText(/signed out/i)).not.toBeInTheDocument();
@@ -175,7 +176,7 @@ describe('remove everything from this device (#51)', () => {
 
   it('is not offered inside the flow screens', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await reachPathLanding(user);
     expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument(); // moved under Home (#112)
     await user.click(screen.getByRole('button', { name: 'Home' }));

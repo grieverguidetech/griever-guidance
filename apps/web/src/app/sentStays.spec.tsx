@@ -9,7 +9,8 @@
  * interrupts, and Save returns to the flow. (A Clerk token refresh does not: the adapter keeps
  * its status while a token is renewed.)
  */
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ProfileResult } from '@griever/api-client';
 import type { ClerkLoadResult } from '../lib/authClient';
@@ -127,7 +128,7 @@ describe('after Done on the last person (#167)', () => {
     const { profile, answer } = lateProfile();
     signedIn(profile);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
 
     await sendAnAnnouncement(user);
     expect(await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' })).toBeInTheDocument();
@@ -147,7 +148,7 @@ describe('after Done on the last person (#167)', () => {
     const { profile, answer } = lateProfile();
     signedIn(profile);
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
 
     await toSending(user);
     await nameCheckInterrupts(user, answer);
@@ -161,7 +162,7 @@ describe('after Done on the last person (#167)', () => {
   it('Back on the path opens Home, the people list', async () => {
     signedIn(Promise.resolve({ ok: true, profile: { ...PROFILE, senderName: 'Anna' } }));
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
 
     await sendAnAnnouncement(user);
     await screen.findByRole('heading', { level: 1, name: 'One thing at a time.' });

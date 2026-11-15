@@ -2,7 +2,8 @@
  * #112: Home is where the app lands and where the path returns. The real App over real
  * localStorage; a "reload" is an unmount and a fresh <App /> over the same storage.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { freshDraft } from '@griever/hooks';
 import { App } from './app';
@@ -43,10 +44,10 @@ describe('Home as the landing (#112)', () => {
   it('lands on Home with the saved person listed after a reload, path untouched', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    const view = render(<App />);
+    const view = renderApp(<App />);
     await expectHome();
     view.unmount();
-    render(<App />);
+    renderApp(<App />);
     await expectHome();
     expect(screen.queryByRole('heading', { name: 'One thing at a time.' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
@@ -65,7 +66,7 @@ describe('Home as the landing (#112)', () => {
       person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z', { announcement: draft }),
       person('s2', 'Harold Price', '2026-10-09T00:00:00.000Z'),
     );
-    render(<App />);
+    renderApp(<App />);
     await expectHome();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
     expect(await screen.findByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
@@ -81,7 +82,7 @@ describe('Home as the landing (#112)', () => {
       person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z', { announcement: draft }),
       person('s2', 'Harold Price', '2026-10-09T00:00:00.000Z'),
     );
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Harold Price' }));
     expect(await screen.findByText('For Harold Price')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'One thing at a time.' })).toBeInTheDocument();
@@ -90,7 +91,7 @@ describe('Home as the landing (#112)', () => {
   it('goes Back from the path to Home with focus on its heading', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await user.click(screen.getByRole('button', { name: 'Home' }));
     const heading = await screen.findByRole('heading', { level: 1, name: HOME });
@@ -100,7 +101,7 @@ describe('Home as the landing (#112)', () => {
   it('keeps Settings under Home and off the path, and shows no other-people list', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Harold Price', '2026-10-09T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await expectHome();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Margaret Hayes' }));
@@ -117,7 +118,7 @@ describe('Home as the landing (#112)', () => {
   it('opens setup for a new person; Back from untouched setup prunes them and returns to Home', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await createFromHome(user);
     expect(await screen.findByRole('heading', { name: 'Who are we writing about?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -132,7 +133,7 @@ describe('Home as the landing (#112)', () => {
     vi.stubGlobal('fetch', fetchSpy);
     try {
       seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-      render(<App />);
+      renderApp(<App />);
       await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
       await user.click(screen.getByRole('button', { name: 'Home' }));
       await expectHome();
@@ -145,7 +146,7 @@ describe('Home as the landing (#112)', () => {
   it('never leaves a blank screen after a pruned setup: Settings, the checklist and Back', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await createFromHome(user);
     await user.click(await screen.findByRole('button', { name: 'Back' }));
     await expectHome();
@@ -158,7 +159,7 @@ describe('Home as the landing (#112)', () => {
   it('opens the checklist as a sheet over Settings, which stays', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Settings' }));
     await user.click(await screen.findByRole('button', { name: "What you'll need" }));
     expect(await screen.findByRole('dialog', { name: "What you'll need" })).toBeInTheDocument();
@@ -169,7 +170,7 @@ describe('Home as the landing (#112)', () => {
   it('opens the checklist as a sheet over Home, which stays', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
-    render(<App />);
+    renderApp(<App />);
     await expectHome();
     await user.click(screen.getByRole('button', { name: "What you'll need" }));
     await user.click(await screen.findByRole('button', { name: 'Close' }));
@@ -199,7 +200,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('first visit: setup, then adding contacts, then who hears first, then the new path', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await expectHome();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: FIRST }));
@@ -221,7 +222,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('a second create skips adding contacts: setup, who hears first, path', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await heading('Who should we be able to reach?');
@@ -240,7 +241,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('Back goes one step at a time: path-bound steps return to contacts, then setup, then Home', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await addOneContact(user);
@@ -258,7 +259,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('Back from who hears first goes to setup when contacts were skipped', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await addOneContact(user);
@@ -274,7 +275,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('Back from an untouched setup on a first visit returns to Home and lists nobody', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await heading('Who are we writing about?');
     await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -285,7 +286,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('saves who hears first on this device and does not make a second person', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await addOneContact(user);
@@ -303,7 +304,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     try {
-      render(<App />);
+      renderApp(<App />);
       await user.click(await screen.findByRole('button', { name: FIRST }));
       await fillSetup(user, 'Margaret Hayes');
       await addOneContact(user);
@@ -318,7 +319,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('opens the checklist as a sheet in the walk, and closing it leaves the step as it was', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await heading('Who should we be able to reach?');
@@ -329,7 +330,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('keeps typed contact input and unsaved ticks across the checklist', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await heading('Who should we be able to reach?');
@@ -367,7 +368,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
     }) as typeof setTimeout);
     const user = userEvent.setup();
     try {
-      render(<App />);
+      renderApp(<App />);
       await user.click(await screen.findByRole('button', { name: FIRST }));
       await fillSetup(user, 'Margaret Hayes');
       await waitFor(() => expect(giveUp).toBeDefined());
@@ -382,7 +383,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('Edit details from the path and Continue returns to the path, not the contacts walk', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await addOneContact(user);
@@ -398,7 +399,7 @@ describe('Create a new one walks setup, contacts, then who hears first (#113)', 
 
   it('Back from who hears first returns to the contacts view that was used', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: FIRST }));
     await fillSetup(user, 'Margaret Hayes');
     await addOneContact(user);

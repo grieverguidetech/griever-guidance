@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import { PRODUCT_NAME } from '@griever/shared';
 import { AppHeader } from './AppHeader';
 
@@ -8,7 +9,7 @@ const webRoot = resolve(__dirname, '../..');
 
 describe('AppHeader', () => {
   it('is a banner that shows only the wordmark image', () => {
-    render(<AppHeader />);
+    renderApp(<AppHeader />);
     const banner = screen.getByRole('banner');
     const logo = screen.getByRole('img', { name: PRODUCT_NAME });
     expect(logo).toHaveAttribute('src', '/brand/wordmark.svg');
@@ -18,7 +19,7 @@ describe('AppHeader', () => {
 
 describe('AppHeader layout', () => {
   it('has a bottom border in the divider token, padding and space below', () => {
-    render(<AppHeader />);
+    renderApp(<AppHeader />);
     const cls = screen.getByRole('banner').className;
     expect(cls).toContain('border-b');
     expect(cls).toContain('border-[color:var(--color-divider)]');
@@ -53,7 +54,7 @@ describe('brand files', () => {
     const svg = readFileSync(resolve(webRoot, 'public/brand/wordmark.svg'), 'utf8');
     expect(svg).not.toMatch(/textLength|lengthAdjust/);
     const [, w, h] = /viewBox="0 0 (\d+) (\d+)"/.exec(svg) ?? [];
-    render(<AppHeader />);
+    renderApp(<AppHeader />);
     const logo = screen.getByRole('img', { name: PRODUCT_NAME });
     expect(Number(logo.getAttribute('width')) / Number(logo.getAttribute('height'))).toBeCloseTo(Number(w) / Number(h), 1);
   });

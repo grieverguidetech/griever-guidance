@@ -3,7 +3,8 @@
  * Covers the note after the last person, reopening a done moment, thanks without a picker,
  * and "Edit person" on the path.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { contactStore } from '@griever/data-local';
 import { freshDraft } from '@griever/hooks';
@@ -68,7 +69,7 @@ describe('the note after the last person', () => {
     await putContacts();
     seed();
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -99,7 +100,7 @@ describe('the note after the last person', () => {
     await putContacts();
     seed();
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -119,7 +120,7 @@ describe('the note after the last person', () => {
     await putContacts();
     seed();
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
@@ -160,7 +161,7 @@ describe('the note after the last person', () => {
         : freshDraft({ templateCategory: 'obituary', templateOverrideId: 'obituary-link', step: 'review', selectedContactIds: ['c1'] });
     seed({ obituaryUrl: 'https://example.com/margaret' }, { [moment]: draft });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     // Half done, so the row says Started; it is not the next card because the announcement is.
     await user.click(screen.getByRole('button', { name: moment === 'service' ? /Share the service/ : /Share the obituary/ }));
@@ -180,7 +181,7 @@ describe('reopening a done moment', () => {
       { announcement: freshDraft({ templateCategory: 'announcement', step: 'sent', selectedContactIds: ['c1'] }) },
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     expect(screen.getAllByRole('button', { name: 'Start' })).toHaveLength(1); // one Start card
 
@@ -216,7 +217,7 @@ describe('thanks and Edit person', () => {
       obituaryUrl: 'https://example.com/margaret',
     });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
 
@@ -229,7 +230,7 @@ describe('thanks and Edit person', () => {
   it('Edit person opens the person details from the path, and Back returns to the path', async () => {
     seed();
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Edit person' }));
     expect(await screen.findByLabelText('Their name')).toHaveValue('Margaret Hayes');
@@ -240,7 +241,7 @@ describe('thanks and Edit person', () => {
   it('Edit person from a form still returns to that form', async () => {
     seed();
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
@@ -258,7 +259,7 @@ describe('the service line in an announcement', () => {
       { announcement: freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c1'] }) },
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openPerson(user);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByRole('heading', { name: 'Read it once before it goes' });

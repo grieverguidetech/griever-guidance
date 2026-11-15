@@ -1,5 +1,6 @@
 /** #460: with the editor on, a failed browser save shows a calm status note. */
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 
 const mocks = vi.hoisted(() => ({ cms: true }));
 
@@ -51,14 +52,14 @@ describe('save failed note (#460)', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota');
     });
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     const note = screen.getByText(NOTE);
     expect(note).toHaveAttribute('role', 'status');
   });
 
   it('shows nothing when saving works', async () => {
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     expect(screen.queryByText(NOTE)).toBeNull();
   });
@@ -68,7 +69,7 @@ describe('save failed note (#460)', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota');
     });
-    render(<App />);
+    renderApp(<App />);
     await screen.findAllByRole('heading', { level: 1 });
     expect(screen.queryByText(NOTE)).toBeNull();
   });

@@ -2,7 +2,8 @@
  * #83: each moment keeps its own draft, so starting one never overwrites another that is half done.
  * The real App over real localStorage, seeded with a half-done announcement.
  */
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import { contactStore } from '@griever/data-local';
 import { freshDraft } from '@griever/hooks';
@@ -71,7 +72,7 @@ describe('one draft per moment (#83)', () => {
   it('keeps the announcement intact after the service is started and the person goes back to it', async () => {
     seed({ announcement });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await resumeAnnouncement(user);
     expect(await screen.findByLabelText(/Anything you'd like to add/)).toHaveValue(note);
@@ -94,7 +95,7 @@ describe('one draft per moment (#83)', () => {
     const service = freshDraft({ templateCategory: 'service', step: 'details', fields: { serviceLocation: 'St Mary Church' } });
     seed({ announcement, service }, { serviceReady: true });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await user.click(screen.getByRole('button', { name: /Share the service/ }));
     expect(await screen.findByLabelText(/^Location/)).toHaveValue('St Mary Church');
@@ -103,7 +104,7 @@ describe('one draft per moment (#83)', () => {
   it('does not wipe the announcement or its contacts when the obituary is shared', async () => {
     seed({ announcement }, { obituaryUrl: 'https://example.com/margaret' });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await user.click(screen.getByRole('button', { name: /Share the obituary/ }));
     await user.click(screen.getByRole('button', { name: 'Choose who to send it to' }));
@@ -126,7 +127,7 @@ describe('one draft per moment (#83)', () => {
       },
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await user.click(screen.getByRole('button', { name: /Share the obituary/ }));
     await user.click(screen.getByRole('button', { name: 'Choose who to send it to' }));
@@ -147,7 +148,7 @@ describe('one draft per moment (#83)', () => {
     const review = freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c-1'], serviceDetailsKnown: 'no' });
     seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await resumeAnnouncement(user);
     await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
@@ -177,7 +178,7 @@ describe('start this message again (#98)', () => {
     const review = freshDraft({ templateCategory: 'announcement', step: 'review', selectedContactIds: ['c-1'], serviceDetailsKnown: 'no' });
     seed({ announcement: review, service }, { draftsUpdatedAt: { announcement: '2026-10-10T00:00:00.000Z', service: '2026-10-09T00:00:00.000Z' } });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await resumeAnnouncement(user);
     await user.click(await screen.findByRole('button', { name: /^Text 1 person/ }));
@@ -204,7 +205,7 @@ describe('start this message again (#98)', () => {
   it('is hidden while the draft is empty', async () => {
     seed({ announcement: freshDraft({ templateCategory: 'announcement', step: 'announce' }) });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await user.click(screen.getByRole('button', { name: 'Start' })); // opened but empty: not "Started"
     await screen.findByLabelText(/Anything you'd like to add/);
@@ -215,7 +216,7 @@ describe('start this message again (#98)', () => {
     await putContact();
     seed({ announcement, service }, { serviceReady: true, recipientsNotified: { announcement: ['c-1'] } });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     // The announcement is done (c-1 was told); its row reopens the half-written draft.
     await user.click(screen.getByRole('button', { name: /Told close family/ }));
@@ -238,7 +239,7 @@ describe('start this message again (#98)', () => {
   it('changes nothing on Keep and puts focus back on the link', async () => {
     seed({ announcement });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await resumeAnnouncement(user);
     await screen.findByLabelText(/Anything you'd like to add/);
@@ -252,7 +253,7 @@ describe('start this message again (#98)', () => {
   it('is offered on the service form too', async () => {
     seed({ service }, { serviceReady: true });
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await openFromHome(user);
     await user.click(screen.getByRole('button', { name: /Share the service/ }));
     await screen.findByLabelText(/^Location/);

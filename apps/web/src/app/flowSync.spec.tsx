@@ -2,7 +2,8 @@
  * #520: background sync wired into the real App. Runs only with the editor flag, the sync flag and
  * a signed-in user. fetch is stubbed, so no network. Flags are mocked per test.
  */
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import { renderApp } from '../test/renderApp';
 import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
@@ -165,7 +166,7 @@ afterEach(() => {
 describe('background sync in the app (#520)', () => {
   it('signed in, editor on, sync on: an edit is sent as a PATCH after the debounce', async () => {
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await editName(' Jr');
     await waitFor(() => expect(flowCalls().some((c) => c.method === 'PATCH')).toBe(true), { timeout: 5000 });
     const patch = flowCalls().find((c) => c.method === 'PATCH');
@@ -176,7 +177,7 @@ describe('background sync in the app (#520)', () => {
 
   it('pulls again when the window gets focus', async () => {
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await waitFor(() => expect(flowCalls().filter((c) => c.method === 'GET')).toHaveLength(1));
     window.dispatchEvent(new Event('focus'));
@@ -186,7 +187,7 @@ describe('background sync in the app (#520)', () => {
   it('a fresh device lands on Overview when the first sync brings people (#566)', async () => {
     window.localStorage.removeItem('gg.sessions.v1');
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
     expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
@@ -199,7 +200,7 @@ describe('background sync in the app (#520)', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
     vi.useFakeTimers({ shouldAdvanceTime: false });
     try {
-      render(<App />);
+      renderApp(<App />);
       // Let Clerk and the profile resolve without moving the clock.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
@@ -231,7 +232,7 @@ describe('background sync in the app (#520)', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
     vi.useFakeTimers({ shouldAdvanceTime: false });
     try {
-      render(<App />);
+      renderApp(<App />);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -271,7 +272,7 @@ describe('background sync in the app (#520)', () => {
     };
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))));
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
     await screen.findByText('Loading…');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     const heading = await screen.findByRole('heading', { level: 1, name: 'Obituary' });
@@ -294,7 +295,7 @@ describe('background sync in the app (#520)', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => undefined)));
     vi.useFakeTimers({ shouldAdvanceTime: false });
     try {
-      render(<App />);
+      renderApp(<App />);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -321,14 +322,14 @@ describe('background sync in the app (#520)', () => {
     window.localStorage.removeItem('gg.sessions.v1');
     serverHasNothing = true;
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' }, { timeout: 1400 })).toBeInTheDocument();
   });
 
   it('makes no /flows calls with the editor off', async () => {
     mocks.cms = false;
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     // Signed in and loaded (the profile was asked for), so only the editor gate keeps sync off.
     await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 1500));
@@ -338,7 +339,7 @@ describe('background sync in the app (#520)', () => {
   it('makes no /flows calls with sync off', async () => {
     mocks.sync = false;
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await editName(' Jr');
     await new Promise((r) => setTimeout(r, 1500));
     expect(flowCalls()).toEqual([]);
@@ -347,7 +348,7 @@ describe('background sync in the app (#520)', () => {
   it('makes no /flows calls when signed out, even with this device marked as signed in before', async () => {
     window.localStorage.setItem('gg.signedIn.v1', USER);
     signedIn(false);
-    render(<App />);
+    renderApp(<App />);
     await screen.findByRole('heading', { level: 1 });
     await new Promise((r) => setTimeout(r, 1500));
     expect(flowCalls()).toEqual([]);
@@ -357,7 +358,7 @@ describe('background sync in the app (#520)', () => {
     mocks.auth = false;
     window.localStorage.setItem('gg.signedIn.v1', USER);
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await editName(' Jr');
     await new Promise((r) => setTimeout(r, 1500));
     expect(flowCalls()).toEqual([]);
@@ -366,7 +367,7 @@ describe('background sync in the app (#520)', () => {
   it('gateway offline: no notice, and the editor still saves on the device', async () => {
     gatewayDown = true;
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await editName(' Jr');
     await waitFor(() => expect(flowCalls().length).toBeGreaterThan(0), { timeout: 5000 });
     expect(screen.queryByText("This browser isn't saving right now. Keep this tab open, or copy anything important.")).toBeNull();
@@ -386,7 +387,7 @@ describe('background sync in the app (#520)', () => {
       JSON.stringify([{ ...JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')[0], heldFor: 'user_previous' }]),
     );
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 1500));
     expect(flowCalls().filter((c) => c.method !== 'GET')).toEqual([]);
@@ -397,7 +398,7 @@ describe('background sync in the app (#520)', () => {
   it('with no earlier account on the device, a local person is adopted and sent', async () => {
     serverHasNothing = true;
     signedIn(true);
-    render(<App />);
+    renderApp(<App />);
     await waitFor(() => expect(flowCalls().some((c) => c.method === 'POST' && c.path === '/flows')).toBe(true), { timeout: 5000 });
   });
 });
