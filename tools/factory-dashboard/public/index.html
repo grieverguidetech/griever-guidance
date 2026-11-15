@@ -122,11 +122,31 @@ function renderNeedsYou() {
 function renderDrift() {
   var s = section("Drift", "board");
   var items = state.drift.filter(visible);
-  s.appendChild(listOf(items, function (li, item) {
-    li.appendChild(el("span", item.rule, "tag"));
-    li.appendChild(link("#" + item.number + " " + item.title, item.url));
-    li.appendChild(el("div", item.detail, "muted"));
-  }, "No drift found."));
+  if (items.length === 0) {
+    s.appendChild(el("p", "No drift found.", "muted"));
+    return;
+  }
+  // Group by rule and collapse each group, so a long drift list does not bury the sections below.
+  var ruleNames = {
+    "in-review-no-pr": "In review, but no open PR",
+    "in-progress-no-work": "In progress, but no worktree or PR",
+    "closed-not-done": "Closed, but not in Done",
+    "open-no-status": "Open, but no board status",
+    "worktree-closed-issue": "Worktree for a closed issue"
+  };
+  Object.keys(ruleNames).forEach(function (rule) {
+    var group = items.filter(function (item) { return item.rule === rule; });
+    if (group.length === 0) {
+      return;
+    }
+    var d = el("details");
+    d.appendChild(el("summary", ruleNames[rule] + " (" + group.length + ")"));
+    d.appendChild(listOf(group, function (li, item) {
+      li.appendChild(link("#" + item.number + " " + item.title, item.url));
+      li.appendChild(el("div", item.detail, "muted"));
+    }, "None."));
+    s.appendChild(d);
+  });
 }
 
 function renderPrs() {
