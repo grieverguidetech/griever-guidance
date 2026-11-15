@@ -1,3 +1,7 @@
+# Every path, including deep links such as /people/x (served as index.html by _redirects).
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+
 /sw.js
   Cache-Control: no-cache
 

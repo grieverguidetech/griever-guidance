@@ -10,15 +10,16 @@
     "@clerk/react": "6.17.8",
     "@griever/api-client": "workspace:*",
     "@griever/contacts": "workspace:*",
+    "@griever/copy": "workspace:*",
     "@griever/data-local": "workspace:*",
     "@griever/data-sync": "workspace:*",
     "@griever/hooks": "workspace:*",
     "@griever/shared": "workspace:*",
-    "@griever/copy": "workspace:*",
     "@griever/tokens": "workspace:*",
     "@griever/ui": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
-    "react-native-web": "0.21.4"
+    "react-native-web": "0.21.4",
+    "react-router": "7.18.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
