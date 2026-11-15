@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Copy for People helping you on the phone's Your account (read only: the same words as web)",
+  "title": "Copy for People helping you on the phone's Your account (the same words as web)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "intro", "helpingHeading", "invitedHeading", "invitedLine", "memberLine", "someone", "loading"],
+  "required": ["heading", "intro", "helpingHeading", "invitedHeading", "invitedLine", "memberLine", "someone", "loading", "emailLabel", "sendButton", "sending", "emailInvalid", "sent", "cancelled", "cancelling", "cancelButton", "cancelLabel"],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
     "intro": { "$ref": "#/$defs/text" },
@@ -12,7 +12,16 @@
     "invitedLine": { "$ref": "#/$defs/text" },
     "memberLine": { "$ref": "#/$defs/text" },
     "someone": { "$ref": "#/$defs/text" },
-    "loading": { "$ref": "#/$defs/text" }
+    "loading": { "$ref": "#/$defs/text" },
+    "emailLabel": { "$ref": "#/$defs/text" },
+    "sendButton": { "$ref": "#/$defs/text" },
+    "sending": { "$ref": "#/$defs/text" },
+    "emailInvalid": { "$ref": "#/$defs/text" },
+    "sent": { "$ref": "#/$defs/text" },
+    "cancelled": { "$ref": "#/$defs/text" },
+    "cancelling": { "$ref": "#/$defs/text" },
+    "cancelButton": { "$ref": "#/$defs/text" },
+    "cancelLabel": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }
