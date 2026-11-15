@@ -40,13 +40,15 @@ interface ProfileProps {
   settings?: SettingsProps;
   /** The people this account can open (the People list). When given, the "Your plans" panel is shown. */
   plans?: readonly (PlanPerson & Pick<Partial<SectionFields>, 'sectionStatus'>)[];
+  /** The "Remove a person" panel, when the editor is on. */
+  removePerson?: ReactNode;
 }
 
 /**
  * The signed-in account content inside the CMS shell, as a settings page: Profile, Sign-in and security, Your plans, On your phone, Payments, People helping you (with "remove a member" beside it), Help and support, Sign out, each its own panel with an h2. The "What you'll need" list is the shell's panel, not repeated here.
  * The shell owns the h1; there is no Back here.
  */
-export function AccountSection({ asksName, senderName, firstName, lastName, birthDate, address, profileLoaded = true, error, peopleHelping, onSaveDetails, onSignOut, onDeleteAccount, email, onManageSignIn, settings, plans }: ProfileProps) {
+export function AccountSection({ asksName, senderName, firstName, lastName, birthDate, address, profileLoaded = true, error, peopleHelping, onSaveDetails, onSignOut, onDeleteAccount, email, onManageSignIn, settings, plans, removePerson }: ProfileProps) {
   const id = useId();
   const [cardNote, setCardNote] = useState(false);
 
@@ -131,6 +133,7 @@ export function AccountSection({ asksName, senderName, firstName, lastName, birt
       </section>
       {peopleHelping}
       {settings?.removeMember ? <div className="gg-panel flex flex-col gap-3">{settings.removeMember}</div> : null}
+      {removePerson}
       <SupportPanel />
       <section className="gg-panel flex flex-col gap-3" aria-labelledby={`${id}-signout`}>
         <h2 id={`${id}-signout`} className="text-[16px] m-0">
@@ -324,11 +327,16 @@ interface SettingsProps {
   removeMember?: ReactNode;
 }
 
+interface AccountSettingsProps extends SettingsProps {
+  removePerson?: ReactNode;
+}
+
 /** Your account when nobody is signed in, or accounts are off: the remove-a-member section when there is one, then Help and support. */
-export function AccountSettingsSection({ removeMember }: SettingsProps) {
+export function AccountSettingsSection({ removeMember, removePerson }: AccountSettingsProps) {
   return (
     <>
       {removeMember ? <div className="gg-panel flex flex-col gap-4">{removeMember}</div> : null}
+      {removePerson}
       <SupportPanel />
     </>
   );
