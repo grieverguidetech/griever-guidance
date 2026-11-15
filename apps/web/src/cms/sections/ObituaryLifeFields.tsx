@@ -7,10 +7,12 @@ import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { PlaceInput } from '../../lib/places/PlaceInput';
 import { EventFields } from './EventFields';
 import {
+  CITY_PLACE_TYPES,
   FLOW_DETAIL_MAX_LENGTH,
   FUNERAL_HOME_PLACE_TYPES,
   WORSHIP_PLACE_TYPES,
   ageFrom,
+  cityPick,
   dateNote,
   splitPersonName,
   type SectionFields,
@@ -99,6 +101,8 @@ interface FieldSpec {
   full?: boolean;
   /** Set: the field suggests these place types. A pick saves the place name only. */
   placeTypes?: readonly string[];
+  /** Set with placeTypes: a pick saves "City, State", and fills an empty State field with the state. */
+  isCity?: boolean;
 }
 
 const nameFields: FieldSpec[] = [
@@ -110,10 +114,10 @@ const nameFields: FieldSpec[] = [
 // Listed row by row: the DOM order is the visual order, so Tab follows what the user sees.
 const lifeFields: FieldSpec[] = [
   { key: 'obituaryAge', label: copy.ageLabel, numeric: true },
-  { key: 'obituaryBirthPlace', label: copy.birthPlaceLabel },
-  { key: 'obituaryCity', label: copy.cityLabel },
+  { key: 'obituaryBirthPlace', label: copy.birthPlaceLabel, placeTypes: CITY_PLACE_TYPES, isCity: true },
+  { key: 'obituaryCity', label: copy.cityLabel, placeTypes: CITY_PLACE_TYPES, isCity: true },
   { key: 'obituaryState', label: copy.stateLabel },
-  { key: 'obituaryDeathPlace', label: copy.deathPlaceLabel, full: true },
+  { key: 'obituaryDeathPlace', label: copy.deathPlaceLabel, full: true, placeTypes: CITY_PLACE_TYPES, isCity: true },
   { key: 'obituaryHighSchool', label: copy.highSchoolLabel },
   { key: 'obituaryGradYear', label: copy.graduationYearLabel, numeric: true },
   { key: 'obituaryCollege', label: copy.collegeLabel },
@@ -207,11 +211,21 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
             maxLength={max}
             pickedMessage={copy.placePicked}
             types={spec.placeTypes}
-            // Only the name is saved, so the paid details call is not needed.
+            // Only the name (and for a city, the state in the suggestion) is saved, so the paid details call is not needed.
             wantsDetails={() => false}
             onPick={(pick) => {
               // Cut to the saved length, as the server would, so a long pick is not lost on save.
-              onChange({ [spec.key]: pick.mainText.slice(0, max) });
+              if (!spec.isCity) {
+                onChange({ [spec.key]: pick.mainText.slice(0, max) });
+                return;
+              }
+              const { display, state } = cityPick(pick);
+              const patch: ObituaryLifePatch = { [spec.key]: display.slice(0, max) };
+              // The State field is filled from where they lived, and only while it is empty.
+              if (spec.key === 'obituaryCity' && state && (values.obituaryState ?? '') === '') {
+                patch.obituaryState = state;
+              }
+              onChange(patch);
             }}
             value={typed}
             onChange={(text) => onChange({ [spec.key]: text })}
