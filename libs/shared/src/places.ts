@@ -39,8 +39,9 @@ export interface PlaceDetailsRequest {
 }
 
 /**
- * Google place types for includedPrimaryTypes. Only Table A types are valid there (a Table B type such
- * as place_of_worship makes the whole request fail):
+ * Google place types for includedPrimaryTypes. Autocomplete (New) takes up to 5 types from Table A or
+ * Table B, or one collection ((regions) or (cities)) alone; a collection cannot be mixed with other types.
+ * `locality` is Table A and `postal_town` is Table B; both are valid here, and neither is a collection.
  * https://developers.google.com/maps/documentation/places/web-service/place-types
  * A request takes at most 5. Service: where a funeral or memorial can be held. Burial: where a person is buried.
  */
@@ -48,8 +49,37 @@ export const FUNERAL_HOME_PLACE_TYPES = ['funeral_home'] as const;
 export const WORSHIP_PLACE_TYPES = ['church', 'synagogue', 'mosque', 'hindu_temple'] as const;
 export const SERVICE_PLACE_TYPES = [...FUNERAL_HOME_PLACE_TYPES, ...WORSHIP_PLACE_TYPES] as const;
 export const BURIAL_PLACE_TYPES = ['cemetery'] as const;
+/** A city or town: where a person lived, was born or died. */
+export const CITY_PLACE_TYPES = ['locality', 'postal_town'] as const;
 /** Every type the gateway accepts. */
-export const ALLOWED_PLACE_TYPES: readonly string[] = [...SERVICE_PLACE_TYPES, ...BURIAL_PLACE_TYPES];
+export const ALLOWED_PLACE_TYPES: readonly string[] = [
+  ...SERVICE_PLACE_TYPES,
+  ...BURIAL_PLACE_TYPES,
+  ...CITY_PLACE_TYPES,
+];
+
+const US_STATE_CODES = new Set(
+  'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(
+    ' ',
+  ),
+);
+
+/**
+ * The text to save for a picked city, and its state when the suggestion names a US one.
+ * Uses only the suggestion, so no paid details call is needed. The service gives a city as
+ * "Springfield" with "IL" after it. With a US state the display is "Springfield, IL"; without one
+ * (a foreign city, an unusual line) it is the whole suggestion line.
+ */
+export function cityPick(suggestion: Pick<PlaceSuggestion, 'text' | 'mainText' | 'secondaryText'>): {
+  display: string;
+  state: string;
+} {
+  const last = suggestion.secondaryText.split(',').at(-1)?.trim() ?? '';
+  if (US_STATE_CODES.has(last)) {
+    return { display: `${suggestion.mainText}, ${last}`, state: last };
+  }
+  return { display: suggestion.text, state: '' };
+}
 
 /** Shortest typed text worth a lookup. Shorter costs money and gives nothing useful. */
 export const PLACE_INPUT_MIN = 3;

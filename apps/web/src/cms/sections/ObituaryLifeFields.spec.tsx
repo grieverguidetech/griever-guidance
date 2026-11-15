@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { fill, findHardCodedCopy, screenCopy } from '@griever/copy';
+import { buildObituaryDraft, fill, findHardCodedCopy, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
 import { PlacesProvider } from '../../lib/places/PlacesContext';
 import type { PlacesClient } from '../../lib/places/placesClient';
@@ -786,6 +786,173 @@ describe('ObituaryLifeFields', () => {
       expect(patches.at(-1)).toEqual({ obituaryChurch: 'First Church' });
       await waitFor(() => expect(screen.queryByRole('combobox', { name: copy.churchLabel })).not.toBeInTheDocument());
       expect(screen.getByLabelText(copy.churchLabel)).toHaveValue('First Church');
+    });
+  });
+
+  describe('city search', () => {
+    const suggestMock = vi.fn<PlacesClient['suggest']>();
+    const detailsMock = vi.fn<PlacesClient['details']>();
+    async function harness(initial: Values, load?: () => Promise<PlacesClient | null>) {
+      suggestMock.mockReset();
+      detailsMock.mockReset();
+      suggestMock.mockResolvedValue([
+        { id: 'c', text: 'Springfield, IL', mainText: 'Springfield', secondaryText: 'IL' },
+      ]);
+      const client: PlacesClient = { suggest: suggestMock, newToken: () => ({}), details: detailsMock };
+      const patches: ObituaryLifePatch[] = [];
+      function Harness() {
+        const [values, setValues] = useState<Values>(initial);
+        return (
+          <PlacesProvider value={{ enabled: true, load: load ?? (() => Promise.resolve(client)) }}>
+            <ObituaryLifeFields
+              values={values}
+              onChange={(p) => {
+                patches.push(p);
+                setValues((v) => ({ ...v, ...p }));
+              }}
+              onServiceChange={vi.fn()}
+              onPersonChange={vi.fn()}
+            />
+          </PlacesProvider>
+        );
+      }
+      render(<Harness />);
+      await userEvent.click(screen.getByRole('button', { name: copy.groupLifeHeading }));
+      return { patches };
+    }
+    const cases: ['obituaryCity' | 'obituaryBirthPlace' | 'obituaryDeathPlace', string][] = [
+      ['obituaryCity', copy.cityLabel],
+      ['obituaryBirthPlace', copy.birthPlaceLabel],
+      ['obituaryDeathPlace', copy.deathPlaceLabel],
+    ];
+
+    it.each(cases)('%s is a combobox with its label and maxlength', async (key, label) => {
+      await harness({});
+      expect(screen.getByRole('combobox', { name: label })).toHaveAttribute(
+        'maxLength',
+        String(FLOW_DETAIL_MAX_LENGTH[key]),
+      );
+    });
+
+    it.each(cases)('%s suggests only city types', async (_key, label) => {
+      await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'spring');
+      await screen.findByRole('option', { name: /Springfield/ });
+      expect(suggestMock.mock.calls.at(-1)?.[1]).toEqual(['locality', 'postal_town']);
+    });
+
+    it.each(cases.filter(([key]) => key !== 'obituaryCity'))('%s: a pick saves "City, State" without a details call', async (key, label) => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(screen.getByRole('combobox', { name: label })).toHaveValue('Springfield, IL'));
+      expect(patches.at(-1)?.[key]).toBe('Springfield, IL');
+      expect(detailsMock).not.toHaveBeenCalled();
+    });
+
+    it('fills an empty State from where they lived', async () => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: copy.cityLabel }), 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(screen.getByLabelText(copy.stateLabel)).toHaveValue('IL'));
+      expect(patches.at(-1)).toEqual({ obituaryCity: 'Springfield', obituaryState: 'IL' });
+      expect(screen.getByRole('combobox', { name: copy.cityLabel })).toHaveValue('Springfield');
+      expect(detailsMock).not.toHaveBeenCalled();
+    });
+
+    it('fills State when it holds only spaces', async () => {
+      const { patches } = await harness({ obituaryState: '   ' });
+      await userEvent.type(screen.getByRole('combobox', { name: copy.cityLabel }), 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(patches.at(-1)).toEqual({ obituaryCity: 'Springfield', obituaryState: 'IL' }));
+    });
+
+    it('says in the status region that State was filled', async () => {
+      await harness({});
+      const input = screen.getByRole('combobox', { name: copy.cityLabel });
+      await userEvent.type(input, 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      const status = within(input.parentElement as HTMLElement).getByRole('status');
+      await waitFor(() => expect(status).toHaveTextContent(copy.stateFilled));
+    });
+
+    it('does not say State was filled when State was already there', async () => {
+      await harness({ obituaryState: 'Ohio' });
+      const input = screen.getByRole('combobox', { name: copy.cityLabel });
+      await userEvent.type(input, 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(input).toHaveValue('Springfield'));
+      expect(within(input.parentElement as HTMLElement).getByRole('status')).not.toHaveTextContent(copy.stateFilled);
+    });
+
+    it('gives "of Springfield, IL, passed" once in the real draft, with no "IL, IL"', async () => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: copy.cityLabel }), 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(screen.getByLabelText(copy.stateLabel)).toHaveValue('IL'));
+      const saved = Object.assign({}, ...patches) as Record<string, string>;
+      const draft = buildObituaryDraft(
+        { obituaryCity: saved.obituaryCity, obituaryState: saved.obituaryState },
+        screenCopy('obituaryDraft'),
+      );
+      expect(draft.split('of Springfield, IL, passed')).toHaveLength(2);
+      expect(draft).not.toContain('IL, IL');
+    });
+
+    it('does not replace a State that is already there', async () => {
+      const { patches } = await harness({ obituaryState: 'Ohio' });
+      await userEvent.type(screen.getByRole('combobox', { name: copy.cityLabel }), 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(screen.getByRole('combobox', { name: copy.cityLabel })).toHaveValue('Springfield'));
+      expect(screen.getByLabelText(copy.stateLabel)).toHaveValue('Ohio');
+      expect(patches.every((p) => p.obituaryState === undefined)).toBe(true);
+    });
+
+    it.each([
+      ['obituaryBirthPlace', copy.birthPlaceLabel],
+      ['obituaryDeathPlace', copy.deathPlaceLabel],
+    ])('%s: a pick never fills State', async (_key, label) => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'spring');
+      await userEvent.click(await screen.findByRole('option', { name: /Springfield/ }));
+      await waitFor(() => expect(screen.getByRole('combobox', { name: label })).toHaveValue('Springfield, IL'));
+      expect(patches.every((p) => p.obituaryState === undefined)).toBe(true);
+      expect(screen.getByLabelText(copy.stateLabel)).toHaveValue('');
+    });
+
+    it('saves the city name and no State for a city outside the US', async () => {
+      const { patches } = await harness({});
+      suggestMock.mockResolvedValue([{ id: 'l', text: 'London, UK', mainText: 'London', secondaryText: 'UK' }]);
+      await userEvent.type(screen.getByRole('combobox', { name: copy.cityLabel }), 'lond');
+      await userEvent.click(await screen.findByRole('option', { name: /London/ }));
+      await waitFor(() => expect(screen.getByRole('combobox', { name: copy.cityLabel })).toHaveValue('London'));
+      expect(patches.every((p) => p.obituaryState === undefined)).toBe(true);
+    });
+
+    it('cuts a long pick to the saved length', async () => {
+      const { patches } = await harness({});
+      const long = 'C'.repeat(FLOW_DETAIL_MAX_LENGTH.obituaryCity + 20);
+      suggestMock.mockResolvedValue([{ id: 'l', text: `${long}, IL`, mainText: long, secondaryText: 'IL' }]);
+      await userEvent.type(screen.getByRole('combobox', { name: copy.cityLabel }), 'ccc');
+      await userEvent.click(await screen.findByRole('option', { name: /^CCCC/ }));
+      await waitFor(() => expect(patches.at(-1)?.obituaryCity).toHaveLength(FLOW_DETAIL_MAX_LENGTH.obituaryCity));
+      for (const patch of patches) {
+        expect(patch.obituaryCity?.length ?? 0).toBeLessThanOrEqual(FLOW_DETAIL_MAX_LENGTH.obituaryCity);
+      }
+    });
+
+    it.each(cases)('%s: typed text saves', async (key, label) => {
+      const { patches } = await harness({});
+      await userEvent.type(screen.getByRole('combobox', { name: label }), 'Ox');
+      expect(patches.at(-1)).toEqual({ [key]: 'Ox' });
+    });
+
+    it('saves typed text when places are unavailable', async () => {
+      const { patches } = await harness({}, () => Promise.resolve(null));
+      await userEvent.type(screen.getByLabelText(copy.cityLabel), 'Oxford');
+      expect(patches.at(-1)).toEqual({ obituaryCity: 'Oxford' });
+      await waitFor(() => expect(screen.queryByRole('combobox', { name: copy.cityLabel })).not.toBeInTheDocument());
+      expect(screen.getByLabelText(copy.cityLabel)).toHaveValue('Oxford');
     });
   });
 

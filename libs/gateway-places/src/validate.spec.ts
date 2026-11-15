@@ -10,6 +10,17 @@ describe('parseSuggestBody', () => {
     expect(parseSuggestBody({ ...ok, types: [] })?.types).toEqual([]);
   });
 
+  it('accepts the city types, alone or with another list', () => {
+    expect(parseSuggestBody({ ...ok, types: ['locality', 'postal_town'] })?.types).toEqual(['locality', 'postal_town']);
+    expect(parseSuggestBody({ ...ok, types: ['locality'] })?.types).toEqual(['locality']);
+  });
+
+  it('still refuses a type that is not allowed, next to a city type', () => {
+    expect(parseSuggestBody({ ...ok, types: ['locality', 'bar'] })).toBeNull();
+    expect(parseSuggestBody({ ...ok, types: ['administrative_area_level_1'] })).toBeNull();
+    expect(parseSuggestBody({ ...ok, types: ['locality', 'locality'] })).toBeNull();
+  });
+
   it('trims the input', () => {
     expect(parseSuggestBody({ ...ok, input: '  abc  ' })?.input).toBe('abc');
   });
@@ -22,7 +33,7 @@ describe('parseSuggestBody', () => {
     ['a 201-character input', { ...ok, input: 'a'.repeat(201) }],
     ['a non-string input', { ...ok, input: 5 }],
     ['an unknown type', { ...ok, types: ['bar'] }],
-    ['6 types', { ...ok, types: ['funeral_home', 'church', 'synagogue', 'mosque', 'hindu_temple', 'cemetery'] }],
+    ['6 types', { ...ok, types: ['funeral_home', 'church', 'synagogue', 'mosque', 'hindu_temple', 'locality'] }],
     ['a duplicate type', { ...ok, types: ['church', 'church'] }],
     ['types that is not an array', { ...ok, types: 'church' }],
     ['an extra key', { ...ok, extra: 1 }],
