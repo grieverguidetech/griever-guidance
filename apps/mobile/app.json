@@ -12,7 +12,10 @@
       "bundleIdentifier": "com.grieversguidance.app",
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": [
+        "applinks:web.grieversguidance.com"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +28,23 @@
       "package": "com.grieversguidance.app",
       "blockedPermissions": [
         "android.permission.WRITE_CONTACTS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "web.grieversguidance.com",
+              "pathPrefix": "/join"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
