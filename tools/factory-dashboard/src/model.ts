@@ -421,13 +421,12 @@ export function parsePort(raw: string | undefined): number {
 
 export const FRIENDLY_HOST = 'gg-tech-dashboard.localhost';
 
-// Blocks DNS rebinding: only the loopback names with our own port, and the friendly name
-// (with no port when the port 80 forward is on, or with our port), may talk to the server.
+// Blocks DNS rebinding: only the loopback names and the friendly name, each with our own
+// port, may talk to the server.
 export function isAllowedHost(host: string | undefined, port: number): boolean {
   return (
     host === `127.0.0.1:${port}` ||
     host === `localhost:${port}` ||
-    host === FRIENDLY_HOST ||
     host === `${FRIENDLY_HOST}:${port}`
   );
 }

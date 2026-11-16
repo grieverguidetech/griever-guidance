@@ -54,37 +54,14 @@ GitHub when the page is open, so an idle server uses no API rate limit.
   keeps the node and pnpm paths it found at install time.
 - Status: `launchctl print gui/$(id -u)/com.grieversguidance.factory`
 
-### Friendly URL with no port (one-time, needs sudo)
+### Friendly URL
 
-Run this yourself from the main checkout:
+You can also open http://gg-tech-dashboard.localhost:4317. The server listens on 127.0.0.1 and
+::1 (macOS resolves `*.localhost` to ::1). It accepts only `127.0.0.1:<port>`, `localhost:<port>`
+and `gg-tech-dashboard.localhost:<port>` as host names, and rejects the rest, including the bare
+name with no port and `[::1]:<port>`.
 
-```text
-sudo bash tools/factory-dashboard/launchd/port80-install.sh
-```
-
-Then open http://gg-tech-dashboard.localhost. (`pnpm factory:port80` prints this command; it does
-not run sudo.) The step changes three things on this Mac:
-
-- Writes `/etc/pf.anchors/com.grieversguidance.factory` with two rules that send port 80 on the
-  loopback (127.0.0.1 and ::1) to port 4317. Nothing outside this Mac can reach it.
-- Loads the rules into the pf anchor `com.apple/gg-factory` and turns pf on (`pfctl -E`). It does
-  not edit `/etc/pf.conf`.
-- Writes `/Library/LaunchDaemons/com.grieversguidance.factory.pf.plist`, which loads the rules
-  again at boot. The daemon saves the pf enable token in `/var/run/gg-factory.pftoken`. The undo
-  script releases it with `pfctl -X`. Other pf users may keep pf on after that; that is normal.
-
-Things to know:
-
-- The forward takes over port 80 on this Mac. Any other local service on port 80 stops
-  answering on 127.0.0.1 and ::1 until you undo it.
-- `http://[::1]:4317` with that literal host returns 403. This is intended; use the names above.
-- If port 4317 is already in use, the server logs "Port 4317 in use" and exits without a restart
-  loop. `install.sh` then reports that the agent did not answer.
-
-The server accepts the host names `127.0.0.1`, `localhost` (with the port) and
-`gg-tech-dashboard.localhost`. It rejects every other host name. It listens on 127.0.0.1 and ::1.
-
-To undo: `sudo bash tools/factory-dashboard/launchd/port80-uninstall.sh`
-(`pnpm factory:port80:remove` prints it). Both scripts are safe to run again.
+If port 4317 is already in use, the server logs "Port 4317 in use" and exits without a restart
+loop. `install.sh` then reports that the agent did not answer.
 
 `gh` uses your keychain login. The scripts never read `.env*` files.

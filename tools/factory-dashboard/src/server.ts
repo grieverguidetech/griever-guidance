@@ -272,7 +272,7 @@ servers[0]?.on('error', (error: NodeJS.ErrnoException) => {
 });
 servers[0]?.listen(port, '127.0.0.1', () => {
   console.log(`Factory dashboard: http://127.0.0.1:${port}`);
-  console.log(`With the port 80 forward on: http://${FRIENDLY_HOST}`);
+  console.log(`Friendly URL: http://${FRIENDLY_HOST}:${port}`);
 });
 
 // The macOS resolver returns ::1 for *.localhost, so listen there too.
