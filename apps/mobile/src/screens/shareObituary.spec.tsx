@@ -989,11 +989,29 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
-  it('Got it goes back the way Back does', () => {
+  it('Got it shows the normal screen with the text box, focuses the heading, and Back still goes back', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
     const onBack = jest.fn();
     nudgeSetup(base, onBack);
+    focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(onBack).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+    // With no text and no details there is nothing to send yet, so the box is empty and Email and Copy are not offered.
+    expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    expect(focusedNode(focus)?.props?.children).toBe('Share the obituary');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('opening the screen again shows the nudge again', () => {
+    const first = nudgeSetup(base);
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    first.unmount();
+    nudgeSetup(base);
+    expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
   });
 
   it('shows the normal screen with only a detail or a publisher, as the web Overview counts them', () => {

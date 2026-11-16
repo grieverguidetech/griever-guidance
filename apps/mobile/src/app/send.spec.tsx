@@ -171,6 +171,17 @@ describe('a moment with nothing written on the web (#824)', () => {
     expect(await screen.findByRole('heading', { name: 'Add the service details on the web first' })).toBeTruthy();
   });
 
+  it('the obituary: Got it shows the normal screen, and Back goes to the hub', async () => {
+    await openAnna(empty);
+    await startMoment('Share the obituary');
+    await screen.findByRole('heading', { name: 'Write the obituary on the web first' });
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(await screen.findByLabelText('Obituary text')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('For Anna')).toBeTruthy();
+  });
+
   it('the obituary keeps its link field under the nudge, and a typed link brings the normal screen', async () => {
     await openAnna(empty);
     await startMoment('Share the obituary');
