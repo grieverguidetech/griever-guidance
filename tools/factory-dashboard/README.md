@@ -37,3 +37,18 @@ It never writes to GitHub or git, never fetches, and never reads `.env*` files.
 - A worktree's `ticket/N` issue is closed.
 
 The rules live in `src/model.ts` and are unit-tested in `src/model.spec.ts`.
+
+## Always on
+
+A macOS LaunchAgent (`com.grieversguidance.factory`) starts the dashboard at login and restarts it
+if it stops. It always runs from the main checkout, not from a worktree. The server only calls
+GitHub when the page is open, so an idle server uses no API rate limit.
+
+- Install (safe to run again): `pnpm factory:install`. It finds `node`, `pnpm` and `gh`, writes
+  `~/Library/LaunchAgents/com.grieversguidance.factory.plist`, loads it, then waits up to 20
+  seconds for http://127.0.0.1:4317. Pass another repo root as an argument if needed.
+- Uninstall: `pnpm factory:uninstall`.
+- Logs: `tail -f ~/Library/Logs/gg-factory.log`
+- Status: `launchctl print gui/$(id -u)/com.grieversguidance.factory`
+
+`gh` uses your keychain login. The scripts never read `.env*` files.
