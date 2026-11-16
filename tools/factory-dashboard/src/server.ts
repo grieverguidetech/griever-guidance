@@ -8,7 +8,14 @@ import { promisify } from 'node:util';
 import {
   ciStateFromChecks,
   computeDrift,
+  computeLaunchBlockers,
   computeNeedsYou,
+  computeRoadmap,
+  MERGED_PR_LIMIT,
+  shippedMayBeCutOff,
+  shippedSearchDate,
+  parseFeatureFlags,
+  shippedThisWeek,
   boardTruncation,
   failedSources,
   isAllowedHost,
@@ -27,6 +34,8 @@ import {
   type BacklogReviewFile,
   type BoardItem,
   type BoardTruncation,
+  type FeatureFlag,
+  type MergedPr,
   type SourceStatus,
   type Issue,
   type Pr,
@@ -117,6 +126,20 @@ async function loadPrs(): Promise<Pr[]> {
 
 type BoardResult = { items: BoardItem[]; truncated: BoardTruncation | null };
 
+async function loadFeatureFlags(): Promise<FeatureFlag[]> {
+  // Names and values only. `gh secret` is never called.
+  return parseFeatureFlags(await ghJson(['variable', 'list', '--repo', REPO, '--json', 'name,value']));
+}
+
+// The search is the 7-day window, so the limit is not what cuts the list.
+async function loadMergedPrs(): Promise<MergedPr[]> {
+  const fields = 'number,title,url,mergedAt';
+  const search = `merged:>=${shippedSearchDate(new Date())}`;
+  const args = ['pr', 'list', '--repo', REPO, '--state', 'merged', '--search', search];
+  const data = await ghJson([...args, '--limit', String(MERGED_PR_LIMIT), '--json', fields]);
+  return data as MergedPr[];
+}
+
 async function loadBoard(): Promise<BoardResult> {
   const data = await ghJson(['project', 'item-list', '4', '--owner', 'ptums', '--format', 'json', '--limit', '500']);
   const items = parseBoardItems(data).map((item) => ({
@@ -169,7 +192,7 @@ async function loadHealth(): Promise<{ status: number; ms: number; url: string }
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 1000)),
@@ -177,6 +200,8 @@ async function buildState() {
     guarded('runs', sources, [] as Run[], loadRuns),
     guarded('worktrees', sources, [] as Worktree[], loadWorktrees),
     guarded('health', sources, null, loadHealth),
+    guarded('featureFlags', sources, [] as FeatureFlag[], loadFeatureFlags),
+    guarded('mergedPrs', sources, [] as MergedPr[], loadMergedPrs),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const backlogReview =
@@ -190,8 +215,10 @@ async function buildState() {
   const split = splitRuns(runsWithLabels);
   const driftBlockedBy = failedSources(sources, ['board', 'openIssues', 'closedIssues', 'prs', 'worktrees']);
   const needsYouBlockedBy = failedSources(sources, ['prs', 'openIssues']);
+  const generatedAt = new Date();
+  const productBlockedBy = failedSources(sources, ['board', 'openIssues']);
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: generatedAt.toISOString(),
     sources,
     needsYou: needsYouBlockedBy.length > 0 ? null : computeNeedsYou(prs, openIssues),
     needsYouBlockedBy,
@@ -204,6 +231,14 @@ async function buildState() {
     drift: driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees }),
     driftBlockedBy,
     backlogReview,
+    product: {
+      flags,
+      shipped: shippedThisWeek(mergedPrs, generatedAt),
+      shippedMayBeCutOff: shippedMayBeCutOff(mergedPrs.length),
+      launchBlockers: productBlockedBy.length > 0 ? null : computeLaunchBlockers(openIssues, board),
+      roadmap: productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board),
+      blockedBy: productBlockedBy,
+    },
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

@@ -544,3 +544,139 @@ export function joinBacklogReview(file: BacklogReviewFile, openIssues: Issue[]):
   const dropped = file.reviews.filter((review) => !openNumbers.has(review.number)).length;
   return { reviewedAt: file.reviewedAt, rows, dropped };
 }
+
+// ---- Product tab ----
+
+export interface FeatureFlag {
+  name: string;
+  state: 'On' | 'Off' | 'Not set';
+}
+
+const FLAG_NAME = /^(?:EXPO_PUBLIC_)?FEATURE_/;
+const ON_VALUES = ['true', '1', 'on', 'yes'];
+const OFF_VALUES = ['false', '0', 'off', 'no'];
+
+// Input is `gh variable list --json name,value`. Only FEATURE_* and EXPO_PUBLIC_FEATURE_* are kept,
+// so nothing else (and no secret) can reach the page. Unknown or empty values show as Not set.
+export function parseFeatureFlags(raw: unknown): FeatureFlag[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const flags: FeatureFlag[] = [];
+  for (const entry of raw) {
+    const item = entry as { name?: unknown; value?: unknown } | null;
+    if (typeof item?.name !== 'string' || !FLAG_NAME.test(item.name)) {
+      continue;
+    }
+    const value = typeof item.value === 'string' ? item.value.trim().toLowerCase() : '';
+    let state: FeatureFlag['state'] = 'Not set';
+    if (ON_VALUES.includes(value)) {
+      state = 'On';
+    } else if (OFF_VALUES.includes(value)) {
+      state = 'Off';
+    }
+    flags.push({ name: item.name, state });
+  }
+  return flags.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export interface MergedPr {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+}
+
+export const SHIPPED_WINDOW_DAYS = 7;
+
+export const MERGED_PR_LIMIT = 500;
+
+// The `gh pr list --search` date for the window start (UTC, YYYY-MM-DD).
+export function shippedSearchDate(now: Date): string {
+  return new Date(now.getTime() - SHIPPED_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export function shippedMayBeCutOff(rowCount: number): boolean {
+  return rowCount >= MERGED_PR_LIMIT;
+}
+
+export function shippedThisWeek(prs: MergedPr[], now: Date): MergedPr[] {
+  const cutoff = now.getTime() - SHIPPED_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return prs
+    .filter((pr) => {
+      if (typeof pr.title !== 'string') {
+        return false;
+      }
+      const merged = Date.parse(pr.mergedAt);
+      return !Number.isNaN(merged) && merged >= cutoff && merged <= now.getTime();
+    })
+    .sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt));
+}
+
+export interface LaunchBlocker {
+  number: number;
+  title: string;
+  url: string;
+  status: string;
+  labels: string[];
+}
+
+export function isLaunchBlocker(issue: Issue): boolean {
+  return issue.labels.includes('launch-blocker') || issue.title.toLowerCase().includes('[launch roadmap]');
+}
+
+function statusByNumber(board: BoardItem[]): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const item of board) {
+    if (item.number !== null) {
+      map.set(item.number, item.status ?? NO_STATUS);
+    }
+  }
+  return map;
+}
+
+export function computeLaunchBlockers(openIssues: Issue[], board: BoardItem[]): LaunchBlocker[] {
+  const statuses = statusByNumber(board);
+  return openIssues
+    .filter(isLaunchBlocker)
+    .map((issue) => ({
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      status: statuses.get(issue.number) ?? NO_STATUS,
+      labels: issue.labels,
+    }))
+    .sort((a, b) => a.number - b.number);
+}
+
+export const ROADMAP_STATUSES = ['Ready', 'In progress', 'Blocked', 'Backlog'];
+export const ROADMAP_OTHER = 'Other';
+
+export interface RoadmapRow {
+  area: string;
+  counts: Record<string, number>;
+  total: number;
+}
+
+// Open issues by area and board status. In review, Done and no status are counted as Other.
+export function computeRoadmap(openIssues: Issue[], board: BoardItem[]): RoadmapRow[] {
+  const statuses = statusByNumber(board);
+  const rows = new Map<string, RoadmapRow>();
+  for (const issue of openIssues) {
+    const area = areaOf(issue.labels);
+    let row = rows.get(area);
+    if (!row) {
+      row = { area, counts: {}, total: 0 };
+      for (const status of [...ROADMAP_STATUSES, ROADMAP_OTHER]) {
+        row.counts[status] = 0;
+      }
+      rows.set(area, row);
+    }
+    const status = statuses.get(issue.number) ?? NO_STATUS;
+    const column = ROADMAP_STATUSES.includes(status) ? status : ROADMAP_OTHER;
+    row.counts[column] = (row.counts[column] ?? 0) + 1;
+    row.total += 1;
+  }
+  const order = listAreas([...rows.keys()].map((area) => (area === NO_AREA ? [] : [`area:${area}`])));
+  return order.map((area) => rows.get(area) as RoadmapRow);
+}
