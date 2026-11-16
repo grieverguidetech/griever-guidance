@@ -51,4 +51,28 @@ GitHub when the page is open, so an idle server uses no API rate limit.
 - Logs: `tail -f ~/Library/Logs/gg-factory.log`
 - Status: `launchctl print gui/$(id -u)/com.grieversguidance.factory`
 
+### Friendly URL with no port (one-time, needs sudo)
+
+Run this yourself from the main checkout:
+
+```text
+sudo bash tools/factory-dashboard/launchd/port80-install.sh
+```
+
+Then open http://gg-tech-dashboard.localhost. (`pnpm factory:port80` prints this command; it does
+not run sudo.) The step changes three things on this Mac:
+
+- Writes `/etc/pf.anchors/com.grieversguidance.factory` with two rules that send port 80 on the
+  loopback (127.0.0.1 and ::1) to port 4317. Nothing outside this Mac can reach it.
+- Loads the rules into the pf anchor `com.apple/gg-factory` and turns pf on (`pfctl -E`). It does
+  not edit `/etc/pf.conf`.
+- Writes `/Library/LaunchDaemons/com.grieversguidance.factory.pf.plist`, which loads the rules
+  again at boot.
+
+The server accepts the host names `127.0.0.1`, `localhost` (with the port) and
+`gg-tech-dashboard.localhost`. It rejects every other host name. It listens on 127.0.0.1 and ::1.
+
+To undo: `sudo bash tools/factory-dashboard/launchd/port80-uninstall.sh`
+(`pnpm factory:port80:remove` prints it). Both scripts are safe to run again.
+
 `gh` uses your keychain login. The scripts never read `.env*` files.

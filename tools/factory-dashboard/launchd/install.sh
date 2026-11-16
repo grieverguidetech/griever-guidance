@@ -72,6 +72,12 @@ echo "Loaded ${LABEL} from ${REPO_ROOT}. Waiting for http://127.0.0.1:${PORT} ..
 for _ in $(seq 1 20); do
   if curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${PORT}"; then
     echo "Factory dashboard is up: http://127.0.0.1:${PORT}"
+    # Reading the pf anchor needs root. If this cannot run, print both URLs.
+    if pfctl -a "com.apple/gg-factory" -s nat 2>/dev/null | grep -q "port = 80"; then
+      echo "Friendly URL: http://gg-tech-dashboard.localhost"
+    else
+      echo "Friendly URL, if you ran the port 80 step (pnpm factory:port80): http://gg-tech-dashboard.localhost"
+    fi
     exit 0
   fi
   sleep 1

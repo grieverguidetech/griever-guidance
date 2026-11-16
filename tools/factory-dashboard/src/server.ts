@@ -1,7 +1,7 @@
 // Read-only factory dashboard server. Runs only `gh` and `git` read commands.
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -11,6 +11,7 @@ import {
   computeNeedsYou,
   boardTruncation,
   failedSources,
+  FRIENDLY_HOST,
   isAllowedHost,
   joinBacklogReview,
   parseBacklogReviews,
@@ -232,7 +233,7 @@ function getState(refresh: boolean): Promise<State> {
 
 const port = parsePort(process.env['FACTORY_PORT']);
 
-const server = createServer(async (request, response) => {
+async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!isAllowedHost(request.headers.host, port)) {
     response.writeHead(403).end('Forbidden');
     return;
@@ -256,8 +257,17 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     response.writeHead(500).end(error instanceof Error ? error.message : 'error');
   }
+}
+
+const servers = [createServer(handle), createServer(handle)];
+
+servers[0]?.listen(port, '127.0.0.1', () => {
+  console.log(`Factory dashboard: http://127.0.0.1:${port}`);
+  console.log(`With the port 80 forward on: http://${FRIENDLY_HOST}`);
 });
 
-server.listen(port, '127.0.0.1', () => {
-  console.log(`Factory dashboard: http://127.0.0.1:${port}`);
+// The macOS resolver returns ::1 for *.localhost, so listen there too.
+servers[1]?.on('error', (error) => {
+  console.error(`Not listening on ::1: ${error.message}`);
 });
+servers[1]?.listen(port, '::1');
