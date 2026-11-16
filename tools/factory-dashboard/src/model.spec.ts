@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   areaOf,
@@ -38,6 +39,11 @@ import {
   closedIssueArgs,
   joinBacklogReview,
   parseBacklogReviews,
+  parseBusiness,
+  buildBusiness,
+  costTotal,
+  isOverdue,
+  localDay,
   parsePort,
   ciStateFromChecks,
   computeDrift,
@@ -1346,5 +1352,88 @@ describe('cache and closed window', () => {
     expect(CACHE_MS).toBe(300_000);
     expect(CLOSED_WINDOW_DAYS).toBe(28);
     expect(shippedSearchDate(new Date('2026-11-29T00:00:00Z'), CLOSED_WINDOW_DAYS)).toBe('2026-11-01');
+  });
+});
+
+describe('business.json', () => {
+  const valid = () => ({
+    updatedAt: '2026-11-15',
+    users: { count: 12, date: '2026-11-14' },
+    costs: [
+      { service: 'AWS', monthly: 20.5 },
+      { service: 'Clerk', monthly: null },
+      { service: 'EAS', monthly: 99 },
+    ],
+    decisions: [
+      { question: 'Open?', options: ['A', 'B'], recommendation: null, decided: null, owner: 'Peter', date: '2026-11-17' },
+      { question: 'Done?', options: [], recommendation: 'Yes', decided: 'Yes', owner: 'Rich', date: '2026-11-10' },
+    ],
+    nextSteps: [
+      { owner: 'Peter', task: 'Later', due: '2026-12-01', done: false },
+      { owner: 'Peter', task: 'Late', due: '2026-11-10', done: false },
+      { owner: 'Rich', task: 'Finished late', due: '2026-11-01', done: true },
+      { owner: 'Peter', task: 'No date', due: null, done: false },
+    ],
+    nextSync: '2026-11-17',
+  });
+  const noon = new Date(2026, 10, 15, 12, 0, 0);
+
+  it('reads a valid file and keeps nulls', () => {
+    expect(parseBusiness(valid()).costs[1]).toEqual({ service: 'Clerk', monthly: null });
+    expect(parseBusiness({ ...valid(), nextSync: null, users: { count: null, date: null } }).users.count).toBeNull();
+  });
+
+  it('gives a plain reason for a missing or wrong field', () => {
+    expect(() => parseBusiness(null)).toThrow('updatedAt');
+    expect(() => parseBusiness({ ...valid(), users: undefined })).toThrow('users');
+    expect(() => parseBusiness({ ...valid(), users: { count: -1, date: null } })).toThrow('users.count');
+    expect(() => parseBusiness({ ...valid(), costs: 'x' })).toThrow('costs must be a list');
+    expect(() => parseBusiness({ ...valid(), costs: [{ service: 'AWS', monthly: '5' }] })).toThrow('costs[0]: monthly');
+    expect(() => parseBusiness({ ...valid(), decisions: [{ question: 'Q', options: 'A', owner: 'P', date: '2026-11-17' }] })).toThrow('decisions[0]: options');
+    expect(() => parseBusiness({ ...valid(), nextSteps: [{ owner: 'P', task: 'T', due: null }] })).toThrow('nextSteps[0]: done');
+  });
+
+  it('refuses bad dates', () => {
+    expect(() => parseBusiness({ ...valid(), updatedAt: '15/11/2026' })).toThrow('updatedAt');
+    expect(() => parseBusiness({ ...valid(), nextSync: '2026-13-40' })).toThrow('nextSync');
+    expect(() => parseBusiness({ ...valid(), users: { count: 1, date: 'soon' } })).toThrow('users.date');
+    expect(() => parseBusiness({ ...valid(), nextSteps: [{ owner: 'P', task: 'T', due: 'Friday', done: false }] })).toThrow('nextSteps[0]: due');
+    expect(() => parseBusiness({ ...valid(), decisions: [{ question: 'Q', options: [], owner: 'P', date: '2026-02-31x' }] })).toThrow('decisions[0]: date');
+  });
+
+  it('adds the known cost lines and counts the unset ones', () => {
+    expect(costTotal(valid().costs)).toEqual({ total: 119.5, unset: 1 });
+    expect(costTotal([{ service: 'AWS', monthly: null }])).toEqual({ total: null, unset: 1 });
+    expect(costTotal([])).toEqual({ total: null, unset: 0 });
+  });
+
+  it('marks a step overdue only when open, dated and before today', () => {
+    expect(localDay(noon)).toBe('2026-11-15');
+    expect(isOverdue({ owner: 'P', task: 'T', due: '2026-11-14', done: false }, '2026-11-15')).toBe(true);
+    expect(isOverdue({ owner: 'P', task: 'T', due: '2026-11-15', done: false }, '2026-11-15')).toBe(false);
+    expect(isOverdue({ owner: 'P', task: 'T', due: '2026-11-14', done: true }, '2026-11-15')).toBe(false);
+    expect(isOverdue({ owner: 'P', task: 'T', due: null, done: false }, '2026-11-15')).toBe(false);
+  });
+
+  it('puts open decisions apart and lists overdue steps first within each owner', () => {
+    const view = buildBusiness(parseBusiness(valid()), noon);
+    expect(view.openDecisions.map((d) => d.question)).toEqual(['Open?']);
+    expect(view.decidedDecisions.map((d) => d.question)).toEqual(['Done?']);
+    expect(view.stepsByOwner.map((g) => g.owner)).toEqual(['Peter', 'Rich']);
+    expect(view.stepsByOwner[0]?.steps.map((s) => s.task)).toEqual(['Late', 'Later', 'No date']);
+    expect(view.stepsByOwner[0]?.steps[0]?.overdue).toBe(true);
+    expect(view.overdueCount).toBe(1);
+    expect(view.costTotal).toBe(119.5);
+  });
+
+  it('the seeded file parses, with unknown numbers left null', () => {
+    const file = parseBusiness(JSON.parse(readFileSync(new URL('../business.json', import.meta.url), 'utf8')));
+    expect(file.decisions).toHaveLength(4);
+    expect(file.decisions.every((d) => d.decided === null && d.owner === 'Peter and Rich' && d.date === '2026-11-17')).toBe(true);
+    expect(file.nextSteps.map((s) => s.owner)).toEqual(['Peter', 'Peter']);
+    expect(file.costs.map((c) => c.service)).toEqual(['AWS', 'Cloudflare', 'Clerk', 'EAS', 'AI tools']);
+    expect(file.costs.every((c) => c.monthly === null)).toBe(true);
+    expect(file.users.count).toBeNull();
+    expect(file.nextSync).toBeNull();
   });
 });

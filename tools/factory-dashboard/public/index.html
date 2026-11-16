@@ -1297,9 +1297,121 @@ function renderProduct() {
   renderFlags(panel);
 }
 
+// ---- Business tab ----
+// Most important first: decisions needed, next steps by owner (overdue first), the key numbers, then the cost chart.
+var NOT_SET = "Not set";
+
+function money(value) {
+  return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function renderDecisions(parent, b) {
+  var s = kitSection(parent, "Decisions needed", "business");
+  if (b.openDecisions.length === 0) {
+    s.appendChild(el("p", "No decisions are open.", "muted"));
+    return;
+  }
+  s.appendChild(paged("decisions", "decisions", b.openDecisions, function (pageItems) {
+    var g = grid("cols-2");
+    pageItems.forEach(function (d) {
+      var c = card();
+      c.appendChild(el("div", d.question));
+      if (d.options.length > 0) {
+        c.appendChild(el("div", "Options: " + d.options.join(" or "), "muted"));
+      }
+      c.appendChild(el("div", "Recommendation: " + (d.recommendation || NOT_SET), "muted"));
+      c.appendChild(el("div", "Owner: " + d.owner + ". Raised " + d.date + ".", "muted"));
+      g.appendChild(c);
+    });
+    return g;
+  }));
+}
+
+function stepLine(li, step) {
+  if (step.overdue) {
+    li.appendChild(el("span", "Overdue", "tag"));
+  }
+  if (step.done) {
+    li.appendChild(el("span", "Done", "tag"));
+  }
+  li.appendChild(document.createTextNode(step.task));
+  li.appendChild(el("div", step.due ? "Due " + step.due : "No due date", "muted"));
+}
+
+function renderSteps(parent, b) {
+  var s = kitSection(parent, "Next steps by owner", null);
+  if (b.stepsByOwner.length === 0) {
+    s.appendChild(el("p", "No next steps.", "muted"));
+    return;
+  }
+  var g = grid("cols-2");
+  b.stepsByOwner.forEach(function (group) {
+    var c = card(group.owner);
+    c.appendChild(pagedList("steps-" + group.owner, "next steps for " + group.owner, group.steps, stepLine, "No next steps."));
+    g.appendChild(c);
+  });
+  s.appendChild(g);
+}
+
+function renderBusinessTiles(parent, b) {
+  var s = el("section");
+  s.appendChild(el("h2", "Key numbers", "sr-only"));
+  var g = grid("kpis");
+  var users = b.users.count === null ? NOT_SET : b.users.count;
+  g.appendChild(kpiTile("Users", users, b.users.date ? "As of " + b.users.date : null));
+  var cost = b.costTotal === null ? NOT_SET : money(b.costTotal);
+  var costNote = b.costUnset > 0 && b.costTotal !== null ? b.costUnset + " of " + b.costs.length + " services not set" : "US dollars per month";
+  g.appendChild(kpiTile("Monthly cost", cost, costNote));
+  g.appendChild(kpiTile("Next sync", b.nextSync || NOT_SET, null));
+  s.appendChild(g);
+  parent.appendChild(s);
+}
+
+function renderCosts(parent, b) {
+  var s = kitSection(parent, "Cost breakdown", null);
+  var c = card("Monthly cost by service");
+  safely(c, function (node) {
+    var set = b.costs.filter(function (line) {
+      return line.monthly !== null;
+    });
+    if (set.length === 0) {
+      node.appendChild(el("p", "No costs are set yet.", "muted"));
+      node.appendChild(chartTable("Monthly cost by service", ["Service", "US dollars per month"], b.costs.map(function (line) {
+        return [line.service, NOT_SET];
+      })));
+      return;
+    }
+    var rows = set.map(function (line) {
+      return { label: line.service, value: line.monthly };
+    });
+    node.appendChild(barChart(rows, "US dollars per month", "Monthly cost by service", c.titleId, "Service"));
+    if (b.costUnset > 0) {
+      var names = b.costs.filter(function (line) {
+        return line.monthly === null;
+      }).map(function (line) {
+        return line.service;
+      });
+      node.appendChild(el("p", "Not set: " + names.join(", ") + ".", "muted"));
+    }
+    node.appendChild(el("p", "Total: " + money(b.costTotal) + " per month.", "muted"));
+  });
+  s.appendChild(c);
+}
+
 function renderBusiness() {
-  main = document.getElementById("panel-business");
-  main.appendChild(el("p", "Coming soon.", "muted"));
+  var panel = document.getElementById("panel-business");
+  main = panel;
+  var b = state.business;
+  if (!b) {
+    var s = kitSection(panel, "Business", "business");
+    s.appendChild(el("p", "The business numbers are not available.", "muted"));
+    return;
+  }
+  renderDecisions(panel, b);
+  renderSteps(panel, b);
+  renderBusinessTiles(panel, b);
+  renderCosts(panel, b);
+  panel.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
 }
 
 function currentTab() {

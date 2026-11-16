@@ -1,0 +1,22 @@
+{
+  "updatedAt": "2026-11-15",
+  "users": { "count": null, "date": null },
+  "costs": [
+    { "service": "AWS", "monthly": null },
+    { "service": "Cloudflare", "monthly": null },
+    { "service": "Clerk", "monthly": null },
+    { "service": "EAS", "monthly": null },
+    { "service": "AI tools", "monthly": null }
+  ],
+  "decisions": [
+    { "question": "What is the pricing model?", "options": ["One-time per person", "Monthly"], "recommendation": null, "decided": null, "owner": "Peter and Rich", "date": "2026-11-17" },
+    { "question": "Launch with sharing off, and add it after Join ships (#128)?", "options": [], "recommendation": "Yes", "decided": null, "owner": "Peter and Rich", "date": "2026-11-17" },
+    { "question": "Who owns sales and marketing?", "options": [], "recommendation": "Rich", "decided": null, "owner": "Peter and Rich", "date": "2026-11-17" },
+    { "question": "When is the partner agreement in writing (roles, equity, IP)?", "options": [], "recommendation": "Before launch", "decided": null, "owner": "Peter and Rich", "date": "2026-11-17" }
+  ],
+  "nextSteps": [
+    { "owner": "Peter", "task": "Call Apple Developer Support (#833)", "due": null, "done": false },
+    { "owner": "Peter", "task": "Clerk production instance (#586)", "due": null, "done": false }
+  ],
+  "nextSync": null
+}

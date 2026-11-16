@@ -32,6 +32,8 @@ import {
   RESTART_HEADER,
   joinBacklogReview,
   parseBacklogReviews,
+  parseBusiness,
+  buildBusiness,
   parsePort,
   countPorcelainLines,
   groupByStatus,
@@ -43,6 +45,7 @@ import {
   parseWorktrees,
   splitRuns,
   type BacklogReviewFile,
+  type BusinessFile,
   type BoardItem,
   type BoardTruncation,
   type FeatureFlag,
@@ -60,6 +63,7 @@ const REPO_URL = `https://github.com/${REPO}`;
 const HEALTH_URL = 'https://api.grieversguidance.com/health';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REVIEW_FILE = join(HERE, '..', 'backlog-review.json');
+const BUSINESS_FILE = join(HERE, '..', 'business.json');
 const RESTART_ON_CHANGE = process.env['FACTORY_RESTART_ON_CHANGE'] === '1';
 const WATCH_MS = 30_000;
 
@@ -199,6 +203,11 @@ async function loadBacklogReviews(): Promise<BacklogReviewFile> {
   return parseBacklogReviews(JSON.parse(await readFile(REVIEW_FILE, 'utf8')));
 }
 
+// Read on every refresh, like the backlog review.
+async function loadBusiness(): Promise<BusinessFile> {
+  return parseBusiness(JSON.parse(await readFile(BUSINESS_FILE, 'utf8')));
+}
+
 async function mainRepoRoot(): Promise<string> {
   const common = (await exec('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim();
   return dirname(common);
@@ -247,6 +256,7 @@ async function buildState() {
     guarded('recentClosed', sources, [] as Issue[], loadRecentClosedIssues),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
+  const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
   const backlogReview =
     reviewFile && sources['openIssues']?.ok ? joinBacklogReview(reviewFile, openIssues) : null;
   const board = boardResult.items;
@@ -284,6 +294,7 @@ async function buildState() {
     drift: drift === null ? null : drift.map(withSummary),
     driftBlockedBy,
     backlogReview,
+    business: businessFile ? buildBusiness(businessFile, generatedAt) : null,
     product: buildProduct({
       sources,
       flags,
