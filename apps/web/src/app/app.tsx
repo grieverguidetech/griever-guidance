@@ -1250,7 +1250,8 @@ function AppBody({
     // A second item opened while one is open replaces its entry, so one Back still returns to the page the
     // first one was opened from, and focus goes to the first opener.
     const replacing = cmsItem !== null;
-    if (!replacing) {
+    // The first opener keeps focus on return; an item that came from a link had none, so this one is it.
+    if (!replacing || itemOpener.current === null) {
       itemOpener.current = { id, region };
     }
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
@@ -1264,11 +1265,14 @@ function AppBody({
     if (closing.current) {
       return;
     }
+    // Nothing behind this entry (React Router's `idx` is 0): go to the Overview instead of a Back that goes nowhere.
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx <= 0) {
+      go({ ...here, section: 'overview', item: null }, { replace: true });
+      return;
+    }
+    // Cleared only when the router commits the new entry (the [location.key] effect), however slow that is.
     closing.current = true;
-    // If the browser has nothing behind us after all, do not leave the close button dead.
-    setTimeout(() => {
-      closing.current = false;
-    }, 600);
     navigate(-1);
   }
 

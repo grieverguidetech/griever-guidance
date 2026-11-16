@@ -349,6 +349,7 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     seed();
     const user = userEvent.setup();
     window.history.replaceState(null, '', `/people/${FLOW}/service`);
+    // React Router's own state shape on an entry: `usr` is our state, `key` the entry key, `idx` its position.
     window.history.pushState({ usr: { openedHere: true }, key: 'reloaded', idx: 1 }, '', `/people/${FLOW}/guide/pronouncement`);
     renderApp(<App />, { path: `/people/${FLOW}/guide/pronouncement` });
     await h1(ITEM);
@@ -357,18 +358,20 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
   });
 
-  it('a double tap on Back goes Back once', async () => {
+  it('a second tap on Back before the page has changed does not go Back again', async () => {
     seed();
     const user = userEvent.setup();
     renderApp(<App />, { path: `/people/${FLOW}/service` });
     await h1('Service');
     await user.click(panel().getByRole('button', { name: ITEM }));
     await h1(ITEM);
-    const go = vi.spyOn(window.history, 'go');
+    // A slow commit: the history move is held, so the location is still the item's at the second tap.
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
     try {
       const back = screen.getByRole('button', { name: 'Back' });
-      await user.dblClick(back);
-      await h1('Service');
+      await user.click(back);
+      await user.click(back);
+      expect(window.location.pathname).toBe(`/people/${FLOW}/guide/pronouncement`);
       expect(go.mock.calls.filter(([delta]) => delta === -1)).toHaveLength(1);
     } finally {
       go.mockRestore();
