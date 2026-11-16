@@ -15,6 +15,9 @@ import {
   mergedSearchDate,
   computeCiHealth,
   computeRunStrip,
+  dependsOn,
+  waitsForPeter,
+  boardStacks,
   computeDeploys,
   computeThroughput,
   flakyIssues,
@@ -254,6 +257,88 @@ describe('needs you', () => {
     );
     expect(items.map((i) => `${i.kind}:${i.number}`)).toEqual(['pr-green:900', 'blocked:5', 'ready-for-human:6']);
     expect(items[0]!.labels).toEqual(['area:ci']);
+  });
+});
+
+describe('dependsOn', () => {
+  it('reads the issue numbers in the Depends on section', () => {
+    const body = '### Context\nSee #1.\n\n### Depends on\n#12 and #34, also #12.\n\n### Size\nM #99';
+    expect(dependsOn(body)).toEqual([12, 34]);
+  });
+
+  it('is empty for None, a missing section, and no body', () => {
+    expect(dependsOn('### Depends on\nNone\n')).toEqual([]);
+    expect(dependsOn('### Context\n#5')).toEqual([]);
+    expect(dependsOn(undefined)).toEqual([]);
+    expect(dependsOn(null)).toEqual([]);
+  });
+
+  it('accepts a different heading level, case and CRLF line ends', () => {
+    expect(dependsOn('## depends on\r\n- #7\r\n- #8\r\n')).toEqual([7, 8]);
+  });
+});
+
+describe('needs you rules', () => {
+  it('keeps a blocked issue only when none of its dependencies is open', () => {
+    const items = computeNeedsYou(
+      [],
+      [
+        { ...issue(1, ['blocked']), dependsOn: [2] },
+        issue(2),
+        { ...issue(3, ['blocked']), dependsOn: [99] },
+        { ...issue(4, ['blocked']), dependsOn: [] },
+      ],
+    );
+    expect(items.map((i) => i.number)).toEqual([3, 4]);
+  });
+
+  it('keeps a blocked issue when only some dependencies are closed, and drops it if any is open', () => {
+    const open = [{ ...issue(1, ['blocked']), dependsOn: [50, 2] }, issue(2)];
+    expect(computeNeedsYou([], open).map((i) => i.number)).toEqual([]);
+  });
+
+  it('adds ready-for-human issues even when they have dependencies', () => {
+    const items = computeNeedsYou([], [{ ...issue(6, ['ready-for-human']), dependsOn: [7] }, issue(7)]);
+    expect(items.map((i) => `${i.kind}:${i.number}`)).toEqual(['ready-for-human:6']);
+  });
+
+  it('keeps ready-to-merge PRs, even drafts, and does not match text', () => {
+    expect(waitsForPeter(pr({ isDraft: true, ci: 'pending', prLabels: ['ready-to-merge'] }))).toBe(true);
+    expect(waitsForPeter(pr({ isDraft: true, ci: 'pending', prLabels: ['other'] }))).toBe(false);
+    expect(waitsForPeter(pr({ title: 'HUMAN TODO', ci: 'red' }))).toBe(false);
+  });
+
+  it('uses the PR summary first, then the issue summary', () => {
+    const issues = [{ ...issue(830), summary: 'from issue' }];
+    expect(computeNeedsYou([pr({ summary: 'from pr' })], issues)[0]!.summary).toBe('from pr');
+    expect(computeNeedsYou([pr()], issues)[0]!.summary).toBe('from issue');
+  });
+});
+
+describe('boardStacks', () => {
+  const item = (n: number, status: string | null, labels: string[] = []): BoardItem => ({ ...boardItem(n, status), labels });
+
+  it('emits an all stack and one per area, with segments in a fixed order', () => {
+    const stacks = boardStacks([
+      item(1, 'Ready', ['area:web']),
+      item(2, 'Ready', ['area:web']),
+      item(3, 'Blocked', ['area:ci']),
+      item(4, 'Backlog'),
+    ]);
+    expect(stacks.map((s) => s.area)).toEqual(['all', 'ci', 'none', 'web']);
+    expect(stacks[0]!.segments.map((seg) => seg.name)).toEqual(['Ready', 'In progress', 'In review', 'Blocked', 'Backlog']);
+    expect(stacks[0]!.segments.map((seg) => seg.value)).toEqual([2, 0, 0, 1, 1]);
+    expect(stacks.find((s) => s.area === 'web')!.total).toBe(2);
+  });
+
+  it('counts No status and Done outside the bar', () => {
+    const [all] = boardStacks([item(1, null), item(2, 'Done'), item(3, 'Weird'), item(4, 'Ready')]);
+    expect(all!.total).toBe(1);
+    expect(all!.noStatus).toBe(2);
+  });
+
+  it('gives an empty all stack for no items', () => {
+    expect(boardStacks([])).toEqual([{ area: 'all', total: 0, noStatus: 0, segments: expect.any(Array) }]);
   });
 });
 
@@ -710,6 +795,15 @@ describe('computeRunStrip', () => {
     expect(health.strip).toEqual(strip);
   });
 
+  it('keeps a run with a bad date and puts it first', () => {
+    const strip = computeRunStrip([
+      run(2, 'success', 'completed', '2026-11-13T00:00:00Z'),
+      run(1, 'failure', 'completed', 'not a date'),
+      run(3, 'success', 'completed', '2026-11-12T00:00:00Z'),
+    ]);
+    expect(strip.map((mark) => mark.id)).toEqual([1, 3, 2]);
+  });
+
   it('is empty when there are no runs', () => {
     expect(computeRunStrip([])).toEqual([]);
   });
@@ -865,9 +959,9 @@ describe('formatDuration', () => {
 
 describe('buildEngineering', () => {
   const now = new Date('2026-11-15T12:00:00Z');
-  const data = { ciMainRuns: [], openIssues: [], deployRuns: [], mergedPrs: [] };
+  const data = { board: [], ciMainRuns: [], openIssues: [], deployRuns: [], mergedPrs: [] };
   const ok = { ok: true };
-  const allOk = { ciMain: ok, openIssues: ok, deploys: ok, mergedPrs: ok };
+  const allOk = { board: ok, ciMain: ok, openIssues: ok, deploys: ok, mergedPrs: ok };
 
   it('fills every field when all sources load', () => {
     const result = buildEngineering(allOk, data, now);
@@ -882,9 +976,10 @@ describe('buildEngineering', () => {
     ['openIssues', 'flaky'],
     ['deploys', 'deploys'],
     ['mergedPrs', 'throughput'],
+    ['board', 'boardStacks'],
   ] as const)('a failed %s source nulls only %s', (source, field) => {
     const result = buildEngineering({ ...allOk, [source]: { ok: false, error: 'x' } }, data, now);
-    for (const key of ['ciHealth', 'flaky', 'deploys', 'throughput'] as const) {
+    for (const key of ['ciHealth', 'flaky', 'deploys', 'throughput', 'boardStacks'] as const) {
       if (key === field) {
         expect(result[key]).toBeNull();
       } else {

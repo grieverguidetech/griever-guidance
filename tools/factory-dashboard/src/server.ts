@@ -19,6 +19,8 @@ import {
   buildProduct,
   openBoardItems,
   summarizeIssue,
+  summarizePr,
+  dependsOn,
   boardTruncation,
   failedSources,
   FRIENDLY_HOST,
@@ -90,7 +92,7 @@ function toIssue(raw: RawIssue): Issue {
     updatedAt: raw.updatedAt,
     labels: raw.labels.map((label) => label.name),
     // Only the one-line summary is kept. The body is dropped here.
-    ...(raw.body === undefined ? {} : { summary: summarizeIssue(raw.body) }),
+    ...(raw.body === undefined ? {} : { summary: summarizeIssue(raw.body), dependsOn: dependsOn(raw.body) }),
   };
 }
 
@@ -112,11 +114,12 @@ type RawPr = {
   statusCheckRollup: never[];
   updatedAt: string;
   body: string;
+  labels?: { name: string }[];
 };
 
 async function loadPrs(): Promise<Pr[]> {
   const fields =
-    'number,title,url,isDraft,headRefName,reviewDecision,statusCheckRollup,updatedAt,body';
+    'number,title,url,isDraft,headRefName,reviewDecision,statusCheckRollup,updatedAt,body,labels';
   const data = (await ghJson(['pr', 'list', '--repo', REPO, '--limit', '200', '--json', fields])) as RawPr[];
   return data.map((pr) => ({
     number: pr.number,
@@ -128,6 +131,9 @@ async function loadPrs(): Promise<Pr[]> {
     ci: ciStateFromChecks(pr.statusCheckRollup),
     issueNumber: issueFromPr(pr.body, pr.headRefName),
     updatedAt: pr.updatedAt,
+    // Only the one-line summary and the label names are kept. The body is dropped here.
+    summary: summarizePr(pr.body),
+    prLabels: (pr.labels ?? []).map((label) => label.name),
   }));
 }
 
@@ -284,7 +290,7 @@ async function buildState() {
       issueSummaryFor: summaryFor,
       now: generatedAt,
     }),
-    engineering: buildEngineering(sources, { ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
+    engineering: buildEngineering(sources, { board: openBoard, ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

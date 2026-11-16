@@ -77,7 +77,7 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .chart-row { display: grid; grid-template-columns: minmax(70px, 22%) 1fr 3.5em; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
 .chart-row .total { text-align: right; }
 .chart-row svg { display: block; width: 100%; overflow: visible; }
-.chart:focus-visible, svg.chart:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.chart:focus-visible, svg.chart:focus-visible, svg.strip:focus-visible, .scroll:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .chart [data-mark]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
 .chart [data-mark]:hover { opacity: 0.8; }
 .tip { position: fixed; z-index: 10; pointer-events: none; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 260px; }
@@ -95,6 +95,7 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .pr-group h3 { font-size: 14px; margin: 12px 0 6px; }
 .pr-group h3:first-child { margin-top: 0; }
 .lower { margin-top: 8px; }
+svg.key { margin-right: 6px; vertical-align: middle; }
 .lower > summary { font-weight: 600; }
 svg.strip { display: block; width: 100%; height: auto; max-height: 56px; overflow: visible; }
 .strip-ends { display: flex; justify-content: space-between; font-size: 13px; margin-top: 2px; }
@@ -211,7 +212,8 @@ function itemText(item) {
 }
 
 function when(iso) {
-  return new Date(iso).toLocaleString();
+  var date = new Date(iso);
+  return isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
 // ---- Engineering tab ----
@@ -289,7 +291,8 @@ function ciTile() {
   if (h.passPercent === null) {
     return kpiTile("CI pass rate on main", "None", "No finished runs");
   }
-  var note = passStatus(h.passPercent) + ": " + h.passed + " of " + h.counted + " finished runs passed";
+  var status = h.counted < 10 ? "Too few runs to judge" : passStatus(h.passPercent);
+  var note = status + ": " + h.passed + " of " + h.counted + " finished runs passed";
   return kpiTile("CI pass rate on main", h.passPercent + "%", note);
 }
 
@@ -303,6 +306,9 @@ function deployStatus(deploys) {
   }
   if (latest.conclusion === "success") {
     return "Latest deploy succeeded";
+  }
+  if (latest.conclusion === "skipped" || latest.conclusion === "cancelled") {
+    return "Latest deploy was " + latest.conclusion;
   }
   return "Latest deploy did not succeed (" + latest.conclusion + ")";
 }
@@ -368,13 +374,30 @@ function renderPrs(parent) {
     li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
     var issue = pr.issueNumber ? " (issue #" + pr.issueNumber + ")" : "";
     li.appendChild(el("div", pr.headRefName + issue, "muted"));
-    li.appendChild(summaryLine({ summary: pr.issueNumber ? summaries[pr.issueNumber] : "" }));
+    li.appendChild(summaryLine({ summary: pr.summary || (pr.issueNumber ? summaries[pr.issueNumber] : "") }));
   }, "No open PRs."));
   s.appendChild(c);
 }
 
 // A strip of one mark per CI run on main, oldest at the left. Pass is a green block, fail is a red block with a cross,
 // ignored is a short grey block, so the result never depends on color alone. One tab stop, arrow keys between runs.
+// The legend key repeats the shape of the mark: a block, a block with a cross, a short block.
+function legendKey(result) {
+  var key = svgEl("svg", { width: 12, height: 14, viewBox: "0 0 12 14" });
+  key.setAttribute("class", "key");
+  key.setAttribute("aria-hidden", "true");
+  var fill = { pass: "var(--green)", fail: "var(--red)", ignored: "var(--grey)" }[result];
+  if (result === "ignored") {
+    key.appendChild(svgEl("rect", { x: 0, y: 4, width: 12, height: 6, rx: 1.5, fill: fill }));
+  } else {
+    key.appendChild(svgEl("rect", { x: 0, y: 0, width: 12, height: 14, rx: 2, fill: fill }));
+  }
+  if (result === "fail") {
+    key.appendChild(svgEl("path", { d: "M3 4 L9 10 M9 4 L3 10", stroke: "var(--card)", "stroke-width": 2, "stroke-linecap": "round", fill: "none" }));
+  }
+  return key;
+}
+
 function runStripChart(marks, caption, labelId) {
   var wrap = el("div", null, "chart");
   var counts = { pass: 0, fail: 0, ignored: 0 };
@@ -382,12 +405,9 @@ function runStripChart(marks, caption, labelId) {
     counts[mark.result] += 1;
   });
   var legend = el("ul", null, "legend");
-  [["pass", "Passed", "--green"], ["fail", "Failed", "--red"], ["ignored", "Ignored", "--grey"]].forEach(function (entry) {
+  [["pass", "Passed"], ["fail", "Failed"], ["ignored", "Ignored"]].forEach(function (entry) {
     var li = el("li");
-    var sw = el("span", null, "swatch");
-    sw.style.background = "var(" + entry[2] + ")";
-    sw.setAttribute("aria-hidden", "true");
-    li.appendChild(sw);
+    li.appendChild(legendKey(entry[0]));
     li.appendChild(document.createTextNode(entry[1] + " (" + counts[entry[0]] + ")"));
     legend.appendChild(li);
   });
@@ -405,9 +425,9 @@ function runStripChart(marks, caption, labelId) {
       g.appendChild(svgEl("rect", { x: x, y: 4, width: 10, height: 32, rx: 2, fill: colors[mark.result] }));
     }
     if (mark.result === "fail") {
-      g.appendChild(svgEl("path", { d: "M" + (x + 2) + " 15 L" + (x + 8) + " 25 M" + (x + 8) + " 15 L" + (x + 2) + " 25", stroke: "var(--chart-on)", "stroke-width": 1.5, fill: "none" }));
+      g.appendChild(svgEl("path", { d: "M" + (x + 2) + " 15 L" + (x + 8) + " 25 M" + (x + 8) + " 15 L" + (x + 2) + " 25", stroke: "var(--card)", "stroke-width": 2.5, "stroke-linecap": "round", fill: "none" }));
     }
-    markInteractive(g, mark.text, when(mark.createdAt));
+    markInteractive(g, mark.text, when(mark.createdAt) + ", run " + (index + 1) + " of " + marks.length);
     svg.appendChild(g);
   });
   chartGroup(svg, labelId);
@@ -417,7 +437,7 @@ function runStripChart(marks, caption, labelId) {
   ends.appendChild(el("span", "Newest"));
   wrap.appendChild(ends);
   wrap.appendChild(chartTable(caption, ["Started", "Result", "Run"], marks.map(function (mark) {
-    return [when(mark.createdAt), mark.text, "Run " + mark.id];
+    return [when(mark.createdAt), mark.text, { text: "Run " + mark.id, url: mark.url }];
   })));
   return wrap;
 }
@@ -478,8 +498,6 @@ function boardList(items, key, label) {
   }, "Empty.");
 }
 
-var BOARD_STACK_NAMES = ["Ready", "In progress", "In review", "Blocked", "Backlog"];
-
 function renderBoard(parent) {
   var s = kitSection(parent, "Board (open issues only)", "board");
   if (state.boardTruncated) {
@@ -489,19 +507,22 @@ function renderBoard(parent) {
   var byStatus = function (status) {
     return (state.board.groups[status] || []).filter(visible);
   };
-  var segments = BOARD_STACK_NAMES.map(function (name) {
-    return { name: name, value: byStatus(name).length };
-  });
-  var total = segments.reduce(function (sum, seg) {
-    return sum + seg.value;
-  }, 0);
-  var top = card("Open issues by status");
-  if (total === 0) {
+  var chosen = areaSelect.value;
+  var stacks = state.engineering.boardStacks || [];
+  var stack = stacks.filter(function (candidate) {
+    return candidate.area === chosen;
+  })[0];
+  var top = card("Open issues with a board status");
+  if (!stack || stack.total === 0) {
     top.appendChild(el("p", "No open issues with a board status.", "muted"));
   } else {
-    top.appendChild(stackedBarChart([{ label: "Open issues", total: total, segments: segments }], BOARD_STACK_NAMES, "Open issues by board status", top.titleId));
+    var names = stack.segments.map(function (seg) {
+      return seg.name;
+    });
+    var rowLabel = chosen === "all" ? "All areas" : chosen;
+    top.appendChild(stackedBarChart([{ label: rowLabel, total: stack.total, segments: stack.segments }], names, "Open issues with a board status", top.titleId));
   }
-  top.appendChild(el("p", "No status: " + byStatus("No status").length + ". Done is listed below and not in the bar.", "muted"));
+  top.appendChild(el("p", "No status: " + (stack ? stack.noStatus : byStatus("No status").length) + ". Done is listed below and not in the bar.", "muted"));
   s.appendChild(top);
   var g = grid("cols-3");
   g.className += " spaced";
@@ -583,7 +604,7 @@ function deploysBody(d) {
     d.appendChild(el("p", "No deploy runs.", "muted"));
     return;
   }
-  var scroll = el("div", null, "scroll");
+  var scroll = scrollBox("Last 5 Deploy workflow runs");
   var table = el("table", null, "plain");
   table.appendChild(el("caption", "Last 5 Deploy workflow runs", "sr-only"));
   var head = el("tr");
@@ -639,7 +660,7 @@ function backlogReviewBody(d) {
     return;
   }
   d.appendChild(paged("backlog-review", "backlog review", review.rows, function (pageRows) {
-    var scroll = el("div", null, "scroll");
+    var scroll = scrollBox("Backlog review");
     var table = el("table", null, "review");
     var head = el("tr");
     [["#", ""], ["Title", ""], ["Recommendation", "wide"], ["Why", "wide"]].forEach(function (col) {
@@ -703,13 +724,9 @@ function renderLower(parent) {
 
 function renderEngineering() {
   var panel = document.getElementById("panel-engineering");
-  renderNeedsYou(panel);
-  renderHealthStrip(panel);
-  renderPrs(panel);
-  renderCharts(panel);
-  renderBoard(panel);
-  renderDrift(panel);
-  renderLower(panel);
+  [renderNeedsYou, renderHealthStrip, renderPrs, renderCharts, renderBoard, renderDrift, renderLower].forEach(function (part) {
+    safely(panel, part);
+  });
 }
 
 // ---- Layout kit (everything is built with textContent and createElementNS) ----
@@ -940,11 +957,29 @@ function barShape(widthAttr, fill) {
   return g;
 }
 
+// A sideways-scrolling box that a keyboard can reach: a tab stop, a region and a name.
+function scrollBox(label) {
+  var box = el("div", null, "scroll");
+  box.setAttribute("tabindex", "0");
+  box.setAttribute("role", "region");
+  box.setAttribute("aria-label", label);
+  return box;
+}
+
+// Runs one part of a tab. A part that throws shows one calm line and the rest of the tab still draws.
+function safely(parent, fn) {
+  try {
+    fn(parent);
+  } catch (e) {
+    parent.appendChild(el("p", "Could not draw this part.", "error"));
+  }
+}
+
 // The table twin of a chart. It scrolls sideways inside its own box so a narrow screen never scrolls the page.
 function chartTable(caption, headers, rows) {
   var d = el("details", null, "chart-table");
   d.appendChild(el("summary", "Table view"));
-  var scroll = el("div", null, "scroll");
+  var scroll = scrollBox(caption);
   var table = el("table", null, "plain");
   table.appendChild(el("caption", caption, "sr-only"));
   var head = el("tr");
@@ -961,6 +996,10 @@ function chartTable(caption, headers, rows) {
         var th = el("th", String(cell));
         th.scope = "row";
         tr.appendChild(th);
+      } else if (cell && typeof cell === "object") {
+        var linked = el("td", null, "num");
+        linked.appendChild(link(cell.text, cell.url));
+        tr.appendChild(linked);
       } else {
         tr.appendChild(el("td", String(cell), "num"));
       }
