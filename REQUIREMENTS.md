@@ -521,7 +521,7 @@ DynamoDB, behind the AWS data function, is the only server database. Convex and 
 (#203, #326). User data is in one table, `gg-data`. A second table, `gg-content` (checklist, samples,
 examples; no user data), is created by `infra/aws/data.yml` and seeded only locally (`pnpm aws:seed`).
 The function's role can only read it, and no action reads it yet. See `DATA.md` for the data architecture (the screen-keyed local session document and
-the shared-people design).
+the shared-people design). Why we store data this way: see `docs/adr/0002-data-storage.md`.
 
 Contact data is never sent to the gateway or the data function. Contact *ids* never appear in shared person
 sync (C3). Message content is never stored on a server and never logged (C2 still applies in the flag-off build), and there is no send history —
