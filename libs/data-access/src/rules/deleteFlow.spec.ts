@@ -42,8 +42,12 @@ const flowItem = (ownerId: string, id: string): FlowItem => ({
 const profile = (userId: string, accountType: 'owner' | 'member' = 'owner') =>
   rawPut(encodeProfile({ userId, accountType, version: 1, createdAt: at(-HOUR), updatedAt: at(-HOUR) }));
 
-/** Every item in the table, as stored. Stable order, so before and after can be compared. */
-async function rawSnapshot(): Promise<string> {
+/**
+ * The items as stored that mention any of the given ids (user or person ids), in stable order, so
+ * before and after can be compared. The table is shared with other specs and tests, so a snapshot
+ * of the whole table would change when they write; ids are unique per test.
+ */
+async function rawSnapshot(...ids: string[]): Promise<string> {
   const items: Array<Record<string, unknown>> = [];
   let start: Record<string, unknown> | undefined;
   do {
@@ -52,7 +56,11 @@ async function rawSnapshot(): Promise<string> {
     start = page.LastEvaluatedKey;
   } while (start);
   const keyOf = (item: Record<string, unknown>) => `${String(item['pk'])}|${String(item['sk'])}`;
-  return JSON.stringify(items.sort((a, b) => keyOf(a).localeCompare(keyOf(b))));
+  const mine = items.filter((item) => {
+    const text = JSON.stringify(item);
+    return ids.some((id) => text.includes(id));
+  });
+  return JSON.stringify(mine.sort((a, b) => keyOf(a).localeCompare(keyOf(b))));
 }
 
 /** An owner with a profile and one person, plus the id guard createFlow would have written. */
@@ -127,16 +135,18 @@ describe.runIf(up)('deleteFlow on DynamoDB Local', () => {
 
     it.each(Object.keys(modes))('%s gets not_found', async (mode) => {
       const { who, id } = await modes[mode]!();
-      const before = await rawSnapshot();
+      const before = await rawSnapshot(who, id);
       expect(await deleteFlow(doc, table, caller(who), id, clock)).toEqual(NOT_FOUND);
-      expect(await rawSnapshot()).toBe(before);
+      expect(await rawSnapshot(who, id)).toBe(before);
     });
   });
 
   it('answers invalid for an id that is not a uuid, and changes nothing', async () => {
-    const before = await rawSnapshot();
-    expect(await deleteFlow(doc, table, caller(uid('owner')), 'nope', clock)).toEqual({ ok: false, code: 'invalid' });
-    expect(await rawSnapshot()).toBe(before);
+    const who = uid('owner');
+    await profile(who);
+    const before = await rawSnapshot(who, 'nope');
+    expect(await deleteFlow(doc, table, caller(who), 'nope', clock)).toEqual({ ok: false, code: 'invalid' });
+    expect(await rawSnapshot(who, 'nope')).toBe(before);
   });
 
   describe('after a delete', () => {
@@ -198,20 +208,21 @@ describe.runIf(up)('deleteFlow on DynamoDB Local', () => {
       };
       await rawPut(encodeInvite(invite));
       await rawPut(encodeToken(tokenHash, owner, invite.id));
-      const before = await rawSnapshot();
+      const scope = [owner, joiner, id, invite.id, tokenHash];
+      const before = await rawSnapshot(...scope);
 
       expect(await acceptInvite(doc, table, caller(joiner), tokenHash, clock)).toEqual({
         ok: false,
         code: 'invite_conflict',
       });
-      expect(await rawSnapshot()).toBe(before);
+      expect(await rawSnapshot(...scope)).toBe(before);
     });
 
     it('lets deleteUser still remove the item and its guard', async () => {
       const { owner, id } = await seedOwnerWithPerson();
       await deleteFlow(doc, table, caller(owner), id, clock);
       await deleteUser(doc, table, owner, clock);
-      const snapshot = await rawSnapshot();
+      const snapshot = await rawSnapshot(owner, id);
       expect(snapshot).not.toContain(owner);
       expect(snapshot).not.toContain(id);
     });
