@@ -246,7 +246,7 @@ export function waitsForPeter(pr: Pr): boolean {
   return isGreenForReview(pr) || (pr.prLabels ?? []).includes('ready-to-merge');
 }
 
-// The issue numbers named in the "### Depends on" section. "None" and a missing section give an empty list.
+// The issue numbers named in a "Depends on" section (any heading level, "##" or "###"). "None" and a missing section give an empty list.
 export function dependsOn(body: string | null | undefined): number[] {
   const text = normalize(body);
   if (text === null) {

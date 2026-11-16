@@ -265,6 +265,14 @@ describe('needs you', () => {
 });
 
 describe('dependsOn', () => {
+  it('reads a "## Depends on" heading (as in #856 and #850)', () => {
+    expect(dependsOn('## Context\nx\n\n## Depends on\n#849\n')).toEqual([849]);
+  });
+
+  it('reads a "### Depends on" heading', () => {
+    expect(dependsOn('## Context\nx\n\n### Depends on\n#849\n\n### Size\nS')).toEqual([849]);
+  });
+
   it('reads the issue numbers in the Depends on section', () => {
     const body = '### Context\nSee #1.\n\n### Depends on\n#12 and #34, also #12.\n\n### Size\nM #99';
     expect(dependsOn(body)).toEqual([12, 34]);
