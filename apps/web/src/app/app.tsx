@@ -335,8 +335,9 @@ const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareO
 const ITEM_IDS = Object.keys(cmsItemLabels) as ChecklistItemId[];
 
 /**
- * What this app stores on a history entry: only the calm line on Your people after a person's page
- * could not be opened. Every screen is a path now (#849, #850), so Back is the browser's own.
+ * What this app stores on a history entry: the calm line on Your people after a person's page could
+ * not be opened. Every screen and checklist item has a path (#849, #850, #856), so Back is the browser's
+ * own. The `openedHere` marker below is the other thing stored.
  */
 interface EntryState {
   /** Your people after a person's page could not be opened: a calm line, never the id. */
@@ -347,6 +348,15 @@ interface EntryState {
 function readEntry(state: unknown): EntryState {
   const raw = typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
   return { missing: raw['missing'] === true };
+}
+
+/**
+ * An item entry that this app pushed from one of its own pages carries `openedHere` in its state, so
+ * closing it can go Back to that page. It survives a reload (the state stays on the entry), and a
+ * link or a hand-typed address never has it.
+ */
+function openedHere(state: unknown): boolean {
+  return typeof state === 'object' && state !== null && (state as Record<string, unknown>)['openedHere'] === true;
 }
 
 /** Where the editor goes: a person's page, an empty page, Your people or Your account (all paths). */
@@ -568,8 +578,8 @@ function AppBody({
   const [flowCategory, setFlowCategory] = useState<TemplateCategory | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
   // Where the open item was opened from, so Back can return to that button.
-  // The key of the entry that openCmsItem pushed ('pending' until the router has committed it).
-  const pushedItemFrom = useRef<string | null>(null);
+  // Set once a close has started Back, until the router commits the new entry: a second tap does nothing.
+  const closing = useRef(false);
   const itemOpener = useRef<{ id: ChecklistItemId; region: 'main' | 'panel' | 'sheet' } | null>(null);
   const restoreOpener = useRef(false);
   // Where Back from "Edit person" returns: the form it was opened from, or the path.
@@ -608,6 +618,7 @@ function AppBody({
   // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
   const accountGeneration = useRef(0);
   // Where the prompt interrupted, so Save or Back returns there and onboarding carries on.
+  // Editor off only: the name prompt returns here after Save. Editor on, Back is the browser's, so nothing sets it.
   const [returnTo, setReturnTo] = useState<AppView>('home');
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
@@ -640,18 +651,17 @@ function AppBody({
       setAskingName(false);
       if (shownItem.current !== null && cmsItem === null) {
         restoreOpener.current = true;
+      } else if (cmsItem !== null) {
+        // Landed on an item (Forward, or Back from a later page): nothing is waiting to be focused.
+        restoreOpener.current = false;
       }
     }
     mounted.current = true;
     shownItem.current = cmsItem;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
-  // The item's entry is known once the router has committed it.
   useEffect(() => {
-    if (pushedItemFrom.current === 'pending') {
-      pushedItemFrom.current = cmsItem !== null ? location.key : null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    closing.current = false;
   }, [location.key]);
   useFocusHeadingOnChange(
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
@@ -865,17 +875,20 @@ function AppBody({
    * Your people (`/people`) and Your account (`/account`, signed in or out). The same spot again adds no
    * entry. Returns whether it moved. Confirm steps are not spots: they have no path (C9).
    */
-  function go(spot: Spot, { replace = false }: { replace?: boolean } = {}): boolean {
+  function go(spot: Spot, { replace = false, mark = false }: { replace?: boolean; mark?: boolean } = {}): boolean {
     let pathname: string;
     let state: Record<string, unknown> | null = null;
     if (spot.view === 'cms') {
-      const path = spot.person ? pagePathFor(spot.person, spot.section ?? 'overview') : null;
-      if (!path) {
+      const person = spot.person;
+      const path = person ? pagePathFor(person, spot.section ?? 'overview') : null;
+      if (!person || !path) {
         return false;
       }
-      pathname = spot.item ? pathForSpot({ flowId: spot.person?.flowId ?? '', section: 'overview', item: spot.item }) : path;
+      pathname = spot.item ? pathForSpot({ flowId: person.flowId, section: 'overview', item: spot.item }) : path;
+      state = mark ? { openedHere: true } : null;
     } else if (spot.view === 'noOne') {
       pathname = pathForSpot({ flowId: null, section: spot.section ?? 'overview', item: spot.item ?? null });
+      state = mark ? { openedHere: true } : null;
     } else if (spot.view === 'people') {
       pathname = paths.people();
       // A person's page that could not be opened: the id leaves the address bar, a calm line says so.
@@ -1234,19 +1247,40 @@ function AppBody({
   }
 
   function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', target: Spot, closeSheet?: () => void) {
-    itemOpener.current = { id, region };
+    // A second item opened while one is open replaces its entry, so one Back still returns to the page the
+    // first one was opened from, and focus goes to the first opener.
+    const replacing = cmsItem !== null;
+    if (!replacing) {
+      itemOpener.current = { id, region };
+    }
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
     closeSheet?.();
-    // The entry this opens is ours: closing it can go Back to the page it came from (see closeCmsItem).
-    pushedItemFrom.current = go({ ...target, item: id }) ? 'pending' : null;
+    // The entry this opens is marked as ours: closing it can go Back to the page it came from (see closeCmsItem).
+    go({ ...target, item: id }, replacing ? { replace: true, mark: openedHere(location.state) } : { mark: true });
+  }
+
+  /** Back to the page this item was opened from. Once, however many times it is tapped. */
+  function backToOpener(): void {
+    if (closing.current) {
+      return;
+    }
+    closing.current = true;
+    // If the browser has nothing behind us after all, do not leave the close button dead.
+    setTimeout(() => {
+      closing.current = false;
+    }, 600);
+    navigate(-1);
   }
 
   function closeCmsItem() {
+    if (closing.current) {
+      return;
+    }
     restoreOpener.current = true;
-    // Opened here (a push of ours): Back is exact, the page and its place return as they were. A deep link
-    // or a reload has no page of ours behind it, so it goes to the Overview and takes the item's entry.
-    if (pushedItemFrom.current === location.key) {
-      navigate(-1);
+    // Opened here (a push of ours, marked in its state, also after a reload): Back is exact, the page and its
+    // place return as they were. A link has no page of ours behind it, so it goes to the Overview and takes the item's entry.
+    if (openedHere(location.state)) {
+      backToOpener();
       return;
     }
     go({ ...here, section: 'overview', item: null }, { replace: true });

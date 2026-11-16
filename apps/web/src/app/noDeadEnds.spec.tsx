@@ -247,4 +247,30 @@ describe('an empty owner account starts from a section (#597)', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expect(screen.queryByText('A person is here now. Their page is open.')).toBeNull();
   });
+
+  it('the Back walk goes on past /start/guide entries to the page before them (#856)', async () => {
+    signedInAs('owner');
+    const user = userEvent.setup();
+    renderApp(<App />);
+    await h1('Overview');
+    const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
+    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await h1('Your people');
+    await user.click(nav().getByRole('button', { name: /^Service/ }));
+    await h1('Service');
+    // An item, then another page: the entries behind Start are Service, the item, Obituary.
+    const row = screen.getByRole('complementary', { name: "What you'll need" }).querySelector<HTMLElement>('[data-checklist-item]');
+    await user.click(row as HTMLElement);
+    await waitFor(() => expect(window.location.pathname).toMatch(/^\/start\/guide\//));
+    await user.click(nav().getByRole('button', { name: /^Obituary/ }));
+    await h1('Obituary');
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: CREATE }));
+    await waitFor(() => expect(stored()).toHaveLength(1));
+    await user.type(await screen.findByLabelText('Their name'), 'Margaret');
+    const personPath = window.location.pathname;
+    expect(personPath).toMatch(/^\/people\//);
+    window.history.back();
+    await h1('Your people');
+    expect(window.location.pathname).not.toBe(personPath);
+  });
 });
