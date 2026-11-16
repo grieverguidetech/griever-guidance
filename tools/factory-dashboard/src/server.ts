@@ -12,15 +12,11 @@ import {
   computeNeedsYou,
   computeRoadmap,
   MERGED_PR_LIMIT,
-  MERGED_WINDOW_DAYS,
+  buildEngineering,
+  mergedSearchDate,
   CI_HEALTH_RUNS,
   DEPLOY_FETCHED,
-  computeCiHealth,
-  computeDeploys,
-  computeThroughput,
-  flakyIssues,
   shippedMayBeCutOff,
-  shippedSearchDate,
   parseFeatureFlags,
   shippedThisWeek,
   boardTruncation,
@@ -142,7 +138,7 @@ async function loadFeatureFlags(): Promise<FeatureFlag[]> {
 // One query for Shipped (7 days) and Throughput (28 days). The search sets the window, so the limit is not what cuts the list.
 async function loadMergedPrs(): Promise<MergedPr[]> {
   const fields = 'number,title,url,mergedAt,createdAt';
-  const search = `merged:>=${shippedSearchDate(new Date(), MERGED_WINDOW_DAYS)}`;
+  const search = `merged:>=${mergedSearchDate(new Date())}`;
   const args = ['pr', 'list', '--repo', REPO, '--state', 'merged', '--search', search];
   const data = await ghJson([...args, '--limit', String(MERGED_PR_LIMIT), '--json', fields]);
   return data as MergedPr[];
@@ -166,7 +162,8 @@ function loadWorkflowRuns(workflow: string, limit: number, branch?: string): Pro
   const fields = 'databaseId,workflowName,headBranch,status,conclusion,url,createdAt';
   const args = ['run', 'list', '--repo', REPO, '--workflow', workflow, '--limit', String(limit)];
   if (branch) {
-    args.push('--branch', branch);
+    // Pushes to main only, so PR-event runs on a branch named main do not count.
+    args.push('--branch', branch, '--event', 'push');
   }
   return ghJson([...args, '--json', fields]).then((data) => data as Run[]);
 }
@@ -258,13 +255,7 @@ async function buildState() {
       roadmap: productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board),
       blockedBy: productBlockedBy,
     },
-    engineering: {
-      ciHealth: sources['ciMain']?.ok ? computeCiHealth(ciMainRuns) : null,
-      flaky: sources['openIssues']?.ok ? flakyIssues(openIssues) : null,
-      deploys: sources['deploys']?.ok ? computeDeploys(deployRuns, generatedAt) : null,
-      throughput: sources['mergedPrs']?.ok ? computeThroughput(mergedPrs, generatedAt) : null,
-      throughputMayBeCutOff: shippedMayBeCutOff(mergedPrs.length),
-    },
+    engineering: buildEngineering(sources, { ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

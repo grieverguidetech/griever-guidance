@@ -148,7 +148,9 @@ function ciDot(ci) {
   };
   var pair = map[ci] || map.none;
   var span = el("span");
-  span.appendChild(el("span", null, "dot " + pair[0]));
+  var dot = el("span", null, "dot " + pair[0]);
+  dot.setAttribute("aria-hidden", "true");
+  span.appendChild(dot);
   span.appendChild(document.createTextNode(pair[1]));
   return span;
 }
@@ -207,6 +209,16 @@ function renderFlaky() {
   }, "No open flaky-test issues."));
 }
 
+function deployColor(run) {
+  if (run.status !== "completed") {
+    return "amber";
+  }
+  if (run.conclusion === "success") {
+    return "green";
+  }
+  return run.conclusion === "skipped" ? "grey" : "red";
+}
+
 function renderDeploys() {
   var s = section("Deploys", "deploys");
   var deploys = state.engineering.deploys;
@@ -214,7 +226,7 @@ function renderDeploys() {
     return;
   }
   if (deploys.lastGood) {
-    var ago = "Last successful deploy: " + deploys.hoursSinceGood + " hours ago (" + when(deploys.lastGood.createdAt) + ").";
+    var ago = "Last successful deploy started " + deploys.sinceGoodText + " ago (" + when(deploys.lastGood.createdAt) + ").";
     s.appendChild(el("p", ago));
   } else {
     s.appendChild(el("p", "No successful deploy in the runs checked.", "error"));
@@ -226,7 +238,7 @@ function renderDeploys() {
   var table = el("table", null, "plain");
   table.appendChild(el("caption", "Last 5 Deploy workflow runs", "sr-only"));
   var head = el("tr");
-  ["Result", "Time", "Run"].forEach(function (name) {
+  ["Result", "Started", "Run"].forEach(function (name) {
     var th = el("th", name);
     th.scope = "col";
     head.appendChild(th);
@@ -235,10 +247,14 @@ function renderDeploys() {
   deploys.recent.forEach(function (run) {
     var tr = el("tr");
     var result = el("td");
-    result.appendChild(runDot(run));
-    result.appendChild(document.createTextNode(run.status === "completed" ? run.conclusion : run.status));
+    var dot = el("span", null, "dot " + deployColor(run));
+    dot.setAttribute("aria-hidden", "true");
+    result.appendChild(dot);
+    result.appendChild(document.createTextNode(" " + (run.status === "completed" ? run.conclusion : run.status)));
     tr.appendChild(result);
-    tr.appendChild(el("td", when(run.createdAt)));
+    var time = el("th", when(run.createdAt));
+    time.scope = "row";
+    tr.appendChild(time);
     var cell = el("td");
     cell.appendChild(link("Run " + run.databaseId, run.url));
     tr.appendChild(cell);
@@ -274,7 +290,7 @@ function renderThroughput() {
     table.appendChild(tr);
   });
   s.appendChild(table);
-  var median = t.medianHours === null ? "No merged PRs to measure." : "Median time from opened to merged: " + t.medianHours + " hours.";
+  var median = t.medianHours === null ? "Median time from opened to merged: Unknown (no merged PRs to measure)." : "Median time from opened to merged: " + t.medianText + ".";
   s.appendChild(el("p", median));
 }
 
@@ -608,11 +624,11 @@ function render() {
   areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
   renderProduct();
   main = document.getElementById("panel-engineering");
+  renderNeedsYou();
   renderCiHealth();
   renderFlaky();
   renderDeploys();
   renderThroughput();
-  renderNeedsYou();
   renderDrift();
   renderBacklogReview();
   renderPrs();

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaOf,
+  buildEngineering,
+  formatDuration,
+  mergedSearchDate,
   computeCiHealth,
   computeDeploys,
   computeThroughput,
@@ -758,5 +761,78 @@ describe('computeThroughput', () => {
 describe('shippedSearchDate window', () => {
   it('can widen to 28 days', () => {
     expect(shippedSearchDate(new Date('2026-11-15T12:00:00Z'), 28)).toBe('2026-10-18');
+  });
+});
+
+describe('boundaries shared by Shipped and Throughput', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const at = (days: number) => ({
+    number: 1,
+    title: 'x',
+    url: 'https://x',
+    mergedAt: new Date(now.getTime() - days * 86_400_000).toISOString(),
+  });
+
+  it('puts a PR merged exactly 7 days ago in both "Shipped this week" and week 0', () => {
+    expect(shippedThisWeek([at(7)], now)).toHaveLength(1);
+    expect(computeThroughput([at(7)], now).weeks.map((w) => w.count)).toEqual([1, 0, 0, 0]);
+  });
+
+  it('drops a PR just over 7 days from Shipped and puts it in week 1', () => {
+    expect(shippedThisWeek([at(7.001)], now)).toHaveLength(0);
+    expect(computeThroughput([at(7.001)], now).weeks.map((w) => w.count)).toEqual([0, 1, 0, 0]);
+  });
+
+  it('keeps a PR merged exactly 28 days ago in week 3 and drops one just over', () => {
+    expect(computeThroughput([at(28)], now).weeks.map((w) => w.count)).toEqual([0, 0, 0, 1]);
+    expect(computeThroughput([at(28.001)], now).total).toBe(0);
+  });
+});
+
+describe('mergedSearchDate', () => {
+  it('goes back 28 days in UTC', () => {
+    expect(mergedSearchDate(new Date('2026-11-15T12:00:00Z'))).toBe('2026-10-18');
+  });
+});
+
+describe('formatDuration', () => {
+  it('uses minutes under an hour and singular at exactly 1', () => {
+    expect(formatDuration(0.5)).toBe('30 minutes');
+    expect(formatDuration(1 / 60)).toBe('1 minute');
+    expect(formatDuration(0.001)).toBe('less than 1 minute');
+    expect(formatDuration(1)).toBe('1 hour');
+    expect(formatDuration(1.5)).toBe('1.5 hours');
+    expect(formatDuration(6)).toBe('6 hours');
+  });
+});
+
+describe('buildEngineering', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const data = { ciMainRuns: [], openIssues: [], deployRuns: [], mergedPrs: [] };
+  const ok = { ok: true };
+  const allOk = { ciMain: ok, openIssues: ok, deploys: ok, mergedPrs: ok };
+
+  it('fills every field when all sources load', () => {
+    const result = buildEngineering(allOk, data, now);
+    expect(result.ciHealth).not.toBeNull();
+    expect(result.flaky).toEqual([]);
+    expect(result.deploys?.sinceGoodText).toBe('Unknown');
+    expect(result.throughput?.medianText).toBe('Unknown');
+  });
+
+  it.each([
+    ['ciMain', 'ciHealth'],
+    ['openIssues', 'flaky'],
+    ['deploys', 'deploys'],
+    ['mergedPrs', 'throughput'],
+  ] as const)('a failed %s source nulls only %s', (source, field) => {
+    const result = buildEngineering({ ...allOk, [source]: { ok: false, error: 'x' } }, data, now);
+    for (const key of ['ciHealth', 'flaky', 'deploys', 'throughput'] as const) {
+      if (key === field) {
+        expect(result[key]).toBeNull();
+      } else {
+        expect(result[key]).not.toBeNull();
+      }
+    }
   });
 });
