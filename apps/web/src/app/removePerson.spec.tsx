@@ -78,7 +78,7 @@ const synced = [
 ];
 
 async function openAccount(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Your account' }));
+  await user.click(await screen.findByRole('link', { name: 'Your account' }));
   await screen.findByRole('heading', { level: 1, name: 'Account' });
 }
 
@@ -110,6 +110,28 @@ beforeEach(() => {
 });
 
 describe('Remove a person on Account (#222)', () => {
+  it('Account is /account, and the remove confirm step has no URL and adds no history entry (C9, #850)', async () => {
+    seed(synced);
+    const user = await startOnOverview();
+    expect(window.location.pathname).toBe('/account');
+    const entries = window.history.length;
+    await user.click(screen.getByRole('button', { name: 'Remove Robert Hayes' }));
+    expect(screen.getByRole('button', { name: 'Yes, remove Robert Hayes' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/account');
+    expect(window.location.search + window.location.hash).toBe('');
+    expect(window.history.length).toBe(entries);
+    await user.click(screen.getByRole('button', { name: 'Keep Robert Hayes' }));
+    expect(window.history.length).toBe(entries);
+  });
+
+  it('a deep link to /account opens the signed-in Account', async () => {
+    seed(synced);
+    renderApp(<App />, { path: '/account' });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Remove Margaret Hayes' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/account');
+  });
+
   it('signed in and synced: removes one of two people after the server says ok, and never lists a member', async () => {
     seed(synced);
     mocks.deleteFlow.mockResolvedValue({ ok: true });
@@ -204,7 +226,7 @@ describe('Remove a person on Account (#222)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     // The session ends somewhere else; the person stays where they are.
     act(() => clerk.endElsewhere());
-    await user.click(await screen.findByRole('button', { name: 'Your account' }));
+    await user.click(await screen.findByRole('link', { name: 'Your account' }));
     expect(await screen.findByText('Sign in to remove someone saved to your account.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove Margaret Hayes' })).not.toBeInTheDocument();
   });

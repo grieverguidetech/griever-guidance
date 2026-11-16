@@ -202,6 +202,15 @@ describe('SideNav', () => {
       expect(nav.getByRole('link', { name: /^Overview/ })).not.toHaveAttribute('aria-current');
     });
 
+    it('Your people and Your account are links too when they have a path, and keep aria-current (#850)', () => {
+      setup({ hrefFor: (key) => (key === 'people' ? '/people' : key === 'account' ? '/account' : null), section: 'account' });
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+      expect(nav.getByRole('link', { name: 'Your people' })).toHaveAttribute('href', '/people');
+      expect(nav.getByRole('link', { name: 'Your account' })).toHaveAttribute('href', '/account');
+      expect(nav.getByRole('link', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
+      expect(nav.getByRole('link', { name: 'Your people' })).not.toHaveAttribute('aria-current');
+    });
+
     it('a plain click or Enter on a link chooses it in the app, without following the href', async () => {
       const user = userEvent.setup();
       const { onSelect } = setup({ hrefFor });

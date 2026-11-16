@@ -116,6 +116,8 @@ describe('editor URLs (#849)', () => {
       `/people/${FLOW}/service`,
       `/people/${FLOW}/obituary`,
       `/people/${FLOW}/thanks`,
+      '/people',
+      '/account',
     ]);
     expect(hrefs.join(' ')).not.toMatch(/s-local-1|Margaret/);
     expect(nav().getByRole('link', { name: /^Obituary/ })).toHaveAttribute('aria-current', 'page');
@@ -158,7 +160,7 @@ describe('editor URLs (#849)', () => {
     renderApp(<App />, { path: `/people/${OTHER}/service` });
     expect(await h1('Your people')).toBeInTheDocument();
     expect(screen.getByText("That page isn't here. Your people are below.")).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/');
+    expect(window.location.pathname).toBe('/people');
     expect(document.body.textContent).not.toContain(OTHER);
     expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
   });
@@ -184,7 +186,7 @@ describe('editor URLs (#849)', () => {
     expect(await h1('Your people')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.queryByText(MISSING_LINE)).toBeNull();
-    expect(window.location.pathname).toBe('/');
+    expect(window.location.pathname).toBe('/people');
   });
 
   it('moving between two people on the same section moves focus to the h1 (#849 a11y)', async () => {
@@ -220,7 +222,7 @@ describe('leaving an unnamed new person (#849 B1)', () => {
   it('Start, then Your people: the list, with no "not here" line', async () => {
     const user = userEvent.setup();
     await startUnnamed(user);
-    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await user.click(nav().getByRole('link', { name: 'Your people' }));
     expect(await h1('Your people')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.queryByText(MISSING_LINE)).toBeNull();
@@ -230,7 +232,7 @@ describe('leaving an unnamed new person (#849 B1)', () => {
   it('Start, then Your account: lands on Account', async () => {
     const user = userEvent.setup();
     await startUnnamed(user);
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     expect(await h1('Account')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
@@ -382,7 +384,7 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/start' });
     await h1('Overview');
-    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await user.click(nav().getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     const before = window.location.pathname;
     await user.click(panel().getByRole('button', { name: ITEM }));
@@ -397,7 +399,7 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/start' });
     await h1('Overview');
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
     const before = window.location.pathname;
     await user.click(panel().getByRole('button', { name: ITEM }));
@@ -463,5 +465,114 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
     await h1('The person');
     expect(window.location.pathname).toMatch(/^\/people\//);
+  });
+});
+
+describe('Your people and Your account have URLs (#850)', () => {
+  const ITEM = 'Get a legal pronouncement of death';
+
+  function back() {
+    act(() => {
+      window.history.back();
+    });
+  }
+
+  it('/people and /account open their screens by deep link, and a reload stays there', async () => {
+    const people = renderApp(<App />, { path: '/people' });
+    expect(await h1('Your people')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(window.location.pathname).toBe('/people');
+    people.unmount();
+    const account = renderApp(<App />, { path: '/account' });
+    expect(await h1('Account')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(window.location.pathname).toBe('/account');
+    account.unmount();
+    renderApp(<App />, { path: window.location.pathname });
+    expect(await h1('Account')).toBeInTheDocument();
+  });
+
+  it('Back from /account returns to the page it was opened from, with focus on its heading', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    await h1('Service');
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
+    await h1('Account');
+    expect(window.location.pathname).toBe('/account');
+    back();
+    const service = await h1('Service');
+    expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
+    await waitFor(() => expect(service).toHaveFocus());
+  });
+
+  it('Back from /account returns to Your people when it was opened from there, and Forward goes on', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/people' });
+    await h1('Your people');
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
+    await h1('Account');
+    back();
+    await h1('Your people');
+    expect(window.location.pathname).toBe('/people');
+    act(() => {
+      window.history.forward();
+    });
+    await h1('Account');
+    expect(window.location.pathname).toBe('/account');
+  });
+
+  it('Back from /account returns to the empty page it was opened from', async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/start/service' });
+    await h1('Service');
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
+    await h1('Account');
+    back();
+    await h1('Service');
+    expect(window.location.pathname).toBe('/start/service');
+  });
+
+  it('an item opened from the panel on Your account closes back to Account, focus on the item', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/account' });
+    await h1('Account');
+    const opener = within(screen.getByRole('complementary', { name: "What you'll need" })).getByRole('button', { name: ITEM });
+    await user.click(opener);
+    await h1(ITEM);
+    expect(window.location.pathname).toBe(`/people/${FLOW}/guide/pronouncement`);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Account');
+    expect(window.location.pathname).toBe('/account');
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it('an item opened from the preview panel on Your people closes back to Your people (nobody saved)', async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/people' });
+    await h1('Your people');
+    await user.click(within(screen.getByRole('complementary', { name: "What you'll need" })).getByRole('button', { name: ITEM }));
+    await h1(ITEM);
+    expect(window.location.pathname).toBe('/start/guide/pronouncement');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Your people');
+    expect(window.location.pathname).toBe('/people');
+  });
+
+  it('an item opened by a link, then closed, goes to the Overview rather than leaving the app', async () => {
+    renderApp(<App />, { path: `/people/${FLOW}/guide/pronouncement` });
+    await h1(ITEM);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Overview');
+  });
+
+  it('with the editor off, /people and /account are not found', async () => {
+    mocks.cms = false;
+    const people = renderApp(<App />, { path: '/people' });
+    expect(await h1("We couldn't find that page.")).toBeInTheDocument();
+    people.unmount();
+    renderApp(<App />, { path: '/account' });
+    expect(await h1("We couldn't find that page.")).toBeInTheDocument();
   });
 });

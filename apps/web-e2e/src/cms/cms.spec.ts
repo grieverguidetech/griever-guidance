@@ -22,10 +22,9 @@ function nav(page: Page) {
   return page.getByRole('navigation');
 }
 
-/** A page with a URL is a link in the nav (#849); Your people and Your account stay buttons until they get one. */
+/** Every item in the nav has a URL, so every item is a link (#849, #850). */
 async function openSection(page: Page, name: string, heading: string) {
-  const role = name === 'Your people' || name === 'Your account' ? 'button' : 'link';
-  await nav(page).getByRole(role, { name: new RegExp(`^${name}`) }).click();
+  await nav(page).getByRole('link', { name: new RegExp(`^${name}`) }).click();
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
@@ -240,7 +239,7 @@ test.describe('navigation (#566)', () => {
     await startPerson(page);
     await expect(page.getByRole('banner').getByRole('img', { name: 'Grievers Guidance' })).toBeVisible();
     await expect(nav(page).getByRole('button', { name: /^The person/ })).toHaveCount(0);
-    await expect(nav(page).getByRole('button', { name: 'Your people' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Your people' })).toBeVisible();
     await expect(nav(page).getByText('Not started')).toHaveCount(0);
     await expect(nav(page).getByText('Ready', { exact: true })).toHaveCount(0);
     await expect(nav(page).getByText('Not named yet')).toHaveCount(0);
@@ -255,8 +254,8 @@ test.describe('navigation (#566)', () => {
     await openSection(page, 'Your account', 'Account');
     await expect(nav(page).getByRole('link', { name: 'Overview' })).toBeVisible();
     await openSection(page, 'Your people', 'Your people');
-    await expect(nav(page).getByRole('button', { name: 'Your account' })).toBeVisible();
-    await expect(nav(page).getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav(page).getByRole('link', { name: 'Your account' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('Back walks the editor screens in the order they were opened', async ({ page }) => {
@@ -340,5 +339,49 @@ test.describe('checklist item URLs (#856)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(servicePath);
     await expect(opener).toBeFocused();
+  });
+});
+
+test.describe('Your people and Your account URLs (#850)', () => {
+  test('Back from /account returns to the page it was opened from, and Forward goes on', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Service', 'Service');
+    const servicePath = new URL(page.url()).pathname;
+    await openSection(page, 'Your account', 'Account');
+    expect(new URL(page.url()).pathname).toBe('/account');
+    await page.goBack();
+    const service = page.getByRole('heading', { level: 1, name: 'Service' });
+    await expect(service).toBeVisible();
+    await expect(service).toBeFocused();
+    expect(new URL(page.url()).pathname).toBe(servicePath);
+    await page.goForward();
+    await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/account');
+  });
+
+  test('/people and /account open by address and survive a reload', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Your people', 'Your people');
+    expect(new URL(page.url()).pathname).toBe('/people');
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+    await openSection(page, 'Your account', 'Account');
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/account');
+  });
+
+  test('the remove-person confirm step has no URL and Back still leaves Account', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Overview', 'Overview');
+    await openSection(page, 'Your account', 'Account');
+    await page.getByRole('button', { name: 'Remove Margaret Hayes' }).click();
+    await expect(page.getByRole('button', { name: 'Yes, remove Margaret Hayes' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/account');
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   });
 });
