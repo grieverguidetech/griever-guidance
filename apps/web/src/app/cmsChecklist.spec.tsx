@@ -277,7 +277,7 @@ describe('checklist in the editor (#421)', () => {
     view.unmount();
     renderApp(<App />);
     // Loading lands on Margaret (just opened); "Change" returns to Home to pick Harold.
-    await user.click(within(await screen.findByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
+    await user.click(within(await screen.findByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
     await user.click(
       await screen.findByRole('button', { name: 'Harold Price' }),
     );

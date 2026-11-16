@@ -78,7 +78,7 @@ const synced = [
 ];
 
 async function openAccount(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Your account' }));
+  await user.click(await screen.findByRole('link', { name: 'Your account' }));
   await screen.findByRole('heading', { level: 1, name: 'Account' });
 }
 
@@ -226,7 +226,7 @@ describe('Remove a person on Account (#222)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     // The session ends somewhere else; the person stays where they are.
     act(() => clerk.endElsewhere());
-    await user.click(await screen.findByRole('button', { name: 'Your account' }));
+    await user.click(await screen.findByRole('link', { name: 'Your account' }));
     expect(await screen.findByText('Sign in to remove someone saved to your account.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove Margaret Hayes' })).not.toBeInTheDocument();
   });

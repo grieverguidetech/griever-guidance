@@ -22,10 +22,9 @@ function nav(page: Page) {
   return page.getByRole('navigation');
 }
 
-/** A page with a URL is a link in the nav (#849); Your people and Your account stay buttons (they have paths, #850, but no nav link yet). */
+/** Every item in the nav has a URL, so every item is a link (#849, #850). */
 async function openSection(page: Page, name: string, heading: string) {
-  const role = name === 'Your people' || name === 'Your account' ? 'button' : 'link';
-  await nav(page).getByRole(role, { name: new RegExp(`^${name}`) }).click();
+  await nav(page).getByRole('link', { name: new RegExp(`^${name}`) }).click();
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
@@ -240,7 +239,7 @@ test.describe('navigation (#566)', () => {
     await startPerson(page);
     await expect(page.getByRole('banner').getByRole('img', { name: 'Grievers Guidance' })).toBeVisible();
     await expect(nav(page).getByRole('button', { name: /^The person/ })).toHaveCount(0);
-    await expect(nav(page).getByRole('button', { name: 'Your people' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Your people' })).toBeVisible();
     await expect(nav(page).getByText('Not started')).toHaveCount(0);
     await expect(nav(page).getByText('Ready', { exact: true })).toHaveCount(0);
     await expect(nav(page).getByText('Not named yet')).toHaveCount(0);
@@ -255,8 +254,8 @@ test.describe('navigation (#566)', () => {
     await openSection(page, 'Your account', 'Account');
     await expect(nav(page).getByRole('link', { name: 'Overview' })).toBeVisible();
     await openSection(page, 'Your people', 'Your people');
-    await expect(nav(page).getByRole('button', { name: 'Your account' })).toBeVisible();
-    await expect(nav(page).getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav(page).getByRole('link', { name: 'Your account' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('Back walks the editor screens in the order they were opened', async ({ page }) => {

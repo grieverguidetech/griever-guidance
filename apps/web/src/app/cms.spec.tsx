@@ -97,7 +97,7 @@ async function openMargaret() {
 
 /** The "Your people" item in the side nav (there is no Change button any more). */
 function peopleNav() {
-  return within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' });
+  return within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' });
 }
 
 beforeEach(() => {
@@ -362,7 +362,7 @@ describe('editor on (#395)', () => {
   it('"Your account" opens the settings content when nobody is signed in, inside the editor, and the nav returns to the Overview', async () => {
     const user = userEvent.setup();
     await openMargaret();
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     const focused8 = await screen.findByRole('heading', { level: 1, name: 'Account' });
     await waitFor(() => expect(focused8).toHaveFocus());
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
@@ -403,7 +403,7 @@ describe('editor on, signed in (#395)', () => {
     renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     const focused10 = await screen.findByRole('heading', { level: 1, name: 'Account' });
     await waitFor(() => expect(focused10).toHaveFocus());
     expect(screen.getByLabelText('First name')).toHaveValue('Anna');
@@ -427,7 +427,7 @@ describe('editor on, signed in (#395)', () => {
     renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     await user.click(screen.getByRole('button', { name: 'Save details' }));
     expect(await screen.findByText('Your details are saved.')).toBeInTheDocument();
@@ -440,7 +440,7 @@ describe('editor on, signed in (#395)', () => {
     renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
   }
 
@@ -512,7 +512,7 @@ describe('editor on, signed in (#395)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByRole('heading', { name: "What you'll need" })).toBeInTheDocument();
@@ -527,7 +527,7 @@ describe('editor on, signed in (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(peopleNav());
     await screen.findByRole('heading', { level: 1, name: 'Your people' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     const panel = within(screen.getByRole('complementary'));
     const item = panel.getAllByRole('button', { name: /pronouncement/i })[0];
@@ -546,7 +546,7 @@ describe('editor on, signed in (#395)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(await screen.findByRole('button', { name: 'Sign in with the test provider' })).toBeInTheDocument();
@@ -566,7 +566,7 @@ describe('editor on, signed in (#395)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     await screen.findByRole('heading', { name: 'People helping you' });
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
@@ -582,7 +582,7 @@ describe('editor on, signed in (#395)', () => {
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
     signedInAs('member');
     renderApp(<App />);
-    await screen.findByRole('button', { name: 'Your account' });
+    await screen.findByRole('link', { name: 'Your account' });
     await waitFor(() => expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument());
   });
 

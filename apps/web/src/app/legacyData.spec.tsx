@@ -97,7 +97,8 @@ describe('legacy data with nobody listable', () => {
     expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/start');
-    expect(nav().queryAllByRole('link')).toHaveLength(0);
+    // The pages have no path for this person, so they stay buttons; Your people and Your account are links.
+    expect(nav().getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(['/people', '/account']);
   });
 });
 
@@ -127,6 +128,7 @@ describe('a person whose flowId is not a path id', () => {
     renderApp(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
-    expect(nav().queryAllByRole('link')).toHaveLength(0);
+    // The pages have no path for this person, so they stay buttons; Your people and Your account are links.
+    expect(nav().getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(['/people', '/account']);
   });
 });

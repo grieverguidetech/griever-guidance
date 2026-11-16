@@ -87,7 +87,7 @@ function expectOneEditorLayout() {
 
 function expectFullNav() {
   const nav = screen.getByRole('navigation', { name: /^Sections/ });
-  expect(within(nav).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(NAV);
+  expect(Array.from(nav.querySelectorAll('a, button')).map((b) => b.textContent?.trim())).toEqual(NAV);
   return nav;
 }
 
@@ -112,7 +112,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
   }
 
   async function openPeople(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
     await h1('Your people');
   }
 
@@ -131,13 +131,13 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     'opens %s with one next step and keeps the layout',
     async (name) => {
       const user = await open();
-      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: new RegExp(`^${name}`) }));
+      await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole(name.startsWith('Your') ? 'link' : 'button', { name: new RegExp(`^${name}`) }));
       const heading = await h1(name);
       await waitFor(() => expect(heading).toHaveFocus());
       expectFullNav();
       expectOneEditorLayout();
       const nav = screen.getByRole('navigation', { name: /^Sections/ });
-      expect(within(nav).getByRole('button', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-current', 'page');
+      expect(within(nav).getByRole(name.startsWith('Your') ? 'link' : 'button', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-current', 'page');
       const main = screen.getByRole('main');
       if (kind === 'owner') {
         expect(within(main).getByRole('button', { name: CREATE })).toBeInTheDocument();
@@ -176,7 +176,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     await h1(label);
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Back' }));
     await h1('Overview');
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await h1('Account');
     label = firstItem().textContent ?? '';
     await user.click(firstItem());
@@ -202,7 +202,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
 
   it('keeps the full nav on Your account', async () => {
     const user = await open();
-    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await user.click(screen.getByRole('link', { name: 'Your account' }));
     await h1('Account');
     expectFullNav();
     expectOneEditorLayout();
@@ -234,7 +234,7 @@ describe('an empty owner account starts from a section (#597)', () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     await h1('Obituary');
@@ -254,7 +254,7 @@ describe('an empty owner account starts from a section (#597)', () => {
     renderApp(<App />);
     await h1('Overview');
     const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await user.click(nav().getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     await user.click(nav().getByRole('button', { name: /^Service/ }));
     await h1('Service');

@@ -241,7 +241,8 @@ describe('background sync in the app (#520)', () => {
       });
       expect(screen.getByText('Loading…')).toBeInTheDocument();
       const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-      expect(nav.getAllByRole('button')).toHaveLength(7);
+      expect(nav.getAllByRole('button')).toHaveLength(5);
+      expect(nav.getAllByRole('link')).toHaveLength(2);
       expect(screen.getByRole('complementary', { name: "What you'll need" }).querySelector('[data-checklist-item]')).not.toBeNull();
       await act(async () => {
         nav.getByRole('button', { name: /^Obituary/ }).click();
@@ -343,7 +344,7 @@ describe('background sync in the app (#520)', () => {
       expect(screen.getByText('Loading…')).toBeInTheDocument();
       const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
       await act(async () => {
-        nav.getByRole('button', { name: 'Your account' }).click();
+        nav.getByRole('link', { name: 'Your account' }).click();
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
       await act(async () => {

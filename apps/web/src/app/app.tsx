@@ -337,7 +337,7 @@ const ITEM_IDS = Object.keys(cmsItemLabels) as ChecklistItemId[];
 /**
  * What this app stores on a history entry: the calm line on Your people after a person's page could
  * not be opened. Every screen and checklist item has a path (#849, #850, #856), so Back is the browser's
- * own. The `openedHere` marker below is the other thing stored.
+ * own. The `openedHere` marker (see `openedHere`, after this) is the other thing stored.
  */
 interface EntryState {
   /** Your people after a person's page could not be opened: a calm line, never the id. */
@@ -663,12 +663,16 @@ function AppBody({
   useEffect(() => {
     closing.current = false;
   }, [location.key]);
+  // The signed-in and signed-out versions of /account are one screen, so one key: a session that ends
+  // while someone types there changes the version, not the focus.
   useFocusHeadingOnChange(
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
       ? `empty:${cmsSection}:${cmsItem ?? ''}`
       : view === 'cms'
         ? `cms:${pathPerson?.flowId ?? ''}:${cmsSection}:${cmsItem ?? ''}`
-        : view,
+        : accountPath
+          ? 'account'
+          : view,
   );
   // Must stay declared after the heading hook above: effects run in order, so this one lands
   // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
@@ -704,7 +708,10 @@ function AppBody({
     // A stale error from another screen would otherwise show here without being announced.
     clearError?.();
     setAskingName(asksName);
-    setReturnTo(from);
+    // Editor off only (the name prompt's return); editor on, Back is the browser's.
+    if (!CMS_ENABLED) {
+      setReturnTo(from);
+    }
     setNeedsName(false);
     if (CMS_ENABLED) {
       return go({ view: 'profile' });
@@ -863,10 +870,19 @@ function AppBody({
     setActiveId(sortedSessions[0].id);
   }, [isSignedIn, activeId, sortedSessions]);
 
-  // Editor on: the person the URL names. Your people and the empty pages have none; the account
-  // screens keep the person whose page they were opened from, else the most recent one.
+  // Editor on: the person the URL names. Your people and the empty pages have none. Your account has no
+  // person in its path, so it shows the most recent one; a person's page counts as opening them (below).
   const editorActive =
     view === 'cms' ? pathPerson : view === 'people' || view === 'noOne' ? null : (pathPerson ?? sortedSessions[0] ?? null);
+  // Showing a person's page makes them the most recent, so Your account (no person in its path) and its
+  // links name the person the visitor was just looking at, also after a deep link, a bookmark or Back.
+  const touchSession = sessions.touchSession;
+  const shownPersonId = view === 'cms' ? (pathPerson?.id ?? null) : null;
+  useEffect(() => {
+    if (CMS_ENABLED && shownPersonId !== null) {
+      touchSession(shownPersonId);
+    }
+  }, [shownPersonId, touchSession]);
   const stateActive = sessions.sessions.find((s) => s.id === activeId) ?? null;
   const active: Session | null = CMS_ENABLED ? editorActive : stateActive;
 
@@ -931,13 +947,16 @@ function AppBody({
     person: active,
   };
 
-  /** The side nav's link for an item, when it has a path: a person's Overview and sections. */
+  /** The side nav's link for an item: Your people, Your account, and a person's Overview and sections. */
   function navHref(person: Session | null) {
     return (key: CmsNavKey): string | null => {
-      if (!person || key === 'people' || key === 'account') {
-        return null;
+      if (key === 'people') {
+        return paths.people();
       }
-      return pagePathFor(person, key);
+      if (key === 'account') {
+        return paths.account();
+      }
+      return person ? pagePathFor(person, key) : null;
     };
   }
 
@@ -2021,6 +2040,7 @@ function AppBody({
           aside={panelFor(null)}
           noCurrent
           personName=""
+          hrefFor={navHref(null)}
           section="people"
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
@@ -2046,6 +2066,7 @@ function AppBody({
           aside={panelFor(null)}
           personName=""
           section={cmsSection}
+          hrefFor={navHref(null)}
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
               go({ view: 'noOne', section: key });

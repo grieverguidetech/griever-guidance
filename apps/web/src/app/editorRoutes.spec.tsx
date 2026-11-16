@@ -116,6 +116,8 @@ describe('editor URLs (#849)', () => {
       `/people/${FLOW}/service`,
       `/people/${FLOW}/obituary`,
       `/people/${FLOW}/thanks`,
+      '/people',
+      '/account',
     ]);
     expect(hrefs.join(' ')).not.toMatch(/s-local-1|Margaret/);
     expect(nav().getByRole('link', { name: /^Obituary/ })).toHaveAttribute('aria-current', 'page');
@@ -220,7 +222,7 @@ describe('leaving an unnamed new person (#849 B1)', () => {
   it('Start, then Your people: the list, with no "not here" line', async () => {
     const user = userEvent.setup();
     await startUnnamed(user);
-    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await user.click(nav().getByRole('link', { name: 'Your people' }));
     expect(await h1('Your people')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.queryByText(MISSING_LINE)).toBeNull();
@@ -230,7 +232,7 @@ describe('leaving an unnamed new person (#849 B1)', () => {
   it('Start, then Your account: lands on Account', async () => {
     const user = userEvent.setup();
     await startUnnamed(user);
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     expect(await h1('Account')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
@@ -382,7 +384,7 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/start' });
     await h1('Overview');
-    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await user.click(nav().getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     const before = window.location.pathname;
     await user.click(panel().getByRole('button', { name: ITEM }));
@@ -397,7 +399,7 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/start' });
     await h1('Overview');
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
     const before = window.location.pathname;
     await user.click(panel().getByRole('button', { name: ITEM }));
@@ -494,7 +496,7 @@ describe('Your people and Your account have URLs (#850)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: `/people/${FLOW}/service` });
     await h1('Service');
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
     expect(window.location.pathname).toBe('/account');
     back();
@@ -507,7 +509,7 @@ describe('Your people and Your account have URLs (#850)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/people' });
     await h1('Your people');
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
     back();
     await h1('Your people');
@@ -524,7 +526,7 @@ describe('Your people and Your account have URLs (#850)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/start/service' });
     await h1('Service');
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
     back();
     await h1('Service');
