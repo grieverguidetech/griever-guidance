@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaOf,
+  buildEngineering,
+  formatDuration,
+  mergedSearchDate,
+  computeCiHealth,
+  computeDeploys,
+  computeThroughput,
+  flakyIssues,
+  medianOf,
   computeLaunchBlockers,
   computeRoadmap,
   parseFeatureFlags,
@@ -610,5 +618,221 @@ describe('computeRoadmap', () => {
 
   it('returns no rows when nothing is open', () => {
     expect(computeRoadmap([], [])).toEqual([]);
+  });
+});
+
+describe('computeCiHealth', () => {
+  const run = (id: number, conclusion: string, status = 'completed', createdAt = '2026-11-14T00:00:00Z'): Run => ({
+    databaseId: id,
+    workflowName: 'CI',
+    headBranch: 'main',
+    status,
+    conclusion,
+    url: `https://x/${id}`,
+    createdAt,
+  });
+
+  it('ignores cancelled and unfinished runs', () => {
+    const health = computeCiHealth([run(1, 'success'), run(2, 'cancelled'), run(3, '', 'in_progress'), run(4, 'failure')]);
+    expect(health).toMatchObject({ passed: 1, failed: 1, counted: 2, ignored: 2, passPercent: 50 });
+  });
+
+  it('counts failure, timed_out and other non-success conclusions as failures', () => {
+    const health = computeCiHealth([run(1, 'success'), run(2, 'timed_out'), run(3, 'failure'), run(4, 'startup_failure')]);
+    expect(health.failed).toBe(3);
+    expect(health.passPercent).toBe(25);
+  });
+
+  it('picks the newest failure', () => {
+    const health = computeCiHealth([
+      run(1, 'failure', 'completed', '2026-11-10T00:00:00Z'),
+      run(2, 'failure', 'completed', '2026-11-13T00:00:00Z'),
+      run(3, 'success', 'completed', '2026-11-14T00:00:00Z'),
+    ]);
+    expect(health.lastFailure?.databaseId).toBe(2);
+  });
+
+  it('returns no rate and no failure when nothing finished', () => {
+    expect(computeCiHealth([])).toMatchObject({ counted: 0, passPercent: null, lastFailure: null });
+    expect(computeCiHealth([run(1, 'cancelled')]).passPercent).toBeNull();
+  });
+});
+
+describe('flakyIssues', () => {
+  const issue = (number: number, title: string, labels: string[] = []) => ({
+    number,
+    title,
+    url: 'https://x',
+    updatedAt: '',
+    labels,
+  });
+
+  it('matches "flaky" in the title, any case, with or without labels', () => {
+    expect(flakyIssues([issue(2, 'Flaky e2e login'), issue(1, 'the FLAKY smoke test'), issue(3, 'Other')]).map((i) => i.number)).toEqual([1, 2]);
+  });
+
+  it('matches retry or times out only with the tests label', () => {
+    const found = flakyIssues([
+      issue(1, 'e2e needs retry', ['tests']),
+      issue(2, 'e2e needs retry', ['area:web']),
+      issue(3, 'Step times out', ['tests']),
+      issue(4, 'Step times out'),
+    ]);
+    expect(found.map((i) => i.number)).toEqual([1, 3]);
+  });
+});
+
+describe('computeDeploys', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const deploy = (id: number, conclusion: string, createdAt: string, status = 'completed'): Run => ({
+    databaseId: id,
+    workflowName: 'Deploy',
+    headBranch: 'main',
+    status,
+    conclusion,
+    url: 'https://x',
+    createdAt,
+  });
+
+  it('shows the 5 newest and finds the last good deploy', () => {
+    const runs = [
+      deploy(1, 'failure', '2026-11-15T11:00:00Z'),
+      deploy(2, 'success', '2026-11-15T06:00:00Z'),
+      deploy(3, 'success', '2026-11-14T06:00:00Z'),
+      deploy(4, 'skipped', '2026-11-13T06:00:00Z'),
+      deploy(5, 'skipped', '2026-11-12T06:00:00Z'),
+      deploy(6, 'skipped', '2026-11-11T06:00:00Z'),
+    ];
+    const result = computeDeploys(runs, now);
+    expect(result.recent.map((r) => r.databaseId)).toEqual([1, 2, 3, 4, 5]);
+    expect(result.lastGood?.databaseId).toBe(2);
+    expect(result.hoursSinceGood).toBe(6);
+  });
+
+  it('does not count unfinished, failed or skipped runs as good', () => {
+    const result = computeDeploys([deploy(1, '', '2026-11-15T11:00:00Z', 'in_progress'), deploy(2, 'skipped', '2026-11-15T10:00:00Z')], now);
+    expect(result.lastGood).toBeNull();
+    expect(result.hoursSinceGood).toBeNull();
+  });
+});
+
+describe('medianOf', () => {
+  it('handles odd, even and empty lists', () => {
+    expect(medianOf([5, 1, 3])).toBe(3);
+    expect(medianOf([4, 1, 3, 2])).toBe(2.5);
+    expect(medianOf([])).toBeNull();
+  });
+});
+
+describe('computeThroughput', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+  const pr = (number: number, mergedDaysAgo: number, openHours: number | null) => ({
+    number,
+    title: 'x',
+    url: 'https://x',
+    mergedAt: daysAgo(mergedDaysAgo),
+    createdAt: openHours === null ? undefined : new Date(now.getTime() - mergedDaysAgo * 86_400_000 - openHours * 3_600_000).toISOString(),
+  });
+
+  it('buckets merges into 4 weeks, newest first, and drops older ones', () => {
+    const result = computeThroughput([pr(1, 1, 1), pr(2, 6.9, 1), pr(3, 7.1, 1), pr(4, 20, 1), pr(5, 27.9, 1), pr(6, 28.1, 1)], now);
+    expect(result.weeks.map((w) => w.count)).toEqual([2, 1, 1, 1]);
+    expect(result.total).toBe(5);
+    expect(result.weeks[0]?.label).toBe('Last 7 days');
+  });
+
+  it('takes the median hours from opened to merged', () => {
+    const result = computeThroughput([pr(1, 1, 2), pr(2, 2, 10), pr(3, 3, 4)], now);
+    expect(result.medianHours).toBe(4);
+  });
+
+  it('skips missing or bad dates and returns null with nothing to measure', () => {
+    const result = computeThroughput([pr(1, 1, null), { ...pr(2, 1, 1), mergedAt: 'nope' }], now);
+    expect(result.total).toBe(1);
+    expect(result.medianHours).toBeNull();
+  });
+
+  it('ignores future merges', () => {
+    expect(computeThroughput([pr(1, -1, 1)], now).total).toBe(0);
+  });
+});
+
+describe('shippedSearchDate window', () => {
+  it('can widen to 28 days', () => {
+    expect(shippedSearchDate(new Date('2026-11-15T12:00:00Z'), 28)).toBe('2026-10-18');
+  });
+});
+
+describe('boundaries shared by Shipped and Throughput', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const at = (days: number) => ({
+    number: 1,
+    title: 'x',
+    url: 'https://x',
+    mergedAt: new Date(now.getTime() - days * 86_400_000).toISOString(),
+  });
+
+  it('puts a PR merged exactly 7 days ago in both "Shipped this week" and week 0', () => {
+    expect(shippedThisWeek([at(7)], now)).toHaveLength(1);
+    expect(computeThroughput([at(7)], now).weeks.map((w) => w.count)).toEqual([1, 0, 0, 0]);
+  });
+
+  it('drops a PR just over 7 days from Shipped and puts it in week 1', () => {
+    expect(shippedThisWeek([at(7.001)], now)).toHaveLength(0);
+    expect(computeThroughput([at(7.001)], now).weeks.map((w) => w.count)).toEqual([0, 1, 0, 0]);
+  });
+
+  it('keeps a PR merged exactly 28 days ago in week 3 and drops one just over', () => {
+    expect(computeThroughput([at(28)], now).weeks.map((w) => w.count)).toEqual([0, 0, 0, 1]);
+    expect(computeThroughput([at(28.001)], now).total).toBe(0);
+  });
+});
+
+describe('mergedSearchDate', () => {
+  it('goes back 28 days in UTC', () => {
+    expect(mergedSearchDate(new Date('2026-11-15T12:00:00Z'))).toBe('2026-10-18');
+  });
+});
+
+describe('formatDuration', () => {
+  it('uses minutes under an hour and singular at exactly 1', () => {
+    expect(formatDuration(0.5)).toBe('30 minutes');
+    expect(formatDuration(1 / 60)).toBe('1 minute');
+    expect(formatDuration(0.001)).toBe('less than 1 minute');
+    expect(formatDuration(1)).toBe('1 hour');
+    expect(formatDuration(1.5)).toBe('1.5 hours');
+    expect(formatDuration(6)).toBe('6 hours');
+  });
+});
+
+describe('buildEngineering', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const data = { ciMainRuns: [], openIssues: [], deployRuns: [], mergedPrs: [] };
+  const ok = { ok: true };
+  const allOk = { ciMain: ok, openIssues: ok, deploys: ok, mergedPrs: ok };
+
+  it('fills every field when all sources load', () => {
+    const result = buildEngineering(allOk, data, now);
+    expect(result.ciHealth).not.toBeNull();
+    expect(result.flaky).toEqual([]);
+    expect(result.deploys?.sinceGoodText).toBe('Unknown');
+    expect(result.throughput?.medianText).toBe('Unknown');
+  });
+
+  it.each([
+    ['ciMain', 'ciHealth'],
+    ['openIssues', 'flaky'],
+    ['deploys', 'deploys'],
+    ['mergedPrs', 'throughput'],
+  ] as const)('a failed %s source nulls only %s', (source, field) => {
+    const result = buildEngineering({ ...allOk, [source]: { ok: false, error: 'x' } }, data, now);
+    for (const key of ['ciHealth', 'flaky', 'deploys', 'throughput'] as const) {
+      if (key === field) {
+        expect(result[key]).toBeNull();
+      } else {
+        expect(result[key]).not.toBeNull();
+      }
+    }
   });
 });

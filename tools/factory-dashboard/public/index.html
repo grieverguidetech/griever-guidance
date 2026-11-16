@@ -148,7 +148,9 @@ function ciDot(ci) {
   };
   var pair = map[ci] || map.none;
   var span = el("span");
-  span.appendChild(el("span", null, "dot " + pair[0]));
+  var dot = el("span", null, "dot " + pair[0]);
+  dot.setAttribute("aria-hidden", "true");
+  span.appendChild(dot);
   span.appendChild(document.createTextNode(pair[1]));
   return span;
 }
@@ -167,6 +169,129 @@ function runDot(run) {
 
 function itemText(item) {
   return (item.number ? "#" + item.number + " " : "") + item.title;
+}
+
+function when(iso) {
+  return new Date(iso).toLocaleString();
+}
+
+function renderCiHealth() {
+  var s = section("CI health on main", "ciMain");
+  var health = state.engineering.ciHealth;
+  if (!health) {
+    return;
+  }
+  if (health.counted === 0) {
+    s.appendChild(el("p", "No finished CI runs on main.", "muted"));
+    return;
+  }
+  var text = health.passPercent + "% passed (" + health.passed + " of " + health.counted + " finished runs).";
+  s.appendChild(el("p", text));
+  s.appendChild(el("p", "Ignored " + health.ignored + " cancelled or unfinished runs. Any other finished run that did not succeed counts as a failure.", "muted"));
+  var p = el("p");
+  if (health.lastFailure) {
+    p.appendChild(document.createTextNode("Last failure: "));
+    p.appendChild(link(when(health.lastFailure.createdAt) + " (" + health.lastFailure.conclusion + ")", health.lastFailure.url));
+  } else {
+    p.appendChild(document.createTextNode("No failures in these runs."));
+  }
+  s.appendChild(p);
+}
+
+function renderFlaky() {
+  var s = section("Flaky tests", "openIssues");
+  var items = state.engineering.flaky;
+  if (!items) {
+    return;
+  }
+  s.appendChild(listOf(items.filter(visible), function (li, issue) {
+    li.appendChild(link("#" + issue.number + " " + issue.title, issue.url));
+  }, "No open flaky-test issues."));
+}
+
+function deployColor(run) {
+  if (run.status !== "completed") {
+    return "amber";
+  }
+  if (run.conclusion === "success") {
+    return "green";
+  }
+  return run.conclusion === "skipped" ? "grey" : "red";
+}
+
+function renderDeploys() {
+  var s = section("Deploys", "deploys");
+  var deploys = state.engineering.deploys;
+  if (!deploys) {
+    return;
+  }
+  if (deploys.lastGood) {
+    var ago = "Last successful deploy started " + deploys.sinceGoodText + " ago (" + when(deploys.lastGood.createdAt) + ").";
+    s.appendChild(el("p", ago));
+  } else {
+    s.appendChild(el("p", "No successful deploy in the runs checked.", "error"));
+  }
+  if (deploys.recent.length === 0) {
+    s.appendChild(el("p", "No deploy runs.", "muted"));
+    return;
+  }
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", "Last 5 Deploy workflow runs", "sr-only"));
+  var head = el("tr");
+  ["Result", "Started", "Run"].forEach(function (name) {
+    var th = el("th", name);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  deploys.recent.forEach(function (run) {
+    var tr = el("tr");
+    var result = el("td");
+    var dot = el("span", null, "dot " + deployColor(run));
+    dot.setAttribute("aria-hidden", "true");
+    result.appendChild(dot);
+    result.appendChild(document.createTextNode(" " + (run.status === "completed" ? run.conclusion : run.status)));
+    tr.appendChild(result);
+    var time = el("th", when(run.createdAt));
+    time.scope = "row";
+    tr.appendChild(time);
+    var cell = el("td");
+    cell.appendChild(link("Run " + run.databaseId, run.url));
+    tr.appendChild(cell);
+    table.appendChild(tr);
+  });
+  s.appendChild(table);
+}
+
+function renderThroughput() {
+  var s = section("Throughput", "mergedPrs");
+  var t = state.engineering.throughput;
+  if (!t) {
+    return;
+  }
+  if (state.engineering.throughputMayBeCutOff) {
+    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
+  }
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", "PRs merged per week, last 4 weeks", "sr-only"));
+  var head = el("tr");
+  ["Week", "PRs merged"].forEach(function (name) {
+    var th = el("th", name);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  t.weeks.forEach(function (week) {
+    var tr = el("tr");
+    var th = el("th", week.label);
+    th.scope = "row";
+    tr.appendChild(th);
+    tr.appendChild(el("td", String(week.count), "num"));
+    table.appendChild(tr);
+  });
+  s.appendChild(table);
+  var median = t.medianHours === null ? "Median time from opened to merged: Unknown (no merged PRs to measure)." : "Median time from opened to merged: " + t.medianText + ".";
+  s.appendChild(el("p", median));
 }
 
 function renderNeedsYou() {
@@ -500,6 +625,10 @@ function render() {
   renderProduct();
   main = document.getElementById("panel-engineering");
   renderNeedsYou();
+  renderCiHealth();
+  renderFlaky();
+  renderDeploys();
+  renderThroughput();
   renderDrift();
   renderBacklogReview();
   renderPrs();
