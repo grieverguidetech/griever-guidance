@@ -96,7 +96,7 @@ describe('legacy data with nobody listable', () => {
     renderApp(<App />);
     expect(await screen.findByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/');
+    expect(window.location.pathname).toBe('/start');
     expect(nav().queryAllByRole('link')).toHaveLength(0);
   });
 });
