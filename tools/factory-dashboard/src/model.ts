@@ -232,9 +232,10 @@ export function groupByStatus(items: BoardItem[]): Record<string, BoardItem[]> {
   return groups;
 }
 
-// Board counts are for open issues only. A closed issue still on the board is drift, not a count.
-export function openBoardItems(board: BoardItem[], openNumbers: Set<number>, closedNumbers: Set<number>): BoardItem[] {
-  return board.filter((item) => item.number === null || openNumbers.has(item.number) || !closedNumbers.has(item.number));
+// Board counts are for open issues only. The open list is complete, so an issue that is not in it is closed
+// (however long ago) and is not counted. Draft items and PRs have no issue state and stay.
+export function openBoardItems(board: BoardItem[], openNumbers: Set<number>): BoardItem[] {
+  return board.filter((item) => item.number === null || item.type === 'PullRequest' || openNumbers.has(item.number));
 }
 
 export function isGreenForReview(pr: Pr): boolean {
@@ -1301,3 +1302,9 @@ export function codeChanged(baseline: number, current: number): boolean {
 // The cache and the closed-issue window. The closed-issue lookup reads the last 28 days only.
 export const CACHE_MS = 5 * 60 * 1000;
 export const CLOSED_WINDOW_DAYS = 28;
+
+// The `gh issue list` arguments for closed issues: only the last 28 days (drift and areas use them).
+export function closedIssueArgs(now: Date, repo: string, limit: number): string[] {
+  const search = `closed:>=${shippedSearchDate(now, CLOSED_WINDOW_DAYS)}`;
+  return ['issue', 'list', '--repo', repo, '--state', 'closed', '--search', search, '--limit', String(limit)];
+}

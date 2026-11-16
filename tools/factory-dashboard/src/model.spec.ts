@@ -35,6 +35,7 @@ import {
   codeChanged,
   CACHE_MS,
   CLOSED_WINDOW_DAYS,
+  closedIssueArgs,
   joinBacklogReview,
   parseBacklogReviews,
   parsePort,
@@ -1222,14 +1223,16 @@ describe('openBoardItems', () => {
 
   it('does not count a closed issue that is still In review', () => {
     const board = [item(1, 'In review'), item(2, 'In review'), item(3, 'In review'), item(null, 'Backlog')];
-    const open = openBoardItems(board, new Set([1]), new Set([2, 3]));
+    const open = openBoardItems(board, new Set([1]));
     expect(open.map((entry) => entry.number)).toEqual([1, null]);
     expect(groupByStatus(open)['In review']).toHaveLength(1);
     expect(groupByStatus(board)['In review']).toHaveLength(3);
   });
 
-  it('keeps everything when the closed list is empty (source failed)', () => {
-    expect(openBoardItems([item(1, 'Done')], new Set(), new Set())).toHaveLength(1);
+  it('drops a board issue that is in neither list (closed long ago), keeps drafts and PRs', () => {
+    const pr: BoardItem = { ...item(500, 'Done'), type: 'PullRequest' };
+    const board = [item(1, 'Ready'), item(999, 'Done'), item(null, 'Backlog'), pr];
+    expect(openBoardItems(board, new Set([1])).map((entry) => entry.number)).toEqual([1, null, 500]);
   });
 });
 
@@ -1327,6 +1330,14 @@ describe('codeChanged', () => {
     expect(codeChanged(100, 100)).toBe(false);
     expect(codeChanged(100, 200)).toBe(true);
     expect(codeChanged(100, 50)).toBe(true);
+  });
+});
+
+describe('closedIssueArgs', () => {
+  it('searches the last 28 days of closed issues', () => {
+    expect(closedIssueArgs(new Date('2026-11-29T00:00:00Z'), 'o/r', 500)).toEqual([
+      'issue', 'list', '--repo', 'o/r', '--state', 'closed', '--search', 'closed:>=2026-11-01', '--limit', '500',
+    ]);
   });
 });
 

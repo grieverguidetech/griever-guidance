@@ -56,7 +56,7 @@ GitHub when the page is open, so an idle server uses no API rate limit.
 
 ### Restart and auto-restart
 
-The plist sets `FACTORY_RESTART_ON_CHANGE=1`. In that mode:
+After this merges, run `pnpm factory:install` once to turn on restart mode (the installed plist is a copy of the template). The plist sets `FACTORY_RESTART_ON_CHANGE=1`. In that mode:
 
 - The server notes the newest file time under `src/` and `public/` at start and checks it every 30
   seconds. On a change it logs "Code changed, restarting" and exits with code 1. launchd's
@@ -71,6 +71,8 @@ The plist sets `FACTORY_RESTART_ON_CHANGE=1`. In that mode:
 
 When run by hand (`pnpm factory`) none of this is on: no watcher, no button, and `POST /api/restart`
 is refused. The GitHub queries are lighter too: a 5 minute cache and 28 days of closed issues.
+
+Limit of the 28 day window: the drift rules "closed, but the board status is not Done" and "worktree of a closed issue" see only issues closed in the last 28 days, so an older closed issue with a wrong board status or a leftover worktree is not flagged. Board counts do not depend on the window: an issue that is not in the open list is closed and is not counted.
 
 ### Friendly URL
 

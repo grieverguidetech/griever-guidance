@@ -28,7 +28,7 @@ import {
   decideRestart,
   codeChanged,
   CACHE_MS,
-  CLOSED_WINDOW_DAYS,
+  closedIssueArgs,
   RESTART_HEADER,
   joinBacklogReview,
   parseBacklogReviews,
@@ -103,13 +103,13 @@ function toIssue(raw: RawIssue): Issue {
 }
 
 function loadIssues(state: 'open' | 'closed', limit: number): Promise<Issue[]> {
-  // Closed issues: only the last 28 days, to keep the GraphQL use low.
-  const window = state === 'closed' ? ['--search', `closed:>=${shippedSearchDate(new Date(), CLOSED_WINDOW_DAYS)}`] : [];
   // Bodies only for open issues: they feed the one-line summaries. Closed issues are many, so they stay light.
   const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body' : 'number,title,labels,url,updatedAt';
-  return ghJson(['issue', 'list', '--repo', REPO, '--state', state, ...window, '--limit', String(limit), '--json', fields]).then(
-    (data) => (data as RawIssue[]).map(toIssue),
-  );
+  const base =
+    state === 'closed'
+      ? closedIssueArgs(new Date(), REPO, limit)
+      : ['issue', 'list', '--repo', REPO, '--state', state, '--limit', String(limit)];
+  return ghJson([...base, '--json', fields]).then((data) => (data as RawIssue[]).map(toIssue));
 }
 
 type RawPr = {
@@ -268,11 +268,7 @@ async function buildState() {
     ...item,
     summary: summaryFor(item.number),
   });
-  const openBoard = openBoardItems(
-    board,
-    new Set(openIssues.map((issue) => issue.number)),
-    new Set(closedIssues.map((issue) => issue.number)),
-  ).map(withSummary);
+  const openBoard = openBoardItems(board, new Set(openIssues.map((issue) => issue.number))).map(withSummary);
   const drift = driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees });
   return {
     generatedAt: generatedAt.toISOString(),
@@ -379,6 +375,41 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   }
 }
 
+// Newest file time under a folder, in ms. A missing folder counts as 0.
+async function newestMtime(dir: string): Promise<number> {
+  let newest = 0;
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    const time = entry.isDirectory() ? await newestMtime(path) : await stat(path).then((s) => s.mtimeMs, () => 0);
+    newest = Math.max(newest, time);
+  }
+  return newest;
+}
+
+async function newestCodeMtime(): Promise<number> {
+  const times = await Promise.all([newestMtime(join(HERE)), newestMtime(join(HERE, '..', 'public'))]);
+  return Math.max(...times);
+}
+
+// Only under launchd: exit 1 when the code changes, so KeepAlive starts the new code.
+if (RESTART_ON_CHANGE) {
+  newestCodeMtime()
+    .then((baseline) => {
+    setInterval(() => {
+      newestCodeMtime()
+        .then((current) => {
+          if (codeChanged(baseline, current)) {
+            console.log('Code changed, restarting');
+            process.exit(1);
+          }
+        })
+        .catch((error: Error) => console.error(`Code check failed: ${error.message}`));
+    }, WATCH_MS);
+    })
+    .catch((error: Error) => console.error(`Code watch not started: ${error.message}`));
+}
+
 const servers = [createServer(handle), createServer(handle)];
 
 servers[0]?.on('error', (error: NodeJS.ErrnoException) => {
@@ -400,36 +431,3 @@ servers[1]?.on('error', (error) => {
   console.error(`Not listening on ::1: ${error.message}`);
 });
 servers[1]?.listen(port, '::1');
-
-// Newest file time under a folder, in ms. A missing folder counts as 0.
-async function newestMtime(dir: string): Promise<number> {
-  let newest = 0;
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  for (const entry of entries) {
-    const path = join(dir, entry.name);
-    const time = entry.isDirectory() ? await newestMtime(path) : (await stat(path)).mtimeMs;
-    newest = Math.max(newest, time);
-  }
-  return newest;
-}
-
-async function newestCodeMtime(): Promise<number> {
-  const times = await Promise.all([newestMtime(join(HERE)), newestMtime(join(HERE, '..', 'public'))]);
-  return Math.max(...times);
-}
-
-// Only under launchd: exit 1 when the code changes, so KeepAlive starts the new code.
-if (RESTART_ON_CHANGE) {
-  void newestCodeMtime().then((baseline) => {
-    setInterval(() => {
-      newestCodeMtime()
-        .then((current) => {
-          if (codeChanged(baseline, current)) {
-            console.log('Code changed, restarting');
-            process.exit(1);
-          }
-        })
-        .catch((error: Error) => console.error(`Code check failed: ${error.message}`));
-    }, WATCH_MS);
-  });
-}
