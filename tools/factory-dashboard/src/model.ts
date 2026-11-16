@@ -475,6 +475,8 @@ export function isAllowedHost(host: string | undefined, port: number): boolean {
 export interface SourceStatus {
   ok: boolean;
   error?: string;
+  // The optional business.json is not there. Not an error.
+  missing?: boolean;
 }
 
 // Names of the sources, among `names`, that did not load. A missing source counts as failed.
@@ -645,12 +647,22 @@ export interface BusinessView {
   nextSync: string | null;
 }
 
+const MAX_MONTHLY = 1e9;
+
 function isIsoDate(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  // Round trip: 2026-02-31 would roll over to March, so it does not come back the same.
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function optionalDate(value: unknown, where: string): string | null {
-  if (value === null || value === undefined) {
+  if (value === undefined) {
+    throw new Error(`${where} must be present (use null when unknown)`);
+  }
+  if (value === null) {
     return null;
   }
   if (!isIsoDate(value)) {
@@ -660,7 +672,10 @@ function optionalDate(value: unknown, where: string): string | null {
 }
 
 function optionalText(value: unknown, where: string): string | null {
-  if (value === null || value === undefined) {
+  if (value === undefined) {
+    throw new Error(`${where} must be present (use null when unknown)`);
+  }
+  if (value === null) {
     return null;
   }
   if (!isText(value)) {
@@ -692,7 +707,7 @@ export function parseBusiness(raw: unknown): BusinessFile {
     throw new Error('users must be an object with count and date');
   }
   const count = users['count'];
-  if (count !== null && (typeof count !== 'number' || !Number.isInteger(count) || count < 0)) {
+  if (count !== null && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) {
     throw new Error('users.count must be a whole number, or null');
   }
   const costs = listOf(data['costs'], 'costs', (item, at): BusinessCostLine => {
@@ -700,7 +715,7 @@ export function parseBusiness(raw: unknown): BusinessFile {
       throw new Error(`${at}: service must be text`);
     }
     const monthly = item['monthly'];
-    if (monthly !== null && (typeof monthly !== 'number' || !Number.isFinite(monthly) || monthly < 0)) {
+    if (monthly !== null && (typeof monthly !== 'number' || !Number.isFinite(monthly) || monthly < 0 || monthly >= MAX_MONTHLY)) {
       throw new Error(`${at}: monthly must be a number of US dollars, or null`);
     }
     return { service: item['service'], monthly: monthly as number | null };

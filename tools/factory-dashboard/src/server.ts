@@ -204,8 +204,18 @@ async function loadBacklogReviews(): Promise<BacklogReviewFile> {
 }
 
 // Read on every refresh, like the backlog review.
-async function loadBusiness(): Promise<BusinessFile> {
-  return parseBusiness(JSON.parse(await readFile(BUSINESS_FILE, 'utf8')));
+// business.json is private and not in git, so a missing file is normal and gives null.
+async function loadBusiness(): Promise<BusinessFile | null> {
+  let text: string;
+  try {
+    text = await readFile(BUSINESS_FILE, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  return parseBusiness(JSON.parse(text));
 }
 
 async function mainRepoRoot(): Promise<string> {
@@ -257,6 +267,9 @@ async function buildState() {
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
+  if (sources['business']?.ok && businessFile === null) {
+    sources['business'] = { ok: true, missing: true };
+  }
   const backlogReview =
     reviewFile && sources['openIssues']?.ok ? joinBacklogReview(reviewFile, openIssues) : null;
   const board = boardResult.items;

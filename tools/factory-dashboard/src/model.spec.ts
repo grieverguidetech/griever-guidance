@@ -1396,9 +1396,10 @@ describe('business.json', () => {
   it('refuses bad dates', () => {
     expect(() => parseBusiness({ ...valid(), updatedAt: '15/11/2026' })).toThrow('updatedAt');
     expect(() => parseBusiness({ ...valid(), nextSync: '2026-13-40' })).toThrow('nextSync');
+    expect(() => parseBusiness({ ...valid(), nextSync: '2026-02-31' })).toThrow('nextSync');
     expect(() => parseBusiness({ ...valid(), users: { count: 1, date: 'soon' } })).toThrow('users.date');
     expect(() => parseBusiness({ ...valid(), nextSteps: [{ owner: 'P', task: 'T', due: 'Friday', done: false }] })).toThrow('nextSteps[0]: due');
-    expect(() => parseBusiness({ ...valid(), decisions: [{ question: 'Q', options: [], owner: 'P', date: '2026-02-31x' }] })).toThrow('decisions[0]: date');
+    expect(() => parseBusiness({ ...valid(), decisions: [{ question: 'Q', options: [], owner: 'P', date: '2026-02-31' }] })).toThrow('decisions[0]: date');
   });
 
   it('adds the known cost lines and counts the unset ones', () => {
@@ -1426,14 +1427,25 @@ describe('business.json', () => {
     expect(view.costTotal).toBe(119.5);
   });
 
-  it('the seeded file parses, with unknown numbers left null', () => {
-    const file = parseBusiness(JSON.parse(readFileSync(new URL('../business.json', import.meta.url), 'utf8')));
-    expect(file.decisions).toHaveLength(4);
-    expect(file.decisions.every((d) => d.decided === null && d.owner === 'Peter and Rich' && d.date === '2026-11-17')).toBe(true);
-    expect(file.nextSteps.map((s) => s.owner)).toEqual(['Peter', 'Peter']);
-    expect(file.costs.map((c) => c.service)).toEqual(['AWS', 'Cloudflare', 'Clerk', 'EAS', 'AI tools']);
+  it('refuses a missing key: null is the only way to say unknown', () => {
+    expect(() => parseBusiness({ ...valid(), nextSteps: [{ owner: 'P', task: 'T', done: false }] })).toThrow('nextSteps[0]: due must be present');
+    expect(() => parseBusiness({ ...valid(), decisions: [{ question: 'Q', options: [], decided: null, owner: 'P', date: '2026-11-17' }] })).toThrow('recommendation must be present');
+    expect(() => parseBusiness({ ...valid(), decisions: [{ question: 'Q', options: [], recommendation: null, owner: 'P', date: '2026-11-17' }] })).toThrow('decided must be present');
+    expect(() => parseBusiness({ ...valid(), users: { count: null } })).toThrow('users.date must be present');
+    const { nextSync, ...noSync } = valid();
+    expect(nextSync).toBe('2026-11-17');
+    expect(() => parseBusiness(noSync)).toThrow('nextSync must be present');
+  });
+
+  it('caps money and counts', () => {
+    expect(() => parseBusiness({ ...valid(), costs: [{ service: 'AWS', monthly: 1e9 }] })).toThrow('monthly');
+    expect(() => parseBusiness({ ...valid(), users: { count: Number.MAX_SAFE_INTEGER + 1, date: null } })).toThrow('users.count');
+    expect(parseBusiness({ ...valid(), users: { count: Number.MAX_SAFE_INTEGER, date: null } }).users.count).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it('the example file parses and has a decision', () => {
+    const file = parseBusiness(JSON.parse(readFileSync(new URL('../business.example.json', import.meta.url), 'utf8')));
+    expect(file.decisions.length).toBeGreaterThan(0);
     expect(file.costs.every((c) => c.monthly === null)).toBe(true);
-    expect(file.users.count).toBeNull();
-    expect(file.nextSync).toBeNull();
   });
 });
