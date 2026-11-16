@@ -2,7 +2,7 @@
 
 One local page that shows the state of the software factory: what needs you, board drift,
 open PRs and their CI, the board by status, worktrees, recent CI and deploy runs, and live API
-health, and a backlog review. An area filter (from `area:*` labels) narrows every section except the backlog review.
+health, and a backlog review. Three tabs (Product, Engineering, Business) are kept in the URL hash. Product shows feature flags (`FEATURE_*` and `EXPO_PUBLIC_FEATURE_*` only), PRs merged in the last 7 days, launch blockers and a roadmap count by area and board status. Engineering holds the sections above. Business says "Coming soon". An area filter (from `area:*` labels) narrows every section except the backlog review.
 
 ## Run
 
@@ -25,8 +25,8 @@ A missing or invalid file shows its reason in the section and does not break the
 ## Read-only
 
 The server only runs `gh` and `git` read commands (`issue list`, `pr list`, `run list`,
-`project item-list`, `worktree list`, `status`, `rev-list`), one GET to the health endpoint, and a read of `backlog-review.json`.
-It never writes to GitHub or git, never fetches, and never reads `.env*` files.
+`project item-list`, `variable list` (feature flag names and values only), `pr list --state merged`, `worktree list`, `status`, `rev-list`), one GET to the health endpoint, and a read of `backlog-review.json`.
+It never calls `gh secret`, never writes to GitHub or git, never fetches, and never reads `.env*` files.
 
 ## Drift rules
 

@@ -40,20 +40,40 @@ table.review { width: 100%; border-collapse: collapse; background: var(--card); 
 table.review th, table.review td { text-align: left; vertical-align: top; padding: 8px 10px; border: 1px solid var(--border); overflow-wrap: anywhere; }
 table.review th.wide, table.review td.wide { width: 36%; font-size: 16px; }
 table.review td.narrow { white-space: nowrap; width: 1%; }
+[role="tablist"] { display: flex; gap: 4px; padding: 8px 16px 0; border-bottom: 1px solid var(--border); background: var(--card); }
+[role="tab"] { border-radius: 6px 6px 0 0; margin-bottom: -1px; }
+[role="tab"] { min-height: 44px; border-bottom: 3px solid transparent; }
+[role="tab"][aria-selected="true"] { font-weight: 600; background: var(--bg); border-bottom-color: var(--focus); }
+[role="tab"]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[role="tabpanel"]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+table.plain { border-collapse: collapse; background: var(--card); }
+table.plain th, table.plain td { text-align: left; padding: 6px 10px; border: 1px solid var(--border); }
+table.plain td.num { text-align: right; }
 </style>
 </head>
 <body>
 <header>
   <h1>Factory dashboard</h1>
   <span id="updated" class="muted" role="status">Loading</span>
-  <label>Area <select id="area"><option value="all">All areas</option></select></label>
+  <label id="area-label">Area <select id="area"><option value="all">All areas</option></select></label>
   <button id="refresh" type="button">Refresh</button>
 </header>
-<main id="main"></main>
+<div role="tablist" aria-label="Dashboard views" id="tabs">
+  <button role="tab" type="button" id="tab-product" aria-controls="panel-product" data-tab="product">Product</button>
+  <button role="tab" type="button" id="tab-engineering" aria-controls="panel-engineering" data-tab="engineering">Engineering</button>
+  <button role="tab" type="button" id="tab-business" aria-controls="panel-business" data-tab="business">Business</button>
+</div>
+<main id="main">
+  <div role="tabpanel" id="panel-product" aria-labelledby="tab-product" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-engineering" aria-labelledby="tab-engineering" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-business" aria-labelledby="tab-business" tabindex="0" hidden></div>
+</main>
 <script>
 "use strict";
 var state = null;
-var main = document.getElementById("main");
+var TABS = ["product", "engineering", "business"];
+var main = document.getElementById("panel-engineering");
 var areaSelect = document.getElementById("area");
 
 function el(tag, text, className) {
@@ -317,8 +337,154 @@ function renderHealth() {
   s.appendChild(p);
 }
 
+function renderFlags() {
+  var s = section("Feature flags", "featureFlags");
+  var flags = state.product.flags;
+  if (flags.length === 0) {
+    if (state.sources.featureFlags.ok) {
+      s.appendChild(el("p", "No feature flags set.", "muted"));
+    }
+    return;
+  }
+  s.appendChild(listOf(flags, function (li, flag) {
+    li.appendChild(el("span", flag.state, "tag"));
+    li.appendChild(el("span", ": ", "sr-only"));
+    li.appendChild(document.createTextNode(flag.name));
+  }, "No feature flags set."));
+}
+
+function renderShipped() {
+  var s = section("Shipped this week", "mergedPrs");
+  if (!state.sources.mergedPrs.ok) {
+    return;
+  }
+  if (state.product.shippedMayBeCutOff) {
+    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
+  }
+  s.appendChild(listOf(state.product.shipped, function (li, pr) {
+    li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
+    li.appendChild(el("div", "Merged " + new Date(pr.mergedAt).toLocaleDateString(), "muted"));
+  }, "Nothing merged in the last 7 days."));
+}
+
+function renderBlockers() {
+  var s = section("Launch blockers", "openIssues");
+  if (state.product.launchBlockers === null) {
+    couldNotCheck(s, state.product.blockedBy);
+    return;
+  }
+  s.appendChild(listOf(state.product.launchBlockers, function (li, item) {
+    li.appendChild(el("span", item.status, "tag"));
+    li.appendChild(el("span", ": ", "sr-only"));
+    li.appendChild(link("#" + item.number + " " + item.title, item.url));
+  }, "No launch blockers open."));
+}
+
+function renderRoadmap() {
+  var s = section("Roadmap", "board");
+  if (state.product.roadmap === null) {
+    couldNotCheck(s, state.product.blockedBy);
+    return;
+  }
+  if (state.product.roadmap.length === 0) {
+    s.appendChild(el("p", "No open issues.", "muted"));
+    return;
+  }
+  var columns = ["Ready", "In progress", "Blocked", "Backlog", "Other"];
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", "Open issues by area and board status", "sr-only"));
+  var head = el("tr");
+  ["Area"].concat(columns, ["Total"]).forEach(function (name) {
+    var th = el("th", name);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  state.product.roadmap.forEach(function (row) {
+    var tr = el("tr");
+    var th = el("th", row.area);
+    th.scope = "row";
+    tr.appendChild(th);
+    columns.forEach(function (name) {
+      tr.appendChild(el("td", String(row.counts[name]), "num"));
+    });
+    tr.appendChild(el("td", String(row.total), "num"));
+    table.appendChild(tr);
+  });
+  s.appendChild(table);
+  s.appendChild(el("p", "Other: In review, Done, and issues with no board status.", "muted"));
+}
+
+function renderProduct() {
+  main = document.getElementById("panel-product");
+  renderFlags();
+  renderShipped();
+  renderBlockers();
+  renderRoadmap();
+}
+
+function renderBusiness() {
+  main = document.getElementById("panel-business");
+  main.appendChild(el("p", "Coming soon.", "muted"));
+}
+
+function currentTab() {
+  var name = location.hash.slice(1);
+  return TABS.indexOf(name) >= 0 ? name : "product";
+}
+
+function showTab(name, focus) {
+  TABS.forEach(function (tab) {
+    var selected = tab === name;
+    var button = document.getElementById("tab-" + tab);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
+    document.getElementById("panel-" + tab).hidden = !selected;
+    if (selected && focus) {
+      button.focus();
+    }
+  });
+  document.getElementById("area-label").hidden = name !== "engineering";
+}
+
+function selectTab(name, focus) {
+  if (location.hash.slice(1) !== name) {
+    location.hash = name;
+  }
+  showTab(name, focus);
+}
+
+document.getElementById("tabs").addEventListener("click", function (event) {
+  var tab = event.target.closest("[role=tab]");
+  if (tab) {
+    selectTab(tab.dataset.tab, false);
+  }
+});
+document.getElementById("tabs").addEventListener("keydown", function (event) {
+  var index = TABS.indexOf(currentTab());
+  var next = null;
+  if (event.key === "ArrowRight") {
+    next = (index + 1) % TABS.length;
+  } else if (event.key === "ArrowLeft") {
+    next = (index + TABS.length - 1) % TABS.length;
+  } else if (event.key === "Home") {
+    next = 0;
+  } else if (event.key === "End") {
+    next = TABS.length - 1;
+  }
+  if (next !== null) {
+    event.preventDefault();
+    selectTab(TABS[next], true);
+  }
+});
+window.addEventListener("hashchange", function () {
+  showTab(currentTab(), false);
+});
+
 function render() {
-  main.textContent = "";
+  TABS.forEach(function (tab) {
+    document.getElementById("panel-" + tab).textContent = "";
+  });
   document.getElementById("updated").textContent = "Updated " + new Date(state.generatedAt).toLocaleTimeString();
   var current = areaSelect.value;
   areaSelect.textContent = "";
@@ -331,6 +497,8 @@ function render() {
     areaSelect.appendChild(o);
   });
   areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
+  renderProduct();
+  main = document.getElementById("panel-engineering");
   renderNeedsYou();
   renderDrift();
   renderBacklogReview();
@@ -339,6 +507,7 @@ function render() {
   renderWorktrees();
   renderRuns();
   renderHealth();
+  renderBusiness();
 }
 
 function load(refresh) {
@@ -364,6 +533,7 @@ areaSelect.addEventListener("change", function () {
     render();
   }
 });
+showTab(currentTab(), false);
 load(false);
 </script>
 </body>
