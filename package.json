@@ -7,6 +7,8 @@
     "aws:up": "docker compose up -d --wait dynamodb ses",
     "aws:down": "docker compose down",
     "factory": "node --conditions=@org/source --import jiti/register tools/factory-dashboard/src/server.ts",
+    "factory:install": "bash tools/factory-dashboard/launchd/install.sh",
+    "factory:uninstall": "bash tools/factory-dashboard/launchd/uninstall.sh",
     "aws:seed": "node --conditions=@org/source --import jiti/register infra/aws-local/seed.ts",
     "aws:tables": "node --conditions=@org/source --import jiti/register infra/aws-local/create-tables.ts",
     "typecheck": "pnpm nx run-many -t typecheck",

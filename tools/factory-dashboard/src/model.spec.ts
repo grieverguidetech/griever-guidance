@@ -359,8 +359,12 @@ describe('isAllowedHost', () => {
     expect(isAllowedHost('localhost:4317', 4317)).toBe(true);
   });
 
+  it('allows the friendly name with the exact port only', () => {
+    expect(isAllowedHost('gg-tech-dashboard.localhost:4317', 4317)).toBe(true);
+  });
+
   it('rejects other hosts, ports and a missing header', () => {
-    for (const bad of ['evil.example', 'evil.example:4317', '127.0.0.1', '127.0.0.1:4318', 'localhost.evil.com:4317', undefined]) {
+    for (const bad of ['gg-tech-dashboard.localhost', 'evil.example', 'evil.example:4317', '127.0.0.1', '127.0.0.1:4318', 'localhost.evil.com:4317', 'gg-tech-dashboard.localhost:4318', 'gg-tech-dashboard.localhost.evil.com', 'evil.gg-tech-dashboard.localhost', undefined]) {
       expect(isAllowedHost(bad, 4317)).toBe(false);
     }
   });
