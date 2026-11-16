@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   areaOf,
   summarizePr,
+  summarizeIssue,
+  openBoardItems,
+  buildProduct,
   toShippedPr,
   shippedPerDay,
   roadmapStacks,
@@ -433,6 +436,7 @@ describe('backlog review', () => {
         action: 'close',
         recommendation: 'rec 1',
         why: 'why 1',
+        summary: '',
       },
     ]);
     expect(result.reviewedAt).toBe('2026-11-15');
@@ -859,12 +863,55 @@ describe('summarizePr', () => {
   });
 
   it('falls back to the first non-empty line when there is no What section', () => {
-    expect(summarizePr('\n\n## Summary\nFixes the [login bug](https://x.test) for good\nMore text')).toBe('Summary');
+    expect(summarizePr('\n\n## Summary\nFixes the [login bug](https://x.test) for good\nMore text')).toBe('Fixes the login bug for good');
     expect(summarizePr('\nFixes the [login bug](https://x.test) for good\nMore text')).toBe('Fixes the login bug for good');
   });
 
-  it('falls back when the What section is empty', () => {
-    expect(summarizePr('Closes #5\n\n## What\n\n## Tests\n- x')).toBe('Closes #5');
+  it('falls back to the first usable line when the What section is empty', () => {
+    expect(summarizePr('Adds the thing\n\n## What\n\n## Tests\n- x')).toBe('Adds the thing');
+  });
+
+  it('never returns a bare Closes line', () => {
+    expect(summarizePr('Closes #871')).toBe('');
+    expect(summarizePr('## What\n\n- Fixes #12\n- Part of #3\n\nCloses #871\n')).toBe('');
+    expect(summarizePr('Closes #5\n\n## What\n\n## Tests\n- x')).toBe('x');
+    expect(summarizePr('#12, #13 and #14\nAdds the router')).toBe('Adds the router');
+  });
+
+  it('skips headings, quotes and fenced code', () => {
+    const body = '# Title\n> a quoted note\n```\nnpm test\n```\nReal line here';
+    expect(summarizePr(body)).toBe('Real line here');
+  });
+
+  it('keeps code spans whole: names with underscores and JSX', () => {
+    expect(summarizePr('## What\n- Adds `FEATURE_SHARE_LINK` and renders `<App/>` in tests')).toBe(
+      'Adds FEATURE_SHARE_LINK and renders <App/> in tests',
+    );
+  });
+
+  it('strips emphasis only when it is paired around words', () => {
+    expect(summarizePr('## What\n- Uses _real_ names like some_file_name and 2 * 3 * 4')).toBe(
+      'Uses real names like some_file_name and 2 * 3 * 4',
+    );
+  });
+
+  it('skips a quote after a lead-in colon and takes the first bullet', () => {
+    const body = '## What\nNew sections at the top:\n> Note: this is a quote\n- Real first item. More words.\n- Second';
+    expect(summarizePr(body)).toBe('Real first item.');
+  });
+
+  it('keeps a bullet that ends with a colon (only plain lead-ins are skipped)', () => {
+    expect(summarizePr('## What\n- Adds these:\n- Second')).toBe('Adds these:');
+  });
+
+  it('cuts a bullet to its first sentence', () => {
+    expect(summarizePr('## What\n- First part. Second part.')).toBe('First part.');
+  });
+
+  it('caps at a word boundary', () => {
+    const result = summarizePr('## What\n- ' + 'alpha beta '.repeat(30));
+    expect(result.length).toBeLessThanOrEqual(140);
+    expect(result).toMatch(/(alpha|beta)\u2026$/);
   });
 
   it('strips markdown, html comments, tags, quotes and checkboxes', () => {
@@ -903,6 +950,12 @@ describe('toShippedPr', () => {
     expect('body' in result).toBe(false);
   });
 
+  it('falls back to the linked issue summary when the PR body has nothing', () => {
+    const pr = { number: 3, title: 'T', url: 'https://x', mergedAt: '2026-11-14T00:00:00Z', body: 'Closes #7' };
+    expect(toShippedPr(pr, labelsFor, (n) => (n === 7 ? 'Issue says this' : '')).summary).toBe('Issue says this');
+    expect(toShippedPr(pr, labelsFor).summary).toBe('');
+  });
+
   it('uses area none when the issue is unknown', () => {
     const pr = { number: 2, title: 'T', url: 'https://x', mergedAt: '2026-11-14T00:00:00Z' };
     expect(toShippedPr(pr, labelsFor)).toMatchObject({ summary: '', area: 'none' });
@@ -920,9 +973,26 @@ describe('product KPIs and roadmap stacks', () => {
     expect(days).toEqual([0, 1, 0, 0, 0, 0, 2]);
   });
 
+  it('keeps a PR exactly 7 days old, so the buckets add up to shippedThisWeek', () => {
+    const prs = [
+      { number: 1, title: 'a', url: 'u', mergedAt: '2026-11-08T12:00:00Z' },
+      { number: 2, title: 'b', url: 'u', mergedAt: '2026-11-15T11:00:00Z' },
+      { number: 3, title: 'c', url: 'u', mergedAt: '2026-11-12T00:00:00Z' },
+    ];
+    const shipped = shippedThisWeek(prs, now);
+    const days = shippedPerDay(shipped, now);
+    expect(days.reduce((a, b) => a + b, 0)).toBe(shipped.length);
+    expect(shipped.length).toBe(3);
+  });
+
+  it('labels the sparkline points from the last 24 hours back', () => {
+    const kpis = computeProductKpis({ launchBlockers: [], shipped: [], flags: [], openIssueCount: 0, now });
+    expect(kpis.perDay.map((day) => day.label)).toEqual(['6 days ago', '5 days ago', '4 days ago', '3 days ago', '2 days ago', '1 day ago', 'Last 24 h']);
+  });
+
   it('counts blockers, shipped, flags on of total and open issues', () => {
     const kpis = computeProductKpis({
-      launchBlockers: [{ number: 1, title: '', url: '', status: 'Ready', labels: [] }],
+      launchBlockers: [{ number: 1, title: '', url: '', status: 'Ready', labels: [], summary: '' }],
       shipped: [{ mergedAt: '2026-11-14T00:00:00Z' }, { mergedAt: '2026-11-13T00:00:00Z' }],
       flags: [
         { name: 'A', state: 'On' },
@@ -955,5 +1025,98 @@ describe('product KPIs and roadmap stacks', () => {
         ],
       },
     ]);
+  });
+});
+
+describe('summarizeIssue', () => {
+  const body = [
+    '### Context',
+    'Rewritten from #12 after the first plan was too big.',
+    'Split from #20 (the dashboard epic).',
+    'Peter (Founder & CTO) asked for a **readability sweep** of the dashboard: charts, columns and brief PR summaries. This ticket builds the kit.',
+    '',
+    '### Acceptance criteria',
+    '- [ ] Layout kit in index.html, with a grid',
+    '- [ ] PR summaries',
+  ].join('\n');
+
+  it('takes the first Context sentence and skips Rewritten and Split from lead-ins', () => {
+    expect(summarizeIssue(body)).toBe('Peter (Founder & CTO) asked for a readability sweep of the dashboard: charts, columns and brief PR summaries.');
+  });
+
+  it('skips lead-ins that share a line with the real sentence', () => {
+    expect(summarizeIssue('### Context\nRewritten from #12. The login page shows no error. More.')).toBe('The login page shows no error.');
+  });
+
+  it('falls back to the first acceptance criterion', () => {
+    expect(summarizeIssue('### Acceptance criteria\n- [ ] The `FEATURE_X` flag hides the panel. And more\n- [ ] Second')).toBe('The FEATURE_X flag hides the panel.');
+  });
+
+  it('falls back to the first usable line, never a bare Closes line', () => {
+    expect(summarizeIssue('Closes #4\n\nJust a plain note about the work')).toBe('Just a plain note about the work');
+    expect(summarizeIssue('## Heading only\n')).toBe('');
+    expect(summarizeIssue(null)).toBe('');
+  });
+
+  it('caps at 140 characters', () => {
+    expect(summarizeIssue('### Context\n' + 'word '.repeat(60)).length).toBeLessThanOrEqual(140);
+  });
+});
+
+describe('openBoardItems', () => {
+  const item = (number: number | null, status: string | null): BoardItem => ({ number, title: '', status, type: 'Issue', url: null, labels: [] });
+
+  it('does not count a closed issue that is still In review', () => {
+    const board = [item(1, 'In review'), item(2, 'In review'), item(3, 'In review'), item(null, 'Backlog')];
+    const open = openBoardItems(board, new Set([1]), new Set([2, 3]));
+    expect(open.map((entry) => entry.number)).toEqual([1, null]);
+    expect(groupByStatus(open)['In review']).toHaveLength(1);
+    expect(groupByStatus(board)['In review']).toHaveLength(3);
+  });
+
+  it('keeps everything when the closed list is empty (source failed)', () => {
+    expect(openBoardItems([item(1, 'Done')], new Set(), new Set())).toHaveLength(1);
+  });
+});
+
+describe('buildProduct', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const issue = { number: 586, title: '[launch roadmap] Clerk', url: 'https://x/586', labels: ['area:web'], updatedAt: '', summary: 'Set up Clerk.' };
+
+  it('sends summaries only, never a PR or issue body', () => {
+    const result = buildProduct({
+      sources: { board: { ok: true }, openIssues: { ok: true }, mergedPrs: { ok: true } },
+      flags: [],
+      mergedPrs: [
+        { number: 9, title: 'PR', url: 'https://x/9', mergedAt: '2026-11-14T00:00:00Z', body: '## What\n- Short line\n\nSECOND_PARAGRAPH_TOKEN and more words', headRefName: 'ticket/586' },
+      ],
+      openIssues: [{ ...issue, body: 'ISSUE_BODY_TOKEN' } as never],
+      board: [],
+      labelsFor: () => ['area:web'],
+      issueSummaryFor: () => '',
+      now,
+    });
+    const json = JSON.stringify(result);
+    expect(json).not.toContain('"body"');
+    expect(json).not.toContain('SECOND_PARAGRAPH_TOKEN');
+    expect(json).not.toContain('ISSUE_BODY_TOKEN');
+    expect(result.shipped[0]?.summary).toBe('Short line');
+    expect(result.launchBlockers?.[0]?.summary).toBe('Set up Clerk.');
+    expect(result.kpis.perDay.reduce((sum, day) => sum + day.count, 0)).toBe(result.shipped.length);
+  });
+
+  it('reports blockers as unknown when a source failed', () => {
+    const result = buildProduct({
+      sources: { board: { ok: false, error: 'x' }, openIssues: { ok: true } },
+      flags: [],
+      mergedPrs: [],
+      openIssues: [],
+      board: [],
+      labelsFor: () => [],
+      issueSummaryFor: () => '',
+      now,
+    });
+    expect(result.launchBlockers).toBeNull();
+    expect(result.blockedBy).toEqual(['board']);
   });
 });

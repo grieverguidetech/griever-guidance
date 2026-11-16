@@ -7,6 +7,7 @@ export interface BoardItem {
   type: string;
   url: string | null;
   labels: string[];
+  summary?: string;
 }
 
 export interface Issue {
@@ -15,6 +16,8 @@ export interface Issue {
   url: string;
   labels: string[];
   updatedAt: string;
+  // One line from the issue body. The body itself never leaves the server.
+  summary?: string;
 }
 
 export interface Pr {
@@ -49,6 +52,7 @@ export interface NeedsYouItem {
   title: string;
   url: string;
   labels: string[];
+  summary?: string;
 }
 
 export interface DriftItem {
@@ -222,6 +226,11 @@ export function groupByStatus(items: BoardItem[]): Record<string, BoardItem[]> {
   return groups;
 }
 
+// Board counts are for open issues only. A closed issue still on the board is drift, not a count.
+export function openBoardItems(board: BoardItem[], openNumbers: Set<number>, closedNumbers: Set<number>): BoardItem[] {
+  return board.filter((item) => item.number === null || openNumbers.has(item.number) || !closedNumbers.has(item.number));
+}
+
 export function isGreenForReview(pr: Pr): boolean {
   return !pr.isDraft && pr.ci === 'green';
 }
@@ -235,6 +244,7 @@ export function computeNeedsYou(prs: Pr[], issues: Issue[]): NeedsYouItem[] {
       title: pr.title,
       url: pr.url,
       labels: issueLabelsFor(pr, issues),
+      summary: issues.find((candidate) => candidate.number === pr.issueNumber)?.summary ?? '',
     });
   }
   for (const issue of issues) {
@@ -255,6 +265,7 @@ function issueItem(kind: NeedsYouItem['kind'], issue: Issue): NeedsYouItem {
     title: issue.title,
     url: issue.url,
     labels: issue.labels,
+    summary: issue.summary ?? '',
   };
 }
 
@@ -479,6 +490,7 @@ export interface BacklogRow {
   action: RowAction;
   recommendation: string;
   why: string;
+  summary: string;
 }
 
 export interface BacklogReview {
@@ -544,6 +556,7 @@ export function joinBacklogReview(file: BacklogReviewFile, openIssues: Issue[]):
       action: review ? review.action : 'not-reviewed',
       recommendation: review ? review.recommendation : NOT_REVIEWED,
       why: review ? review.why : 'No review has been written for this issue yet.',
+      summary: issue.summary ?? '',
     };
   });
   rows.sort((a, b) => ACTION_ORDER.indexOf(a.action) - ACTION_ORDER.indexOf(b.action) || a.number - b.number);
@@ -599,33 +612,82 @@ export interface MergedPr {
 
 export const SUMMARY_MAX = 140;
 
+// Code spans are kept whole: their text is set aside, the rest is stripped, then the text comes back.
 function stripMarkdown(text: string): string {
-  return text
+  const code: string[] = [];
+  const held = text.replace(/`([^`]*)`/g, (_match, inner: string) => {
+    code.push(inner);
+    return `\u0000${code.length - 1}\u0000`;
+  });
+  const stripped = held
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[`*_~]+/g, '')
-    .replace(/^\s*>+\s*/, '')
+    .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2')
+    .replace(/(^|[^\w*])\*(?=\S)([^*]+?)(?<=\S)\*(?![\w*])/g, '$1$2')
+    .replace(/(^|[^\w_])_(?=\S)([^_]+?)(?<=\S)_(?![\w_])/g, '$1$2')
+    .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, '$1')
     .replace(/^\s*#{1,6}\s+/, '')
     .replace(/^\s*\[[ xX]\]\s*/, '')
     .replace(/\s+/g, ' ')
     .trim();
+  return stripped.replace(/\u0000(\d+)\u0000/g, (_match, index: string) => code[Number(index)] ?? '');
 }
 
+// Cuts at the last word boundary that leaves room for the ellipsis.
 function capSummary(text: string): string {
   if (text.length <= SUMMARY_MAX) {
     return text;
   }
-  return text.slice(0, SUMMARY_MAX - 1).trimEnd() + '\u2026';
+  const room = text.slice(0, SUMMARY_MAX - 1);
+  const space = room.lastIndexOf(' ');
+  const cut = space > SUMMARY_MAX / 2 ? room.slice(0, space) : room;
+  return cut.trimEnd() + '…';
 }
 
 const BULLET = /^\s*(?:[-*+]|\d+[.)])\s+/;
+const ISSUE_LINK_LINE = /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|part of)\s+#\d+\b/i;
+const ISSUE_REF_LINE = /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:#\d+[\s,;]*(?:and\s+)?)+$/i;
 
-// The lines under a "## What" heading, up to the next heading. Empty when there is none.
-function whatSection(body: string): string[] {
+interface UsableLine {
+  text: string;
+  bullet: boolean;
+}
+
+// The lines worth reading: no headings, quotes, fenced code, comments, or lines that only link an issue.
+function usableLines(lines: string[]): UsableLine[] {
+  const out: UsableLine[] = [];
+  let fenced = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^(```|~~~)/.test(trimmed)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced || trimmed === '' || /^#{1,6}\s/.test(trimmed) || trimmed.startsWith('>')) {
+      continue;
+    }
+    if (ISSUE_LINK_LINE.test(line) || ISSUE_REF_LINE.test(line)) {
+      continue;
+    }
+    const text = stripMarkdown(line.replace(BULLET, ''));
+    if (text !== '') {
+      out.push({ text, bullet: BULLET.test(line) });
+    }
+  }
+  return out;
+}
+
+function firstSentence(text: string): string {
+  const match = /^.*?[.!?](?=\s|$)/.exec(text);
+  return match ? match[0] : text;
+}
+
+// The lines under the first heading that matches, up to the next heading. Empty when none matches.
+function sectionLines(body: string, heading: RegExp): string[] {
   const lines = body.split('\n');
-  const start = lines.findIndex((line) => /^#{1,6}\s*what\b/i.test(line.trim()));
+  const start = lines.findIndex((line) => /^#{1,6}\s/.test(line.trim()) && heading.test(line.trim().replace(/^#{1,6}\s*/, '')));
   if (start < 0) {
     return [];
   }
@@ -639,26 +701,63 @@ function whatSection(body: string): string[] {
   return section;
 }
 
-// One line for the dashboard: the first bullet or sentence under "## What", else the first
-// non-empty line. Markdown is stripped and the result is at most SUMMARY_MAX characters.
-export function summarizePr(body: string | null | undefined): string {
+function normalize(body: string | null | undefined): string | null {
   if (typeof body !== 'string') {
+    return null;
+  }
+  return body.replace(/\r\n?/g, '\n').replace(/<!--[\s\S]*?-->/g, '');
+}
+
+// A lead-in is a plain line that ends with a colon and only introduces what follows.
+function skipLeadIn(lines: UsableLine[]): UsableLine | undefined {
+  const first = lines[0];
+  if (first && !first.bullet && first.text.endsWith(':') && lines.length > 1) {
+    return lines[1];
+  }
+  return first;
+}
+
+function oneLine(line: UsableLine | undefined): string {
+  return line ? capSummary(firstSentence(line.text)) : '';
+}
+
+// One line for the dashboard: the first bullet or sentence under "## What", else the first usable
+// line. Never a heading, a quote, code, or a bare "Closes #N". Empty when nothing is left.
+export function summarizePr(body: string | null | undefined): string {
+  const clean = normalize(body);
+  if (clean === null) {
     return '';
   }
-  const clean = body.replace(/\r\n?/g, '\n').replace(/<!--[\s\S]*?-->/g, '');
-  const lines = whatSection(clean).filter((line) => stripMarkdown(line) !== '');
-  // A lead-in line that ends with a colon only introduces the list below it, so skip it.
-  const first = lines.length > 1 && stripMarkdown(lines[0] ?? '').endsWith(':') ? lines[1] : lines[0];
-  if (first !== undefined) {
-    const text = stripMarkdown(first.replace(BULLET, ''));
-    if (BULLET.test(first)) {
-      return capSummary(text);
-    }
-    const sentence = /^.*?[.!?](?=\s|$)/.exec(text);
-    return capSummary(sentence ? sentence[0] : text);
+  const what = skipLeadIn(usableLines(sectionLines(clean, /^what\b/i)));
+  if (what) {
+    return oneLine(what);
   }
-  const fallback = clean.split('\n').map(stripMarkdown).find((line) => line !== '');
-  return capSummary(fallback ?? '');
+  return oneLine(usableLines(clean.split('\n'))[0]);
+}
+
+const ISSUE_LEAD_IN = /^(?:rewritten|split from)\b/i;
+
+// One line for an issue: the first sentence of "### Context" (not a "Rewritten ..." or "Split from ..."
+// lead-in), else the first acceptance criterion, else the first usable line.
+export function summarizeIssue(body: string | null | undefined): string {
+  const clean = normalize(body);
+  if (clean === null) {
+    return '';
+  }
+  const context = usableLines(sectionLines(clean, /^context\b/i));
+  const candidates = context.length > 1 && !context[0]?.bullet && context[0]?.text.endsWith(':') ? context.slice(1) : context;
+  for (const line of candidates) {
+    const sentences = line.text.split(/(?<=[.!?])\s+/);
+    const found = sentences.find((sentence) => !ISSUE_LEAD_IN.test(sentence));
+    if (found) {
+      return capSummary(found);
+    }
+  }
+  const criteria = usableLines(sectionLines(clean, /^acceptance/i)).find((line) => line.bullet);
+  if (criteria) {
+    return capSummary(firstSentence(criteria.text));
+  }
+  return oneLine(usableLines(clean.split('\n'))[0]);
 }
 
 // A merged PR as the page sees it: a summary and an area, never the full body.
@@ -671,32 +770,44 @@ export interface ShippedPr {
   area: string;
 }
 
-export function toShippedPr(pr: MergedPr, labelsFor: (issue: number | null) => string[]): ShippedPr {
+// The summary falls back to the linked issue's summary when the PR body has nothing else.
+export function toShippedPr(
+  pr: MergedPr,
+  labelsFor: (issue: number | null) => string[],
+  issueSummaryFor: (issue: number | null) => string = () => '',
+): ShippedPr {
   const issue = issueFromPr(pr.body, pr.headRefName ?? '');
   return {
     number: pr.number,
     title: pr.title,
     url: pr.url,
     mergedAt: pr.mergedAt,
-    summary: summarizePr(pr.body),
+    summary: summarizePr(pr.body) || issueSummaryFor(issue),
     area: areaOf(labelsFor(issue)),
   };
 }
 
-// PRs merged per day for the 7 days up to now, oldest first. Same window rule as shippedThisWeek.
+// PRs merged per day for the 7 days up to now, oldest first. A PR exactly 7 days old is kept, like
+// shippedThisWeek, so the buckets always add up to the shipped count.
 export function shippedPerDay(shipped: { mergedAt: string }[], now: Date): number[] {
   const days = new Array<number>(SHIPPED_WINDOW_DAYS).fill(0);
   for (const pr of shipped) {
     const age = now.getTime() - Date.parse(pr.mergedAt);
-    if (Number.isNaN(age) || age < 0) {
+    if (Number.isNaN(age) || age < 0 || age > SHIPPED_WINDOW_DAYS * DAY_MS) {
       continue;
     }
-    const index = Math.floor(age / DAY_MS);
-    if (index < SHIPPED_WINDOW_DAYS) {
-      days[SHIPPED_WINDOW_DAYS - 1 - index] = (days[SHIPPED_WINDOW_DAYS - 1 - index] ?? 0) + 1;
-    }
+    const slot = SHIPPED_WINDOW_DAYS - 1 - Math.min(Math.floor(age / DAY_MS), SHIPPED_WINDOW_DAYS - 1);
+    days[slot] = (days[slot] ?? 0) + 1;
   }
   return days;
+}
+
+// "Last 24 h", "1 day ago" ... for a sparkline point `ago` days before the newest one.
+export function dayAgoLabel(ago: number): string {
+  if (ago === 0) {
+    return 'Last 24 h';
+  }
+  return ago === 1 ? '1 day ago' : `${ago} days ago`;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -742,6 +853,7 @@ export interface LaunchBlocker {
   url: string;
   status: string;
   labels: string[];
+  summary: string;
 }
 
 export function isLaunchBlocker(issue: Issue): boolean {
@@ -768,6 +880,7 @@ export function computeLaunchBlockers(openIssues: Issue[], board: BoardItem[]): 
       url: issue.url,
       status: statuses.get(issue.number) ?? NO_STATUS,
       labels: issue.labels,
+      summary: issue.summary ?? '',
     }))
     .sort((a, b) => a.number - b.number);
 }
@@ -830,7 +943,7 @@ export interface ProductKpis {
   flagsOn: number;
   flagsTotal: number;
   openIssues: number | null;
-  shippedPerDay: number[];
+  perDay: { label: string; count: number }[];
 }
 
 export function computeProductKpis(input: {
@@ -846,7 +959,47 @@ export function computeProductKpis(input: {
     flagsOn: input.flags.filter((flag) => flag.state === 'On').length,
     flagsTotal: input.flags.length,
     openIssues: input.openIssueCount,
-    shippedPerDay: shippedPerDay(input.shipped, input.now),
+    perDay: shippedPerDay(input.shipped, input.now).map((count, index, all) => ({
+      label: dayAgoLabel(all.length - 1 - index),
+      count,
+    })),
+  };
+}
+
+export interface ProductInput {
+  sources: Record<string, SourceStatus>;
+  flags: FeatureFlag[];
+  mergedPrs: MergedPr[];
+  openIssues: Issue[];
+  board: BoardItem[];
+  labelsFor: (issue: number | null) => string[];
+  issueSummaryFor: (issue: number | null) => string;
+  now: Date;
+}
+
+// Everything the Product tab shows. Only summaries are sent: no PR or issue body is in the result.
+export function buildProduct(input: ProductInput) {
+  const blockedBy = failedSources(input.sources, ['board', 'openIssues']);
+  const shipped = shippedThisWeek(input.mergedPrs, input.now).map((pr) =>
+    toShippedPr(pr, input.labelsFor, input.issueSummaryFor),
+  );
+  const launchBlockers = blockedBy.length > 0 ? null : computeLaunchBlockers(input.openIssues, input.board);
+  const roadmap = blockedBy.length > 0 ? null : computeRoadmap(input.openIssues, input.board);
+  return {
+    flags: input.flags,
+    shipped,
+    shippedMayBeCutOff: shippedMayBeCutOff(input.mergedPrs.length),
+    kpis: computeProductKpis({
+      launchBlockers,
+      shipped,
+      flags: input.flags,
+      openIssueCount: input.sources['openIssues']?.ok ? input.openIssues.length : null,
+      now: input.now,
+    }),
+    launchBlockers,
+    roadmap,
+    roadmapStacks: roadmap === null ? null : roadmapStacks(roadmap),
+    blockedBy,
   };
 }
 
