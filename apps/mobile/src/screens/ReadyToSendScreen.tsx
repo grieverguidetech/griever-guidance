@@ -7,7 +7,7 @@ import type { UseContactsResult } from '@griever/hooks';
 import { firstName } from '@griever/shared';
 import type { MomentKey } from '@griever/shared';
 import { colors } from '@griever/tokens';
-import { ReadyToSend } from '../ui';
+import { focusNode, ReadyToSend } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
@@ -49,23 +49,11 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleB
   // Set when the person opens the people sheet, so focus goes back to the button they pressed.
   const openedSheet = useRef(false);
 
-  // The heading takes screen-reader focus when the screen opens.
+  // The heading takes screen-reader focus when the screen opens, and again after "Got it" swaps the nudge for the
+  // normal screen. Deferred a tick so the screen reader takes it after the swap has drawn.
   useEffect(() => {
-    const handle = heading.current ? findNodeHandle(heading.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
-  }, []);
-
-  // After "Got it" the nudge is replaced by the normal screen: the heading takes focus again, so the screen reader starts at the top.
-  useEffect(() => {
-    if (!nudgeDismissed) {
-      return;
-    }
-    const handle = heading.current ? findNodeHandle(heading.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
+    const timer = setTimeout(() => focusNode(heading.current), 0);
+    return () => clearTimeout(timer);
   }, [nudgeDismissed]);
 
   // The people sheet is open while the step is 'contacts'. When it is gone, focus returns to the button that opened it.

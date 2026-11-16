@@ -5,7 +5,7 @@ import { fill, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH, isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
-import { ShareObituary } from '../ui';
+import { focusNode, ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { TextInputNode } from '../ui/screens/ShareObituary';
 import { colors } from '@griever/tokens';
@@ -86,11 +86,10 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   }, []);
 
   // The heading takes screen-reader focus when the screen opens, and again after "Got it" swaps the nudge for the normal screen.
+  // Deferred a tick so the screen reader takes it after the swap has drawn.
   useEffect(() => {
-    const handle = heading.current ? findNodeHandle(heading.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
+    const timer = setTimeout(() => focusNode(heading.current), 0);
+    return () => clearTimeout(timer);
   }, [nudgeDismissed]);
 
   // Loads this person's saved address, unless the user has already started typing.

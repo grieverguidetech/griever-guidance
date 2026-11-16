@@ -171,6 +171,34 @@ describe('a moment with nothing written on the web (#824)', () => {
     expect(await screen.findByRole('heading', { name: 'Add the service details on the web first' })).toBeTruthy();
   });
 
+  describe('while the saved people are still loading (the flow is on its people step)', () => {
+    const openLoading = async () => {
+      const real = AsyncStorage.getItem.bind(AsyncStorage);
+      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([empty]));
+      await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+      // The saved contacts never load, so the people step stays open under the nudge.
+      jest.spyOn(AsyncStorage, 'getItem').mockImplementation((key) => (key === 'gg.contacts.v1' ? new Promise(() => undefined) : real(key)));
+      render(<App />);
+      fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+      fireEvent.press(await screen.findByRole('button', { name: /Share the service/ }));
+      fireEvent.press(await screen.findByRole('button', { name: 'Got it' }));
+      await screen.findByLabelText('Your message');
+    };
+
+    it('Back reaches the hub in one press', async () => {
+      await openLoading();
+      fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      expect(await screen.findByText('For Anna')).toBeTruthy();
+    });
+
+    it('Choose who to tell opens the people sheet and stays on Ready to send underneath', async () => {
+      await openLoading();
+      expect(await openPeople()).toBeTruthy();
+      expect(screen.getByLabelText('Your message')).toBeTruthy();
+      expect(screen.queryByText('For Anna')).toBeNull();
+    });
+  });
+
   it('the obituary: Got it shows the normal screen, and Back goes to the hub', async () => {
     await openAnna(empty);
     await startMoment('Share the obituary');

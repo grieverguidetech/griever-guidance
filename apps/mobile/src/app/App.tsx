@@ -360,8 +360,12 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   const choosePeople = useCallback(() => {
     sheetAsked.current = true;
     setPeopleAsked(true);
-    flow.prevStep();
-  }, [flow.prevStep]);
+    // Already on the people step (the saved people are still loading): only open the sheet. Stepping back from here
+    // would leave Ready to send.
+    if (flow.step !== 'contacts') {
+      flow.prevStep();
+    }
+  }, [flow.prevStep, flow.step]);
   useEffect(() => {
     if (flow.step !== 'contacts') {
       sheetAsked.current = false;
@@ -396,7 +400,12 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       // A safety net. A visible Modal takes Android Back through its onRequestClose, so this only runs if
       // Back reaches the bar with the sheet open; then it closes the sheet and nothing else.
       if (flow.step === 'contacts') {
-        flow.nextStep();
+        if (sheetAsked.current) {
+          flow.nextStep();
+        } else {
+          // The sheet was never asked for: the saved people are still loading under Ready to send. Back leaves, as it does there.
+          backToStart();
+        }
         return;
       }
       // The step before this one is the picker: go to the hub instead. Ready to send also goes
