@@ -31,6 +31,10 @@ import {
   boardTruncation,
   failedSources,
   isAllowedHost,
+  decideRestart,
+  codeChanged,
+  CACHE_MS,
+  CLOSED_WINDOW_DAYS,
   joinBacklogReview,
   parseBacklogReviews,
   parsePort,
@@ -1260,5 +1264,68 @@ describe('buildProduct', () => {
     });
     expect(result.launchBlockers).toBeNull();
     expect(result.blockedBy).toEqual(['board']);
+  });
+});
+
+describe('decideRestart', () => {
+  const good = {
+    method: 'POST',
+    host: '127.0.0.1:4399',
+    origin: 'http://127.0.0.1:4399',
+    restartHeader: '1',
+    restartEnabled: true,
+    port: 4399,
+  };
+
+  it('allows a complete request', () => {
+    expect(decideRestart(good)).toEqual({ allowed: true });
+  });
+
+  it('allows the friendly host as the origin', () => {
+    const friendly = 'gg-tech-dashboard.localhost:4399';
+    expect(decideRestart({ ...good, host: friendly, origin: `http://${friendly}` })).toEqual({ allowed: true });
+  });
+
+  it('refuses other methods with 405', () => {
+    for (const method of ['GET', 'OPTIONS', 'PUT', 'DELETE', undefined]) {
+      expect(decideRestart({ ...good, method })).toMatchObject({ allowed: false, status: 405 });
+    }
+  });
+
+  it('refuses a host that is not allowed', () => {
+    expect(decideRestart({ ...good, host: 'evil.example:4399' })).toMatchObject({ allowed: false, status: 403 });
+    expect(decideRestart({ ...good, host: undefined })).toMatchObject({ allowed: false, status: 403 });
+  });
+
+  it('refuses when restart is not enabled', () => {
+    expect(decideRestart({ ...good, restartEnabled: false })).toMatchObject({ allowed: false, status: 403 });
+  });
+
+  it('refuses a missing or wrong origin', () => {
+    for (const origin of [undefined, 'null', 'https://127.0.0.1:4399', 'http://evil.example', 'http://127.0.0.1:4399/', 'http://127.0.0.1:1', 'http://127.0.0.1:4399.evil.com']) {
+      expect(decideRestart({ ...good, origin })).toMatchObject({ allowed: false, status: 403 });
+    }
+  });
+
+  it('refuses a missing or wrong restart header', () => {
+    for (const restartHeader of [undefined, '', '0', 'true']) {
+      expect(decideRestart({ ...good, restartHeader })).toMatchObject({ allowed: false, status: 403 });
+    }
+  });
+});
+
+describe('codeChanged', () => {
+  it('is false for the same time and true for a newer or an older one', () => {
+    expect(codeChanged(100, 100)).toBe(false);
+    expect(codeChanged(100, 200)).toBe(true);
+    expect(codeChanged(100, 50)).toBe(true);
+  });
+});
+
+describe('cache and closed window', () => {
+  it('caches for 5 minutes and reads 28 days of closed issues', () => {
+    expect(CACHE_MS).toBe(300_000);
+    expect(CLOSED_WINDOW_DAYS).toBe(28);
+    expect(shippedSearchDate(new Date('2026-11-29T00:00:00Z'), CLOSED_WINDOW_DAYS)).toBe('2026-11-01');
   });
 });

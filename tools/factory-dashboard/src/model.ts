@@ -1255,3 +1255,49 @@ export function buildEngineering(sources: Record<string, SourceStatus>, data: En
     throughputMayBeCutOff: shippedMayBeCutOff(data.mergedPrs.length),
   };
 }
+
+// ---- Restart (launchd mode only) ----
+
+export const RESTART_HEADER = 'x-factory-restart';
+
+export interface RestartRequest {
+  method: string | undefined;
+  host: string | undefined;
+  origin: string | undefined;
+  restartHeader: string | undefined;
+  restartEnabled: boolean;
+  port: number;
+}
+
+export type RestartDecision = { allowed: true } | { allowed: false; status: number; reason: string };
+
+// Guards POST /api/restart. Every check must pass. The server never sends CORS headers, so a page on
+// another origin cannot pass the preflight that the custom header forces.
+export function decideRestart(request: RestartRequest): RestartDecision {
+  if (request.method !== 'POST') {
+    return { allowed: false, status: 405, reason: 'POST only' };
+  }
+  if (!isAllowedHost(request.host, request.port)) {
+    return { allowed: false, status: 403, reason: 'Host not allowed' };
+  }
+  if (!request.restartEnabled) {
+    return { allowed: false, status: 403, reason: 'Restart is not enabled' };
+  }
+  const origin = request.origin;
+  if (origin === undefined || !origin.startsWith('http://') || !isAllowedHost(origin.slice('http://'.length), request.port)) {
+    return { allowed: false, status: 403, reason: 'Origin not allowed' };
+  }
+  if (request.restartHeader !== '1') {
+    return { allowed: false, status: 403, reason: 'Missing restart header' };
+  }
+  return { allowed: true };
+}
+
+// True when the newest file time under src/ and public/ differs from the one taken at start.
+export function codeChanged(baseline: number, current: number): boolean {
+  return current !== baseline;
+}
+
+// The cache and the closed-issue window. The closed-issue lookup reads the last 28 days only.
+export const CACHE_MS = 5 * 60 * 1000;
+export const CLOSED_WINDOW_DAYS = 28;
