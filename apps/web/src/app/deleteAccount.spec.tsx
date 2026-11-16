@@ -96,6 +96,25 @@ afterEach(() => {
 });
 
 describe('delete account in the app (#575)', () => {
+  it('the delete confirm step has no URL and adds no history entry (C9, #850)', async () => {
+    const user = userEvent.setup();
+    mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: async () => undefined }).load);
+    renderApp(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Margaret Hayes' }));
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await user.click(screen.getByRole('button', { name: 'Your account' }));
+    await screen.findByRole('heading', { level: 1, name: 'Account' });
+    const entries = window.history.length;
+    await user.click(screen.getByRole('button', { name: 'Delete my account' }));
+    expect(await screen.findByRole('button', { name: 'Yes, delete my account' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/account');
+    expect(window.location.search + window.location.hash).toBe('');
+    expect(window.history.length).toBe(entries);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(window.history.length).toBe(entries);
+    expect(window.location.pathname).toBe('/account');
+  });
+
   it('Clerk resolves: the done screen has focus, and sessions and contacts are empty', async () => {
     await contactStore.put({ contactId: 'c1' } as never);
     mocks.loadClerk.mockResolvedValue(fakeClerk({ userId: USER, deleteAccount: async () => undefined }).load);

@@ -289,7 +289,7 @@ describe('background sync in the app (#520)', () => {
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
       expect(screen.getByText("That page isn't here. Your people are below.")).toBeInTheDocument();
-      expect(window.location.pathname).toBe('/');
+      expect(window.location.pathname).toBe('/people');
       expect(document.body.textContent).not.toContain(other);
     } finally {
       vi.useRealTimers();
