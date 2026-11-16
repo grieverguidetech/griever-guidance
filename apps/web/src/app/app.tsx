@@ -338,8 +338,9 @@ const ITEM_IDS = Object.keys(cmsItemLabels) as ChecklistItemId[];
 
 /**
  * INTERIM until R3 (#850): Your people and Account have no path yet, so they ride on the history
- * entry's state at the current path. An item opened from their preview panel rides there too. The
- * empty pages (`/start`) and a person's pages have paths (#849, #856).
+ * entry's state at the current path. The empty pages (`/start`), a person's pages and every checklist
+ * item have paths (#849, #856). An item opened from the preview panel on Your people or Your account
+ * has a path too, and closes with Back to the entry that opened it.
  */
 type StateScreen = 'people' | 'profile' | 'settings';
 const STATE_SCREENS: StateScreen[] = ['people', 'profile', 'settings'];
@@ -361,6 +362,15 @@ function readEntry(state: unknown): EntryState {
     item: ITEM_IDS.find((id) => id === raw['item']) ?? null,
     missing: raw['missing'] === true,
   };
+}
+
+/**
+ * An item entry that this app pushed from one of its own pages carries `openedHere` in its state, so
+ * closing it can go Back to that page. It survives a reload (the state stays on the entry), and a
+ * link or a hand-typed address never has it.
+ */
+function openedHere(state: unknown): boolean {
+  return typeof state === 'object' && state !== null && (state as Record<string, unknown>)['openedHere'] === true;
 }
 
 /** Where the editor goes: a person's page (by path) or one of the interim state screens. */
@@ -565,8 +575,8 @@ function AppBody({
   const [flowCategory, setFlowCategory] = useState<TemplateCategory | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
   // Where the open item was opened from, so Back can return to that button.
-  // The key of the entry that openCmsItem pushed ('pending' until the router has committed it).
-  const pushedItemFrom = useRef<string | null>(null);
+  // Set once a close has started Back, until the router commits the new entry: a second tap does nothing.
+  const closing = useRef(false);
   const itemOpener = useRef<{ id: ChecklistItemId; region: 'main' | 'panel' | 'sheet' } | null>(null);
   const restoreOpener = useRef(false);
   // Where Back from "Edit person" returns: the form it was opened from, or the path.
@@ -644,18 +654,17 @@ function AppBody({
       setAskingName(false);
       if (shownItem.current !== null && cmsItem === null) {
         restoreOpener.current = true;
+      } else if (cmsItem !== null) {
+        // Landed on an item (Forward, or Back from a later page): nothing is waiting to be focused.
+        restoreOpener.current = false;
       }
     }
     mounted.current = true;
     shownItem.current = cmsItem;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
-  // The item's entry is known once the router has committed it.
   useEffect(() => {
-    if (pushedItemFrom.current === 'pending') {
-      pushedItemFrom.current = cmsItem !== null ? location.key : null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    closing.current = false;
   }, [location.key]);
   useFocusHeadingOnChange(
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
@@ -861,19 +870,20 @@ function AppBody({
    * empty pages (interim, see StateScreen) push the current path with their screen in the entry's state.
    * The same screen again adds no entry. Returns whether it moved.
    */
-  function go(spot: Spot, { replace = false }: { replace?: boolean } = {}): boolean {
+  function go(spot: Spot, { replace = false, mark = false }: { replace?: boolean; mark?: boolean } = {}): boolean {
     let pathname = location.pathname;
     let state: Record<string, unknown> | null;
     if (spot.view === 'cms') {
-      const path = spot.person ? pagePathFor(spot.person, spot.section ?? 'overview') : null;
-      if (!path) {
+      const person = spot.person;
+      const path = person ? pagePathFor(person, spot.section ?? 'overview') : null;
+      if (!person || !path) {
         return false;
       }
-      pathname = spot.item ? pathForSpot({ flowId: spot.person?.flowId ?? '', section: 'overview', item: spot.item }) : path;
-      state = null;
+      pathname = spot.item ? pathForSpot({ flowId: person.flowId, section: 'overview', item: spot.item }) : path;
+      state = mark ? { openedHere: true } : null;
     } else if (spot.view === 'noOne') {
       pathname = pathForSpot({ flowId: null, section: spot.section ?? 'overview', item: spot.item ?? null });
-      state = null;
+      state = mark ? { openedHere: true } : null;
     } else {
       // A person's page that could not be opened: the id leaves the address bar.
       if (spot.leavePath) {
@@ -1227,20 +1237,43 @@ function AppBody({
   }
 
   function openCmsItem(id: ChecklistItemId, region: 'main' | 'panel' | 'sheet', target: Spot, closeSheet?: () => void) {
-    itemOpener.current = { id, region };
+    // A second item opened while one is open replaces its entry, so one Back still returns to the page the
+    // first one was opened from, and focus goes to the first opener.
+    const replacing = cmsItem !== null;
+    if (!replacing) {
+      itemOpener.current = { id, region };
+    }
     itemFromAccount.current = null;
     itemFromEmpty.current = null;
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
     closeSheet?.();
-    // The entry this opens is ours: closing it can go Back to the page it came from (see closeCmsItem).
-    pushedItemFrom.current = go({ ...target, item: id }) ? 'pending' : null;
+    // The entry this opens is marked as ours: closing it can go Back to the page it came from (see closeCmsItem).
+    go({ ...target, item: id }, replacing ? { replace: true, mark: openedHere(location.state) } : { mark: true });
+  }
+
+  /** Back to the page this item was opened from. Once, however many times it is tapped. */
+  function backToOpener(): void {
+    if (closing.current) {
+      return;
+    }
+    closing.current = true;
+    // If the browser has nothing behind us after all, do not leave the close button dead.
+    setTimeout(() => {
+      closing.current = false;
+    }, 600);
+    navigate(-1);
   }
 
   function closeCmsItem() {
+    if (closing.current) {
+      return;
+    }
     const origin = itemFromEmpty.current;
     if (origin && origin.id === cmsItem) {
       itemFromEmpty.current = null;
-      if (origin.view === 'profile') {
+      if (openedHere(location.state)) {
+        backToOpener();
+      } else if (origin.view === 'profile') {
         openProfile(false, accountFrom.current);
       } else {
         go({ view: origin.view });
@@ -1250,14 +1283,18 @@ function AppBody({
     if (itemFromAccount.current !== null && itemFromAccount.current === cmsItem) {
       // Opened from the panel on Your account: Back returns there.
       itemFromAccount.current = null;
-      openProfile(false, accountFrom.current);
+      if (openedHere(location.state)) {
+        backToOpener();
+      } else {
+        openProfile(false, accountFrom.current);
+      }
       return;
     }
     restoreOpener.current = true;
-    // Opened here (a push of ours): Back is exact, the page and its place return as they were. A deep link
-    // or a reload has no page of ours behind it, so it goes to the Overview and takes the item's entry.
-    if (pushedItemFrom.current === location.key) {
-      navigate(-1);
+    // Opened here (a push of ours, marked in its state, also after a reload): Back is exact, the page and its
+    // place return as they were. A link has no page of ours behind it, so it goes to the Overview and takes the item's entry.
+    if (openedHere(location.state)) {
+      backToOpener();
       return;
     }
     go({ ...here, section: 'overview', item: null }, { replace: true });

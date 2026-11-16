@@ -289,6 +289,8 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     await h1('Service');
     expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
     await waitFor(() => expect(opener).toHaveFocus());
+    await act(async () => {});
+    expect(opener).toHaveFocus();
   });
 
   it('the browser Back button closes the item the same way, and Forward opens it again', async () => {
@@ -318,6 +320,101 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     expect(window.history.length).toBe(before);
   });
 
+  it('item A, then item B, then Back, then Back: one Back leaves the items, the next ends where it began, focus on A (#856)', async () => {
+    seed();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    await h1('Service');
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('aside [data-checklist-item]'));
+    const [first, second] = rows;
+    expect(first.getAttribute('data-checklist-item')).not.toBe(second.getAttribute('data-checklist-item'));
+    const firstId = first.getAttribute('data-checklist-item');
+    await user.click(first);
+    await screen.findByRole('heading', { level: 1, name: /\S/ });
+    const secondRow = document.querySelector<HTMLElement>(`aside [data-checklist-item="${second.getAttribute('data-checklist-item')}"]`);
+    await user.click(secondRow as HTMLElement);
+    await waitFor(() => expect(window.location.pathname).toBe(`/people/${FLOW}/guide/${second.getAttribute('data-checklist-item')}`));
+    // The second item took the first one's entry: one Back leaves both.
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Service');
+    expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
+    // Focus goes to the row of the FIRST item, which is still on the page.
+    const firstNow = document.querySelector<HTMLElement>(`aside [data-checklist-item="${firstId}"]`);
+    await waitFor(() => expect(firstNow).toHaveFocus());
+    await act(async () => {});
+    expect(firstNow).toHaveFocus();
+  });
+
+  it('an item entry that carries our marker (a reload) still closes Back to the page before it', async () => {
+    seed();
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', `/people/${FLOW}/service`);
+    window.history.pushState({ usr: { openedHere: true }, key: 'reloaded', idx: 1 }, '', `/people/${FLOW}/guide/pronouncement`);
+    renderApp(<App />, { path: `/people/${FLOW}/guide/pronouncement` });
+    await h1(ITEM);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Service');
+    expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
+  });
+
+  it('a double tap on Back goes Back once', async () => {
+    seed();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    await h1('Service');
+    await user.click(panel().getByRole('button', { name: ITEM }));
+    await h1(ITEM);
+    const go = vi.spyOn(window.history, 'go');
+    try {
+      const back = screen.getByRole('button', { name: 'Back' });
+      await user.dblClick(back);
+      await h1('Service');
+      expect(go.mock.calls.filter(([delta]) => delta === -1)).toHaveLength(1);
+    } finally {
+      go.mockRestore();
+    }
+  });
+
+  it('nobody saved: an item opened from Your people closes back to Your people at its own address', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/start' });
+    await h1('Overview');
+    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await h1('Your people');
+    const before = window.location.pathname;
+    await user.click(panel().getByRole('button', { name: ITEM }));
+    await h1(ITEM);
+    expect(window.location.pathname).toBe('/start/guide/pronouncement');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Your people');
+    expect(window.location.pathname).toBe(before);
+  });
+
+  it('nobody saved: an item opened from Your account closes back to Your account at its own address', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/start' });
+    await h1('Overview');
+    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await h1('Account');
+    const before = window.location.pathname;
+    await user.click(panel().getByRole('button', { name: ITEM }));
+    await h1(ITEM);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Account');
+    expect(window.location.pathname).toBe(before);
+  });
+
+  it('a guide path with an item that is not ours is not found, also on /start', async () => {
+    renderApp(<App />, { path: '/start/guide/nope' });
+    expect(await h1("We couldn't find that page.")).toBeInTheDocument();
+  });
+
+  it('with the editor off, /start is not found', async () => {
+    mocks.cms = false;
+    renderApp(<App />, { path: '/start' });
+    expect(await h1("We couldn't find that page.")).toBeInTheDocument();
+  });
+
   it('an item that is not on the checklist is not found', async () => {
     seed();
     renderApp(<App />, { path: `/people/${FLOW}/guide/nope` });
@@ -343,6 +440,8 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     await h1('Service');
     expect(window.location.pathname).toBe('/start/service');
     await waitFor(() => expect(opener).toHaveFocus());
+    await act(async () => {});
+    expect(opener).toHaveFocus();
   });
 
   it('an empty page once someone exists is replaced by that person, with no extra entry (#566)', async () => {
