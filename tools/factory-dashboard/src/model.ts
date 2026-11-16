@@ -475,6 +475,8 @@ export function isAllowedHost(host: string | undefined, port: number): boolean {
 export interface SourceStatus {
   ok: boolean;
   error?: string;
+  // The optional business.json is not there. Not an error.
+  missing?: boolean;
 }
 
 // Names of the sources, among `names`, that did not load. A missing source counts as failed.
@@ -593,6 +595,223 @@ export function joinBacklogReview(file: BacklogReviewFile, openIssues: Issue[]):
   const openNumbers = new Set(openIssues.map((issue) => issue.number));
   const dropped = file.reviews.filter((review) => !openNumbers.has(review.number)).length;
   return { reviewedAt: file.reviewedAt, rows, dropped };
+}
+
+// ---- Business tab ----
+
+export interface BusinessDecision {
+  question: string;
+  options: string[];
+  recommendation: string | null;
+  decided: string | null;
+  owner: string;
+  date: string;
+}
+
+export interface BusinessStep {
+  owner: string;
+  task: string;
+  due: string | null;
+  done: boolean;
+}
+
+export interface BusinessCostLine {
+  service: string;
+  monthly: number | null;
+}
+
+export interface BusinessFile {
+  updatedAt: string;
+  users: { count: number | null; date: string | null };
+  costs: BusinessCostLine[];
+  decisions: BusinessDecision[];
+  nextSteps: BusinessStep[];
+  nextSync: string | null;
+}
+
+export interface BusinessStepView extends BusinessStep {
+  overdue: boolean;
+}
+
+export interface BusinessView {
+  updatedAt: string;
+  users: { count: number | null; date: string | null };
+  costs: BusinessCostLine[];
+  // Sum of the lines that are set. Null when no line is set.
+  costTotal: number | null;
+  costUnset: number;
+  openDecisions: BusinessDecision[];
+  decidedDecisions: BusinessDecision[];
+  stepsByOwner: { owner: string; steps: BusinessStepView[] }[];
+  overdueCount: number;
+  nextSync: string | null;
+}
+
+const MAX_MONTHLY = 1e9;
+
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  // Round trip: 2026-02-31 would roll over to March, so it does not come back the same.
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function optionalDate(value: unknown, where: string): string | null {
+  if (value === undefined) {
+    throw new Error(`${where} must be present (use null when unknown)`);
+  }
+  if (value === null) {
+    return null;
+  }
+  if (!isIsoDate(value)) {
+    throw new Error(`${where} must be a date like 2026-11-17, or null`);
+  }
+  return value;
+}
+
+function optionalText(value: unknown, where: string): string | null {
+  if (value === undefined) {
+    throw new Error(`${where} must be present (use null when unknown)`);
+  }
+  if (value === null) {
+    return null;
+  }
+  if (!isText(value)) {
+    throw new Error(`${where} must be text, or null`);
+  }
+  return value;
+}
+
+function listOf<T>(value: unknown, where: string, build: (item: Record<string, unknown>, at: string) => T): T[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${where} must be a list`);
+  }
+  return value.map((entry: unknown, index: number) => {
+    if (!entry || typeof entry !== 'object') {
+      throw new Error(`${where}[${index}] must be an object`);
+    }
+    return build(entry as Record<string, unknown>, `${where}[${index}]`);
+  });
+}
+
+// Checks the shape of business.json. Throws with a plain reason when it is wrong. Unknown numbers are null.
+export function parseBusiness(raw: unknown): BusinessFile {
+  const data = raw as Record<string, unknown> | null;
+  if (!data || typeof data !== 'object' || !isIsoDate(data['updatedAt'])) {
+    throw new Error('updatedAt must be a date like 2026-11-15');
+  }
+  const users = data['users'] as Record<string, unknown> | null;
+  if (!users || typeof users !== 'object') {
+    throw new Error('users must be an object with count and date');
+  }
+  const count = users['count'];
+  if (count !== null && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) {
+    throw new Error('users.count must be a whole number, or null');
+  }
+  const costs = listOf(data['costs'], 'costs', (item, at): BusinessCostLine => {
+    if (!isText(item['service'])) {
+      throw new Error(`${at}: service must be text`);
+    }
+    const monthly = item['monthly'];
+    if (monthly !== null && (typeof monthly !== 'number' || !Number.isFinite(monthly) || monthly < 0 || monthly >= MAX_MONTHLY)) {
+      throw new Error(`${at}: monthly must be a number of US dollars, or null`);
+    }
+    return { service: item['service'], monthly: monthly as number | null };
+  });
+  const decisions = listOf(data['decisions'], 'decisions', (item, at): BusinessDecision => {
+    if (!isText(item['question']) || !isText(item['owner'])) {
+      throw new Error(`${at}: question and owner must be text`);
+    }
+    const options = item['options'];
+    if (!Array.isArray(options) || !options.every(isText)) {
+      throw new Error(`${at}: options must be a list of text`);
+    }
+    if (!isIsoDate(item['date'])) {
+      throw new Error(`${at}: date must be a date like 2026-11-17`);
+    }
+    return {
+      question: item['question'],
+      options: options as string[],
+      recommendation: optionalText(item['recommendation'], `${at}: recommendation`),
+      decided: optionalText(item['decided'], `${at}: decided`),
+      owner: item['owner'],
+      date: item['date'],
+    };
+  });
+  const nextSteps = listOf(data['nextSteps'], 'nextSteps', (item, at): BusinessStep => {
+    if (!isText(item['owner']) || !isText(item['task'])) {
+      throw new Error(`${at}: owner and task must be text`);
+    }
+    if (typeof item['done'] !== 'boolean') {
+      throw new Error(`${at}: done must be true or false`);
+    }
+    return {
+      owner: item['owner'],
+      task: item['task'],
+      due: optionalDate(item['due'], `${at}: due`),
+      done: item['done'],
+    };
+  });
+  return {
+    updatedAt: data['updatedAt'],
+    users: { count: count as number | null, date: optionalDate(users['date'], 'users.date') },
+    costs,
+    decisions,
+    nextSteps,
+    nextSync: optionalDate(data['nextSync'], 'nextSync'),
+  };
+}
+
+// Today as a local YYYY-MM-DD, so it compares as text with the dates in the file.
+export function localDay(now: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+// A step is overdue when it is not done and its due date is before today. No due date is never overdue.
+export function isOverdue(step: BusinessStep, today: string): boolean {
+  return !step.done && step.due !== null && step.due < today;
+}
+
+export function costTotal(costs: BusinessCostLine[]): { total: number | null; unset: number } {
+  const known = costs.filter((line) => line.monthly !== null);
+  const total = known.length === 0 ? null : known.reduce((sum, line) => sum + (line.monthly as number), 0);
+  return { total, unset: costs.length - known.length };
+}
+
+// Open decisions first, steps grouped by owner with overdue first, and the cost total.
+export function buildBusiness(file: BusinessFile, now: Date): BusinessView {
+  const today = localDay(now);
+  const cost = costTotal(file.costs);
+  const owners: string[] = [];
+  for (const step of file.nextSteps) {
+    if (!owners.includes(step.owner)) {
+      owners.push(step.owner);
+    }
+  }
+  const stepsByOwner = owners.map((owner) => {
+    const steps = file.nextSteps
+      .filter((step) => step.owner === owner)
+      .map((step): BusinessStepView => ({ ...step, overdue: isOverdue(step, today) }));
+    // Overdue first, then open, then done. Sort is stable, so the file order is kept inside each group.
+    const rank = (step: BusinessStepView): number => (step.overdue ? 0 : step.done ? 2 : 1);
+    steps.sort((a, b) => rank(a) - rank(b));
+    return { owner, steps };
+  });
+  return {
+    updatedAt: file.updatedAt,
+    users: file.users,
+    costs: file.costs,
+    costTotal: cost.total,
+    costUnset: cost.unset,
+    openDecisions: file.decisions.filter((d) => d.decided === null),
+    decidedDecisions: file.decisions.filter((d) => d.decided !== null),
+    stepsByOwner,
+    overdueCount: stepsByOwner.reduce((sum, group) => sum + group.steps.filter((s) => s.overdue).length, 0),
+    nextSync: file.nextSync,
+  };
 }
 
 // ---- Product tab ----

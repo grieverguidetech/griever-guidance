@@ -85,3 +85,4 @@ apps/marketing/.astro/
 
 # the flag-on web build used by the CMS e2e (apps/web-e2e/playwright.cms.config.ts)
 apps/web/dist-cms/
+tools/factory-dashboard/business.json

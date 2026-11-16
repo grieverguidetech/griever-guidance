@@ -37,6 +37,8 @@ button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.6; border-style: 
 ul.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 ul.list li { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
 .muted { color: var(--muted); }
+.tag.overdue { color: var(--red); border-color: var(--red); border-width: 2px; font-weight: 600; }
+.decision { overflow-wrap: anywhere; }
 .tag { display: inline-block; font-size: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; margin-right: 6px; color: var(--muted); }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; background: var(--grey); }
 .dot.green { background: var(--green); } .dot.red { background: var(--red); } .dot.amber { background: var(--amber); }
@@ -1027,15 +1029,15 @@ function barChart(rows, unit, caption, labelId, rowName) {
     line.appendChild(el("span", row.label));
     var svg = svgEl("svg", { height: BAR_H, width: "100%" });
     var bar = barShape((row.value / max * 100) + "%", "var(--chart-1)");
-    markInteractive(bar, row.value + " " + unit, row.label);
+    markInteractive(bar, (row.text || row.value) + " " + unit, row.label);
     svg.appendChild(svgEl("line", { x1: 0, x2: 0, y1: 0, y2: BAR_H, stroke: "var(--chart-axis)", "stroke-width": 1 }));
     svg.appendChild(bar);
     line.appendChild(svg);
-    line.appendChild(el("span", String(row.value), "total"));
+    line.appendChild(el("span", String(row.text || row.value), "total"));
     wrap.appendChild(line);
   });
   wrap.appendChild(chartTable(caption, [rowName || "Area", unit], rows.map(function (r) {
-    return [r.label, r.value];
+    return [r.label, r.text || r.value];
   })));
   chartGroup(wrap, labelId);
   return wrap;
@@ -1297,9 +1299,155 @@ function renderProduct() {
   renderFlags(panel);
 }
 
+// ---- Business tab ----
+// Most important first: decisions needed, next steps by owner, the key numbers, then the cost chart.
+var NOT_SET = "Not set";
+
+function money(value) {
+  return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function decisionCard(d, decided) {
+  var c = card(d.question);
+  c.classList.add("decision");
+  if (decided) {
+    c.appendChild(el("div", "Decided: " + d.decided));
+  }
+  if (d.options.length > 0) {
+    c.appendChild(el("div", "Options: " + d.options.join(" or "), "muted"));
+  }
+  c.appendChild(el("div", "Recommendation: " + (d.recommendation || NOT_SET), "muted"));
+  c.appendChild(el("div", "Owner: " + d.owner + ". Raised " + d.date + ".", "muted"));
+  return c;
+}
+
+function renderDecisions(parent, b) {
+  var s = kitSection(parent, "Decisions needed", "business");
+  safely(s, function (node) {
+    if (b.openDecisions.length === 0) {
+      node.appendChild(el("p", "No decisions are open.", "muted"));
+    } else {
+      node.appendChild(paged("decisions", "decisions", b.openDecisions, function (pageItems) {
+        var g = grid("cols-2");
+        pageItems.forEach(function (d) {
+          g.appendChild(decisionCard(d, false));
+        });
+        return g;
+      }));
+    }
+    if (b.decidedDecisions.length > 0) {
+      var details = el("details", null, "more");
+      details.appendChild(el("summary", "Decided (" + b.decidedDecisions.length + ")"));
+      var g2 = grid("cols-2");
+      b.decidedDecisions.forEach(function (d) {
+        g2.appendChild(decisionCard(d, true));
+      });
+      details.appendChild(g2);
+      node.appendChild(details);
+    }
+  });
+}
+
+function stepLine(li, step) {
+  if (step.overdue) {
+    li.appendChild(el("span", "Overdue", "tag overdue"));
+    li.appendChild(el("span", ": ", "sr-only"));
+  }
+  if (step.done) {
+    li.appendChild(el("span", "Done", "tag"));
+    li.appendChild(el("span", ": ", "sr-only"));
+  }
+  li.appendChild(document.createTextNode(step.task));
+  li.appendChild(el("div", step.due ? "Due " + step.due : "No due date", "muted"));
+}
+
+function renderSteps(parent, b) {
+  var s = kitSection(parent, "Next steps by owner", null);
+  safely(s, function (node) {
+    if (b.stepsByOwner.length === 0) {
+      node.appendChild(el("p", "No next steps.", "muted"));
+      return;
+    }
+    var g = grid("cols-2");
+    b.stepsByOwner.forEach(function (group) {
+      var c = card(group.owner);
+      c.appendChild(pagedList("steps-" + group.owner, "next steps for " + group.owner, group.steps, stepLine, "No next steps."));
+      g.appendChild(c);
+    });
+    node.appendChild(g);
+  });
+}
+
+function renderBusinessTiles(parent, b) {
+  var s = el("section");
+  s.appendChild(el("h2", "Key numbers", "sr-only"));
+  safely(s, function (node) {
+    var g = grid("kpis");
+    var users = b.users.count === null ? NOT_SET : b.users.count;
+    g.appendChild(kpiTile("Users", users, b.users.date ? "As of " + b.users.date : null));
+    var cost = b.costTotal === null ? NOT_SET : money(b.costTotal);
+    var costNote = b.costUnset > 0 && b.costTotal !== null ? b.costUnset + " of " + b.costs.length + " services not set" : "US dollars per month";
+    g.appendChild(kpiTile("Monthly cost", cost, costNote));
+    g.appendChild(kpiTile("Next sync", b.nextSync || NOT_SET, null));
+    node.appendChild(g);
+  });
+  parent.appendChild(s);
+}
+
+function renderCosts(parent, b) {
+  var s = kitSection(parent, "Cost breakdown", null);
+  var c = card("Monthly cost by service");
+  safely(c, function (node) {
+    var set = b.costs.filter(function (line) {
+      return line.monthly !== null;
+    });
+    if (set.length === 0) {
+      node.appendChild(el("p", "No costs are set yet.", "muted"));
+      node.appendChild(chartTable("Monthly cost by service", ["Service", "US dollars per month"], b.costs.map(function (line) {
+        return [line.service, NOT_SET];
+      })));
+      return;
+    }
+    var rows = set.map(function (line) {
+      return { label: line.service, value: line.monthly, text: money(line.monthly) };
+    });
+    node.appendChild(barChart(rows, "US dollars per month", "Monthly cost by service", c.titleId, "Service"));
+    if (b.costUnset > 0) {
+      var names = b.costs.filter(function (line) {
+        return line.monthly === null;
+      }).map(function (line) {
+        return line.service;
+      });
+      node.appendChild(el("p", "Not set: " + names.join(", ") + ".", "muted"));
+    }
+    node.appendChild(el("p", "Total: " + money(b.costTotal) + " per month.", "muted"));
+  });
+  s.appendChild(c);
+}
+
 function renderBusiness() {
-  main = document.getElementById("panel-business");
-  main.appendChild(el("p", "Coming soon.", "muted"));
+  var panel = document.getElementById("panel-business");
+  main = panel;
+  var b = state.business;
+  if (!b) {
+    var s = el("section");
+    s.appendChild(el("h2", "Business"));
+    var src = state.sources.business;
+    if (src && src.missing) {
+      s.appendChild(el("p", "No business.json yet. Copy business.example.json to business.json and fill it in.", "muted"));
+    } else if (src && !src.ok) {
+      s.appendChild(el("p", "Could not load: " + src.error, "error"));
+    } else {
+      s.appendChild(el("p", "The business numbers are not available.", "muted"));
+    }
+    panel.appendChild(s);
+    return;
+  }
+  renderDecisions(panel, b);
+  renderSteps(panel, b);
+  renderBusinessTiles(panel, b);
+  renderCosts(panel, b);
+  panel.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
 }
 
 function currentTab() {
