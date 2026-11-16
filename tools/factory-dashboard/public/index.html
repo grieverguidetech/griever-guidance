@@ -8,11 +8,16 @@
 :root {
   --bg: #f7f7f5; --card: #ffffff; --text: #1f2328; --muted: #59636e; --border: #d1d9e0;
   --green: #1a7f37; --red: #cf222e; --amber: #9a6700; --grey: #6e7781; --link: #0550ae; --focus: #0969da;
+  /* Chart tokens: categorical slots 1-5 of the dataviz reference palette, validated on --card. */
+  --chart-1: #2a78d6; --chart-2: #1baf7a; --chart-3: #eb6834; --chart-4: #6250d6; --chart-5: #e87ba4; --chart-on: #ffffff;
+  --chart-axis: #c3c2b7; --chart-track: #eceae4;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0d1117; --card: #161b22; --text: #e6edf3; --muted: #9198a1; --border: #30363d;
     --green: #3fb950; --red: #ff7b72; --amber: #d29922; --grey: #8b949e; --link: #79c0ff; --focus: #58a6ff;
+    --chart-1: #3987e5; --chart-2: #199e70; --chart-3: #d95926; --chart-4: #9085e9; --chart-5: #d55181; --chart-on: #ffffff;
+    --chart-axis: #383835; --chart-track: #21262d;
   }
 }
 * { box-sizing: border-box; }
@@ -50,6 +55,47 @@ table.review td.narrow { white-space: nowrap; width: 1%; }
 table.plain { border-collapse: collapse; background: var(--card); }
 table.plain th, table.plain td { text-align: left; padding: 6px 10px; border: 1px solid var(--border); }
 table.plain td.num { text-align: right; }
+/* ---- Layout kit ---- */
+.grid { display: grid; gap: 12px; align-items: start; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .grid.cols-2, .grid.cols-3 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .grid.cols-3 { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 480px) { .grid.kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .grid.kpis { grid-template-columns: repeat(4, 1fr); } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.grid.kpis { align-items: stretch; }
+.card > h3 { font-size: 14px; margin: 0 0 8px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi .label { font-size: 13px; color: var(--muted); }
+.kpi .value { font-size: 32px; font-weight: 600; line-height: 1.1; }
+.kpi.hero .value { font-size: 48px; }
+.kpi .note { font-size: 13px; color: var(--muted); }
+.kpi svg { margin-top: 4px; }
+.more > summary { color: var(--link); margin: 6px 0 4px; }
+details > summary { min-height: 24px; padding: 4px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+.chart-row { display: grid; grid-template-columns: minmax(70px, 22%) 1fr 3.5em; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
+.chart-row .total { text-align: right; }
+.chart-row svg { display: block; width: 100%; overflow: visible; }
+.chart:focus-visible, svg.chart:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.chart [data-mark]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.chart [data-mark]:hover { opacity: 0.8; }
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 260px; }
+.tip strong { display: block; font-size: 15px; }
+.tip span { color: var(--muted); }
+.chart-table { margin-top: 8px; }
+.scroll { overflow-x: auto; max-width: 100%; }
+.spark { margin-top: 4px; }
+.item-summary { color: var(--muted); font-size: 13px; }
+.grid.spaced { margin-top: 12px; }
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.pager button { min-height: 44px; min-width: 44px; }
+.pager button:disabled { opacity: 0.5; cursor: default; }
+.pager-status { color: var(--muted); font-size: 13px; }
+.pr-group h3 { font-size: 14px; margin: 12px 0 6px; }
+.pr-group h3:first-child { margin-top: 0; }
+.pr-summary { color: var(--muted); font-size: 13px; }
+ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -204,8 +250,9 @@ function renderFlaky() {
   if (!items) {
     return;
   }
-  s.appendChild(listOf(items.filter(visible), function (li, issue) {
+  s.appendChild(pagedList("flaky", "flaky tests", items.filter(visible), function (li, issue) {
     li.appendChild(link("#" + issue.number + " " + issue.title, issue.url));
+    li.appendChild(summaryLine(issue));
   }, "No open flaky-test issues."));
 }
 
@@ -302,9 +349,10 @@ function renderNeedsYou() {
     return;
   }
   var items = state.needsYou.filter(visible);
-  s.appendChild(listOf(items, function (li, item) {
+  s.appendChild(pagedList("needs-you", "items that need you", items, function (li, item) {
     li.appendChild(el("span", labels[item.kind], "tag"));
     li.appendChild(link("#" + item.number + " " + item.title, item.url));
+    li.appendChild(summaryLine(item));
   }, "Nothing waits for you."));
 }
 
@@ -336,8 +384,9 @@ function renderDrift() {
     }
     var d = el("details");
     d.appendChild(el("summary", ruleNames[rule] + " (" + group.length + ")"));
-    d.appendChild(listOf(group, function (li, item) {
+    d.appendChild(pagedList("drift-" + rule, ruleNames[rule], group, function (li, item) {
       li.appendChild(link("#" + item.number + " " + item.title, item.url));
+      li.appendChild(summaryLine(item));
       li.appendChild(el("div", item.detail, "muted"));
     }, "None."));
     s.appendChild(d);
@@ -349,6 +398,7 @@ function reviewRow(row) {
   tr.appendChild(el("td", "#" + row.number, "narrow"));
   var title = el("td");
   title.appendChild(link(row.title, row.url));
+  title.appendChild(summaryLine(row));
   tr.appendChild(title);
   tr.appendChild(el("td", row.recommendation, "wide"));
   tr.appendChild(el("td", row.why, "wide"));
@@ -369,23 +419,25 @@ function renderBacklogReview() {
     s.appendChild(el("p", "No open issues.", "muted"));
     return;
   }
-  var table = el("table", null, "review");
-  var head = el("tr");
-  [["#", ""], ["Title", ""], ["Recommendation", "wide"], ["Why", "wide"]].forEach(function (col) {
-    var th = el("th", col[0], col[1]);
-    th.scope = "col";
-    head.appendChild(th);
-  });
-  table.appendChild(head);
-  review.rows.forEach(function (row) {
-    table.appendChild(reviewRow(row));
-  });
-  s.appendChild(table);
+  s.appendChild(paged("backlog-review", "backlog review", review.rows, function (pageRows) {
+    var table = el("table", null, "review");
+    var head = el("tr");
+    [["#", ""], ["Title", ""], ["Recommendation", "wide"], ["Why", "wide"]].forEach(function (col) {
+      var th = el("th", col[0], col[1]);
+      th.scope = "col";
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    pageRows.forEach(function (row) {
+      table.appendChild(reviewRow(row));
+    });
+    return table;
+  }));
 }
 
 function renderPrs() {
   var s = section("Open PRs", "prs");
-  s.appendChild(listOf(state.prs.filter(visible), function (li, pr) {
+  s.appendChild(pagedList("open-prs", "open PRs", state.prs.filter(visible), function (li, pr) {
     li.appendChild(ciDot(pr.ci));
     if (pr.isDraft) {
       li.appendChild(el("span", "Draft", "tag"));
@@ -396,14 +448,15 @@ function renderPrs() {
   }, "No open PRs."));
 }
 
-function boardList(items) {
-  return listOf(items, function (li, item) {
+function boardList(items, key, label) {
+  return pagedList(key, label, items, function (li, item) {
     li.appendChild(link(itemText(item), item.url));
+    li.appendChild(summaryLine(item));
   }, "Empty.");
 }
 
 function renderBoard() {
-  var s = section("Board", "board");
+  var s = section("Board (open issues only)", "board");
   if (state.boardTruncated) {
     var note = "Board truncated: showing " + state.boardTruncated.shown + " of " + state.boardTruncated.total;
     s.appendChild(el("p", note, "error"));
@@ -413,20 +466,20 @@ function renderBoard() {
     var items = (state.board.groups[status] || []).filter(visible);
     var col = el("div", null, "column");
     col.appendChild(el("h3", status + " (" + items.length + ")"));
-    col.appendChild(boardList(items));
+    col.appendChild(boardList(items, "board-" + status, status + " issues"));
     wrap.appendChild(col);
   });
   s.appendChild(wrap);
   var done = (state.board.groups["Done"] || []).filter(visible);
   var d = el("details");
   d.appendChild(el("summary", "Done (" + done.length + ")"));
-  d.appendChild(boardList(done));
+  d.appendChild(boardList(done, "board-Done", "Done issues"));
   s.appendChild(d);
 }
 
 function renderWorktrees() {
   var s = section("Worktrees", "worktrees");
-  s.appendChild(listOf(state.worktrees.filter(visible), function (li, tree) {
+  s.appendChild(pagedList("worktrees", "worktrees", state.worktrees.filter(visible), function (li, tree) {
     var text = (tree.branch || "detached") + (tree.isMain ? " (main checkout)" : "");
     var issueUrl = "https://github.com/grieverguidetech/griever-guidance/issues/" + tree.issueNumber;
     li.appendChild(tree.issueNumber ? link(text, issueUrl) : el("span", text));
@@ -440,7 +493,7 @@ function renderRuns() {
   var s = section("Recent runs", "runs");
   [["CI", state.runs.ci], ["Deploy", state.runs.deploy]].forEach(function (pair) {
     s.appendChild(el("h3", pair[0]));
-    s.appendChild(listOf(pair[1].filter(visible), function (li, run) {
+    s.appendChild(pagedList("runs-" + pair[0], pair[0] + " runs", pair[1].filter(visible), function (li, run) {
       li.appendChild(runDot(run));
       li.appendChild(link(run.workflowName + " on " + run.headBranch, run.url));
       var outcome = run.status + (run.conclusion ? ", " + run.conclusion : "");
@@ -462,8 +515,517 @@ function renderHealth() {
   s.appendChild(p);
 }
 
-function renderFlags() {
-  var s = section("Feature flags", "featureFlags");
+// ---- Layout kit (everything is built with textContent and createElementNS) ----
+var SVG_NS = "http://www.w3.org/2000/svg";
+var PAGE_SIZE = 10;
+var BAR_H = 18;
+var pageOf = {};
+var idCounter = 0;
+
+function nextId(prefix) {
+  idCounter += 1;
+  return prefix + "-" + idCounter;
+}
+
+function svgEl(tag, attrs) {
+  var node = document.createElementNS(SVG_NS, tag);
+  Object.keys(attrs || {}).forEach(function (name) {
+    node.setAttribute(name, String(attrs[name]));
+  });
+  return node;
+}
+
+function grid(kind) {
+  return el("div", null, "grid " + kind);
+}
+
+// A card with an optional h3. The h3 gets an id so a chart inside can name itself with aria-labelledby.
+function card(title) {
+  var c = el("div", null, "card");
+  if (title) {
+    var h = el("h3", title);
+    h.id = nextId("h");
+    c.appendChild(h);
+    c.titleId = h.id;
+  }
+  return c;
+}
+
+// A section with an h2 and the source error (if any).
+function kitSection(parent, title, key) {
+  var s = el("section");
+  s.appendChild(el("h2", title));
+  var src = state.sources[key];
+  if (src && !src.ok) {
+    s.appendChild(el("p", "Could not load: " + src.error, "error"));
+  }
+  parent.appendChild(s);
+  return s;
+}
+
+// A one-line summary under an item title. Nothing is drawn when there is none.
+function summaryLine(item) {
+  if (item && item.summary) {
+    return el("div", item.summary, "item-summary");
+  }
+  return document.createDocumentFragment();
+}
+
+// For lists that are short by nature: the first `limit` items, the rest in a closed <details>.
+function withShowMore(items, limit, build, emptyText, noun) {
+  if (items.length <= limit) {
+    return listOf(items, build, emptyText);
+  }
+  var wrap = el("div");
+  wrap.appendChild(listOf(items.slice(0, limit), build, emptyText));
+  var more = el("details", null, "more");
+  more.appendChild(el("summary", "Show " + (items.length - limit) + " more " + noun));
+  more.appendChild(listOf(items.slice(limit), build, emptyText));
+  wrap.appendChild(more);
+  return wrap;
+}
+
+// Pagination for long lists: 10 per page, real Previous and Next buttons, "Showing 11-20 of 54" announced politely.
+// renderPage(pageItems) returns the node for one page. Lists of 10 or fewer are drawn as they are.
+function paged(key, label, items, renderPage) {
+  if (items.length <= PAGE_SIZE) {
+    return renderPage(items);
+  }
+  var wrap = el("div", null, "paged");
+  var body = el("div");
+  var bar = el("div", null, "pager");
+  var prev = el("button", "Previous");
+  var next = el("button", "Next");
+  var status = el("span", null, "pager-status");
+  prev.type = "button";
+  next.type = "button";
+  prev.setAttribute("aria-label", "Previous page, " + label);
+  next.setAttribute("aria-label", "Next page, " + label);
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  function show() {
+    var pages = Math.ceil(items.length / PAGE_SIZE);
+    var page = Math.min(pageOf[key] || 0, pages - 1);
+    pageOf[key] = page;
+    var start = page * PAGE_SIZE;
+    var end = Math.min(start + PAGE_SIZE, items.length);
+    body.textContent = "";
+    body.appendChild(renderPage(items.slice(start, end)));
+    status.textContent = "Showing " + (start + 1) + "-" + end + " of " + items.length;
+    prev.disabled = page === 0;
+    next.disabled = end >= items.length;
+  }
+  function go(step, clicked, other) {
+    pageOf[key] = (pageOf[key] || 0) + step;
+    show();
+    if (clicked.disabled) {
+      other.focus();
+    }
+  }
+  prev.addEventListener("click", function () {
+    go(-1, prev, next);
+  });
+  next.addEventListener("click", function () {
+    go(1, next, prev);
+  });
+  bar.appendChild(prev);
+  bar.appendChild(status);
+  bar.appendChild(next);
+  wrap.appendChild(body);
+  wrap.appendChild(bar);
+  show();
+  return wrap;
+}
+
+function pagedList(key, label, items, build, emptyText) {
+  return paged(key, label, items, function (pageItems) {
+    return listOf(pageItems, build, emptyText);
+  });
+}
+
+function kpiTile(label, value, note, hero) {
+  var tile = el("div", null, "card kpi" + (hero ? " hero" : ""));
+  var name = el("span", label, "label");
+  name.id = nextId("k");
+  tile.titleId = name.id;
+  tile.appendChild(name);
+  tile.appendChild(el("span", value === null ? "Unknown" : String(value), "value"));
+  if (note) {
+    tile.appendChild(el("span", note, "note"));
+  }
+  return tile;
+}
+
+// One shared tooltip. Marks show it on pointer move and on keyboard focus. Escape, pointer leave and blur hide it.
+var tip = null;
+function showTip(target, value, name, x, y) {
+  if (!tip) {
+    tip = el("div", null, "tip");
+    tip.setAttribute("aria-hidden", "true");
+    document.body.appendChild(tip);
+  }
+  tip.textContent = "";
+  tip.appendChild(el("strong", value));
+  tip.appendChild(el("span", name));
+  tip.hidden = false;
+  var box = target.getBoundingClientRect();
+  var left = x === null ? box.left + box.width / 2 : x;
+  var top = y === null ? box.top : y;
+  tip.style.left = Math.min(Math.max(8, left + 12), window.innerWidth - 270) + "px";
+  tip.style.top = Math.max(8, top - 52) + "px";
+}
+
+function hideTip() {
+  if (tip) {
+    tip.hidden = true;
+  }
+}
+
+document.addEventListener("keydown", function (event) {
+  if (event.key === "Escape") {
+    hideTip();
+  }
+});
+
+// A mark is reachable with the arrow keys inside its chart (tabindex -1), not as its own tab stop.
+function markInteractive(mark, value, name) {
+  mark.setAttribute("tabindex", "-1");
+  mark.setAttribute("data-mark", "1");
+  mark.setAttribute("role", "img");
+  mark.setAttribute("aria-label", value + ", " + name);
+  mark.addEventListener("pointermove", function (event) {
+    showTip(mark, value, name, event.clientX, event.clientY);
+  });
+  mark.addEventListener("pointerleave", hideTip);
+  mark.addEventListener("focus", function () {
+    showTip(mark, value, name, null, null);
+  });
+  mark.addEventListener("blur", hideTip);
+}
+
+// One tab stop per chart. Arrow keys, Home and End move between its marks. The tooltip follows focus.
+function chartGroup(node, labelId) {
+  var hint = el("span", "Use the arrow keys to move between values. Press Escape to hide the tooltip.", "sr-only");
+  hint.id = nextId("hint");
+  node.appendChild(hint);
+  node.setAttribute("tabindex", "0");
+  node.setAttribute("role", "group");
+  node.setAttribute("aria-labelledby", labelId);
+  node.setAttribute("aria-describedby", hint.id);
+  node.addEventListener("keydown", function (event) {
+    var marks = Array.prototype.slice.call(node.querySelectorAll("[data-mark]"));
+    if (marks.length === 0) {
+      return;
+    }
+    var at = marks.indexOf(document.activeElement);
+    var to = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      to = at < 0 ? 0 : Math.min(at + 1, marks.length - 1);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      to = at < 0 ? 0 : Math.max(at - 1, 0);
+    } else if (event.key === "Home") {
+      to = 0;
+    } else if (event.key === "End") {
+      to = marks.length - 1;
+    }
+    if (to !== null) {
+      event.preventDefault();
+      marks[to].focus();
+    }
+  });
+}
+
+// A bar from the left baseline: square at the baseline, 4px round at the data end.
+function barShape(widthAttr, fill) {
+  var g = svgEl("g");
+  g.appendChild(svgEl("rect", { x: 0, y: 0, width: widthAttr, height: BAR_H, rx: 4, fill: fill }));
+  g.appendChild(svgEl("rect", { x: 0, y: 0, width: 6, height: BAR_H, fill: fill }));
+  return g;
+}
+
+// The table twin of a chart. It scrolls sideways inside its own box so a narrow screen never scrolls the page.
+function chartTable(caption, headers, rows) {
+  var d = el("details", null, "chart-table");
+  d.appendChild(el("summary", "Table view"));
+  var scroll = el("div", null, "scroll");
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", caption, "sr-only"));
+  var head = el("tr");
+  headers.forEach(function (name) {
+    var th = el("th", name);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  rows.forEach(function (cells) {
+    var tr = el("tr");
+    cells.forEach(function (cell, index) {
+      if (index === 0) {
+        var th = el("th", String(cell));
+        th.scope = "row";
+        tr.appendChild(th);
+      } else {
+        tr.appendChild(el("td", String(cell), "num"));
+      }
+    });
+    table.appendChild(tr);
+  });
+  scroll.appendChild(table);
+  d.appendChild(scroll);
+  return d;
+}
+
+// Horizontal bars, one series, one baseline. rows: [{ label, value }]. Value sits at the bar tip.
+function barChart(rows, unit, caption, labelId) {
+  var wrap = el("div", null, "chart");
+  var max = Math.max.apply(null, rows.map(function (r) {
+    return r.value;
+  }).concat([1]));
+  rows.forEach(function (row) {
+    var line = el("div", null, "chart-row");
+    line.appendChild(el("span", row.label));
+    var svg = svgEl("svg", { height: BAR_H, width: "100%" });
+    var bar = barShape((row.value / max * 100) + "%", "var(--chart-1)");
+    markInteractive(bar, row.value + " " + unit, row.label);
+    svg.appendChild(svgEl("line", { x1: 0, x2: 0, y1: 0, y2: BAR_H, stroke: "var(--chart-axis)", "stroke-width": 1 }));
+    svg.appendChild(bar);
+    line.appendChild(svg);
+    line.appendChild(el("span", String(row.value), "total"));
+    wrap.appendChild(line);
+  });
+  wrap.appendChild(chartTable(caption, ["Area", unit], rows.map(function (r) {
+    return [r.label, r.value];
+  })));
+  chartGroup(wrap, labelId);
+  return wrap;
+}
+
+// Stacked bars, one per row, fixed segment order, 2px surface gap, legend, tooltip, value labels where they fit, table view.
+// rows: [{ label, total, segments: [{ name, value }] }]. Series colors follow the order of `names`.
+function stackedBarChart(rows, names, caption, labelId) {
+  var wrap = el("div", null, "chart");
+  var legend = el("ul", null, "legend");
+  names.forEach(function (name, index) {
+    var li = el("li");
+    var sw = el("span", null, "swatch");
+    sw.style.background = "var(--chart-" + (index + 1) + ")";
+    sw.setAttribute("aria-hidden", "true");
+    li.appendChild(sw);
+    li.appendChild(document.createTextNode(name));
+    legend.appendChild(li);
+  });
+  wrap.appendChild(legend);
+  var max = Math.max.apply(null, rows.map(function (r) {
+    return r.total;
+  }).concat([1]));
+  rows.forEach(function (row) {
+    var line = el("div", null, "chart-row");
+    line.appendChild(el("span", row.label));
+    var svg = svgEl("svg", { height: BAR_H, width: "100%" });
+    var scale = row.total / max * 100;
+    var at = 0;
+    var lastIndex = -1;
+    row.segments.forEach(function (seg, index) {
+      if (seg.value > 0) {
+        lastIndex = index;
+      }
+    });
+    row.segments.forEach(function (seg, index) {
+      if (seg.value === 0) {
+        return;
+      }
+      var width = seg.value / row.total * scale;
+      var part = svgEl("svg", { x: at + "%", y: 0, width: width + "%", height: BAR_H, overflow: "visible" });
+      var fill = "var(--chart-" + (index + 1) + ")";
+      part.appendChild(svgEl("rect", { x: 0, y: 0, width: "100%", height: BAR_H, fill: fill, rx: index === lastIndex ? 4 : 0 }));
+      if (index === lastIndex && at > 0) {
+        part.appendChild(svgEl("rect", { x: 0, y: 0, width: 6, height: BAR_H, fill: fill }));
+      }
+      if (at > 0) {
+        // The 2px gap between touching segments, in the surface color.
+        part.appendChild(svgEl("rect", { x: 0, y: 0, width: 2, height: BAR_H, fill: "var(--card)" }));
+      }
+      part.setAttribute("data-seg", String(seg.value));
+      markInteractive(part, seg.value + " " + (seg.value === 1 ? "issue" : "issues"), row.label + ", " + seg.name);
+      svg.appendChild(part);
+      at += width;
+    });
+    line.appendChild(svg);
+    line.appendChild(el("span", String(row.total), "total"));
+    wrap.appendChild(line);
+  });
+  wrap.appendChild(chartTable(caption, ["Area"].concat(names, ["Total"]), rows.map(function (row) {
+    return [row.label].concat(row.segments.map(function (seg) {
+      return seg.value;
+    }), [row.total]);
+  })));
+  chartGroup(wrap, labelId);
+  return wrap;
+}
+
+// Puts the value inside each stacked segment that is wide enough for it. Runs after the page is in the DOM,
+// and again on resize and tab change, because widths are only known then.
+function fitLabels() {
+  Array.prototype.forEach.call(document.querySelectorAll("svg[data-seg]"), function (seg) {
+    var old = seg.querySelector("text");
+    if (old) {
+      seg.removeChild(old);
+    }
+    var value = seg.getAttribute("data-seg");
+    if (seg.getBoundingClientRect().width < value.length * 8 + 16) {
+      return;
+    }
+    var text = svgEl("text", { x: 8, y: 13, fill: "var(--chart-on)", "font-size": 12, "font-weight": 600, "pointer-events": "none" });
+    text.textContent = value;
+    seg.appendChild(text);
+  });
+}
+window.addEventListener("resize", fitLabels);
+
+// A 7-point line, 2px, with an end dot (surface ring), one tab stop, a mark per point, and a table view.
+// points: [{ label, count }]
+function sparkline(points, unit, caption, labelId) {
+  var wrap = el("div", null, "spark");
+  var w = 120;
+  var h = 28;
+  var values = points.map(function (p) {
+    return p.count;
+  });
+  var max = Math.max.apply(null, values.concat([1]));
+  var xs = values.map(function (v, i) {
+    return 6 + i * ((w - 12) / Math.max(values.length - 1, 1));
+  });
+  var ys = values.map(function (v) {
+    return h - 6 - v / max * (h - 12);
+  });
+  var svg = svgEl("svg", { width: w, height: h, viewBox: "0 0 " + w + " " + h });
+  svg.setAttribute("class", "chart");
+  svg.appendChild(svgEl("polyline", {
+    points: xs.map(function (x, i) {
+      return x + "," + ys[i];
+    }).join(" "),
+    fill: "none", stroke: "var(--chart-1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"
+  }));
+  svg.appendChild(svgEl("circle", { cx: xs[xs.length - 1], cy: ys[ys.length - 1], r: 4, fill: "var(--chart-1)", stroke: "var(--card)", "stroke-width": 2 }));
+  points.forEach(function (p, i) {
+    var hit = svgEl("circle", { cx: xs[i], cy: ys[i], r: 9, fill: "transparent" });
+    markInteractive(hit, p.count + " " + unit, p.label);
+    svg.appendChild(hit);
+  });
+  chartGroup(svg, labelId);
+  wrap.appendChild(svg);
+  wrap.appendChild(chartTable(caption, ["Day", unit], points.map(function (p) {
+    return [p.label, p.count];
+  })));
+  return wrap;
+}
+
+// ---- Product tab ----
+function renderHeadline(parent) {
+  var k = state.product.kpis;
+  var s = el("section");
+  s.appendChild(el("h2", "Headline", "sr-only"));
+  var g = grid("kpis");
+  g.appendChild(kpiTile("Launch blockers open", k.launchBlockers, k.launchBlockers === 0 ? "Nothing blocks launch" : null, true));
+  var shipped = kpiTile("PRs shipped this week", state.sources.mergedPrs.ok ? k.shipped : null, "Last 7 days");
+  if (state.sources.mergedPrs.ok) {
+    shipped.appendChild(sparkline(k.perDay, "PRs", "PRs merged per day, last 7 days", shipped.titleId));
+  }
+  g.appendChild(shipped);
+  var flagsValue = state.sources.featureFlags.ok ? k.flagsOn + " of " + k.flagsTotal : null;
+  g.appendChild(kpiTile("Feature flags on", flagsValue, "Out of all feature flags"));
+  g.appendChild(kpiTile("Open issues", k.openIssues, null));
+  s.appendChild(g);
+  parent.appendChild(s);
+}
+
+function renderBlockers(parent) {
+  var s = kitSection(parent, "Launch blockers", "openIssues");
+  if (state.product.launchBlockers === null) {
+    couldNotCheck(s, state.product.blockedBy);
+    return;
+  }
+  var c = card();
+  c.appendChild(withShowMore(state.product.launchBlockers, 5, function (li, item) {
+    li.appendChild(el("span", item.status, "tag"));
+    li.appendChild(el("span", ": ", "sr-only"));
+    li.appendChild(link("#" + item.number + " " + item.title, item.url));
+    li.appendChild(summaryLine(item));
+  }, "Nothing blocks launch.", "launch blockers"));
+  s.appendChild(c);
+}
+
+function shippedGroups(shipped) {
+  var groups = {};
+  shipped.forEach(function (pr) {
+    (groups[pr.area] = groups[pr.area] || []).push(pr);
+  });
+  return Object.keys(groups).sort(function (a, b) {
+    if (a === "none" || b === "none") {
+      return a === "none" ? 1 : -1;
+    }
+    return groups[b].length - groups[a].length || a.localeCompare(b);
+  }).map(function (area) {
+    return { area: area, prs: groups[area] };
+  });
+}
+
+function renderShipped(parent) {
+  var s = kitSection(parent, "Shipped this week", "mergedPrs");
+  if (!state.sources.mergedPrs.ok) {
+    return;
+  }
+  if (state.product.shippedMayBeCutOff) {
+    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
+  }
+  var shipped = state.product.shipped;
+  if (shipped.length === 0) {
+    s.appendChild(el("p", "Nothing merged in the last 7 days.", "muted"));
+    return;
+  }
+  var groups = shippedGroups(shipped);
+  var chart = card("PRs shipped by area");
+  chart.appendChild(barChart(groups.map(function (group) {
+    return { label: group.area, value: group.prs.length };
+  }), "PRs", "PRs shipped this week by area", chart.titleId));
+  s.appendChild(chart);
+  var g = grid("cols-2");
+  g.className += " spaced";
+  groups.forEach(function (group) {
+    var c = card(group.area + " (" + group.prs.length + ")");
+    c.appendChild(pagedList("ship-" + group.area, group.area + " PRs", group.prs, function (li, pr) {
+      li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
+      li.appendChild(el("span", " · " + new Date(pr.mergedAt).toLocaleDateString(), "muted"));
+      li.appendChild(summaryLine(pr));
+    }, "None."));
+    g.appendChild(c);
+  });
+  s.appendChild(g);
+}
+
+var ROADMAP_NAMES = ["Ready", "In progress", "Blocked", "Backlog", "Other"];
+
+function renderRoadmap(parent) {
+  var s = kitSection(parent, "Roadmap", "board");
+  var stacks = state.product.roadmapStacks;
+  if (stacks === null) {
+    couldNotCheck(s, state.product.blockedBy);
+    return;
+  }
+  if (stacks.length === 0) {
+    s.appendChild(el("p", "No open issues.", "muted"));
+    return;
+  }
+  var c = card("Open issues by area and board status");
+  c.appendChild(stackedBarChart(stacks.map(function (stack) {
+    return { label: stack.area, total: stack.total, segments: stack.segments };
+  }), ROADMAP_NAMES, "Open issues by area and board status", c.titleId));
+  c.appendChild(el("p", "Other: In review, Done, and issues with no board status.", "muted"));
+  s.appendChild(c);
+}
+
+function renderFlags(parent) {
+  var s = kitSection(parent, "Feature flags", "featureFlags");
   var flags = state.product.flags;
   if (flags.length === 0) {
     if (state.sources.featureFlags.ok) {
@@ -471,81 +1033,27 @@ function renderFlags() {
     }
     return;
   }
-  s.appendChild(listOf(flags, function (li, flag) {
+  var c = card();
+  var build = function (li, flag) {
     li.appendChild(el("span", flag.state, "tag"));
     li.appendChild(el("span", ": ", "sr-only"));
     li.appendChild(document.createTextNode(flag.name));
-  }, "No feature flags set."));
-}
-
-function renderShipped() {
-  var s = section("Shipped this week", "mergedPrs");
-  if (!state.sources.mergedPrs.ok) {
-    return;
-  }
-  if (state.product.shippedMayBeCutOff) {
-    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
-  }
-  s.appendChild(listOf(state.product.shipped, function (li, pr) {
-    li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
-    li.appendChild(el("div", "Merged " + new Date(pr.mergedAt).toLocaleDateString(), "muted"));
-  }, "Nothing merged in the last 7 days."));
-}
-
-function renderBlockers() {
-  var s = section("Launch blockers", "openIssues");
-  if (state.product.launchBlockers === null) {
-    couldNotCheck(s, state.product.blockedBy);
-    return;
-  }
-  s.appendChild(listOf(state.product.launchBlockers, function (li, item) {
-    li.appendChild(el("span", item.status, "tag"));
-    li.appendChild(el("span", ": ", "sr-only"));
-    li.appendChild(link("#" + item.number + " " + item.title, item.url));
-  }, "No launch blockers open."));
-}
-
-function renderRoadmap() {
-  var s = section("Roadmap", "board");
-  if (state.product.roadmap === null) {
-    couldNotCheck(s, state.product.blockedBy);
-    return;
-  }
-  if (state.product.roadmap.length === 0) {
-    s.appendChild(el("p", "No open issues.", "muted"));
-    return;
-  }
-  var columns = ["Ready", "In progress", "Blocked", "Backlog", "Other"];
-  var table = el("table", null, "plain");
-  table.appendChild(el("caption", "Open issues by area and board status", "sr-only"));
-  var head = el("tr");
-  ["Area"].concat(columns, ["Total"]).forEach(function (name) {
-    var th = el("th", name);
-    th.scope = "col";
-    head.appendChild(th);
+  };
+  c.appendChild(withShowMore(flags, 12, build, "No feature flags set.", "feature flags"));
+  s.appendChild(c);
+  Array.prototype.forEach.call(c.querySelectorAll("ul.list"), function (ul) {
+    ul.className = "list flags";
   });
-  table.appendChild(head);
-  state.product.roadmap.forEach(function (row) {
-    var tr = el("tr");
-    var th = el("th", row.area);
-    th.scope = "row";
-    tr.appendChild(th);
-    columns.forEach(function (name) {
-      tr.appendChild(el("td", String(row.counts[name]), "num"));
-    });
-    tr.appendChild(el("td", String(row.total), "num"));
-    table.appendChild(tr);
-  });
-  s.appendChild(table);
-  s.appendChild(el("p", "Other: In review, Done, and issues with no board status.", "muted"));
 }
 
 function renderProduct() {
-  main = document.getElementById("panel-product");
-  renderFlags();
-  renderShipped();
-  renderBlockers();
-  renderRoadmap();
+  var panel = document.getElementById("panel-product");
+  main = panel;
+  renderHeadline(panel);
+  renderBlockers(panel);
+  renderShipped(panel);
+  renderRoadmap(panel);
+  renderFlags(panel);
 }
 
 function renderBusiness() {
@@ -570,6 +1078,7 @@ function showTab(name, focus) {
     }
   });
   document.getElementById("area-label").hidden = name !== "engineering";
+  fitLabels();
 }
 
 function selectTab(name, focus) {
@@ -637,6 +1146,7 @@ function render() {
   renderRuns();
   renderHealth();
   renderBusiness();
+  fitLabels();
 }
 
 function load(refresh) {

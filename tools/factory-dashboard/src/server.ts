@@ -8,17 +8,17 @@ import { promisify } from 'node:util';
 import {
   ciStateFromChecks,
   computeDrift,
-  computeLaunchBlockers,
   computeNeedsYou,
-  computeRoadmap,
   MERGED_PR_LIMIT,
   buildEngineering,
   mergedSearchDate,
+  shippedSearchDate,
   CI_HEALTH_RUNS,
   DEPLOY_FETCHED,
-  shippedMayBeCutOff,
   parseFeatureFlags,
-  shippedThisWeek,
+  buildProduct,
+  openBoardItems,
+  summarizeIssue,
   boardTruncation,
   failedSources,
   FRIENDLY_HOST,
@@ -80,7 +80,7 @@ async function guarded<T>(
   }
 }
 
-type RawIssue = { number: number; title: string; url: string; updatedAt: string; labels: { name: string }[] };
+type RawIssue = { number: number; title: string; url: string; updatedAt: string; labels: { name: string }[]; body?: string };
 
 function toIssue(raw: RawIssue): Issue {
   return {
@@ -89,11 +89,14 @@ function toIssue(raw: RawIssue): Issue {
     url: raw.url,
     updatedAt: raw.updatedAt,
     labels: raw.labels.map((label) => label.name),
+    // Only the one-line summary is kept. The body is dropped here.
+    ...(raw.body === undefined ? {} : { summary: summarizeIssue(raw.body) }),
   };
 }
 
 function loadIssues(state: 'open' | 'closed', limit: number): Promise<Issue[]> {
-  const fields = 'number,title,labels,url,updatedAt';
+  // Bodies only for open issues: they feed the one-line summaries. Closed issues are many, so they stay light.
+  const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body' : 'number,title,labels,url,updatedAt';
   return ghJson(['issue', 'list', '--repo', REPO, '--state', state, '--limit', String(limit), '--json', fields]).then(
     (data) => (data as RawIssue[]).map(toIssue),
   );
@@ -137,11 +140,20 @@ async function loadFeatureFlags(): Promise<FeatureFlag[]> {
 
 // One query for Shipped (7 days) and Throughput (28 days). The search sets the window, so the limit is not what cuts the list.
 async function loadMergedPrs(): Promise<MergedPr[]> {
-  const fields = 'number,title,url,mergedAt,createdAt';
+  const fields = 'number,title,url,mergedAt,createdAt,body,headRefName';
   const search = `merged:>=${mergedSearchDate(new Date())}`;
   const args = ['pr', 'list', '--repo', REPO, '--state', 'merged', '--search', search];
   const data = await ghJson([...args, '--limit', String(MERGED_PR_LIMIT), '--json', fields]);
   return data as MergedPr[];
+}
+
+// Issues closed in the Shipped window, for the summary of a PR whose own body says nothing useful.
+function loadRecentClosedIssues(): Promise<Issue[]> {
+  const search = `closed:>=${shippedSearchDate(new Date())}`;
+  const args = ['issue', 'list', '--repo', REPO, '--state', 'closed', '--search', search, '--limit', '300'];
+  return ghJson([...args, '--json', 'number,title,labels,url,updatedAt,body']).then((data) =>
+    (data as RawIssue[]).map(toIssue),
+  );
 }
 
 async function loadBoard(): Promise<BoardResult> {
@@ -206,7 +218,7 @@ async function loadHealth(): Promise<{ status: number; ms: number; url: string }
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 1000)),
@@ -218,6 +230,7 @@ async function buildState() {
     guarded('mergedPrs', sources, [] as MergedPr[], loadMergedPrs),
     guarded('ciMain', sources, [] as Run[], () => loadWorkflowRuns('ci.yml', CI_HEALTH_RUNS, 'main')),
     guarded('deploys', sources, [] as Run[], () => loadWorkflowRuns('deploy.yml', DEPLOY_FETCHED)),
+    guarded('recentClosed', sources, [] as Issue[], loadRecentClosedIssues),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const backlogReview =
@@ -232,29 +245,45 @@ async function buildState() {
   const driftBlockedBy = failedSources(sources, ['board', 'openIssues', 'closedIssues', 'prs', 'worktrees']);
   const needsYouBlockedBy = failedSources(sources, ['prs', 'openIssues']);
   const generatedAt = new Date();
-  const productBlockedBy = failedSources(sources, ['board', 'openIssues']);
+  const summaries = new Map<number, string>();
+  for (const issue of [...recentClosed, ...openIssues]) {
+    summaries.set(issue.number, issue.summary ?? '');
+  }
+  const summaryFor = (n: number | null): string => (n === null ? '' : (summaries.get(n) ?? ''));
+  const withSummary = <T extends { number: number | null }>(item: T): T & { summary: string } => ({
+    ...item,
+    summary: summaryFor(item.number),
+  });
+  const openBoard = openBoardItems(
+    board,
+    new Set(openIssues.map((issue) => issue.number)),
+    new Set(closedIssues.map((issue) => issue.number)),
+  ).map(withSummary);
+  const drift = driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees });
   return {
     generatedAt: generatedAt.toISOString(),
     sources,
     needsYou: needsYouBlockedBy.length > 0 ? null : computeNeedsYou(prs, openIssues),
     needsYouBlockedBy,
     boardTruncated: boardResult.truncated,
-    board: { items: board, groups: groupByStatus(board) },
+    board: { items: openBoard, groups: groupByStatus(openBoard) },
     prs: prsWithLabels,
     worktrees: treesWithLabels,
     runs: split,
     health,
-    drift: driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees }),
+    drift: drift === null ? null : drift.map(withSummary),
     driftBlockedBy,
     backlogReview,
-    product: {
+    product: buildProduct({
+      sources,
       flags,
-      shipped: shippedThisWeek(mergedPrs, generatedAt),
-      shippedMayBeCutOff: shippedMayBeCutOff(mergedPrs.length),
-      launchBlockers: productBlockedBy.length > 0 ? null : computeLaunchBlockers(openIssues, board),
-      roadmap: productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board),
-      blockedBy: productBlockedBy,
-    },
+      mergedPrs,
+      openIssues,
+      board,
+      labelsFor,
+      issueSummaryFor: summaryFor,
+      now: generatedAt,
+    }),
     engineering: buildEngineering(sources, { ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
