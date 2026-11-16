@@ -219,3 +219,14 @@ to read in a minute; it is a staging area, not an archive.
 - **Rule:** CI must not download system packages per run. Run e2e in the official Playwright image
   and keep its tag equal to the `@playwright/test` version; the "Check Playwright image" step fails
   when they differ, so bump the tag in the same PR as any Playwright upgrade.
+
+### 2026-11-15 — a DynamoDB Local test flaked because the TTL sweeper deleted its item (#869)
+- **What happened:** "still refuses a joiner who owns only that person (C11)" failed twice in CI
+  `aws-local` (#867, #873) and passed on rerun. The before/after snapshots differed by one item: a
+  "deleted and expired" person seeded with `ttl = now - 10`.
+- **Why:** the spec's fixed clock (2026-10-24) was already in the real past, so that ttl was really
+  expired and DynamoDB Local's TTL sweeper deleted the item mid-run. We first blamed other tests
+  writing to the shared table, but each spec file has its own random table.
+- **Rule:** tests on DynamoDB Local must keep every ttl, seeded or computed, in the real future (use
+  a fixed clock far ahead, such as 2099), or the sweeper deletes items mid-test. Scope raw snapshots
+  to the ids the test created.
