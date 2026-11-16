@@ -22,12 +22,12 @@ function visit(path: string) {
 describe('routes', () => {
   const FLOW = '3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10';
 
-  it.each(['/', '/sign-in', '/sign-up', '/join', `/people/${FLOW}`, `/people/${FLOW}/service`, `/people/${FLOW}/thanks`, `/people/${FLOW}/guide/officiant`, '/start', '/start/service', '/start/guide/officiant'])('%s renders the App', (path) => {
+  it.each(['/', '/sign-in', '/sign-up', '/join', `/people/${FLOW}`, `/people/${FLOW}/service`, `/people/${FLOW}/thanks`, `/people/${FLOW}/guide/officiant`, '/start', '/start/service', '/start/guide/officiant', '/people', '/account'])('%s renders the App', (path) => {
     visit(path);
     expect(screen.getByText('the app')).toBeInTheDocument();
   });
 
-  it.each(['/nope', '/people', '/sign-in/extra', `/people/${FLOW}/nope`, '/start/nope', '/start/guide'])('%s renders NotFound for now', (path) => {
+  it.each(['/nope', '/account/x', '/sign-in/extra', `/people/${FLOW}/nope`, '/start/nope', '/start/guide'])('%s renders NotFound for now', (path) => {
     visit(path);
     expect(screen.getByRole('heading', { level: 1, name: "We couldn't find that page." })).toBeInTheDocument();
     expect(screen.queryByText('the app')).not.toBeInTheDocument();

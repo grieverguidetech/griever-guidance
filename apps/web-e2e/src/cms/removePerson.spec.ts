@@ -15,7 +15,7 @@ test('an owner removes a person from Account, and Your people no longer lists th
   await page.getByLabel('Their name').fill('Margaret Hayes');
 
   const nav = page.getByRole('navigation').first();
-  await nav.getByRole('button', { name: /^Your account/ }).click();
+  await nav.getByRole('link', { name: /^Your account/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Remove Margaret Hayes' }).click();
@@ -31,7 +31,7 @@ test('an owner removes a person from Account, and Your people no longer lists th
   const emptied = await new AxeBuilder({ page }).withTags(WCAG).disableRules(['color-contrast']).analyze();
   expect(emptied.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 
-  await nav.getByRole('button', { name: /^Your people/ }).click();
+  await nav.getByRole('link', { name: /^Your people/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
   await expect(page.getByText('Margaret Hayes')).toHaveCount(0);
 });

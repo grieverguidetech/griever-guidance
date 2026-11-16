@@ -21,7 +21,6 @@ import {
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { deleteFlow, getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
-import { SECTION_ORDER } from '@griever/shared';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
@@ -46,6 +45,7 @@ import { ObituarySection } from '../cms/sections/ObituarySection';
 import { ThanksSection } from '../cms/sections/ThanksSection';
 import type { CmsNavKey } from '../cms/SideNav';
 import { pathForSpot, spotFromPath } from '../routes/editorLocation';
+import { parsePath, paths } from '../routes/paths';
 import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
@@ -332,23 +332,14 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
 /** Views that need a person to be open; with nobody open Home is shown instead. */
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary', 'cms'];
 
-/** Overview and the five sections. */
-const CMS_SECTIONS: CmsSection[] = ['overview', ...SECTION_ORDER];
 const ITEM_IDS = Object.keys(cmsItemLabels) as ChecklistItemId[];
 
 /**
- * INTERIM until R3 (#850): Your people and Account have no path yet, so they ride on the history
- * entry's state at the current path. The empty pages (`/start`), a person's pages and every checklist
- * item have paths (#849, #856). An item opened from the preview panel on Your people or Your account
- * has a path too, and closes with Back to the entry that opened it.
+ * What this app stores on a history entry: the calm line on Your people after a person's page could
+ * not be opened. Every screen and checklist item has a path (#849, #850, #856), so Back is the browser's
+ * own. The `openedHere` marker (see `openedHere`, after this) is the other thing stored.
  */
-type StateScreen = 'people' | 'profile' | 'settings';
-const STATE_SCREENS: StateScreen[] = ['people', 'profile', 'settings'];
-
 interface EntryState {
-  screen: StateScreen | null;
-  section: CmsSection;
-  item: ChecklistItemId | null;
   /** Your people after a person's page could not be opened: a calm line, never the id. */
   missing: boolean;
 }
@@ -356,12 +347,7 @@ interface EntryState {
 /** What this app stored on a history entry. Anything else (another app, a hand-made entry) reads as nothing. */
 function readEntry(state: unknown): EntryState {
   const raw = typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
-  return {
-    screen: STATE_SCREENS.find((s) => s === raw['screen']) ?? null,
-    section: CMS_SECTIONS.find((s) => s === raw['section']) ?? 'overview',
-    item: ITEM_IDS.find((id) => id === raw['item']) ?? null,
-    missing: raw['missing'] === true,
-  };
+  return { missing: raw['missing'] === true };
 }
 
 /**
@@ -373,18 +359,16 @@ function openedHere(state: unknown): boolean {
   return typeof state === 'object' && state !== null && (state as Record<string, unknown>)['openedHere'] === true;
 }
 
-/** Where the editor goes: a person's page (by path) or one of the interim state screens. */
+/** Where the editor goes: a person's page, an empty page, Your people or Your account (all paths). */
 interface Spot {
-  /** 'cms' and 'noOne' (the empty pages) are paths; the rest are interim state screens. */
-  view: 'cms' | 'noOne' | StateScreen;
+  /** 'profile' (signed in) and 'settings' (signed out) are the two versions of the one /account path. */
+  view: 'cms' | 'noOne' | 'people' | 'profile' | 'settings';
   section?: CmsSection;
   item?: ChecklistItemId | null;
   /** The person for 'cms'. */
   person?: Session | null;
   /** Your people after a person's page could not be opened by an unknown id: shows the calm line. */
   missing?: boolean;
-  /** Go to `/` rather than keep the current path (an id that names nobody here). */
-  leavePath?: boolean;
 }
 
 /**
@@ -516,9 +500,8 @@ function AppBody({
     if (!CMS_ENABLED || !landed.current || !isSignedIn) {
       return false;
     }
-    const screen = readEntry(entryLocation.state).screen;
     // An empty page once someone exists is gone: Back walks on past it (#597), as the old history hook did.
-    if (screen === null && spotFromPath(entryLocation.pathname)?.flowId === null && sortedSessions.length > 0) {
+    if (spotFromPath(entryLocation.pathname)?.flowId === null && sortedSessions.length > 0) {
       return true;
     }
     // Below the sign-in steps lies another site or an earlier sign-in in this tab: only a page of a person
@@ -528,7 +511,7 @@ function AppBody({
       return !spot?.flowId || !sessionList.some((s) => s.flowId === spot.flowId);
     }
     if (WALK_PATHS.includes(entryLocation.pathname)) {
-      return screen === null;
+      return true;
     }
     return false;
   }
@@ -542,25 +525,45 @@ function AppBody({
   }
   const shown = walking ? lastOwn.current : location;
 
-  // The editor's spot, derived from the entry shown (#849). R2a routes a person's pages; the rest is interim state.
+  // The editor's spot, derived from the path shown (#849, #850): every screen has one.
   const entry = readEntry(CMS_ENABLED ? shown.state : null);
   const pathSpot = CMS_ENABLED ? spotFromPath(shown.pathname) : null;
+  const screenRoute = CMS_ENABLED ? parsePath(shown.pathname) : null;
+  const peoplePath = screenRoute?.name === 'people';
+  const accountPath = screenRoute?.name === 'account';
   const personPath = pathSpot?.flowId ? pathSpot : null;
   const pathPerson = personPath ? (sessionList.find((s) => s.flowId === personPath.flowId) ?? null) : null;
   const editorDecides = CMS_ENABLED && baseView !== 'signIn';
-  const startPath = pathSpot !== null && pathSpot.flowId === null && !entry.screen;
-  const view: AppView =
-    editorDecides && entry.screen ? entry.screen : editorDecides && personPath ? 'cms' : editorDecides && startPath ? 'noOne' : baseView;
-  const cmsSection: CmsSection = entry.screen ? entry.section : (pathSpot?.section ?? 'overview');
-  // An item is in the path (guide URLs), or in the entry's state for the interim screens.
+  const startPath = pathSpot !== null && pathSpot.flowId === null;
+  // /account is one path with two versions: the signed-in one, and Settings when nobody is signed in.
+  const accountView: AppView = auth?.isSignedIn ? 'profile' : 'settings';
+  const view: AppView = !editorDecides
+    ? baseView
+    : peoplePath
+      ? 'people'
+      : accountPath
+        ? accountView
+        : personPath
+          ? 'cms'
+          : startPath
+            ? 'noOne'
+            : baseView;
+  const cmsSection: CmsSection = pathSpot?.section ?? 'overview';
+  // An item is in the path (guide URLs).
   const pathItem = ITEM_IDS.find((id) => id === pathSpot?.item) ?? null;
-  const cmsItem: ChecklistItemId | null = entry.screen ? entry.item : pathItem;
+  const cmsItem: ChecklistItemId | null = pathItem;
   // A person's page whose person is not on this device: deleted, another account's, or not pulled yet.
   const personMissing = view === 'cms' && personPath !== null && pathPerson === null;
   // An editor path the table refuses (or any editor path with the editor off).
   // A guide path whose item is not one of ours is not found either.
-  const editorPath = location.pathname.startsWith('/people/') || location.pathname.startsWith('/start');
-  const notFound = editorPath && (!CMS_ENABLED || pathSpot === null || (pathSpot.item !== null && pathItem === null));
+  const editorPath =
+    location.pathname.startsWith('/people/') ||
+    location.pathname.startsWith('/start') ||
+    location.pathname === '/people' ||
+    location.pathname === '/account';
+  const notFound =
+    editorPath &&
+    (!CMS_ENABLED || (pathSpot === null && !peoplePath && !accountPath) || (pathSpot !== null && pathSpot.item !== null && pathItem === null));
 
   const firstView = useRef(view);
   // Shown once, on the first screen after a removal; leaving it ends it for good.
@@ -615,6 +618,7 @@ function AppBody({
   // number is for a different sign-in, so its answer is dropped (it must not prompt someone else).
   const accountGeneration = useRef(0);
   // Where the prompt interrupted, so Save or Back returns there and onboarding carries on.
+  // Editor off only: the name prompt returns here after Save. Editor on, Back is the browser's, so nothing sets it.
   const [returnTo, setReturnTo] = useState<AppView>('home');
   // Set by the Sign out button, so only that (not a session that ended elsewhere) leaves the screen.
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
@@ -636,19 +640,12 @@ function AppBody({
     const timer = setTimeout(() => setMissingAnnouncement(cmsShellCopy.personMissing), 100);
     return () => clearTimeout(timer);
   }, [missingShown]);
-  // The item opened from the panel on Your account, so Back returns there. It only counts while that
-  // same item is open, and it is dropped whenever the item closes or history restores a screen.
-  const itemFromAccount = useRef<ChecklistItemId | null>(null);
-  // Same for an item opened from the preview panel with nobody saved: the screen to return to.
-  const itemFromEmpty = useRef<{ id: ChecklistItemId; view: 'people' | 'profile' | 'settings' } | null>(null);
   // Back or Forward restored an entry: what onRestore did under the old history hook (#566). Declared
   // before the heading hook, so a closed item hands focus back to its opener after the h1 took it.
   const mounted = useRef(false);
   const shownItem = useRef(cmsItem);
   useEffect(() => {
     if (mounted.current && navigationType === 'POP' && !walking) {
-      itemFromAccount.current = null;
-      itemFromEmpty.current = null;
       // Back never lands in the name prompt, and an error from another screen is not carried over.
       auth?.clearError();
       setAskingName(false);
@@ -666,12 +663,16 @@ function AppBody({
   useEffect(() => {
     closing.current = false;
   }, [location.key]);
+  // The signed-in and signed-out versions of /account are one screen, so one key: a session that ends
+  // while someone types there changes the version, not the focus.
   useFocusHeadingOnChange(
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
       ? `empty:${cmsSection}:${cmsItem ?? ''}`
       : view === 'cms'
         ? `cms:${pathPerson?.flowId ?? ''}:${cmsSection}:${cmsItem ?? ''}`
-        : view,
+        : accountPath
+          ? 'account'
+          : view,
   );
   // Must stay declared after the heading hook above: effects run in order, so this one lands
   // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
@@ -707,13 +708,24 @@ function AppBody({
     // A stale error from another screen would otherwise show here without being announced.
     clearError?.();
     setAskingName(asksName);
-    setReturnTo(from);
+    // Editor off only (the name prompt's return); editor on, Back is the browser's.
+    if (!CMS_ENABLED) {
+      setReturnTo(from);
+    }
     setNeedsName(false);
     if (CMS_ENABLED) {
       return go({ view: 'profile' });
     }
     setView('profile');
     return true;
+  }
+
+  /** Your account in the editor: one path, the signed-in version or Settings when nobody is signed in. Returns whether it moved. */
+  function openAccount(): boolean {
+    if (auth?.isSignedIn) {
+      return openProfile(false);
+    }
+    return go({ view: 'settings' });
   }
 
   // Sign-in resolves asynchronously (the boot-time session check, or the Clerk form), so the
@@ -858,21 +870,30 @@ function AppBody({
     setActiveId(sortedSessions[0].id);
   }, [isSignedIn, activeId, sortedSessions]);
 
-  // Editor on: the person the URL names. Your people and the empty pages have none; the account
-  // screens keep the person whose page they were opened from, else the most recent one.
+  // Editor on: the person the URL names. Your people and the empty pages have none. Your account has no
+  // person in its path, so it shows the most recent one; a person's page counts as opening them (below).
   const editorActive =
     view === 'cms' ? pathPerson : view === 'people' || view === 'noOne' ? null : (pathPerson ?? sortedSessions[0] ?? null);
+  // Showing a person's page makes them the most recent, so Your account (no person in its path) and its
+  // links name the person the visitor was just looking at, also after a deep link, a bookmark or Back.
+  const touchSession = sessions.touchSession;
+  const shownPersonId = view === 'cms' ? (pathPerson?.id ?? null) : null;
+  useEffect(() => {
+    if (CMS_ENABLED && shownPersonId !== null) {
+      touchSession(shownPersonId);
+    }
+  }, [shownPersonId, touchSession]);
   const stateActive = sessions.sessions.find((s) => s.id === activeId) ?? null;
   const active: Session | null = CMS_ENABLED ? editorActive : stateActive;
 
   /**
-   * The one way the editor moves (#849). A person's page goes to its path; Your people, Account and the
-   * empty pages (interim, see StateScreen) push the current path with their screen in the entry's state.
-   * The same screen again adds no entry. Returns whether it moved.
+   * The one way the editor moves (#849, #850). Every spot has a path: a person's page, an empty page,
+   * Your people (`/people`) and Your account (`/account`, signed in or out). The same spot again adds no
+   * entry. Returns whether it moved. Confirm steps are not spots: they have no path (C9).
    */
   function go(spot: Spot, { replace = false, mark = false }: { replace?: boolean; mark?: boolean } = {}): boolean {
-    let pathname = location.pathname;
-    let state: Record<string, unknown> | null;
+    let pathname: string;
+    let state: Record<string, unknown> | null = null;
     if (spot.view === 'cms') {
       const person = spot.person;
       const path = person ? pagePathFor(person, spot.section ?? 'overview') : null;
@@ -884,12 +905,12 @@ function AppBody({
     } else if (spot.view === 'noOne') {
       pathname = pathForSpot({ flowId: null, section: spot.section ?? 'overview', item: spot.item ?? null });
       state = mark ? { openedHere: true } : null;
+    } else if (spot.view === 'people') {
+      pathname = paths.people();
+      // A person's page that could not be opened: the id leaves the address bar, a calm line says so.
+      state = { missing: spot.missing ?? false };
     } else {
-      // A person's page that could not be opened: the id leaves the address bar.
-      if (spot.leavePath) {
-        pathname = '/';
-      }
-      state = { screen: spot.view, section: spot.section ?? 'overview', item: spot.item ?? null, missing: spot.missing ?? false };
+      pathname = paths.account();
     }
     if (pathname === location.pathname && JSON.stringify(readEntry(state)) === JSON.stringify(readEntry(location.state))) {
       return false;
@@ -919,15 +940,23 @@ function AppBody({
   }
 
   /** The current editor spot, to change one part of it. */
-  const here: Spot = { view: view === 'cms' || view === 'noOne' || STATE_SCREENS.includes(view as StateScreen) ? (view as Spot['view']) : 'noOne', section: cmsSection, item: cmsItem, person: active };
+  const here: Spot = {
+    view: view === 'cms' || view === 'noOne' || view === 'people' || view === 'profile' || view === 'settings' ? view : 'noOne',
+    section: cmsSection,
+    item: cmsItem,
+    person: active,
+  };
 
-  /** The side nav's link for an item, when it has a path: a person's Overview and sections. */
+  /** The side nav's link for an item: Your people, Your account, and a person's Overview and sections. */
   function navHref(person: Session | null) {
     return (key: CmsNavKey): string | null => {
-      if (!person || key === 'people' || key === 'account') {
-        return null;
+      if (key === 'people') {
+        return paths.people();
       }
-      return pagePathFor(person, key);
+      if (key === 'account') {
+        return paths.account();
+      }
+      return person ? pagePathFor(person, key) : null;
     };
   }
 
@@ -957,7 +986,7 @@ function AppBody({
     // Removed on this device (or seen earlier in this load, then dropped): no line, it is not news.
     const flowId = personPath?.flowId ?? '';
     const removedHere = seenFlows.current.has(flowId) || (readRemovedFlows(browserStorage) ?? []).some((mark) => mark.id === flowId);
-    go({ view: 'people', missing: !removedHere, leavePath: true }, { replace: true });
+    go({ view: 'people', missing: !removedHere }, { replace: true });
   });
   // Every person this load has shown, so a page of one who is gone since reads as removed, not unknown.
   const seenFlows = useRef(new Set<string>());
@@ -983,7 +1012,7 @@ function AppBody({
       if (walkMoves.current >= MAX_WALK) {
         return;
       }
-      if (WALK_PATHS.includes(window.location.pathname) && readEntry(entryState()).screen === null) {
+      if (WALK_PATHS.includes(window.location.pathname)) {
         walkedPastSignIn.current = true;
       }
       walkMoves.current += 1;
@@ -1244,8 +1273,6 @@ function AppBody({
     if (!replacing || itemOpener.current === null) {
       itemOpener.current = { id, region };
     }
-    itemFromAccount.current = null;
-    itemFromEmpty.current = null;
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
     closeSheet?.();
     // The entry this opens is marked as ours: closing it can go Back to the page it came from (see closeCmsItem).
@@ -1272,28 +1299,6 @@ function AppBody({
     if (closing.current) {
       return;
     }
-    const origin = itemFromEmpty.current;
-    if (origin && origin.id === cmsItem) {
-      itemFromEmpty.current = null;
-      if (openedHere(location.state)) {
-        backToOpener();
-      } else if (origin.view === 'profile') {
-        openProfile(false, accountFrom.current);
-      } else {
-        go({ view: origin.view });
-      }
-      return;
-    }
-    if (itemFromAccount.current !== null && itemFromAccount.current === cmsItem) {
-      // Opened from the panel on Your account: Back returns there.
-      itemFromAccount.current = null;
-      if (openedHere(location.state)) {
-        backToOpener();
-      } else {
-        openProfile(false, accountFrom.current);
-      }
-      return;
-    }
     restoreOpener.current = true;
     // Opened here (a push of ours, marked in its state, also after a reload): Back is exact, the page and its
     // place return as they were. A link has no page of ours behind it, so it goes to the Overview and takes the item's entry.
@@ -1304,14 +1309,6 @@ function AppBody({
     go({ ...here, section: 'overview', item: null }, { replace: true });
   }
 
-  // Where Your account was opened from (flag on): Back returns there.
-  const accountFrom = useRef<'cms' | 'people' | 'noOne'>('cms');
-  useEffect(() => {
-    if (cmsItem === null) {
-      itemFromAccount.current = null;
-      itemFromEmpty.current = null;
-    }
-  }, [cmsItem]);
   // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
   // is a real move to a new screen, so it asks for the h1 itself.
   const focusAfterLanding = useRef(false);
@@ -1329,7 +1326,8 @@ function AppBody({
     if (!CMS_ENABLED || landed.current || !isSignedIn || auth?.isLoading || baseView !== 'home') {
       return;
     }
-    if (entry.screen || personPath) {
+    // A deep link to a person's page, Your people or Your account wins over the landing.
+    if (personPath || peoplePath || accountPath) {
       landed.current = true;
       return;
     }
@@ -1440,14 +1438,13 @@ function AppBody({
           onOpenItem={(id) => {
             auth?.clearError();
             setAskingName(false);
+            // A push: Back is the browser's, so it returns to the screen the panel was used on.
             openCmsItem(id, inSheet ? 'sheet' : 'panel', { view: 'noOne', section: view === 'noOne' ? cmsSection : 'overview' }, closeSheet);
-            // Back returns to the screen the panel was used on (Your people or Your account), not the empty Overview.
-            itemFromEmpty.current = view === 'people' || view === 'profile' || view === 'settings' ? { id, view } : null;
           }}
         />
       );
     }
-    return ({ closeSheet }: { inSheet: boolean; closeSheet: () => void }) => (
+    return ({ inSheet, closeSheet }: { inSheet: boolean; closeSheet: () => void }) => (
       <ChecklistPanel
         checklist={person.checklist ?? {}}
         onSetItem={(id, state) => sessions.setChecklistItem(person.id, id, state)}
@@ -1456,8 +1453,8 @@ function AppBody({
           auth?.clearError();
           setAskingName(false);
           sessions.touchSession(person.id);
-          openCmsItem(id, 'main', { view: 'cms', person, section: 'overview' }, closeSheet);
-          itemFromAccount.current = id;
+          // A push: Back is the browser's, so it returns to Your people or Your account.
+          openCmsItem(id, inSheet ? 'sheet' : 'panel', { view: 'cms', person, section: 'overview' }, closeSheet);
         }}
       />
     );
@@ -1496,8 +1493,7 @@ function AppBody({
           // Your people is already open.
           onPeople={() => undefined}
           onAccount={() => {
-            accountFrom.current = 'people';
-            moveThenPrune(() => (auth?.isSignedIn ? openProfile(false, 'people') : go({ view: 'settings' })));
+            moveThenPrune(() => openAccount());
           }}
           notice={endedNote}
         >
@@ -1512,12 +1508,8 @@ function AppBody({
     );
   }
 
-  /** Back from Settings or Your account: flag on, to where the person came from. */
+  /** Back from Settings or Your account (flag off; with the editor on the browser's Back does this). */
   function backFromAccount() {
-    if (CMS_ENABLED && (accountFrom.current === 'people' || accountFrom.current === 'noOne')) {
-      go({ view: 'people' });
-      return;
-    }
     goHome();
   }
 
@@ -1590,7 +1582,6 @@ function AppBody({
     CMS_ENABLED && signedIn && profileAnswered && !prefillHolds && lacksFirstName(knownProfile) ? (
       <NameNote
         onOpenAccount={() => {
-          accountFrom.current = view === 'noOne' ? 'noOne' : 'cms';
           openProfile(false);
         }}
       />
@@ -1773,8 +1764,7 @@ function AppBody({
           }}
           onPeople={leaveCms}
           onAccount={() => {
-            accountFrom.current = 'cms';
-            moveThenPrune(() => (auth?.isSignedIn ? openProfile(false) : go({ view: 'settings' })));
+            moveThenPrune(() => openAccount());
           }}
           notice={endedNote}
         >
@@ -2050,6 +2040,7 @@ function AppBody({
           aside={panelFor(null)}
           noCurrent
           personName=""
+          hrefFor={navHref(null)}
           section="people"
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
@@ -2057,14 +2048,7 @@ function AppBody({
             }
           }}
           onPeople={() => go({ view: 'people' })}
-          onAccount={() => {
-            accountFrom.current = 'people';
-            if (auth?.isSignedIn) {
-              openProfile(false, 'people');
-            } else {
-              go({ view: 'settings' });
-            }
-          }}
+          onAccount={() => openAccount()}
           notice={endedNote}
         >
           <Loading inShell />
@@ -2082,20 +2066,14 @@ function AppBody({
           aside={panelFor(null)}
           personName=""
           section={cmsSection}
+          hrefFor={navHref(null)}
           onSelect={(key) => {
             if (key !== 'account' && key !== 'people') {
               go({ view: 'noOne', section: key });
             }
           }}
           onPeople={() => go({ view: 'people' })}
-          onAccount={() => {
-            accountFrom.current = 'noOne';
-            if (auth?.isSignedIn) {
-              openProfile(false, 'noOne');
-            } else {
-              go({ view: 'settings' });
-            }
-          }}
+          onAccount={() => openAccount()}
           notice={endedNote}
         >
           {cmsItem ? (

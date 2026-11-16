@@ -176,9 +176,9 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
     await h1('Overview');
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
     const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav().getByRole('button', { name: 'Your account' }));
+    await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
-    await user.click(nav().getByRole('button', { name: 'Your people' }));
+    await user.click(nav().getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     await user.click(nav().getByRole('button', { name: 'Overview' }));
     await h1('Overview');
@@ -194,7 +194,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
     await h1('Overview');
     await waitFor(() => expect(mocks.updateProfile).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole('button', { name: NAME_NOTE })).toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: 'Your account' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your account' }));
     await h1('Account');
     await settle();
     expect(screen.queryByText(identityErrorMessage('unavailable'))).not.toBeInTheDocument();
@@ -235,11 +235,11 @@ describe('Account page (#603 2)', () => {
     renderApp(<App />);
     await h1('Overview');
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    await user.click(within(nav).getByRole('button', { name: 'Your account' }));
+    await user.click(within(nav).getByRole('link', { name: 'Your account' }));
     expect(await h1('Account')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
     const main = screen.getByRole('main');
-    expect(within(main).queryByRole('button', { name: 'Your people' })).not.toBeInTheDocument();
+    expect(within(main).queryByRole('link', { name: 'Your people' })).not.toBeInTheDocument();
   });
 });
 
@@ -251,7 +251,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
     expect(screen.getByText(/Nothing is here yet/)).toBeInTheDocument();
     expect(screen.queryByText('No one here yet.')).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    await user.click(within(nav).getByRole('button', { name: 'Your people' }));
+    await user.click(within(nav).getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     expect(screen.getByText('No one here yet.')).toBeInTheDocument();
     expect(screen.queryByText(/Nothing is here yet/)).not.toBeInTheDocument();
@@ -265,7 +265,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
     await h1('Overview');
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getAllByRole('img', { name: 'Not started' })).toHaveLength(4);
-    await userEvent.click(within(nav).getByRole('button', { name: 'Your people' }));
+    await userEvent.click(within(nav).getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     expect(within(screen.getByRole('navigation', { name: 'Sections' })).getAllByRole('img', { name: 'Not started' })).toHaveLength(4);
   });
@@ -292,7 +292,7 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('button', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('link', { name: 'Your people' }));
     await h1('Your people');
     await user.click(screen.getByRole('button', { name: CREATE }));
     expect(await h1('The person')).toBeInTheDocument();
