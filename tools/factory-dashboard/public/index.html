@@ -77,7 +77,7 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .chart-row { display: grid; grid-template-columns: minmax(70px, 22%) 1fr 3.5em; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
 .chart-row .total { text-align: right; }
 .chart-row svg { display: block; width: 100%; overflow: visible; }
-.chart:focus-visible, svg.chart:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.chart:focus-visible, svg.chart:focus-visible, svg.strip:focus-visible, .scroll:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .chart [data-mark]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
 .chart [data-mark]:hover { opacity: 0.8; }
 .tip { position: fixed; z-index: 10; pointer-events: none; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 260px; }
@@ -94,6 +94,11 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .pager-status { color: var(--muted); font-size: 13px; }
 .pr-group h3 { font-size: 14px; margin: 12px 0 6px; }
 .pr-group h3:first-child { margin-top: 0; }
+.lower { margin-top: 8px; }
+svg.key { margin-right: 6px; vertical-align: middle; }
+.lower > summary { font-weight: 600; }
+svg.strip { display: block; width: 100%; height: auto; max-height: 56px; overflow: visible; }
+.strip-ends { display: flex; justify-content: space-between; font-size: 13px; margin-top: 2px; }
 .pr-summary { color: var(--muted); font-size: 13px; }
 ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); font-size: 13px; }
 </style>
@@ -157,17 +162,6 @@ function visible(item) {
   return chosen === "all" || areaOf(item.labels) === chosen;
 }
 
-function section(title, key) {
-  var s = el("section");
-  s.appendChild(el("h2", title));
-  var src = state.sources[key];
-  if (src && !src.ok) {
-    s.appendChild(el("p", "Could not load: " + src.error, "error"));
-  }
-  main.appendChild(s);
-  return s;
-}
-
 function couldNotCheck(s, failed) {
   s.appendChild(el("p", "Could not check: " + failed.join(", ") + " failed to load.", "error"));
 }
@@ -218,42 +212,371 @@ function itemText(item) {
 }
 
 function when(iso) {
-  return new Date(iso).toLocaleString();
+  var date = new Date(iso);
+  return isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
-function renderCiHealth() {
-  var s = section("CI health on main", "ciMain");
-  var health = state.engineering.ciHealth;
-  if (!health) {
+// ---- Engineering tab ----
+// One-line summaries for PRs come from the linked issue, which the page already has on the board, needs-you and drift lists.
+function summaryIndex() {
+  var index = {};
+  var lists = [state.board.items, state.needsYou || [], state.drift || []];
+  lists.forEach(function (items) {
+    items.forEach(function (item) {
+      if (item.number && item.summary && !index[item.number]) {
+        index[item.number] = item.summary;
+      }
+    });
+  });
+  return index;
+}
+
+function sourceFailed(key) {
+  return !!state.sources[key] && !state.sources[key].ok;
+}
+
+// A <details> that starts closed. When its source failed, the failure shows in the summary and inside.
+function lowerSection(parent, title, key) {
+  var d = el("details", null, "card lower");
+  var src = state.sources[key];
+  var failed = !!src && !src.ok;
+  d.appendChild(el("summary", title + (failed ? " (could not load)" : "")));
+  if (failed) {
+    d.appendChild(el("p", "Could not load: " + src.error, "error"));
+  }
+  parent.appendChild(d);
+  return d;
+}
+
+function renderNeedsYou(parent) {
+  var s = kitSection(parent, "Needs you", "prs");
+  var labels = { "pr-green": "Ready for G2", blocked: "Blocked", "ready-for-human": "Ready for human" };
+  if (state.needsYou === null) {
+    couldNotCheck(s, state.needsYouBlockedBy);
     return;
   }
-  if (health.counted === 0) {
-    s.appendChild(el("p", "No finished CI runs on main.", "muted"));
+  var items = state.needsYou.filter(visible);
+  if (items.length === 0) {
+    s.appendChild(el("p", "Nothing waits for you.", "muted"));
     return;
   }
-  var text = health.passPercent + "% passed (" + health.passed + " of " + health.counted + " finished runs).";
-  s.appendChild(el("p", text));
-  s.appendChild(el("p", "Ignored " + health.ignored + " cancelled or unfinished runs. Any other finished run that did not succeed counts as a failure.", "muted"));
-  var p = el("p");
-  if (health.lastFailure) {
+  s.appendChild(paged("needs-you", "items that need you", items, function (pageItems) {
+    var g = grid("cols-2");
+    pageItems.forEach(function (item) {
+      var c = card();
+      var line = el("div");
+      line.appendChild(el("span", labels[item.kind], "tag"));
+      line.appendChild(link("#" + item.number + " " + item.title, item.url));
+      c.appendChild(line);
+      c.appendChild(summaryLine(item));
+      g.appendChild(c);
+    });
+    return g;
+  }));
+}
+
+// Pass-rate bands: 90% and up is Healthy, 70% to 89% is Watch, below 70% is Failing.
+function passStatus(percent) {
+  if (percent >= 90) {
+    return "Healthy";
+  }
+  return percent >= 70 ? "Watch" : "Failing";
+}
+
+function ciTile() {
+  var h = state.engineering.ciHealth;
+  if (!h) {
+    return kpiTile("CI pass rate on main", null, "Status unknown: could not load");
+  }
+  if (h.passPercent === null) {
+    return kpiTile("CI pass rate on main", "None", "No finished runs");
+  }
+  var status = h.counted < 10 ? "Too few runs to judge" : passStatus(h.passPercent);
+  var note = status + ": " + h.passed + " of " + h.counted + " finished runs passed";
+  return kpiTile("CI pass rate on main", h.passPercent + "%", note);
+}
+
+function deployStatus(deploys) {
+  var latest = deploys.recent[0];
+  if (!latest) {
+    return "No deploy runs";
+  }
+  if (latest.status !== "completed") {
+    return "Latest deploy is running";
+  }
+  if (latest.conclusion === "success") {
+    return "Latest deploy succeeded";
+  }
+  if (latest.conclusion === "skipped" || latest.conclusion === "cancelled") {
+    return "Latest deploy was " + latest.conclusion;
+  }
+  return "Latest deploy did not succeed (" + latest.conclusion + ")";
+}
+
+function deployTile() {
+  var d = state.engineering.deploys;
+  var label = "Since last good deploy";
+  if (!d) {
+    return kpiTile(label, null, "Status unknown: could not load");
+  }
+  if (!d.lastGood) {
+    return kpiTile(label, "None", "No successful deploy in the runs checked");
+  }
+  return kpiTile(label, d.sinceGoodText, deployStatus(d));
+}
+
+function flakyTile() {
+  var items = state.engineering.flaky;
+  if (!items) {
+    return kpiTile("Flaky tests open", null, "Status unknown: could not load");
+  }
+  var count = items.filter(visible).length;
+  return kpiTile("Flaky tests open", count, count === 0 ? "None open" : "Needs attention");
+}
+
+function prTile() {
+  if (sourceFailed("prs")) {
+    return kpiTile("Open PRs", null, "Status unknown: could not load");
+  }
+  var prs = state.prs.filter(visible);
+  var failing = prs.filter(function (pr) {
+    return pr.ci === "red";
+  }).length;
+  var note = "No open PRs";
+  if (prs.length > 0) {
+    note = failing === 0 ? "No failing checks" : failing + " with failing checks";
+  }
+  return kpiTile("Open PRs", prs.length, note);
+}
+
+function renderHealthStrip(parent) {
+  var s = el("section");
+  s.appendChild(el("h2", "Health", "sr-only"));
+  var g = grid("kpis");
+  g.appendChild(ciTile());
+  g.appendChild(deployTile());
+  g.appendChild(flakyTile());
+  g.appendChild(prTile());
+  s.appendChild(g);
+  parent.appendChild(s);
+}
+
+function renderPrs(parent) {
+  var s = kitSection(parent, "Open PRs and their CI", "prs");
+  var summaries = summaryIndex();
+  var c = card();
+  c.appendChild(pagedList("open-prs", "open PRs", state.prs.filter(visible), function (li, pr) {
+    li.appendChild(ciDot(pr.ci));
+    li.appendChild(document.createTextNode(" "));
+    if (pr.isDraft) {
+      li.appendChild(el("span", "Draft", "tag"));
+    }
+    li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
+    var issue = pr.issueNumber ? " (issue #" + pr.issueNumber + ")" : "";
+    li.appendChild(el("div", pr.headRefName + issue, "muted"));
+    li.appendChild(summaryLine({ summary: pr.summary || (pr.issueNumber ? summaries[pr.issueNumber] : "") }));
+  }, "No open PRs."));
+  s.appendChild(c);
+}
+
+// A strip of one mark per CI run on main, oldest at the left. Pass is a green block, fail is a red block with a cross,
+// ignored is a short grey block, so the result never depends on color alone. One tab stop, arrow keys between runs.
+// The legend key repeats the shape of the mark: a block, a block with a cross, a short block.
+function legendKey(result) {
+  var key = svgEl("svg", { width: 12, height: 14, viewBox: "0 0 12 14" });
+  key.setAttribute("class", "key");
+  key.setAttribute("aria-hidden", "true");
+  var fill = { pass: "var(--green)", fail: "var(--red)", ignored: "var(--grey)" }[result];
+  if (result === "ignored") {
+    key.appendChild(svgEl("rect", { x: 0, y: 4, width: 12, height: 6, rx: 1.5, fill: fill }));
+  } else {
+    key.appendChild(svgEl("rect", { x: 0, y: 0, width: 12, height: 14, rx: 2, fill: fill }));
+  }
+  if (result === "fail") {
+    key.appendChild(svgEl("path", { d: "M3 4 L9 10 M9 4 L3 10", stroke: "var(--card)", "stroke-width": 2, "stroke-linecap": "round", fill: "none" }));
+  }
+  return key;
+}
+
+function runStripChart(marks, caption, labelId) {
+  var wrap = el("div", null, "chart");
+  var counts = { pass: 0, fail: 0, ignored: 0 };
+  marks.forEach(function (mark) {
+    counts[mark.result] += 1;
+  });
+  var legend = el("ul", null, "legend");
+  [["pass", "Passed"], ["fail", "Failed"], ["ignored", "Ignored"]].forEach(function (entry) {
+    var li = el("li");
+    li.appendChild(legendKey(entry[0]));
+    li.appendChild(document.createTextNode(entry[1] + " (" + counts[entry[0]] + ")"));
+    legend.appendChild(li);
+  });
+  wrap.appendChild(legend);
+  var step = 14;
+  var svg = svgEl("svg", { viewBox: "0 0 " + (marks.length * step) + " 40", width: "100%" });
+  svg.setAttribute("class", "strip");
+  var colors = { pass: "var(--green)", fail: "var(--red)", ignored: "var(--grey)" };
+  marks.forEach(function (mark, index) {
+    var x = index * step;
+    var g = svgEl("g");
+    if (mark.result === "ignored") {
+      g.appendChild(svgEl("rect", { x: x, y: 15, width: 10, height: 10, rx: 2, fill: colors.ignored }));
+    } else {
+      g.appendChild(svgEl("rect", { x: x, y: 4, width: 10, height: 32, rx: 2, fill: colors[mark.result] }));
+    }
+    if (mark.result === "fail") {
+      g.appendChild(svgEl("path", { d: "M" + (x + 2) + " 15 L" + (x + 8) + " 25 M" + (x + 8) + " 15 L" + (x + 2) + " 25", stroke: "var(--card)", "stroke-width": 2.5, "stroke-linecap": "round", fill: "none" }));
+    }
+    markInteractive(g, mark.text, when(mark.createdAt) + ", run " + (index + 1) + " of " + marks.length);
+    svg.appendChild(g);
+  });
+  chartGroup(svg, labelId);
+  wrap.appendChild(svg);
+  var ends = el("div", null, "strip-ends muted");
+  ends.appendChild(el("span", "Oldest"));
+  ends.appendChild(el("span", "Newest"));
+  wrap.appendChild(ends);
+  wrap.appendChild(chartTable(caption, ["Started", "Result", "Run"], marks.map(function (mark) {
+    return [when(mark.createdAt), mark.text, { text: "Run " + mark.id, url: mark.url }];
+  })));
+  return wrap;
+}
+
+function throughputCard() {
+  var c = card("PRs merged per week");
+  var t = state.engineering.throughput;
+  if (!t) {
+    c.appendChild(el("p", "Could not load: " + state.sources.mergedPrs.error, "error"));
+    return c;
+  }
+  if (state.engineering.throughputMayBeCutOff) {
+    c.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
+  }
+  c.appendChild(barChart(t.weeks.map(function (week) {
+    return { label: week.label, value: week.count };
+  }), "PRs merged", "PRs merged per week, last 4 weeks", c.titleId, "Week"));
+  var median = t.medianHours === null ? "Median time from opened to merged: Unknown (no merged PRs to measure)." : "Median time from opened to merged: " + t.medianText + ".";
+  c.appendChild(el("p", median, "muted"));
+  return c;
+}
+
+function ciRunsCard() {
+  var c = card("CI results, last 30 runs on main");
+  var h = state.engineering.ciHealth;
+  if (!h) {
+    c.appendChild(el("p", "Could not load: " + state.sources.ciMain.error, "error"));
+    return c;
+  }
+  if (h.strip.length === 0) {
+    c.appendChild(el("p", "No CI runs on main.", "muted"));
+    return c;
+  }
+  c.appendChild(runStripChart(h.strip, "CI results of the last " + h.strip.length + " runs on main, oldest first", c.titleId));
+  var p = el("p", null, "muted");
+  if (h.lastFailure) {
     p.appendChild(document.createTextNode("Last failure: "));
-    p.appendChild(link(when(health.lastFailure.createdAt) + " (" + health.lastFailure.conclusion + ")", health.lastFailure.url));
+    p.appendChild(link(when(h.lastFailure.createdAt) + " (" + h.lastFailure.conclusion + ")", h.lastFailure.url));
   } else {
     p.appendChild(document.createTextNode("No failures in these runs."));
   }
-  s.appendChild(p);
+  c.appendChild(p);
+  return c;
 }
 
-function renderFlaky() {
-  var s = section("Flaky tests", "openIssues");
-  var items = state.engineering.flaky;
-  if (!items) {
+function renderCharts(parent) {
+  var s = kitSection(parent, "Trends", null);
+  var g = grid("cols-2");
+  g.appendChild(throughputCard());
+  g.appendChild(ciRunsCard());
+  s.appendChild(g);
+}
+
+function boardList(items, key, label) {
+  return pagedList(key, label, items, function (li, item) {
+    li.appendChild(link(itemText(item), item.url));
+    li.appendChild(summaryLine(item));
+  }, "Empty.");
+}
+
+function renderBoard(parent) {
+  var s = kitSection(parent, "Board (open issues only)", "board");
+  if (state.boardTruncated) {
+    var note = "Board truncated: showing " + state.boardTruncated.shown + " of " + state.boardTruncated.total;
+    s.appendChild(el("p", note, "error"));
+  }
+  var byStatus = function (status) {
+    return (state.board.groups[status] || []).filter(visible);
+  };
+  var chosen = areaSelect.value;
+  var stacks = state.engineering.boardStacks || [];
+  var stack = stacks.filter(function (candidate) {
+    return candidate.area === chosen;
+  })[0];
+  var top = card("Open issues with a board status");
+  if (!stack || stack.total === 0) {
+    top.appendChild(el("p", "No open issues with a board status.", "muted"));
+  } else {
+    var names = stack.segments.map(function (seg) {
+      return seg.name;
+    });
+    var rowLabel = chosen === "all" ? "All areas" : chosen;
+    top.appendChild(stackedBarChart([{ label: rowLabel, total: stack.total, segments: stack.segments }], names, "Open issues with a board status", top.titleId));
+  }
+  top.appendChild(el("p", "No status: " + (stack ? stack.noStatus : byStatus("No status").length) + ". Done is listed below and not in the bar.", "muted"));
+  s.appendChild(top);
+  var g = grid("cols-3");
+  g.className += " spaced";
+  ["Ready", "In progress", "In review", "Blocked", "Backlog", "No status"].forEach(function (status) {
+    var items = byStatus(status);
+    var c = card(status + " (" + items.length + ")");
+    c.appendChild(boardList(items, "board-" + status, status + " issues"));
+    g.appendChild(c);
+  });
+  s.appendChild(g);
+  var done = byStatus("Done");
+  var d = el("details", null, "more");
+  d.appendChild(el("summary", "Done (" + done.length + ")"));
+  d.appendChild(boardList(done, "board-Done", "Done issues"));
+  s.appendChild(d);
+}
+
+function renderDrift(parent) {
+  var s = kitSection(parent, "Drift", "board");
+  if (state.drift === null) {
+    couldNotCheck(s, state.driftBlockedBy);
     return;
   }
-  s.appendChild(pagedList("flaky", "flaky tests", items.filter(visible), function (li, issue) {
-    li.appendChild(link("#" + issue.number + " " + issue.title, issue.url));
-    li.appendChild(summaryLine(issue));
-  }, "No open flaky-test issues."));
+  var items = state.drift.filter(visible);
+  if (items.length === 0) {
+    s.appendChild(el("p", "No drift found.", "muted"));
+    return;
+  }
+  // Group by rule and collapse each group, so a long drift list does not bury the sections below.
+  var ruleNames = {
+    "in-review-no-pr": "In review, but no open PR",
+    "in-progress-no-work": "In progress, but no worktree or PR",
+    "closed-not-done": "Closed, but not in Done",
+    "open-no-status": "Open, but no board status",
+    "worktree-closed-issue": "Worktree for a closed issue"
+  };
+  var c = card();
+  Object.keys(ruleNames).forEach(function (rule) {
+    var group = items.filter(function (item) {
+      return item.rule === rule;
+    });
+    if (group.length === 0) {
+      return;
+    }
+    var d = el("details");
+    d.appendChild(el("summary", ruleNames[rule] + " (" + group.length + ")"));
+    d.appendChild(pagedList("drift-" + rule, ruleNames[rule], group, function (li, item) {
+      li.appendChild(link("#" + item.number + " " + item.title, item.url));
+      li.appendChild(summaryLine(item));
+      li.appendChild(el("div", item.detail, "muted"));
+    }, "None."));
+    c.appendChild(d);
+  });
+  s.appendChild(c);
 }
 
 function deployColor(run) {
@@ -266,22 +589,22 @@ function deployColor(run) {
   return run.conclusion === "skipped" ? "grey" : "red";
 }
 
-function renderDeploys() {
-  var s = section("Deploys", "deploys");
+function deploysBody(d) {
   var deploys = state.engineering.deploys;
   if (!deploys) {
     return;
   }
   if (deploys.lastGood) {
     var ago = "Last successful deploy started " + deploys.sinceGoodText + " ago (" + when(deploys.lastGood.createdAt) + ").";
-    s.appendChild(el("p", ago));
+    d.appendChild(el("p", ago));
   } else {
-    s.appendChild(el("p", "No successful deploy in the runs checked.", "error"));
+    d.appendChild(el("p", "No successful deploy in the runs checked.", "error"));
   }
   if (deploys.recent.length === 0) {
-    s.appendChild(el("p", "No deploy runs.", "muted"));
+    d.appendChild(el("p", "No deploy runs.", "muted"));
     return;
   }
+  var scroll = scrollBox("Last 5 Deploy workflow runs");
   var table = el("table", null, "plain");
   table.appendChild(el("caption", "Last 5 Deploy workflow runs", "sr-only"));
   var head = el("tr");
@@ -307,90 +630,8 @@ function renderDeploys() {
     tr.appendChild(cell);
     table.appendChild(tr);
   });
-  s.appendChild(table);
-}
-
-function renderThroughput() {
-  var s = section("Throughput", "mergedPrs");
-  var t = state.engineering.throughput;
-  if (!t) {
-    return;
-  }
-  if (state.engineering.throughputMayBeCutOff) {
-    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
-  }
-  var table = el("table", null, "plain");
-  table.appendChild(el("caption", "PRs merged per week, last 4 weeks", "sr-only"));
-  var head = el("tr");
-  ["Week", "PRs merged"].forEach(function (name) {
-    var th = el("th", name);
-    th.scope = "col";
-    head.appendChild(th);
-  });
-  table.appendChild(head);
-  t.weeks.forEach(function (week) {
-    var tr = el("tr");
-    var th = el("th", week.label);
-    th.scope = "row";
-    tr.appendChild(th);
-    tr.appendChild(el("td", String(week.count), "num"));
-    table.appendChild(tr);
-  });
-  s.appendChild(table);
-  var median = t.medianHours === null ? "Median time from opened to merged: Unknown (no merged PRs to measure)." : "Median time from opened to merged: " + t.medianText + ".";
-  s.appendChild(el("p", median));
-}
-
-function renderNeedsYou() {
-  var s = section("Needs you", "prs");
-  var labels = { "pr-green": "Ready for G2", blocked: "Blocked", "ready-for-human": "Ready for human" };
-  if (state.needsYou === null) {
-    couldNotCheck(s, state.needsYouBlockedBy);
-    return;
-  }
-  var items = state.needsYou.filter(visible);
-  s.appendChild(pagedList("needs-you", "items that need you", items, function (li, item) {
-    li.appendChild(el("span", labels[item.kind], "tag"));
-    li.appendChild(link("#" + item.number + " " + item.title, item.url));
-    li.appendChild(summaryLine(item));
-  }, "Nothing waits for you."));
-}
-
-function renderDrift() {
-  var s = section("Drift", "board");
-  if (state.drift === null) {
-    couldNotCheck(s, state.driftBlockedBy);
-    return;
-  }
-  var items = state.drift.filter(visible);
-  if (items.length === 0) {
-    s.appendChild(el("p", "No drift found.", "muted"));
-    return;
-  }
-  // Group by rule and collapse each group, so a long drift list does not bury the sections below.
-  var ruleNames = {
-    "in-review-no-pr": "In review, but no open PR",
-    "in-progress-no-work": "In progress, but no worktree or PR",
-    "closed-not-done": "Closed, but not in Done",
-    "open-no-status": "Open, but no board status",
-    "worktree-closed-issue": "Worktree for a closed issue"
-  };
-  Object.keys(ruleNames).forEach(function (rule) {
-    var group = items.filter(function (item) {
-      return item.rule === rule;
-    });
-    if (group.length === 0) {
-      return;
-    }
-    var d = el("details");
-    d.appendChild(el("summary", ruleNames[rule] + " (" + group.length + ")"));
-    d.appendChild(pagedList("drift-" + rule, ruleNames[rule], group, function (li, item) {
-      li.appendChild(link("#" + item.number + " " + item.title, item.url));
-      li.appendChild(summaryLine(item));
-      li.appendChild(el("div", item.detail, "muted"));
-    }, "None."));
-    s.appendChild(d);
-  });
+  scroll.appendChild(table);
+  d.appendChild(scroll);
 }
 
 function reviewRow(row) {
@@ -405,21 +646,21 @@ function reviewRow(row) {
   return tr;
 }
 
-function renderBacklogReview() {
-  var s = section("Backlog review", "backlogReview");
+function backlogReviewBody(d) {
   var review = state.backlogReview;
   if (!review) {
     if (state.sources.backlogReview.ok) {
-      s.appendChild(el("p", "Empty: open issues failed to load, so reviews cannot be matched.", "error"));
+      d.appendChild(el("p", "Empty: open issues failed to load, so reviews cannot be matched.", "error"));
     }
     return;
   }
-  s.appendChild(el("p", "Reviewed " + review.reviewedAt + ". Reviews hidden because the issue is no longer open:" + review.dropped + ".", "muted"));
+  d.appendChild(el("p", "Reviewed " + review.reviewedAt + ". Reviews hidden because the issue is no longer open: " + review.dropped + ".", "muted"));
   if (review.rows.length === 0) {
-    s.appendChild(el("p", "No open issues.", "muted"));
+    d.appendChild(el("p", "No open issues.", "muted"));
     return;
   }
-  s.appendChild(paged("backlog-review", "backlog review", review.rows, function (pageRows) {
+  d.appendChild(paged("backlog-review", "backlog review", review.rows, function (pageRows) {
+    var scroll = scrollBox("Backlog review");
     var table = el("table", null, "review");
     var head = el("tr");
     [["#", ""], ["Title", ""], ["Recommendation", "wide"], ["Why", "wide"]].forEach(function (col) {
@@ -431,55 +672,13 @@ function renderBacklogReview() {
     pageRows.forEach(function (row) {
       table.appendChild(reviewRow(row));
     });
-    return table;
+    scroll.appendChild(table);
+    return scroll;
   }));
 }
 
-function renderPrs() {
-  var s = section("Open PRs", "prs");
-  s.appendChild(pagedList("open-prs", "open PRs", state.prs.filter(visible), function (li, pr) {
-    li.appendChild(ciDot(pr.ci));
-    if (pr.isDraft) {
-      li.appendChild(el("span", "Draft", "tag"));
-    }
-    li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
-    var issue = pr.issueNumber ? " (issue #" + pr.issueNumber + ")" : "";
-    li.appendChild(el("div", pr.headRefName + issue, "muted"));
-  }, "No open PRs."));
-}
-
-function boardList(items, key, label) {
-  return pagedList(key, label, items, function (li, item) {
-    li.appendChild(link(itemText(item), item.url));
-    li.appendChild(summaryLine(item));
-  }, "Empty.");
-}
-
-function renderBoard() {
-  var s = section("Board (open issues only)", "board");
-  if (state.boardTruncated) {
-    var note = "Board truncated: showing " + state.boardTruncated.shown + " of " + state.boardTruncated.total;
-    s.appendChild(el("p", note, "error"));
-  }
-  var wrap = el("div", null, "columns");
-  ["Backlog", "Ready", "In progress", "In review", "Blocked", "No status"].forEach(function (status) {
-    var items = (state.board.groups[status] || []).filter(visible);
-    var col = el("div", null, "column");
-    col.appendChild(el("h3", status + " (" + items.length + ")"));
-    col.appendChild(boardList(items, "board-" + status, status + " issues"));
-    wrap.appendChild(col);
-  });
-  s.appendChild(wrap);
-  var done = (state.board.groups["Done"] || []).filter(visible);
-  var d = el("details");
-  d.appendChild(el("summary", "Done (" + done.length + ")"));
-  d.appendChild(boardList(done, "board-Done", "Done issues"));
-  s.appendChild(d);
-}
-
-function renderWorktrees() {
-  var s = section("Worktrees", "worktrees");
-  s.appendChild(pagedList("worktrees", "worktrees", state.worktrees.filter(visible), function (li, tree) {
+function worktreesBody(d) {
+  d.appendChild(pagedList("worktrees", "worktrees", state.worktrees.filter(visible), function (li, tree) {
     var text = (tree.branch || "detached") + (tree.isMain ? " (main checkout)" : "");
     var issueUrl = "https://github.com/grieverguidetech/griever-guidance/issues/" + tree.issueNumber;
     li.appendChild(tree.issueNumber ? link(text, issueUrl) : el("span", text));
@@ -489,11 +688,10 @@ function renderWorktrees() {
   }, "No worktrees."));
 }
 
-function renderRuns() {
-  var s = section("Recent runs", "runs");
+function runsBody(d) {
   [["CI", state.runs.ci], ["Deploy", state.runs.deploy]].forEach(function (pair) {
-    s.appendChild(el("h3", pair[0]));
-    s.appendChild(pagedList("runs-" + pair[0], pair[0] + " runs", pair[1].filter(visible), function (li, run) {
+    d.appendChild(el("h3", pair[0]));
+    d.appendChild(pagedList("runs-" + pair[0], pair[0] + " runs", pair[1].filter(visible), function (li, run) {
       li.appendChild(runDot(run));
       li.appendChild(link(run.workflowName + " on " + run.headBranch, run.url));
       var outcome = run.status + (run.conclusion ? ", " + run.conclusion : "");
@@ -502,8 +700,7 @@ function renderRuns() {
   });
 }
 
-function renderHealth() {
-  var s = section("Health", "health");
+function apiHealthBody(d) {
   if (!state.health) {
     return;
   }
@@ -512,7 +709,24 @@ function renderHealth() {
   p.appendChild(ciDot(ok ? "green" : "red"));
   p.appendChild(link(state.health.url, state.health.url));
   p.appendChild(document.createTextNode(" returned " + state.health.status + " in " + state.health.ms + " ms"));
-  s.appendChild(p);
+  d.appendChild(p);
+}
+
+function renderLower(parent) {
+  var s = kitSection(parent, "More detail", null);
+  s.appendChild(el("p", "Each part is closed until you open it.", "muted"));
+  worktreesBody(lowerSection(s, "Worktrees", "worktrees"));
+  runsBody(lowerSection(s, "Recent runs", "runs"));
+  deploysBody(lowerSection(s, "Deploys", "deploys"));
+  backlogReviewBody(lowerSection(s, "Backlog review", "backlogReview"));
+  apiHealthBody(lowerSection(s, "API health", "health"));
+}
+
+function renderEngineering() {
+  var panel = document.getElementById("panel-engineering");
+  [renderNeedsYou, renderHealthStrip, renderPrs, renderCharts, renderBoard, renderDrift, renderLower].forEach(function (part) {
+    safely(panel, part);
+  });
 }
 
 // ---- Layout kit (everything is built with textContent and createElementNS) ----
@@ -743,11 +957,29 @@ function barShape(widthAttr, fill) {
   return g;
 }
 
+// A sideways-scrolling box that a keyboard can reach: a tab stop, a region and a name.
+function scrollBox(label) {
+  var box = el("div", null, "scroll");
+  box.setAttribute("tabindex", "0");
+  box.setAttribute("role", "region");
+  box.setAttribute("aria-label", label);
+  return box;
+}
+
+// Runs one part of a tab. A part that throws shows one calm line and the rest of the tab still draws.
+function safely(parent, fn) {
+  try {
+    fn(parent);
+  } catch (e) {
+    parent.appendChild(el("p", "Could not draw this part.", "error"));
+  }
+}
+
 // The table twin of a chart. It scrolls sideways inside its own box so a narrow screen never scrolls the page.
 function chartTable(caption, headers, rows) {
   var d = el("details", null, "chart-table");
   d.appendChild(el("summary", "Table view"));
-  var scroll = el("div", null, "scroll");
+  var scroll = scrollBox(caption);
   var table = el("table", null, "plain");
   table.appendChild(el("caption", caption, "sr-only"));
   var head = el("tr");
@@ -764,6 +996,10 @@ function chartTable(caption, headers, rows) {
         var th = el("th", String(cell));
         th.scope = "row";
         tr.appendChild(th);
+      } else if (cell && typeof cell === "object") {
+        var linked = el("td", null, "num");
+        linked.appendChild(link(cell.text, cell.url));
+        tr.appendChild(linked);
       } else {
         tr.appendChild(el("td", String(cell), "num"));
       }
@@ -776,7 +1012,7 @@ function chartTable(caption, headers, rows) {
 }
 
 // Horizontal bars, one series, one baseline. rows: [{ label, value }]. Value sits at the bar tip.
-function barChart(rows, unit, caption, labelId) {
+function barChart(rows, unit, caption, labelId, rowName) {
   var wrap = el("div", null, "chart");
   var max = Math.max.apply(null, rows.map(function (r) {
     return r.value;
@@ -793,7 +1029,7 @@ function barChart(rows, unit, caption, labelId) {
     line.appendChild(el("span", String(row.value), "total"));
     wrap.appendChild(line);
   });
-  wrap.appendChild(chartTable(caption, ["Area", unit], rows.map(function (r) {
+  wrap.appendChild(chartTable(caption, [rowName || "Area", unit], rows.map(function (r) {
     return [r.label, r.value];
   })));
   chartGroup(wrap, labelId);
@@ -1132,19 +1368,7 @@ function render() {
   });
   areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
   renderProduct();
-  main = document.getElementById("panel-engineering");
-  renderNeedsYou();
-  renderCiHealth();
-  renderFlaky();
-  renderDeploys();
-  renderThroughput();
-  renderDrift();
-  renderBacklogReview();
-  renderPrs();
-  renderBoard();
-  renderWorktrees();
-  renderRuns();
-  renderHealth();
+  renderEngineering();
   renderBusiness();
   fitLabels();
 }

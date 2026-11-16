@@ -18,6 +18,8 @@ export interface Issue {
   updatedAt: string;
   // One line from the issue body. The body itself never leaves the server.
   summary?: string;
+  // Issue numbers from the "### Depends on" section. Only the numbers are kept, never the body.
+  dependsOn?: number[];
 }
 
 export interface Pr {
@@ -30,6 +32,10 @@ export interface Pr {
   ci: CiState;
   issueNumber: number | null;
   updatedAt: string;
+  // One line from the PR body. The body itself never leaves the server.
+  summary?: string;
+  // The PR's own labels, such as ready-to-merge.
+  prLabels?: string[];
 }
 
 export type CiState = 'green' | 'red' | 'pending' | 'none';
@@ -235,20 +241,43 @@ export function isGreenForReview(pr: Pr): boolean {
   return !pr.isDraft && pr.ci === 'green';
 }
 
+// A PR waits for Peter when it is non-draft and green, or when it carries the ready-to-merge label.
+export function waitsForPeter(pr: Pr): boolean {
+  return isGreenForReview(pr) || (pr.prLabels ?? []).includes('ready-to-merge');
+}
+
+// The issue numbers named in the "### Depends on" section. "None" and a missing section give an empty list.
+export function dependsOn(body: string | null | undefined): number[] {
+  const text = normalize(body);
+  if (text === null) {
+    return [];
+  }
+  const found = new Set<number>();
+  for (const line of sectionLines(text, /^depends on\b/i)) {
+    for (const match of line.matchAll(/#(\d+)/g)) {
+      found.add(Number(match[1]));
+    }
+  }
+  return [...found];
+}
+
 export function computeNeedsYou(prs: Pr[], issues: Issue[]): NeedsYouItem[] {
   const items: NeedsYouItem[] = [];
-  for (const pr of prs.filter(isGreenForReview)) {
+  const open = new Set(issues.map((issue) => issue.number));
+  for (const pr of prs.filter(waitsForPeter)) {
     items.push({
       kind: 'pr-green',
       number: pr.number,
       title: pr.title,
       url: pr.url,
       labels: issueLabelsFor(pr, issues),
-      summary: issues.find((candidate) => candidate.number === pr.issueNumber)?.summary ?? '',
+      summary: pr.summary || (issues.find((candidate) => candidate.number === pr.issueNumber)?.summary ?? ''),
     });
   }
   for (const issue of issues) {
-    if (issue.labels.includes('blocked')) {
+    // A blocked issue waits for Peter only when none of the issues it depends on is still open.
+    const waiting = (issue.dependsOn ?? []).some((n) => open.has(n));
+    if (issue.labels.includes('blocked') && !waiting) {
       items.push(issueItem('blocked', issue));
     }
     if (issue.labels.includes('ready-for-human')) {
@@ -1015,6 +1044,43 @@ export interface CiHealth {
   ignored: number;
   passPercent: number | null;
   lastFailure: Run | null;
+  // The runs as marks for the run strip, oldest first.
+  strip: RunMark[];
+}
+
+export type RunResult = 'pass' | 'fail' | 'ignored';
+
+export interface RunMark {
+  id: number;
+  result: RunResult;
+  // Plain words for the tooltip and the table view: "Passed", "Failed (timed_out)", "Ignored (cancelled)".
+  text: string;
+  url: string;
+  createdAt: string;
+}
+
+// Same rule as the pass rate: cancelled and unfinished runs are ignored, any other finished run that did not succeed failed.
+export function computeRunStrip(runs: Run[]): RunMark[] {
+  // A run with a bad date goes first, so the sort stays stable and the rest keep their order.
+  const time = (run: Run): number => {
+    const t = Date.parse(run.createdAt);
+    return Number.isNaN(t) ? Number.NEGATIVE_INFINITY : t;
+  };
+  return [...runs]
+    .sort((a, b) => (time(a) === time(b) ? 0 : time(a) < time(b) ? -1 : 1))
+    .map((run): RunMark => {
+      const mark = { id: run.databaseId, url: run.url, createdAt: run.createdAt };
+      if (run.status !== 'completed') {
+        return { ...mark, result: 'ignored', text: `Ignored (${run.status})` };
+      }
+      if (run.conclusion === 'cancelled') {
+        return { ...mark, result: 'ignored', text: 'Ignored (cancelled)' };
+      }
+      if (run.conclusion === 'success') {
+        return { ...mark, result: 'pass', text: 'Passed' };
+      }
+      return { ...mark, result: 'fail', text: `Failed (${run.conclusion || 'no conclusion'})` };
+    });
 }
 
 // Cancelled and unfinished runs are ignored. Every other finished run that did not succeed counts as a failure.
@@ -1031,6 +1097,7 @@ export function computeCiHealth(runs: Run[]): CiHealth {
     ignored: runs.length - counted.length,
     passPercent: counted.length === 0 ? null : Math.round((passed / counted.length) * 100),
     lastFailure: failures[0] ?? null,
+    strip: computeRunStrip(runs),
   };
 }
 
@@ -1139,7 +1206,37 @@ export function computeThroughput(prs: MergedPr[], now: Date): Throughput {
   };
 }
 
+export const BOARD_STACK_STATUSES = ['Ready', 'In progress', 'In review', 'Blocked', 'Backlog'];
+
+export interface BoardStack {
+  // 'all' or an area name.
+  area: string;
+  // Issues with a board status in the five segments.
+  total: number;
+  // Open issues with no board status. They are not in the bar.
+  noStatus: number;
+  segments: StackSegment[];
+}
+
+function stackOf(area: string, items: BoardItem[]): BoardStack {
+  const groups = groupByStatus(items);
+  const segments = BOARD_STACK_STATUSES.map((name) => ({ name, value: (groups[name] ?? []).length }));
+  return {
+    area,
+    total: segments.reduce((sum, seg) => sum + seg.value, 0),
+    noStatus: (groups[NO_STATUS] ?? []).length,
+    segments,
+  };
+}
+
+// One stack for every open board item ('all') and one per area, like roadmapStacks. Done is not in the bar.
+export function boardStacks(items: BoardItem[]): BoardStack[] {
+  const areas = [...new Set(items.map((item) => areaOf(item.labels)))].sort();
+  return [stackOf('all', items), ...areas.map((area) => stackOf(area, items.filter((item) => areaOf(item.labels) === area)))];
+}
+
 export interface EngineeringData {
+  board: BoardItem[];
   ciMainRuns: Run[];
   openIssues: Issue[];
   deployRuns: Run[];
@@ -1154,6 +1251,7 @@ export function buildEngineering(sources: Record<string, SourceStatus>, data: En
     deploys: sources['deploys']?.ok ? computeDeploys(data.deployRuns, now) : null,
     throughput: sources['mergedPrs']?.ok ? computeThroughput(data.mergedPrs, now) : null,
     // Shipped and Throughput share one merged-PR query, so one limit flag covers both.
+    boardStacks: sources['board']?.ok ? boardStacks(data.board) : null,
     throughputMayBeCutOff: shippedMayBeCutOff(data.mergedPrs.length),
   };
 }
