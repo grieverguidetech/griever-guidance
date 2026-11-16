@@ -12,6 +12,13 @@ import {
   computeNeedsYou,
   computeRoadmap,
   MERGED_PR_LIMIT,
+  MERGED_WINDOW_DAYS,
+  CI_HEALTH_RUNS,
+  DEPLOY_FETCHED,
+  computeCiHealth,
+  computeDeploys,
+  computeThroughput,
+  flakyIssues,
   shippedMayBeCutOff,
   shippedSearchDate,
   parseFeatureFlags,
@@ -132,10 +139,10 @@ async function loadFeatureFlags(): Promise<FeatureFlag[]> {
   return parseFeatureFlags(await ghJson(['variable', 'list', '--repo', REPO, '--json', 'name,value']));
 }
 
-// The search is the 7-day window, so the limit is not what cuts the list.
+// One query for Shipped (7 days) and Throughput (28 days). The search sets the window, so the limit is not what cuts the list.
 async function loadMergedPrs(): Promise<MergedPr[]> {
-  const fields = 'number,title,url,mergedAt';
-  const search = `merged:>=${shippedSearchDate(new Date())}`;
+  const fields = 'number,title,url,mergedAt,createdAt';
+  const search = `merged:>=${shippedSearchDate(new Date(), MERGED_WINDOW_DAYS)}`;
   const args = ['pr', 'list', '--repo', REPO, '--state', 'merged', '--search', search];
   const data = await ghJson([...args, '--limit', String(MERGED_PR_LIMIT), '--json', fields]);
   return data as MergedPr[];
@@ -153,6 +160,15 @@ async function loadBoard(): Promise<BoardResult> {
 function loadRuns(): Promise<Run[]> {
   const fields = 'databaseId,workflowName,headBranch,status,conclusion,url,createdAt';
   return ghJson(['run', 'list', '--repo', REPO, '--limit', '15', '--json', fields]).then((data) => data as Run[]);
+}
+
+function loadWorkflowRuns(workflow: string, limit: number, branch?: string): Promise<Run[]> {
+  const fields = 'databaseId,workflowName,headBranch,status,conclusion,url,createdAt';
+  const args = ['run', 'list', '--repo', REPO, '--workflow', workflow, '--limit', String(limit)];
+  if (branch) {
+    args.push('--branch', branch);
+  }
+  return ghJson([...args, '--json', fields]).then((data) => data as Run[]);
 }
 
 // Read on every refresh, so an edit shows without a restart.
@@ -193,7 +209,7 @@ async function loadHealth(): Promise<{ status: number; ms: number; url: string }
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 1000)),
@@ -203,6 +219,8 @@ async function buildState() {
     guarded('health', sources, null, loadHealth),
     guarded('featureFlags', sources, [] as FeatureFlag[], loadFeatureFlags),
     guarded('mergedPrs', sources, [] as MergedPr[], loadMergedPrs),
+    guarded('ciMain', sources, [] as Run[], () => loadWorkflowRuns('ci.yml', CI_HEALTH_RUNS, 'main')),
+    guarded('deploys', sources, [] as Run[], () => loadWorkflowRuns('deploy.yml', DEPLOY_FETCHED)),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const backlogReview =
@@ -239,6 +257,13 @@ async function buildState() {
       launchBlockers: productBlockedBy.length > 0 ? null : computeLaunchBlockers(openIssues, board),
       roadmap: productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board),
       blockedBy: productBlockedBy,
+    },
+    engineering: {
+      ciHealth: sources['ciMain']?.ok ? computeCiHealth(ciMainRuns) : null,
+      flaky: sources['openIssues']?.ok ? flakyIssues(openIssues) : null,
+      deploys: sources['deploys']?.ok ? computeDeploys(deployRuns, generatedAt) : null,
+      throughput: sources['mergedPrs']?.ok ? computeThroughput(mergedPrs, generatedAt) : null,
+      throughputMayBeCutOff: shippedMayBeCutOff(mergedPrs.length),
     },
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };

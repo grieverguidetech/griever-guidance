@@ -592,15 +592,22 @@ export interface MergedPr {
   title: string;
   url: string;
   mergedAt: string;
+  createdAt?: string;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export const SHIPPED_WINDOW_DAYS = 7;
+
+// The merged-PR query covers this many days: 4 weeks for Throughput.
+export const THROUGHPUT_WEEKS = 4;
+export const MERGED_WINDOW_DAYS = THROUGHPUT_WEEKS * 7;
 
 export const MERGED_PR_LIMIT = 500;
 
 // The `gh pr list --search` date for the window start (UTC, YYYY-MM-DD).
-export function shippedSearchDate(now: Date): string {
-  return new Date(now.getTime() - SHIPPED_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+export function shippedSearchDate(now: Date, days: number = SHIPPED_WINDOW_DAYS): string {
+  return new Date(now.getTime() - days * DAY_MS).toISOString().slice(0, 10);
 }
 
 export function shippedMayBeCutOff(rowCount: number): boolean {
@@ -686,4 +693,120 @@ export function computeRoadmap(openIssues: Issue[], board: BoardItem[]): Roadmap
   }
   const order = listAreas([...rows.keys()].map((area) => (area === NO_AREA ? [] : [`area:${area}`])));
   return order.map((area) => rows.get(area) as RoadmapRow);
+}
+
+export const CI_HEALTH_RUNS = 30;
+export const DEPLOY_SHOWN = 5;
+// Fetch more deploy runs than are shown, so "last good deploy" can look further back.
+export const DEPLOY_FETCHED = 20;
+
+export interface CiHealth {
+  passed: number;
+  failed: number;
+  counted: number;
+  ignored: number;
+  passPercent: number | null;
+  lastFailure: Run | null;
+}
+
+// Cancelled and unfinished runs are ignored. Every other finished run that did not succeed counts as a failure.
+export function computeCiHealth(runs: Run[]): CiHealth {
+  const counted = runs.filter((run) => run.status === 'completed' && run.conclusion !== 'cancelled');
+  const passed = counted.filter((run) => run.conclusion === 'success').length;
+  const failures = counted
+    .filter((run) => run.conclusion !== 'success')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  return {
+    passed,
+    failed: failures.length,
+    counted: counted.length,
+    ignored: runs.length - counted.length,
+    passPercent: counted.length === 0 ? null : Math.round((passed / counted.length) * 100),
+    lastFailure: failures[0] ?? null,
+  };
+}
+
+export function isFlakyIssue(issue: Issue): boolean {
+  const title = issue.title.toLowerCase();
+  if (title.includes('flaky')) {
+    return true;
+  }
+  return issue.labels.includes('tests') && (title.includes('retry') || title.includes('times out'));
+}
+
+export function flakyIssues(issues: Issue[]): Issue[] {
+  return issues.filter(isFlakyIssue).sort((a, b) => a.number - b.number);
+}
+
+export interface DeploySummary {
+  recent: Run[];
+  lastGood: Run | null;
+  hoursSinceGood: number | null;
+}
+
+export function computeDeploys(runs: Run[], now: Date): DeploySummary {
+  const newestFirst = [...runs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const lastGood = newestFirst.find((run) => run.status === 'completed' && run.conclusion === 'success') ?? null;
+  const started = lastGood ? Date.parse(lastGood.createdAt) : Number.NaN;
+  const hours = Math.max(0, (now.getTime() - started) / (60 * 60 * 1000));
+  return {
+    recent: newestFirst.slice(0, DEPLOY_SHOWN),
+    lastGood,
+    hoursSinceGood: lastGood && !Number.isNaN(started) ? Math.round(hours * 10) / 10 : null,
+  };
+}
+
+export interface WeekCount {
+  label: string;
+  count: number;
+}
+
+export interface Throughput {
+  weeks: WeekCount[];
+  total: number;
+  medianHours: number | null;
+}
+
+export function medianOf(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) {
+    return sorted[mid] as number;
+  }
+  return ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
+}
+
+function weekLabel(index: number): string {
+  if (index === 0) {
+    return 'Last 7 days';
+  }
+  return `${index * 7 + 1} to ${index * 7 + 7} days ago`;
+}
+
+// Week 0 is the 7 days up to now; week 3 is the oldest. PRs outside the 4 weeks or with bad dates are dropped.
+export function computeThroughput(prs: MergedPr[], now: Date): Throughput {
+  const counts = new Array<number>(THROUGHPUT_WEEKS).fill(0);
+  const hours: number[] = [];
+  for (const pr of prs) {
+    const merged = Date.parse(pr.mergedAt);
+    const age = now.getTime() - merged;
+    if (Number.isNaN(merged) || age < 0 || age >= MERGED_WINDOW_DAYS * DAY_MS) {
+      continue;
+    }
+    const week = Math.floor(age / (7 * DAY_MS));
+    counts[week] = (counts[week] ?? 0) + 1;
+    const opened = Date.parse(pr.createdAt ?? '');
+    if (!Number.isNaN(opened) && merged >= opened) {
+      hours.push((merged - opened) / (60 * 60 * 1000));
+    }
+  }
+  const median = medianOf(hours);
+  return {
+    weeks: counts.map((count, index) => ({ label: weekLabel(index), count })),
+    total: counts.reduce((sum, count) => sum + count, 0),
+    medianHours: median === null ? null : Math.round(median * 10) / 10,
+  };
 }
