@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaOf,
+  computeLaunchBlockers,
+  computeRoadmap,
+  parseFeatureFlags,
+  shippedThisWeek,
   boardTruncation,
   failedSources,
   isAllowedHost,
@@ -445,5 +449,135 @@ describe('backlog review', () => {
     expect(() => parseBacklogReviews(file([{ ...review(1, 'keep'), why: '' }]))).toThrow('why');
     expect(() => parseBacklogReviews(file([{ ...review(0, 'keep') }]))).toThrow('number');
     expect(() => parseBacklogReviews(file([review(1, 'keep'), review(1, 'close')]))).toThrow('twice');
+  });
+});
+
+describe('parseFeatureFlags', () => {
+  it('maps values to On, Off and unset, and sorts by name', () => {
+    const flags = parseFeatureFlags([
+      { name: 'FEATURE_B', value: 'true' },
+      { name: 'EXPO_PUBLIC_FEATURE_A', value: 'false' },
+      { name: 'FEATURE_C', value: '' },
+      { name: 'FEATURE_D', value: 'maybe' },
+      { name: 'FEATURE_E', value: ' TRUE ' },
+    ]);
+    expect(flags).toEqual([
+      { name: 'EXPO_PUBLIC_FEATURE_A', state: 'Off' },
+      { name: 'FEATURE_B', state: 'On' },
+      { name: 'FEATURE_C', state: 'unset' },
+      { name: 'FEATURE_D', state: 'unset' },
+      { name: 'FEATURE_E', state: 'On' },
+    ]);
+  });
+
+  it('lists only flag names and never other variables or values', () => {
+    const flags = parseFeatureFlags([
+      { name: 'CLOUDFLARE_API_TOKEN', value: 'secret' },
+      { name: 'MY_FEATURE_X', value: 'true' },
+      { name: 'FEATURE_OK', value: 'secret-looking' },
+      { value: 'true' },
+    ]);
+    expect(flags).toEqual([{ name: 'FEATURE_OK', state: 'unset' }]);
+    expect(JSON.stringify(flags)).not.toContain('secret');
+  });
+
+  it('returns an empty list for bad input', () => {
+    expect(parseFeatureFlags(null)).toEqual([]);
+    expect(parseFeatureFlags({})).toEqual([]);
+  });
+});
+
+describe('shippedThisWeek', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+  const pr = (number: number, mergedAt: string) => ({ number, title: `PR ${number}`, url: 'https://x', mergedAt });
+
+  it('keeps PRs merged in the last 7 days, newest first', () => {
+    const result = shippedThisWeek(
+      [pr(1, '2026-11-10T00:00:00Z'), pr(2, '2026-11-14T00:00:00Z'), pr(3, '2026-11-12T00:00:00Z')],
+      now,
+    );
+    expect(result.map((item) => item.number)).toEqual([2, 3, 1]);
+  });
+
+  it('drops a PR merged just over 7 days ago and keeps one just inside', () => {
+    const result = shippedThisWeek(
+      [pr(1, '2026-11-08T11:59:00Z'), pr(2, '2026-11-08T12:01:00Z'), pr(3, '2026-11-07T12:00:00Z')],
+      now,
+    );
+    expect(result.map((item) => item.number)).toEqual([2]);
+  });
+
+  it('ignores bad dates and future dates', () => {
+    expect(shippedThisWeek([pr(1, 'nope'), pr(2, '2026-11-16T00:00:00Z')], now)).toEqual([]);
+  });
+});
+
+describe('launch blockers', () => {
+  const issue = (number: number, title: string, labels: string[]): Issue => ({
+    number,
+    title,
+    url: `https://github.com/x/${number}`,
+    labels,
+    updatedAt: '',
+  });
+  const boardItem = (number: number, status: string | null): BoardItem => ({
+    number,
+    title: '',
+    status,
+    type: 'Issue',
+    url: null,
+    labels: [],
+  });
+
+  it('matches the label or the title marker, with board status', () => {
+    const result = computeLaunchBlockers(
+      [
+        issue(5, 'Plain', ['launch-blocker']),
+        issue(3, '[Launch Roadmap] Store listing', []),
+        issue(4, 'Other', ['area:web']),
+        issue(6, 'Unplaced', ['launch-blocker']),
+      ],
+      [boardItem(5, 'In progress'), boardItem(3, 'Ready'), boardItem(4, 'Ready')],
+    );
+    expect(result.map((item) => [item.number, item.status])).toEqual([
+      [3, 'Ready'],
+      [5, 'In progress'],
+      [6, 'No status'],
+    ]);
+  });
+});
+
+describe('computeRoadmap', () => {
+  const issue = (number: number, labels: string[]): Issue => ({ number, title: '', url: '', labels, updatedAt: '' });
+  const boardItem = (number: number, status: string | null): BoardItem => ({
+    number,
+    title: '',
+    status,
+    type: 'Issue',
+    url: null,
+    labels: [],
+  });
+
+  it('counts open issues by area and status, with Other for the rest', () => {
+    const rows = computeRoadmap(
+      [
+        issue(1, ['area:web']),
+        issue(2, ['area:web']),
+        issue(3, ['area:web']),
+        issue(4, ['area:api']),
+        issue(5, []),
+        issue(6, ['area:web']),
+      ],
+      [boardItem(1, 'Ready'), boardItem(2, 'Ready'), boardItem(3, 'In review'), boardItem(4, 'Blocked'), boardItem(5, 'Backlog')],
+    );
+    expect(rows.map((row) => row.area)).toEqual(['api', 'web', 'none']);
+    expect(rows[0]).toEqual({ area: 'api', counts: { Ready: 0, 'In progress': 0, Blocked: 1, Backlog: 0, Other: 0 }, total: 1 });
+    expect(rows[1]?.counts).toEqual({ Ready: 2, 'In progress': 0, Blocked: 0, Backlog: 0, Other: 2 });
+    expect(rows[1]?.total).toBe(4);
+    expect(rows[2]?.counts['Backlog']).toBe(1);
+  });
+
+  it('returns no rows when nothing is open', () => {
+    expect(computeRoadmap([], [])).toEqual([]);
   });
 });
