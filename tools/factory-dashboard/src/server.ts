@@ -1,6 +1,6 @@
 // Read-only factory dashboard server. Runs only `gh` and `git` read commands.
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +25,11 @@ import {
   failedSources,
   FRIENDLY_HOST,
   isAllowedHost,
+  decideRestart,
+  codeChanged,
+  CACHE_MS,
+  closedIssueArgs,
+  RESTART_HEADER,
   joinBacklogReview,
   parseBacklogReviews,
   parsePort,
@@ -53,9 +58,10 @@ const run = promisify(execFile);
 const REPO = 'grieverguidetech/griever-guidance';
 const REPO_URL = `https://github.com/${REPO}`;
 const HEALTH_URL = 'https://api.grieversguidance.com/health';
-const CACHE_MS = 30_000;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REVIEW_FILE = join(HERE, '..', 'backlog-review.json');
+const RESTART_ON_CHANGE = process.env['FACTORY_RESTART_ON_CHANGE'] === '1';
+const WATCH_MS = 30_000;
 
 async function exec(command: string, args: string[], cwd?: string): Promise<string> {
   const { stdout } = await run(command, args, { cwd, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
@@ -99,9 +105,11 @@ function toIssue(raw: RawIssue): Issue {
 function loadIssues(state: 'open' | 'closed', limit: number): Promise<Issue[]> {
   // Bodies only for open issues: they feed the one-line summaries. Closed issues are many, so they stay light.
   const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body' : 'number,title,labels,url,updatedAt';
-  return ghJson(['issue', 'list', '--repo', REPO, '--state', state, '--limit', String(limit), '--json', fields]).then(
-    (data) => (data as RawIssue[]).map(toIssue),
-  );
+  const base =
+    state === 'closed'
+      ? closedIssueArgs(new Date(), REPO, limit)
+      : ['issue', 'list', '--repo', REPO, '--state', state, '--limit', String(limit)];
+  return ghJson([...base, '--json', fields]).then((data) => (data as RawIssue[]).map(toIssue));
 }
 
 type RawPr = {
@@ -227,7 +235,7 @@ async function buildState() {
   const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
-    guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 1000)),
+    guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 500)),
     guarded('prs', sources, [] as Pr[], loadPrs),
     guarded('runs', sources, [] as Run[], loadRuns),
     guarded('worktrees', sources, [] as Worktree[], loadWorktrees),
@@ -260,11 +268,7 @@ async function buildState() {
     ...item,
     summary: summaryFor(item.number),
   });
-  const openBoard = openBoardItems(
-    board,
-    new Set(openIssues.map((issue) => issue.number)),
-    new Set(closedIssues.map((issue) => issue.number)),
-  ).map(withSummary);
+  const openBoard = openBoardItems(board, new Set(openIssues.map((issue) => issue.number))).map(withSummary);
   const drift = driftBlockedBy.length > 0 ? null : computeDrift({ board, openIssues, closedIssues, prs, worktrees });
   return {
     generatedAt: generatedAt.toISOString(),
@@ -319,12 +323,38 @@ function getState(refresh: boolean): Promise<State> {
 
 const port = parsePort(process.env['FACTORY_PORT']);
 
+// No CORS headers are ever sent, so a preflight from another origin fails.
+function handleRestart(request: IncomingMessage, response: ServerResponse): void {
+  const decision = decideRestart({
+    method: request.method,
+    host: request.headers.host,
+    origin: request.headers.origin,
+    restartHeader: request.headers[RESTART_HEADER] as string | undefined,
+    restartEnabled: RESTART_ON_CHANGE,
+    port,
+  });
+  if (!decision.allowed) {
+    response.writeHead(decision.status).end(decision.reason);
+    return;
+  }
+  console.log('Restart requested from the page');
+  response.writeHead(202, { 'content-type': 'text/plain' });
+  // Exit 1 so launchd (KeepAlive on failure) starts the server again on the latest code.
+  response.end('Restarting', () => {
+    setTimeout(() => process.exit(1), 100);
+  });
+}
+
 async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!isAllowedHost(request.headers.host, port)) {
     response.writeHead(403).end('Forbidden');
     return;
   }
   const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+  if (url.pathname === '/api/restart') {
+    handleRestart(request, response);
+    return;
+  }
   if (request.method !== 'GET') {
     response.writeHead(405).end();
     return;
@@ -336,13 +366,48 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
     } else if (url.pathname === '/api/state') {
       const state = await getState(url.searchParams.get('refresh') === '1');
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-      response.end(JSON.stringify(state));
+      response.end(JSON.stringify({ ...state, restartAvailable: RESTART_ON_CHANGE }));
     } else {
       response.writeHead(404).end('Not found');
     }
   } catch (error) {
     response.writeHead(500).end(error instanceof Error ? error.message : 'error');
   }
+}
+
+// Newest file time under a folder, in ms. A missing folder counts as 0.
+async function newestMtime(dir: string): Promise<number> {
+  let newest = 0;
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    const time = entry.isDirectory() ? await newestMtime(path) : await stat(path).then((s) => s.mtimeMs, () => 0);
+    newest = Math.max(newest, time);
+  }
+  return newest;
+}
+
+async function newestCodeMtime(): Promise<number> {
+  const times = await Promise.all([newestMtime(join(HERE)), newestMtime(join(HERE, '..', 'public'))]);
+  return Math.max(...times);
+}
+
+// Only under launchd: exit 1 when the code changes, so KeepAlive starts the new code.
+if (RESTART_ON_CHANGE) {
+  newestCodeMtime()
+    .then((baseline) => {
+    setInterval(() => {
+      newestCodeMtime()
+        .then((current) => {
+          if (codeChanged(baseline, current)) {
+            console.log('Code changed, restarting');
+            process.exit(1);
+          }
+        })
+        .catch((error: Error) => console.error(`Code check failed: ${error.message}`));
+    }, WATCH_MS);
+    })
+    .catch((error: Error) => console.error(`Code watch not started: ${error.message}`));
 }
 
 const servers = [createServer(handle), createServer(handle)];

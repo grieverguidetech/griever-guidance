@@ -10,21 +10,21 @@ health, and a backlog review. Three tabs (Product, Engineering, Business) are ke
 pnpm factory
 ```
 
-Open http://127.0.0.1:4317. Set `FACTORY_PORT` to use another port. Data is cached for 30
-seconds; the Refresh button reloads it.
+Open http://127.0.0.1:4317. Set `FACTORY_PORT` to use another port. Data is cached for 5
+minutes; the Refresh button reloads it.
 
 ## Backlog review
 
 `backlog-review.json` holds one review per open issue: `number`, `action` (`close`, `decide`,
 `rewrite` or `keep`), `recommendation` and `why`, plus a top-level `reviewedAt` date. The server
-reads the file on each refresh, so an edit shows without a restart (after the 30 second cache, or
+reads the file on each refresh, so an edit shows without a restart (after the 5 minute cache, or
 press Refresh). Rows sort close, decide, rewrite, not reviewed, keep, then by issue number. Open
 issues with no review show as "Not reviewed". Reviews for closed issues are left out and counted.
 A missing or invalid file shows its reason in the section and does not break the page.
 
 ## Read-only
 
-The server only runs `gh` and `git` read commands (`issue list` (open issues with their bodies, closed issues of the last 7 days with their bodies), `pr list`, `run list`,
+The server only runs `gh` and `git` read commands (`issue list` (open issues with their bodies, closed issues of the last 28 days for the drift and area checks, closed issues of the last 7 days with their bodies for summaries), `pr list`, `run list`,
 `project item-list`, `variable list` (feature flag names and values only), `pr list --state merged` (28 days, with the opened time, the body and the branch name, which feed the PR summary and area; Shipped keeps the last 7), `run list --workflow ci.yml --branch main` and `run list --workflow deploy.yml`, `worktree list`, `status`, `rev-list`), one GET to the health endpoint, and a read of `backlog-review.json`.
 It never calls `gh secret`, never writes to GitHub or git, never fetches, and never reads `.env*` files.
 
@@ -53,6 +53,26 @@ GitHub when the page is open, so an idle server uses no API rate limit.
 - After an `nvm` (or other node version) change, run `pnpm factory:install` again. The agent
   keeps the node and pnpm paths it found at install time.
 - Status: `launchctl print gui/$(id -u)/com.grieversguidance.factory`
+
+### Restart and auto-restart
+
+After this merges, run `pnpm factory:install` once to turn on restart mode (the installed plist is a copy of the template). The plist sets `FACTORY_RESTART_ON_CHANGE=1`. In that mode:
+
+- The server notes the newest file time under `src/` and `public/` at start and checks it every 30
+  seconds. On a change it logs "Code changed, restarting" and exits with code 1. launchd's
+  KeepAlive (SuccessfulExit=false) starts it again on the new code.
+- The header shows a "Restart dashboard" button. It sends `POST /api/restart`, the server answers
+  202 and exits with code 1, and the page shows "Restarting…", polls `/api/state` for up to 30
+  seconds, then reloads. The endpoint needs an allowed Host, an `Origin` of exactly
+  `http://<allowed host>`, the header `X-Factory-Restart: 1` and this mode. The server sends no CORS
+  headers, so another web page cannot pass the preflight.
+- If `/api/state` lacks a section the page expects, the page says "The dashboard was updated.
+  Restart it to load the new code."
+
+When run by hand (`pnpm factory`) none of this is on: no watcher, no button, and `POST /api/restart`
+is refused. The GitHub queries are lighter too: a 5 minute cache and 28 days of closed issues.
+
+Limit of the 28 day window: the drift rules "closed, but the board status is not Done" and "worktree of a closed issue" see only issues closed in the last 28 days, so an older closed issue with a wrong board status or a leftover worktree is not flagged. Board counts do not depend on the window: an issue that is not in the open list is closed and is not counted.
 
 ### Friendly URL
 

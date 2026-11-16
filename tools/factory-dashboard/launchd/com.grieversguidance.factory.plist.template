@@ -17,6 +17,8 @@
     <string>__PATH__</string>
     <key>FACTORY_PORT</key>
     <string>__PORT__</string>
+    <key>FACTORY_RESTART_ON_CHANGE</key>
+    <string>1</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

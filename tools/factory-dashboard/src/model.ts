@@ -232,9 +232,10 @@ export function groupByStatus(items: BoardItem[]): Record<string, BoardItem[]> {
   return groups;
 }
 
-// Board counts are for open issues only. A closed issue still on the board is drift, not a count.
-export function openBoardItems(board: BoardItem[], openNumbers: Set<number>, closedNumbers: Set<number>): BoardItem[] {
-  return board.filter((item) => item.number === null || openNumbers.has(item.number) || !closedNumbers.has(item.number));
+// Board counts are for open issues only. The open list is complete, so an issue that is not in it is closed
+// (however long ago) and is not counted. Draft items and PRs have no issue state and stay.
+export function openBoardItems(board: BoardItem[], openNumbers: Set<number>): BoardItem[] {
+  return board.filter((item) => item.number === null || item.type === 'PullRequest' || openNumbers.has(item.number));
 }
 
 export function isGreenForReview(pr: Pr): boolean {
@@ -246,7 +247,7 @@ export function waitsForPeter(pr: Pr): boolean {
   return isGreenForReview(pr) || (pr.prLabels ?? []).includes('ready-to-merge');
 }
 
-// The issue numbers named in the "### Depends on" section. "None" and a missing section give an empty list.
+// The issue numbers named in a "Depends on" section (any heading level, "##" or "###"). "None" and a missing section give an empty list.
 export function dependsOn(body: string | null | undefined): number[] {
   const text = normalize(body);
   if (text === null) {
@@ -1254,4 +1255,56 @@ export function buildEngineering(sources: Record<string, SourceStatus>, data: En
     boardStacks: sources['board']?.ok ? boardStacks(data.board) : null,
     throughputMayBeCutOff: shippedMayBeCutOff(data.mergedPrs.length),
   };
+}
+
+// ---- Restart (launchd mode only) ----
+
+export const RESTART_HEADER = 'x-factory-restart';
+
+export interface RestartRequest {
+  method: string | undefined;
+  host: string | undefined;
+  origin: string | undefined;
+  restartHeader: string | undefined;
+  restartEnabled: boolean;
+  port: number;
+}
+
+export type RestartDecision = { allowed: true } | { allowed: false; status: number; reason: string };
+
+// Guards POST /api/restart. Every check must pass. The server never sends CORS headers, so a page on
+// another origin cannot pass the preflight that the custom header forces.
+export function decideRestart(request: RestartRequest): RestartDecision {
+  if (request.method !== 'POST') {
+    return { allowed: false, status: 405, reason: 'POST only' };
+  }
+  if (!isAllowedHost(request.host, request.port)) {
+    return { allowed: false, status: 403, reason: 'Host not allowed' };
+  }
+  if (!request.restartEnabled) {
+    return { allowed: false, status: 403, reason: 'Restart is not enabled' };
+  }
+  const origin = request.origin;
+  if (origin === undefined || !origin.startsWith('http://') || !isAllowedHost(origin.slice('http://'.length), request.port)) {
+    return { allowed: false, status: 403, reason: 'Origin not allowed' };
+  }
+  if (request.restartHeader !== '1') {
+    return { allowed: false, status: 403, reason: 'Missing restart header' };
+  }
+  return { allowed: true };
+}
+
+// True when the newest file time under src/ and public/ differs from the one taken at start.
+export function codeChanged(baseline: number, current: number): boolean {
+  return current !== baseline;
+}
+
+// The cache and the closed-issue window. The closed-issue lookup reads the last 28 days only.
+export const CACHE_MS = 5 * 60 * 1000;
+export const CLOSED_WINDOW_DAYS = 28;
+
+// The `gh issue list` arguments for closed issues: only the last 28 days (drift and areas use them).
+export function closedIssueArgs(now: Date, repo: string, limit: number): string[] {
+  const search = `closed:>=${shippedSearchDate(now, CLOSED_WINDOW_DAYS)}`;
+  return ['issue', 'list', '--repo', repo, '--state', 'closed', '--search', search, '--limit', String(limit)];
 }

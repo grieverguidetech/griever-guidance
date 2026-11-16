@@ -31,6 +31,9 @@ a { color: var(--link); }
 a:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 button, select { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); }
 button { cursor: pointer; }
+header button { min-height: 44px; min-width: 44px; }
+button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.6; border-style: dashed; }
+#restart-note[hidden] { display: none; }
 ul.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 ul.list li { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
 .muted { color: var(--muted); }
@@ -109,6 +112,8 @@ ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px
   <span id="updated" class="muted" role="status">Loading</span>
   <label id="area-label">Area <select id="area"><option value="all">All areas</option></select></label>
   <button id="refresh" type="button">Refresh</button>
+  <button id="restart" type="button" hidden>Restart dashboard</button>
+  <span id="restart-note" class="muted" role="status" hidden></span>
 </header>
 <div role="tablist" aria-label="Dashboard views" id="tabs">
   <button role="tab" type="button" id="tab-product" aria-controls="panel-product" data-tab="product">Product</button>
@@ -1351,11 +1356,37 @@ window.addEventListener("hashchange", function () {
   showTab(currentTab(), false);
 });
 
+var STALE_NOTE = "The dashboard was updated. Restart it to load the new code.";
+
+// Sets the note only when its text changes, so a screen reader does not repeat it. Empty text hides it.
+function setNote(text) {
+  var note = document.getElementById("restart-note");
+  if (note.textContent !== text) {
+    note.textContent = text;
+  }
+  note.hidden = text === "";
+}
+
+function showUpdated() {
+  var when = new Date(state.generatedAt);
+  document.getElementById("updated").textContent = isNaN(when.getTime()) ? "Updated" : "Updated " + when.toLocaleTimeString();
+}
+
 function render() {
+  var note = document.getElementById("restart-note");
+  document.getElementById("restart").hidden = state.restartAvailable !== true;
+  if (missingSection(state)) {
+    setNote(STALE_NOTE);
+    showUpdated();
+    return;
+  }
+  if (note.textContent === STALE_NOTE) {
+    setNote("");
+  }
   TABS.forEach(function (tab) {
     document.getElementById("panel-" + tab).textContent = "";
   });
-  document.getElementById("updated").textContent = "Updated " + new Date(state.generatedAt).toLocaleTimeString();
+  showUpdated();
   var current = areaSelect.value;
   areaSelect.textContent = "";
   var all = el("option", "All areas");
@@ -1373,6 +1404,66 @@ function render() {
   fitLabels();
 }
 
+// The first section the page needs that the server did not send, or null.
+function missingSection(s) {
+  var need = [s && s.areas, s && s.board, s && s.prs, s && s.product, s && s.engineering, s && s.engineering && s.engineering.ciHealth];
+  return need.some(function (part) {
+    return part === undefined || part === null;
+  });
+}
+
+var RESTART_WAIT_MS = 30000;
+
+// Polls /api/state until the server answers again, then reloads the page.
+function waitForServer(started) {
+  fetch("/api/state", { cache: "no-store" })
+    .then(function (r) {
+      if (!r.ok) {
+        throw new Error("not ready");
+      }
+      try {
+        sessionStorage.setItem("factoryRestarted", "1");
+      } catch (e) {
+        // Private mode: the reload still happens, only the message is lost.
+      }
+      location.reload();
+    })
+    .catch(function () {
+      if (Date.now() - started > RESTART_WAIT_MS) {
+        setNote("The dashboard did not come back in 30 seconds. Check the log, then reload.");
+        document.getElementById("restart").setAttribute("aria-disabled", "false");
+        return;
+      }
+      setTimeout(function () {
+        waitForServer(started);
+      }, 1000);
+    });
+}
+
+// aria-disabled keeps keyboard focus on the button while it waits.
+function restart() {
+  var button = document.getElementById("restart");
+  if (button.getAttribute("aria-disabled") === "true") {
+    return;
+  }
+  button.setAttribute("aria-disabled", "true");
+  setNote("Restarting…");
+  fetch("/api/restart", { method: "POST", headers: { "X-Factory-Restart": "1" } })
+    .then(function (r) {
+      if (r.status !== 202) {
+        throw new Error("refused");
+      }
+      setTimeout(function () {
+        waitForServer(Date.now());
+      }, 1000);
+    })
+    .catch(function () {
+      button.setAttribute("aria-disabled", "false");
+      setNote("The dashboard could not restart. Try again, or restart it by hand.");
+      button.focus();
+    });
+}
+
 function load(refresh) {
   document.getElementById("updated").textContent = "Loading";
   fetch("/api/state" + (refresh ? "?refresh=1" : ""))
@@ -1388,6 +1479,7 @@ function load(refresh) {
     });
 }
 
+document.getElementById("restart").addEventListener("click", restart);
 document.getElementById("refresh").addEventListener("click", function () {
   load(true);
 });
@@ -1397,6 +1489,14 @@ areaSelect.addEventListener("change", function () {
   }
 });
 showTab(currentTab(), false);
+try {
+  if (sessionStorage.getItem("factoryRestarted") === "1") {
+    sessionStorage.removeItem("factoryRestarted");
+    setNote("Dashboard restarted.");
+  }
+} catch (e) {
+  // No session storage: skip the message.
+}
 load(false);
 </script>
 </body>

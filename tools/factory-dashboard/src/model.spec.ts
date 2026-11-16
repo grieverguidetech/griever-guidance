@@ -31,6 +31,11 @@ import {
   boardTruncation,
   failedSources,
   isAllowedHost,
+  decideRestart,
+  codeChanged,
+  CACHE_MS,
+  CLOSED_WINDOW_DAYS,
+  closedIssueArgs,
   joinBacklogReview,
   parseBacklogReviews,
   parsePort,
@@ -261,6 +266,14 @@ describe('needs you', () => {
 });
 
 describe('dependsOn', () => {
+  it('reads a "## Depends on" heading (as in #856 and #850)', () => {
+    expect(dependsOn('## Context\nx\n\n## Depends on\n#849\n')).toEqual([849]);
+  });
+
+  it('reads a "### Depends on" heading', () => {
+    expect(dependsOn('## Context\nx\n\n### Depends on\n#849\n\n### Size\nS')).toEqual([849]);
+  });
+
   it('reads the issue numbers in the Depends on section', () => {
     const body = '### Context\nSee #1.\n\n### Depends on\n#12 and #34, also #12.\n\n### Size\nM #99';
     expect(dependsOn(body)).toEqual([12, 34]);
@@ -1210,14 +1223,16 @@ describe('openBoardItems', () => {
 
   it('does not count a closed issue that is still In review', () => {
     const board = [item(1, 'In review'), item(2, 'In review'), item(3, 'In review'), item(null, 'Backlog')];
-    const open = openBoardItems(board, new Set([1]), new Set([2, 3]));
+    const open = openBoardItems(board, new Set([1]));
     expect(open.map((entry) => entry.number)).toEqual([1, null]);
     expect(groupByStatus(open)['In review']).toHaveLength(1);
     expect(groupByStatus(board)['In review']).toHaveLength(3);
   });
 
-  it('keeps everything when the closed list is empty (source failed)', () => {
-    expect(openBoardItems([item(1, 'Done')], new Set(), new Set())).toHaveLength(1);
+  it('drops a board issue that is in neither list (closed long ago), keeps drafts and PRs', () => {
+    const pr: BoardItem = { ...item(500, 'Done'), type: 'PullRequest' };
+    const board = [item(1, 'Ready'), item(999, 'Done'), item(null, 'Backlog'), pr];
+    expect(openBoardItems(board, new Set([1])).map((entry) => entry.number)).toEqual([1, null, 500]);
   });
 });
 
@@ -1260,5 +1275,76 @@ describe('buildProduct', () => {
     });
     expect(result.launchBlockers).toBeNull();
     expect(result.blockedBy).toEqual(['board']);
+  });
+});
+
+describe('decideRestart', () => {
+  const good = {
+    method: 'POST',
+    host: '127.0.0.1:4399',
+    origin: 'http://127.0.0.1:4399',
+    restartHeader: '1',
+    restartEnabled: true,
+    port: 4399,
+  };
+
+  it('allows a complete request', () => {
+    expect(decideRestart(good)).toEqual({ allowed: true });
+  });
+
+  it('allows the friendly host as the origin', () => {
+    const friendly = 'gg-tech-dashboard.localhost:4399';
+    expect(decideRestart({ ...good, host: friendly, origin: `http://${friendly}` })).toEqual({ allowed: true });
+  });
+
+  it('refuses other methods with 405', () => {
+    for (const method of ['GET', 'OPTIONS', 'PUT', 'DELETE', undefined]) {
+      expect(decideRestart({ ...good, method })).toMatchObject({ allowed: false, status: 405 });
+    }
+  });
+
+  it('refuses a host that is not allowed', () => {
+    expect(decideRestart({ ...good, host: 'evil.example:4399' })).toMatchObject({ allowed: false, status: 403 });
+    expect(decideRestart({ ...good, host: undefined })).toMatchObject({ allowed: false, status: 403 });
+  });
+
+  it('refuses when restart is not enabled', () => {
+    expect(decideRestart({ ...good, restartEnabled: false })).toMatchObject({ allowed: false, status: 403 });
+  });
+
+  it('refuses a missing or wrong origin', () => {
+    for (const origin of [undefined, 'null', 'https://127.0.0.1:4399', 'http://evil.example', 'http://127.0.0.1:4399/', 'http://127.0.0.1:1', 'http://127.0.0.1:4399.evil.com']) {
+      expect(decideRestart({ ...good, origin })).toMatchObject({ allowed: false, status: 403 });
+    }
+  });
+
+  it('refuses a missing or wrong restart header', () => {
+    for (const restartHeader of [undefined, '', '0', 'true']) {
+      expect(decideRestart({ ...good, restartHeader })).toMatchObject({ allowed: false, status: 403 });
+    }
+  });
+});
+
+describe('codeChanged', () => {
+  it('is false for the same time and true for a newer or an older one', () => {
+    expect(codeChanged(100, 100)).toBe(false);
+    expect(codeChanged(100, 200)).toBe(true);
+    expect(codeChanged(100, 50)).toBe(true);
+  });
+});
+
+describe('closedIssueArgs', () => {
+  it('searches the last 28 days of closed issues', () => {
+    expect(closedIssueArgs(new Date('2026-11-29T00:00:00Z'), 'o/r', 500)).toEqual([
+      'issue', 'list', '--repo', 'o/r', '--state', 'closed', '--search', 'closed:>=2026-11-01', '--limit', '500',
+    ]);
+  });
+});
+
+describe('cache and closed window', () => {
+  it('caches for 5 minutes and reads 28 days of closed issues', () => {
+    expect(CACHE_MS).toBe(300_000);
+    expect(CLOSED_WINDOW_DAYS).toBe(28);
+    expect(shippedSearchDate(new Date('2026-11-29T00:00:00Z'), CLOSED_WINDOW_DAYS)).toBe('2026-11-01');
   });
 });
