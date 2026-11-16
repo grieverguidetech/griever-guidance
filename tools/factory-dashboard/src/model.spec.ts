@@ -4,6 +4,8 @@ import {
   computeLaunchBlockers,
   computeRoadmap,
   parseFeatureFlags,
+  shippedMayBeCutOff,
+  shippedSearchDate,
   shippedThisWeek,
   boardTruncation,
   failedSources,
@@ -464,8 +466,8 @@ describe('parseFeatureFlags', () => {
     expect(flags).toEqual([
       { name: 'EXPO_PUBLIC_FEATURE_A', state: 'Off' },
       { name: 'FEATURE_B', state: 'On' },
-      { name: 'FEATURE_C', state: 'unset' },
-      { name: 'FEATURE_D', state: 'unset' },
+      { name: 'FEATURE_C', state: 'Not set' },
+      { name: 'FEATURE_D', state: 'Not set' },
       { name: 'FEATURE_E', state: 'On' },
     ]);
   });
@@ -477,7 +479,7 @@ describe('parseFeatureFlags', () => {
       { name: 'FEATURE_OK', value: 'secret-looking' },
       { value: 'true' },
     ]);
-    expect(flags).toEqual([{ name: 'FEATURE_OK', state: 'unset' }]);
+    expect(flags).toEqual([{ name: 'FEATURE_OK', state: 'Not set' }]);
     expect(JSON.stringify(flags)).not.toContain('secret');
   });
 
@@ -505,6 +507,21 @@ describe('shippedThisWeek', () => {
       now,
     );
     expect(result.map((item) => item.number)).toEqual([2]);
+  });
+
+  it('drops entries whose title is not a string', () => {
+    const bad = { number: 9, title: null, url: 'https://x', mergedAt: '2026-11-14T00:00:00Z' } as never;
+    expect(shippedThisWeek([bad, pr(1, '2026-11-14T00:00:00Z')], now).map((item) => item.number)).toEqual([1]);
+  });
+
+  it('builds the search date 7 days back in UTC', () => {
+    expect(shippedSearchDate(now)).toBe('2026-11-08');
+    expect(shippedSearchDate(new Date('2026-03-02T00:30:00Z'))).toBe('2026-02-23');
+  });
+
+  it('flags a result that fills the limit', () => {
+    expect(shippedMayBeCutOff(499)).toBe(false);
+    expect(shippedMayBeCutOff(500)).toBe(true);
   });
 
   it('ignores bad dates and future dates', () => {
@@ -567,13 +584,23 @@ describe('computeRoadmap', () => {
         issue(4, ['area:api']),
         issue(5, []),
         issue(6, ['area:web']),
+        issue(7, ['area:web']),
+        issue(8, ['area:api']),
       ],
-      [boardItem(1, 'Ready'), boardItem(2, 'Ready'), boardItem(3, 'In review'), boardItem(4, 'Blocked'), boardItem(5, 'Backlog')],
+      [
+        boardItem(1, 'Ready'),
+        boardItem(2, 'Ready'),
+        boardItem(3, 'In review'),
+        boardItem(4, 'Blocked'),
+        boardItem(5, 'Backlog'),
+        boardItem(7, 'In progress'),
+        boardItem(8, 'Done'),
+      ],
     );
     expect(rows.map((row) => row.area)).toEqual(['api', 'web', 'none']);
-    expect(rows[0]).toEqual({ area: 'api', counts: { Ready: 0, 'In progress': 0, Blocked: 1, Backlog: 0, Other: 0 }, total: 1 });
-    expect(rows[1]?.counts).toEqual({ Ready: 2, 'In progress': 0, Blocked: 0, Backlog: 0, Other: 2 });
-    expect(rows[1]?.total).toBe(4);
+    expect(rows[0]).toEqual({ area: 'api', counts: { Ready: 0, 'In progress': 0, Blocked: 1, Backlog: 0, Other: 1 }, total: 2 });
+    expect(rows[1]?.counts).toEqual({ Ready: 2, 'In progress': 1, Blocked: 0, Backlog: 0, Other: 2 });
+    expect(rows[1]?.total).toBe(5);
     expect(rows[2]?.counts['Backlog']).toBe(1);
   });
 

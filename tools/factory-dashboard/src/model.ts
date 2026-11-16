@@ -549,7 +549,7 @@ export function joinBacklogReview(file: BacklogReviewFile, openIssues: Issue[]):
 
 export interface FeatureFlag {
   name: string;
-  state: 'On' | 'Off' | 'unset';
+  state: 'On' | 'Off' | 'Not set';
 }
 
 const FLAG_NAME = /^(?:EXPO_PUBLIC_)?FEATURE_/;
@@ -557,7 +557,7 @@ const ON_VALUES = ['true', '1', 'on', 'yes'];
 const OFF_VALUES = ['false', '0', 'off', 'no'];
 
 // Input is `gh variable list --json name,value`. Only FEATURE_* and EXPO_PUBLIC_FEATURE_* are kept,
-// so nothing else (and no secret) can reach the page. Unknown or empty values show as unset.
+// so nothing else (and no secret) can reach the page. Unknown or empty values show as Not set.
 export function parseFeatureFlags(raw: unknown): FeatureFlag[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -569,7 +569,7 @@ export function parseFeatureFlags(raw: unknown): FeatureFlag[] {
       continue;
     }
     const value = typeof item.value === 'string' ? item.value.trim().toLowerCase() : '';
-    let state: FeatureFlag['state'] = 'unset';
+    let state: FeatureFlag['state'] = 'Not set';
     if (ON_VALUES.includes(value)) {
       state = 'On';
     } else if (OFF_VALUES.includes(value)) {
@@ -589,10 +589,24 @@ export interface MergedPr {
 
 export const SHIPPED_WINDOW_DAYS = 7;
 
+export const MERGED_PR_LIMIT = 500;
+
+// The `gh pr list --search` date for the window start (UTC, YYYY-MM-DD).
+export function shippedSearchDate(now: Date): string {
+  return new Date(now.getTime() - SHIPPED_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export function shippedMayBeCutOff(rowCount: number): boolean {
+  return rowCount >= MERGED_PR_LIMIT;
+}
+
 export function shippedThisWeek(prs: MergedPr[], now: Date): MergedPr[] {
   const cutoff = now.getTime() - SHIPPED_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   return prs
     .filter((pr) => {
+      if (typeof pr.title !== 'string') {
+        return false;
+      }
       const merged = Date.parse(pr.mergedAt);
       return !Number.isNaN(merged) && merged >= cutoff && merged <= now.getTime();
     })

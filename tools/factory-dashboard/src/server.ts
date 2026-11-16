@@ -11,6 +11,9 @@ import {
   computeLaunchBlockers,
   computeNeedsYou,
   computeRoadmap,
+  MERGED_PR_LIMIT,
+  shippedMayBeCutOff,
+  shippedSearchDate,
   parseFeatureFlags,
   shippedThisWeek,
   boardTruncation,
@@ -128,9 +131,12 @@ async function loadFeatureFlags(): Promise<FeatureFlag[]> {
   return parseFeatureFlags(await ghJson(['variable', 'list', '--repo', REPO, '--json', 'name,value']));
 }
 
+// The search is the 7-day window, so the limit is not what cuts the list.
 async function loadMergedPrs(): Promise<MergedPr[]> {
   const fields = 'number,title,url,mergedAt';
-  const data = await ghJson(['pr', 'list', '--repo', REPO, '--state', 'merged', '--limit', '100', '--json', fields]);
+  const search = `merged:>=${shippedSearchDate(new Date())}`;
+  const args = ['pr', 'list', '--repo', REPO, '--state', 'merged', '--search', search];
+  const data = await ghJson([...args, '--limit', String(MERGED_PR_LIMIT), '--json', fields]);
   return data as MergedPr[];
 }
 
@@ -228,6 +234,7 @@ async function buildState() {
     product: {
       flags,
       shipped: shippedThisWeek(mergedPrs, generatedAt),
+      shippedMayBeCutOff: shippedMayBeCutOff(mergedPrs.length),
       launchBlockers: productBlockedBy.length > 0 ? null : computeLaunchBlockers(openIssues, board),
       roadmap: productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board),
       blockedBy: productBlockedBy,
