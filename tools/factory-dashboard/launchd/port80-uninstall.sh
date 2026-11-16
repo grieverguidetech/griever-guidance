@@ -6,6 +6,7 @@ LABEL="com.grieversguidance.factory"
 ANCHOR="com.apple/gg-factory"
 RULES="/etc/pf.anchors/${LABEL}"
 DAEMON="/Library/LaunchDaemons/${LABEL}.pf.plist"
+TOKEN_FILE="/var/run/gg-factory.pftoken"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this with sudo: sudo bash $0" >&2
@@ -16,6 +17,10 @@ if launchctl print "system/${LABEL}.pf" >/dev/null 2>&1; then
   launchctl bootout "system/${LABEL}.pf" || true
 fi
 pfctl -a "${ANCHOR}" -F all 2>/dev/null || true
-rm -f "${DAEMON}" "${RULES}"
+# Release our hold on pf. Other pf users (for example other tools) may keep it on.
+if [ -s "${TOKEN_FILE}" ]; then
+  pfctl -X "$(cat "${TOKEN_FILE}")" >/dev/null 2>&1 || true
+fi
+rm -f "${DAEMON}" "${RULES}" "${TOKEN_FILE}"
 
 echo "Port 80 forward is removed."

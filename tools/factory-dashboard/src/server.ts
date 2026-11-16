@@ -261,6 +261,15 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
 
 const servers = [createServer(handle), createServer(handle)];
 
+servers[0]?.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    // Exit 0 so launchd (KeepAlive on failure only) does not restart in a loop.
+    console.error(`Port ${port} in use`);
+    process.exit(0);
+  }
+  console.error(`Cannot listen on 127.0.0.1: ${error.message}`);
+  process.exit(1);
+});
 servers[0]?.listen(port, '127.0.0.1', () => {
   console.log(`Factory dashboard: http://127.0.0.1:${port}`);
   console.log(`With the port 80 forward on: http://${FRIENDLY_HOST}`);

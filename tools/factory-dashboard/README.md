@@ -48,7 +48,10 @@ GitHub when the page is open, so an idle server uses no API rate limit.
   `~/Library/LaunchAgents/com.grieversguidance.factory.plist`, loads it, then waits up to 20
   seconds for http://127.0.0.1:4317. Pass another repo root as an argument if needed.
 - Uninstall: `pnpm factory:uninstall`.
-- Logs: `tail -f ~/Library/Logs/gg-factory.log`
+- Logs: `tail -f ~/Library/Logs/gg-factory.log`. The log grows over time. Clear it with
+  `: > ~/Library/Logs/gg-factory.log`.
+- After an `nvm` (or other node version) change, run `pnpm factory:install` again. The agent
+  keeps the node and pnpm paths it found at install time.
 - Status: `launchctl print gui/$(id -u)/com.grieversguidance.factory`
 
 ### Friendly URL with no port (one-time, needs sudo)
@@ -67,7 +70,16 @@ not run sudo.) The step changes three things on this Mac:
 - Loads the rules into the pf anchor `com.apple/gg-factory` and turns pf on (`pfctl -E`). It does
   not edit `/etc/pf.conf`.
 - Writes `/Library/LaunchDaemons/com.grieversguidance.factory.pf.plist`, which loads the rules
-  again at boot.
+  again at boot. The daemon saves the pf enable token in `/var/run/gg-factory.pftoken`. The undo
+  script releases it with `pfctl -X`. Other pf users may keep pf on after that; that is normal.
+
+Things to know:
+
+- The forward takes over port 80 on this Mac. Any other local service on port 80 stops
+  answering on 127.0.0.1 and ::1 until you undo it.
+- `http://[::1]:4317` with that literal host returns 403. This is intended; use the names above.
+- If port 4317 is already in use, the server logs "Port 4317 in use" and exits without a restart
+  loop. `install.sh` then reports that the agent did not answer.
 
 The server accepts the host names `127.0.0.1`, `localhost` (with the port) and
 `gg-tech-dashboard.localhost`. It rejects every other host name. It listens on 127.0.0.1 and ::1.
