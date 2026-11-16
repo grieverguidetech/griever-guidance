@@ -20,6 +20,19 @@ const contacts = {
   ],
 } as never;
 
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle per node lets a test see where focus was sent.
+const mockHandles = new Map<unknown, number>();
+const mockHandleFor = (node: unknown) => {
+  if (!mockHandles.has(node)) {
+    mockHandles.set(node, mockHandles.size + 1);
+  }
+  return mockHandles.get(node);
+};
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: (node: unknown) => (node ? mockHandleFor(node) : null),
+}));
+
 // Stable defaults: a new array each render would re-run the effect below.
 const PICKED = ['c0'];
 const NONE: string[] = [];
@@ -424,18 +437,34 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
-  it('Got it goes back the way Back does', () => {
-    // The app's Back from Ready to send goes to the hub; here it is the flow's step back, once.
+  it('Got it shows Ready to send with the suggested words and the send button, and focuses the heading', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<Harness web={EMPTY} />);
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Share the service' })).toBeTruthy();
+    expect((screen.getByLabelText('Your message').props as { value?: string }).value).toMatch(/\S/);
+    expect(primary()).toBeTruthy();
+    const nodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
+    expect(nodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'Share the service')).toBe(true);
+  });
+
+  it('Back still goes back after Got it, and opening the screen again shows the nudge', () => {
     const back = jest.fn();
     function Probe() {
       const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
-      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} onChoosePeople={() => undefined} />;
+      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} contacts={contacts} onChoosePeople={() => undefined} />;
     }
-    render(<Probe />);
+    const first = render(<Probe />);
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
-    expect(back).toHaveBeenCalledTimes(1);
+    expect(back).not.toHaveBeenCalled();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(back).toHaveBeenCalledTimes(2);
+    expect(back).toHaveBeenCalledTimes(1);
+    first.unmount();
+    render(<Probe />);
+    expect(screen.getByRole('button', { name: 'Got it' })).toBeTruthy();
   });
 
   it('reads heading, card heading, line, then Got it, and the card is not one accessible block', () => {

@@ -421,7 +421,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       onArrived={clearArrival}
     />
   );
-  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={choosePeople} onGotIt={onHub} peopleAsked={peopleAsked} notified={session.recipientsNotified} focusPeopleButton={focusPeopleButton} />;
+  return <Navigation flow={flowWithHub} contacts={contacts} bar={bar} onChoosePeople={choosePeople} peopleAsked={peopleAsked} notified={session.recipientsNotified} focusPeopleButton={focusPeopleButton} />;
 };
 
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
@@ -877,7 +877,6 @@ const Navigation = ({
   contacts,
   bar,
   onChoosePeople,
-  onGotIt,
   peopleAsked,
   notified,
   focusPeopleButton,
@@ -886,8 +885,6 @@ const Navigation = ({
   contacts: ReturnType<typeof useContacts>;
   bar: ReactNode;
   onChoosePeople: () => void;
-  /** The nudge's Got it: the hub, even while the people step is still open under it. */
-  onGotIt: () => void;
   peopleAsked: boolean;
   notified: Session['recipientsNotified'];
   focusPeopleButton?: MutableRefObject<(() => void) | null>;
@@ -908,7 +905,7 @@ const Navigation = ({
               withPersonContext(
                 bar,
                 <>
-                  <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} onGotIt={onGotIt} focusPeopleButton={focusPeopleButton} />
+                  <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoosePeople} focusPeopleButton={focusPeopleButton} />
                   <ContactSelectorScreen
                     flow={flow}
                     contacts={contacts}

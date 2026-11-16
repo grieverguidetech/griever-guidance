@@ -85,7 +85,7 @@ const startMoment = async (title: string) =>
 describe('a moment with nothing written on the web (#824)', () => {
   const empty = { ...anna, announcementMessage: undefined, serviceMessage: '  ', serviceType: '', thanksMessage: '' } as unknown as Session;
 
-  it('shows the nudge instead of the message and send controls, and Got it returns to the hub', async () => {
+  it('shows the nudge instead of the message and send controls, and Got it shows Ready to send', async () => {
     await openAnna(empty);
     await startMoment('Announce the passing');
     expect(await screen.findByRole('heading', { name: 'Write the announcement on the web first' })).toBeTruthy();
@@ -94,9 +94,9 @@ describe('a moment with nothing written on the web (#824)', () => {
     expect(screen.queryByRole('button', { name: /^Text \d/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^(Choose who to tell|Change who you're texting)/ })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
-    // The hub: the person's plan, with the row unchanged (still the lit next step).
-    expect(await screen.findByText('For Anna')).toBeTruthy();
-    expect(await screen.findByRole('button', { name: /^Announce the passing, .*Continue$/ })).toBeTruthy();
+    expect(await screen.findByLabelText('Your message')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Write the announcement on the web first' })).toBeNull();
+    expect(screen.queryByText('For Anna')).toBeNull();
   });
 
   it('a flow with web wording still opens the message', async () => {
@@ -150,27 +150,25 @@ describe('a moment with nothing written on the web (#824)', () => {
   it.each([
     ['Share the service', 'Add the service details on the web first'],
     ['Send thank-yous', 'Write the thank-you note on the web first'],
-    ['Share the obituary', 'Write the obituary on the web first'],
-  ])('%s: Got it returns to the hub, with the row unchanged', async (moment, nudge) => {
+  ])('%s: Got it shows Ready to send, and Back from there goes to the hub', async (moment, nudge) => {
     await openAnna(empty);
     await startMoment(moment);
     await screen.findByRole('heading', { name: nudge });
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(await screen.findByLabelText('Your message')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('For Anna')).toBeTruthy();
-    expect(screen.getByRole('button', { name: new RegExp(moment) })).toBeTruthy();
   });
 
-  it('Got it reaches the hub while the people are still loading (the flow is on its people step)', async () => {
-    const real = AsyncStorage.getItem.bind(AsyncStorage);
-    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([empty]));
-    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
-    // The saved contacts never load, so the people step stays open under the nudge.
-    jest.spyOn(AsyncStorage, 'getItem').mockImplementation((key) => (key === 'gg.contacts.v1' ? new Promise(() => undefined) : real(key)));
-    render(<App />);
-    fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
-    fireEvent.press(await screen.findByRole('button', { name: /Share the service/ }));
+  it('opening the step again after Got it shows the nudge again', async () => {
+    await openAnna(empty);
+    await startMoment('Share the service');
     fireEvent.press(await screen.findByRole('button', { name: 'Got it' }));
-    expect(await screen.findByText('For Anna')).toBeTruthy();
+    await screen.findByLabelText('Your message');
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByText('For Anna');
+    await startMoment('Share the service');
+    expect(await screen.findByRole('heading', { name: 'Add the service details on the web first' })).toBeTruthy();
   });
 
   it('the obituary keeps its link field under the nudge, and a typed link brings the normal screen', async () => {
