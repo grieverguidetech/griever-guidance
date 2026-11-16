@@ -8,11 +8,16 @@
 :root {
   --bg: #f7f7f5; --card: #ffffff; --text: #1f2328; --muted: #59636e; --border: #d1d9e0;
   --green: #1a7f37; --red: #cf222e; --amber: #9a6700; --grey: #6e7781; --link: #0550ae; --focus: #0969da;
+  /* Chart tokens: categorical slots 1-5 of the dataviz reference palette, validated on --card. */
+  --chart-1: #2a78d6; --chart-2: #eb6834; --chart-3: #1baf7a; --chart-4: #eda100; --chart-5: #e87ba4;
+  --chart-axis: #c3c2b7; --chart-track: #eceae4;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0d1117; --card: #161b22; --text: #e6edf3; --muted: #9198a1; --border: #30363d;
     --green: #3fb950; --red: #ff7b72; --amber: #d29922; --grey: #8b949e; --link: #79c0ff; --focus: #58a6ff;
+    --chart-1: #3987e5; --chart-2: #d95926; --chart-3: #199e70; --chart-4: #c98500; --chart-5: #d55181;
+    --chart-axis: #383835; --chart-track: #21262d;
   }
 }
 * { box-sizing: border-box; }
@@ -50,6 +55,37 @@ table.review td.narrow { white-space: nowrap; width: 1%; }
 table.plain { border-collapse: collapse; background: var(--card); }
 table.plain th, table.plain td { text-align: left; padding: 6px 10px; border: 1px solid var(--border); }
 table.plain td.num { text-align: right; }
+/* ---- Layout kit ---- */
+.grid { display: grid; gap: 12px; align-items: start; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .grid.cols-2, .grid.cols-3 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .grid.cols-3 { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 480px) { .grid.kpis { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .grid.kpis { grid-template-columns: repeat(4, 1fr); } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.grid.kpis { align-items: stretch; }
+.card > h3 { font-size: 14px; margin: 0 0 8px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi .label { font-size: 13px; color: var(--muted); }
+.kpi .value { font-size: 32px; font-weight: 600; line-height: 1.1; }
+.kpi.hero .value { font-size: 48px; }
+.kpi .note { font-size: 13px; color: var(--muted); }
+.kpi svg { margin-top: 4px; }
+.more > summary { color: var(--link); margin: 6px 0 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.swatch { display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.chart-row { display: grid; grid-template-columns: minmax(70px, 22%) 1fr 3.5em; gap: 8px; align-items: center; margin: 6px 0; font-size: 13px; }
+.chart-row .total { text-align: right; }
+.chart-row svg { display: block; width: 100%; overflow: visible; }
+.chart [tabindex]:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.chart [tabindex]:hover { opacity: 0.8; }
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 260px; }
+.tip strong { display: block; font-size: 15px; }
+.tip span { color: var(--muted); }
+.chart-table { margin-top: 8px; }
+.pr-group h3 { font-size: 14px; margin: 12px 0 6px; }
+.pr-group h3:first-child { margin-top: 0; }
+.pr-summary { color: var(--muted); font-size: 13px; }
+ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -462,8 +498,375 @@ function renderHealth() {
   s.appendChild(p);
 }
 
-function renderFlags() {
-  var s = section("Feature flags", "featureFlags");
+// ---- Layout kit (everything is built with textContent and createElementNS) ----
+var SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgEl(tag, attrs) {
+  var node = document.createElementNS(SVG_NS, tag);
+  Object.keys(attrs || {}).forEach(function (name) {
+    node.setAttribute(name, String(attrs[name]));
+  });
+  return node;
+}
+
+function grid(kind) {
+  return el("div", null, "grid " + kind);
+}
+
+function card(title) {
+  var c = el("div", null, "card");
+  if (title) {
+    c.appendChild(el("h3", title));
+  }
+  return c;
+}
+
+// A section with an h2, the source error (if any) and an optional "show more" for long lists.
+function kitSection(parent, title, key) {
+  var s = el("section");
+  s.appendChild(el("h2", title));
+  var src = state.sources[key];
+  if (src && !src.ok) {
+    s.appendChild(el("p", "Could not load: " + src.error, "error"));
+  }
+  parent.appendChild(s);
+  return s;
+}
+
+// Shows the first `limit` items and puts the rest in a closed <details>.
+function withShowMore(items, limit, build, emptyText) {
+  if (items.length <= limit) {
+    return listOf(items, build, emptyText);
+  }
+  var wrap = el("div");
+  wrap.appendChild(listOf(items.slice(0, limit), build, emptyText));
+  var more = el("details", null, "more");
+  more.appendChild(el("summary", "Show " + (items.length - limit) + " more"));
+  more.appendChild(listOf(items.slice(limit), build, emptyText));
+  wrap.appendChild(more);
+  return wrap;
+}
+
+function kpiTile(label, value, note, hero) {
+  var tile = card();
+  tile.className = "card kpi" + (hero ? " hero" : "");
+  tile.appendChild(el("span", label, "label"));
+  tile.appendChild(el("span", value === null ? "Unknown" : String(value), "value"));
+  if (note) {
+    tile.appendChild(el("span", note, "note"));
+  }
+  return tile;
+}
+
+// One shared tooltip. Marks show it on hover and on keyboard focus; the same text is the mark's aria-label.
+var tip = null;
+function showTip(target, value, name, x, y) {
+  if (!tip) {
+    tip = el("div", null, "tip");
+    tip.setAttribute("aria-hidden", "true");
+    document.body.appendChild(tip);
+  }
+  tip.textContent = "";
+  tip.appendChild(el("strong", value));
+  tip.appendChild(el("span", name));
+  tip.hidden = false;
+  var box = target.getBoundingClientRect();
+  var left = x === null ? box.left + box.width / 2 : x;
+  var top = y === null ? box.top : y;
+  tip.style.left = Math.min(Math.max(8, left + 12), window.innerWidth - 270) + "px";
+  tip.style.top = Math.max(8, top - 52) + "px";
+}
+
+function hideTip() {
+  if (tip) {
+    tip.hidden = true;
+  }
+}
+
+// Makes an SVG mark focusable, named, and wired to the tooltip.
+function markInteractive(mark, value, name) {
+  mark.setAttribute("tabindex", "0");
+  mark.setAttribute("role", "img");
+  mark.setAttribute("aria-label", value + ", " + name);
+  mark.addEventListener("pointermove", function (event) {
+    showTip(mark, value, name, event.clientX, event.clientY);
+  });
+  mark.addEventListener("pointerleave", hideTip);
+  mark.addEventListener("focus", function () {
+    showTip(mark, value, name, null, null);
+  });
+  mark.addEventListener("blur", hideTip);
+}
+
+// A bar from the left baseline: square at the baseline, 4px round at the data end.
+function barShape(widthAttr, height, fill) {
+  var g = svgEl("g");
+  g.appendChild(svgEl("rect", { x: 0, y: 0, width: widthAttr, height: height, rx: 4, fill: fill }));
+  g.appendChild(svgEl("rect", { x: 0, y: 0, width: 6, height: height, fill: fill }));
+  return g;
+}
+
+function chartTable(caption, headers, rows) {
+  var d = el("details", null, "chart-table");
+  d.appendChild(el("summary", "Table view"));
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", caption, "sr-only"));
+  var head = el("tr");
+  headers.forEach(function (name) {
+    var th = el("th", name);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  rows.forEach(function (cells) {
+    var tr = el("tr");
+    cells.forEach(function (cell, index) {
+      if (index === 0) {
+        var th = el("th", String(cell));
+        th.scope = "row";
+        tr.appendChild(th);
+      } else {
+        tr.appendChild(el("td", String(cell), "num"));
+      }
+    });
+    table.appendChild(tr);
+  });
+  d.appendChild(table);
+  return d;
+}
+
+// Horizontal bars, one series, one baseline. rows: [{ label, value }]. Value sits at the bar tip.
+function barChart(rows, unit, caption) {
+  var wrap = el("div", null, "chart");
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", caption);
+  var max = Math.max.apply(null, rows.map(function (r) {
+    return r.value;
+  }).concat([1]));
+  rows.forEach(function (row) {
+    var line = el("div", null, "chart-row");
+    line.appendChild(el("span", row.label));
+    var svg = svgEl("svg", { height: 12, width: "100%" });
+    var bar = barShape((row.value / max * 100) + "%", 12, "var(--chart-1)");
+    markInteractive(bar, row.value + " " + unit, row.label);
+    svg.appendChild(svgEl("line", { x1: 0, x2: 0, y1: 0, y2: 12, stroke: "var(--chart-axis)", "stroke-width": 1 }));
+    svg.appendChild(bar);
+    line.appendChild(svg);
+    line.appendChild(el("span", String(row.value), "total"));
+    wrap.appendChild(line);
+  });
+  wrap.appendChild(chartTable(caption, ["Name", unit], rows.map(function (r) {
+    return [r.label, r.value];
+  })));
+  return wrap;
+}
+
+// Stacked bars, one per row, fixed segment order, 2px surface gap, legend, tooltip and table view.
+// rows: [{ label, total, segments: [{ name, value }] }]. Series colors follow the order of `names`.
+function stackedBarChart(rows, names, caption) {
+  var wrap = el("div", null, "chart");
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", caption);
+  var legend = el("ul", null, "legend");
+  names.forEach(function (name, index) {
+    var li = el("li");
+    var sw = el("span", null, "swatch");
+    sw.style.background = "var(--chart-" + (index + 1) + ")";
+    sw.setAttribute("aria-hidden", "true");
+    li.appendChild(sw);
+    li.appendChild(document.createTextNode(name));
+    legend.appendChild(li);
+  });
+  wrap.appendChild(legend);
+  var max = Math.max.apply(null, rows.map(function (r) {
+    return r.total;
+  }).concat([1]));
+  rows.forEach(function (row) {
+    var line = el("div", null, "chart-row");
+    line.appendChild(el("span", row.label));
+    var svg = svgEl("svg", { height: 16, width: "100%" });
+    var scale = row.total / max * 100;
+    var at = 0;
+    var lastIndex = -1;
+    row.segments.forEach(function (seg, index) {
+      if (seg.value > 0) {
+        lastIndex = index;
+      }
+    });
+    row.segments.forEach(function (seg, index) {
+      if (seg.value === 0) {
+        return;
+      }
+      var width = seg.value / row.total * scale;
+      var part = svgEl("svg", { x: at + "%", y: 0, width: width + "%", height: 16, overflow: "visible" });
+      var fill = "var(--chart-" + (index + 1) + ")";
+      part.appendChild(svgEl("rect", { x: 0, y: 0, width: "100%", height: 16, fill: fill, rx: index === lastIndex ? 4 : 0 }));
+      if (index === lastIndex && at > 0) {
+        part.appendChild(svgEl("rect", { x: 0, y: 0, width: 6, height: 16, fill: fill }));
+      }
+      if (at > 0) {
+        part.appendChild(svgEl("rect", { x: 0, y: 0, width: 2, height: 16, fill: "var(--card)" }));
+      }
+      markInteractive(part, seg.value + " " + (seg.value === 1 ? "issue" : "issues"), row.label + ", " + seg.name);
+      svg.appendChild(part);
+      at += width;
+    });
+    line.appendChild(svg);
+    line.appendChild(el("span", String(row.total), "total"));
+    wrap.appendChild(line);
+  });
+  wrap.appendChild(chartTable(caption, ["Area"].concat(names, ["Total"]), rows.map(function (row) {
+    return [row.label].concat(row.segments.map(function (seg) {
+      return seg.value;
+    }), [row.total]);
+  })));
+  return wrap;
+}
+
+// A 7-point line, 2px, with an end dot (surface ring) and a hover/focus target per point.
+function sparkline(values, labels, unit) {
+  var w = 120;
+  var h = 28;
+  var max = Math.max.apply(null, values.concat([1]));
+  var step = w / Math.max(values.length - 1, 1);
+  var points = values.map(function (v, i) {
+    return [6 + i * ((w - 12) / Math.max(values.length - 1, 1)), h - 6 - v / max * (h - 12)];
+  });
+  var svg = svgEl("svg", { width: w, height: h, viewBox: "0 0 " + w + " " + h, role: "group" });
+  svg.setAttribute("aria-label", "Last " + values.length + " days");
+  svg.appendChild(svgEl("polyline", {
+    points: points.map(function (p) {
+      return p[0] + "," + p[1];
+    }).join(" "),
+    fill: "none", stroke: "var(--chart-1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"
+  }));
+  var end = points[points.length - 1];
+  svg.appendChild(svgEl("circle", { cx: end[0], cy: end[1], r: 4, fill: "var(--chart-1)", stroke: "var(--card)", "stroke-width": 2 }));
+  points.forEach(function (p, i) {
+    var hit = svgEl("circle", { cx: p[0], cy: p[1], r: Math.min(step / 2, 12), fill: "transparent" });
+    markInteractive(hit, values[i] + " " + unit, labels[i]);
+    svg.appendChild(hit);
+  });
+  return svg;
+}
+
+// ---- Product tab ----
+function dayLabels(generatedAt, count) {
+  var out = [];
+  for (var i = count - 1; i >= 0; i--) {
+    out.push(new Date(new Date(generatedAt).getTime() - i * 86400000).toLocaleDateString());
+  }
+  return out;
+}
+
+function renderHeadline(parent) {
+  var k = state.product.kpis;
+  var s = el("section");
+  s.appendChild(el("h2", "Headline", "sr-only"));
+  var g = grid("kpis");
+  g.appendChild(kpiTile("Launch blockers open", k.launchBlockers, k.launchBlockers === 0 ? "Nothing blocks launch" : null, true));
+  var shipped = kpiTile("PRs shipped this week", state.sources.mergedPrs.ok ? k.shipped : null, "Last 7 days");
+  if (state.sources.mergedPrs.ok) {
+    shipped.appendChild(sparkline(k.shippedPerDay, dayLabels(state.generatedAt, k.shippedPerDay.length), "PRs"));
+  }
+  g.appendChild(shipped);
+  var flagsValue = state.sources.featureFlags.ok ? k.flagsOn + " of " + k.flagsTotal : null;
+  g.appendChild(kpiTile("Feature flags on", flagsValue, "Out of all feature flags"));
+  g.appendChild(kpiTile("Open issues", k.openIssues, null));
+  s.appendChild(g);
+  parent.appendChild(s);
+}
+
+function renderBlockers(parent) {
+  var s = kitSection(parent, "Launch blockers", "openIssues");
+  if (state.product.launchBlockers === null) {
+    couldNotCheck(s, state.product.blockedBy);
+    return;
+  }
+  var c = card();
+  c.appendChild(withShowMore(state.product.launchBlockers, 5, function (li, item) {
+    li.appendChild(el("span", item.status, "tag"));
+    li.appendChild(el("span", ": ", "sr-only"));
+    li.appendChild(link("#" + item.number + " " + item.title, item.url));
+  }, "Nothing blocks launch."));
+  s.appendChild(c);
+}
+
+function shippedGroups(shipped) {
+  var groups = {};
+  shipped.forEach(function (pr) {
+    (groups[pr.area] = groups[pr.area] || []).push(pr);
+  });
+  return Object.keys(groups).sort(function (a, b) {
+    if (a === "none" || b === "none") {
+      return a === "none" ? 1 : -1;
+    }
+    return groups[b].length - groups[a].length || a.localeCompare(b);
+  }).map(function (area) {
+    return { area: area, prs: groups[area] };
+  });
+}
+
+function renderShipped(parent) {
+  var s = kitSection(parent, "Shipped this week", "mergedPrs");
+  if (!state.sources.mergedPrs.ok) {
+    return;
+  }
+  if (state.product.shippedMayBeCutOff) {
+    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
+  }
+  var shipped = state.product.shipped;
+  if (shipped.length === 0) {
+    s.appendChild(el("p", "Nothing merged in the last 7 days.", "muted"));
+    return;
+  }
+  var groups = shippedGroups(shipped);
+  var g = grid("cols-2");
+  var list = card();
+  groups.forEach(function (group) {
+    var box = el("div", null, "pr-group");
+    box.appendChild(el("h3", group.area + " (" + group.prs.length + ")"));
+    box.appendChild(withShowMore(group.prs, 3, function (li, pr) {
+      li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
+      if (pr.summary) {
+        li.appendChild(el("div", pr.summary, "pr-summary"));
+      }
+      li.appendChild(el("div", "Merged " + new Date(pr.mergedAt).toLocaleDateString(), "muted"));
+    }, "None."));
+    list.appendChild(box);
+  });
+  g.appendChild(list);
+  var chart = card("PRs shipped by area");
+  chart.appendChild(barChart(groups.map(function (group) {
+    return { label: group.area, value: group.prs.length };
+  }), "PRs", "PRs shipped this week by area"));
+  g.appendChild(chart);
+  s.appendChild(g);
+}
+
+var ROADMAP_NAMES = ["Ready", "In progress", "Blocked", "Backlog", "Other"];
+
+function renderRoadmap(parent) {
+  var s = kitSection(parent, "Roadmap", "board");
+  var stacks = state.product.roadmapStacks;
+  if (stacks === null) {
+    couldNotCheck(s, state.product.blockedBy);
+    return;
+  }
+  if (stacks.length === 0) {
+    s.appendChild(el("p", "No open issues.", "muted"));
+    return;
+  }
+  var c = card("Open issues by area and board status");
+  c.appendChild(stackedBarChart(stacks.map(function (stack) {
+    return { label: stack.area, total: stack.total, segments: stack.segments };
+  }), ROADMAP_NAMES, "Open issues by area and board status"));
+  c.appendChild(el("p", "Other: In review, Done, and issues with no board status.", "muted"));
+  s.appendChild(c);
+}
+
+function renderFlags(parent) {
+  var s = kitSection(parent, "Feature flags", "featureFlags");
   var flags = state.product.flags;
   if (flags.length === 0) {
     if (state.sources.featureFlags.ok) {
@@ -471,81 +874,27 @@ function renderFlags() {
     }
     return;
   }
-  s.appendChild(listOf(flags, function (li, flag) {
+  var c = card();
+  var build = function (li, flag) {
     li.appendChild(el("span", flag.state, "tag"));
     li.appendChild(el("span", ": ", "sr-only"));
     li.appendChild(document.createTextNode(flag.name));
-  }, "No feature flags set."));
-}
-
-function renderShipped() {
-  var s = section("Shipped this week", "mergedPrs");
-  if (!state.sources.mergedPrs.ok) {
-    return;
-  }
-  if (state.product.shippedMayBeCutOff) {
-    s.appendChild(el("p", "May be cut off: the list reached its limit.", "error"));
-  }
-  s.appendChild(listOf(state.product.shipped, function (li, pr) {
-    li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
-    li.appendChild(el("div", "Merged " + new Date(pr.mergedAt).toLocaleDateString(), "muted"));
-  }, "Nothing merged in the last 7 days."));
-}
-
-function renderBlockers() {
-  var s = section("Launch blockers", "openIssues");
-  if (state.product.launchBlockers === null) {
-    couldNotCheck(s, state.product.blockedBy);
-    return;
-  }
-  s.appendChild(listOf(state.product.launchBlockers, function (li, item) {
-    li.appendChild(el("span", item.status, "tag"));
-    li.appendChild(el("span", ": ", "sr-only"));
-    li.appendChild(link("#" + item.number + " " + item.title, item.url));
-  }, "No launch blockers open."));
-}
-
-function renderRoadmap() {
-  var s = section("Roadmap", "board");
-  if (state.product.roadmap === null) {
-    couldNotCheck(s, state.product.blockedBy);
-    return;
-  }
-  if (state.product.roadmap.length === 0) {
-    s.appendChild(el("p", "No open issues.", "muted"));
-    return;
-  }
-  var columns = ["Ready", "In progress", "Blocked", "Backlog", "Other"];
-  var table = el("table", null, "plain");
-  table.appendChild(el("caption", "Open issues by area and board status", "sr-only"));
-  var head = el("tr");
-  ["Area"].concat(columns, ["Total"]).forEach(function (name) {
-    var th = el("th", name);
-    th.scope = "col";
-    head.appendChild(th);
+  };
+  c.appendChild(withShowMore(flags, 12, build, "No feature flags set."));
+  s.appendChild(c);
+  Array.prototype.forEach.call(c.querySelectorAll("ul.list"), function (ul) {
+    ul.className = "list flags";
   });
-  table.appendChild(head);
-  state.product.roadmap.forEach(function (row) {
-    var tr = el("tr");
-    var th = el("th", row.area);
-    th.scope = "row";
-    tr.appendChild(th);
-    columns.forEach(function (name) {
-      tr.appendChild(el("td", String(row.counts[name]), "num"));
-    });
-    tr.appendChild(el("td", String(row.total), "num"));
-    table.appendChild(tr);
-  });
-  s.appendChild(table);
-  s.appendChild(el("p", "Other: In review, Done, and issues with no board status.", "muted"));
 }
 
 function renderProduct() {
-  main = document.getElementById("panel-product");
-  renderFlags();
-  renderShipped();
-  renderBlockers();
-  renderRoadmap();
+  var panel = document.getElementById("panel-product");
+  main = panel;
+  renderHeadline(panel);
+  renderBlockers(panel);
+  renderShipped(panel);
+  renderRoadmap(panel);
+  renderFlags(panel);
 }
 
 function renderBusiness() {

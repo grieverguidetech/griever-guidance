@@ -593,6 +593,110 @@ export interface MergedPr {
   url: string;
   mergedAt: string;
   createdAt?: string;
+  body?: string;
+  headRefName?: string;
+}
+
+export const SUMMARY_MAX = 140;
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_~]+/g, '')
+    .replace(/^\s*>+\s*/, '')
+    .replace(/^\s*#{1,6}\s+/, '')
+    .replace(/^\s*\[[ xX]\]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function capSummary(text: string): string {
+  if (text.length <= SUMMARY_MAX) {
+    return text;
+  }
+  return text.slice(0, SUMMARY_MAX - 1).trimEnd() + '\u2026';
+}
+
+const BULLET = /^\s*(?:[-*+]|\d+[.)])\s+/;
+
+// The lines under a "## What" heading, up to the next heading. Empty when there is none.
+function whatSection(body: string): string[] {
+  const lines = body.split('\n');
+  const start = lines.findIndex((line) => /^#{1,6}\s*what\b/i.test(line.trim()));
+  if (start < 0) {
+    return [];
+  }
+  const section: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^#{1,6}\s/.test(line.trim())) {
+      break;
+    }
+    section.push(line);
+  }
+  return section;
+}
+
+// One line for the dashboard: the first bullet or sentence under "## What", else the first
+// non-empty line. Markdown is stripped and the result is at most SUMMARY_MAX characters.
+export function summarizePr(body: string | null | undefined): string {
+  if (typeof body !== 'string') {
+    return '';
+  }
+  const clean = body.replace(/\r\n?/g, '\n').replace(/<!--[\s\S]*?-->/g, '');
+  const lines = whatSection(clean).filter((line) => stripMarkdown(line) !== '');
+  // A lead-in line that ends with a colon only introduces the list below it, so skip it.
+  const first = lines.length > 1 && stripMarkdown(lines[0] ?? '').endsWith(':') ? lines[1] : lines[0];
+  if (first !== undefined) {
+    const text = stripMarkdown(first.replace(BULLET, ''));
+    if (BULLET.test(first)) {
+      return capSummary(text);
+    }
+    const sentence = /^.*?[.!?](?=\s|$)/.exec(text);
+    return capSummary(sentence ? sentence[0] : text);
+  }
+  const fallback = clean.split('\n').map(stripMarkdown).find((line) => line !== '');
+  return capSummary(fallback ?? '');
+}
+
+// A merged PR as the page sees it: a summary and an area, never the full body.
+export interface ShippedPr {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+  summary: string;
+  area: string;
+}
+
+export function toShippedPr(pr: MergedPr, labelsFor: (issue: number | null) => string[]): ShippedPr {
+  const issue = issueFromPr(pr.body, pr.headRefName ?? '');
+  return {
+    number: pr.number,
+    title: pr.title,
+    url: pr.url,
+    mergedAt: pr.mergedAt,
+    summary: summarizePr(pr.body),
+    area: areaOf(labelsFor(issue)),
+  };
+}
+
+// PRs merged per day for the 7 days up to now, oldest first. Same window rule as shippedThisWeek.
+export function shippedPerDay(shipped: { mergedAt: string }[], now: Date): number[] {
+  const days = new Array<number>(SHIPPED_WINDOW_DAYS).fill(0);
+  for (const pr of shipped) {
+    const age = now.getTime() - Date.parse(pr.mergedAt);
+    if (Number.isNaN(age) || age < 0) {
+      continue;
+    }
+    const index = Math.floor(age / DAY_MS);
+    if (index < SHIPPED_WINDOW_DAYS) {
+      days[SHIPPED_WINDOW_DAYS - 1 - index] = (days[SHIPPED_WINDOW_DAYS - 1 - index] ?? 0) + 1;
+    }
+  }
+  return days;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -698,6 +802,52 @@ export function computeRoadmap(openIssues: Issue[], board: BoardItem[]): Roadmap
   }
   const order = listAreas([...rows.keys()].map((area) => (area === NO_AREA ? [] : [`area:${area}`])));
   return order.map((area) => rows.get(area) as RoadmapRow);
+}
+
+export interface StackSegment {
+  name: string;
+  value: number;
+}
+
+export interface RoadmapStack {
+  area: string;
+  total: number;
+  segments: StackSegment[];
+}
+
+// One stacked bar per area, segments in the fixed status order (zero segments kept so the order never moves).
+export function roadmapStacks(rows: RoadmapRow[]): RoadmapStack[] {
+  return rows.map((row) => ({
+    area: row.area,
+    total: row.total,
+    segments: [...ROADMAP_STATUSES, ROADMAP_OTHER].map((name) => ({ name, value: row.counts[name] ?? 0 })),
+  }));
+}
+
+export interface ProductKpis {
+  launchBlockers: number | null;
+  shipped: number;
+  flagsOn: number;
+  flagsTotal: number;
+  openIssues: number | null;
+  shippedPerDay: number[];
+}
+
+export function computeProductKpis(input: {
+  launchBlockers: LaunchBlocker[] | null;
+  shipped: { mergedAt: string }[];
+  flags: FeatureFlag[];
+  openIssueCount: number | null;
+  now: Date;
+}): ProductKpis {
+  return {
+    launchBlockers: input.launchBlockers === null ? null : input.launchBlockers.length,
+    shipped: input.shipped.length,
+    flagsOn: input.flags.filter((flag) => flag.state === 'On').length,
+    flagsTotal: input.flags.length,
+    openIssues: input.openIssueCount,
+    shippedPerDay: shippedPerDay(input.shipped, input.now),
+  };
 }
 
 export const CI_HEALTH_RUNS = 30;

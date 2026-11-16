@@ -19,6 +19,9 @@ import {
   shippedMayBeCutOff,
   parseFeatureFlags,
   shippedThisWeek,
+  toShippedPr,
+  computeProductKpis,
+  roadmapStacks,
   boardTruncation,
   failedSources,
   FRIENDLY_HOST,
@@ -137,7 +140,7 @@ async function loadFeatureFlags(): Promise<FeatureFlag[]> {
 
 // One query for Shipped (7 days) and Throughput (28 days). The search sets the window, so the limit is not what cuts the list.
 async function loadMergedPrs(): Promise<MergedPr[]> {
-  const fields = 'number,title,url,mergedAt,createdAt';
+  const fields = 'number,title,url,mergedAt,createdAt,body,headRefName';
   const search = `merged:>=${mergedSearchDate(new Date())}`;
   const args = ['pr', 'list', '--repo', REPO, '--state', 'merged', '--search', search];
   const data = await ghJson([...args, '--limit', String(MERGED_PR_LIMIT), '--json', fields]);
@@ -233,6 +236,9 @@ async function buildState() {
   const needsYouBlockedBy = failedSources(sources, ['prs', 'openIssues']);
   const generatedAt = new Date();
   const productBlockedBy = failedSources(sources, ['board', 'openIssues']);
+  const shipped = shippedThisWeek(mergedPrs, generatedAt).map((pr) => toShippedPr(pr, labelsFor));
+  const launchBlockers = productBlockedBy.length > 0 ? null : computeLaunchBlockers(openIssues, board);
+  const roadmap = productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board);
   return {
     generatedAt: generatedAt.toISOString(),
     sources,
@@ -249,10 +255,18 @@ async function buildState() {
     backlogReview,
     product: {
       flags,
-      shipped: shippedThisWeek(mergedPrs, generatedAt),
+      shipped,
+      kpis: computeProductKpis({
+        launchBlockers,
+        shipped,
+        flags,
+        openIssueCount: sources['openIssues']?.ok ? openIssues.length : null,
+        now: generatedAt,
+      }),
+      roadmapStacks: roadmap === null ? null : roadmapStacks(roadmap),
       shippedMayBeCutOff: shippedMayBeCutOff(mergedPrs.length),
-      launchBlockers: productBlockedBy.length > 0 ? null : computeLaunchBlockers(openIssues, board),
-      roadmap: productBlockedBy.length > 0 ? null : computeRoadmap(openIssues, board),
+      launchBlockers,
+      roadmap,
       blockedBy: productBlockedBy,
     },
     engineering: buildEngineering(sources, { ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),

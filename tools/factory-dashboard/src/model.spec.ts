@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaOf,
+  summarizePr,
+  toShippedPr,
+  shippedPerDay,
+  roadmapStacks,
+  computeProductKpis,
+  SUMMARY_MAX,
   buildEngineering,
   formatDuration,
   mergedSearchDate,
@@ -834,5 +840,120 @@ describe('buildEngineering', () => {
         expect(result[key]).not.toBeNull();
       }
     }
+  });
+});
+
+describe('summarizePr', () => {
+  it('takes the first bullet under ## What', () => {
+    const body = '## Why\nBecause.\n\n## What\n\n- Adds the **layout kit** to the dashboard\n- Second bullet\n\n## Tests\n- x';
+    expect(summarizePr(body)).toBe('Adds the layout kit to the dashboard');
+  });
+
+  it('takes the first sentence when the What section is prose', () => {
+    expect(summarizePr('## What\nMakes the tab easier to read. It also adds charts.\n')).toBe('Makes the tab easier to read.');
+  });
+
+  it('skips a lead-in line that ends with a colon', () => {
+    expect(summarizePr('## What\nNew sections at the top:\n- Real first item\n- Second')).toBe('Real first item');
+    expect(summarizePr('## What\nOnly a lead-in:')).toBe('Only a lead-in:');
+  });
+
+  it('falls back to the first non-empty line when there is no What section', () => {
+    expect(summarizePr('\n\n## Summary\nFixes the [login bug](https://x.test) for good\nMore text')).toBe('Summary');
+    expect(summarizePr('\nFixes the [login bug](https://x.test) for good\nMore text')).toBe('Fixes the login bug for good');
+  });
+
+  it('falls back when the What section is empty', () => {
+    expect(summarizePr('Closes #5\n\n## What\n\n## Tests\n- x')).toBe('Closes #5');
+  });
+
+  it('strips markdown, html comments, tags, quotes and checkboxes', () => {
+    const body = '<!-- template note -->\n## What\n- [x] `code` and _emphasis_ with <b>tags</b> and ![img](a.png)';
+    expect(summarizePr(body)).toBe('code and emphasis with tags and img');
+  });
+
+  it('handles CRLF line endings', () => {
+    expect(summarizePr('## What\r\n- First\r\n- Second\r\n')).toBe('First');
+  });
+
+  it('returns an empty string for missing or blank bodies', () => {
+    expect(summarizePr(null)).toBe('');
+    expect(summarizePr(undefined)).toBe('');
+    expect(summarizePr('  \n \n')).toBe('');
+  });
+
+  it('caps the summary at 140 characters', () => {
+    const long = 'word '.repeat(60);
+    const result = summarizePr('## What\n- ' + long);
+    expect(SUMMARY_MAX).toBe(140);
+    expect(result.length).toBeLessThanOrEqual(140);
+    expect(result.endsWith('\u2026')).toBe(true);
+    expect(summarizePr('x'.repeat(140))).toBe('x'.repeat(140));
+    expect(summarizePr('x'.repeat(141)).length).toBe(140);
+  });
+});
+
+describe('toShippedPr', () => {
+  const labelsFor = (n: number | null): string[] => (n === 7 ? ['area:web'] : []);
+
+  it('keeps a summary and an area, and drops the full body', () => {
+    const pr = { number: 1, title: 'T', url: 'https://x', mergedAt: '2026-11-14T00:00:00Z', body: '## What\n- Does a thing\n\nCloses #7', headRefName: 'ticket/9' };
+    const result = toShippedPr(pr, labelsFor);
+    expect(result).toEqual({ number: 1, title: 'T', url: 'https://x', mergedAt: '2026-11-14T00:00:00Z', summary: 'Does a thing', area: 'web' });
+    expect('body' in result).toBe(false);
+  });
+
+  it('uses area none when the issue is unknown', () => {
+    const pr = { number: 2, title: 'T', url: 'https://x', mergedAt: '2026-11-14T00:00:00Z' };
+    expect(toShippedPr(pr, labelsFor)).toMatchObject({ summary: '', area: 'none' });
+  });
+});
+
+describe('product KPIs and roadmap stacks', () => {
+  const now = new Date('2026-11-15T12:00:00Z');
+
+  it('puts PRs into 7 daily buckets, oldest first', () => {
+    const days = shippedPerDay(
+      [{ mergedAt: '2026-11-15T10:00:00Z' }, { mergedAt: '2026-11-15T01:00:00Z' }, { mergedAt: '2026-11-09T13:00:00Z' }, { mergedAt: '2026-11-01T00:00:00Z' }],
+      now,
+    );
+    expect(days).toEqual([0, 1, 0, 0, 0, 0, 2]);
+  });
+
+  it('counts blockers, shipped, flags on of total and open issues', () => {
+    const kpis = computeProductKpis({
+      launchBlockers: [{ number: 1, title: '', url: '', status: 'Ready', labels: [] }],
+      shipped: [{ mergedAt: '2026-11-14T00:00:00Z' }, { mergedAt: '2026-11-13T00:00:00Z' }],
+      flags: [
+        { name: 'A', state: 'On' },
+        { name: 'B', state: 'Off' },
+        { name: 'C', state: 'Not set' },
+      ],
+      openIssueCount: 12,
+      now,
+    });
+    expect(kpis).toMatchObject({ launchBlockers: 1, shipped: 2, flagsOn: 1, flagsTotal: 3, openIssues: 12 });
+  });
+
+  it('reports unknown blockers and issue count as null', () => {
+    const kpis = computeProductKpis({ launchBlockers: null, shipped: [], flags: [], openIssueCount: null, now });
+    expect(kpis).toMatchObject({ launchBlockers: null, openIssues: null, flagsOn: 0, flagsTotal: 0 });
+  });
+
+  it('builds stack segments in the fixed status order, keeping zeros', () => {
+    const stacks = roadmapStacks([{ area: 'web', counts: { Ready: 2, 'In progress': 0, Blocked: 1, Backlog: 3, Other: 0 }, total: 6 }]);
+    expect(stacks).toEqual([
+      {
+        area: 'web',
+        total: 6,
+        segments: [
+          { name: 'Ready', value: 2 },
+          { name: 'In progress', value: 0 },
+          { name: 'Blocked', value: 1 },
+          { name: 'Backlog', value: 3 },
+          { name: 'Other', value: 0 },
+        ],
+      },
+    ]);
   });
 });
