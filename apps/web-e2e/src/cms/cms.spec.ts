@@ -325,3 +325,20 @@ test.describe('editor URLs (#849)', () => {
     expect(await violations(page, { contrastOnly: true })).toEqual([]);
   });
 });
+
+test.describe('checklist item URLs (#856)', () => {
+  test('open an item from Service, close it: back on Service, focus on the item', async ({ page }) => {
+    await startPerson(page);
+    await page.getByLabel('Their name').fill('Margaret Hayes');
+    await openSection(page, 'Service', 'Service');
+    const servicePath = new URL(page.url()).pathname;
+    const opener = page.getByRole('complementary', { name: "What you'll need" }).getByRole('button', { name: 'Get a legal pronouncement of death' });
+    await opener.click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Get a legal pronouncement of death' })).toBeFocused();
+    expect(new URL(page.url()).pathname).toMatch(/^\/people\/[A-Za-z0-9-]+\/guide\/pronouncement$/);
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Service' })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe(servicePath);
+    await expect(opener).toBeFocused();
+  });
+});

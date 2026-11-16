@@ -337,12 +337,12 @@ const CMS_SECTIONS: CmsSection[] = ['overview', ...SECTION_ORDER];
 const ITEM_IDS = Object.keys(cmsItemLabels) as ChecklistItemId[];
 
 /**
- * INTERIM until R3 (#849 decisions): Your people, Account and the empty pages have no path yet, so
- * they ride on the history entry's state at the current path. An open checklist item rides the same
- * way on a person's path until R2b (#856) gives it `/guide/:itemId`.
+ * INTERIM until R3 (#850): Your people and Account have no path yet, so they ride on the history
+ * entry's state at the current path. An item opened from their preview panel rides there too. The
+ * empty pages (`/start`) and a person's pages have paths (#849, #856).
  */
-type StateScreen = 'people' | 'profile' | 'settings' | 'noOne';
-const STATE_SCREENS: StateScreen[] = ['people', 'profile', 'settings', 'noOne'];
+type StateScreen = 'people' | 'profile' | 'settings';
+const STATE_SCREENS: StateScreen[] = ['people', 'profile', 'settings'];
 
 interface EntryState {
   screen: StateScreen | null;
@@ -365,7 +365,8 @@ function readEntry(state: unknown): EntryState {
 
 /** Where the editor goes: a person's page (by path) or one of the interim state screens. */
 interface Spot {
-  view: 'cms' | StateScreen;
+  /** 'cms' and 'noOne' (the empty pages) are paths; the rest are interim state screens. */
+  view: 'cms' | 'noOne' | StateScreen;
   section?: CmsSection;
   item?: ChecklistItemId | null;
   /** The person for 'cms'. */
@@ -507,7 +508,7 @@ function AppBody({
     }
     const screen = readEntry(entryLocation.state).screen;
     // An empty page once someone exists is gone: Back walks on past it (#597), as the old history hook did.
-    if (screen === 'noOne' && sortedSessions.length > 0) {
+    if (screen === null && spotFromPath(entryLocation.pathname)?.flowId === null && sortedSessions.length > 0) {
       return true;
     }
     // Below the sign-in steps lies another site or an earlier sign-in in this tab: only a page of a person
@@ -537,13 +538,19 @@ function AppBody({
   const personPath = pathSpot?.flowId ? pathSpot : null;
   const pathPerson = personPath ? (sessionList.find((s) => s.flowId === personPath.flowId) ?? null) : null;
   const editorDecides = CMS_ENABLED && baseView !== 'signIn';
-  const view: AppView = editorDecides && entry.screen ? entry.screen : editorDecides && personPath ? 'cms' : baseView;
-  const cmsSection: CmsSection = entry.screen ? entry.section : (personPath?.section ?? 'overview');
-  const cmsItem: ChecklistItemId | null = entry.item;
+  const startPath = pathSpot !== null && pathSpot.flowId === null && !entry.screen;
+  const view: AppView =
+    editorDecides && entry.screen ? entry.screen : editorDecides && personPath ? 'cms' : editorDecides && startPath ? 'noOne' : baseView;
+  const cmsSection: CmsSection = entry.screen ? entry.section : (pathSpot?.section ?? 'overview');
+  // An item is in the path (guide URLs), or in the entry's state for the interim screens.
+  const pathItem = ITEM_IDS.find((id) => id === pathSpot?.item) ?? null;
+  const cmsItem: ChecklistItemId | null = entry.screen ? entry.item : pathItem;
   // A person's page whose person is not on this device: deleted, another account's, or not pulled yet.
   const personMissing = view === 'cms' && personPath !== null && pathPerson === null;
   // An editor path the table refuses (or any editor path with the editor off).
-  const notFound = location.pathname.startsWith('/people/') && (!CMS_ENABLED || pathSpot === null);
+  // A guide path whose item is not one of ours is not found either.
+  const editorPath = location.pathname.startsWith('/people/') || location.pathname.startsWith('/start');
+  const notFound = editorPath && (!CMS_ENABLED || pathSpot === null || (pathSpot.item !== null && pathItem === null));
 
   const firstView = useRef(view);
   // Shown once, on the first screen after a removal; leaving it ends it for good.
@@ -558,6 +565,8 @@ function AppBody({
   const [flowCategory, setFlowCategory] = useState<TemplateCategory | undefined>(undefined);
   const [setupEditing, setSetupEditing] = useState(false);
   // Where the open item was opened from, so Back can return to that button.
+  // The key of the entry that openCmsItem pushed ('pending' until the router has committed it).
+  const pushedItemFrom = useRef<string | null>(null);
   const itemOpener = useRef<{ id: ChecklistItemId; region: 'main' | 'panel' | 'sheet' } | null>(null);
   const restoreOpener = useRef(false);
   // Where Back from "Edit person" returns: the form it was opened from, or the path.
@@ -639,6 +648,13 @@ function AppBody({
     }
     mounted.current = true;
     shownItem.current = cmsItem;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+  // The item's entry is known once the router has committed it.
+  useEffect(() => {
+    if (pushedItemFrom.current === 'pending') {
+      pushedItemFrom.current = cmsItem !== null ? location.key : null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
   useFocusHeadingOnChange(
@@ -853,8 +869,11 @@ function AppBody({
       if (!path) {
         return false;
       }
-      pathname = path;
-      state = spot.item ? { item: spot.item } : null;
+      pathname = spot.item ? pathForSpot({ flowId: spot.person?.flowId ?? '', section: 'overview', item: spot.item }) : path;
+      state = null;
+    } else if (spot.view === 'noOne') {
+      pathname = pathForSpot({ flowId: null, section: spot.section ?? 'overview', item: spot.item ?? null });
+      state = null;
     } else {
       // A person's page that could not be opened: the id leaves the address bar.
       if (spot.leavePath) {
@@ -890,7 +909,7 @@ function AppBody({
   }
 
   /** The current editor spot, to change one part of it. */
-  const here: Spot = { view: view === 'cms' || STATE_SCREENS.includes(view as StateScreen) ? (view as Spot['view']) : 'noOne', section: cmsSection, item: cmsItem, person: active };
+  const here: Spot = { view: view === 'cms' || view === 'noOne' || STATE_SCREENS.includes(view as StateScreen) ? (view as Spot['view']) : 'noOne', section: cmsSection, item: cmsItem, person: active };
 
   /** The side nav's link for an item, when it has a path: a person's Overview and sections. */
   function navHref(person: Session | null) {
@@ -1213,7 +1232,8 @@ function AppBody({
     itemFromEmpty.current = null;
     // Same update as the item opening, so the sheet does not return focus after the heading took it.
     closeSheet?.();
-    go({ ...target, item: id });
+    // The entry this opens is ours: closing it can go Back to the page it came from (see closeCmsItem).
+    pushedItemFrom.current = go({ ...target, item: id }) ? 'pending' : null;
   }
 
   function closeCmsItem() {
@@ -1234,7 +1254,13 @@ function AppBody({
       return;
     }
     restoreOpener.current = true;
-    go({ ...here, item: null });
+    // Opened here (a push of ours): Back is exact, the page and its place return as they were. A deep link
+    // or a reload has no page of ours behind it, so it goes to the Overview and takes the item's entry.
+    if (pushedItemFrom.current === location.key) {
+      navigate(-1);
+      return;
+    }
+    go({ ...here, section: 'overview', item: null }, { replace: true });
   }
 
   // Where Your account was opened from (flag on): Back returns there.

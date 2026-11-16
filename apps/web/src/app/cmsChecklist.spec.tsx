@@ -96,7 +96,8 @@ describe('checklist in the editor (#421)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Overview' }),
     ).toBeInTheDocument();
-    expect(opener).toHaveFocus();
+    // Closing is a real Back now (#856), so focus lands once the router has committed the page.
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it('Open Service on a service item closes the item and focuses the Service h1', async () => {

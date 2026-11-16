@@ -264,3 +264,102 @@ describe('the e2e steps of "a typed name reaches the Overview" (#849 CI failure)
     expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
   });
 });
+
+describe('checklist items and the empty pages have URLs (#856)', () => {
+  const ITEM = 'Get a legal pronouncement of death';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  function panel() {
+    return within(screen.getByRole('complementary', { name: "What you'll need" }));
+  }
+
+  it('open an item from Service, close it: back on Service, focus on the item that opened it', async () => {
+    seed();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    await h1('Service');
+    const opener = panel().getByRole('button', { name: ITEM });
+    await user.click(opener);
+    await h1(ITEM);
+    expect(window.location.pathname).toBe(`/people/${FLOW}/guide/pronouncement`);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Service');
+    expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it('the browser Back button closes the item the same way, and Forward opens it again', async () => {
+    seed();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    await h1('Service');
+    await user.click(panel().getByRole('button', { name: ITEM }));
+    await h1(ITEM);
+    act(() => window.history.back());
+    await h1('Service');
+    expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
+    act(() => window.history.forward());
+    await h1(ITEM);
+    expect(window.location.pathname).toBe(`/people/${FLOW}/guide/pronouncement`);
+  });
+
+  it('an item opened by a link or a reload closes to the Overview, replacing its own entry', async () => {
+    seed();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: `/people/${FLOW}/guide/pronouncement` });
+    await h1(ITEM);
+    const before = window.history.length;
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Overview');
+    expect(window.location.pathname).toBe(`/people/${FLOW}`);
+    expect(window.history.length).toBe(before);
+  });
+
+  it('an item that is not on the checklist is not found', async () => {
+    seed();
+    renderApp(<App />, { path: `/people/${FLOW}/guide/nope` });
+    expect(await h1("We couldn't find that page.")).toBeInTheDocument();
+  });
+
+  it('with nobody saved, /start shows the empty Overview and /start/service the empty Service', async () => {
+    renderApp(<App />, { path: '/start/service' });
+    expect(await h1('Service')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Start with someone I've lost" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/start/service');
+  });
+
+  it('an item opened from the empty Service page closes back to it, focus on the item', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/start/service' });
+    await h1('Service');
+    const opener = panel().getByRole('button', { name: ITEM });
+    await user.click(opener);
+    await h1(ITEM);
+    expect(window.location.pathname).toBe('/start/guide/pronouncement');
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await h1('Service');
+    expect(window.location.pathname).toBe('/start/service');
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it('an empty page once someone exists is replaced by that person, with no extra entry (#566)', async () => {
+    seed();
+    const before = window.history.length;
+    renderApp(<App />, { path: '/start/service' });
+    await h1('Service');
+    await waitFor(() => expect(window.location.pathname).toBe(`/people/${FLOW}/service`));
+    expect(window.history.length).toBe(before);
+  });
+
+  it('Start on /start makes the person and moves to their page', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/start' });
+    await h1('Overview');
+    await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
+    await h1('The person');
+    expect(window.location.pathname).toMatch(/^\/people\//);
+  });
+});
