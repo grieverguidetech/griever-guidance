@@ -66,5 +66,6 @@
   "emptyMember": "This page fills in when someone shares a person with you.",
   "emptyHolding": "One moment. We are checking your account for people.",
   "arrivedNote": "A person is here now. Their page is open.",
-  "loadingTitle": "One moment"
+  "loadingTitle": "One moment",
+  "personMissing": "That page isn't here. Your people are below."
 }

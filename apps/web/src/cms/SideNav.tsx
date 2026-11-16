@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { fill, screenCopy } from '@griever/copy';
 import { SECTION_ORDER } from '@griever/shared';
 import type { SectionKey, SectionStatus } from '@griever/shared';
@@ -92,6 +92,11 @@ function navKeyFor(section: CmsNavKey): CmsNavKey {
   return section === 'person' ? 'people' : section;
 }
 
+/** A left click with no key held: the other clicks keep the browser's own link behavior (a new tab, a download). */
+function isPlainClick(event: MouseEvent): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
 export function navTitle(key: CmsNavKey): string {
   return copy[NAV_COPY[key]];
 }
@@ -104,13 +109,15 @@ interface Props {
   statuses?: Partial<Record<SectionKey, SectionStatus>>;
   /** Nothing is the current page (a loading screen), so no item carries aria-current. */
   noCurrent?: boolean;
+  /** The URL for an item, or null when it has none yet: an item with a URL is a link, the others are buttons. */
+  hrefFor?: (key: CmsNavKey) => string | null;
 }
 
 /**
  * Wide screens: always shown. Narrow screens: behind a menu button. The button sits outside the
  * nav landmark so a screen reader does not hear the landmark name twice.
  */
-export function SideNav({ personName, section, onSelect, statuses = {}, noCurrent = false }: Props) {
+export function SideNav({ personName, section, onSelect, statuses = {}, noCurrent = false, hrefFor }: Props) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -159,24 +166,44 @@ export function SideNav({ personName, section, onSelect, statuses = {}, noCurren
                 );
               }
               const current = !noCurrent && key === navKeyFor(section);
+              const href = hrefFor?.(key) ?? null;
+              const className = `gg-row flex-wrap ${current ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`;
+              const label = (
+                <>
+                  <span>{navTitle(key)}</span>
+                  {isSectionKey(key) ? (
+                    <>
+                      {' '}
+                      <span className="gg-meta gg-row-trail flex items-center gap-1">
+                        <StatusMark status={statuses[key] ?? 'not_started'} />
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              );
               return (
                 <li key={key}>
-                  <button
-                    type="button"
-                    className={`gg-row flex-wrap ${current ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`}
-                    aria-current={current ? 'page' : undefined}
-                    onClick={() => choose(key)}
-                  >
-                    <span>{navTitle(key)}</span>
-                    {isSectionKey(key) ? (
-                      <>
-                        {' '}
-                        <span className="gg-meta gg-row-trail flex items-center gap-1">
-                          <StatusMark status={statuses[key] ?? 'not_started'} />
-                        </span>
-                      </>
-                    ) : null}
-                  </button>
+                  {href ? (
+                    // A page with a URL is a link, so it can be opened in a new tab or copied. A plain click
+                    // goes through onSelect, which moves in the app (router navigation, focus on the h1).
+                    <a
+                      href={href}
+                      className={className}
+                      aria-current={current ? 'page' : undefined}
+                      onClick={(event) => {
+                        if (isPlainClick(event)) {
+                          event.preventDefault();
+                          choose(key);
+                        }
+                      }}
+                    >
+                      {label}
+                    </a>
+                  ) : (
+                    <button type="button" className={className} aria-current={current ? 'page' : undefined} onClick={() => choose(key)}>
+                      {label}
+                    </button>
+                  )}
                 </li>
               );
             })}

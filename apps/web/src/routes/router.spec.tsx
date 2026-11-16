@@ -20,12 +20,14 @@ function visit(path: string) {
 }
 
 describe('routes', () => {
-  it.each(['/', '/sign-in', '/sign-up', '/join'])('%s renders the App', (path) => {
+  const FLOW = '3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10';
+
+  it.each(['/', '/sign-in', '/sign-up', '/join', `/people/${FLOW}`, `/people/${FLOW}/service`, `/people/${FLOW}/thanks`])('%s renders the App', (path) => {
     visit(path);
     expect(screen.getByText('the app')).toBeInTheDocument();
   });
 
-  it.each(['/nope', '/people', '/sign-in/extra'])('%s renders NotFound for now', (path) => {
+  it.each(['/nope', '/people', '/sign-in/extra', `/people/${FLOW}/nope`, `/people/${FLOW}/guide/officiant`, '/start'])('%s renders NotFound for now', (path) => {
     visit(path);
     expect(screen.getByRole('heading', { level: 1, name: "We couldn't find that page." })).toBeInTheDocument();
     expect(screen.queryByText('the app')).not.toBeInTheDocument();
@@ -42,4 +44,20 @@ describe('App mounting', () => {
     expect(screen.getByText('the app')).toBeInTheDocument();
     expect(mounts.count).toBe(1);
   });
+});
+
+describe('route warnings', () => {
+  it.each(['/', '/sign-in', '/join', '/people/3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10/service'])(
+    '%s logs no "leaf route has no element" warning',
+    (path) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        visit(path);
+        const leafWarnings = warn.mock.calls.filter((args) => String(args[0]).includes('does not have an element or Component'));
+        expect(leafWarnings).toEqual([]);
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
 });

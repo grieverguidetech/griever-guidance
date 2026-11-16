@@ -183,4 +183,54 @@ describe('SideNav', () => {
     const source = readFileSync(join(import.meta.dirname, 'SideNav.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsShell')).toEqual([]);
   });
+
+  describe('with paths (#849)', () => {
+    const hrefFor = (key: CmsNavKey) => (key === 'people' || key === 'account' ? null : `/people/abc/${key}`);
+
+    it('makes the pages links with their href, and keeps Your people and Your account as buttons', () => {
+      setup({ hrefFor });
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+      expect(nav.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+        '/people/abc/overview',
+        '/people/abc/announcement',
+        '/people/abc/service',
+        '/people/abc/obituary',
+        '/people/abc/thanks',
+      ]);
+      expect(nav.getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(['Your people', 'Your account']);
+      expect(nav.getByRole('link', { name: /^Service/ })).toHaveAttribute('aria-current', 'page');
+      expect(nav.getByRole('link', { name: /^Overview/ })).not.toHaveAttribute('aria-current');
+    });
+
+    it('a plain click or Enter on a link chooses it in the app, without following the href', async () => {
+      const user = userEvent.setup();
+      const { onSelect } = setup({ hrefFor });
+      const link = screen.getByRole('link', { name: /^Obituary/ });
+      const followed = vi.fn((event: Event) => event.defaultPrevented);
+      document.addEventListener('click', followed);
+      await user.click(link);
+      expect(onSelect).toHaveBeenLastCalledWith('obituary');
+      expect(followed).toHaveLastReturnedWith(true);
+      link.focus();
+      await user.keyboard('{Enter}');
+      expect(onSelect).toHaveBeenCalledTimes(2);
+      document.removeEventListener('click', followed);
+    });
+
+    it('a click with a key held is left to the browser (a new tab), and does not move in the app', () => {
+      const { onSelect } = setup({ hrefFor });
+      const link = screen.getByRole('link', { name: /^Obituary/ });
+      // Read whether the app stopped the link, then stop it here so jsdom does not try to load the page.
+      let preventedByApp: boolean | null = null;
+      const stop = (event: Event) => {
+        preventedByApp = event.defaultPrevented;
+        event.preventDefault();
+      };
+      document.addEventListener('click', stop);
+      link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true }));
+      document.removeEventListener('click', stop);
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(preventedByApp).toBe(false);
+    });
+  });
 });

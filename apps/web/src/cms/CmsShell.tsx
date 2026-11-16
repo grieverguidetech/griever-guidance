@@ -57,11 +57,13 @@ interface Props {
   nobody?: boolean;
   /** A loading screen: no nav item is the current page. */
   noCurrent?: boolean;
+  /** The side nav link for an item, or null for one that has no path yet (it stays a button). */
+  hrefFor?: (key: CmsNavKey) => string | null;
   children: ReactNode;
 }
 
 /** Nav left, editor right from `md`; stacked below. The shell owns the page's only h1. */
-export function CmsShell({ personName, section, onSelect, onPeople, onAccount, notice, statuses, aside, title, syncOn, nobody = false, noCurrent = false, children }: Props) {
+export function CmsShell({ personName, section, onSelect, onPeople, onAccount, notice, statuses, aside, title, syncOn, nobody = false, noCurrent = false, hrefFor, children }: Props) {
   const heading = useRef<HTMLElement | null>(null);
   const setHeading = useCallback((node: unknown) => {
     heading.current = node as HTMLElement | null;
@@ -115,7 +117,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
 
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
-      <SideNav personName={personName} section={section} onSelect={select} statuses={statuses} noCurrent={noCurrent} />
+      <SideNav personName={personName} section={section} onSelect={select} statuses={statuses} noCurrent={noCurrent} hrefFor={hrefFor} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
         {aside ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
