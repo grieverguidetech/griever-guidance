@@ -1015,6 +1015,38 @@ export interface CiHealth {
   ignored: number;
   passPercent: number | null;
   lastFailure: Run | null;
+  // The runs as marks for the run strip, oldest first.
+  strip: RunMark[];
+}
+
+export type RunResult = 'pass' | 'fail' | 'ignored';
+
+export interface RunMark {
+  id: number;
+  result: RunResult;
+  // Plain words for the tooltip and the table view: "Passed", "Failed (timed_out)", "Ignored (cancelled)".
+  text: string;
+  url: string;
+  createdAt: string;
+}
+
+// Same rule as the pass rate: cancelled and unfinished runs are ignored, any other finished run that did not succeed failed.
+export function computeRunStrip(runs: Run[]): RunMark[] {
+  return [...runs]
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .map((run): RunMark => {
+      const mark = { id: run.databaseId, url: run.url, createdAt: run.createdAt };
+      if (run.status !== 'completed') {
+        return { ...mark, result: 'ignored', text: `Ignored (${run.status})` };
+      }
+      if (run.conclusion === 'cancelled') {
+        return { ...mark, result: 'ignored', text: 'Ignored (cancelled)' };
+      }
+      if (run.conclusion === 'success') {
+        return { ...mark, result: 'pass', text: 'Passed' };
+      }
+      return { ...mark, result: 'fail', text: `Failed (${run.conclusion || 'no conclusion'})` };
+    });
 }
 
 // Cancelled and unfinished runs are ignored. Every other finished run that did not succeed counts as a failure.
@@ -1031,6 +1063,7 @@ export function computeCiHealth(runs: Run[]): CiHealth {
     ignored: runs.length - counted.length,
     passPercent: counted.length === 0 ? null : Math.round((passed / counted.length) * 100),
     lastFailure: failures[0] ?? null,
+    strip: computeRunStrip(runs),
   };
 }
 

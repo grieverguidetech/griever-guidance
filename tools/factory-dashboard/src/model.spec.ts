@@ -14,6 +14,7 @@ import {
   formatDuration,
   mergedSearchDate,
   computeCiHealth,
+  computeRunStrip,
   computeDeploys,
   computeThroughput,
   flakyIssues,
@@ -665,6 +666,52 @@ describe('computeCiHealth', () => {
   it('returns no rate and no failure when nothing finished', () => {
     expect(computeCiHealth([])).toMatchObject({ counted: 0, passPercent: null, lastFailure: null });
     expect(computeCiHealth([run(1, 'cancelled')]).passPercent).toBeNull();
+  });
+});
+
+describe('computeRunStrip', () => {
+  const run = (id: number, conclusion: string, status = 'completed', createdAt = '2026-11-14T00:00:00Z'): Run => ({
+    databaseId: id,
+    workflowName: 'CI',
+    headBranch: 'main',
+    status,
+    conclusion,
+    url: `https://x/${id}`,
+    createdAt,
+  });
+
+  it('puts the oldest run first, whatever the input order', () => {
+    const strip = computeRunStrip([
+      run(3, 'success', 'completed', '2026-11-14T00:00:00Z'),
+      run(1, 'success', 'completed', '2026-11-12T00:00:00Z'),
+      run(2, 'success', 'completed', '2026-11-13T00:00:00Z'),
+    ]);
+    expect(strip.map((mark) => mark.id)).toEqual([1, 2, 3]);
+  });
+
+  it('marks pass, fail and ignored with the same rule as the pass rate', () => {
+    const strip = computeRunStrip([
+      run(1, 'success', 'completed', '2026-11-10T00:00:00Z'),
+      run(2, 'timed_out', 'completed', '2026-11-11T00:00:00Z'),
+      run(3, 'cancelled', 'completed', '2026-11-12T00:00:00Z'),
+      run(4, '', 'in_progress', '2026-11-13T00:00:00Z'),
+    ]);
+    expect(strip.map((mark) => mark.result)).toEqual(['pass', 'fail', 'ignored', 'ignored']);
+    expect(strip.map((mark) => mark.text)).toEqual(['Passed', 'Failed (timed_out)', 'Ignored (cancelled)', 'Ignored (in_progress)']);
+  });
+
+  it('counts match computeCiHealth, and the strip rides on ciHealth', () => {
+    const runs = [run(1, 'success'), run(2, 'failure'), run(3, 'cancelled')];
+    const health = computeCiHealth(runs);
+    const strip = computeRunStrip(runs);
+    expect(strip.filter((mark) => mark.result === 'pass')).toHaveLength(health.passed);
+    expect(strip.filter((mark) => mark.result === 'fail')).toHaveLength(health.failed);
+    expect(strip.filter((mark) => mark.result === 'ignored')).toHaveLength(health.ignored);
+    expect(health.strip).toEqual(strip);
+  });
+
+  it('is empty when there are no runs', () => {
+    expect(computeRunStrip([])).toEqual([]);
   });
 });
 
