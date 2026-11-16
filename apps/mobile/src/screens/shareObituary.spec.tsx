@@ -15,6 +15,7 @@ import { publisherEmailKey } from '../lib/mailCompose';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
+// This mock applies to the whole file.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
   ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
   // A distinct handle per node, so a test can tell which node got screen-reader focus.
@@ -363,6 +364,10 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
     Platform.OS = 'android';
     try {
       setup(linked);
+      // The heading's focus on arrival is deferred a tick; let it run before the sheet is opened.
+      act(() => {
+        jest.runAllTimers();
+      });
       fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
       focus.mockClear();
       fireEvent.press(within(screen.getByTestId('checklist-sheet')).getByRole('button', { name: 'Close' }));
@@ -989,11 +994,33 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
-  it('Got it goes back the way Back does', () => {
+  it('Got it shows the normal screen with the text box, focuses the heading, and Back still goes back', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
     const onBack = jest.fn();
     nudgeSetup(base, onBack);
+    focus.mockClear();
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(onBack).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+    // With no text and no details there is nothing to send yet, so the box is empty and Email and Copy are not offered.
+    expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    // Focus is deferred one tick, after the swap has drawn.
+    await waitFor(() => expect(focusedNode(focus)?.props?.children).toBe('Share the obituary'));
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  // The date of passing alone is not "written on the web", so the nudge shows; Got it then gives the drafted text.
+  it('Got it with only a date of passing shows the drafted text with its brackets, the brackets line, Email and Copy', () => {
+    nudgeSetup({ ...base, dateOfPassing: '2026-10-01' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    expect((screen.getByLabelText(BOX).props as { value?: string }).value).toMatch(/\[[A-Z ]+\]/);
+    expect(screen.getByText('Some parts are still in [brackets]. Fill them in or delete them before you send.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy the text' })).toBeTruthy();
   });
 
   it('shows the normal screen with only a detail or a publisher, as the web Overview counts them', () => {

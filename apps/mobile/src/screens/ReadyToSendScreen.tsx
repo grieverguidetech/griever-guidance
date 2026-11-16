@@ -7,7 +7,7 @@ import type { UseContactsResult } from '@griever/hooks';
 import { firstName } from '@griever/shared';
 import type { MomentKey } from '@griever/shared';
 import { colors } from '@griever/tokens';
-import { ReadyToSend } from '../ui';
+import { focusNode, ReadyToSend } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
@@ -27,8 +27,6 @@ interface Props extends FlowProps {
   contacts?: UseContactsResult;
   /** Opens the people step: the change-people button, or the button when nobody is picked. */
   onChoosePeople: () => void;
-  /** "Got it" on the nudge. Set by the app to go straight to the hub; unset it does what Back does. */
-  onGotIt?: () => void;
   /** Set to a function that focuses the button that opens the people sheet; the sheet's onDismiss (iOS) calls it. */
   focusPeopleButton?: { current: (() => void) | null };
 }
@@ -37,25 +35,26 @@ const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
   (Object.keys(MOMENT_CATEGORY) as MomentKey[]).find((key) => MOMENT_CATEGORY[key] === category) ?? 'announce';
 
 /** The screen is the ReadyToSend in apps/mobile/src/ui; this holds what is mobile only: the share sheet and focus. */
-export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, focusPeopleButton }: Props) {
+export function ReadyToSendScreen({ flow, contacts, onChoosePeople, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
   const [shareFailed, setShareFailed] = useState(false);
   // Set when the person types in a Share the service field, for this person and template. It keeps the field on screen
   // after the last missing detail is typed, so the field (and the keyboard) do not vanish mid-typing.
   const [editedServiceKey, setEditedServiceKey] = useState<string | null>(null);
+  // Set by "Got it" on the nudge. It lasts for this visit to the screen: opening the step again shows the nudge again.
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const shareButton = useRef<ButtonNode>(null);
   const heading = useRef<ComponentRef<typeof RNText>>(null);
   const peopleButton = useRef<ButtonNode>(null);
   // Set when the person opens the people sheet, so focus goes back to the button they pressed.
   const openedSheet = useRef(false);
 
-  // The heading takes screen-reader focus when the screen opens.
+  // The heading takes screen-reader focus when the screen opens, and again after "Got it" swaps the nudge for the
+  // normal screen. Deferred a tick so the screen reader takes it after the swap has drawn.
   useEffect(() => {
-    const handle = heading.current ? findNodeHandle(heading.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
-  }, []);
+    const timer = setTimeout(() => focusNode(heading.current), 0);
+    return () => clearTimeout(timer);
+  }, [nudgeDismissed]);
 
   // The people sheet is open while the step is 'contacts'. When it is gone, focus returns to the button that opened it.
   // iOS: from the sheet's onDismiss (focus set earlier is lost to the closing animation). Elsewhere: when the step changes.
@@ -143,11 +142,12 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
     flow.session !== undefined &&
     !hasWebContent(flow.session, flow.templateCategory) &&
     !flow.messageOverride?.trim() &&
-    !flow.sendJob;
+    !flow.sendJob &&
+    !nudgeDismissed;
   let nudge: ComponentProps<typeof ReadyToSend>['nudge'];
   if (showNudge && flow.templateCategory) {
     const key = NUDGE_KEYS[flow.templateCategory];
-    nudge = { title: nudgeCopy[`${key}Title`], line: nudgeCopy[`${key}Line`], button: nudgeCopy.gotIt, onGotIt: onGotIt ?? prevStep };
+    nudge = { title: nudgeCopy[`${key}Title`], line: nudgeCopy[`${key}Line`], button: nudgeCopy.gotIt, onGotIt: () => setNudgeDismissed(true) };
   }
 
   return (

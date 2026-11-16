@@ -5,7 +5,7 @@ import { fill, hasTemplateBlanks, screenCopy } from '@griever/copy';
 import { FLOW_DETAIL_MAX_LENGTH, isValidObituaryLink, obituaryLink } from '@griever/shared';
 import type { ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import type { Session } from '@griever/hooks';
-import { ShareObituary } from '../ui';
+import { focusNode, ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { TextInputNode } from '../ui/screens/ShareObituary';
 import { colors } from '@griever/tokens';
@@ -49,6 +49,8 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   // The Android focus return waits one tick; an unmount before it runs cancels it.
   const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(focusTimer.current), []);
+  // Set by "Got it" on the nudge. It lasts for this visit to the screen: opening it again shows the nudge again.
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
   // Set only by a mail or share result in this visit, so leaving and coming back does not show Done again.
@@ -83,13 +85,12 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     };
   }, []);
 
-  // The heading takes screen-reader focus when the screen opens.
+  // The heading takes screen-reader focus when the screen opens, and again after "Got it" swaps the nudge for the normal screen.
+  // Deferred a tick so the screen reader takes it after the swap has drawn.
   useEffect(() => {
-    const handle = heading.current ? findNodeHandle(heading.current) : null;
-    if (handle) {
-      AccessibilityInfo.setAccessibilityFocus(handle);
-    }
-  }, []);
+    const timer = setTimeout(() => focusNode(heading.current), 0);
+    return () => clearTimeout(timer);
+  }, [nudgeDismissed]);
 
   // Loads this person's saved address, unless the user has already started typing.
   useEffect(() => {
@@ -267,7 +268,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ShareObituary
           copy={copy}
-          nudge={hasWebContent(session, 'obituary') ? undefined : { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) }}
+          nudge={hasWebContent(session, 'obituary') || nudgeDismissed ? undefined : { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => setNudgeDismissed(true) }}
           eyebrow={fill(copy.forName, { name })}
           eyebrowTone="accent2"
           link={session.obituaryUrl}

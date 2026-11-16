@@ -20,6 +20,20 @@ const contacts = {
   ],
 } as never;
 
+// Jest has no native view tree, so findNodeHandle returns null. A fake handle per node lets a test see where focus was sent.
+// This mock applies to the whole file.
+const mockHandles = new Map<unknown, number>();
+const mockHandleFor = (node: unknown) => {
+  if (!mockHandles.has(node)) {
+    mockHandles.set(node, mockHandles.size + 1);
+  }
+  return mockHandles.get(node);
+};
+jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
+  ...jest.requireActual<object>('react-native/Libraries/ReactNative/RendererProxy'),
+  findNodeHandle: (node: unknown) => (node ? mockHandleFor(node) : null),
+}));
+
 // Stable defaults: a new array each render would re-run the effect below.
 const PICKED = ['c0'];
 const NONE: string[] = [];
@@ -424,18 +438,53 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
-  it('Got it goes back the way Back does', () => {
-    // The app's Back from Ready to send goes to the hub; here it is the flow's step back, once.
-    const back = jest.fn();
+  it('Got it shows Ready to send with the suggested words and the send button, and focuses the heading', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<Harness web={EMPTY} />);
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Share the service' })).toBeTruthy();
+    expect((screen.getByLabelText('Your message').props as { value?: string }).value).toMatch(/\S/);
+    expect(primary()).toBeTruthy();
+    // Focus is deferred one tick, after the swap has drawn.
+    await waitFor(() => {
+      const nodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
+      expect(nodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'Share the service')).toBe(true);
+    });
+  });
+
+  it('after Got it the person can write and send: typing keeps the nudge gone, and the primary button starts the send', () => {
+    const setMessageOverride = jest.fn();
+    const startSendJob = jest.fn();
     function Probe() {
-      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
-      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} onChoosePeople={() => undefined} />;
+      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' } }) });
+      const { selectContacts } = flow;
+      useEffect(() => { selectContacts(PICKED); }, [selectContacts]);
+      return <ReadyToSendScreen flow={{ ...flow, setMessageOverride, startSendJob }} contacts={contacts} onChoosePeople={() => undefined} />;
     }
     render(<Probe />);
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
-    expect(back).toHaveBeenCalledTimes(1);
+    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    expect(setMessageOverride).toHaveBeenCalledWith('Come as you are.');
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    fireEvent.press(primary());
+    expect(startSendJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back still goes back after Got it', () => {
+    // Reopening the step shows the nudge again: that is covered end to end in app/send.spec.tsx.
+    const back = jest.fn();
+    function Probe() {
+      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
+      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} contacts={contacts} onChoosePeople={() => undefined} />;
+    }
+    render(<Probe />);
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(back).not.toHaveBeenCalled();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(back).toHaveBeenCalledTimes(2);
+    expect(back).toHaveBeenCalledTimes(1);
   });
 
   it('reads heading, card heading, line, then Got it, and the card is not one accessible block', () => {
