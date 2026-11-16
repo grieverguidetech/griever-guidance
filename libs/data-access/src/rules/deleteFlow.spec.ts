@@ -11,7 +11,9 @@ import { acceptInvite } from './acceptInvite.js';
 import { deleteUser } from './deleteUser.js';
 import { createFlow, deleteFlow, listFlows, updateFlow } from './flows.js';
 
-const clock = fixedClock('2026-10-24T12:00:00.000Z');
+// Far in the real future on purpose: every ttl these tests seed or compute (clock +/- seconds, +90 days)
+// must stay in the real future, or DynamoDB Local's TTL sweeper deletes the item mid-test.
+const clock = fixedClock('2099-10-24T12:00:00.000Z');
 const NOW_SECONDS = Math.floor(clock.now().getTime() / 1000);
 const NINETY_DAYS = 90 * 24 * 60 * 60;
 const HOUR = 60 * 60 * 1000;
@@ -44,8 +46,10 @@ const profile = (userId: string, accountType: 'owner' | 'member' = 'owner') =>
 
 /**
  * The items as stored that mention any of the given ids (user or person ids), in stable order, so
- * before and after can be compared. The table is shared with other specs and tests, so a snapshot
- * of the whole table would change when they write; ids are unique per test.
+ * before and after can be compared. Scoped to the ids a test created so that anything outside them
+ * (for example an item DynamoDB Local's TTL sweeper removes) cannot change the comparison; ids are
+ * unique per test. The sweeper was the cause of the flake in #869: the old fixed clock was in the
+ * real past, so a "deleted and expired" item with ttl = now - 10 was really expired and got swept.
  */
 async function rawSnapshot(...ids: string[]): Promise<string> {
   const items: Array<Record<string, unknown>> = [];
@@ -94,50 +98,56 @@ describe.runIf(up)('deleteFlow on DynamoDB Local', () => {
   });
 
   describe('refusals are identical and change nothing', () => {
-    const modes: Record<string, () => Promise<{ who: string; id: string }>> = {
+    const modes: Record<string, () => Promise<{ who: string; id: string; scope: string[] }>> = {
       'a member of the owner': async () => {
         const { owner, id } = await seedOwnerWithPerson();
-        return { who: await seedMemberOf(owner), id };
+        const member = await seedMemberOf(owner);
+        return { who: member, id, scope: [member, owner, id] };
       },
       'a stranger': async () => {
-        const { id } = await seedOwnerWithPerson();
-        return { who: uid('stranger'), id };
+        const { owner, id } = await seedOwnerWithPerson();
+        const stranger = uid('stranger');
+        return { who: stranger, id, scope: [stranger, owner, id] };
       },
-      'an unknown id': async () => ({ who: uid('owner'), id: randomUUID() }),
+      'an unknown id': async () => {
+        const who = uid('owner');
+        const id = randomUUID();
+        return { who, id, scope: [who, id] };
+      },
       'an already-deleted person': async () => {
         const { owner, id } = await seedOwnerWithPerson({
           deletedAt: at(-HOUR),
           ttl: NOW_SECONDS + NINETY_DAYS,
         });
-        return { who: owner, id };
+        return { who: owner, id, scope: [owner, id] };
       },
       'an expired person': async () => {
         const { owner, id } = await seedOwnerWithPerson({ ttl: NOW_SECONDS - 10 });
-        return { who: owner, id };
+        return { who: owner, id, scope: [owner, id] };
       },
       'a deleted and expired person': async () => {
         const { owner, id } = await seedOwnerWithPerson({ deletedAt: at(-HOUR), ttl: NOW_SECONDS - 10 });
-        return { who: owner, id };
+        return { who: owner, id, scope: [owner, id] };
       },
       'an owner whose id guard belongs to someone else': async () => {
         const { owner, id } = await seedOwnerWithPerson();
         await rawPut({ ...flowGuardKey(id), entity: 'FLOW_GUARD', ownerId: uid('other') });
-        return { who: owner, id };
+        return { who: owner, id, scope: [owner, id] };
       },
       'an owner whose id guard is missing': async () => {
         const owner = uid('owner');
         const id = randomUUID();
         await profile(owner);
         await rawPut(encodeFlow(flowItem(owner, id)));
-        return { who: owner, id };
+        return { who: owner, id, scope: [owner, id] };
       },
     };
 
     it.each(Object.keys(modes))('%s gets not_found', async (mode) => {
-      const { who, id } = await modes[mode]!();
-      const before = await rawSnapshot(who, id);
+      const { who, id, scope } = await modes[mode]!();
+      const before = await rawSnapshot(...scope);
       expect(await deleteFlow(doc, table, caller(who), id, clock)).toEqual(NOT_FOUND);
-      expect(await rawSnapshot(who, id)).toBe(before);
+      expect(await rawSnapshot(...scope)).toBe(before);
     });
   });
 
