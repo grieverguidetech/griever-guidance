@@ -620,12 +620,18 @@ export interface BusinessCostLine {
   monthly: number | null;
 }
 
+export interface BusinessLink {
+  label: string;
+  url: string;
+}
+
 export interface BusinessFile {
   updatedAt: string;
   users: { count: number | null; date: string | null };
   costs: BusinessCostLine[];
   decisions: BusinessDecision[];
   nextSteps: BusinessStep[];
+  links: BusinessLink[];
   nextSync: string | null;
 }
 
@@ -644,6 +650,7 @@ export interface BusinessView {
   decidedDecisions: BusinessDecision[];
   stepsByOwner: { owner: string; steps: BusinessStepView[] }[];
   overdueCount: number;
+  links: BusinessLink[];
   nextSync: string | null;
 }
 
@@ -754,12 +761,24 @@ export function parseBusiness(raw: unknown): BusinessFile {
       done: item['done'],
     };
   });
+  // links is optional. Missing means none. Each url must be https.
+  const links = listOf(data['links'] === undefined ? [] : data['links'], 'links', (item, at): BusinessLink => {
+    if (!isText(item['label'])) {
+      throw new Error(`${at}: label must be text`);
+    }
+    const url = item['url'];
+    if (typeof url !== 'string' || !url.startsWith('https://')) {
+      throw new Error(`${at}: url must start with https://`);
+    }
+    return { label: item['label'], url };
+  });
   return {
     updatedAt: data['updatedAt'],
     users: { count: count as number | null, date: optionalDate(users['date'], 'users.date') },
     costs,
     decisions,
     nextSteps,
+    links,
     nextSync: optionalDate(data['nextSync'], 'nextSync'),
   };
 }
@@ -810,6 +829,7 @@ export function buildBusiness(file: BusinessFile, now: Date): BusinessView {
     decidedDecisions: file.decisions.filter((d) => d.decided !== null),
     stepsByOwner,
     overdueCount: stepsByOwner.reduce((sum, group) => sum + group.steps.filter((s) => s.overdue).length, 0),
+    links: file.links,
     nextSync: file.nextSync,
   };
 }

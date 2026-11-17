@@ -1393,6 +1393,24 @@ describe('business.json', () => {
     expect(() => parseBusiness({ ...valid(), nextSteps: [{ owner: 'P', task: 'T', due: null }] })).toThrow('nextSteps[0]: done');
   });
 
+  it('treats missing links as an empty list', () => {
+    expect(parseBusiness(valid()).links).toEqual([]);
+    expect(buildBusiness(parseBusiness(valid()), noon).links).toEqual([]);
+  });
+
+  it('reads a valid link and passes it to the view', () => {
+    const links = [{ label: 'Sheet', url: 'https://example.com/sheet' }];
+    expect(parseBusiness({ ...valid(), links }).links).toEqual(links);
+    expect(buildBusiness(parseBusiness({ ...valid(), links }), noon).links).toEqual(links);
+  });
+
+  it('refuses a link that is not https or has no label', () => {
+    expect(() => parseBusiness({ ...valid(), links: [{ label: 'A', url: 'http://example.com' }] })).toThrow('links[0]: url must start with https://');
+    expect(() => parseBusiness({ ...valid(), links: [{ label: 'A', url: 'javascript:alert(1)' }] })).toThrow('links[0]: url must start with https://');
+    expect(() => parseBusiness({ ...valid(), links: [{ url: 'https://example.com' }] })).toThrow('links[0]: label must be text');
+    expect(() => parseBusiness({ ...valid(), links: 'x' })).toThrow('links must be a list');
+  });
+
   it('refuses bad dates', () => {
     expect(() => parseBusiness({ ...valid(), updatedAt: '15/11/2026' })).toThrow('updatedAt');
     expect(() => parseBusiness({ ...valid(), nextSync: '2026-13-40' })).toThrow('nextSync');
