@@ -1,6 +1,6 @@
 # 0002: Data storage on DynamoDB behind the data function
 
-Status: proposed, waiting for the product owner. Ticket: #885.
+Status: accepted by the product owner, 2026-11-16. Ticket: #885.
 
 ## Context
 
@@ -14,7 +14,10 @@ less service. Peter agreed to delete it on 2026-10-24 (#203 comment, PR #288).
 
 On 2026-10-19 Peter decided to remove Supabase and move data to AWS, with the gateway kept on
 Cloudflare Workers (commit 0fa71de, `docs/aws-migration-plan.md`). The first draft of that plan had
-recommended keeping Supabase, for RLS and to avoid a password reset (commit abcac27). The plan's
+recommended keeping Supabase, for RLS and to avoid a password reset (commit abcac27). The product
+owner gave the reason on 2026-11-16 (#885): to avoid lock-in to one product, and to build on one
+cloud provider instead. AWS was chosen because it is one ecosystem, and the app can
+use the services it provides (Lambda, DynamoDB, SES and the rest) as it grows. The plan's
 version 4 sets an AWS budget of $10 a month for all AWS services (`docs/aws-migration-plan.md`).
 Convex and Supabase held only test data and 3 to 4 test users, so no data was moved (plan decision 9,
 #287).
@@ -91,9 +94,10 @@ A new server field goes through the data function and the shared key list (ADR 0
 second store. Changing the data function means a hand deploy before the merge when clients send new
 keys (ADR 0001 addendum, "Deploy order"). Moving off DynamoDB or the Workers gateway needs a new ADR.
 
-## Open questions for the product owner
+## Answers from the product owner (2026-11-16, #885)
 
-1. Why was Supabase replaced at all? Commit 0fa71de says only that Peter decided on 2026-10-19. The
-   first draft (commit abcac27) had recommended keeping it.
-2. Why AWS, and not another host for the data function? No issue or doc gives the reason.
-3. Is the $10 a month AWS budget still the limit to judge future storage choices by?
+1. **Why replace Supabase?** To avoid lock-in to one product. The app builds on one cloud
+   provider instead.
+2. **Why AWS for the data function?** It is one ecosystem. The app can use the services and
+   functions AWS provides as it grows.
+3. **Is $10 a month still the AWS budget?** Yes, for now. Judge future storage choices against it.
