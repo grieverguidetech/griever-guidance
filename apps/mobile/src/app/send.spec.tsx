@@ -227,15 +227,15 @@ describe('a moment with nothing written on the web (#824)', () => {
     expect(await screen.findByText('For Anna')).toBeTruthy();
   });
 
-  it('the obituary keeps its link field under the nudge, and a typed link brings the normal screen', async () => {
+  it('the obituary hides Step 2 under the nudge (#889)', async () => {
     await openAnna(empty);
     await startMoment('Share the obituary');
     await screen.findByRole('heading', { name: 'Write the obituary on the web first' });
     expect(screen.queryByLabelText(/^Your obituary|Obituary text/i)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Email it to the paper or funeral home' })).toBeNull();
-    fireEvent.changeText(await screen.findByLabelText('Link to the obituary'), 'https://legacy.com/anna');
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull());
-    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    expect(screen.queryByLabelText('Link to the obituary')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Paste link' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Choose who to send it to' })).toBeNull();
   });
 });
 

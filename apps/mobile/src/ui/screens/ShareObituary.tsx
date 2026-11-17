@@ -125,7 +125,7 @@ export interface ObituaryTextEditor {
 }
 
 export interface ShareObituaryProps {
-  /** Nothing started on the web for the obituary: the nudge replaces the text box, Email and Copy. The link field stays (the link is only added on the phone). */
+  /** Nothing started on the web for the obituary: the nudge replaces the text box, Email and Copy. Step 2 (link, Paste link, publisher, Continue) is hidden too (#889). */
   nudge?: WebNudgeProps;
   copy: ShareObituaryCopy;
   /** The eyebrow line, for example "For Margaret". */
@@ -210,7 +210,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         </Heading>
         <Body tone="muted">{copy.intro}</Body>
       </View>
-      {/* The nudge takes the text card's place, so the link field below keeps its position while a link is typed. */}
+      {/* The nudge takes the text card's place and hides Step 2. */}
       {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
       {!nudge && publisherEmail && copy.emailButton ? (
         <Card>
@@ -266,62 +266,66 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           ) : null}
         </Card>
       ) : null}
-      {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
-      <Field
-        label={copy.linkLabel}
-        accessibleName={copy.linkLabel}
-        placeholder={copy.linkPlaceholder}
-        value={link}
-        onChangeText={onLinkChange}
-        onBlur={() => setTouched(true)}
-        invalid={showError}
-        describedBy={showError ? errorId : undefined}
-        hint={showError ? copy.invalidLink : undefined}
-        url
-        returnKeyType="next"
-      />
-      <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
-      {onPasteLink && copy.pasteButton ? (
+      {nudge ? null : (
         <>
-          <Button label={copy.pasteButton} variant="secondary" onPress={onPasteLink} />
-          <Status id={pasteId} message={pasteMessage} />
-        </>
-      ) : null}
-      <Field
-        label={copy.publisherLabel}
-        optional={copy.optional}
-        accessibleName={`${copy.publisherLabel} ${copy.optional}`}
-        placeholder={copy.publisherPlaceholder}
-        value={publisher}
-        onChangeText={onPublisherChange}
-        returnKeyType="done"
-      />
-      {preview ? (
-        <Card>
+          {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
+          <Field
+            label={copy.linkLabel}
+            accessibleName={copy.linkLabel}
+            placeholder={copy.linkPlaceholder}
+            value={link}
+            onChangeText={onLinkChange}
+            onBlur={() => setTouched(true)}
+            invalid={showError}
+            describedBy={showError ? errorId : undefined}
+            hint={showError ? copy.invalidLink : undefined}
+            url
+            returnKeyType="next"
+          />
+          <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
+          {onPasteLink && copy.pasteButton ? (
+            <>
+              <Button label={copy.pasteButton} variant="secondary" onPress={onPasteLink} />
+              <Status id={pasteId} message={pasteMessage} />
+            </>
+          ) : null}
+          <Field
+            label={copy.publisherLabel}
+            optional={copy.optional}
+            accessibleName={`${copy.publisherLabel} ${copy.optional}`}
+            placeholder={copy.publisherPlaceholder}
+            value={publisher}
+            onChangeText={onPublisherChange}
+            returnKeyType="done"
+          />
+          {preview ? (
+            <Card>
+              <Body tone="muted" small>
+                {copy.previewKicker}
+              </Body>
+              <Body>{preview}</Body>
+            </Card>
+          ) : null}
+          <Button
+            label={copy.continue}
+            ariaDisabled={!linkValid}
+            announceDisabled
+            describedBy={reason ? reasonId : showError ? errorId : undefined}
+            hint={blockedBy}
+            onPress={() => {
+              if (linkValid) {
+                onContinue();
+              } else {
+                setTouched(true);
+              }
+            }}
+          />
+          <Status id={reasonId} message={reason} />
           <Body tone="muted" small>
-            {copy.previewKicker}
+            {copy.waiting}
           </Body>
-          <Body>{preview}</Body>
-        </Card>
-      ) : null}
-      <Button
-        label={copy.continue}
-        ariaDisabled={!linkValid}
-        announceDisabled
-        describedBy={reason ? reasonId : showError ? errorId : undefined}
-        hint={blockedBy}
-        onPress={() => {
-          if (linkValid) {
-            onContinue();
-          } else {
-            setTouched(true);
-          }
-        }}
-      />
-      <Status id={reasonId} message={reason} />
-      <Body tone="muted" small>
-        {copy.waiting}
-      </Body>
+        </>
+      )}
       {onDraft ? (
         <Card>
           <Heading level={2}>{copy.draftTitle}</Heading>

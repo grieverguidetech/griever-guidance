@@ -58,6 +58,8 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [pasteMessage, setPasteMessage] = useState<string | undefined>(undefined);
+  // Whether the nudge was showing when the screen opened. Content present at open never brings the nudge back this visit, so clearing the link or publisher does not unmount Step 2 under the person's finger. Sync bringing content still clears it. The screen is keyed by person.
+  const [nudgeAtOpen] = useState(() => !hasWebContent(session, 'obituary'));
   // What the user typed in the obituary box. null until they type, so the box follows the details until then.
   const [editValue, setEditValue] = useState<string | null>(null);
   // The publisher's address is typed here and kept on this phone only, per person (never part of the session, so it never syncs: DS-7).
@@ -265,7 +267,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ShareObituary
           copy={copy}
-          nudge={hasWebContent(session, 'obituary') ? undefined : { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) }}
+          nudge={nudgeAtOpen && !hasWebContent(session, 'obituary') ? { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) } : undefined}
           eyebrow={fill(copy.forName, { name })}
           eyebrowTone="accent2"
           link={session.obituaryUrl}

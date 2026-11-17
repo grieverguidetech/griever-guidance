@@ -979,7 +979,7 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
       </SerifReadyContext.Provider>,
     );
 
-  it('shows the nudge under the heading, with the link field but no text box, Email or Copy', () => {
+  it('shows the nudge under the heading, with no text box, Email, Copy or Step 2 (#889)', () => {
     nudgeSetup({ ...base, obituaryText: '  ', obituaryUrl: ' ' } as Session);
     expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
@@ -988,9 +988,13 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
     expect(screen.queryByLabelText(BOX)).toBeNull();
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy the text' })).toBeNull();
-    // The link is only added on the phone (C10), so its field and Paste stay.
-    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Paste link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "What you'll need" })).toBeTruthy();
+    // Step 2 is hidden while the nudge shows (#889).
+    expect(screen.queryByText(/Step 2/)).toBeNull();
+    expect(screen.queryByLabelText('Link to the obituary')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Paste link' })).toBeNull();
+    expect(screen.queryByText(/Where it was published/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Choose who to send it to' })).toBeNull();
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
@@ -1019,8 +1023,27 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
     nudgeSetup({ ...base, obituaryUrl: 'https://legacy.com/anna' } as Session);
     expect(screen.getByLabelText(BOX)).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    // With web content, Step 2 is present (#889).
+    expect(screen.getByText(/Step 2/)).toBeTruthy();
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Paste link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Choose who to send it to' })).toBeTruthy();
     screen.unmount();
     nudgeSetup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
     expect(screen.getByLabelText(BOX)).toBeTruthy();
+  });
+
+  it('keeps Step 2 when the only content, a link, is cleared on screen (#889)', () => {
+    const screenSession = { ...base, obituaryText: '', obituaryUrl: 'https://legacy.com/anna' } as Session;
+    const ui = (session: Session) => (
+      <SerifReadyContext.Provider value>
+        <ShareObituaryScreen session={session} onChange={jest.fn()} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={jest.fn()} />
+      </SerifReadyContext.Provider>
+    );
+    const view = render(ui(screenSession));
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    view.rerender(ui({ ...screenSession, obituaryUrl: '' } as Session));
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
   });
 });
