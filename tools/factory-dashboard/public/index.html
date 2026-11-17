@@ -46,6 +46,8 @@ ul.list li { background: var(--card); border: 1px solid var(--border); border-ra
 .error { border-left: 4px solid var(--red); padding: 6px 10px; background: var(--card); }
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .column h3 { font-size: 14px; margin: 0 0 6px; }
+.scroll-list { max-height: 420px; overflow-y: auto; }
+.scroll-list:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 details summary { cursor: pointer; }
 table.review { width: 100%; border-collapse: collapse; background: var(--card); }
 table.review th, table.review td { text-align: left; vertical-align: top; padding: 8px 10px; border: 1px solid var(--border); overflow-wrap: anywhere; }
@@ -511,6 +513,16 @@ function boardList(items, key, label) {
   }, "Empty.");
 }
 
+// A card list that scrolls past 420px. A focusable region, so keyboard users can scroll it.
+function scrollList(list, title) {
+  var wrap = el("div", null, "scroll-list");
+  wrap.tabIndex = 0;
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", title);
+  wrap.appendChild(list);
+  return wrap;
+}
+
 function renderBoard(parent) {
   var s = kitSection(parent, "Board (open issues only)", "board");
   if (state.boardTruncated) {
@@ -542,7 +554,7 @@ function renderBoard(parent) {
   ["Ready", "In progress", "In review", "Blocked", "Backlog", "No status"].forEach(function (status) {
     var items = byStatus(status);
     var c = card(status + " (" + items.length + ")");
-    c.appendChild(boardList(items, "board-" + status, status + " issues"));
+    c.appendChild(scrollList(boardList(items, "board-" + status, status + " issues"), status + " (" + items.length + ")"));
     g.appendChild(c);
   });
   s.appendChild(g);
@@ -1450,11 +1462,11 @@ function renderShipped(parent) {
   g.className += " spaced";
   groups.forEach(function (group) {
     var c = card(group.area + " (" + group.prs.length + ")");
-    c.appendChild(pagedList("ship-" + group.area, group.area + " PRs", group.prs, function (li, pr) {
+    c.appendChild(scrollList(pagedList("ship-" + group.area, group.area + " PRs", group.prs, function (li, pr) {
       li.appendChild(link("#" + pr.number + " " + pr.title, pr.url));
       li.appendChild(el("span", " · " + new Date(pr.mergedAt).toLocaleDateString(), "muted"));
       li.appendChild(summaryLine(pr));
-    }, "None."));
+    }, "None."), group.area + " (" + group.prs.length + ")"));
     g.appendChild(c);
   });
   s.appendChild(g);
