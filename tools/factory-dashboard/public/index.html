@@ -90,6 +90,7 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .tip strong { display: block; font-size: 15px; }
 .tip span { color: var(--muted); }
 .chart-table { margin-top: 8px; }
+.chart-table > summary { min-height: 44px; display: flex; align-items: center; }
 .scroll { overflow-x: auto; max-width: 100%; }
 .spark { margin-top: 4px; }
 .item-summary { color: var(--muted); font-size: 13px; }
@@ -740,7 +741,7 @@ function closedParts(parent, parts) {
 
 // ---- Delivery metrics (DORA) ----
 function notMeasured(label) {
-  return kpiTile(label, "Not measured yet", "Needs the next ticket");
+  return kpiTile(label, "Not measured yet", null);
 }
 
 function deployFrequencyTile() {
@@ -749,7 +750,11 @@ function deployFrequencyTile() {
   if (!f) {
     return kpiTile(label, null, "Status unknown: could not load");
   }
-  return kpiTile(label, f.perWeekText, "Band: " + f.band + ". " + f.last28 + " deploys in the last 28 days");
+  var note = "Band: " + f.band + ". " + countOf(f.last28, "deploy") + " in the last 28 days";
+  if (f.mayBeCutOff) {
+    note += ". May be cut off: the run list reached its limit";
+  }
+  return kpiTile(label, f.perWeekText, note);
 }
 
 function leadTimeTile() {
@@ -758,15 +763,22 @@ function leadTimeTile() {
   if (!l) {
     return kpiTile(label, null, "Status unknown: could not load");
   }
+  if (l.rows.length === 0) {
+    return kpiTile(label, "None", "No PRs merged in 28 days");
+  }
   if (l.medianTotalHours === null) {
     return kpiTile(label, "None", "No merged PR has been deployed yet");
   }
-  return kpiTile(label, hoursText(l.medianTotalHours), "Band: " + l.band + ". Median of " + l.deployed + " deployed PRs, 28 days");
+  var leadNote = "Band: " + l.band + ". Median of " + countOf(l.deployed, "deployed PR") + ", 28 days";
+  if (l.truncated) {
+    leadNote += ". May be cut off: more than 1,000 PRs merged in 28 days";
+  }
+  return kpiTile(label, hoursText(l.medianTotalHours), leadNote);
 }
 
 function renderDora(parent) {
   var s = el("section");
-  s.appendChild(el("h3", "Delivery metrics (DORA)", "sr-only"));
+  s.appendChild(el("h2", "Delivery metrics", "group-title"));
   var g = grid("kpis");
   g.appendChild(deployFrequencyTile());
   g.appendChild(leadTimeTile());
@@ -777,17 +789,22 @@ function renderDora(parent) {
   parent.appendChild(s);
 }
 
+function countOf(count, noun) {
+  return count + " " + noun + (count === 1 ? "" : "s");
+}
+
+// Plain words, like formatLeadTime in model.ts: "5 minutes", "1.1 hours", "3.2 days".
 function hoursText(hours) {
   if (hours === null || hours === undefined) {
     return "Not deployed yet";
   }
   if (hours < 1) {
-    return Math.round(hours * 60) + " min";
+    return countOf(Math.round(hours * 60), "minute");
   }
   if (hours < 48) {
-    return (Math.round(hours * 10) / 10) + " h";
+    return countOf(Math.round(hours * 10) / 10, "hour");
   }
-  return (Math.round(hours / 24 * 10) / 10) + " days";
+  return countOf(Math.round(hours / 24 * 10) / 10, "day");
 }
 
 function round1(value) {
@@ -800,6 +817,7 @@ function renderDeploysPerWeek(parent) {
   s.appendChild(c);
   var f = state.delivery.deployFrequency;
   if (!f) {
+    c.appendChild(el("p", "Could not load.", "error"));
     return;
   }
   c.appendChild(el("p", "All areas. The area filter does not change this.", "muted"));
@@ -807,7 +825,7 @@ function renderDeploysPerWeek(parent) {
     c.appendChild(el("p", "May be cut off: the run list reached its limit.", "error"));
   }
   c.appendChild(barChart(f.weeks.map(function (week) {
-    return { label: week.label, value: week.count };
+    return { label: week.label, value: week.count, text: countOf(week.count, "deploy") };
   }), "deploys", "Successful deploys on main per week, last 8 weeks", c.titleId, "Week"));
 }
 
@@ -830,7 +848,7 @@ function leadTimeTable(rows) {
     first.appendChild(document.createTextNode(" " + row.title));
     tr.appendChild(first);
     tr.appendChild(el("td", when(row.mergedAt)));
-    tr.appendChild(el("td", hoursText(row.codeHours), "num"));
+    tr.appendChild(el("td", row.codeHours === null ? "First commit unknown" : hoursText(row.codeHours), "num"));
     tr.appendChild(el("td", hoursText(row.reviewHours), "num"));
     tr.appendChild(el("td", row.deployHours === null ? "Not deployed yet" : hoursText(row.deployHours), "num"));
     tr.appendChild(el("td", row.totalHours === null ? "Not deployed yet" : hoursText(row.totalHours), "num"));
@@ -849,9 +867,13 @@ function renderLeadTime(parent) {
   var c = card("Median time from first commit to deploy, PRs merged in the last 28 days");
   s.appendChild(c);
   if (!l) {
+    c.appendChild(el("p", "Could not load.", "error"));
     return;
   }
   c.appendChild(el("p", "All areas. The area filter does not change this.", "muted"));
+  if (l.truncated) {
+    c.appendChild(el("p", "May be cut off: more than 1,000 PRs merged in 28 days.", "error"));
+  }
   if (l.rows.length === 0) {
     c.appendChild(el("p", "No PRs merged in the last 28 days.", "muted"));
     return;
@@ -866,12 +888,13 @@ function renderLeadTime(parent) {
   });
   c.appendChild(barChart(bars.map(function (pair) {
     return { label: pair[0], value: round1(pair[1]), text: hoursText(pair[1]) };
-  }), "hours (median)", "Median lead time by stage, hours", c.titleId, "Stage"));
+  }), "median", "Median lead time by stage", c.titleId, "Stage", "Table view: medians by stage"));
   var note = l.deployed + " of " + l.rows.length + " PRs are deployed. Code and review medians use all " + l.rows.length + " PRs. Deploy and total use the deployed ones only.";
   if (l.notDeployed > 0) {
     note += " " + l.notDeployed + " not deployed yet, left out of those medians.";
   }
   c.appendChild(el("p", note, "muted"));
+  c.appendChild(el("p", "Total is the median of each PR's total, not the sum of the bars.", "muted"));
   var d = el("details", null, "chart-table");
   d.appendChild(el("summary", "Table view: every PR"));
   d.appendChild(paged("lead-time", "lead time PRs", l.rows, leadTimeTable));
@@ -1173,9 +1196,9 @@ function safely(parent, fn) {
 }
 
 // The table twin of a chart. It scrolls sideways inside its own box so a narrow screen never scrolls the page.
-function chartTable(caption, headers, rows) {
+function chartTable(caption, headers, rows, summaryText) {
   var d = el("details", null, "chart-table");
-  d.appendChild(el("summary", "Table view"));
+  d.appendChild(el("summary", summaryText || "Table view"));
   var scroll = scrollBox(caption);
   var table = el("table", null, "plain");
   table.appendChild(el("caption", caption, "sr-only"));
@@ -1209,7 +1232,7 @@ function chartTable(caption, headers, rows) {
 }
 
 // Horizontal bars, one series, one baseline. rows: [{ label, value }]. Value sits at the bar tip.
-function barChart(rows, unit, caption, labelId, rowName) {
+function barChart(rows, unit, caption, labelId, rowName, tableSummary) {
   var wrap = el("div", null, "chart");
   var max = Math.max.apply(null, rows.map(function (r) {
     return r.value;
@@ -1219,7 +1242,8 @@ function barChart(rows, unit, caption, labelId, rowName) {
     line.appendChild(el("span", row.label));
     var svg = svgEl("svg", { height: BAR_H, width: "100%" });
     var bar = barShape((row.value / max * 100) + "%", "var(--chart-1)");
-    markInteractive(bar, (row.text || row.value) + " " + unit, row.label);
+    // A row with its own text carries its unit in the words ("1 deploy", "5 minutes").
+    markInteractive(bar, row.text ? row.text : row.value + " " + unit, row.label);
     svg.appendChild(svgEl("line", { x1: 0, x2: 0, y1: 0, y2: BAR_H, stroke: "var(--chart-axis)", "stroke-width": 1 }));
     svg.appendChild(bar);
     line.appendChild(svg);
@@ -1228,7 +1252,7 @@ function barChart(rows, unit, caption, labelId, rowName) {
   });
   wrap.appendChild(chartTable(caption, [rowName || "Area", unit], rows.map(function (r) {
     return [r.label, r.text || r.value];
-  })));
+  }), tableSummary));
   chartGroup(wrap, labelId);
   return wrap;
 }
