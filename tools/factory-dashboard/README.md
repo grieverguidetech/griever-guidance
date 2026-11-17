@@ -51,7 +51,7 @@ Cost Explorer bills $0.01 a call. The server calls it only when the page asks fo
 - Issue is open, but it has no board status or is not on the board.
 - A worktree's `ticket/N` issue is closed.
 
-The rules live in `src/model.ts` and are unit-tested in `src/model.spec.ts`.
+The rules live in `src/model.ts`.
 
 ## Always on
 
