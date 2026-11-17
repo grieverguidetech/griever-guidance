@@ -1547,3 +1547,205 @@ export function closedIssueArgs(now: Date, repo: string, limit: number): string[
   const search = `closed:>=${shippedSearchDate(now, CLOSED_WINDOW_DAYS)}`;
   return ['issue', 'list', '--repo', repo, '--state', 'closed', '--search', search, '--limit', String(limit)];
 }
+
+// ---- Recent commits, ADRs and AWS cost (CTO tab) ----
+
+export const COMMITS_SHOWN = 8;
+// Fields are split by the unit separator, so a subject can hold any other character.
+export const GIT_LOG_FORMAT = '%h%x1f%ct%x1f%s';
+
+export interface CommitInfo {
+  sha: string;
+  subject: string;
+  age: string;
+}
+
+function plural(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? '' : 's'} ago`;
+}
+
+export function formatAge(seconds: number): string {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  if (minutes < 1) {
+    return 'just now';
+  }
+  if (minutes < 60) {
+    return plural(minutes, 'minute');
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) {
+    return plural(hours, 'hour');
+  }
+  return plural(Math.floor(hours / 24), 'day');
+}
+
+// Parses `git log --format=GIT_LOG_FORMAT`. A line that does not fit is skipped.
+export function parseGitLog(output: string, now: Date): CommitInfo[] {
+  const commits: CommitInfo[] = [];
+  for (const line of output.split('\n')) {
+    const [sha, time, ...rest] = line.split('\x1f');
+    const seconds = Number(time);
+    const subject = rest.join('\x1f').trim();
+    if (!sha || !time || !Number.isFinite(seconds) || subject === '') {
+      continue;
+    }
+    commits.push({ sha, subject, age: formatAge(now.getTime() / 1000 - seconds) });
+  }
+  return commits.slice(0, COMMITS_SHOWN);
+}
+
+export interface AdrInfo {
+  file: string;
+  number: string;
+  title: string;
+  status: string | null;
+}
+
+// Title: the first `# ` heading, without a leading "0001:". Status: the first line under `## Status`,
+// else a `Status:` line. A file with neither has status null.
+export function parseAdr(file: string, text: string): AdrInfo {
+  const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
+  const number = /^(\d+)/.exec(file)?.[1] ?? '';
+  const heading = lines.find((line) => line.startsWith('# '));
+  const title = (heading ? heading.slice(2) : file.replace(/\.md$/, '')).replace(/^\d+\s*[:.-]\s*/, '').trim();
+  let status: string | null = null;
+  const at = lines.findIndex((line) => /^##\s+Status\s*$/i.test(line));
+  if (at >= 0) {
+    const next = lines.slice(at + 1).find((line) => line.trim() !== '');
+    if (next !== undefined && !next.startsWith('#')) {
+      status = next.trim();
+    }
+  } else {
+    const inline = lines.find((line) => /^Status:\s*\S/i.test(line));
+    status = inline ? inline.replace(/^Status:\s*/i, '').trim() : null;
+  }
+  return { file, number, title, status };
+}
+
+export const COST_BUDGET_USD = 10;
+export const COST_CACHE_MS = 12 * 60 * 60 * 1000;
+
+// Cost Explorer dates: the first of this month (UTC) to tomorrow (End is exclusive).
+export function costPeriod(now: Date): { start: string; end: string } {
+  const day = (date: Date): string => date.toISOString().slice(0, 10);
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  return { start: day(start), end: day(end) };
+}
+
+export interface CostResult {
+  dollars: number;
+  // True when Cost Explorer marks any period as an estimate.
+  estimated: boolean;
+}
+
+// Sums UnblendedCost over ResultsByTime. No periods, a unit other than USD, or a non-number is
+// unreadable (null), so it is never cached or shown as $0.
+export function parseCostExplorer(data: unknown): CostResult | null {
+  const periods = (data as { ResultsByTime?: unknown } | null)?.ResultsByTime;
+  if (!Array.isArray(periods) || periods.length === 0) {
+    return null;
+  }
+  let total = 0;
+  let estimated = false;
+  for (const period of periods) {
+    const entry = period as { Estimated?: unknown; Total?: { UnblendedCost?: { Amount?: unknown; Unit?: unknown } } } | null;
+    const cost = entry?.Total?.UnblendedCost;
+    const value = typeof cost?.Amount === 'string' && cost.Amount.trim() !== '' ? Number(cost.Amount) : Number.NaN;
+    if (!Number.isFinite(value) || cost?.Unit !== 'USD') {
+      return null;
+    }
+    total += value;
+    estimated = estimated || entry?.Estimated === true;
+  }
+  return { dollars: Math.round(total * 100) / 100, estimated };
+}
+
+export function formatDollars(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
+export interface CostReading extends CostResult {
+  at: number;
+  // First day of the month the reading is for (from costPeriod).
+  start: string;
+}
+
+// Fresh for 12 hours and only inside the month it was read for. A future time or no reading is not fresh.
+export function isCostFresh(reading: Pick<CostReading, 'at' | 'start'> | null, now: number, periodStart: string): boolean {
+  return reading !== null && reading.start === periodStart && now >= reading.at && now - reading.at < COST_CACHE_MS;
+}
+
+// Checks a reading read back from the cache file. Anything off gives null.
+export function validateCostReading(data: unknown): CostReading | null {
+  const r = data as Partial<Record<keyof CostReading, unknown>> | null;
+  if (
+    !r ||
+    typeof r.at !== 'number' ||
+    !Number.isFinite(r.at) ||
+    typeof r.dollars !== 'number' ||
+    !Number.isFinite(r.dollars) ||
+    typeof r.start !== 'string' ||
+    typeof r.estimated !== 'boolean'
+  ) {
+    return null;
+  }
+  return { at: r.at, dollars: r.dollars, estimated: r.estimated, start: r.start };
+}
+
+export interface CostReaderDeps {
+  // The one billed call. It gets the month start and the end date.
+  call: (period: { start: string; end: string }) => Promise<CostResult>;
+  now: () => number;
+  load: () => Promise<CostReading | null>;
+  save: (reading: CostReading) => Promise<void>;
+}
+
+// One reader per server. Reads the saved reading once, calls only when it is stale, shares one call
+// between concurrent requests, and keeps and saves only good readings. A failed call is retried next time.
+export function makeCostReader(deps: CostReaderDeps): () => Promise<CostReading> {
+  let memory: CostReading | null | undefined;
+  let inFlight: Promise<CostReading> | null = null;
+  async function read(): Promise<CostReading> {
+    const now = deps.now();
+    const period = costPeriod(new Date(now));
+    if (memory === undefined) {
+      memory = validateCostReading(await deps.load().catch(() => null));
+    }
+    if (memory !== null && isCostFresh(memory, now, period.start)) {
+      return memory;
+    }
+    const result = await deps.call(period);
+    const reading: CostReading = { ...result, at: now, start: period.start };
+    memory = reading;
+    await deps.save(reading).catch(() => undefined);
+    return reading;
+  }
+  return () => {
+    if (!inFlight) {
+      inFlight = read().finally(() => {
+        inFlight = null;
+      });
+    }
+    return inFlight;
+  };
+}
+
+const LOGIN_PROBLEM = /ExpiredToken|token has expired|Unable to locate credentials|SSO|InvalidClientTokenId|UnrecognizedClient/i;
+
+// A plain reason for the page. The raw error is never sent: only its first line, cut short, with the
+// CLI boilerplate removed and ARNs, account ids, key ids and long token-like strings redacted.
+export function costErrorMessage(raw: string): string {
+  if (LOGIN_PROBLEM.test(raw)) {
+    return 'AWS login missing or expired. Run: aws login';
+  }
+  const firstLine = (raw.split('\n').find((line) => line.trim() !== '') ?? '').trim();
+  const safe = firstLine
+    .replace(/An error occurred \((\w+)\) when calling the \w+ operation:\s*/, '$1: ')
+    .replace(/arn:aws:[^\s]+/g, '[removed]')
+    .replace(/\b\d{12}\b/g, '[removed]')
+    .replace(/\b(AKIA|ASIA)[A-Z0-9]{12,}\b/g, '[removed]')
+    .replace(/[A-Za-z0-9/+=_-]{32,}/g, '[removed]')
+    .slice(0, 120);
+  return safe === '' ? 'Could not read AWS cost.' : `Could not read AWS cost. ${safe}`;
+}

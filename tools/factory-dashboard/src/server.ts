@@ -1,6 +1,7 @@
-// Read-only factory dashboard server. Runs only `gh` and `git` read commands.
+// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands. It writes only one cache file (the AWS cost reading).
 import { execFile } from 'node:child_process';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,15 @@ import {
   decideRestart,
   codeChanged,
   CACHE_MS,
+  COST_BUDGET_USD,
+  GIT_LOG_FORMAT,
+  COMMITS_SHOWN,
+  costErrorMessage,
+  makeCostReader,
+  validateCostReading,
+  parseAdr,
+  parseCostExplorer,
+  parseGitLog,
   closedIssueArgs,
   RESTART_HEADER,
   joinBacklogReview,
@@ -44,6 +54,10 @@ import {
   parseLeftRight,
   parseWorktrees,
   splitRuns,
+  type AdrInfo,
+  type CostReading,
+  type CostResult,
+  type CommitInfo,
   type BacklogReviewFile,
   type BusinessFile,
   type BoardItem,
@@ -249,9 +263,67 @@ async function loadHealth(): Promise<{ status: number; ms: number; url: string }
   return { status: response.status, ms: Date.now() - started, url: HEALTH_URL };
 }
 
+// The origin/main that is already local. No fetch.
+async function loadCommits(): Promise<CommitInfo[]> {
+  const root = await mainRepoRoot();
+  const args = ['log', 'origin/main', `-${COMMITS_SHOWN}`, `--format=${GIT_LOG_FORMAT}`];
+  return parseGitLog(await exec('git', args, root), new Date());
+}
+
+// Reads docs/adr/*.md from the main checkout. A missing folder is an empty list.
+async function loadAdrs(): Promise<AdrInfo[]> {
+  const dir = join(await mainRepoRoot(), 'docs', 'adr');
+  const names = (await readdir(dir).catch(() => [] as string[])).filter((name) => name.endsWith('.md')).sort();
+  return Promise.all(names.map(async (name) => parseAdr(name, await readFile(join(dir, name), 'utf8'))));
+}
+
+// Cost Explorer bills $0.01 a call. makeCostReader keeps a good reading for 12 hours (and for the month
+// it was read in). The reading is also saved to one file outside the repo, so a restart does not call again.
+// Refresh does not clear it. This is the only file the dashboard writes.
+const COST_CACHE_DIR = join(homedir(), 'Library', 'Caches', 'gg-factory');
+const COST_CACHE_FILE = join(COST_CACHE_DIR, 'aws-cost.json');
+
+async function callCostExplorer(period: { start: string; end: string }): Promise<CostResult> {
+  const args = [
+    'ce', 'get-cost-and-usage',
+    '--time-period', `Start=${period.start},End=${period.end}`,
+    '--granularity', 'MONTHLY',
+    '--metrics', 'UnblendedCost',
+    '--output', 'json',
+  ];
+  let reply: string;
+  try {
+    reply = await exec('aws', args);
+  } catch (error) {
+    // Only stderr or the message is judged, then mapped to a plain reason. Nothing raw is passed on.
+    const detail = error as { stderr?: string; message?: string };
+    throw new Error(costErrorMessage(detail.stderr || detail.message || ''));
+  }
+  let parsed: CostResult | null = null;
+  try {
+    parsed = parseCostExplorer(JSON.parse(reply));
+  } catch {
+    parsed = null;
+  }
+  if (parsed === null) {
+    throw new Error(costErrorMessage('Unreadable reply'));
+  }
+  return parsed;
+}
+
+const readCost = makeCostReader({
+  call: callCostExplorer,
+  now: () => Date.now(),
+  load: async () => validateCostReading(JSON.parse(await readFile(COST_CACHE_FILE, 'utf8'))),
+  save: async (reading) => {
+    await mkdir(COST_CACHE_DIR, { recursive: true });
+    await writeFile(COST_CACHE_FILE, JSON.stringify(reading), 'utf8');
+  },
+});
+
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 500)),
@@ -264,6 +336,9 @@ async function buildState() {
     guarded('ciMain', sources, [] as Run[], () => loadWorkflowRuns('ci.yml', CI_HEALTH_RUNS, 'main')),
     guarded('deploys', sources, [] as Run[], () => loadWorkflowRuns('deploy.yml', DEPLOY_FETCHED)),
     guarded('recentClosed', sources, [] as Issue[], loadRecentClosedIssues),
+    guarded('commits', sources, [] as CommitInfo[], loadCommits),
+    guarded('adrs', sources, [] as AdrInfo[], loadAdrs),
+    guarded('awsCost', sources, null as CostReading | null, readCost),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
@@ -319,6 +394,12 @@ async function buildState() {
       now: generatedAt,
     }),
     engineering: buildEngineering(sources, { board: openBoard, ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
+    commits,
+    adrs: adrs.map((adr) => ({ ...adr, url: `${REPO_URL}/blob/main/docs/adr/${adr.file}` })),
+    cost:
+      costReading === null
+        ? null
+        : { dollars: costReading.dollars, estimated: costReading.estimated, budget: COST_BUDGET_USD, checkedAt: new Date(costReading.at).toISOString() },
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }
