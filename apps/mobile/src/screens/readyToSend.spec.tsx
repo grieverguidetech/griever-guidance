@@ -438,7 +438,7 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
-  it('Got it calls the hub callback, and does not go back a step or swap the nudge', () => {
+  it('Got it calls the hub callback, and does not go back a step', () => {
     const onGotIt = jest.fn();
     const back = jest.fn();
     function Probe() {

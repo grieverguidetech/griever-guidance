@@ -156,7 +156,23 @@ describe('a moment with nothing written on the web (#824)', () => {
     await screen.findByRole('heading', { name: nudge });
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
     expect(await screen.findByText('For Anna')).toBeTruthy();
-    expect(screen.getByRole('button', { name: new RegExp(moment) })).toBeTruthy();
+    expect(screen.getByRole('button', { name: new RegExp(`^${moment}, `) })).toBeTruthy();
+    // The lit next step is still the announcement.
+    expect(screen.getByRole('button', { name: /^Announce the passing, .*Continue$/ })).toBeTruthy();
+  });
+
+  it('Got it focuses the hub heading', async () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    await openAnna(empty);
+    await startMoment('Share the service');
+    const gotIt = await screen.findByRole('button', { name: 'Got it' });
+    focus.mockClear();
+    fireEvent.press(gotIt);
+    await screen.findByText('For Anna');
+    await waitFor(() => {
+      const nodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
+      expect(nodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'Ready to send')).toBe(true);
+    });
   });
 
   it('opening the step again after Got it shows the nudge again', async () => {
@@ -171,21 +187,27 @@ describe('a moment with nothing written on the web (#824)', () => {
   describe('while the saved people are still loading (the flow is on its people step)', () => {
     // Web wording is written, so there is no nudge and Ready to send itself is under the loading people step.
     const written = { ...empty, serviceMessage: 'Come as you are.' } as unknown as Session;
-    const openLoading = async () => {
+    const openLoading = async (person: Session = written, ready: () => Promise<unknown> = () => screen.findByLabelText('Your message')) => {
       const real = AsyncStorage.getItem.bind(AsyncStorage);
-      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([written]));
+      await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
       await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
       // The saved contacts never load, so the people step stays open under Ready to send.
       jest.spyOn(AsyncStorage, 'getItem').mockImplementation((key) => (key === 'gg.contacts.v1' ? new Promise(() => undefined) : real(key)));
       render(<App />);
       fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
       fireEvent.press(await screen.findByRole('button', { name: /Share the service/ }));
-      await screen.findByLabelText('Your message');
+      await ready();
     };
 
     it('Back reaches the hub in one press', async () => {
       await openLoading();
       fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      expect(await screen.findByText('For Anna')).toBeTruthy();
+    });
+
+    it('with nothing written on the web, Got it reaches the hub in one press', async () => {
+      await openLoading(empty, () => screen.findByRole('heading', { name: 'Add the service details on the web first' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
       expect(await screen.findByText('For Anna')).toBeTruthy();
     });
 
@@ -197,7 +219,7 @@ describe('a moment with nothing written on the web (#824)', () => {
     });
   });
 
-  it('the obituary: Got it returns to the hub, as Back does', async () => {
+  it('the obituary: Got it returns to the hub', async () => {
     await openAnna(empty);
     await startMoment('Share the obituary');
     await screen.findByRole('heading', { name: 'Write the obituary on the web first' });
