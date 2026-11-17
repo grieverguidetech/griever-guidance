@@ -1425,6 +1425,23 @@ function renderCosts(parent, b) {
   s.appendChild(c);
 }
 
+// Lowest in the tab. Shown only when business.json has links. link() uses textContent and only https URLs.
+function renderLinks(parent, b) {
+  if (!b.links || b.links.length === 0) {
+    return;
+  }
+  var s = kitSection(parent, "Links", "business");
+  var g = grid("cols-2");
+  var c = card();
+  b.links.forEach(function (item) {
+    var line = el("div");
+    line.appendChild(link(item.label, item.url));
+    c.appendChild(line);
+  });
+  g.appendChild(c);
+  s.appendChild(g);
+}
+
 function renderBusiness() {
   var panel = document.getElementById("panel-business");
   main = panel;
@@ -1447,6 +1464,7 @@ function renderBusiness() {
   renderSteps(panel, b);
   renderBusinessTiles(panel, b);
   renderCosts(panel, b);
+  renderLinks(panel, b);
   panel.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
 }
 

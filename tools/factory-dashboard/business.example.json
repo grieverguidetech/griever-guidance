@@ -11,5 +11,8 @@
   "nextSteps": [
     { "owner": "Founder", "task": "Example next step", "due": null, "done": false }
   ],
+  "links": [
+    { "label": "Example working doc", "url": "https://docs.google.com/spreadsheets/d/EXAMPLE" }
+  ],
   "nextSync": null
 }
