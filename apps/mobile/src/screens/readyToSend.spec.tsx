@@ -40,7 +40,7 @@ const NONE: string[] = [];
 const FIVE = ['c0', 'c1', 'c2', 'c3', 'c4'];
 const TWO = ['c0', 'c1'];
 
-function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, web = {}, loading = false }: { loading?: boolean; fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
+function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose = () => undefined, onGotIt = () => undefined, web = {}, loading = false }: { loading?: boolean; onGotIt?: () => void; fields?: Record<string, string>; thanks?: boolean; senderName?: string; category?: 'announcement' | 'obituary'; ids?: string[]; onChoose?: () => void; web?: Partial<SessionDetails & SectionFields> } = {}) {
   const flow = useSendFlow({
     session: loading ? null : { ...session, ...(senderName === undefined ? {} : { senderName }), ...web },
     draft: freshDraft({
@@ -52,7 +52,7 @@ function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose 
   });
   const { selectContacts } = flow;
   useEffect(() => { selectContacts(ids); }, [selectContacts, ids]);
-  return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoose} />;
+  return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoose} onGotIt={onGotIt} />;
 }
 
 const primary = () => screen.getByRole('button', { name: 'Text 1 person' });
@@ -405,7 +405,7 @@ describe('the people-button focus hook (#673)', () => {
     const hook: { current: (() => void) | null } = { current: null };
     const Host = () => {
       const flow = useSendFlow({ session, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
-      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} focusPeopleButton={hook} />;
+      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} onGotIt={() => undefined} focusPeopleButton={hook} />;
     };
     const { unmount } = render(<Host />);
     expect(hook.current).toEqual(expect.any(Function));
@@ -438,53 +438,26 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(screen.queryByText(/!/)).toBeNull();
   });
 
-  it('Got it shows Ready to send with the suggested words and the send button, and focuses the heading', async () => {
+  it('Got it calls the hub callback, and does not go back a step or swap the nudge', () => {
+    const onGotIt = jest.fn();
+    const back = jest.fn();
+    function Probe() {
+      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
+      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} contacts={contacts} onChoosePeople={() => undefined} onGotIt={onGotIt} />;
+    }
+    render(<Probe />);
+    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
+    expect(onGotIt).toHaveBeenCalledTimes(1);
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it('focuses the screen heading on arrival', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<Harness web={EMPTY} />);
-    focus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
-    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Share the service' })).toBeTruthy();
-    expect((screen.getByLabelText('Your message').props as { value?: string }).value).toMatch(/\S/);
-    expect(primary()).toBeTruthy();
-    // Focus is deferred one tick, after the swap has drawn.
     await waitFor(() => {
       const nodes = focus.mock.calls.map(([handle]) => [...mockHandles.entries()].find(([, h]) => h === handle)?.[0]);
       expect(nodes.some((node) => (node as { props?: { children?: unknown } } | undefined)?.props?.children === 'Share the service')).toBe(true);
     });
-  });
-
-  it('after Got it the person can write and send: typing keeps the nudge gone, and the primary button starts the send', () => {
-    const setMessageOverride = jest.fn();
-    const startSendJob = jest.fn();
-    function Probe() {
-      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: { serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'Oak Chapel' } }) });
-      const { selectContacts } = flow;
-      useEffect(() => { selectContacts(PICKED); }, [selectContacts]);
-      return <ReadyToSendScreen flow={{ ...flow, setMessageOverride, startSendJob }} contacts={contacts} onChoosePeople={() => undefined} />;
-    }
-    render(<Probe />);
-    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
-    expect(setMessageOverride).toHaveBeenCalledWith('Come as you are.');
-    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
-    fireEvent.press(primary());
-    expect(startSendJob).toHaveBeenCalledTimes(1);
-  });
-
-  it('Back still goes back after Got it', () => {
-    // Reopening the step shows the nudge again: that is covered end to end in app/send.spec.tsx.
-    const back = jest.fn();
-    function Probe() {
-      const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
-      return <ReadyToSendScreen flow={{ ...flow, prevStep: back }} contacts={contacts} onChoosePeople={() => undefined} />;
-    }
-    render(<Probe />);
-    fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
-    expect(back).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    expect(back).toHaveBeenCalledTimes(1);
   });
 
   it('reads heading, card heading, line, then Got it, and the card is not one accessible block', () => {
@@ -505,7 +478,7 @@ describe('Ready to send with nothing written on the web (#824)', () => {
   it('keeps the normal screen when the words were already edited or a send is under way', () => {
     function Resumed() {
       const flow = useSendFlow({ session: { ...session, ...EMPTY }, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: { serviceDate: 'June 14' }, messageOverride: 'My own words.' }) });
-      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} />;
+      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} onGotIt={() => undefined} />;
     }
     render(<Resumed />);
     expect(screen.getByDisplayValue('My own words.')).toBeTruthy();
