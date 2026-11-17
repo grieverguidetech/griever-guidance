@@ -1032,4 +1032,18 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
     nudgeSetup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
     expect(screen.getByLabelText(BOX)).toBeTruthy();
   });
+
+  it('keeps Step 2 when the only content, a link, is cleared on screen (#889)', () => {
+    const screenSession = { ...base, obituaryText: '', obituaryUrl: 'https://legacy.com/anna' } as Session;
+    const ui = (session: Session) => (
+      <SerifReadyContext.Provider value>
+        <ShareObituaryScreen session={session} onChange={jest.fn()} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={jest.fn()} />
+      </SerifReadyContext.Provider>
+    );
+    const view = render(ui(screenSession));
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    view.rerender(ui({ ...screenSession, obituaryUrl: '' } as Session));
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+  });
 });

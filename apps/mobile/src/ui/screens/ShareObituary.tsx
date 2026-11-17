@@ -268,62 +268,62 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
       ) : null}
       {nudge ? null : (
         <>
-      {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
-      <Field
-        label={copy.linkLabel}
-        accessibleName={copy.linkLabel}
-        placeholder={copy.linkPlaceholder}
-        value={link}
-        onChangeText={onLinkChange}
-        onBlur={() => setTouched(true)}
-        invalid={showError}
-        describedBy={showError ? errorId : undefined}
-        hint={showError ? copy.invalidLink : undefined}
-        url
-        returnKeyType="next"
-      />
-      <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
-      {onPasteLink && copy.pasteButton ? (
-        <>
-          <Button label={copy.pasteButton} variant="secondary" onPress={onPasteLink} />
-          <Status id={pasteId} message={pasteMessage} />
-        </>
-      ) : null}
-      <Field
-        label={copy.publisherLabel}
-        optional={copy.optional}
-        accessibleName={`${copy.publisherLabel} ${copy.optional}`}
-        placeholder={copy.publisherPlaceholder}
-        value={publisher}
-        onChangeText={onPublisherChange}
-        returnKeyType="done"
-      />
-      {preview ? (
-        <Card>
+          {publisherEmail && copy.linkStepLabel ? <Heading level={2}>{copy.linkStepLabel}</Heading> : null}
+          <Field
+            label={copy.linkLabel}
+            accessibleName={copy.linkLabel}
+            placeholder={copy.linkPlaceholder}
+            value={link}
+            onChangeText={onLinkChange}
+            onBlur={() => setTouched(true)}
+            invalid={showError}
+            describedBy={showError ? errorId : undefined}
+            hint={showError ? copy.invalidLink : undefined}
+            url
+            returnKeyType="next"
+          />
+          <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
+          {onPasteLink && copy.pasteButton ? (
+            <>
+              <Button label={copy.pasteButton} variant="secondary" onPress={onPasteLink} />
+              <Status id={pasteId} message={pasteMessage} />
+            </>
+          ) : null}
+          <Field
+            label={copy.publisherLabel}
+            optional={copy.optional}
+            accessibleName={`${copy.publisherLabel} ${copy.optional}`}
+            placeholder={copy.publisherPlaceholder}
+            value={publisher}
+            onChangeText={onPublisherChange}
+            returnKeyType="done"
+          />
+          {preview ? (
+            <Card>
+              <Body tone="muted" small>
+                {copy.previewKicker}
+              </Body>
+              <Body>{preview}</Body>
+            </Card>
+          ) : null}
+          <Button
+            label={copy.continue}
+            ariaDisabled={!linkValid}
+            announceDisabled
+            describedBy={reason ? reasonId : showError ? errorId : undefined}
+            hint={blockedBy}
+            onPress={() => {
+              if (linkValid) {
+                onContinue();
+              } else {
+                setTouched(true);
+              }
+            }}
+          />
+          <Status id={reasonId} message={reason} />
           <Body tone="muted" small>
-            {copy.previewKicker}
+            {copy.waiting}
           </Body>
-          <Body>{preview}</Body>
-        </Card>
-      ) : null}
-      <Button
-        label={copy.continue}
-        ariaDisabled={!linkValid}
-        announceDisabled
-        describedBy={reason ? reasonId : showError ? errorId : undefined}
-        hint={blockedBy}
-        onPress={() => {
-          if (linkValid) {
-            onContinue();
-          } else {
-            setTouched(true);
-          }
-        }}
-      />
-      <Status id={reasonId} message={reason} />
-      <Body tone="muted" small>
-        {copy.waiting}
-      </Body>
         </>
       )}
       {onDraft ? (
