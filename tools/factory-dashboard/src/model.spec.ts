@@ -1,6 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  parseGitLog,
+  formatAge,
+  parseAdr,
+  parseCostExplorer,
+  costPeriod,
+  makeCostReader,
+  validateCostReading,
+  type CostReading,
+  formatDollars,
+  isCostFresh,
+  costErrorMessage,
+  COST_CACHE_MS,
   areaOf,
   summarizePr,
   summarizeIssue,
@@ -1465,5 +1477,265 @@ describe('business.json', () => {
     const file = parseBusiness(JSON.parse(readFileSync(new URL('../business.example.json', import.meta.url), 'utf8')));
     expect(file.decisions.length).toBeGreaterThan(0);
     expect(file.costs.every((c) => c.monthly === null)).toBe(true);
+  });
+});
+
+describe('parseGitLog', () => {
+  const now = new Date('2026-11-16T12:00:00Z');
+  const at = (iso: string): number => Date.parse(iso) / 1000;
+
+  it('parses sha, subject and age', () => {
+    const out = `abc1234\x1f${at('2026-11-16T10:00:00Z')}\x1fFix thing (#1)\ndef5678\x1f${at('2026-11-14T12:00:00Z')}\x1fOther\n`;
+    expect(parseGitLog(out, now)).toEqual([
+      { sha: 'abc1234', subject: 'Fix thing (#1)', age: '2 hours ago' },
+      { sha: 'def5678', subject: 'Other', age: '2 days ago' },
+    ]);
+  });
+
+  it('keeps tabs and colons in the subject and skips bad lines', () => {
+    const out = `a1\x1f${at('2026-11-16T11:59:30Z')}\x1ffeat: a\tb\n\nbroken line\nb2\x1fnotanumber\x1fx\n`;
+    expect(parseGitLog(out, now)).toEqual([{ sha: 'a1', subject: 'feat: a\tb', age: 'just now' }]);
+  });
+
+  it('keeps at most 8', () => {
+    const out = Array.from({ length: 12 }, (_, i) => `s${i}\x1f${at('2026-11-16T11:00:00Z')}\x1fc${i}`).join('\n');
+    expect(parseGitLog(out, now)).toHaveLength(8);
+  });
+
+  it('formats ages', () => {
+    expect(formatAge(5 * 60)).toBe('5 minutes ago');
+    expect(formatAge(60)).toBe('1 minute ago');
+    expect(formatAge(3600)).toBe('1 hour ago');
+    expect(formatAge(3 * 3600)).toBe('3 hours ago');
+    expect(formatAge(24 * 3600 * 3)).toBe('3 days ago');
+    expect(formatAge(-10)).toBe('just now');
+  });
+});
+
+describe('parseAdr', () => {
+  it('reads title and an inline Status line', () => {
+    const adr = parseAdr('0001-person-details-sync.md', '# 0001: Person details sync\n\nStatus: accepted, 2026-10-30. Ticket: #516.\n\n## Context\n');
+    expect(adr).toEqual({ file: '0001-person-details-sync.md', number: '0001', title: 'Person details sync', status: 'accepted, 2026-10-30. Ticket: #516.' });
+  });
+
+  it('reads the first line under a Status heading', () => {
+    const adr = parseAdr('0003-x.md', '# Use X\n\n## Status\n\nProposed\nmore text\n\n## Context\n');
+    expect(adr.status).toBe('Proposed');
+    expect(adr.title).toBe('Use X');
+    expect(adr.number).toBe('0003');
+  });
+
+  it('gives null status when there is none or the heading is empty', () => {
+    expect(parseAdr('0004-y.md', '# Y\n\n## Context\ntext').status).toBeNull();
+    expect(parseAdr('0005-z.md', '# Z\n\n## Status\n\n## Context\ntext').status).toBeNull();
+  });
+
+  it('falls back to the file name without a heading', () => {
+    expect(parseAdr('0006-no-heading.md', 'text').title).toBe('no-heading');
+  });
+});
+
+describe('parseCostExplorer', () => {
+  const reply = (...amounts: unknown[]) => ({
+    ResultsByTime: amounts.map((Amount) => ({ Estimated: false, Total: { UnblendedCost: { Amount, Unit: 'USD' } } })),
+  });
+
+  it('reads one month', () => {
+    expect(parseCostExplorer(reply('3.4567'))).toEqual({ dollars: 3.46, estimated: false });
+  });
+
+  it('sums several periods', () => {
+    expect(parseCostExplorer(reply('1.10', '2.20'))?.dollars).toBe(3.3);
+  });
+
+  it('passes Estimated through', () => {
+    const data = { ResultsByTime: [{ Estimated: true, Total: { UnblendedCost: { Amount: '1', Unit: 'USD' } } }] };
+    expect(parseCostExplorer(data)).toEqual({ dollars: 1, estimated: true });
+  });
+
+  it('is null for an empty ResultsByTime (unreadable, not $0)', () => {
+    expect(parseCostExplorer({ ResultsByTime: [] })).toBeNull();
+  });
+
+  it('is null for a non-number, a wrong unit or a wrong shape', () => {
+    expect(parseCostExplorer(reply('abc'))).toBeNull();
+    expect(parseCostExplorer(reply(''))).toBeNull();
+    expect(parseCostExplorer(reply(5))).toBeNull();
+    expect(parseCostExplorer({ ResultsByTime: [{ Total: { UnblendedCost: { Amount: '1', Unit: 'EUR' } } }] })).toBeNull();
+    expect(parseCostExplorer({ ResultsByTime: [{ Total: { UnblendedCost: { Amount: '1' } } }] })).toBeNull();
+    expect(parseCostExplorer({})).toBeNull();
+    expect(parseCostExplorer(null)).toBeNull();
+    expect(parseCostExplorer({ ResultsByTime: [{}] })).toBeNull();
+  });
+
+  it('formats dollars and the period', () => {
+    expect(formatDollars(3.4)).toBe('$3.40');
+    expect(costPeriod(new Date('2026-11-16T05:00:00Z'))).toEqual({ start: '2026-11-01', end: '2026-11-17' });
+    expect(costPeriod(new Date('2026-12-31T05:00:00Z'))).toEqual({ start: '2026-12-01', end: '2027-01-01' });
+  });
+});
+
+describe('isCostFresh', () => {
+  const reading = { at: 1000, start: '2026-11-01' };
+
+  it('is fresh under 12 hours and stale at 12 hours', () => {
+    expect(isCostFresh(reading, 1000 + COST_CACHE_MS - 1, '2026-11-01')).toBe(true);
+    expect(isCostFresh(reading, 1000 + COST_CACHE_MS, '2026-11-01')).toBe(false);
+  });
+
+  it('is not fresh with no reading or a time in the future', () => {
+    expect(isCostFresh(null, 5, '2026-11-01')).toBe(false);
+    expect(isCostFresh({ at: 2000, start: '2026-11-01' }, 1000, '2026-11-01')).toBe(false);
+  });
+
+  it('is stale when the month changed, even inside 12 hours (Oct 31 to Nov 1)', () => {
+    const oct31 = Date.parse('2026-10-31T23:00:00Z');
+    const nov1 = Date.parse('2026-11-01T01:00:00Z');
+    const octReading = { at: oct31, start: costPeriod(new Date(oct31)).start };
+    expect(isCostFresh(octReading, oct31 + 1000, costPeriod(new Date(oct31 + 1000)).start)).toBe(true);
+    expect(isCostFresh(octReading, nov1, costPeriod(new Date(nov1)).start)).toBe(false);
+  });
+});
+
+describe('validateCostReading', () => {
+  it('accepts a good reading and rejects the rest', () => {
+    const good = { at: 5, dollars: 1.5, start: '2026-11-01', estimated: false };
+    expect(validateCostReading(good)).toEqual(good);
+    expect(validateCostReading({ ...good, dollars: 'x' })).toBeNull();
+    expect(validateCostReading({ ...good, at: Number.NaN })).toBeNull();
+    expect(validateCostReading({ at: 5 })).toBeNull();
+    expect(validateCostReading(null)).toBeNull();
+  });
+});
+
+describe('makeCostReader', () => {
+  const T0 = Date.parse('2026-11-16T12:00:00Z');
+  const H = 60 * 60 * 1000;
+
+  function setup(saved: CostReading | null = null) {
+    const state = { now: T0, calls: 0, fail: false, saved, saves: 0 };
+    const read = makeCostReader({
+      call: async () => {
+        state.calls += 1;
+        await Promise.resolve();
+        if (state.fail) {
+          throw new Error('AWS login missing or expired. Run: aws login');
+        }
+        return { dollars: 2.5, estimated: false };
+      },
+      now: () => state.now,
+      load: async () => state.saved,
+      save: async (reading) => {
+        state.saved = reading;
+        state.saves += 1;
+      },
+    });
+    return { state, read };
+  }
+
+  it('shares one call between two concurrent reads', async () => {
+    const { state, read } = setup();
+    const [a, b] = await Promise.all([read(), read()]);
+    expect(state.calls).toBe(1);
+    expect(a).toEqual(b);
+    expect(a.dollars).toBe(2.5);
+  });
+
+  it('does not call again within 12 hours, and calls after', async () => {
+    const { state, read } = setup();
+    await read();
+    state.now = T0 + 12 * H - 1;
+    await read();
+    expect(state.calls).toBe(1);
+    state.now = T0 + 12 * H;
+    await read();
+    expect(state.calls).toBe(2);
+  });
+
+  it('does not cache a failure, and retries', async () => {
+    const { state, read } = setup();
+    state.fail = true;
+    await expect(read()).rejects.toThrow('aws login');
+    await expect(read()).rejects.toThrow('aws login');
+    expect(state.calls).toBe(2);
+    expect(state.saves).toBe(0);
+    state.fail = false;
+    await read();
+    expect(state.calls).toBe(3);
+    expect(state.saves).toBe(1);
+  });
+
+  it('calls again when the month changes', async () => {
+    const { state, read } = setup();
+    state.now = Date.parse('2026-10-31T23:00:00Z');
+    await read();
+    state.now = Date.parse('2026-11-01T00:30:00Z');
+    await read();
+    expect(state.calls).toBe(2);
+  });
+
+  it('uses a saved reading after a restart and does not call', async () => {
+    const first = setup();
+    const saved = await first.read();
+    const restarted = setup(saved);
+    restarted.state.now = T0 + H;
+    const again = await restarted.read();
+    expect(restarted.state.calls).toBe(0);
+    expect(again.dollars).toBe(2.5);
+  });
+
+  it('ignores a saved reading from another month or a failed load', async () => {
+    const old = setup({ at: T0 - H, dollars: 9, start: '2026-10-01', estimated: false });
+    await old.read();
+    expect(old.state.calls).toBe(1);
+    const broken = makeCostReader({
+      call: async () => ({ dollars: 1, estimated: false }),
+      now: () => T0,
+      load: async () => {
+        throw new Error('no file');
+      },
+      save: async () => {
+        throw new Error('disk full');
+      },
+    });
+    expect((await broken()).dollars).toBe(1);
+  });
+});
+
+describe('costErrorMessage', () => {
+  const LOGIN = 'AWS login missing or expired. Run: aws login';
+
+  it('maps each login problem to one message', () => {
+    for (const text of [
+      'An error occurred (ExpiredToken) when calling the GetCostAndUsage operation: The security token included in the request is expired',
+      'Token has expired and refresh failed',
+      'Unable to locate credentials. You can configure credentials by running "aws configure".',
+      'Error loading SSO Token: Token for x does not exist',
+      'An error occurred (InvalidClientTokenId) when calling the GetCostAndUsage operation: bad',
+      'An error occurred (UnrecognizedClientException) when calling the GetCostAndUsage operation: bad',
+    ]) {
+      expect(costErrorMessage(text)).toBe(LOGIN);
+    }
+  });
+
+  it('does not call a non-login error a login problem', () => {
+    expect(costErrorMessage('Could not connect to the endpoint URL')).toBe('Could not read AWS cost. Could not connect to the endpoint URL');
+    expect(costErrorMessage('Unreadable reply')).toBe('Could not read AWS cost. Unreadable reply');
+  });
+
+  it('strips the CLI boilerplate but keeps the error code', () => {
+    const out = costErrorMessage('An error occurred (AccessDeniedException) when calling the GetCostAndUsage operation: User is not authorized');
+    expect(out).toBe('Could not read AWS cost. AccessDeniedException: User is not authorized');
+  });
+
+
+  it('cuts long text and keeps only the first line', () => {
+    const out = costErrorMessage('first ' + 'y '.repeat(200) + '\nsecond line');
+    expect(out.length).toBeLessThan(160);
+    expect(out).not.toContain('second');
+  });
+
+  it('handles empty output', () => {
+    expect(costErrorMessage('')).toBe('Could not read AWS cost.');
   });
 });

@@ -713,15 +713,7 @@ function runsBody(d) {
 }
 
 function apiHealthBody(d) {
-  if (!state.health) {
-    return;
-  }
-  var ok = state.health.status >= 200 && state.health.status < 300;
-  var p = el("p");
-  p.appendChild(ciDot(ok ? "green" : "red"));
-  p.appendChild(link(state.health.url, state.health.url));
-  p.appendChild(document.createTextNode(" returned " + state.health.status + " in " + state.health.ms + " ms"));
-  d.appendChild(p);
+  d.appendChild(healthLine());
 }
 
 // A heading for one SDLC stage. Parts that follow it are drawn into the same panel.
@@ -1491,6 +1483,85 @@ function renderBusiness(parent) {
   parent.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
 }
 
+function renderCommits(parent) {
+  var s = kitSection(parent, "Recent commits on main", "commits");
+  if (sourceFailed("commits")) {
+    return;
+  }
+  var c = card();
+  c.appendChild(listOf(state.commits || [], function (li, commit) {
+    li.appendChild(el("code", commit.sha));
+    li.appendChild(document.createTextNode(" " + commit.subject + " "));
+    li.appendChild(el("span", commit.age, "muted"));
+  }, "No commits found."));
+  s.appendChild(c);
+}
+
+function costLine() {
+  var src = state.sources.awsCost;
+  if (src && !src.ok) {
+    return el("p", src.error, "error");
+  }
+  if (!state.cost) {
+    return el("p", "AWS spend is not available.", "muted");
+  }
+  var text = "AWS spend this month (UTC): $" + state.cost.dollars.toFixed(2) + " of $" + state.cost.budget.toFixed(2) + (state.cost.estimated ? " (estimate)" : "");
+  var over = state.cost.dollars > state.cost.budget;
+  return el("p", text + (over ? " (over budget)" : ""), over ? "error" : null);
+}
+
+// "Healthy" or "Unhealthy" in words, with a decorative dot. Used here and in the Operate part.
+function healthLine() {
+  var failed = state.sources.health && !state.sources.health.ok;
+  if (failed || !state.health) {
+    var reason = failed ? state.sources.health.error : "no reply";
+    return el("p", "API health could not load: " + reason, "error");
+  }
+  var ok = state.health.status >= 200 && state.health.status < 300;
+  var p = el("p");
+  var dot = el("span", null, "dot " + (ok ? "green" : "red"));
+  dot.setAttribute("aria-hidden", "true");
+  p.appendChild(dot);
+  p.appendChild(document.createTextNode(" " + (ok ? "Healthy" : "Unhealthy") + ": " + state.health.url + " returned " + state.health.status + " in " + state.health.ms + " ms"));
+  return p;
+}
+
+function deployLine() {
+  if (sourceFailed("deploys") || !state.engineering.deploys) {
+    var src = state.sources.deploys;
+    return el("p", "Last good deploy could not load: " + (src && src.error ? src.error : "no data"), "error");
+  }
+  var d = state.engineering.deploys;
+  return el("p", "Last good deploy: " + (d.lastGood ? d.sinceGoodText + " ago" : "none in the runs checked"));
+}
+
+function renderInfra(parent) {
+  var s = el("section");
+  s.appendChild(el("h3", "Spend, health and deploys"));
+  var c = card();
+  c.appendChild(costLine());
+  if (state.cost && state.cost.checkedAt) {
+    c.appendChild(el("p", "Cost read at " + new Date(state.cost.checkedAt).toLocaleString() + ". It is read at most once every 12 hours.", "muted"));
+  }
+  c.appendChild(healthLine());
+  c.appendChild(deployLine());
+  s.appendChild(c);
+  parent.appendChild(s);
+}
+
+function renderAdrs(parent) {
+  var s = kitSection(parent, "Architecture decisions", "adrs");
+  if (sourceFailed("adrs")) {
+    return;
+  }
+  var c = card();
+  c.appendChild(listOf(state.adrs || [], function (li, adr) {
+    li.appendChild(link("ADR " + adr.number + ": " + adr.title, adr.url));
+    li.appendChild(el("div", adr.status || "No status", "item-summary"));
+  }, "No decisions recorded."));
+  s.appendChild(c);
+}
+
 function renderCto() {
   var panel = document.getElementById("panel-cto");
   safely(panel, renderNeedsYou);
@@ -1501,9 +1572,16 @@ function renderCto() {
   });
   groupTitle(panel, "Engineering");
   safely(panel, renderPrs);
+  safely(panel, renderCommits);
+  groupTitle(panel, "Infra and cost");
+  allAreasNote(panel);
+  safely(panel, renderInfra);
   groupTitle(panel, "Business");
   allAreasNote(panel);
   safely(panel, renderBusiness);
+  groupTitle(panel, "Decisions");
+  allAreasNote(panel);
+  safely(panel, renderAdrs);
 }
 
 function currentTab() {
@@ -1620,7 +1698,7 @@ function render() {
 
 // The first section the page needs that the server did not send, or null.
 function missingSection(s) {
-  var need = [s && s.areas, s && s.board, s && s.prs, s && s.product, s && s.engineering, s && s.engineering && s.engineering.ciHealth];
+  var need = [s && s.areas, s && s.board, s && s.prs, s && s.product, s && s.engineering, s && s.engineering && s.engineering.ciHealth, s && s.adrs];
   return need.some(function (part) {
     return part === undefined || part === null;
   });
