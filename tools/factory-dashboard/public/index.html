@@ -27,6 +27,7 @@ h1 { font-size: 18px; margin: 0 auto 0 0; }
 main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px; }
 section { margin-top: 20px; }
 h2 { font-size: 16px; margin: 0 0 8px; }
+h3 { font-size: 16px; margin: 0 0 8px; }
 a { color: var(--link); }
 a:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 button, select { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); }
@@ -68,7 +69,7 @@ table.plain td.num { text-align: right; }
 @media (min-width: 900px) { .grid.kpis { grid-template-columns: repeat(4, 1fr); } }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; min-width: 0; }
 .grid.kpis { align-items: stretch; }
-.card > h3 { font-size: 14px; margin: 0 0 8px; }
+.card > h4 { font-size: 14px; margin: 0 0 8px; }
 .kpi { display: flex; flex-direction: column; gap: 2px; }
 .kpi .label { font-size: 13px; color: var(--muted); }
 .kpi .value { font-size: 32px; font-weight: 600; line-height: 1.1; }
@@ -100,6 +101,7 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .pr-group h3 { font-size: 14px; margin: 12px 0 6px; }
 .pr-group h3:first-child { margin-top: 0; }
 .lower { margin-top: 8px; }
+h2.group-title { font-size: 22px; margin: 32px 0 0; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
 svg.key { margin-right: 6px; vertical-align: middle; }
 .lower > summary { font-weight: 600; }
 svg.strip { display: block; width: 100%; height: auto; max-height: 56px; overflow: visible; }
@@ -118,20 +120,19 @@ ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px
   <span id="restart-note" class="muted" role="status" hidden></span>
 </header>
 <div role="tablist" aria-label="Dashboard views" id="tabs">
-  <button role="tab" type="button" id="tab-product" aria-controls="panel-product" data-tab="product">Product</button>
-  <button role="tab" type="button" id="tab-engineering" aria-controls="panel-engineering" data-tab="engineering">Engineering</button>
-  <button role="tab" type="button" id="tab-business" aria-controls="panel-business" data-tab="business">Business</button>
+  <button role="tab" type="button" id="tab-cto" aria-controls="panel-cto" data-tab="cto">CTO</button>
+  <button role="tab" type="button" id="tab-factory" aria-controls="panel-factory" data-tab="factory">Software Factory</button>
 </div>
 <main id="main">
-  <div role="tabpanel" id="panel-product" aria-labelledby="tab-product" tabindex="0" hidden></div>
-  <div role="tabpanel" id="panel-engineering" aria-labelledby="tab-engineering" tabindex="0" hidden></div>
-  <div role="tabpanel" id="panel-business" aria-labelledby="tab-business" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-cto" aria-labelledby="tab-cto" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-factory" aria-labelledby="tab-factory" tabindex="0" hidden></div>
 </main>
 <script>
 "use strict";
 var state = null;
-var TABS = ["product", "engineering", "business"];
-var main = document.getElementById("panel-engineering");
+var TABS = ["cto", "factory"];
+// Hashes from the old 3 tabs still open the matching new tab.
+var OLD_TABS = { product: "cto", business: "cto", engineering: "factory" };
 var areaSelect = document.getElementById("area");
 
 function el(tag, text, className) {
@@ -223,7 +224,7 @@ function when(iso) {
   return isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
-// ---- Engineering tab ----
+// ---- Engineering group (CTO) and shared helpers ----
 // One-line summaries for PRs come from the linked issue, which the page already has on the board, needs-you and drift lists.
 function summaryIndex() {
   var index = {};
@@ -256,7 +257,7 @@ function lowerSection(parent, title, key) {
 }
 
 function renderNeedsYou(parent) {
-  var s = kitSection(parent, "Needs you", "prs");
+  var s = kitSection(parent, "Needs you", "prs", "h2");
   var labels = { "pr-green": "Ready for G2", blocked: "Blocked", "ready-for-human": "Ready for human" };
   if (state.needsYou === null) {
     couldNotCheck(s, state.needsYouBlockedBy);
@@ -358,7 +359,7 @@ function prTile() {
 
 function renderHealthStrip(parent) {
   var s = el("section");
-  s.appendChild(el("h2", "Health", "sr-only"));
+  s.appendChild(el("h3", "Health", "sr-only"));
   var g = grid("kpis");
   g.appendChild(ciTile());
   g.appendChild(deployTile());
@@ -450,7 +451,7 @@ function runStripChart(marks, caption, labelId) {
 }
 
 function throughputCard() {
-  var c = card("PRs merged per week");
+  var c = card("Merged PRs, by week");
   var t = state.engineering.throughput;
   if (!t) {
     c.appendChild(el("p", "Could not load: " + state.sources.mergedPrs.error, "error"));
@@ -490,12 +491,16 @@ function ciRunsCard() {
   return c;
 }
 
-function renderCharts(parent) {
-  var s = kitSection(parent, "Trends", null);
-  var g = grid("cols-2");
-  g.appendChild(throughputCard());
-  g.appendChild(ciRunsCard());
-  s.appendChild(g);
+// Review: PRs merged per week.
+function renderThroughput(parent) {
+  var s = kitSection(parent, "PRs merged per week", null);
+  s.appendChild(throughputCard());
+}
+
+// Test: the last CI runs on main.
+function renderCiRuns(parent) {
+  var s = kitSection(parent, "CI runs on main", null);
+  s.appendChild(ciRunsCard());
 }
 
 function boardList(items, key, label) {
@@ -697,7 +702,7 @@ function worktreesBody(d) {
 
 function runsBody(d) {
   [["CI", state.runs.ci], ["Deploy", state.runs.deploy]].forEach(function (pair) {
-    d.appendChild(el("h3", pair[0]));
+    d.appendChild(el("h4", pair[0]));
     d.appendChild(pagedList("runs-" + pair[0], pair[0] + " runs", pair[1].filter(visible), function (li, run) {
       li.appendChild(runDot(run));
       li.appendChild(link(run.workflowName + " on " + run.headBranch, run.url));
@@ -719,20 +724,51 @@ function apiHealthBody(d) {
   d.appendChild(p);
 }
 
-function renderLower(parent) {
-  var s = kitSection(parent, "More detail", null);
-  s.appendChild(el("p", "Each part is closed until you open it.", "muted"));
-  worktreesBody(lowerSection(s, "Worktrees", "worktrees"));
-  runsBody(lowerSection(s, "Recent runs", "runs"));
-  deploysBody(lowerSection(s, "Deploys", "deploys"));
-  backlogReviewBody(lowerSection(s, "Backlog review", "backlogReview"));
-  apiHealthBody(lowerSection(s, "API health", "health"));
+// A heading for one SDLC stage. Parts that follow it are drawn into the same panel.
+function groupTitle(parent, title) {
+  parent.appendChild(el("h2", title, "group-title"));
 }
 
-function renderEngineering() {
-  var panel = document.getElementById("panel-engineering");
-  [renderNeedsYou, renderHealthStrip, renderPrs, renderCharts, renderBoard, renderDrift, renderLower].forEach(function (part) {
-    safely(panel, part);
+// Under the Product and Business groups: the area filter does not narrow them.
+function allAreasNote(parent) {
+  parent.appendChild(el("p", "All areas. The area filter does not change this group.", "muted"));
+}
+
+// Closed-by-default parts of a stage. The note says "it" for 1 part and "them" for 2 or more, and each part stays isolated.
+function closedParts(parent, parts) {
+  var s = el("section");
+  s.appendChild(el("p", parts.length === 1 ? "Closed until you open it." : "Closed until you open them.", "muted"));
+  parts.forEach(function (part) {
+    safely(s, function (box) {
+      part[1](lowerSection(box, part[0], part[2]));
+    });
+  });
+  parent.appendChild(s);
+}
+
+function renderFactory() {
+  var panel = document.getElementById("panel-factory");
+  var stages = [
+    ["Plan", [renderBoard, renderDrift, function (p) {
+      closedParts(p, [["Backlog review", backlogReviewBody, "backlogReview"]]);
+    }]],
+    ["Build", [function (p) {
+      closedParts(p, [["Worktrees", worktreesBody, "worktrees"]]);
+    }]],
+    ["Review", [renderThroughput]],
+    ["Test", [renderHealthStrip, renderCiRuns]],
+    ["Release", [function (p) {
+      closedParts(p, [["Deploys", deploysBody, "deploys"], ["Recent runs", runsBody, "runs"]]);
+    }]],
+    ["Operate", [function (p) {
+      closedParts(p, [["API health", apiHealthBody, "health"]]);
+    }]]
+  ];
+  stages.forEach(function (stage) {
+    groupTitle(panel, stage[0]);
+    stage[1].forEach(function (part) {
+      safely(panel, part);
+    });
   });
 }
 
@@ -760,11 +796,11 @@ function grid(kind) {
   return el("div", null, "grid " + kind);
 }
 
-// A card with an optional h3. The h3 gets an id so a chart inside can name itself with aria-labelledby.
+// A card with an optional h4. The h4 gets an id so a chart inside can name itself with aria-labelledby.
 function card(title) {
   var c = el("div", null, "card");
   if (title) {
-    var h = el("h3", title);
+    var h = el("h4", title);
     h.id = nextId("h");
     c.appendChild(h);
     c.titleId = h.id;
@@ -772,10 +808,10 @@ function card(title) {
   return c;
 }
 
-// A section with an h2 and the source error (if any).
-function kitSection(parent, title, key) {
+// A section with a heading and the source error (if any). The heading is an h3 inside a group, an h2 for Needs you.
+function kitSection(parent, title, key, level) {
   var s = el("section");
-  s.appendChild(el("h2", title));
+  s.appendChild(el(level || "h3", title));
   var src = state.sources[key];
   if (src && !src.ok) {
     s.appendChild(el("p", "Could not load: " + src.error, "error"));
@@ -1163,11 +1199,11 @@ function sparkline(points, unit, caption, labelId) {
   return wrap;
 }
 
-// ---- Product tab ----
+// ---- Product group (CTO) ----
 function renderHeadline(parent) {
   var k = state.product.kpis;
   var s = el("section");
-  s.appendChild(el("h2", "Headline", "sr-only"));
+  s.appendChild(el("h3", "Headline", "sr-only"));
   var g = grid("kpis");
   g.appendChild(kpiTile("Launch blockers open", k.launchBlockers, k.launchBlockers === 0 ? "Nothing blocks launch" : null, true));
   var shipped = kpiTile("PRs shipped this week", state.sources.mergedPrs.ok ? k.shipped : null, "Last 7 days");
@@ -1289,17 +1325,7 @@ function renderFlags(parent) {
   });
 }
 
-function renderProduct() {
-  var panel = document.getElementById("panel-product");
-  main = panel;
-  renderHeadline(panel);
-  renderBlockers(panel);
-  renderShipped(panel);
-  renderRoadmap(panel);
-  renderFlags(panel);
-}
-
-// ---- Business tab ----
+// ---- Business group (CTO) ----
 // Most important first: decisions needed, next steps by owner, the key numbers, then the cost chart.
 var NOT_SET = "Not set";
 
@@ -1380,7 +1406,7 @@ function renderSteps(parent, b) {
 
 function renderBusinessTiles(parent, b) {
   var s = el("section");
-  s.appendChild(el("h2", "Key numbers", "sr-only"));
+  s.appendChild(el("h3", "Key numbers", "sr-only"));
   safely(s, function (node) {
     var g = grid("kpis");
     var users = b.users.count === null ? NOT_SET : b.users.count;
@@ -1442,13 +1468,10 @@ function renderLinks(parent, b) {
   s.appendChild(g);
 }
 
-function renderBusiness() {
-  var panel = document.getElementById("panel-business");
-  main = panel;
+function renderBusiness(parent) {
   var b = state.business;
   if (!b) {
     var s = el("section");
-    s.appendChild(el("h2", "Business"));
     var src = state.sources.business;
     if (src && src.missing) {
       s.appendChild(el("p", "No business.json yet. Copy business.example.json to business.json and fill it in.", "muted"));
@@ -1457,20 +1480,46 @@ function renderBusiness() {
     } else {
       s.appendChild(el("p", "The business numbers are not available.", "muted"));
     }
-    panel.appendChild(s);
+    parent.appendChild(s);
     return;
   }
-  renderDecisions(panel, b);
-  renderSteps(panel, b);
-  renderBusinessTiles(panel, b);
-  renderCosts(panel, b);
-  renderLinks(panel, b);
-  panel.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
+  [renderDecisions, renderSteps, renderBusinessTiles, renderCosts, renderLinks].forEach(function (part) {
+    safely(parent, function (box) {
+      part(box, b);
+    });
+  });
+  parent.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
+}
+
+function renderCto() {
+  var panel = document.getElementById("panel-cto");
+  safely(panel, renderNeedsYou);
+  groupTitle(panel, "Product");
+  allAreasNote(panel);
+  [renderHeadline, renderBlockers, renderShipped, renderRoadmap, renderFlags].forEach(function (part) {
+    safely(panel, part);
+  });
+  groupTitle(panel, "Engineering");
+  safely(panel, renderPrs);
+  groupTitle(panel, "Business");
+  allAreasNote(panel);
+  safely(panel, renderBusiness);
 }
 
 function currentTab() {
   var name = location.hash.slice(1);
-  return TABS.indexOf(name) >= 0 ? name : "product";
+  if (OLD_TABS[name]) {
+    name = OLD_TABS[name];
+  }
+  return TABS.indexOf(name) >= 0 ? name : "cto";
+}
+
+// Rewrites an old or unknown hash (#product, #business, #engineering, anything else) to the new one without a history entry.
+function fixOldHash() {
+  var name = location.hash.slice(1);
+  if (TABS.indexOf(name) < 0) {
+    history.replaceState(null, "", "#" + (OLD_TABS[name] || "cto"));
+  }
 }
 
 function showTab(name, focus) {
@@ -1484,7 +1533,6 @@ function showTab(name, focus) {
       button.focus();
     }
   });
-  document.getElementById("area-label").hidden = name !== "engineering";
   fitLabels();
 }
 
@@ -1519,6 +1567,7 @@ document.getElementById("tabs").addEventListener("keydown", function (event) {
   }
 });
 window.addEventListener("hashchange", function () {
+  fixOldHash();
   showTab(currentTab(), false);
 });
 
@@ -1564,9 +1613,8 @@ function render() {
     areaSelect.appendChild(o);
   });
   areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
-  renderProduct();
-  renderEngineering();
-  renderBusiness();
+  renderCto();
+  renderFactory();
   fitLabels();
 }
 
@@ -1654,6 +1702,7 @@ areaSelect.addEventListener("change", function () {
     render();
   }
 });
+fixOldHash();
 showTab(currentTab(), false);
 try {
   if (sessionStorage.getItem("factoryRestarted") === "1") {
