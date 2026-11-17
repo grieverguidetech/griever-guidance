@@ -12,10 +12,13 @@ import {
   computeNeedsYou,
   MERGED_PR_LIMIT,
   buildEngineering,
+  buildDelivery,
+  type PrLeadInput,
   mergedSearchDate,
   shippedSearchDate,
   CI_HEALTH_RUNS,
   DEPLOY_FETCHED,
+  DEPLOY_FETCH_DAYS,
   parseFeatureFlags,
   buildProduct,
   openBoardItems,
@@ -106,7 +109,7 @@ async function guarded<T>(
   }
 }
 
-type RawIssue = { number: number; title: string; url: string; updatedAt: string; labels: { name: string }[]; body?: string };
+type RawIssue = { number: number; title: string; url: string; updatedAt: string; createdAt?: string; closedAt?: string; stateReason?: string; labels: { name: string }[]; body?: string };
 
 function toIssue(raw: RawIssue): Issue {
   return {
@@ -115,6 +118,7 @@ function toIssue(raw: RawIssue): Issue {
     url: raw.url,
     updatedAt: raw.updatedAt,
     labels: raw.labels.map((label) => label.name),
+    ...(raw.createdAt === undefined || raw.closedAt === undefined ? {} : { createdAt: raw.createdAt, closedAt: raw.closedAt, stateReason: raw.stateReason }),
     // Only the one-line summary is kept. The body is dropped here.
     ...(raw.body === undefined ? {} : { summary: summarizeIssue(raw.body), dependsOn: dependsOn(raw.body) }),
   };
@@ -122,7 +126,7 @@ function toIssue(raw: RawIssue): Issue {
 
 function loadIssues(state: 'open' | 'closed', limit: number): Promise<Issue[]> {
   // Bodies only for open issues: they feed the one-line summaries. Closed issues are many, so they stay light.
-  const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body' : 'number,title,labels,url,updatedAt';
+  const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body' : 'number,title,labels,url,updatedAt,createdAt,closedAt,stateReason';
   const base =
     state === 'closed'
       ? closedIssueArgs(new Date(), REPO, limit)
@@ -179,6 +183,60 @@ async function loadMergedPrs(): Promise<MergedPr[]> {
   return data as MergedPr[];
 }
 
+type RawLeadNode = {
+  number: number;
+  title: string;
+  url: string;
+  createdAt: string;
+  mergedAt: string;
+  mergeCommit: { oid: string } | null;
+  commits: { nodes: { commit: { authoredDate: string } }[] };
+};
+
+const LEAD_QUERY =
+  'query($q:String!,$after:String){search(query:$q,type:ISSUE,first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{... on PullRequest{number title url createdAt mergedAt mergeCommit{oid} commits(first:1){nodes{commit{authoredDate}}}}}}}';
+const LEAD_MAX_PAGES = 10;
+
+type LeadResult = { prs: PrLeadInput[]; truncated: boolean };
+
+// PRs merged in the last 28 days with the time of their first commit. `gh pr list --json commits` is too big for the
+// GraphQL limit at this size, so this is one read-only search query, 100 PRs a page, 10 pages at most. Only 1 commit per PR is asked.
+// At the page limit it stops and says so (truncated) instead of failing.
+async function loadPrLeadInputs(): Promise<LeadResult> {
+  const search = `repo:${REPO} base:main is:pr is:merged merged:>=${mergedSearchDate(new Date())}`;
+  const found: PrLeadInput[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < LEAD_MAX_PAGES; page += 1) {
+    const args = ['api', 'graphql', '-f', `query=${LEAD_QUERY}`, '-f', `q=${search}`];
+    if (after !== null) {
+      args.push('-f', `after=${after}`);
+    }
+    const reply = (await ghJson(args)) as {
+      errors?: { message?: string }[];
+      data?: { search: { pageInfo: { hasNextPage: boolean; endCursor: string }; nodes: RawLeadNode[] } };
+    };
+    if (!reply.data || reply.errors) {
+      throw new Error(reply.errors?.[0]?.message?.slice(0, 200) ?? 'GraphQL reply had no data');
+    }
+    for (const node of reply.data.search.nodes) {
+      found.push({
+        number: node.number,
+        title: node.title,
+        url: node.url,
+        createdAt: node.createdAt,
+        mergedAt: node.mergedAt,
+        mergeSha: node.mergeCommit?.oid ?? null,
+        firstCommitAt: node.commits.nodes[0]?.commit.authoredDate ?? null,
+      });
+    }
+    if (!reply.data.search.pageInfo.hasNextPage) {
+      return { prs: found, truncated: false };
+    }
+    after = reply.data.search.pageInfo.endCursor;
+  }
+  return { prs: found, truncated: true };
+}
+
 // Issues closed in the Shipped window, for the summary of a PR whose own body says nothing useful.
 function loadRecentClosedIssues(): Promise<Issue[]> {
   const search = `closed:>=${shippedSearchDate(new Date())}`;
@@ -202,12 +260,15 @@ function loadRuns(): Promise<Run[]> {
   return ghJson(['run', 'list', '--repo', REPO, '--limit', '15', '--json', fields]).then((data) => data as Run[]);
 }
 
-function loadWorkflowRuns(workflow: string, limit: number, branch?: string): Promise<Run[]> {
-  const fields = 'databaseId,workflowName,headBranch,status,conclusion,url,createdAt';
+function loadWorkflowRuns(workflow: string, limit: number, branch?: string, since?: string): Promise<Run[]> {
+  const fields = 'databaseId,workflowName,headBranch,status,conclusion,url,createdAt,updatedAt,headSha';
   const args = ['run', 'list', '--repo', REPO, '--workflow', workflow, '--limit', String(limit)];
   if (branch) {
     // Pushes to main only, so PR-event runs on a branch named main do not count.
     args.push('--branch', branch, '--event', 'push');
+  }
+  if (since) {
+    args.push('--created', `>=${since}`);
   }
   return ghJson([...args, '--json', fields]).then((data) => data as Run[]);
 }
@@ -323,7 +384,7 @@ const readCost = makeCostReader({
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 500)),
@@ -334,11 +395,12 @@ async function buildState() {
     guarded('featureFlags', sources, [] as FeatureFlag[], loadFeatureFlags),
     guarded('mergedPrs', sources, [] as MergedPr[], loadMergedPrs),
     guarded('ciMain', sources, [] as Run[], () => loadWorkflowRuns('ci.yml', CI_HEALTH_RUNS, 'main')),
-    guarded('deploys', sources, [] as Run[], () => loadWorkflowRuns('deploy.yml', DEPLOY_FETCHED)),
+    guarded('deploys', sources, [] as Run[], () => loadWorkflowRuns('deploy.yml', DEPLOY_FETCHED, undefined, shippedSearchDate(new Date(), DEPLOY_FETCH_DAYS))),
     guarded('recentClosed', sources, [] as Issue[], loadRecentClosedIssues),
     guarded('commits', sources, [] as CommitInfo[], loadCommits),
     guarded('adrs', sources, [] as AdrInfo[], loadAdrs),
     guarded('awsCost', sources, null as CostReading | null, readCost),
+    guarded('prLeadInputs', sources, { prs: [], truncated: false } as LeadResult, loadPrLeadInputs),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
@@ -394,6 +456,7 @@ async function buildState() {
       now: generatedAt,
     }),
     engineering: buildEngineering(sources, { board: openBoard, ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
+    delivery: buildDelivery(sources, { board: openBoard, closedIssues, deployRuns, prLeadInputs: prLead.prs, prLeadTruncated: prLead.truncated }, generatedAt),
     commits,
     adrs: adrs.map((adr) => ({ ...adr, url: `${REPO_URL}/blob/main/docs/adr/${adr.file}` })),
     cost:

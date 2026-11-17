@@ -16,6 +16,11 @@ export interface Issue {
   url: string;
   labels: string[];
   updatedAt: string;
+  // Only on closed issues: the times for cycle time.
+  createdAt?: string;
+  closedAt?: string;
+  // COMPLETED or NOT_PLANNED. Only on closed issues.
+  stateReason?: string;
   // One line from the issue body. The body itself never leaves the server.
   summary?: string;
   // Issue numbers from the "### Depends on" section. Only the numbers are kept, never the body.
@@ -421,6 +426,10 @@ export interface Run {
   conclusion: string;
   url: string;
   createdAt: string;
+  // When the run last changed. For a finished run this is when it ended.
+  updatedAt?: string;
+  // The commit the run was for. Only the deploy runs are read for it.
+  headSha?: string;
 }
 
 export function splitRuns(runs: Run[]): { ci: Run[]; deploy: Run[] } {
@@ -1274,8 +1283,11 @@ export function buildProduct(input: ProductInput) {
 
 export const CI_HEALTH_RUNS = 30;
 export const DEPLOY_SHOWN = 5;
-// Fetch more deploy runs than are shown, so "last good deploy" can look further back.
-export const DEPLOY_FETCHED = 20;
+// The deploy run list is limited to the last 8 weeks by date (the deploys-per-week bars and the lead time read all of them;
+// "last good deploy" looks at the same runs). This is the safety cap: a list that reaches it may be cut off. About 410 runs in 8 weeks in November 2026.
+export const DEPLOY_FETCHED = 500;
+// Days of deploy runs fetched (8 weeks).
+export const DEPLOY_FETCH_DAYS = 56;
 
 export interface CiHealth {
   passed: number;
@@ -1497,6 +1509,242 @@ export function buildEngineering(sources: Record<string, SourceStatus>, data: En
 }
 
 // ---- Restart (launchd mode only) ----
+
+// ---- Delivery metrics (DORA): Software Factory tab ----
+
+export const DELIVERY_WEEKS = 8;
+export const DELIVERY_WINDOW_DAYS = 28;
+const HOUR_MS = 60 * 60 * 1000;
+
+export type DoraBand = 'Elite' | 'High' | 'Medium' | 'Low';
+
+// Deploys per day over the window. More than 1 a day is "on demand" (Elite).
+export function deployFrequencyBand(perDay: number): DoraBand {
+  if (perDay > 1) {
+    return 'Elite';
+  }
+  if (perDay >= 1 / 7) {
+    return 'High';
+  }
+  return perDay >= 1 / 30 ? 'Medium' : 'Low';
+}
+
+// Median lead time in hours: under 1 day Elite, up to 1 week High, up to 1 month Medium (30 days), else Low.
+export function leadTimeBand(hours: number): DoraBand {
+  if (hours < 24) {
+    return 'Elite';
+  }
+  if (hours <= 7 * 24) {
+    return 'High';
+  }
+  return hours <= 30 * 24 ? 'Medium' : 'Low';
+}
+
+// "20 minutes", "6.5 hours", "3.2 days". Days from 48 hours up.
+export function formatLeadTime(hours: number): string {
+  if (hours >= 48) {
+    return `${Math.round((hours / 24) * 10) / 10} days`;
+  }
+  return formatDuration(hours);
+}
+
+function isMainDeploy(run: Run): boolean {
+  return run.status === 'completed' && run.conclusion === 'success' && run.headBranch === 'main';
+}
+
+export interface DeployFrequency {
+  // Week 0 is the last 7 days, like Throughput.
+  weeks: WeekCount[];
+  // Successful deploys in the last 28 days.
+  last28: number;
+  perWeek: number;
+  perWeekText: string;
+  band: DoraBand;
+  // True when the run list reached its cap.
+  mayBeCutOff: boolean;
+}
+
+export function computeDeployFrequency(runs: Run[], now: Date): DeployFrequency {
+  const counts = new Array<number>(DELIVERY_WEEKS).fill(0);
+  let last28 = 0;
+  for (const run of runs.filter(isMainDeploy)) {
+    const age = now.getTime() - Date.parse(run.createdAt);
+    if (Number.isNaN(age) || age < 0 || age > DELIVERY_WEEKS * 7 * DAY_MS) {
+      continue;
+    }
+    const week = Math.max(0, Math.ceil(age / (7 * DAY_MS)) - 1);
+    counts[week] = (counts[week] ?? 0) + 1;
+    if (age <= DELIVERY_WINDOW_DAYS * DAY_MS) {
+      last28 += 1;
+    }
+  }
+  const perWeek = Math.round((last28 / (DELIVERY_WINDOW_DAYS / 7)) * 10) / 10;
+  return {
+    weeks: counts.map((count, index) => ({ label: weekLabel(index), count })),
+    last28,
+    perWeek,
+    perWeekText: `${perWeek} per week`,
+    band: deployFrequencyBand(last28 / DELIVERY_WINDOW_DAYS),
+    // The list is already limited to 8 weeks by date, so a full list means runs were left out.
+    mayBeCutOff: runs.length >= DEPLOY_FETCHED,
+  };
+}
+
+// A merged PR with the facts lead time needs. firstCommitAt is the author date of its first commit.
+export interface PrLeadInput {
+  number: number;
+  title: string;
+  url: string;
+  createdAt: string;
+  mergedAt: string;
+  mergeSha: string | null;
+  firstCommitAt: string | null;
+}
+
+export interface LeadTimeRow {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+  // Null when the PR has no first commit time.
+  codeHours: number | null;
+  reviewHours: number;
+  // Null when the PR has no later successful deploy: "Not deployed yet", never 0.
+  deployHours: number | null;
+  totalHours: number | null;
+}
+
+export interface LeadTime {
+  rows: LeadTimeRow[];
+  deployed: number;
+  notDeployed: number;
+  // Code: PRs with a first commit time. Review: every merged PR. Deploy and total: deployed PRs only.
+  medianCodeHours: number | null;
+  medianReviewHours: number | null;
+  medianDeployHours: number | null;
+  medianTotalHours: number | null;
+  band: DoraBand | null;
+  // True when the PR search reached its page limit.
+  truncated: boolean;
+}
+
+function hoursBetween(from: string, to: string): number {
+  return Math.max(0, (Date.parse(to) - Date.parse(from)) / HOUR_MS);
+}
+
+// The deploy run for a PR: the successful main run for its merge commit, else the first successful run that started after the merge.
+// It counts as deployed when the run ends.
+function deployFor(pr: PrLeadInput, deploys: Run[]): Run | null {
+  const merged = Date.parse(pr.mergedAt);
+  const bySha = pr.mergeSha === null ? undefined : deploys.find((run) => run.headSha === pr.mergeSha);
+  if (bySha) {
+    return bySha;
+  }
+  const later = deploys.filter((run) => Date.parse(run.createdAt) >= merged);
+  later.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  return later[0] ?? null;
+}
+
+export function computeLeadTime(prs: PrLeadInput[], runs: Run[], now: Date, truncated: boolean = false): LeadTime {
+  const deploys = runs.filter(isMainDeploy);
+  const rows: LeadTimeRow[] = [];
+  for (const pr of prs) {
+    const merged = Date.parse(pr.mergedAt);
+    const age = now.getTime() - merged;
+    if (Number.isNaN(merged) || Number.isNaN(Date.parse(pr.createdAt)) || age < 0 || age > DELIVERY_WINDOW_DAYS * DAY_MS) {
+      continue;
+    }
+    const codeHours = pr.firstCommitAt === null ? null : hoursBetween(pr.firstCommitAt, pr.createdAt);
+    const reviewHours = hoursBetween(pr.createdAt, pr.mergedAt);
+    const run = deployFor(pr, deploys);
+    const deployHours = run === null ? null : hoursBetween(pr.mergedAt, run.updatedAt ?? run.createdAt);
+    rows.push({
+      number: pr.number,
+      title: pr.title,
+      url: pr.url,
+      mergedAt: pr.mergedAt,
+      codeHours,
+      reviewHours,
+      deployHours,
+      // With no first commit time, the total starts when the PR was opened.
+      totalHours: deployHours === null ? null : (codeHours ?? 0) + reviewHours + deployHours,
+    });
+  }
+  rows.sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt));
+  const deployedRows = rows.filter((row) => row.deployHours !== null);
+  const median = (values: number[]): number | null => medianOf(values);
+  const total = median(deployedRows.map((row) => row.totalHours as number));
+  return {
+    rows,
+    deployed: deployedRows.length,
+    notDeployed: rows.length - deployedRows.length,
+    medianCodeHours: median(rows.flatMap((row) => (row.codeHours === null ? [] : [row.codeHours]))),
+    medianReviewHours: median(rows.map((row) => row.reviewHours)),
+    medianDeployHours: median(deployedRows.map((row) => row.deployHours as number)),
+    medianTotalHours: total,
+    band: total === null ? null : leadTimeBand(total),
+    truncated,
+  };
+}
+
+export interface CycleTime {
+  count: number;
+  medianDays: number | null;
+  medianText: string;
+}
+
+// Issues with the `ticket` label that were closed as completed (not "not planned") in the last 28 days: days from opened to closed.
+export function computeCycleTime(closed: Issue[], now: Date): CycleTime {
+  const days: number[] = [];
+  for (const issue of closed) {
+    const opened = Date.parse(issue.createdAt ?? '');
+    const done = Date.parse(issue.closedAt ?? '');
+    const age = now.getTime() - done;
+    if (!issue.labels.includes('ticket') || issue.stateReason !== 'COMPLETED' || Number.isNaN(opened) || Number.isNaN(done) || age < 0 || age > DELIVERY_WINDOW_DAYS * DAY_MS || done < opened) {
+      continue;
+    }
+    days.push((done - opened) / DAY_MS);
+  }
+  const median = medianOf(days);
+  return {
+    count: days.length,
+    medianDays: median === null ? null : Math.round(median * 10) / 10,
+    medianText: median === null ? 'Unknown' : formatLeadTime(median * 24),
+  };
+}
+
+export interface Wip {
+  inProgress: number;
+  inReview: number;
+  total: number;
+}
+
+// Open issues on the board in In progress or In review.
+export function computeWip(board: BoardItem[]): Wip {
+  const inProgress = board.filter((item) => item.status === 'In progress').length;
+  const inReview = board.filter((item) => item.status === 'In review').length;
+  return { inProgress, inReview, total: inProgress + inReview };
+}
+
+export interface DeliveryData {
+  board: BoardItem[];
+  closedIssues: Issue[];
+  deployRuns: Run[];
+  prLeadInputs: PrLeadInput[];
+  // The PR search reached its page limit.
+  prLeadTruncated: boolean;
+}
+
+// Each field is null only when its own sources failed.
+export function buildDelivery(sources: Record<string, SourceStatus>, data: DeliveryData, now: Date) {
+  const ok = (...names: string[]): boolean => names.every((name) => sources[name]?.ok);
+  return {
+    deployFrequency: ok('deploys') ? computeDeployFrequency(data.deployRuns, now) : null,
+    leadTime: ok('deploys', 'prLeadInputs') ? computeLeadTime(data.prLeadInputs, data.deployRuns, now, data.prLeadTruncated) : null,
+    cycleTime: ok('closedIssues') ? computeCycleTime(data.closedIssues, now) : null,
+    wip: ok('board') ? computeWip(data.board) : null,
+  };
+}
 
 export const RESTART_HEADER = 'x-factory-restart';
 
