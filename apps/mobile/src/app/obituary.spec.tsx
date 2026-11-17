@@ -143,6 +143,24 @@ describe('sharing the obituary on mobile', () => {
     expect((await screen.findByLabelText('Link to the obituary')).props.value).toBe('legacy.com/anna');
   });
 
+  it('Got it on the nudge lands on the hub with focus on the heading', async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: '', obituaryUrl: '' }]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna'));
+    fireEvent.press(await screen.findByRole('button', { name: /Share the obituary/ }));
+    const gotIt = await screen.findByRole('button', { name: 'Got it' });
+    focus.mockClear();
+    fireEvent.press(gotIt);
+    await screen.findByText('For Anna');
+    await waitFor(() => {
+      const handles = (globalThis as unknown as { nodeHandles: Map<any, number> }).nodeHandles;
+      const nodes = focus.mock.calls.map(([handle]) => [...handles].find(([, h]) => h === handle)?.[0]);
+      expect(nodes.some((node) => node?.props?.role === 'heading' && node?.props?.children === 'Ready to send')).toBe(true);
+    });
+  });
+
   it('shows no Done on arrival; emailing then Done lands on the hub with the obituary row done and focus on the heading', async () => {
     await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: 'Anna loved the garden.' }]));
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
