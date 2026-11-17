@@ -100,6 +100,7 @@ details > summary { min-height: 24px; padding: 4px 0; }
 .pr-group h3 { font-size: 14px; margin: 12px 0 6px; }
 .pr-group h3:first-child { margin-top: 0; }
 .lower { margin-top: 8px; }
+h2.group-title { font-size: 22px; margin: 32px 0 0; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
 svg.key { margin-right: 6px; vertical-align: middle; }
 .lower > summary { font-weight: 600; }
 svg.strip { display: block; width: 100%; height: auto; max-height: 56px; overflow: visible; }
@@ -118,20 +119,19 @@ ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px
   <span id="restart-note" class="muted" role="status" hidden></span>
 </header>
 <div role="tablist" aria-label="Dashboard views" id="tabs">
-  <button role="tab" type="button" id="tab-product" aria-controls="panel-product" data-tab="product">Product</button>
-  <button role="tab" type="button" id="tab-engineering" aria-controls="panel-engineering" data-tab="engineering">Engineering</button>
-  <button role="tab" type="button" id="tab-business" aria-controls="panel-business" data-tab="business">Business</button>
+  <button role="tab" type="button" id="tab-cto" aria-controls="panel-cto" data-tab="cto">CTO</button>
+  <button role="tab" type="button" id="tab-factory" aria-controls="panel-factory" data-tab="factory">Software Factory</button>
 </div>
 <main id="main">
-  <div role="tabpanel" id="panel-product" aria-labelledby="tab-product" tabindex="0" hidden></div>
-  <div role="tabpanel" id="panel-engineering" aria-labelledby="tab-engineering" tabindex="0" hidden></div>
-  <div role="tabpanel" id="panel-business" aria-labelledby="tab-business" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-cto" aria-labelledby="tab-cto" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-factory" aria-labelledby="tab-factory" tabindex="0" hidden></div>
 </main>
 <script>
 "use strict";
 var state = null;
-var TABS = ["product", "engineering", "business"];
-var main = document.getElementById("panel-engineering");
+var TABS = ["cto", "factory"];
+// Hashes from the old 3 tabs still open the matching new tab.
+var OLD_TABS = { product: "cto", business: "cto", engineering: "factory" };
 var areaSelect = document.getElementById("area");
 
 function el(tag, text, className) {
@@ -490,12 +490,16 @@ function ciRunsCard() {
   return c;
 }
 
-function renderCharts(parent) {
-  var s = kitSection(parent, "Trends", null);
-  var g = grid("cols-2");
-  g.appendChild(throughputCard());
-  g.appendChild(ciRunsCard());
-  s.appendChild(g);
+// Review: PRs merged per week.
+function renderThroughput(parent) {
+  var s = kitSection(parent, "PRs merged per week", null);
+  s.appendChild(throughputCard());
+}
+
+// Test: the last CI runs on main.
+function renderCiRuns(parent) {
+  var s = kitSection(parent, "CI runs on main", null);
+  s.appendChild(ciRunsCard());
 }
 
 function boardList(items, key, label) {
@@ -719,20 +723,46 @@ function apiHealthBody(d) {
   d.appendChild(p);
 }
 
-function renderLower(parent) {
-  var s = kitSection(parent, "More detail", null);
-  s.appendChild(el("p", "Each part is closed until you open it.", "muted"));
-  worktreesBody(lowerSection(s, "Worktrees", "worktrees"));
-  runsBody(lowerSection(s, "Recent runs", "runs"));
-  deploysBody(lowerSection(s, "Deploys", "deploys"));
-  backlogReviewBody(lowerSection(s, "Backlog review", "backlogReview"));
-  apiHealthBody(lowerSection(s, "API health", "health"));
+// A heading for one SDLC stage. Parts that follow it are drawn into the same panel.
+function groupTitle(parent, title) {
+  parent.appendChild(el("h2", title, "group-title"));
 }
 
-function renderEngineering() {
-  var panel = document.getElementById("panel-engineering");
-  [renderNeedsYou, renderHealthStrip, renderPrs, renderCharts, renderBoard, renderDrift, renderLower].forEach(function (part) {
-    safely(panel, part);
+// Closed-by-default parts of a stage. The note names how many there are, and each part stays isolated.
+function closedParts(parent, parts) {
+  var s = el("section");
+  s.appendChild(el("p", "Closed until you open it.", "muted"));
+  parts.forEach(function (part) {
+    safely(s, function (box) {
+      part[1](lowerSection(box, part[0], part[2]));
+    });
+  });
+  parent.appendChild(s);
+}
+
+function renderFactory() {
+  var panel = document.getElementById("panel-factory");
+  var stages = [
+    ["Plan", [renderBoard, renderDrift, function (p) {
+      closedParts(p, [["Backlog review", backlogReviewBody, "backlogReview"]]);
+    }]],
+    ["Build", [function (p) {
+      closedParts(p, [["Worktrees", worktreesBody, "worktrees"]]);
+    }]],
+    ["Review", [renderThroughput]],
+    ["Test", [renderHealthStrip, renderCiRuns]],
+    ["Release", [function (p) {
+      closedParts(p, [["Deploys", deploysBody, "deploys"], ["Recent runs", runsBody, "runs"]]);
+    }]],
+    ["Operate", [function (p) {
+      closedParts(p, [["API health", apiHealthBody, "health"]]);
+    }]]
+  ];
+  stages.forEach(function (stage) {
+    groupTitle(panel, stage[0]);
+    stage[1].forEach(function (part) {
+      safely(panel, part);
+    });
   });
 }
 
@@ -1289,16 +1319,6 @@ function renderFlags(parent) {
   });
 }
 
-function renderProduct() {
-  var panel = document.getElementById("panel-product");
-  main = panel;
-  renderHeadline(panel);
-  renderBlockers(panel);
-  renderShipped(panel);
-  renderRoadmap(panel);
-  renderFlags(panel);
-}
-
 // ---- Business tab ----
 // Most important first: decisions needed, next steps by owner, the key numbers, then the cost chart.
 var NOT_SET = "Not set";
@@ -1442,13 +1462,10 @@ function renderLinks(parent, b) {
   s.appendChild(g);
 }
 
-function renderBusiness() {
-  var panel = document.getElementById("panel-business");
-  main = panel;
+function renderBusiness(parent) {
   var b = state.business;
   if (!b) {
     var s = el("section");
-    s.appendChild(el("h2", "Business"));
     var src = state.sources.business;
     if (src && src.missing) {
       s.appendChild(el("p", "No business.json yet. Copy business.example.json to business.json and fill it in.", "muted"));
@@ -1457,20 +1474,44 @@ function renderBusiness() {
     } else {
       s.appendChild(el("p", "The business numbers are not available.", "muted"));
     }
-    panel.appendChild(s);
+    parent.appendChild(s);
     return;
   }
-  renderDecisions(panel, b);
-  renderSteps(panel, b);
-  renderBusinessTiles(panel, b);
-  renderCosts(panel, b);
-  renderLinks(panel, b);
-  panel.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
+  [renderDecisions, renderSteps, renderBusinessTiles, renderCosts, renderLinks].forEach(function (part) {
+    safely(parent, function (box) {
+      part(box, b);
+    });
+  });
+  parent.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
+}
+
+function renderCto() {
+  var panel = document.getElementById("panel-cto");
+  safely(panel, renderNeedsYou);
+  groupTitle(panel, "Product");
+  [renderHeadline, renderBlockers, renderShipped, renderRoadmap, renderFlags].forEach(function (part) {
+    safely(panel, part);
+  });
+  groupTitle(panel, "Engineering");
+  safely(panel, renderPrs);
+  groupTitle(panel, "Business");
+  safely(panel, renderBusiness);
 }
 
 function currentTab() {
   var name = location.hash.slice(1);
-  return TABS.indexOf(name) >= 0 ? name : "product";
+  if (OLD_TABS[name]) {
+    name = OLD_TABS[name];
+  }
+  return TABS.indexOf(name) >= 0 ? name : "cto";
+}
+
+// Rewrites an old hash (#product, #business, #engineering) to the new one without a history entry.
+function fixOldHash() {
+  var name = location.hash.slice(1);
+  if (OLD_TABS[name]) {
+    history.replaceState(null, "", "#" + OLD_TABS[name]);
+  }
 }
 
 function showTab(name, focus) {
@@ -1484,7 +1525,6 @@ function showTab(name, focus) {
       button.focus();
     }
   });
-  document.getElementById("area-label").hidden = name !== "engineering";
   fitLabels();
 }
 
@@ -1519,6 +1559,7 @@ document.getElementById("tabs").addEventListener("keydown", function (event) {
   }
 });
 window.addEventListener("hashchange", function () {
+  fixOldHash();
   showTab(currentTab(), false);
 });
 
@@ -1564,9 +1605,8 @@ function render() {
     areaSelect.appendChild(o);
   });
   areaSelect.value = state.areas.indexOf(current) >= 0 ? current : "all";
-  renderProduct();
-  renderEngineering();
-  renderBusiness();
+  renderCto();
+  renderFactory();
   fitLabels();
 }
 
@@ -1654,6 +1694,7 @@ areaSelect.addEventListener("change", function () {
     render();
   }
 });
+fixOldHash();
 showTab(currentTab(), false);
 try {
   if (sessionStorage.getItem("factoryRestarted") === "1") {
