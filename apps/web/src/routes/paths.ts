@@ -10,7 +10,7 @@
  *   /people/:flowId/:section       person | announcement | service | obituary | thanks
  *   /people/:flowId/guide/:itemId  one checklist item
  *   /start, /start/:section, /start/guide/:itemId   the same, before a person exists
- *   /account, /join                account; join (the fragment is kept)
+ *   /account, /join                account; join (the invitation's `#t=` is read and removed at boot, #128)
  */
 
 export const SECTIONS = ['person', 'announcement', 'service', 'obituary', 'thanks'] as const;
