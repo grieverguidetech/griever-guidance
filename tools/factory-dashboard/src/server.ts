@@ -1,4 +1,4 @@
-// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands. It writes only one cache file (the AWS cost reading).
+// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It writes only one cache file (the AWS cost reading).
 import { execFile } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -363,6 +363,15 @@ async function lastChanged(root: string, file: string): Promise<string | null> {
   }
 }
 
+async function mermaidVersion(): Promise<string> {
+  try {
+    const pkg = JSON.parse(await readFile(join(HERE, '..', 'node_modules', 'mermaid', 'package.json'), 'utf8')) as { version?: string };
+    return pkg.version ?? '0';
+  } catch {
+    return '0';
+  }
+}
+
 async function loadDiagrams() {
   const root = await mainRepoRoot();
   const now = new Date();
@@ -376,7 +385,8 @@ async function loadDiagrams() {
   const diagrams = (
     await Promise.all(
       files.map(async (file) => {
-        const blocks = extractMermaidBlocks(file, await readFile(join(root, file), 'utf8'));
+        const text = await readFile(join(root, file), 'utf8').catch(() => null);
+        const blocks = text === null ? [] : extractMermaidBlocks(file, text);
         if (blocks.length === 0) {
           return [];
         }
@@ -385,7 +395,7 @@ async function loadDiagrams() {
         return blocks.map((block) => ({
           ...block,
           group: diagramGroup(file),
-          url: `${REPO_URL}/blob/main/${file}#L${block.line}`,
+          url: `${REPO_URL}/blob/main/${file}?plain=1#L${block.line}`,
           lastChanged: changed,
           daysAgo: age.days,
           stale: age.stale,
@@ -396,11 +406,13 @@ async function loadDiagrams() {
   return {
     generatedAt: now.toISOString(),
     staleDays: DIAGRAM_STALE_DAYS,
+    mermaidVersion: await mermaidVersion(),
     groups: DIAGRAM_GROUPS.map((name) => ({ name, diagrams: diagrams.filter((d) => d.group === name) })),
   };
 }
 
 // The Mermaid browser bundle, served from node_modules (no CDN). Read when asked, so the server starts without it.
+// The page asks for it with ?v=<version>, so a new Mermaid version is not served from the browser cache.
 const MERMAID_FILE = join(HERE, '..', 'node_modules', 'mermaid', 'dist', 'mermaid.min.js');
 
 // Cost Explorer bills $0.01 a call. makeCostReader keeps a good reading for 12 hours (and for the month

@@ -123,10 +123,10 @@ h2.panel-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.0
 progress.bar { display: block; width: 100%; height: 8px; margin: 4px 0; accent-color: var(--chart-1); }
 .panel-lines { overflow-wrap: anywhere; margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 table.plain td.text, table.plain th.text { text-align: left; font-weight: 400; }
-.diagram { overflow-x: auto; }
+.diagram.drawn { background: #ffffff; color: #1f2328; padding: 16px; border-radius: 6px; }
 .diagram svg { max-width: 100%; height: auto; }
 .diagram-meta { margin: 0 0 8px; }
-pre.diagram-source { overflow-x: auto; margin: 8px 0 0; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+pre.diagram-source { margin: 0; padding: 8px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -2059,16 +2059,20 @@ function renderCto() {
 }
 
 // ---- Architecture tab: the Mermaid blocks of the docs, drawn by the local Mermaid bundle ----
+// It does not read `state`: /api/diagrams has its own request. Mermaid loads and draws when the tab is first shown.
 var diagramData = null;
+var diagramText = null;
+var architectureWanted = false;
+var architectureBuilt = false;
 var mermaidLoad = null;
 var drawToken = 0;
 
 // Loads /vendor/mermaid.min.js once, from this server. Nothing comes from outside localhost.
-function loadMermaid() {
+function loadMermaid(version) {
   if (!mermaidLoad) {
     mermaidLoad = new Promise(function (resolve, reject) {
       var tag = document.createElement("script");
-      tag.src = "/vendor/mermaid.min.js";
+      tag.src = "/vendor/mermaid.min.js?v=" + encodeURIComponent(version || "0");
       tag.onload = function () {
         resolve(window.mermaid);
       };
@@ -2094,73 +2098,112 @@ function diagramCard(parent, d) {
   meta.appendChild(link(d.file + ", line " + d.line, d.url));
   meta.appendChild(document.createTextNode(". " + ageLine(d)));
   c.appendChild(meta);
+  var region = scrollBox("Diagram: " + d.title);
   var drawing = el("div", null, "diagram");
   drawing.appendChild(el("p", "Drawing the diagram.", "muted"));
-  c.appendChild(drawing);
-  var text = el("details");
+  region.appendChild(drawing);
+  c.appendChild(region);
+  var text = el("details", null, "chart-table");
   text.appendChild(el("summary", "Show the text"));
-  text.appendChild(el("pre", d.source, "diagram-source"));
+  var source = scrollBox("Text of the diagram: " + d.title);
+  source.appendChild(el("pre", d.source, "diagram-source"));
+  text.appendChild(source);
   c.appendChild(text);
   parent.appendChild(c);
-  return { drawing: drawing, data: d, title: c.titleId };
+  return { drawing: drawing, data: d };
 }
 
 function showDrawingError(slot, reason) {
   slot.drawing.textContent = "";
+  slot.drawing.className = "diagram";
+  slot.drawing.removeAttribute("role");
+  slot.drawing.removeAttribute("aria-label");
   slot.drawing.appendChild(el("p", "Could not draw this diagram. " + reason, "error"));
 }
 
-// Draws one diagram. Mermaid returns an SVG string (sanitized by securityLevel strict); it is parsed, not assigned with innerHTML.
-function drawDiagram(mermaid, slot, index) {
-  var id = "mmd-" + index;
+// Draws one diagram and resolves true or false. Mermaid runs in strict mode and sanitizes its own SVG with DOMPurify, and the
+// source is a doc in this repo. The SVG string is parsed and imported as nodes instead of assigned with innerHTML.
+function drawDiagram(mermaid, slot, id) {
   return mermaid.render(id, slot.data.source).then(function (out) {
     var svg = new DOMParser().parseFromString(out.svg, "text/html").querySelector("svg");
     if (!svg) {
       throw new Error("Mermaid returned no drawing.");
     }
     slot.drawing.textContent = "";
+    slot.drawing.className = "diagram drawn";
     slot.drawing.setAttribute("role", "img");
-    slot.drawing.setAttribute("aria-labelledby", slot.title);
+    slot.drawing.setAttribute("aria-label", "Diagram: " + slot.data.title + ". The text view follows.");
     slot.drawing.appendChild(document.importNode(svg, true));
+    return true;
   }).catch(function (e) {
     var stray = document.getElementById("d" + id);
     if (stray) {
       stray.remove();
     }
     showDrawingError(slot, (e && e.message ? String(e.message) : "Unknown error.").split("\n")[0].slice(0, 200));
+    return false;
   });
 }
 
-// Draws the diagrams one after another. A newer call (a theme change, Refresh) stops an older one.
-function drawAllDiagrams(slots) {
+function drawSummary(done, total) {
+  var failed = total - done;
+  return "Drew " + done + " of " + total + " diagrams." + (failed > 0 ? " " + failed + " could not be drawn." : "");
+}
+
+// Draws the diagrams one after another and writes one line to the status. A newer call stops an older one.
+// Mermaid always uses its default theme, drawn on a light box, so the colors stay readable in both page themes.
+function drawAllDiagrams(slots, status, version) {
   var token = ++drawToken;
-  var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  loadMermaid().then(function (mermaid) {
-    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default", suppressErrorRendering: true });
+  status.textContent = "";
+  var done = 0;
+  loadMermaid(version).then(function (mermaid) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "default",
+      suppressErrorRendering: true,
+      themeVariables: { clusterBorder: "#6b6b2a" }
+    });
     return slots.reduce(function (chain, slot, index) {
       return chain.then(function () {
-        return token === drawToken ? drawDiagram(mermaid, slot, token + "-" + index) : null;
+        if (token !== drawToken) {
+          return null;
+        }
+        return drawDiagram(mermaid, slot, "mmd-" + token + "-" + index).then(function (ok) {
+          done += ok ? 1 : 0;
+        });
       });
     }, Promise.resolve());
   }).catch(function (e) {
     slots.forEach(function (slot) {
       showDrawingError(slot, e.message);
     });
+  }).then(function () {
+    if (token === drawToken) {
+      status.textContent = drawSummary(done, slots.length);
+    }
   });
 }
 
 function renderArchitecture() {
   var node = document.getElementById("panel-architecture");
   node.textContent = "";
+  architectureBuilt = true;
+  drawToken += 1;
   var slots = [];
+  var status = null;
   safely(node, function (parent) {
-    var p = panel(parent, "Architecture", "docs/*.md", diagramData && diagramData.generatedAt);
-    if (!diagramData || diagramData.error) {
-      p.appendChild(el("p", "Could not load: " + (diagramData ? diagramData.error : "no data"), "error"));
+    var p = panel(parent, "Architecture", "docs/*.md", diagramData.generatedAt);
+    if (diagramData.error) {
+      p.appendChild(el("p", "Could not load the diagrams: " + diagramData.error, "error"));
       return;
     }
+    status = el("p", "Drawing the diagrams.", "muted");
+    status.setAttribute("role", "status");
+    p.appendChild(status);
     diagramData.groups.forEach(function (group) {
-      var s = kitSection(p, group.name, "architecture");
+      var s = el("section");
+      s.appendChild(el("h3", group.name));
       if (group.diagrams.length === 0) {
         s.appendChild(el("p", "No diagrams in the docs for this group.", "muted"));
       }
@@ -2169,18 +2212,59 @@ function renderArchitecture() {
           slots.push(diagramCard(box, d));
         });
       });
+      p.appendChild(s);
     });
   });
-  if (slots.length > 0) {
-    drawAllDiagrams(slots);
+  if (slots.length > 0 && status) {
+    drawAllDiagrams(slots, status, diagramData.mermaidVersion);
   }
 }
 
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-  if (state) {
-    renderArchitecture();
+// Called when the Architecture tab is shown. The first call builds it (or shows the loading line); later calls change nothing.
+function showArchitecture() {
+  architectureWanted = true;
+  if (architectureBuilt) {
+    return;
   }
-});
+  if (diagramData) {
+    renderArchitecture();
+    return;
+  }
+  var node = document.getElementById("panel-architecture");
+  if (!node.firstChild) {
+    var line = el("p", "Loading the diagrams.", "muted");
+    line.setAttribute("role", "status");
+    node.appendChild(line);
+  }
+}
+
+// Reads /api/diagrams on its own. When the JSON has not changed, the cards stay as they are (focus and open text views are kept).
+function loadDiagrams() {
+  fetch("/api/diagrams", { cache: "no-store" })
+    .then(function (r) {
+      if (!r.ok) {
+        throw new Error("HTTP " + r.status);
+      }
+      return r.text();
+    })
+    .then(function (text) {
+      if (text === diagramText && architectureBuilt) {
+        return;
+      }
+      diagramText = text;
+      diagramData = JSON.parse(text);
+      if (architectureWanted) {
+        renderArchitecture();
+      }
+    })
+    .catch(function (e) {
+      diagramText = null;
+      diagramData = { error: e.message, generatedAt: new Date().toISOString() };
+      if (architectureWanted) {
+        renderArchitecture();
+      }
+    });
+}
 
 function currentTab() {
   var name = location.hash.slice(1);
@@ -2205,6 +2289,9 @@ function showTab(name, focus) {
     button.setAttribute("aria-selected", selected ? "true" : "false");
     button.tabIndex = selected ? 0 : -1;
     document.getElementById("panel-" + tab).hidden = !selected;
+    if (selected && tab === "architecture") {
+      showArchitecture();
+    }
     if (selected && focus) {
       button.focus();
     }
@@ -2358,13 +2445,7 @@ function restart() {
 
 function load(refresh) {
   document.getElementById("updated").textContent = "Loading";
-  var diagrams = fetch("/api/diagrams", { cache: "no-store" })
-    .then(function (r) {
-      return r.ok ? r.json() : { error: "HTTP " + r.status };
-    })
-    .catch(function (e) {
-      return { error: e.message };
-    });
+  loadDiagrams();
   fetch("/api/state" + (refresh ? "?refresh=1" : ""))
     .then(function (r) {
       return r.json();
@@ -2372,11 +2453,6 @@ function load(refresh) {
     .then(function (data) {
       state = data;
       render();
-      return diagrams;
-    })
-    .then(function (found) {
-      diagramData = found;
-      renderArchitecture();
     })
     .catch(function (e) {
       document.getElementById("updated").textContent = "Could not load: " + e.message;

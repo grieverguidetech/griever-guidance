@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "out-tsc/vitest",
+    "tsBuildInfoFile": "out-tsc/vitest/tsconfig.spec.tsbuildinfo",
+    "emitDeclarationOnly": true,
+    "types": ["vitest/globals", "node"]
+  },
+  "include": ["src/**/*.spec.ts"],
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    }
+  ]
+}

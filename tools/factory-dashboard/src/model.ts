@@ -2104,44 +2104,56 @@ export type DiagramGroupName = 'System' | 'User flows' | 'Data';
 export const DIAGRAM_GROUPS: DiagramGroupName[] = ['System', 'User flows', 'Data'];
 export const DIAGRAM_STALE_DAYS = 30;
 
-export type DiagramBlock = { file: string; line: number; title: string; kind: string; source: string };
+export type DiagramBlock = { file: string; line: number; title: string; source: string };
 
 // Every ```mermaid block in one doc. `line` is the line of the opening fence (1-based). The title is the
-// nearest heading above it (a `#` line outside any code fence), else the file name.
+// nearest heading above it (a `#` line outside any code fence and outside front matter), without backticks,
+// else the file name. A second block under the same heading gets " (2)", a third " (3)".
 export function extractMermaidBlocks(file: string, text: string): DiagramBlock[] {
   const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
   const blocks: DiagramBlock[] = [];
-  let heading = file.replace(/\.md$/, '');
+  const fallback = file.replace(/\.md$/, '');
+  let heading = fallback;
+  let underHeading = 0;
   let fence: string | null = null;
-  let current: { line: number; title: string; body: string[] } | null = null;
-  lines.forEach((line, index) => {
+  let current: { line: number; body: string[] } | null = null;
+  let index = 0;
+  if (lines[0]?.trim() === '---') {
+    const end = lines.findIndex((line, at) => at > 0 && line.trim() === '---');
+    index = end > 0 ? end + 1 : 0;
+  }
+  for (; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
     const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
     if (fence === null) {
       if (open) {
         fence = open[1] ?? '```';
         if ((open[2] ?? '').toLowerCase() === 'mermaid') {
-          current = { line: index + 1, title: heading, body: [] };
+          current = { line: index + 1, body: [] };
         }
-      } else {
-        const found = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
-        if (found) {
-          heading = (found[1] ?? heading).trim();
-        }
+        continue;
       }
-      return;
+      const found = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+      if (found) {
+        heading = (found[1] ?? '').replace(/`/g, '').trim() || fallback;
+        underHeading = 0;
+      }
+      continue;
     }
-    if (open && line.trim().startsWith(fence) && (open[2] ?? '') === '') {
+    // A closing fence: same character, at least as long, nothing after it.
+    const closes = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+    if (closes && (closes[1] ?? '').startsWith(fence[0] ?? '`') && (closes[1] ?? '').length >= fence.length) {
       fence = null;
       if (current) {
-        const source = current.body.join('\n').trim();
-        const kind = /^(\S+)/.exec(source)?.[1] ?? 'diagram';
-        blocks.push({ file, line: current.line, title: current.title, kind, source });
+        underHeading += 1;
+        const title = underHeading === 1 ? heading : `${heading} (${underHeading})`;
+        blocks.push({ file, line: current.line, title, source: current.body.join('\n').trim() });
         current = null;
       }
-      return;
+      continue;
     }
     current?.body.push(line);
-  });
+  }
   return blocks;
 }
 
