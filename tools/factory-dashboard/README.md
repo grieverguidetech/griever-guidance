@@ -48,7 +48,7 @@ A missing or invalid file shows its reason in the section and does not break the
 - `nextSteps`: a list of `{ "owner", "task", "due" (date or null), "done" (true or false) }`. A step is overdue when it is not done and its due date is before today. Steps are grouped by owner, overdue first.
 - `nextSync`: date or null.
 
-## Linear: GRI
+## User stories (Linear GRI)
 
 The Business panel on the CTO tab lists the open issues of the Linear team with key GRI (completed, canceled and duplicate are left out): ID (a link), title, status, priority, assignee ('Unassigned' when none) and last updated. Rows sort by priority (no priority last), then newest update first, 10 per page.
 
@@ -63,7 +63,7 @@ The server reads the key from the Keychain on each call (`security find-generic-
 ## Read-only
 
 The server only runs `gh`, `git` and one `aws` read command (`issue list` (open issues with their bodies and assignees, closed issues of the last 28 days for the drift and area checks, closed issues of the last 7 days with their bodies for summaries), `pr list`, `api repos/.../milestones` (open milestones, REST), `run list`,
-`project item-list`, `variable list` (feature flag names and values only), `pr list --state merged` (28 days, with the opened time, the body and the branch name, which feed the PR summary and area; Shipped keeps the last 7), `run list --workflow ci.yml --branch main` and `run list --workflow deploy.yml` (runs of the last 56 days, at most 500, with the end time and commit sha), one `gh api graphql` search query for merged PRs with their first commit time, `worktree list`, `status`, `rev-list`, `log origin/main` for the recent commits), `aws ce get-cost-and-usage` (this month, MONTHLY, UnblendedCost; see below), a read of `docs/adr/*.md`, one GET to the health endpoint, a read of `backlog-review.json` and `business.json`, and one read-only Linear GraphQL query (see Linear: GRI).
+`project item-list`, `variable list` (feature flag names and values only), `pr list --state merged` (28 days, with the opened time, the body and the branch name, which feed the PR summary and area; Shipped keeps the last 7), `run list --workflow ci.yml --branch main` and `run list --workflow deploy.yml` (runs of the last 56 days, at most 500, with the end time and commit sha), one `gh api graphql` search query for merged PRs with their first commit time, `worktree list`, `status`, `rev-list`, `log origin/main` for the recent commits), `aws ce get-cost-and-usage` (this month, MONTHLY, UnblendedCost; see below), a read of `docs/adr/*.md`, one GET to the health endpoint, a read of `backlog-review.json` and `business.json`, and one read-only Linear GraphQL query (see User stories).
 It never calls `gh secret`, never writes to GitHub or git, never fetches, writes only one file (the AWS cost cache, `~/Library/Caches/gg-factory/aws-cost.json`, outside the repo), and never reads `.env*` files.
 
 ### AWS cost
