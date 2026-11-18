@@ -709,6 +709,8 @@ describe('personal details (#717)', () => {
     mockGetProfile.mockResolvedValue({ ok: false, reason: 'offline' });
     renderAccount(true);
     await screen.findByDisplayValue('Kept');
+    // The kept profile shows before the failed load answers, and Save is ignored until it does (the next test). Wait for the answer.
+    await waitFor(() => expect(screen.queryByText('Loading your details.')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     saveButton();
     await screen.findByText('Your details are saved.');
