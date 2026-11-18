@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { ClerkProvider, useAuth, useClerk, useReverification, useUser } from '@clerk/react';
+import { useNavigate } from 'react-router';
 import { isReverificationCancelledError } from '@clerk/react/errors';
 import { enUS } from '@clerk/localizations';
 import { SIGNED_IN_STORAGE_KEY, useAccount } from '@griever/hooks';
@@ -272,11 +273,33 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
   return <>{children({ unavailable: false, account, getAccessToken, signOut, email, clerkNames, openAccountSettings: instance.loaded ? openAccountSettings : undefined, deleteAccount: instance.loaded ? deleteAccount : undefined })}</>;
 }
 
-// The app has no router: when Clerk wants to move the page after sign-in or sign-out, stay put and
-// drop any leftover sign-in hash. The app reacts to the session itself. Replace, never push, so Back
-// cannot return to a sign-in step; the entry's state is kept because the app records its own there.
+// When Clerk wants to move the page after sign-in or sign-out, stay put and drop any leftover sign-in
+// hash: the app reacts to the session itself (the sign-in guard sends the person to `next`). Replace,
+// never push; the entry's state is kept because the app records its own there.
 function stayHere(): void {
   window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+}
+
+/**
+ * Where Clerk's own move goes, or null to stay here. Only its sign-in steps (`/sign-in/...`, path
+ * routing) move the page. The current `next` is carried over when Clerk leaves it off, so the
+ * return-to survives every step.
+ */
+export function clerkStepTarget(to: string, currentSearch: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(to, window.location.origin);
+  } catch {
+    return null;
+  }
+  if (url.origin !== window.location.origin || (url.pathname !== '/sign-in' && !url.pathname.startsWith('/sign-in/'))) {
+    return null;
+  }
+  const next = new URLSearchParams(currentSearch).get('next');
+  if (next !== null && !url.searchParams.has('next')) {
+    url.searchParams.set('next', next);
+  }
+  return url.pathname + url.search;
 }
 
 /**
@@ -296,6 +319,19 @@ export const appearance = {
 } as const;
 
 export function ClerkAccount({ children }: { children: (state: ClerkAccountState) => ReactNode }) {
+  const navigate = useNavigate();
+  // Clerk's steps replace the entry (push and replace alike), so they leave nothing for Back.
+  const moveClerk = useCallback(
+    (to: string) => {
+      const target = clerkStepTarget(to, window.location.search);
+      if (target === null) {
+        stayHere();
+        return;
+      }
+      return navigate(target, { replace: true });
+    },
+    [navigate],
+  );
   const publishableKey = String(import.meta.env['VITE_CLERK_PUBLISHABLE_KEY'] ?? '').trim();
   if (!publishableKey) {
     return <>{children({ unavailable: true })}</>;
@@ -305,8 +341,10 @@ export function ClerkAccount({ children }: { children: (state: ClerkAccountState
       publishableKey={publishableKey}
       localization={localization}
       appearance={appearance}
-      routerPush={stayHere}
-      routerReplace={stayHere}
+      routerPush={moveClerk}
+      routerReplace={moveClerk}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-in"
       afterSignOutUrl="/"
     >
       <AccountBridge>{children}</AccountBridge>
