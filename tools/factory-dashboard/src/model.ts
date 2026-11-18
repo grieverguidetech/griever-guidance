@@ -2098,3 +2098,79 @@ export function costErrorMessage(raw: string): string {
     .slice(0, 120);
   return safe === '' ? 'Could not read AWS cost.' : `Could not read AWS cost. ${safe}`;
 }
+
+// ---- Architecture tab: the Mermaid blocks in the docs ----
+export type DiagramGroupName = 'System' | 'User flows' | 'Data';
+export const DIAGRAM_GROUPS: DiagramGroupName[] = ['System', 'User flows', 'Data'];
+export const DIAGRAM_STALE_DAYS = 30;
+
+export type DiagramBlock = { file: string; line: number; title: string; source: string };
+
+// Every ```mermaid block in one doc. `line` is the line of the opening fence (1-based). The title is the
+// nearest heading above it (a `#` line outside any code fence and outside front matter), without backticks,
+// else the file name. A second block under the same heading gets " (2)", a third " (3)".
+export function extractMermaidBlocks(file: string, text: string): DiagramBlock[] {
+  const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
+  const blocks: DiagramBlock[] = [];
+  const fallback = file.replace(/\.md$/, '');
+  let heading = fallback;
+  let underHeading = 0;
+  let fence: string | null = null;
+  let current: { line: number; body: string[] } | null = null;
+  let index = 0;
+  if (lines[0]?.trim() === '---') {
+    const end = lines.findIndex((line, at) => at > 0 && line.trim() === '---');
+    index = end > 0 ? end + 1 : 0;
+  }
+  for (; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
+    if (fence === null) {
+      if (open) {
+        fence = open[1] ?? '```';
+        if ((open[2] ?? '').toLowerCase() === 'mermaid') {
+          current = { line: index + 1, body: [] };
+        }
+        continue;
+      }
+      const found = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+      if (found) {
+        heading = (found[1] ?? '').replace(/`/g, '').trim() || fallback;
+        underHeading = 0;
+      }
+      continue;
+    }
+    // A closing fence: same character, at least as long, nothing after it.
+    const closes = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+    if (closes && (closes[1] ?? '').startsWith(fence[0] ?? '`') && (closes[1] ?? '').length >= fence.length) {
+      fence = null;
+      if (current) {
+        underHeading += 1;
+        const title = underHeading === 1 ? heading : `${heading} (${underHeading})`;
+        blocks.push({ file, line: current.line, title, source: current.body.join('\n').trim() });
+        current = null;
+      }
+      continue;
+    }
+    current?.body.push(line);
+  }
+  return blocks;
+}
+
+// docs/frontend.md is User flows, docs/learnings is Data, everything else (backend-services.md, ADRs, any other doc) is System.
+export function diagramGroup(file: string): DiagramGroupName {
+  if (file === 'docs/frontend.md') {
+    return 'User flows';
+  }
+  return file.startsWith('docs/learnings/') ? 'Data' : 'System';
+}
+
+// Whole days since the last commit that touched the file. null when git gave no date.
+export function diagramAge(lastChanged: string | null, now: Date): { days: number | null; stale: boolean } {
+  const time = lastChanged === null ? NaN : Date.parse(lastChanged);
+  if (Number.isNaN(time)) {
+    return { days: null, stale: false };
+  }
+  const days = Math.max(0, Math.floor((now.getTime() - time) / 86_400_000));
+  return { days, stale: days > DIAGRAM_STALE_DAYS };
+}
