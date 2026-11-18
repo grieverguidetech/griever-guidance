@@ -187,6 +187,13 @@ describe('ObituaryLifeFields', () => {
       expect(personPatches.at(-1)).toEqual({ birthDate: tidy });
     });
 
+    it('does not tidy a birth date before 1800', async () => {
+      const { personPatches } = setup({ birthDate: '3/3/1750' });
+      await userEvent.click(screen.getByLabelText(birthLabel));
+      await userEvent.tab();
+      expect(personPatches).toEqual([]);
+    });
+
     it('tidies a date of passing before 2000 on blur', async () => {
       const { personPatches } = setup({ dateOfPassing: '5/29/1985' });
       await userEvent.click(screen.getByLabelText(passingLabel));
@@ -195,9 +202,10 @@ describe('ObituaryLifeFields', () => {
     });
 
     it('works out the age from a tidied 1940 birth date', async () => {
-      setup({ birthDate: '6/15/1940', dateOfPassing: 'November 2, 2026' });
+      const { personPatches } = setup({ birthDate: '6/15/1940', dateOfPassing: 'November 2, 2026' });
       await userEvent.click(screen.getByLabelText(birthLabel));
       await userEvent.tab();
+      expect(personPatches.at(-1)).toEqual({ birthDate: 'June 15, 1940' });
       expect(screen.getByLabelText(copy.ageLabel)).toHaveValue('86');
     });
 

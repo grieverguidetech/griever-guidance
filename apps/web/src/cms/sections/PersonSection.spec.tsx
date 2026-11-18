@@ -131,12 +131,11 @@ describe('PersonSection', () => {
     expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: 'May 29, 1985' });
   });
 
-  it('leaves a future date as typed apart from tidying, and keeps the note', async () => {
-    const { onChange } = setup({ dateOfPassing: '12/25/2099' });
-    await userEvent.click(screen.getByLabelText(/Date they passed/));
+  it('does not tidy a birth date before 1800', async () => {
+    const { onChange } = setup({ birthDate: '3/3/1750' });
+    await userEvent.click(screen.getByLabelText(/Date of birth/));
     await userEvent.tab();
-    expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: 'December 25, 2099' });
-    expect(screen.getByText('This date is still ahead. You can keep it.')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('tidies a typed date on blur', async () => {

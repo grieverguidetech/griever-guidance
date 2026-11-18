@@ -6,7 +6,7 @@ import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { MarkReady } from './MarkReady';
 
 /** Birth and passing dates run far before 2000, so the field's default years would not tidy them. */
-const LIFE_YEARS = { minYear: 1000, maxYear: 9999 };
+const LIFE_YEARS = { minYear: 1800, maxYear: 2100 };
 
 const copy = screenCopy('cmsPerson');
 
