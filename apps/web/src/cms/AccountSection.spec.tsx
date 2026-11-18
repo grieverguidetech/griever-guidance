@@ -210,6 +210,7 @@ describe('AccountSection personal details', () => {
     // The date field stays off autofill: browsers fill a birthday as yyyy-mm-dd.
     expect(screen.getByLabelText('Date of birth')).toHaveAttribute('autocomplete', 'off');
     expect(screen.getByLabelText('Date of birth')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Date of birth, choose date from calendar' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Address' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', SAVE)).toHaveLength(1);
   });

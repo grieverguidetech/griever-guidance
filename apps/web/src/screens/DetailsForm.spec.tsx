@@ -44,3 +44,10 @@ describe('Service place field', () => {
     expect(screen.getByLabelText('message')).toHaveTextContent('River');
   });
 });
+
+describe('Service date calendar button', () => {
+  it('is named by its field', () => {
+    render(<Harness />);
+    expect(screen.getByRole('button', { name: /^Service date.*, choose date from calendar$/ })).toBeInTheDocument();
+  });
+});

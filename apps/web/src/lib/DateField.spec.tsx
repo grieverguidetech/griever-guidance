@@ -139,3 +139,10 @@ describe('dateToISO', () => {
     expect(dateToISO('2026')).toBe('');
   });
 });
+
+describe('calendar button fallback', () => {
+  it('uses the plain button text when no label id is given', () => {
+    render(<DateInput id="solo" value="" onChange={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Choose date from calendar' })).toBeInTheDocument();
+  });
+});

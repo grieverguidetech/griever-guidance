@@ -311,12 +311,13 @@ export function PersonalDetailsForm({ namesOnly, profileLoaded = true, headingLe
       />
       {namesOnly ? null : (
         <>
-          <label htmlFor={`${id}-dob`} className="font-semibold">
+          <label id={`${id}-dob-label`} htmlFor={`${id}-dob`} className="font-semibold">
             {copy.birthDateLabel}
           </label>
           {/* autoComplete stays off in DateInput on purpose: browsers fill a birthday as yyyy-mm-dd, which this field does not read. */}
           <DateInput
             id={`${id}-dob`}
+            labelId={`${id}-dob-label`}
             value={values.date}
             min={`${BIRTH_YEAR_MIN}-01-01`}
             max={todayISO()}
