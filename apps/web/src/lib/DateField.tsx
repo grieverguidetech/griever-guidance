@@ -1,6 +1,9 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { parseCompleteDate } from '@griever/shared';
 import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
+import { screenCopy } from '@griever/copy';
+
+const copy = screenCopy('cmsShell');
 
 /**
  * An accessible, low-effort date field. The user can **type** a date freely
@@ -52,6 +55,8 @@ interface DateInputProps {
   describedBy?: string;
   /** The id of a visible label elsewhere on the page, when there is no `<label htmlFor>`. */
   labelledBy?: string;
+  /** The id of the field's visible label. Names the calendar button ("Date, choose date from calendar"). Falls back to `labelledBy`. */
+  labelId?: string;
   required?: boolean;
   /** A quiet, non-blocking note under the field (not an alert). Never stops saving. */
   note?: string;
@@ -74,6 +79,7 @@ export function DateInput({
   max,
   describedBy,
   labelledBy,
+  labelId,
   required,
   note: liveNote,
   noteOnBlur,
@@ -88,6 +94,21 @@ export function DateInput({
   const helpId = `${id}-help`;
   const noteId = `${id}-note`;
   const errorId = `${id}-error`;
+  const fieldLabelIds = labelId ?? labelledBy;
+  const [fieldName, setFieldName] = useState('');
+  // Read the visible label text so the button can be named by its field. A single aria-label
+  // (not aria-labelledby) keeps this button out of label queries for the field itself.
+  useLayoutEffect(() => {
+    const name = (fieldLabelIds ?? '')
+      .split(' ')
+      .map((labelElId) => document.getElementById(labelElId)?.textContent?.trim() ?? '')
+      .filter(Boolean)
+      .join(' ');
+    setFieldName(name);
+  });
+  const buttonName = fieldName
+    ? `${fieldName}, ${copy.dateCalendarButton.charAt(0).toLowerCase()}${copy.dateCalendarButton.slice(1)}`
+    : copy.dateCalendarButton;
 
   function openPicker() {
     const el = pickerRef.current as
@@ -149,7 +170,7 @@ export function DateInput({
       <button
         type="button"
         className="gg-datebox-trigger"
-        aria-label="Choose date from calendar"
+        aria-label={buttonName}
         onClick={openPicker}
       >
         <CalendarBlank size={18} weight="duotone" aria-hidden="true" />
@@ -200,8 +221,8 @@ export function DateField({ id, label, hint, ...input }: DateFieldProps) {
   const hintId = hint ? `${id}-hint` : undefined;
   return (
     <div className="gg-field">
-      <label htmlFor={id}>{label}</label>
-      <DateInput id={id} describedBy={hintId} {...input} />
+      <label id={`${id}-label`} htmlFor={id}>{label}</label>
+      <DateInput id={id} labelId={`${id}-label`} describedBy={hintId} {...input} />
       {hint && (
         <p
           id={hintId}

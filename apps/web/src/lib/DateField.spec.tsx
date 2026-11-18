@@ -37,7 +37,7 @@ describe('DateInput notes', () => {
     const help = screen.getByText(/Type a date such as/);
     await userEvent.click(screen.getByLabelText('Date'));
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Choose date from calendar' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Date, choose date from calendar' })).toHaveFocus();
     expect(help).not.toHaveClass('sr-only');
     await userEvent.tab();
     expect(help).toHaveClass('sr-only');
@@ -46,6 +46,32 @@ describe('DateInput notes', () => {
   it('shows the help while a note is showing, even without focus', () => {
     render(<DateField id="d" label="Date" value="x" visibleHelp note="A note" onChange={() => undefined} />);
     expect(screen.getByText(/Type a date such as/)).not.toHaveClass('sr-only');
+  });
+});
+
+describe('calendar button name', () => {
+  it('names each calendar button by its own field, so two on a page differ', () => {
+    render(
+      <>
+        <DateField id="a" label="Date of birth" value="" onChange={() => undefined} />
+        <DateField id="b" label="Date of passing" value="" onChange={() => undefined} />
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Date of birth, choose date from calendar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Date of passing, choose date from calendar' })).toBeInTheDocument();
+  });
+
+  it('uses labelledBy (for example a legend plus label) when there is no labelId', () => {
+    render(
+      <>
+        <span id="lg">Funeral or memorial service</span>
+        <span id="lb">Date</span>
+        <DateInput id="x" labelledBy="lg lb" value="" onChange={() => undefined} />
+      </>,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Funeral or memorial service Date, choose date from calendar' }),
+    ).toBeInTheDocument();
   });
 });
 

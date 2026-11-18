@@ -92,7 +92,7 @@ describe('EventFields', () => {
     await userEvent.tab();
     expect(screen.getByLabelText('Date')).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Choose date from calendar' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Reception Date, choose date from calendar' })).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByLabelText('Time')).toHaveFocus();
     await userEvent.tab();
