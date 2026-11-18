@@ -1818,9 +1818,11 @@ function renderBusinessPanel(parent) {
   var b = state.business;
   if (!b) {
     businessMissing(parent);
+    // The Linear list does not need business.json, so it still shows.
+    safely(parent, renderLinear);
     return;
   }
-  [renderBusinessTiles, renderOpenDecisionLines, renderSteps, renderCosts, renderLinks].forEach(function (part) {
+  [renderBusinessTiles, renderOpenDecisionLines, renderSteps, renderLinear, renderCosts, renderLinks].forEach(function (part) {
     safely(parent, function (box) {
       part(box, b);
     });
@@ -2119,7 +2121,6 @@ function renderCto() {
     var p = panel(box, "Business", "business.json");
     allAreasNote(p);
     safely(p, renderBusinessPanel);
-    safely(p, renderLinear);
   });
 }
 
