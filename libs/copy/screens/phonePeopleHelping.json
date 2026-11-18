@@ -21,5 +21,6 @@
   "removeAction": "Remove",
   "removeKeep": "Keep",
   "removing": "Removing…",
-  "removed": "{name} has been removed."
+  "removed": "{name} has been removed.",
+  "removeKeepLabel": "Keep {name}"
 }

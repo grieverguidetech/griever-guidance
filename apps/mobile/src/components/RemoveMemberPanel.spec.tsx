@@ -36,6 +36,14 @@ async function renderOwner(members: Member[] = [sam, pat]) {
 }
 
 const lastFocusText = () => mockFocus.mock.calls.at(-1)?.[0]?.props.children;
+// The text lines drawn inside the last node that got focus: for a button, its label.
+const lastFocusLines = () => {
+  const node = mockFocus.mock.calls.at(-1)?.[0];
+  const found = screen.UNSAFE_root.findAll((n: { instance: unknown }) => n.instance === node)[0];
+  return found
+    ? found.findAll((n: { type: unknown; props: Record<string, unknown> }) => typeof n.type === 'string' && typeof n.props.children === 'string').map((n: { props: Record<string, unknown> }) => n.props.children)
+    : [];
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -53,9 +61,9 @@ describe('Remove a helper', () => {
     await renderOwner();
     fireEvent.press(rowButton('Sam Lee'));
     expect(screen.getByText(CONFIRM_LINE)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Remove' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Keep' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Remove Sam Lee' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove Sam Lee' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Keep Sam Lee' })).toBeTruthy();
+    expect(screen.queryByText('Remove Sam Lee')).toBeNull();
     expect(mockRemoveMember).not.toHaveBeenCalled();
     await waitFor(() => expect(lastFocusText()).toBe(CONFIRM_LINE));
   });
@@ -65,11 +73,11 @@ describe('Remove a helper', () => {
     fireEvent.press(rowButton('Sam Lee'));
     await waitFor(() => expect(lastFocusText()).toBe(CONFIRM_LINE));
     mockFocus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: 'Keep' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Keep Sam Lee' }));
     expect(screen.queryByText(CONFIRM_LINE)).toBeNull();
     expect(rowButton('Sam Lee')).toBeTruthy();
     await waitFor(() => expect(mockFocus).toHaveBeenCalledTimes(1));
-    expect(mockFocus.mock.calls[0][0]).not.toBeNull();
+    expect(lastFocusLines()).toEqual(['Remove Sam Lee']);
     expect(mockRemoveMember).not.toHaveBeenCalled();
   });
 
@@ -77,11 +85,11 @@ describe('Remove a helper', () => {
     await renderOwner();
     mockGetMembers.mockResolvedValue({ ok: true, view: view([pat]) });
     fireEvent.press(rowButton('Sam Lee'));
-    fireEvent.press(screen.getByRole('button', { name: 'Remove' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
     expect(await screen.findByText('Sam Lee has been removed.')).toBeTruthy();
     expect(mockRemoveMember).toHaveBeenCalledTimes(1);
     expect(mockRemoveMember).toHaveBeenCalledWith('tok', 'm1');
-    await waitFor(() => expect(lastFocusText()).toBe('People helping you'));
+    await waitFor(() => expect(lastFocusText()).toBe('Helping you'));
     await waitFor(() => expect(screen.queryByText('Sam Lee')).toBeNull());
   });
 
@@ -90,8 +98,8 @@ describe('Remove a helper', () => {
     let release: (r: RemoveMemberResult) => void = () => undefined;
     mockRemoveMember.mockReturnValue(new Promise((resolve) => (release = resolve)));
     fireEvent.press(rowButton('Sam Lee'));
-    fireEvent.press(screen.getByRole('button', { name: 'Remove' }));
-    fireEvent.press(screen.getByRole('button', { name: 'Removing…' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
     expect(screen.getByText('Removing…')).toBeTruthy();
     mockGetMembers.mockResolvedValue({ ok: true, view: view([pat]) });
     await act(async () => release({ ok: true }));
@@ -104,12 +112,68 @@ describe('Remove a helper', () => {
     fireEvent.press(rowButton('Sam Lee'));
     await waitFor(() => expect(lastFocusText()).toBe(CONFIRM_LINE));
     mockFocus.mockClear();
-    fireEvent.press(screen.getByRole('button', { name: 'Remove' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
     expect(await screen.findByText('You need a connection to do this. Nothing else is affected.')).toBeTruthy();
     expect(screen.queryByText('Sam Lee has been removed.')).toBeNull();
     expect(rowButton('Sam Lee')).toBeTruthy();
     await waitFor(() => expect(mockFocus).toHaveBeenCalledTimes(1));
-    expect(lastFocusText()).not.toBe('People helping you');
+    expect(lastFocusLines()).toEqual(['Remove Sam Lee']);
+  });
+
+  it('focuses the section heading when the last helper is removed', async () => {
+    await renderOwner([sam]);
+    mockGetMembers.mockResolvedValue({ ok: true, view: view([]) });
+    fireEvent.press(rowButton('Sam Lee'));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    await screen.findByText('Sam Lee has been removed.');
+    await waitFor(() => expect(lastFocusText()).toBe('People helping you'));
+    expect(screen.queryByText('Helping you')).toBeNull();
+  });
+
+  it('hides the removed row, removes once and focuses the heading when the reload after it fails', async () => {
+    await renderOwner();
+    mockGetMembers.mockResolvedValue({ ok: false, reason: 'offline' });
+    fireEvent.press(rowButton('Sam Lee'));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    expect(await screen.findByText(/Sam Lee has been removed\./)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Remove Sam Lee' })).toBeNull();
+    expect(screen.queryByText('Sam Lee')).toBeNull();
+    expect(screen.getByText('pat@example.com')).toBeTruthy();
+    expect(mockRemoveMember).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(lastFocusText()).toBe('Helping you'));
+  });
+
+  it('keeps one confirm step open at a time and does not move focus to the row it closes', async () => {
+    await renderOwner();
+    fireEvent.press(rowButton('Sam Lee'));
+    await waitFor(() => expect(lastFocusText()).toBe(CONFIRM_LINE));
+    mockFocus.mockClear();
+    fireEvent.press(rowButton('pat@example.com'));
+    expect(screen.getAllByText(/won't see the people you're writing about/)).toHaveLength(1);
+    expect(screen.getByText("pat@example.com won't see the people you're writing about any more.")).toBeTruthy();
+    expect(rowButton('Sam Lee')).toBeTruthy();
+    await waitFor(() => expect(lastFocusText()).toBe("pat@example.com won't see the people you're writing about any more."));
+    expect(mockFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the step buttons with the person', async () => {
+    await renderOwner();
+    fireEvent.press(rowButton('pat@example.com'));
+    expect(screen.getByRole('button', { name: 'Remove pat@example.com' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Keep pat@example.com' })).toBeTruthy();
+  });
+
+  it('ignores Keep while the removal runs', async () => {
+    await renderOwner();
+    let release: (r: RemoveMemberResult) => void = () => undefined;
+    mockRemoveMember.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    fireEvent.press(rowButton('Sam Lee'));
+    fireEvent.press(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Keep Sam Lee' }));
+    expect(screen.getByText(CONFIRM_LINE)).toBeTruthy();
+    mockGetMembers.mockResolvedValue({ ok: true, view: view([pat]) });
+    await act(async () => release({ ok: true }));
+    expect(mockRemoveMember).toHaveBeenCalledTimes(1);
   });
 
   it('shows a member no remove control', async () => {
