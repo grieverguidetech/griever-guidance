@@ -14,6 +14,7 @@ import { Heading } from '../ui/Heading';
 import { Status } from '../ui/Status';
 import { Body } from '../ui/Text';
 import { LabelledInput } from './AddressFields';
+import { RemoveMemberPanel } from './RemoveMemberPanel';
 
 const copy = screenCopy('phonePeopleHelping');
 
@@ -37,7 +38,7 @@ export function PeopleHelping({ sessionEnded }: { sessionEnded: boolean }) {
 
 function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | null> }) {
   const statusId = useId();
-  const { view, status, message, invite, revoke } = useMembers({ getAccessToken: getToken, enabled: true });
+  const { view, status, message, invite, revoke, remove } = useMembers({ getAccessToken: getToken, enabled: true });
   const owner = view?.role === 'owner' ? view : null;
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
@@ -45,11 +46,18 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
   // What this section says itself (sent, cancelled). A failure shows the hook's own message.
   const [notice, setNotice] = useState<string | null>(null);
   const [cancelCount, setCancelCount] = useState(0);
+  const [removeCount, setRemoveCount] = useState(0);
+  // The one row whose confirm step is open, as on web.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Removed helpers stay hidden until a fresh list arrives, even if the reload after the removal failed.
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const visibleMembers = owner ? owner.members.filter((member) => !removedIds.includes(member.id)) : [];
   const [cancellingIds, setCancellingIds] = useState<string[]>([]);
   const sendingRef = useRef(false);
   const cancelling = useRef(new Set<string>());
   const emailInput = useRef<ComponentRef<typeof TextInput> | null>(null);
   const sectionHeading = useRef<ComponentRef<typeof Text> | null>(null);
+  const helpingHeading = useRef<ComponentRef<typeof Text> | null>(null);
   const invitedHeading = useRef<ComponentRef<typeof Text> | null>(null);
 
   // After a cancel the list has reloaded: focus goes to the invited list heading, or to the section heading when none are left.
@@ -60,6 +68,23 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
     const timer = setTimeout(() => focusNode(invitedHeading.current ?? sectionHeading.current), 0);
     return () => clearTimeout(timer);
   }, [cancelCount]);
+
+  // A fresh list replaces the hidden-row bookkeeping.
+  useEffect(() => {
+    setRemovedIds([]);
+  }, [view]);
+
+  // After a removal focus goes to the helpers list heading, or to the section heading when no one is left.
+  const membersLeft = visibleMembers.length;
+  useEffect(() => {
+    if (removeCount === 0) {
+      return;
+    }
+    const timer = setTimeout(() => focusNode(membersLeft > 0 ? helpingHeading.current : sectionHeading.current), 0);
+    return () => clearTimeout(timer);
+    // Only when a removal finishes, not when the list changes later.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [removeCount]);
 
   async function send() {
     if (sendingRef.current) {
@@ -102,6 +127,17 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
     }
   }
 
+  async function removeMember(member: { id: string; name: string | null; email: string }): Promise<boolean> {
+    setNotice(null);
+    const ok = await remove(member.id);
+    if (ok) {
+      setRemovedIds((ids) => [...ids, member.id]);
+      setNotice(fill(copy.removed, { name: member.name ?? member.email }));
+      setRemoveCount((count) => count + 1);
+    }
+    return ok;
+  }
+
   // Both lines show: a sent or cancelled notice and a failed reload can be true together.
   const statusLine = [notice, message].filter(Boolean).join(' ') || undefined;
 
@@ -139,15 +175,35 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
         </>
       ) : null}
       {!view && status === 'loading' ? <Body tone="muted">{copy.loading}</Body> : null}
-      {owner && owner.members.length > 0 ? (
+      {owner && visibleMembers.length > 0 ? (
         <View style={styles.list}>
-          <Heading level={3}>{copy.helpingHeading}</Heading>
+          <Heading level={3} headingRef={helpingHeading}>
+            {copy.helpingHeading}
+          </Heading>
           <View style={styles.list} role="list">
-            {owner.members.map((member) => (
-              <View key={member.id} role="listitem">
-                <Body>{member.name ?? member.email}</Body>
-              </View>
-            ))}
+            {visibleMembers.map((member) => {
+              const name = member.name ?? member.email;
+              return (
+                <View key={member.id} style={styles.invite} role="listitem">
+                  <Body>{name}</Body>
+                  <RemoveMemberPanel
+                    copy={{
+                      openLabel: fill(copy.removeButton, { name }),
+                      confirmBody: fill(copy.removeConfirm, { name }),
+                      confirmAction: copy.removeAction,
+                      confirmName: fill(copy.removeButton, { name }),
+                      keep: copy.removeKeep,
+                      keepName: fill(copy.removeKeepLabel, { name }),
+                      removing: copy.removing,
+                    }}
+                    open={confirmingId === member.id}
+                    onOpen={() => setConfirmingId(member.id)}
+                    onClose={() => setConfirmingId((id) => (id === member.id ? null : id))}
+                    onRemove={() => removeMember(member)}
+                  />
+                </View>
+              );
+            })}
           </View>
         </View>
       ) : null}
