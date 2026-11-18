@@ -22,5 +22,13 @@
   "removeKeep": "Keep",
   "removing": "Removing…",
   "removed": "{name} has been removed.",
-  "removeKeepLabel": "Keep {name}"
+  "removeKeepLabel": "Keep {name}",
+  "leaveButton": "Stop helping {owner}",
+  "leaveHeading": "Stop helping {owner}?",
+  "leaveConfirm": "You'll stop seeing the people {owner} shares with you, and anything you started writing for them will be removed from this device. You can then add someone yourself.",
+  "leaveAction": "Stop helping",
+  "leaveKeep": "Keep helping",
+  "leaving": "Stopping…",
+  "leaveOffline": "You need a connection to stop helping. Nothing has changed.",
+  "left": "You've stopped helping {owner}."
 }

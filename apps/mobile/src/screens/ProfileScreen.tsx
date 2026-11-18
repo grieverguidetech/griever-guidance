@@ -174,6 +174,13 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
   const failedLoad = identity.profileLoadFailed === true;
   const canSave = identity.profileLoaded || (failedLoad && identity.profile !== null);
   const waiting = !canSave && !sessionEnded;
+  // A reload after the details were already shown (for example after leaving a family) runs quietly: the
+  // fields keep what they showed, so no waiting line is shown or announced. Save still waits for the answer.
+  const hadDetails = useRef(false);
+  if (identity.profileLoaded) {
+    hadDetails.current = true;
+  }
+  const quietReload = waiting && hadDetails.current && identity.profile !== null && !failedLoad;
   // Try again is offered only when the load failed and there is nothing kept to edit.
   const loadFailed = waiting && failedLoad;
   const signIn = useSignInInfo();
@@ -291,7 +298,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
     // The offline line shows by itself when the phone is offline.
     message = identity.offline ? '' : copy.unavailable;
     tone = 'danger';
-  } else if (waiting) {
+  } else if (waiting && !quietReload) {
     message = copy.loadingDetails;
   } else if (saved) {
     message = copy.detailsSaved;
@@ -323,7 +330,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
       )}
       fieldDisabled={sessionEnded}
       primaryLabel={primaryLabel}
-      primaryBusy={sessionEnded ? false : pending || waiting}
+      primaryBusy={sessionEnded ? false : pending || (waiting && !quietReload)}
       onRetry={loadFailed ? identity.reloadProfile : undefined}
       onPrimary={sessionEnded ? onSignInAgain : save}
       onSignOut={sessionEnded ? undefined : onSignOut}
@@ -335,7 +342,7 @@ export function ProfileScreen({ identity, initialName, sessionEnded: sessionEnde
       onDeleteAccount={canDelete ? deleteAccount : undefined}
       offline={identity.offline}
       status={{ message, tone }}
-      peopleHelping={<PeopleHelping sessionEnded={sessionEnded === true} />}
+      peopleHelping={<PeopleHelping sessionEnded={sessionEnded === true} reloadProfile={identity.reloadProfile} />}
       onBack={onBack}
       headingRef={heading}
     />

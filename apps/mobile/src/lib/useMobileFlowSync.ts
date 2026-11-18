@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { flowQueueKey, FLOW_QUEUE_STORAGE_KEY, useFlowSync } from '@griever/hooks';
 import type { SendFlowStorage, UseSessionsResult, Session } from '@griever/hooks';
 import { useSyncAuth } from './AccountProvider';
 import { createDeviceCache } from './deviceCache';
 import { AUTH_ENABLED, SYNC_ENABLED } from './features';
+import { onLeftFamily } from './leftFamily';
 
 /** The phone's wake source: the app coming back to the foreground. Returns the unsubscribe. */
 export function subscribeAppActive(onWake: () => void): () => void {
@@ -70,13 +71,42 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, storage }: UseMo
 
   const joined = useMemo(() => (queue ? joinStorage(storage, queue) : storage), [storage, queue]);
   const getAccessToken = auth?.getToken;
+
+  // The wake listeners the sync registers, so a pull can be asked for at once (after leaving a family, #224).
+  const wakers = useRef(new Set<() => void>());
+  const subscribe = useCallback((onWake: () => void) => {
+    const stop = subscribeAppActive(onWake);
+    wakers.current.add(onWake);
+    return () => {
+      wakers.current.delete(onWake);
+      stop();
+    };
+  }, []);
+
+  // After a member leaves: the shared people go from the device now, whether or not the pull that follows works.
+  // Only for the signed-in account that left; applyRemoteFlows with no flows removes shared people and nothing else.
+  useEffect(() => {
+    if (userId === '') {
+      return;
+    }
+    return onLeftFamily((leftUserId) => {
+      if (leftUserId !== userId) {
+        return;
+      }
+      applyRemoteFlows({ flows: [] }, userId);
+      for (const wake of [...wakers.current]) {
+        wake();
+      }
+    });
+  }, [userId, applyRemoteFlows]);
+
   useFlowSync({
     sessions,
     userId,
     enabled: allowed && queue !== null && readyQueue === queue,
     getAccessToken: getAccessToken ?? (async () => null),
     storage: joined,
-    subscribe: subscribeAppActive,
+    subscribe,
     applyRemoteFlows,
   });
 }

@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import type { SyncAuth } from './AccountProvider';
+import { announceLeftFamily } from './leftFamily';
 import { useMobileFlowSync } from './useMobileFlowSync';
 
 const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null }));
@@ -135,5 +136,43 @@ describe('useMobileFlowSync', () => {
     expect(base.getItem).not.toHaveBeenCalledWith('gg.flowQueue.v1:user_1');
     expect(joined.getItem('gg.sessions.v1')).toBe('[]');
     expect(base.getItem).toHaveBeenCalledWith('gg.sessions.v1');
+  });
+});
+
+describe('useMobileFlowSync: after a member leaves (#224)', () => {
+  it('drops the shared people at once and asks the sync for a pull, for the signed-in account only', async () => {
+    mockAuth = signedIn;
+    mockFlags.auth = true;
+    mockFlags.sync = true;
+    const applyRemoteFlows = jest.fn();
+    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, storage }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const onWake = jest.fn();
+    lastOptions().subscribe(onWake);
+
+    announceLeftFamily('someone_else');
+    expect(applyRemoteFlows).not.toHaveBeenCalled();
+    expect(onWake).not.toHaveBeenCalled();
+
+    announceLeftFamily('user_1');
+    expect(applyRemoteFlows).toHaveBeenCalledTimes(1);
+    expect(applyRemoteFlows).toHaveBeenCalledWith({ flows: [] }, 'user_1');
+    expect(onWake).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops listening when the hook unmounts', async () => {
+    mockAuth = signedIn;
+    mockFlags.auth = true;
+    mockFlags.sync = true;
+    const applyRemoteFlows = jest.fn();
+    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, storage }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    view.unmount();
+    announceLeftFamily('user_1');
+    expect(applyRemoteFlows).not.toHaveBeenCalled();
   });
 });
