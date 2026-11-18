@@ -4,6 +4,7 @@
  * address bar at once. It only ever leaves this module for the body of `acceptInvite`.
  */
 import { INVITE_TOKEN_PATTERN } from '@griever/shared';
+import type { AcceptInviteResult } from '@griever/api-client';
 
 export const JOIN_STORAGE_KEY = 'gg.join.v1';
 /** A saved link is dropped after 7 days; the invitation itself expires sooner on the server. */
@@ -111,5 +112,36 @@ export function clearJoinToken(): void {
     storage()?.removeItem(JOIN_STORAGE_KEY);
   } catch {
     // Blocked: nothing to remove.
+  }
+}
+
+/**
+ * What an accept answer means for the saved link. `null` is no answer in time, or no session token.
+ * - `joined`: done; drop the link.
+ * - `unusable` (a dead link: wrong, expired, used, revoked, or refused as malformed or not allowed) and
+ *   `conflict` (this account has people of its own): drop the link, after checking the account is not
+ *   already a member (then it joined earlier, and nothing is said).
+ * - `offline` and `later` (busy, too many tries, signed out, any other failure): keep the link for a later load.
+ */
+export type JoinOutcome = 'joined' | 'unusable' | 'conflict' | 'offline' | 'later';
+
+export function joinOutcome(result: AcceptInviteResult | null): JoinOutcome {
+  if (result === null) {
+    return 'offline';
+  }
+  if (result.ok) {
+    return 'joined';
+  }
+  switch (result.reason) {
+    case 'unusable':
+    case 'invalid':
+    case 'forbidden':
+      return 'unusable';
+    case 'conflict':
+      return 'conflict';
+    case 'offline':
+      return 'offline';
+    default:
+      return 'later';
   }
 }

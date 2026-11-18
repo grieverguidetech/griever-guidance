@@ -3,17 +3,83 @@
   "title": "Copy for the Join screen (an invitation link)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "body", "createAccount", "signIn", "joining", "unusableHeading", "unusableBody", "offlineHeading", "offlineBody", "continue"],
+  "required": [
+    "heading",
+    "body",
+    "createAccount",
+    "signIn",
+    "joining",
+    "unusableHeading",
+    "unusableBody",
+    "conflictHeading",
+    "conflictBody",
+    "offlineHeading",
+    "offlineBody",
+    "laterHeading",
+    "laterBody",
+    "joinedNote",
+    "continue"
+  ],
   "properties": {
-    "heading": { "type": "string", "minLength": 1 },
-    "body": { "type": "string", "minLength": 1 },
-    "createAccount": { "type": "string", "minLength": 1 },
-    "signIn": { "type": "string", "minLength": 1 },
-    "joining": { "type": "string", "minLength": 1 },
-    "unusableHeading": { "type": "string", "minLength": 1 },
-    "unusableBody": { "type": "string", "minLength": 1 },
-    "offlineHeading": { "type": "string", "minLength": 1 },
-    "offlineBody": { "type": "string", "minLength": 1 },
-    "continue": { "type": "string", "minLength": 1 }
+    "heading": {
+      "type": "string",
+      "minLength": 1
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createAccount": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signIn": {
+      "type": "string",
+      "minLength": 1
+    },
+    "joining": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unusableHeading": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unusableBody": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conflictHeading": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conflictBody": {
+      "type": "string",
+      "minLength": 1
+    },
+    "offlineHeading": {
+      "type": "string",
+      "minLength": 1
+    },
+    "offlineBody": {
+      "type": "string",
+      "minLength": 1
+    },
+    "laterHeading": {
+      "type": "string",
+      "minLength": 1
+    },
+    "laterBody": {
+      "type": "string",
+      "minLength": 1
+    },
+    "joinedNote": {
+      "type": "string",
+      "minLength": 1
+    },
+    "continue": {
+      "type": "string",
+      "minLength": 1
+    }
   }
 }

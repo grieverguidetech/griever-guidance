@@ -2,6 +2,7 @@
  * Joining from an invitation link (#128) on the real App (editor on), with a fake Clerk and a stubbed
  * api-client. No network. The flags are mocked so each test picks its setup.
  */
+import { StrictMode } from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AcceptInviteResult } from '@griever/api-client';
@@ -47,6 +48,8 @@ const LINK = `/join#t=${TOKEN}`;
 const SIGN_IN_BUTTON = 'Sign in with the test provider';
 const UNUSABLE = "This invitation can't be used";
 const UNUSABLE_BODY = 'Ask the person who sent it for a new one.';
+const CONFLICT = "This invitation can't be joined";
+const JOINED = "You're helping Anna now.";
 const MEMBER_EMPTY = "When someone adds you to help, the people you're helping will show here.";
 
 function profile(accountType: 'owner' | 'member') {
@@ -81,6 +84,8 @@ function accepts(result: AcceptInviteResult) {
 }
 
 const saved = () => window.localStorage.getItem(JOIN_STORAGE_KEY);
+/** A link saved on an earlier load (the email-confirmation round trip). */
+const saveToken = () => window.localStorage.setItem(JOIN_STORAGE_KEY, JSON.stringify({ token: TOKEN, savedAt: Date.now() - 60_000 }));
 
 /** Everything the app sent out or showed: the token must be in none of it. */
 function expectTokenNowhere() {
@@ -174,28 +179,82 @@ describe('signed out, flags on', () => {
 });
 
 describe('signed in, flags on', () => {
-  it('already signed in when the link opens: accepts at once', async () => {
+  it('already signed in when the link opens: accepts once, opens Your people and says whose', async () => {
     useClerk({ userId: 'u1' });
     renderApp(<App />, { path: LINK });
     expect(await screen.findByText(MEMBER_EMPTY)).toBeInTheDocument();
     expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
     expect(mocks.acceptInvite).toHaveBeenCalledWith('tok', TOKEN);
     expect(window.location.pathname).toBe('/people');
+    const note = await screen.findByText(JOINED);
+    expect(note.closest('[role="status"]')).toHaveAttribute('aria-live', 'polite');
+    expect(note.textContent).not.toContain('!');
     expectTokenNowhere();
   });
 
-  it('after the email-confirmation round trip, a later load signed in still joins with the saved link', async () => {
-    window.localStorage.setItem(JOIN_STORAGE_KEY, JSON.stringify({ token: TOKEN, savedAt: Date.now() - 60_000 }));
+  it('accepts exactly once under StrictMode (effects run twice there)', async () => {
+    useClerk({ userId: 'u1' });
+    renderApp(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+      { path: LINK },
+    );
+    expect(await screen.findByText(MEMBER_EMPTY)).toBeInTheDocument();
+    await screen.findByText(JOINED);
+    expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it('after the email-confirmation round trip, a later load on / still joins with the saved link', async () => {
+    saveToken();
     useClerk({ userId: 'u1' });
     renderApp(<App />, { path: '/' });
     expect(await screen.findByText(MEMBER_EMPTY)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/people');
     expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
     expect(mocks.acceptInvite).toHaveBeenCalledWith('tok', TOKEN);
     expect(saved()).toBeNull();
   });
 
-  it.each(['unusable', 'conflict', 'invalid', 'forbidden'] as const)(
-    'a refused link (%s) shows the one calm message, clears the token, and Continue opens the app',
+  it('on a deep link, accepts in place and keeps the page', async () => {
+    saveToken();
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: '/account' });
+    expect(await screen.findByText(JOINED)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/account');
+    expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Joining…')).toBeNull();
+    expect(saved()).toBeNull();
+  });
+
+  it('already a member (joined on an earlier load): drops the link quietly, without asking the server to join', async () => {
+    mocks.joined = true;
+    saveToken();
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: LINK });
+    expect(await screen.findByText(MEMBER_EMPTY)).toBeInTheDocument();
+    await waitFor(() => expect(saved()).toBeNull());
+    expect(mocks.acceptInvite).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: UNUSABLE })).toBeNull();
+    expect(screen.queryByRole('heading', { name: CONFLICT })).toBeNull();
+  });
+
+  it.each(['conflict', 'unusable'] as const)('a %s answer for an account that turns out to be a member already: no failure screen, link dropped', async (reason) => {
+    mocks.acceptInvite.mockImplementation(async () => {
+      mocks.joined = true;
+      return { ok: false, reason };
+    });
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: LINK });
+    await waitFor(() => expect(saved()).toBeNull());
+    await waitFor(() => expect(window.location.pathname).not.toBe('/join'));
+    expect(screen.queryByRole('heading', { name: UNUSABLE })).toBeNull();
+    expect(screen.queryByRole('heading', { name: CONFLICT })).toBeNull();
+    expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['unusable', 'invalid', 'forbidden'] as const)(
+    'a dead link (%s) shows the one calm message, clears the token, and Continue opens the app',
     async (reason) => {
       accepts({ ok: false, reason });
       useClerk({ userId: 'u1' });
@@ -213,6 +272,29 @@ describe('signed in, flags on', () => {
     },
   );
 
+  it('conflict (this account has people of its own): its own message, and the token is cleared', async () => {
+    accepts({ ok: false, reason: 'conflict' });
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: LINK });
+    const heading = await screen.findByRole('heading', { level: 1, name: CONFLICT });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(screen.getByText("You already have people you're helping, so this invitation can't be joined from this account.")).toBeInTheDocument();
+    expect(saved()).toBeNull();
+  });
+
+  it.each(['unavailable', 'rate_limited', 'signed_out', 'failed'] as const)('%s: keeps the link and says to try again later', async (reason) => {
+    accepts({ ok: false, reason });
+    useClerk({ userId: 'u1' });
+    const user = userEvent.setup();
+    renderApp(<App />, { path: LINK });
+    const heading = await screen.findByRole('heading', { level: 1, name: "Joining isn't available right now" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(saved()).toContain(TOKEN);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(window.location.pathname).not.toBe('/join'));
+    expect(saved()).toContain(TOKEN);
+  });
+
   it('offline: keeps the link and says so', async () => {
     accepts({ ok: false, reason: 'offline' });
     useClerk({ userId: 'u1' });
@@ -220,7 +302,7 @@ describe('signed in, flags on', () => {
     renderApp(<App />, { path: LINK });
     const heading = await screen.findByRole('heading', { level: 1, name: 'You need a connection to join' });
     await waitFor(() => expect(heading).toHaveFocus());
-    expect(screen.getByText("Your link is saved; open the app again when you're connected.")).toBeInTheDocument();
+    expect(screen.getByText("Your link is saved. Open the app again when you're connected.")).toBeInTheDocument();
     expect(saved()).toContain(TOKEN);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(window.location.pathname).not.toBe('/join'));

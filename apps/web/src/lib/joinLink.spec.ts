@@ -3,6 +3,7 @@ import {
   JOIN_STORAGE_KEY,
   captureJoinLink,
   clearJoinToken,
+  joinOutcome,
   joinTokenFromUrl,
   savedJoinToken,
 } from './joinLink';
@@ -102,6 +103,8 @@ describe('savedJoinToken', () => {
     ['not JSON', 'nope'],
     ['a bad token', JSON.stringify({ token: 'short', savedAt: NOW })],
     ['no date', JSON.stringify({ token: TOKEN })],
+    ['a date that is not a number', JSON.stringify({ token: TOKEN, savedAt: String(NOW) })],
+    ['a token that is not a string', JSON.stringify({ token: 42, savedAt: NOW })],
     ['a date in the future', JSON.stringify({ token: TOKEN, savedAt: NOW + 1000 })],
   ])('drops an entry with %s', (_label, raw) => {
     window.localStorage.setItem(JOIN_STORAGE_KEY, raw);
@@ -117,5 +120,28 @@ describe('clearJoinToken', () => {
     clearJoinToken();
     expect(savedJoinToken(NOW)).toBeNull();
     expect(window.localStorage.getItem(JOIN_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('joinOutcome', () => {
+  it('joined on success', () => {
+    expect(joinOutcome({ ok: true, ownerId: 'o1' })).toBe('joined');
+  });
+
+  it.each(['unusable', 'invalid', 'forbidden'] as const)('%s is a dead link: the link is used up', (reason) => {
+    expect(joinOutcome({ ok: false, reason })).toBe('unusable');
+  });
+
+  it('conflict is its own outcome', () => {
+    expect(joinOutcome({ ok: false, reason: 'conflict' })).toBe('conflict');
+  });
+
+  it('offline, or no answer in time, keeps the link', () => {
+    expect(joinOutcome({ ok: false, reason: 'offline' })).toBe('offline');
+    expect(joinOutcome(null)).toBe('offline');
+  });
+
+  it.each(['unavailable', 'rate_limited', 'signed_out', 'failed'] as const)('%s keeps the link for later', (reason) => {
+    expect(joinOutcome({ ok: false, reason })).toBe('later');
   });
 });

@@ -6,7 +6,12 @@
   "joining": "Joining…",
   "unusableHeading": "This invitation can't be used",
   "unusableBody": "Ask the person who sent it for a new one.",
+  "conflictHeading": "This invitation can't be joined",
+  "conflictBody": "You already have people you're helping, so this invitation can't be joined from this account.",
   "offlineHeading": "You need a connection to join",
-  "offlineBody": "Your link is saved; open the app again when you're connected.",
+  "offlineBody": "Your link is saved. Open the app again when you're connected.",
+  "laterHeading": "Joining isn't available right now",
+  "laterBody": "Your link is saved. Open the app again in a little while to try again.",
+  "joinedNote": "You're helping {owner} now.",
   "continue": "Continue"
 }

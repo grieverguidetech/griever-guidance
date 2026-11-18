@@ -23,7 +23,7 @@ import { acceptInvite, deleteFlow, getProfile } from '@griever/api-client';
 import type { AcceptInviteResult, ProfileResult } from '@griever/api-client';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
-import { screenCopy } from '@griever/copy';
+import { fill, screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { SYNC_ENABLED } from '../lib/syncFlag';
@@ -50,7 +50,7 @@ import { isSignInPath, rememberNext, rememberedNext, requireAccount } from '../r
 import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
-import { JOIN_PATH, captureJoinLink, clearJoinToken, savedJoinToken } from '../lib/joinLink';
+import { JOIN_PATH, captureJoinLink, clearJoinToken, joinOutcome, savedJoinToken } from '../lib/joinLink';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { Profile } from '../screens/Profile';
 import { Join } from '../screens/Join';
@@ -105,6 +105,7 @@ type CmsSection = Exclude<CmsNavKey, 'account' | 'people'>;
 const LANDING_SYNC_WAIT_MS = 1500;
 const cmsShellCopy = screenCopy('cmsShell');
 const accountCopy = screenCopy('account');
+const joinCopy = screenCopy('join');
 const cmsItemLabels = screenCopy('cmsChecklist').items;
 
 const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
@@ -345,6 +346,11 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
   }
 }
 
+/** Where a waiting invitation shows the Join screen; on any other page it is accepted in place (#128). */
+function isJoinTakeoverPath(pathname: string): boolean {
+  return pathname === '/' || pathname === JOIN_PATH;
+}
+
 /** The longest the Joining screen waits; past it, the link is kept and the app opens (C5: no blocking on the network). */
 const JOIN_WAIT_MS = 15000;
 
@@ -579,19 +585,37 @@ function AppBody({
   const [joinToken, setJoinToken] = useState<string | null>(() => (joinOn ? savedJoinToken() : null));
   const [joinPhase, setJoinPhase] = useState<JoinPhase | 'done' | null>(null);
   const joinStarted = useRef(false);
+  // The page the person was on when they were first signed in with a link waiting (written during render,
+  // before the landing moves them). From `/` or `/join` the Join screen shows and success opens Your people;
+  // on any other page the link is accepted in place, and that page stays (#128).
+  const joinEntry = useRef<string | null>(null);
+  // The sign-in pages don't count: the guard is about to send the person on to `next` (`/join`).
+  const onSignInPage = isSignInPath(location.pathname) || location.pathname === '/sign-up';
+  if (joinEntry.current === null && joinOn && joinToken !== null && (!!auth?.isSignedIn || offline) && !onSignInPage) {
+    joinEntry.current = location.pathname;
+  }
+  const joinTakesOver = isJoinTakeoverPath(joinEntry.current ?? shown.pathname);
   const joinSignedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
   const joinScreen: JoinPhase | null =
     !joinOn || joinPhase === 'done'
       ? null
-      : joinPhase !== null
-        ? joinPhase
-        : joinToken === null
-          ? null
-          : offline || !!auth?.isSignedIn
-            ? 'joining'
-            : joinSignedOut && shown.pathname === JOIN_PATH
-              ? 'invited'
-              : null;
+      : joinPhase === 'joining'
+        ? joinTakesOver
+          ? 'joining'
+          : null
+        : joinPhase !== null
+          ? joinPhase
+          : joinToken === null
+            ? null
+            : offline || !!auth?.isSignedIn
+              ? joinTakesOver
+                ? 'joining'
+                : null
+              : joinSignedOut && shown.pathname === JOIN_PATH
+                ? 'invited'
+                : null;
+  // "You're helping Anna now.", said on the page a join lands on, once the members list names the owner.
+  const [joinedNote, setJoinedNote] = useState<{ path: string; text: string | null; seen: boolean } | null>(null);
   const startPath = pathSpot !== null && pathSpot.flowId === null;
   // /account is one path with two versions: the signed-in one, and Settings when nobody is signed in.
   const accountView: AppView = auth?.isSignedIn ? 'profile' : 'settings';
@@ -952,6 +976,13 @@ function AppBody({
       <div role="status" aria-live="polite" className="sr-only">
         {missingAnnouncement}
       </div>
+      <div role="status" aria-live="polite" className="text-[13px]">
+        {joinedNote?.text && location.pathname === joinedNote.path ? (
+          <p className="m-0 mb-4" style={{ color: 'var(--text-muted)' }}>
+            {joinedNote.text}
+          </p>
+        ) : null}
+      </div>
     </>
   );
 
@@ -969,54 +1000,116 @@ function AppBody({
   // True from the app's own move off `/join` until the router shows the new page (its move renders later
   // than the state change that ends the Join screen), so `/join` is not sent to `/` meanwhile.
   const leavingJoin = useRef(false);
+  // The path now, for the accept below, which answers after renders its closure has not seen.
+  const currentPath = useRef(location.pathname);
+  currentPath.current = location.pathname;
   useEffect(() => {
     if (location.pathname !== JOIN_PATH) {
       leavingJoin.current = false;
     }
   }, [location.pathname]);
-  // Signed in (or local work only) with an invitation waiting: accept it once per load (#128). A
-  // connection problem keeps the link for a later load; any other answer uses it up, with one message.
+  /** Leaves `/join` for `to`, if the person is still there. */
+  const leaveJoinPath = useCallback(
+    (to: string) => {
+      if (currentPath.current === JOIN_PATH) {
+        leavingJoin.current = true;
+        void navigate(to, { replace: true });
+      }
+    },
+    [navigate],
+  );
+  // Signed in (or local work only) with an invitation waiting: accept it once per load (#128). See
+  // joinOutcome for which answers keep the link and which use it up.
   const reloadProfile = auth?.reloadProfile;
   const refreshMembers = members.refresh;
+  const joinProfileAnswered = auth?.profileAnswered ?? false;
+  const alreadyMember = auth?.profile?.accountType === 'member';
   useEffect(() => {
     if (!joinOn || joinToken === null || joinStarted.current) {
       return;
     }
+    // Already a member (joined on an earlier load): the link is spent. Drop it and say nothing.
+    const dropQuietly = () => {
+      clearJoinToken();
+      setJoinToken(null);
+      setJoinPhase('done');
+      leaveJoinPath(paths.landing());
+    };
     if (offline) {
-      joinStarted.current = true;
-      setJoinPhase('offline');
+      if (isJoinTakeoverPath(currentPath.current)) {
+        joinStarted.current = true;
+        setJoinPhase('offline');
+      }
       return;
     }
-    if (!signedIn || !getAccessToken) {
+    if (!signedIn || !getAccessToken || !joinProfileAnswered) {
       return;
     }
     joinStarted.current = true;
+    if (alreadyMember) {
+      dropQuietly();
+      return;
+    }
     setJoinPhase('joining');
     void (async () => {
-      const result = await acceptWithin(getAccessToken, joinToken, JOIN_WAIT_MS);
-      if (result === null || (!result.ok && result.reason === 'offline')) {
-        setJoinPhase('offline');
+      const outcome = joinOutcome(await acceptWithin(getAccessToken, joinToken, JOIN_WAIT_MS));
+      if (outcome === 'offline' || outcome === 'later') {
+        setJoinPhase(outcome);
+        return;
+      }
+      if (outcome !== 'joined') {
+        // A refusal may only mean this account joined already (on an earlier load, or after a slow answer): ask afresh.
+        const access = await getAccessToken().catch(() => null);
+        const fresh = access ? await getProfile(access) : null;
+        if (fresh?.ok && fresh.profile.accountType === 'member') {
+          reloadProfile?.();
+          dropQuietly();
+          return;
+        }
+        clearJoinToken();
+        setJoinToken(null);
+        setJoinPhase(outcome);
         return;
       }
       clearJoinToken();
       setJoinToken(null);
-      if (!result.ok) {
-        setJoinPhase('unusable');
-        return;
-      }
-      // Now a member: the profile says so (no "Create a new one"), and the list shows whose people these are.
+      // Now a member: the profile says so (no "Create a new one"), and the list names whose people these are.
       reloadProfile?.();
       void refreshMembers();
-      leavingJoin.current = true;
+      const from = joinEntry.current ?? currentPath.current;
+      const to = !isJoinTakeoverPath(from) ? currentPath.current : CMS_ENABLED ? paths.people() : paths.landing();
+      setJoinedNote({ path: to, text: null, seen: false });
       setJoinPhase('done');
-      if (CMS_ENABLED) {
-        void navigate(paths.people(), { replace: true });
-      } else {
-        setView('home');
-        void navigate(paths.landing(), { replace: true });
+      if (isJoinTakeoverPath(from)) {
+        if (!CMS_ENABLED) {
+          setView('home');
+        }
+        leavingJoin.current = currentPath.current === JOIN_PATH;
+        void navigate(to, { replace: true });
       }
     })();
-  }, [joinOn, joinToken, offline, signedIn, getAccessToken, reloadProfile, refreshMembers, navigate]);
+  }, [joinOn, joinToken, offline, signedIn, getAccessToken, joinProfileAnswered, alreadyMember, reloadProfile, refreshMembers, navigate, leaveJoinPath]);
+
+  // The joined note: filled a moment after the owner's name is known, so the region is in the page first
+  // and the words are announced. It ends once the person has seen it and moved to another page.
+  const memberOwner = members.view?.role === 'member' ? (members.view.owner.name ?? 'someone') : null;
+  useEffect(() => {
+    if (!joinedNote || joinedNote.text !== null || memberOwner === null) {
+      return;
+    }
+    const timer = setTimeout(() => setJoinedNote({ ...joinedNote, text: fill(joinCopy.joinedNote, { owner: memberOwner }) }), 100);
+    return () => clearTimeout(timer);
+  }, [joinedNote, memberOwner]);
+  useEffect(() => {
+    if (!joinedNote?.text) {
+      return;
+    }
+    if (location.pathname === joinedNote.path && !joinedNote.seen) {
+      setJoinedNote({ ...joinedNote, seen: true });
+    } else if (location.pathname !== joinedNote.path && joinedNote.seen) {
+      setJoinedNote(null);
+    }
+  }, [joinedNote, location.pathname]);
 
   /** From the Join screen to Clerk's sign-in (sign-up is on the same screen), coming back to `/join`. */
   function joinThroughSignIn() {
@@ -1024,13 +1117,10 @@ function AppBody({
     navigate(paths.signIn(JOIN_PATH), { replace: true });
   }
 
-  /** Continue after a refused or offline join: the normal app, from the start. */
+  /** Continue after a join that did not happen: the page they were on, or the start when that was `/join`. */
   function leaveJoin() {
     setJoinPhase('done');
-    if (location.pathname === JOIN_PATH) {
-      leavingJoin.current = true;
-      void navigate(paths.landing(), { replace: true });
-    }
+    leaveJoinPath(paths.landing());
   }
 
   const canCreate = !(sharingOn && auth?.profile?.accountType === 'member');

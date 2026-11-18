@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Join } from './Join';
 import type { JoinPhase } from './Join';
@@ -22,26 +22,27 @@ describe('Join', () => {
     expect(onSignIn).toHaveBeenCalledTimes(1);
   });
 
-  it('joining: a status, no h1 and no buttons', () => {
+  it('joining: a polite status that is in the page empty first, then says Joining (so it is announced)', async () => {
     show('joining');
-    expect(screen.getByRole('status')).toHaveTextContent('Joining…');
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveTextContent('');
+    await waitFor(() => expect(status).toHaveTextContent('Joining…'));
     expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('unusable: one calm message with Continue', async () => {
-    const { onContinue } = show('unusable');
-    expect(screen.getByRole('heading', { level: 1, name: "This invitation can't be used" })).toHaveFocus();
-    expect(screen.getByText('Ask the person who sent it for a new one.')).toBeInTheDocument();
+  it.each<[JoinPhase, string, string]>([
+    ['unusable', "This invitation can't be used", 'Ask the person who sent it for a new one.'],
+    ['conflict', "This invitation can't be joined", "You already have people you're helping, so this invitation can't be joined from this account."],
+    ['offline', 'You need a connection to join', "Your link is saved. Open the app again when you're connected."],
+    ['later', "Joining isn't available right now", 'Your link is saved. Open the app again in a little while to try again.'],
+  ])('%s: its own h1, focused, one calm line, and Continue', async (phase, heading, body) => {
+    const { onContinue } = show(phase);
+    expect(screen.getByRole('heading', { level: 1, name: heading })).toHaveFocus();
+    expect(screen.getByText(body)).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Continue' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
-  });
-
-  it('offline: says the link is saved, with Continue', () => {
-    show('offline');
-    expect(screen.getByRole('heading', { level: 1, name: 'You need a connection to join' })).toHaveFocus();
-    expect(screen.getByText("Your link is saved; open the app again when you're connected.")).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
   });
 
   it('moves focus to the new h1 when the phase changes', () => {
@@ -51,7 +52,7 @@ describe('Join', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 
-  it.each<JoinPhase>(['invited', 'unusable', 'offline'])('%s: buttons use the 44px button class, and no exclamation points', (phase) => {
+  it.each<JoinPhase>(['invited', 'unusable', 'conflict', 'offline', 'later'])('%s: buttons use the 44px button class, and no exclamation points', (phase) => {
     show(phase);
     for (const button of screen.getAllByRole('button')) {
       expect(button).toHaveClass('gg-btn');

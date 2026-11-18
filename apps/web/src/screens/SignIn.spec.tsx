@@ -24,16 +24,6 @@ describe('SignInScreen', () => {
     expect(mocks.props).toMatchObject({ withSignUp: true, routing: 'path', path: '/sign-in' });
   });
 
-  it('keeps hash routing on /join, which stays public (#851)', () => {
-    render(
-      <MemoryRouter initialEntries={['/join']}>
-        <SignInScreen />
-      </MemoryRouter>,
-    );
-    expect(mocks.props).toMatchObject({ withSignUp: true, routing: 'hash' });
-    expect(mocks.props).not.toHaveProperty('path');
-  });
-
   it('uses calm copy: no exclamation points (C7)', () => {
     const { container } = render(<SignInScreen />, { wrapper: MemoryRouter });
     expect(container.textContent).not.toContain('!');

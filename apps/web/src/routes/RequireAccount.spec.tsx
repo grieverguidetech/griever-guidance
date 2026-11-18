@@ -272,10 +272,11 @@ describe('the guard on the App', () => {
 
   it('/join with sharing off drops the fragment and opens the normal app (#128; join.spec.tsx covers sharing on)', async () => {
     useClerk();
-    renderApp(<App />, { path: '/join#t=abc' });
+    renderApp(<App />, { path: `/join#t=${'A'.repeat(43)}` });
     await screen.findByRole('button', { name: SIGN_IN_BUTTON });
     expect(window.location.pathname).toBe('/sign-in');
     expect(window.location.hash).toBe('');
+    expect(window.localStorage.getItem('gg.join.v1')).toBeNull();
   });
 
   it('a session that ends mid-use keeps the page and its note, with no redirect', async () => {
