@@ -534,13 +534,28 @@ function AppBody({
   const [deletingAccount, setDeletingAccount] = useState(false);
   const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn && !deletingAccount;
   // Sync waits until the device's list is kept for this account, so another account's person is never sent under this token.
+  // The sync's wake listeners, so the app can ask for a pull straight away (after leaving a family, #223).
+  const syncWakers = useRef(new Set<() => void>());
+  const subscribeSync = useCallback((onWake: () => void) => {
+    const stop = subscribeToWake(onWake);
+    syncWakers.current.add(onWake);
+    return () => {
+      syncWakers.current.delete(onWake);
+      stop();
+    };
+  }, []);
+  const pullNow = useCallback(() => {
+    for (const wake of [...syncWakers.current]) {
+      wake();
+    }
+  }, []);
   const flowSync = useFlowSync({
     sessions: sessionList,
     userId: auth?.userId ?? '',
     getAccessToken: memberToken,
     enabled: syncOn && sessions.heldFor === auth?.userId,
     storage: browserStorage,
-    subscribe: subscribeToWake,
+    subscribe: subscribeSync,
     applyRemoteFlows: sessions.applyRemoteFlows,
   });
 
@@ -1114,6 +1129,18 @@ function AppBody({
 
   // The joined note: filled a moment after the owner's name is known, so the region is in the page first
   // and the words are announced. It ends once the person has seen it and moved to another page.
+  // Stop helping (#223): once the server agrees, a pull drops the shared people (and their drafts) from
+  // this device, and the profile reload brings back "Create a new one". A failure changes nothing.
+  const membersLeave = members.leave;
+  const leaveFamily = useCallback(async () => {
+    const ok = await membersLeave();
+    if (ok) {
+      pullNow();
+      reloadProfile?.();
+    }
+    return ok;
+  }, [membersLeave, pullNow, reloadProfile]);
+
   const memberOwner = members.view?.role === 'member' ? (members.view.owner.name ?? 'someone') : null;
   useEffect(() => {
     if (!joinedNote || joinedNote.text !== null || memberOwner === null) {
@@ -1990,6 +2017,7 @@ function AppBody({
               message={members.message}
               onInvite={members.invite}
               onRevoke={members.revoke}
+              onLeave={leaveFamily}
             />
           ) : undefined
         }
@@ -2030,6 +2058,7 @@ function AppBody({
                 message={members.message}
                 onInvite={members.invite}
                 onRevoke={members.revoke}
+                onLeave={leaveFamily}
               />
             ) : undefined
           }

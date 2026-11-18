@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { MembersView } from '@griever/shared';
+import { MEMBERS_MESSAGES } from '@griever/hooks';
 import { formatDate } from '../lib/format';
-import { PeopleHelping } from './PeopleHelping';
+import { LEAVE_OFFLINE, PeopleHelping } from './PeopleHelping';
 
 const owner: MembersView = {
   role: 'owner',
@@ -156,6 +157,111 @@ describe('PeopleHelping as a member', () => {
   it('falls back to "someone" without an owner name', () => {
     setup({ view: { role: 'member', owner: { id: 'o1', name: null } } });
     expect(screen.getByText("You're helping someone.")).toBeInTheDocument();
+  });
+});
+
+describe('PeopleHelping: stop helping (#223)', () => {
+  const member: MembersView = { role: 'member', owner: { id: 'o1', name: 'Anna' } };
+  const CONFIRM =
+    "You'll stop seeing the people Anna shares with you, and anything you started writing for them will be removed from this device. You can then add someone yourself.";
+
+  it('shows "Stop helping Anna" under the member line, as a 44px button', () => {
+    setup({ view: member, onLeave: vi.fn(async () => true) });
+    const button = screen.getByRole('button', { name: 'Stop helping Anna' });
+    expect(button).toHaveClass('gg-btn');
+    // The button comes after the "You're helping" line.
+    const line = screen.getByText("You're helping Anna.");
+    expect(line.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('never shows the button to an owner', () => {
+    setup({ view: owner, onLeave: vi.fn(async () => true) });
+    expect(screen.queryByRole('button', { name: /Stop helping/ })).not.toBeInTheDocument();
+    setup({ view: { role: 'owner', members: [], invites: [] }, onLeave: vi.fn(async () => true) });
+    expect(screen.queryByRole('button', { name: /Stop helping/ })).not.toBeInTheDocument();
+  });
+
+  it('opens a confirm step with the exact copy, focus on its heading, and no exclamation points', async () => {
+    const user = userEvent.setup();
+    const { onLeave } = setup({ view: member, onLeave: vi.fn(async () => true) });
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    const heading = screen.getByRole('heading', { name: 'Stop helping Anna?' });
+    expect(heading).toHaveFocus();
+    expect(screen.getByText(CONFIRM)).toBeInTheDocument();
+    const stop = screen.getByRole('button', { name: 'Stop helping' });
+    const keep = screen.getByRole('button', { name: 'Keep helping' });
+    expect(stop).toHaveClass('gg-btn');
+    expect(keep).toHaveClass('gg-btn');
+    expect(document.body.textContent).not.toContain('!');
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('"Keep helping" closes the step, leaves nothing changed and puts focus back on the button', async () => {
+    const user = userEvent.setup();
+    const { onLeave } = setup({ view: member, onLeave: vi.fn(async () => true) });
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Keep helping' }));
+    expect(screen.queryByText(CONFIRM)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop helping Anna' })).toHaveFocus();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('calls onLeave once for a double tap', async () => {
+    const user = userEvent.setup();
+    let resolve: (ok: boolean) => void = () => undefined;
+    const onLeave = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
+    setup({ view: member, onLeave });
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    const stop = screen.getByRole('button', { name: 'Stop helping' });
+    await user.click(stop);
+    await user.click(stop);
+    expect(stop).toHaveAttribute('aria-disabled', 'true');
+    resolve(true);
+    await waitFor(() => expect(screen.queryByText(CONFIRM)).not.toBeInTheDocument());
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it('offline: keeps the step open and says so, in its own words', async () => {
+    const user = userEvent.setup();
+    const props = {
+      view: member,
+      status: 'ready' as const,
+      message: null as string | null,
+      onInvite: vi.fn(async () => true),
+      onRevoke: vi.fn(async () => true),
+      onLeave: vi.fn(async () => false),
+    };
+    const { rerender } = render(<PeopleHelping {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    // The hook sets its general offline copy before the leave resolves false.
+    props.onLeave.mockImplementation(async () => {
+      rerender(<PeopleHelping {...props} message={MEMBERS_MESSAGES.offline} />);
+      return false;
+    });
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(LEAVE_OFFLINE));
+    expect(LEAVE_OFFLINE).toBe('You need a connection to stop helping. Nothing has changed.');
+    expect(screen.getByText(CONFIRM)).toBeInTheDocument();
+    expect(screen.getByText("You're helping Anna.")).toBeInTheDocument();
+    expect(screen.getByRole('status')).not.toHaveTextContent(MEMBERS_MESSAGES.offline);
+  });
+
+  it('after leaving, focus moves to the owner heading once the view says owner', async () => {
+    const user = userEvent.setup();
+    const props = {
+      view: member as MembersView,
+      status: 'ready' as const,
+      message: null,
+      onInvite: vi.fn(async () => true),
+      onRevoke: vi.fn(async () => true),
+      onLeave: vi.fn(async () => true),
+    };
+    const { rerender } = render(<PeopleHelping {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    rerender(<PeopleHelping {...props} view={{ role: 'owner', members: [], invites: [] }} />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'People helping you' })).toHaveFocus());
+    expect(screen.queryByRole('button', { name: /Stop helping/ })).not.toBeInTheDocument();
   });
 });
 
