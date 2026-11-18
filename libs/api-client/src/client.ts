@@ -28,6 +28,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** A machine code from the body (`{ code }`), for routes that send one. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -44,13 +46,17 @@ async function request(path: string, init?: RequestInit, signal?: AbortSignal): 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     let message = text || res.statusText;
+    let code: string | undefined;
     try {
-      const parsed = JSON.parse(text) as { error?: string };
+      const parsed = JSON.parse(text) as { error?: string; code?: unknown };
       if (parsed.error) message = parsed.error;
+      if (typeof parsed.code === 'string') {
+        code = parsed.code;
+      }
     } catch {
       // body wasn't JSON — fall back to the raw text/status above
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, code);
   }
   return res;
 }

@@ -98,8 +98,12 @@ interface Stored {
   known: string[];
   /** The facts and details last seen per person, so edits made while sync was off are still found. */
   baselines: Record<string, SyncedFields>;
-  /** Flows marked known only because a create got 409, and not yet written to (#942). */
+  /** Flows marked known only because a create got `taken`, and not yet written to (#942). */
   conflicted?: string[];
+  /** Old flowId to new, for people given a new id and not yet seen holding it (#942). */
+  moved?: Record<string, string>;
+  /** Ids made by a re-mint. One of these is never re-minted again (#942). */
+  reminted?: string[];
 }
 
 interface SyncState {
@@ -113,12 +117,21 @@ interface SyncState {
   /** People the server refused to create; not offered again this run. */
   refused: Set<string>;
   /**
-   * Known only because a create got 409. If the PATCH that follows gets 404, someone else took the
-   * id first (#942). Cleared by the first write that works. Saved in storage.
+   * Known only because a create got `taken` (another account holds the id). If the PATCH that follows
+   * gets 404, the person gets a new id (#942). A plain `conflict` (the caller's own id) never lands
+   * here. Cleared by the first write that works. Saved in storage.
    */
   conflicted: Set<string>;
-  /** Old flowId to new, for people given a new id this run. Sessions may still carry the old one until React re-renders. */
+  /**
+   * Old flowId to new, for people given a new id. A session may still hold the old one: until React
+   * re-renders, or after a restart whose sessions save was lost. Saved; an entry goes once a session
+   * holds the new id and none holds the old.
+   */
   moved: Map<string, string>;
+  /** Ids a re-mint made. Never re-minted again, so a run of `taken` answers cannot loop. Saved. */
+  reminted: Set<string>;
+  /** Old ids this run has already asked useSessions to move. Not saved: a restart asks again. */
+  moveAsked: Set<string>;
 }
 
 function readStored(storage: SendFlowStorage | undefined, userId: string): SyncState {
@@ -131,6 +144,8 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
     refused: new Set(),
     conflicted: new Set(),
     moved: new Map(),
+    reminted: new Set(),
+    moveAsked: new Set(),
   };
   if (!storage) return state;
   try {
@@ -152,6 +167,16 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
         state.conflicted.add(id);
       }
     }
+    for (const [oldId, newId] of Object.entries(parsed.moved ?? {})) {
+      if (isUuid(oldId) && typeof newId === 'string' && isUuid(newId)) {
+        state.moved.set(oldId, newId);
+      }
+    }
+    for (const id of parsed.reminted ?? []) {
+      if (typeof id === 'string' && isUuid(id)) {
+        state.reminted.add(id);
+      }
+    }
   } catch {
     // unreadable storage: start empty
   }
@@ -166,6 +191,8 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
       known: [...state.known],
       baselines: Object.fromEntries(state.baselines),
       conflicted: [...state.conflicted],
+      moved: Object.fromEntries(state.moved),
+      reminted: [...state.reminted],
     };
     storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
@@ -182,7 +209,7 @@ const isMine = (s: Session, userId: string): boolean =>
   s.role === 'member' || s.ownerId === null || s.ownerId === userId;
 
 /** The id sync uses for a session: its new one if it was given one this run and the session does not show it yet. */
-function flowIdOf(state: SyncState, s: Session): string {
+function flowIdOf(state: SyncState, s: Pick<Session, 'flowId'>): string {
   let id = s.flowId;
   for (let next = state.moved.get(id); next !== undefined; next = state.moved.get(id)) {
     id = next;
@@ -208,7 +235,35 @@ function remint(state: SyncState, oldId: string, session: Session): string {
   }
   state.queue.set(newId, toSyncedFields(session));
   state.moved.set(oldId, newId);
+  state.reminted.add(newId);
   return newId;
+}
+
+/**
+ * The moves useSessions still has to make: a session holding an old id is asked to take the new one
+ * once per run, so a restart whose sessions save was lost does not leave the person on the old id
+ * (the next pull would then add the new id as a second person). An entry is dropped once a session
+ * holds the new id and none holds the old one. `dirty` is true when an entry was dropped.
+ */
+function pendingMoves(state: SyncState, sessions: readonly Session[]): { moves: Array<[string, string]>; dirty: boolean } {
+  const held = new Set(sessions.map((s) => s.flowId));
+  const moves: Array<[string, string]> = [];
+  let dirty = false;
+  for (const [oldId, newId] of [...state.moved]) {
+    if (!held.has(oldId)) {
+      if (held.has(newId)) {
+        state.moved.delete(oldId);
+        state.moveAsked.delete(oldId);
+        dirty = true;
+      }
+      continue;
+    }
+    if (!state.moveAsked.has(oldId)) {
+      state.moveAsked.add(oldId);
+      moves.push([oldId, flowIdOf(state, { flowId: oldId })]);
+    }
+  }
+  return { moves, dirty };
 }
 
 /** Stops one request: clears its timer and aborts it. Called on unmount. */
@@ -299,10 +354,12 @@ function scanSessions(
     state.baselines.delete(id);
     dirty = true;
   }
-  for (const id of [...state.conflicted]) {
-    if (!seen.has(id)) {
-      state.conflicted.delete(id);
-      dirty = true;
+  for (const ids of [state.conflicted, state.reminted]) {
+    for (const id of [...ids]) {
+      if (!seen.has(id)) {
+        ids.delete(id);
+        dirty = true;
+      }
     }
   }
   return { queue: changed, dirty: dirty || changed };
@@ -343,7 +400,14 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     const state = stateRef.current;
     try {
       const { queue, dirty } = scanSessions(state, sessions, userId, new Set((readRemovedFlows(storage) ?? []).map((m) => m.id)));
-      if (dirty) writeStored(storage, state);
+      const moved = pendingMoves(state, sessions);
+      if (dirty || moved.dirty) {
+        writeStored(storage, state);
+      }
+      // Runs before the sync effect's first pull, so a person still on an old id is moved first (#942).
+      for (const [oldId, newId] of moved.moves) {
+        latest.current.moveFlowId(oldId, newId);
+      }
       if (queue) kickRef.current(EDIT_DEBOUNCE_MS);
     } catch {
       // Never thrown to the app (C5). The next change scans again.
@@ -482,19 +546,30 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
             writeStored(latest.current.storage, state);
             break;
           }
-          if (result.reason === 'conflict' && create) {
+          if ((result.reason === 'conflict' || result.reason === 'taken') && create) {
             state.known.add(id); // the server has it already: edit it instead
-            state.conflicted.add(id);
-            writeStored(latest.current.storage, state);
+            if (result.reason === 'taken') {
+              // Another account holds this id. If the PATCH gets 404 too, the person moves (below).
+              state.conflicted.add(id);
+              writeStored(latest.current.storage, state);
+            }
             continue;
           }
-          // 409 on create, then 404 on the PATCH: the id is someone else's flow (#942). An owner's person
-          // moves to a new id and is created again with everything. A plain 404 (a deleted flow, lost
-          // access) never gets here: only a 409 puts an id in `conflicted`.
-          if (result.reason === 'not_found' && !create && state.conflicted.has(id) && mayCreate(session, userId)) {
+          // `taken` on create, then 404 on the PATCH: the id is someone else's flow (#942). An owner's
+          // person moves to a new id and is created again with everything. A plain 404 (a deleted flow,
+          // lost access, or the caller's own deleted id, which answers `conflict`) never gets here. An
+          // id a re-mint made is never re-minted: it falls through to drop-and-pull.
+          if (
+            result.reason === 'not_found' &&
+            !create &&
+            state.conflicted.has(id) &&
+            !state.reminted.has(id) &&
+            mayCreate(session, userId)
+          ) {
             const newId = remint(state, id, session);
             ids.push(newId);
             writeStored(latest.current.storage, state);
+            state.moveAsked.add(id);
             latest.current.moveFlowId(id, newId);
             break;
           }

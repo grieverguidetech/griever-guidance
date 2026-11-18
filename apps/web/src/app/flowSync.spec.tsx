@@ -137,6 +137,35 @@ function signedIn(signed: boolean) {
   mocks.loadClerk.mockResolvedValue(fakeClerk(signed ? { userId: USER } : {}).load);
 }
 
+/**
+ * The server has someone else's flow under FLOW: create gets 409 `taken`, PATCH gets 404 (#942). Any
+ * other id is free. The PATCH waits for `gate` when one is given, so a test can act before the move.
+ */
+function stubSquattedGateway(gate?: Promise<void>) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      const method = init?.method ?? 'GET';
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+      calls.push({ method, path, body });
+      const reply = (status: number, json: unknown) =>
+        new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
+      if (method === 'GET') {
+        return reply(200, []);
+      }
+      if (method === 'POST' && body?.['id'] === FLOW) {
+        return reply(409, { error: 'That person already exists.', code: 'taken' });
+      }
+      if (method === 'PATCH' && path === `/flows/${FLOW}`) {
+        await gate;
+        return reply(404, { error: 'That could not be found.' });
+      }
+      return reply(201, { id: body?.['id'], ownerId: OWNER_UUID, role: 'owner', facts: body, updatedAt: '2026-10-01T00:00:00.000Z', updatedBy: null });
+    }),
+  );
+}
+
 async function editName(text: string) {
   const user = userEvent.setup();
   await screen.findByRole('heading', { level: 1, name: 'Overview' });
@@ -443,28 +472,7 @@ describe('background sync in the app (#520)', () => {
 
   it('a person whose id someone else took first moves to a new id, and their open page follows by replace (#942)', async () => {
     seed();
-    // The server has someone else's flow under FLOW: create gets 409, PATCH gets 404. Any other id is free.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const path = new URL(String(input)).pathname;
-        const method = init?.method ?? 'GET';
-        const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
-        calls.push({ method, path, body });
-        const reply = (status: number, json: unknown) =>
-          new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
-        if (method === 'GET') {
-          return reply(200, []);
-        }
-        if (method === 'POST' && body?.['id'] === FLOW) {
-          return reply(409, { error: 'exists' });
-        }
-        if (method === 'PATCH' && path === `/flows/${FLOW}`) {
-          return reply(404, { error: 'not_found' });
-        }
-        return reply(201, { id: body?.['id'], ownerId: OWNER_UUID, role: 'owner', facts: body, updatedAt: '2026-10-01T00:00:00.000Z', updatedBy: null });
-      }),
-    );
+    stubSquattedGateway();
     signedIn(true);
     renderApp(<App />, { path: `/people/${FLOW}/service` });
     expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toBeInTheDocument();
@@ -487,9 +495,31 @@ describe('background sync in the app (#520)', () => {
     window.localStorage.setItem('gg.sessions.v1', JSON.stringify([{ ...person, flowId: moved, formerFlowIds: [FLOW] }]));
     serverHasNothing = true;
     signedIn(true);
-    renderApp(<App />, { path: `/people/${FLOW}/obituary` });
+    renderApp(<App />, { path: `/people/${FLOW}/obituary?from=link#top` });
     await waitFor(() => expect(window.location.pathname).toBe(`/people/${moved}/obituary`));
+    expect(window.location.search).toBe('?from=link');
+    expect(window.location.hash).toBe('#top');
     expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
     expect(screen.queryByText("That page isn't here. Your people are below.")).toBeNull();
+  });
+
+  it('keeps focus in the field being typed in when the person moves to a new id (#942)', async () => {
+    let release: () => void = () => undefined;
+    stubSquattedGateway(new Promise<void>((resolve) => (release = resolve)));
+    signedIn(true);
+    renderApp(<App />, { path: `/people/${FLOW}/person` });
+    expect(await screen.findByRole('heading', { level: 1, name: 'The person' })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Their name'));
+    expect(screen.getByLabelText('Their name')).toHaveFocus();
+    release();
+    await waitFor(() => expect(window.location.pathname).not.toBe(`/people/${FLOW}/person`), { timeout: 5000 });
+    const saved = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')[0];
+    expect(window.location.pathname).toBe(`/people/${saved.flowId}/person`);
+    // Let any focus move that the new path would cause run first.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getByLabelText('Their name')).toHaveFocus();
   });
 });

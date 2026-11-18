@@ -279,4 +279,24 @@ describe('moveFlowId (#942)', () => {
     expect(result.current.sessions[0].flowId).toBe(A);
     expect(result.current.sessions[0].formerFlowIds).toBeUndefined();
   });
+
+  it('keeps the same list when no session holds the old id, so a repeat ask re-renders nothing', () => {
+    const { result } = renderHook(() => useSessions(mem([local()])));
+    const before = result.current.sessions;
+    act(() => result.current.moveFlowId(B, A));
+    expect(result.current.sessions).toBe(before);
+  });
+
+  it('keeps only strings from a saved formerFlowIds, and drops one that is not a list', () => {
+    const { result } = renderHook(() =>
+      useSessions(
+        mem([
+          local({ formerFlowIds: [B, 7, null, 'x'] as never }),
+          local({ id: 'local-2', flowId: B, formerFlowIds: 'not a list' as never }),
+        ]),
+      ),
+    );
+    expect(result.current.sessions[0].formerFlowIds).toEqual([B, 'x']);
+    expect(result.current.sessions[1].formerFlowIds).toBeUndefined();
+  });
 });

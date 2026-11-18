@@ -296,6 +296,7 @@ describe('flows router (real callData, fetch stubbed)', () => {
       ['forbidden', 403],
       ['not_found', 404],
       ['conflict', 409],
+      ['taken', 409],
       ['busy', 503],
       ['something_new', 503],
     ])('data code %s becomes %i', async (code, status) => {
@@ -314,6 +315,17 @@ describe('flows router (real callData, fetch stubbed)', () => {
     it('is 409 when the id already exists', async () => {
       dataAnswer = () => fail('conflict');
       expect((await send('POST', '/flows', { id: FLOW_ID, ...FACTS })).status).toBe(409);
+    });
+
+    it('tells taken from conflict only by a code in the 409 body, with the same copy (#942)', async () => {
+      dataAnswer = () => fail('taken');
+      const taken = await send('POST', '/flows', { id: FLOW_ID, ...FACTS });
+      expect(taken.status).toBe(409);
+      expect(await taken.json()).toEqual({ error: 'That person already exists.', code: 'taken' });
+      dataAnswer = () => fail('conflict');
+      const own = await send('POST', '/flows', { id: FLOW_ID, ...FACTS });
+      expect(own.status).toBe(409);
+      expect(await own.json()).toEqual({ error: 'That person already exists.' });
     });
 
     it('is 503 when the data function is down, without leaking details', async () => {

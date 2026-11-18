@@ -1223,18 +1223,19 @@ describe('service keys sync as stored (real useSessions)', () => {
 });
 
 describe('useFlowSync and a flowId someone else took first (#942)', () => {
+  const TAKEN: Reply = { status: 409, body: { error: 'That person already exists.', code: 'taken' } };
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-  /** The server has someone else's flow under FLOW: a create gets 409 and a PATCH gets 404. Any other id is free. */
+  /** The server has someone else's flow under FLOW: a create gets `taken` and a PATCH gets 404. Any other id is free. */
   const squatted = (req: Req): Reply => {
     if (req.method === 'GET') return { status: 200, body: [] };
-    if (req.method === 'POST' && req.body?.['id'] === FLOW) return { status: 409, body: { error: 'exists' } };
+    if (req.method === 'POST' && req.body?.['id'] === FLOW) return TAKEN;
     if (req.method === 'PATCH' && req.path === `/flows/${FLOW}`) return { status: 404, body: { error: 'not_found' } };
     if (req.method === 'POST') return { status: 201, body: record({}, USER, String(req.body?.['id'])) };
     return { status: 200, body: record({}, USER, req.path.split('/').pop()) };
   };
 
-  it('409 on create then 404 on the PATCH: a new id is made and created with every edit, and the old id is dropped', async () => {
+  it('taken on create then 404 on the PATCH: a new id is made and created with every edit, and the old id is dropped', async () => {
     const requests = mockFetch(squatted);
     const storage = memoryStorage();
     const local = session({ ownerId: null, serviceDate: 'June 3', obituaryPublisher: 'Legacy' });
@@ -1282,6 +1283,18 @@ describe('useFlowSync and a flowId someone else took first (#942)', () => {
     expect(moveFlowId).not.toHaveBeenCalled();
   });
 
+  it('a conflict on create (my own id, even one I deleted) then a 404 on the PATCH makes no new id', async () => {
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [] };
+      if (req.method === 'POST') return { status: 409, body: { error: 'That person already exists.' } };
+      return { status: 404, body: { error: 'not_found' } };
+    });
+    const { moveFlowId } = setup([session({ ownerId: null })]);
+    await advance(10);
+    expect(writes(requests).map((r) => `${r.method} ${r.path}`)).toEqual(['POST /flows', `PATCH /flows/${FLOW}`]);
+    expect(moveFlowId).not.toHaveBeenCalled();
+  });
+
   it('a 409 whose PATCH works, then a later 404, makes no new id (the flow was ours, then deleted)', async () => {
     let gone = false;
     const requests = mockFetch((req) => {
@@ -1313,7 +1326,7 @@ describe('useFlowSync and a flowId someone else took first (#942)', () => {
     expect(moveFlowId).not.toHaveBeenCalled();
   });
 
-  it('remembers the 409 across a restart, so a PATCH that first fails offline still leads to a new id', async () => {
+  it('remembers the taken answer across a restart, so a PATCH that first fails offline still leads to a new id', async () => {
     let online = true;
     const requests = mockFetch((req) => {
       if (!online && req.method === 'PATCH') return 'offline';
@@ -1333,8 +1346,95 @@ describe('useFlowSync and a flowId someone else took first (#942)', () => {
     expect(second.moveFlowId).toHaveBeenCalledTimes(1);
     const newId = (second.moveFlowId.mock.calls[0] as [string, string])[1];
     const after = writes(requests).slice(before);
-    // No second create of the old id: the saved 409 sends the PATCH, and its 404 moves the person.
+    // No second create of the old id: the saved answer sends the PATCH, and its 404 moves the person.
     expect(after.map((r) => `${r.method} ${r.path}`)).toEqual([`PATCH /flows/${FLOW}`, 'POST /flows']);
     expect(after[1]).toMatchObject({ body: { id: newId, serviceDate: 'June 3' } });
+  });
+
+  it('makes a new id at most once: a new id that is taken too falls back to drop-and-pull', async () => {
+    // Every create is taken and every PATCH is 404. After 6 writes the server goes offline, so a
+    // missing cap fails this test on the write list instead of looping forever.
+    let sent = 0;
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [] };
+      sent += 1;
+      if (sent > 6) return 'offline';
+      return req.method === 'POST' ? TAKEN : { status: 404, body: { error: 'not_found' } };
+    });
+    const { moveFlowId } = setup([session({ ownerId: null })]);
+    await advance(10);
+    await advance(PULL + 10);
+    expect(moveFlowId).toHaveBeenCalledTimes(1);
+    const newId = (moveFlowId.mock.calls[0] as [string, string])[1];
+    expect(writes(requests).map((r) => `${r.method} ${r.path}`)).toEqual([
+      'POST /flows',
+      `PATCH /flows/${FLOW}`,
+      'POST /flows',
+      `PATCH /flows/${newId}`,
+    ]);
+  });
+
+  it('after a restart that lost the sessions save, moves the person before the first pull, so they stay one person', async () => {
+    const created = new Set<string>();
+    mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [...created].map((id) => record({}, USER, id)) };
+      if (req.method === 'POST' && req.body?.['id'] === FLOW) return TAKEN;
+      if (req.method === 'PATCH' && req.path === `/flows/${FLOW}`) return { status: 404, body: { error: 'not_found' } };
+      if (req.method === 'POST') {
+        created.add(String(req.body?.['id']));
+        return { status: 201, body: record({}, USER, String(req.body?.['id'])) };
+      }
+      return { status: 200, body: record({}, USER, req.path.split('/').pop()) };
+    });
+    const storage = memoryStorage();
+    const local = session({ ownerId: null });
+    // First run: the move is asked for, but the sessions save never happens (moveFlowId is a stub).
+    const first = setup([local], { storage });
+    await advance(10);
+    expect(created.size).toBe(1);
+    const [newId] = [...created];
+    first.unmount();
+
+    // Restart: the device still holds the person under the old id; the server lists the new id.
+    storage.setItem('gg.sessions.v1', JSON.stringify([local]));
+    storage.setItem('gg.sessionsAccount.v1', USER);
+    const second = renderHook(() => {
+      const s = useSessions(storage, USER);
+      useFlowSync({
+        sessions: s.sessions,
+        userId: USER,
+        getAccessToken: async () => 'tok',
+        enabled: true,
+        storage,
+        subscribe: () => () => undefined,
+        applyRemoteFlows: s.applyRemoteFlows,
+        moveFlowId: s.moveFlowId,
+      });
+      return s;
+    });
+    await advance(10);
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    const people = second.result.current.sessions;
+    expect(people.map((p) => [p.id, p.flowId])).toEqual([[local.id, newId]]);
+    expect(people[0].formerFlowIds).toEqual([FLOW]);
+    expect(created.size).toBe(1);
+    // The move is seen, so its saved entry is gone.
+    expect(JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}').moved).toEqual({});
+  });
+
+  it('forgets a taken id once the person is gone from the device', async () => {
+    mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [] };
+      if (req.method === 'POST') return TAKEN;
+      return 'offline';
+    });
+    const storage = memoryStorage();
+    const { rerender } = setup([session({ ownerId: null })], { storage });
+    await advance(10);
+    const saved = () => JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}') as { conflicted?: string[] };
+    expect(saved().conflicted).toEqual([FLOW]);
+    rerender({ sessions: [] });
+    await advance(10);
+    expect(saved().conflicted).toEqual([]);
   });
 });

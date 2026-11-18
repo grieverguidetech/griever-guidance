@@ -367,6 +367,17 @@ function migrateSession(stored: StoredSession): Session {
     drafts,
     draftsUpdatedAt,
   };
+  // Device-only old ids (#942). Anything that is not a list of strings is dropped.
+  if (stored.formerFlowIds !== undefined) {
+    const former = Array.isArray(stored.formerFlowIds)
+      ? (stored.formerFlowIds as unknown[]).filter((id): id is string => typeof id === 'string')
+      : [];
+    if (former.length > 0) {
+      migrated.formerFlowIds = former;
+    } else {
+      delete migrated.formerFlowIds;
+    }
+  }
   if (stored.sectionStatus !== undefined) {
     const sectionStatus = cleanSectionStatus(stored.sectionStatus);
     if (sectionStatus) {
@@ -886,14 +897,16 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
   }, []);
 
   const moveFlowId = useCallback((oldFlowId: string, newFlowId: string) => {
-    setSessions((list) =>
-      list.map((s) => {
-        if (s.flowId !== oldFlowId || s.role !== 'owner') {
-          return s;
-        }
-        return { ...s, flowId: newFlowId, formerFlowIds: [...(s.formerFlowIds ?? []), oldFlowId] };
-      }),
-    );
+    const moves = (s: Session) => s.flowId === oldFlowId && s.role === 'owner';
+    setSessions((list) => {
+      // Asked again for a move already made (after a restart): keep the same list, so nothing re-renders.
+      if (!list.some(moves)) {
+        return list;
+      }
+      return list.map((s) =>
+        moves(s) ? { ...s, flowId: newFlowId, formerFlowIds: [...(s.formerFlowIds ?? []), oldFlowId] } : s,
+      );
+    });
   }, []);
 
   const setServiceReady = useCallback((id: string, ready: boolean) => {

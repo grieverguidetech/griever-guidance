@@ -869,7 +869,8 @@ function AppBody({
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
       ? `empty:${cmsSection}:${cmsItem ?? ''}`
       : view === 'cms'
-        ? `cms:${pathPerson?.flowId ?? ''}:${cmsSection}:${cmsItem ?? ''}`
+        ? // The local id, not the flowId: sync can give a person a new flowId while they type (#942).
+          `cms:${pathPerson?.id ?? ''}:${cmsSection}:${cmsItem ?? ''}`
         : accountPath
           ? 'account'
           : view,
@@ -1345,13 +1346,13 @@ function AppBody({
     go({ view: 'people', missing: !removedHere }, { replace: true });
   });
   // A person given a new id by sync (#942), or an old link to them: replace the entry, so Back does not
-  // return to the old id. The entry's state (openedHere) moves with it.
+  // return to the old id. The entry's state (openedHere), query and hash move with it.
   useEffect(() => {
     if (movedPath === null || walking) {
       return;
     }
-    navigate(movedPath, { replace: true, state: location.state });
-  }, [movedPath, walking, navigate, location.state]);
+    navigate({ pathname: movedPath, search: location.search, hash: location.hash }, { replace: true, state: location.state });
+  }, [movedPath, walking, navigate, location.search, location.hash, location.state]);
 
   // Every person this load has shown, so a page of one who is gone since reads as removed, not unknown.
   const seenFlows = useRef(new Set<string>());
