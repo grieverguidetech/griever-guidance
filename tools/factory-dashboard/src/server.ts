@@ -1,7 +1,7 @@
 // Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It also makes one read-only Linear GraphQL query (key from the macOS Keychain, never sent to the page). It writes only one cache file (the AWS cost reading).
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,10 @@ import {
   extractMermaidBlocks,
   diagramGroup,
   diagramAge,
+  buildProjectMermaid,
+  buildPipelineMermaid,
+  parseWorkflow,
+  type NxGraph,
   DIAGRAM_GROUPS,
   DIAGRAM_STALE_DAYS,
   parseCostExplorer,
@@ -374,6 +378,44 @@ async function mermaidVersion(): Promise<string> {
   }
 }
 
+// "From the code" diagrams. The project graph comes from `nx graph --file` (no shell) and is kept for 1 hour; a failed read is
+// not kept. The workflows are read on each call.
+const GRAPH_CACHE_MS = 3_600_000;
+let graphCache: { at: number; mermaid: string } | null = null;
+
+async function readProjectMermaid(root: string): Promise<{ at: number; mermaid: string }> {
+  if (graphCache && Date.now() - graphCache.at < GRAPH_CACHE_MS) {
+    return graphCache;
+  }
+  const file = join(tmpdir(), `factory-nx-graph-${process.pid}-${Date.now()}.json`);
+  try {
+    await run('pnpm', ['nx', 'graph', `--file=${file}`], { cwd: root, maxBuffer: 64 * 1024 * 1024, timeout: 120_000 });
+    const graph = (JSON.parse(await readFile(file, 'utf8')) as { graph: NxGraph }).graph;
+    graphCache = { at: Date.now(), mermaid: buildProjectMermaid(graph) };
+    return graphCache;
+  } finally {
+    await rm(file, { force: true });
+  }
+}
+
+async function loadCodeDiagrams(root: string) {
+  const base = { group: 'From the code', fromCode: true, file: '', line: 0, url: '', lastChanged: null, daysAgo: null, stale: false };
+  const projects = { ...base, title: 'Apps and libs', source: '', readMinutesAgo: 0, error: '' };
+  try {
+    const read = await readProjectMermaid(root);
+    projects.source = read.mermaid;
+    projects.readMinutesAgo = Math.floor((Date.now() - read.at) / 60_000);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split('\n')[0] ?? '' : '';
+    projects.error = `Could not read the project graph. ${reason.slice(0, 200)}`.trim();
+  }
+  const dir = join(root, '.github', 'workflows');
+  const names = (await readdir(dir).catch(() => [] as string[])).filter((name) => /\.ya?ml$/.test(name)).sort();
+  const workflows = await Promise.all(names.map(async (name) => parseWorkflow(name, await readFile(join(dir, name), 'utf8'))));
+  const pipeline = { ...base, title: 'CI and deploy pipeline', source: buildPipelineMermaid(workflows), readMinutesAgo: 0, error: '' };
+  return [projects, pipeline];
+}
+
 async function loadDiagrams() {
   const root = await mainRepoRoot();
   const now = new Date();
@@ -405,6 +447,7 @@ async function loadDiagrams() {
       }),
     )
   ).flat();
+  diagrams.unshift(...((await loadCodeDiagrams(root)) as typeof diagrams));
   return {
     generatedAt: now.toISOString(),
     staleDays: DIAGRAM_STALE_DAYS,

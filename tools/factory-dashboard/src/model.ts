@@ -2100,8 +2100,8 @@ export function costErrorMessage(raw: string): string {
 }
 
 // ---- Architecture tab: the Mermaid blocks in the docs ----
-export type DiagramGroupName = 'System' | 'User flows' | 'Data';
-export const DIAGRAM_GROUPS: DiagramGroupName[] = ['System', 'User flows', 'Data'];
+export type DiagramGroupName = 'From the code' | 'System' | 'User flows' | 'Data';
+export const DIAGRAM_GROUPS: DiagramGroupName[] = ['From the code', 'System', 'User flows', 'Data'];
 export const DIAGRAM_STALE_DAYS = 30;
 
 export type DiagramBlock = { file: string; line: number; title: string; source: string };
@@ -2173,6 +2173,214 @@ export function diagramAge(lastChanged: string | null, now: Date): { days: numbe
   }
   const days = Math.max(0, Math.floor((now.getTime() - time) / 86_400_000));
   return { days, stale: days > DIAGRAM_STALE_DAYS };
+}
+
+// ---- Architecture tab: diagrams built from the code ----
+
+// A Mermaid-safe id: letters, digits and underscores only, with a prefix so a name like "end" is never a keyword.
+// Two names that clean to the same id get a number, so no two nodes merge.
+export function safeMermaidId(prefix: string, name: string, used: Set<string>): string {
+  const base = `${prefix}_${name.replace(/[^A-Za-z0-9_]/g, '_')}`;
+  let id = base;
+  for (let n = 2; used.has(id); n += 1) {
+    id = `${base}_${n}`;
+  }
+  used.add(id);
+  return id;
+}
+
+const mermaidLabel = (text: string): string => `"${text.replace(/["#]/g, "'")}"`;
+
+export type NxGraph = {
+  nodes: Record<string, { type?: string }>;
+  dependencies: Record<string, { target: string }[]>;
+};
+
+// The `graph` object of `nx graph --file`. Apps (and e2e and tools, unless the graph says lib) in one subgraph, libs in
+// another, one arrow per project-to-project dependency. `npm:` nodes and arrows to them are left out.
+export function buildProjectMermaid(graph: NxGraph): string {
+  const names = Object.keys(graph.nodes).filter((name) => !name.startsWith('npm:')).sort();
+  const used = new Set<string>();
+  const ids = new Map(names.map((name) => [name, safeMermaidId('p', name, used)]));
+  const lines = ['flowchart TB'];
+  for (const [title, isLib] of [['Apps', false], ['Libs', true]] as const) {
+    lines.push(`  subgraph ${title}`);
+    for (const name of names) {
+      if ((graph.nodes[name]?.type === 'lib') === isLib) {
+        lines.push(`    ${ids.get(name)}[${mermaidLabel(name)}]`);
+      }
+    }
+    lines.push('  end');
+  }
+  for (const name of names) {
+    const targets = [...new Set((graph.dependencies[name] ?? []).map((dep) => dep.target))].filter((t) => ids.has(t)).sort();
+    for (const target of targets) {
+      lines.push(`  ${ids.get(name)} --> ${ids.get(target)}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+type YamlNode = { value: string; items: string[]; children: Map<string, YamlNode> };
+type YamlLine = { indent: number; text: string };
+
+// Removes a trailing comment (a # at the start or after a space, outside quotes).
+function stripYamlComment(line: string): string {
+  let quote = '';
+  for (let at = 0; at < line.length; at += 1) {
+    const ch = line[at] ?? '';
+    if (quote !== '') {
+      quote = ch === quote ? '' : quote;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === '#' && (at === 0 || /\s/.test(line[at - 1] ?? ''))) {
+      return line.slice(0, at);
+    }
+  }
+  return line;
+}
+
+const unquote = (text: string): string => text.trim().replace(/^(["'])(.*)\1$/, '$2');
+
+function inlineList(value: string): string[] {
+  const inner = /^\[(.*)\]$/.exec(value.trim());
+  const parts = inner ? (inner[1] ?? '').split(',') : value.trim() === '' ? [] : [value];
+  return parts.map(unquote).filter((part) => part !== '');
+}
+
+// A small reader for the part of YAML that workflow files use for names, triggers and jobs: keys, inline lists, "- item"
+// lists and block scalars. It does not build anything it does not need (steps are kept only as text under their key).
+function parseYamlLines(lines: YamlLine[]): YamlNode {
+  const node: YamlNode = { value: '', items: [], children: new Map() };
+  const base = lines[0]?.indent ?? 0;
+  for (let at = 0; at < lines.length; ) {
+    const line = lines[at] as YamlLine;
+    let end = at + 1;
+    const keyLine = /^(["']?)([^:"'\s][^:]*?)\1\s*:(?:\s+(.*))?$/.exec(line.text);
+    if (line.text.startsWith('-')) {
+      while (end < lines.length && (lines[end] as YamlLine).indent > base) {
+        end += 1;
+      }
+      node.items.push(unquote(line.text.replace(/^-\s*/, '')));
+    } else {
+      const inner: YamlLine[] = [];
+      while (end < lines.length && ((lines[end] as YamlLine).indent > base || (keyLine && (keyLine[3] ?? '') === '' && (lines[end] as YamlLine).indent === base && (lines[end] as YamlLine).text.startsWith('-')))) {
+        inner.push(lines[end] as YamlLine);
+        end += 1;
+      }
+      if (keyLine) {
+        const child = inner.length > 0 ? parseYamlLines(inner) : { value: '', items: [], children: new Map<string, YamlNode>() };
+        const rawValue = (keyLine[3] ?? '').trim();
+        child.value = /^[>|][+-]?$/.test(rawValue) ? inner.map((l) => l.text).join(' ') : unquote(rawValue);
+        node.children.set(keyLine[2] ?? '', child);
+      }
+    }
+    at = end;
+  }
+  return node;
+}
+
+export type WorkflowTrigger = { event: string; branches: string[]; workflows: string[]; types: string[]; crons: number };
+export type WorkflowJob = { id: string; name: string; needs: string[]; condition: string };
+export type WorkflowInfo = { file: string; name: string; triggers: WorkflowTrigger[]; jobs: WorkflowJob[] };
+
+const yamlList = (node: YamlNode | undefined): string[] => (node ? [...inlineList(node.value), ...node.items] : []);
+
+// Reads the name, the triggers under `on:` and the jobs (id, name, needs, if) of one workflow file.
+export function parseWorkflow(file: string, text: string): WorkflowInfo {
+  const lines: YamlLine[] = [];
+  for (const raw of text.split('\n')) {
+    const cleaned = stripYamlComment(raw.replace(/\r$/, '')).replace(/\s+$/, '');
+    if (cleaned.trim() !== '') {
+      lines.push({ indent: cleaned.length - cleaned.trimStart().length, text: cleaned.trim() });
+    }
+  }
+  const root = parseYamlLines(lines);
+  const on = root.children.get('on') ?? root.children.get('true');
+  const triggers: WorkflowTrigger[] = [];
+  const events = on ? [...inlineList(on.value), ...on.items] : [];
+  for (const event of events) {
+    triggers.push({ event, branches: [], workflows: [], types: [], crons: 0 });
+  }
+  on?.children.forEach((node, event) => {
+    triggers.push({
+      event,
+      branches: yamlList(node.children.get('branches')),
+      workflows: yamlList(node.children.get('workflows')),
+      types: yamlList(node.children.get('types')),
+      crons: event === 'schedule' ? node.items.length : 0,
+    });
+  });
+  const jobs: WorkflowJob[] = [];
+  root.children.get('jobs')?.children.forEach((node, id) => {
+    jobs.push({ id, name: node.children.get('name')?.value || id, needs: yamlList(node.children.get('needs')), condition: node.children.get('if')?.value ?? '' });
+  });
+  return { file, name: root.children.get('name')?.value || file.replace(/\.ya?ml$/, ''), triggers, jobs };
+}
+
+// The words of the condition a job in the waiting workflow checks on the run it follows, from `workflow_run.conclusion == 'x'`
+// and `workflow_run.event == 'y'`. Nothing is added when the file has no such check.
+function runCondition(workflow: WorkflowInfo): string {
+  const found = (field: string): string[] =>
+    workflow.jobs.flatMap((job) => [...job.condition.matchAll(new RegExp(`workflow_run\\.${field}\\s*==\\s*'([^']+)'`, 'g'))].map((m) => m[1] ?? ''));
+  const conclusions = [...new Set(found('conclusion'))];
+  const events = [...new Set(found('event'))];
+  const parts = [conclusions.length > 0 ? `${conclusions.join(' or ')}` : '', events.length > 0 ? `a ${events.join(' or ')}` : ''].filter((p) => p !== '');
+  return parts.length === 0 ? '' : ` if ${parts.join(' on ')}`;
+}
+
+// One subgraph per workflow with its jobs (arrows for needs), trigger nodes with arrows into the workflow, and an arrow
+// from the workflow a `workflow_run` trigger waits on, labelled with its types, branches and the conditions its jobs check.
+export function buildPipelineMermaid(workflows: WorkflowInfo[]): string {
+  const used = new Set<string>();
+  const ids = new Map(workflows.map((wf) => [wf.file, safeMermaidId('w', wf.file.replace(/\.ya?ml$/, ''), used)]));
+  const lines = ['flowchart LR'];
+  const triggerNodes = new Map<string, string>();
+  const edges: string[] = [];
+  const triggerNode = (key: string, label: string): string => {
+    let id = triggerNodes.get(key);
+    if (!id) {
+      id = safeMermaidId('t', key, used);
+      triggerNodes.set(key, id);
+    }
+    return `${id}(${mermaidLabel(label)})`;
+  };
+  for (const wf of workflows) {
+    const wfId = ids.get(wf.file) as string;
+    const jobIds = new Map(wf.jobs.map((job) => [job.id, safeMermaidId('j', `${wfId}_${job.id}`, used)]));
+    lines.push(`  subgraph ${wfId}[${mermaidLabel(`${wf.name} (${wf.file})`)}]`);
+    wf.jobs.forEach((job) => {
+      lines.push(`    ${jobIds.get(job.id)}[${mermaidLabel(job.name)}]`);
+    });
+    wf.jobs.forEach((job) => {
+      job.needs.filter((need) => jobIds.has(need)).forEach((need) => {
+        lines.push(`    ${jobIds.get(need)} --> ${jobIds.get(job.id)}`);
+      });
+    });
+    lines.push('  end');
+    for (const trigger of wf.triggers) {
+      const branches = trigger.branches.join(', ');
+      if (trigger.event === 'workflow_run') {
+        const label = `after ${trigger.types.join(' or ') || 'it runs'}${branches ? ` on ${branches}` : ''}${runCondition(wf)}`;
+        for (const waited of trigger.workflows) {
+          const source = workflows.find((other) => other.name === waited);
+          const from = source ? (ids.get(source.file) as string) : triggerNode(`run ${waited}`, waited);
+          edges.push(`  ${from} -->|${mermaidLabel(label)}| ${wfId}`);
+        }
+      } else if (trigger.event === 'pull_request') {
+        edges.push(`  ${triggerNode('pull_request', 'pull request')} --> ${wfId}`);
+      } else if (trigger.event === 'push') {
+        edges.push(`  ${triggerNode(`push ${branches}`, branches ? `push to ${branches}` : 'push')} --> ${wfId}`);
+      } else if (trigger.event === 'workflow_dispatch') {
+        edges.push(`  ${triggerNode('manual', 'manual')} --> ${wfId}`);
+      } else if (trigger.event === 'schedule') {
+        edges.push(`  ${triggerNode('schedule', 'schedule')} --> ${wfId}`);
+      } else {
+        edges.push(`  ${triggerNode(trigger.event, trigger.event)} --> ${wfId}`);
+      }
+    }
+  }
+  return [...lines, ...edges].join('\n');
 }
 
 // ---- Linear (team GRI), read-only ----
