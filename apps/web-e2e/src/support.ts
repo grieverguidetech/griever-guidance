@@ -55,7 +55,7 @@ export async function startFirstPerson(
   await page.goto('/');
   await page.getByRole('button', { name: "Start with someone I've lost" }).click();
   await page.getByLabel('Their name').fill(personName);
-  await page.getByLabel('Date they passed (optional)', { exact: true }).fill('May 29, 2026');
+  await page.getByRole('textbox', { name: 'Date they passed (optional)', exact: true }).fill('May 29, 2026');
   if (senderName) await page.getByLabel('Your name (optional)').fill(senderName);
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeVisible();
