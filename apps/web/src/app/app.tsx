@@ -20,7 +20,7 @@ import {
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { acceptInvite, deleteFlow, getProfile } from '@griever/api-client';
-import type { AcceptInviteResult, ProfileResult } from '@griever/api-client';
+import type { ProfileResult } from '@griever/api-client';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { fill, screenCopy } from '@griever/copy';
@@ -51,6 +51,7 @@ import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import { JOIN_PATH, captureJoinLink, clearJoinToken, joinOutcome, savedJoinToken } from '../lib/joinLink';
+import type { JoinOutcome } from '../lib/joinLink';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { Profile } from '../screens/Profile';
 import { Join } from '../screens/Join';
@@ -351,31 +352,61 @@ function isJoinTakeoverPath(pathname: string): boolean {
   return pathname === '/' || pathname === JOIN_PATH;
 }
 
-/** The longest the Joining screen waits; past it, the link is kept and the app opens (C5: no blocking on the network). */
+/** The longest a whole join may take (every call in it); past it, the link is kept and the app opens (C5: no blocking on the network). */
 const JOIN_WAIT_MS = 15000;
 
+const TIMED_OUT = Symbol('timed out');
+
+/** A join's result: a joinOutcome, or `member` when the server says this account is a member already. */
+type JoinRun = JoinOutcome | 'member';
+
 /**
- * Accepts the invitation, or null when no token could be read or no answer came in time (treated as
- * offline: the link stays saved). The invitation token goes only into acceptInvite's request body.
+ * Joins with the invitation, every step inside one `waitMs` budget; running out reads as offline (the
+ * link stays saved). Only a profile the server answers now may say "already a member" (never a cached
+ * one): asked before accepting, and again after a refusal, which may only mean an earlier join worked.
+ * The invitation token goes only into acceptInvite's request body.
  */
-async function acceptWithin(
-  getAccessToken: () => Promise<string | null>,
-  inviteToken: string,
-  waitMs: number,
-): Promise<AcceptInviteResult | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timedOut = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), waitMs);
-  });
-  const attempt = (async () => {
-    const access = await getAccessToken().catch(() => null);
-    return access ? acceptInvite(access, inviteToken) : null;
-  })();
-  try {
-    return await Promise.race([attempt, timedOut]);
-  } finally {
-    clearTimeout(timer);
+async function runJoin(getAccessToken: () => Promise<string | null>, inviteToken: string, waitMs: number): Promise<JoinRun> {
+  const deadline = Date.now() + waitMs;
+  async function within<T>(work: Promise<T>): Promise<T | typeof TIMED_OUT> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), Math.max(0, deadline - Date.now()));
+    });
+    try {
+      return await Promise.race([work, timedOut]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  const access = await within(getAccessToken().catch(() => null));
+  if (access === TIMED_OUT || access === null) {
+    return 'offline';
+  }
+  async function isMember(): Promise<boolean | typeof TIMED_OUT> {
+    const fresh = await within(getProfile(access as string).catch(() => null));
+    if (fresh === TIMED_OUT) {
+      return TIMED_OUT;
+    }
+    return fresh?.ok === true && fresh.profile.accountType === 'member';
+  }
+  const before = await isMember();
+  if (before === TIMED_OUT) {
+    return 'offline';
+  }
+  if (before) {
+    return 'member';
+  }
+  const result = await within(acceptInvite(access, inviteToken));
+  const outcome = joinOutcome(result === TIMED_OUT ? null : result);
+  if (outcome !== 'unusable' && outcome !== 'conflict') {
+    return outcome;
+  }
+  const after = await isMember();
+  if (after === TIMED_OUT) {
+    return 'offline';
+  }
+  return after ? 'member' : outcome;
 }
 
 /** Views that need a person to be open; with nobody open Home is shown instead. */
@@ -1022,19 +1053,10 @@ function AppBody({
   // joinOutcome for which answers keep the link and which use it up.
   const reloadProfile = auth?.reloadProfile;
   const refreshMembers = members.refresh;
-  const joinProfileAnswered = auth?.profileAnswered ?? false;
-  const alreadyMember = auth?.profile?.accountType === 'member';
   useEffect(() => {
     if (!joinOn || joinToken === null || joinStarted.current) {
       return;
     }
-    // Already a member (joined on an earlier load): the link is spent. Drop it and say nothing.
-    const dropQuietly = () => {
-      clearJoinToken();
-      setJoinToken(null);
-      setJoinPhase('done');
-      leaveJoinPath(paths.landing());
-    };
     if (offline) {
       if (isJoinTakeoverPath(currentPath.current)) {
         joinStarted.current = true;
@@ -1042,45 +1064,45 @@ function AppBody({
       }
       return;
     }
-    if (!signedIn || !getAccessToken || !joinProfileAnswered) {
+    if (!signedIn || !getAccessToken) {
       return;
     }
     joinStarted.current = true;
-    if (alreadyMember) {
-      dropQuietly();
-      return;
-    }
     setJoinPhase('joining');
     void (async () => {
-      const outcome = joinOutcome(await acceptWithin(getAccessToken, joinToken, JOIN_WAIT_MS));
-      if (outcome === 'offline' || outcome === 'later') {
-        setJoinPhase(outcome);
-        return;
-      }
-      if (outcome !== 'joined') {
-        // A refusal may only mean this account joined already (on an earlier load, or after a slow answer): ask afresh.
-        const access = await getAccessToken().catch(() => null);
-        const fresh = access ? await getProfile(access) : null;
-        if (fresh?.ok && fresh.profile.accountType === 'member') {
-          reloadProfile?.();
-          dropQuietly();
-          return;
-        }
+      const outcome = await runJoin(getAccessToken, joinToken, JOIN_WAIT_MS);
+      const from = joinEntry.current ?? currentPath.current;
+      const takesOver = isJoinTakeoverPath(from);
+      if (outcome === 'member') {
+        // Joined on an earlier load: the link is spent. Drop it and say nothing.
+        reloadProfile?.();
         clearJoinToken();
         setJoinToken(null);
-        setJoinPhase(outcome);
+        setJoinPhase('done');
+        if (!CMS_ENABLED && currentPath.current === JOIN_PATH) {
+          setView('home');
+        }
+        leaveJoinPath(paths.landing());
+        return;
+      }
+      if (outcome === 'offline' || outcome === 'later') {
+        // The link is kept. On a page of their own, nothing interrupts them; the next load tries again.
+        setJoinPhase(takesOver ? outcome : 'done');
         return;
       }
       clearJoinToken();
       setJoinToken(null);
+      if (outcome !== 'joined') {
+        setJoinPhase(outcome);
+        return;
+      }
       // Now a member: the profile says so (no "Create a new one"), and the list names whose people these are.
       reloadProfile?.();
       void refreshMembers();
-      const from = joinEntry.current ?? currentPath.current;
-      const to = !isJoinTakeoverPath(from) ? currentPath.current : CMS_ENABLED ? paths.people() : paths.landing();
+      const to = !takesOver ? currentPath.current : CMS_ENABLED ? paths.people() : paths.landing();
       setJoinedNote({ path: to, text: null, seen: false });
       setJoinPhase('done');
-      if (isJoinTakeoverPath(from)) {
+      if (takesOver) {
         if (!CMS_ENABLED) {
           setView('home');
         }
@@ -1088,7 +1110,7 @@ function AppBody({
         void navigate(to, { replace: true });
       }
     })();
-  }, [joinOn, joinToken, offline, signedIn, getAccessToken, joinProfileAnswered, alreadyMember, reloadProfile, refreshMembers, navigate, leaveJoinPath]);
+  }, [joinOn, joinToken, offline, signedIn, getAccessToken, reloadProfile, refreshMembers, navigate, leaveJoinPath]);
 
   // The joined note: filled a moment after the owner's name is known, so the region is in the page first
   // and the words are announced. It ends once the person has seen it and moved to another page.

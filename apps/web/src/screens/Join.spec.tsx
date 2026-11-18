@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Join } from './Join';
 import type { JoinPhase } from './Join';
@@ -22,19 +22,27 @@ describe('Join', () => {
     expect(onSignIn).toHaveBeenCalledTimes(1);
   });
 
-  it('joining: a polite status that is in the page empty first, then says Joining (so it is announced)', async () => {
-    show('joining');
-    const status = screen.getByRole('status');
-    expect(status).toHaveAttribute('aria-live', 'polite');
-    expect(status).toHaveTextContent('');
-    await waitFor(() => expect(status).toHaveTextContent('Joining…'));
+  it('joining: a polite status that is in the page empty first, then says Joining (so it is announced)', () => {
+    vi.useFakeTimers();
+    try {
+      show('joining');
+      const status = screen.getByRole('status');
+      expect(status).toHaveAttribute('aria-live', 'polite');
+      expect(status).toHaveTextContent('');
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      expect(status).toHaveTextContent('Joining…');
+    } finally {
+      vi.useRealTimers();
+    }
     expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
   });
 
   it.each<[JoinPhase, string, string]>([
     ['unusable', "This invitation can't be used", 'Ask the person who sent it for a new one.'],
-    ['conflict', "This invitation can't be joined", "You already have people you're helping, so this invitation can't be joined from this account."],
+    ['conflict', "This invitation can't be joined", "You already have your own people in this account, so this invitation can't be joined from it."],
     ['offline', 'You need a connection to join', "Your link is saved. Open the app again when you're connected."],
     ['later', "Joining isn't available right now", 'Your link is saved. Open the app again in a little while to try again.'],
   ])('%s: its own h1, focused, one calm line, and Continue', async (phase, heading, body) => {

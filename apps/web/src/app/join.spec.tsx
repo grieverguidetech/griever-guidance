@@ -14,6 +14,7 @@ import { renderApp } from '../test/renderApp';
 const mocks = vi.hoisted(() => ({
   sharing: true,
   auth: true,
+  cms: true,
   joined: false,
   loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
   getProfile: vi.fn(),
@@ -31,7 +32,11 @@ vi.mock('../lib/features', () => ({
   OBITUARY_DRAFTING_ENABLED: false,
   PAYMENTS_ENABLED: false,
 }));
-vi.mock('../lib/cmsFlag', () => ({ CMS_ENABLED: true }));
+vi.mock('../lib/cmsFlag', () => ({
+  get CMS_ENABLED() {
+    return mocks.cms;
+  },
+}));
 vi.mock('../lib/authClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/authClient')>();
   return { ...actual, loadClerk: mocks.loadClerk };
@@ -50,6 +55,8 @@ const UNUSABLE = "This invitation can't be used";
 const UNUSABLE_BODY = 'Ask the person who sent it for a new one.';
 const CONFLICT = "This invitation can't be joined";
 const JOINED = "You're helping Anna now.";
+/** The joined note is filled on a timer after the members list answers; a loaded CI machine gets room. */
+const NOTE_WAIT = { timeout: 4000 };
 const MEMBER_EMPTY = "When someone adds you to help, the people you're helping will show here.";
 
 function profile(accountType: 'owner' | 'member') {
@@ -102,6 +109,7 @@ let logSpies: ReturnType<typeof vi.spyOn>[];
 beforeEach(() => {
   mocks.sharing = true;
   mocks.auth = true;
+  mocks.cms = true;
   mocks.joined = false;
   clearJoinToken();
   window.localStorage.clear();
@@ -186,7 +194,7 @@ describe('signed in, flags on', () => {
     expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
     expect(mocks.acceptInvite).toHaveBeenCalledWith('tok', TOKEN);
     expect(window.location.pathname).toBe('/people');
-    const note = await screen.findByText(JOINED);
+    const note = await screen.findByText(JOINED, undefined, NOTE_WAIT);
     expect(note.closest('[role="status"]')).toHaveAttribute('aria-live', 'polite');
     expect(note.textContent).not.toContain('!');
     expectTokenNowhere();
@@ -201,7 +209,7 @@ describe('signed in, flags on', () => {
       { path: LINK },
     );
     expect(await screen.findByText(MEMBER_EMPTY)).toBeInTheDocument();
-    await screen.findByText(JOINED);
+    await screen.findByText(JOINED, undefined, NOTE_WAIT);
     expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
   });
 
@@ -220,7 +228,7 @@ describe('signed in, flags on', () => {
     saveToken();
     useClerk({ userId: 'u1' });
     renderApp(<App />, { path: '/account' });
-    expect(await screen.findByText(JOINED)).toBeInTheDocument();
+    expect(await screen.findByText(JOINED, undefined, NOTE_WAIT)).toBeInTheDocument();
     expect(window.location.pathname).toBe('/account');
     expect(mocks.acceptInvite).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Joining…')).toBeNull();
@@ -278,7 +286,7 @@ describe('signed in, flags on', () => {
     renderApp(<App />, { path: LINK });
     const heading = await screen.findByRole('heading', { level: 1, name: CONFLICT });
     await waitFor(() => expect(heading).toHaveFocus());
-    expect(screen.getByText("You already have people you're helping, so this invitation can't be joined from this account.")).toBeInTheDocument();
+    expect(screen.getByText("You already have your own people in this account, so this invitation can't be joined from it.")).toBeInTheDocument();
     expect(saved()).toBeNull();
   });
 
@@ -311,7 +319,93 @@ describe('signed in, flags on', () => {
   });
 });
 
+describe('a deep link (not / or /join)', () => {
+  it.each([
+    ['offline', { ok: false, reason: 'offline' }],
+    ['later', { ok: false, reason: 'unavailable' }],
+  ] as const)('%s: no screen, the page stays and the link is kept', async (_label, result) => {
+    accepts(result);
+    saveToken();
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: '/account' });
+    await waitFor(() => expect(mocks.acceptInvite).toHaveBeenCalledTimes(1));
+    // Give the answer a moment to land: a screen would show now.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(window.location.pathname).toBe('/account');
+    expect(screen.queryByRole('heading', { name: 'You need a connection to join' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: "Joining isn't available right now" })).toBeNull();
+    expect(saved()).toContain(TOKEN);
+  });
+
+  it('a dead link: the person is told', async () => {
+    accepts({ ok: false, reason: 'unusable' });
+    saveToken();
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: '/account' });
+    expect(await screen.findByRole('heading', { level: 1, name: UNUSABLE })).toBeInTheDocument();
+    expect(saved()).toBeNull();
+  });
+});
+
+describe('the server says who is a member', () => {
+  it('a cached profile that says member does not drop the link: the server says owner, so it accepts', async () => {
+    window.localStorage.setItem('gg.profile.v1', JSON.stringify({ id: 'u1', senderName: 'Ben', contactSource: null, accountType: 'member' }));
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: LINK });
+    await waitFor(() => expect(mocks.acceptInvite).toHaveBeenCalledTimes(1));
+    expect(mocks.acceptInvite).toHaveBeenCalledWith('tok', TOKEN);
+  });
+
+  it('editor off: the quiet drop from /join lands on Home', async () => {
+    mocks.cms = false;
+    mocks.joined = true;
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: LINK });
+    expect(await screen.findByText(/the people you're helping will show here/)).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(saved()).toBeNull();
+    expect(mocks.acceptInvite).not.toHaveBeenCalled();
+  });
+});
+
 describe('no answer', () => {
+  it('the profile check never answers: after 15 seconds the link is kept and the person is told (C5)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mocks.getProfile.mockReturnValue(new Promise(() => {}));
+      useClerk({ userId: 'u1' });
+      renderApp(<App />, { path: LINK });
+      await waitFor(() => expect(mocks.getProfile).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(await screen.findByRole('heading', { level: 1, name: 'You need a connection to join' })).toBeInTheDocument();
+      expect(mocks.acceptInvite).not.toHaveBeenCalled();
+      expect(saved()).toContain(TOKEN);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the check after a refusal never answers: still 15 seconds in all, link kept', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let calls = 0;
+      mocks.getProfile.mockImplementation(() => {
+        calls += 1;
+        // The account's own load and the check before accepting answer; the check after the refusal never does.
+        return calls <= 2 ? Promise.resolve({ ok: true, profile: profile('owner') }) : new Promise(() => {});
+      });
+      accepts({ ok: false, reason: 'conflict' });
+      useClerk({ userId: 'u1' });
+      renderApp(<App />, { path: LINK });
+      await waitFor(() => expect(mocks.acceptInvite).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(await screen.findByRole('heading', { level: 1, name: 'You need a connection to join' })).toBeInTheDocument();
+      expect(saved()).toContain(TOKEN);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('after 15 seconds keeps the link and says so, so Joining never holds the app (C5)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
