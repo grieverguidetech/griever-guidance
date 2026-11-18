@@ -123,6 +123,10 @@ h2.panel-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.0
 progress.bar { display: block; width: 100%; height: 8px; margin: 4px 0; accent-color: var(--chart-1); }
 .panel-lines { overflow-wrap: anywhere; margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 table.plain td.text, table.plain th.text { text-align: left; font-weight: 400; }
+.diagram { overflow-x: auto; }
+.diagram svg { max-width: 100%; height: auto; }
+.diagram-meta { margin: 0 0 8px; }
+pre.diagram-source { overflow-x: auto; margin: 8px 0 0; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -137,15 +141,17 @@ table.plain td.text, table.plain th.text { text-align: left; font-weight: 400; }
 <div role="tablist" aria-label="Dashboard views" id="tabs">
   <button role="tab" type="button" id="tab-cto" aria-controls="panel-cto" data-tab="cto">CTO</button>
   <button role="tab" type="button" id="tab-factory" aria-controls="panel-factory" data-tab="factory">Software Factory</button>
+  <button role="tab" type="button" id="tab-architecture" aria-controls="panel-architecture" data-tab="architecture">Architecture</button>
 </div>
 <main id="main">
   <div role="tabpanel" id="panel-cto" aria-labelledby="tab-cto" tabindex="0" hidden></div>
   <div role="tabpanel" id="panel-factory" aria-labelledby="tab-factory" tabindex="0" hidden></div>
+  <div role="tabpanel" id="panel-architecture" aria-labelledby="tab-architecture" tabindex="0" hidden></div>
 </main>
 <script>
 "use strict";
 var state = null;
-var TABS = ["cto", "factory"];
+var TABS = ["cto", "factory", "architecture"];
 // Hashes from the old 3 tabs still open the matching new tab.
 var OLD_TABS = { product: "cto", business: "cto", engineering: "factory" };
 var areaSelect = document.getElementById("area");
@@ -2052,6 +2058,130 @@ function renderCto() {
   safely(panelNode, renderDecisionsPanel);
 }
 
+// ---- Architecture tab: the Mermaid blocks of the docs, drawn by the local Mermaid bundle ----
+var diagramData = null;
+var mermaidLoad = null;
+var drawToken = 0;
+
+// Loads /vendor/mermaid.min.js once, from this server. Nothing comes from outside localhost.
+function loadMermaid() {
+  if (!mermaidLoad) {
+    mermaidLoad = new Promise(function (resolve, reject) {
+      var tag = document.createElement("script");
+      tag.src = "/vendor/mermaid.min.js";
+      tag.onload = function () {
+        resolve(window.mermaid);
+      };
+      tag.onerror = function () {
+        mermaidLoad = null;
+        reject(new Error("The Mermaid script did not load."));
+      };
+      document.head.appendChild(tag);
+    });
+  }
+  return mermaidLoad;
+}
+
+function ageLine(d) {
+  var text = d.daysAgo === null ? "Last changed: unknown" : "Last changed " + d.daysAgo + (d.daysAgo === 1 ? " day" : " days") + " ago";
+  return d.stale ? text + ". May be out of date." : text + ".";
+}
+
+// One card: title, source link, age, the drawing (filled later) and the text view.
+function diagramCard(parent, d) {
+  var c = card(d.title);
+  var meta = el("p", null, "diagram-meta muted");
+  meta.appendChild(link(d.file + ", line " + d.line, d.url));
+  meta.appendChild(document.createTextNode(". " + ageLine(d)));
+  c.appendChild(meta);
+  var drawing = el("div", null, "diagram");
+  drawing.appendChild(el("p", "Drawing the diagram.", "muted"));
+  c.appendChild(drawing);
+  var text = el("details");
+  text.appendChild(el("summary", "Show the text"));
+  text.appendChild(el("pre", d.source, "diagram-source"));
+  c.appendChild(text);
+  parent.appendChild(c);
+  return { drawing: drawing, data: d, title: c.titleId };
+}
+
+function showDrawingError(slot, reason) {
+  slot.drawing.textContent = "";
+  slot.drawing.appendChild(el("p", "Could not draw this diagram. " + reason, "error"));
+}
+
+// Draws one diagram. Mermaid returns an SVG string (sanitized by securityLevel strict); it is parsed, not assigned with innerHTML.
+function drawDiagram(mermaid, slot, index) {
+  var id = "mmd-" + index;
+  return mermaid.render(id, slot.data.source).then(function (out) {
+    var svg = new DOMParser().parseFromString(out.svg, "text/html").querySelector("svg");
+    if (!svg) {
+      throw new Error("Mermaid returned no drawing.");
+    }
+    slot.drawing.textContent = "";
+    slot.drawing.setAttribute("role", "img");
+    slot.drawing.setAttribute("aria-labelledby", slot.title);
+    slot.drawing.appendChild(document.importNode(svg, true));
+  }).catch(function (e) {
+    var stray = document.getElementById("d" + id);
+    if (stray) {
+      stray.remove();
+    }
+    showDrawingError(slot, (e && e.message ? String(e.message) : "Unknown error.").split("\n")[0].slice(0, 200));
+  });
+}
+
+// Draws the diagrams one after another. A newer call (a theme change, Refresh) stops an older one.
+function drawAllDiagrams(slots) {
+  var token = ++drawToken;
+  var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  loadMermaid().then(function (mermaid) {
+    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default", suppressErrorRendering: true });
+    return slots.reduce(function (chain, slot, index) {
+      return chain.then(function () {
+        return token === drawToken ? drawDiagram(mermaid, slot, token + "-" + index) : null;
+      });
+    }, Promise.resolve());
+  }).catch(function (e) {
+    slots.forEach(function (slot) {
+      showDrawingError(slot, e.message);
+    });
+  });
+}
+
+function renderArchitecture() {
+  var node = document.getElementById("panel-architecture");
+  node.textContent = "";
+  var slots = [];
+  safely(node, function (parent) {
+    var p = panel(parent, "Architecture", "docs/*.md", diagramData && diagramData.generatedAt);
+    if (!diagramData || diagramData.error) {
+      p.appendChild(el("p", "Could not load: " + (diagramData ? diagramData.error : "no data"), "error"));
+      return;
+    }
+    diagramData.groups.forEach(function (group) {
+      var s = kitSection(p, group.name, "architecture");
+      if (group.diagrams.length === 0) {
+        s.appendChild(el("p", "No diagrams in the docs for this group.", "muted"));
+      }
+      group.diagrams.forEach(function (d) {
+        safely(s, function (box) {
+          slots.push(diagramCard(box, d));
+        });
+      });
+    });
+  });
+  if (slots.length > 0) {
+    drawAllDiagrams(slots);
+  }
+}
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+  if (state) {
+    renderArchitecture();
+  }
+});
+
 function currentTab() {
   var name = location.hash.slice(1);
   if (OLD_TABS[name]) {
@@ -2145,7 +2275,9 @@ function render() {
     setNote("");
   }
   TABS.forEach(function (tab) {
-    document.getElementById("panel-" + tab).textContent = "";
+    if (tab !== "architecture") {
+      document.getElementById("panel-" + tab).textContent = "";
+    }
   });
   showUpdated();
   var current = areaSelect.value;
@@ -2226,6 +2358,13 @@ function restart() {
 
 function load(refresh) {
   document.getElementById("updated").textContent = "Loading";
+  var diagrams = fetch("/api/diagrams", { cache: "no-store" })
+    .then(function (r) {
+      return r.ok ? r.json() : { error: "HTTP " + r.status };
+    })
+    .catch(function (e) {
+      return { error: e.message };
+    });
   fetch("/api/state" + (refresh ? "?refresh=1" : ""))
     .then(function (r) {
       return r.json();
@@ -2233,6 +2372,11 @@ function load(refresh) {
     .then(function (data) {
       state = data;
       render();
+      return diagrams;
+    })
+    .then(function (found) {
+      diagramData = found;
+      renderArchitecture();
     })
     .catch(function (e) {
       document.getElementById("updated").textContent = "Could not load: " + e.message;

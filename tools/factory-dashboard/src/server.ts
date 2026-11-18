@@ -41,6 +41,11 @@ import {
   makeCostReader,
   validateCostReading,
   parseAdr,
+  extractMermaidBlocks,
+  diagramGroup,
+  diagramAge,
+  DIAGRAM_GROUPS,
+  DIAGRAM_STALE_DAYS,
   parseCostExplorer,
   parseGitLog,
   closedIssueArgs,
@@ -346,6 +351,58 @@ async function loadAdrs(): Promise<AdrInfo[]> {
   return Promise.all(names.map(async (name) => parseAdr(name, await readFile(join(dir, name), 'utf8'))));
 }
 
+// Architecture tab: every ```mermaid block in docs/*.md, docs/adr/*.md and docs/learnings/*.md of the main checkout.
+// Read on each request (not cached), so a new block shows after a reload. The age comes from `git log -1` for the file.
+const DIAGRAM_DIRS = ['docs', 'docs/adr', 'docs/learnings'];
+
+async function lastChanged(root: string, file: string): Promise<string | null> {
+  try {
+    return (await exec('git', ['log', '-1', '--format=%cI', '--', file], root)).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadDiagrams() {
+  const root = await mainRepoRoot();
+  const now = new Date();
+  const files = (
+    await Promise.all(
+      DIAGRAM_DIRS.map(async (dir) =>
+        (await readdir(join(root, dir)).catch(() => [] as string[])).filter((name) => name.endsWith('.md')).sort().map((name) => `${dir}/${name}`),
+      ),
+    )
+  ).flat();
+  const diagrams = (
+    await Promise.all(
+      files.map(async (file) => {
+        const blocks = extractMermaidBlocks(file, await readFile(join(root, file), 'utf8'));
+        if (blocks.length === 0) {
+          return [];
+        }
+        const changed = await lastChanged(root, file);
+        const age = diagramAge(changed, now);
+        return blocks.map((block) => ({
+          ...block,
+          group: diagramGroup(file),
+          url: `${REPO_URL}/blob/main/${file}#L${block.line}`,
+          lastChanged: changed,
+          daysAgo: age.days,
+          stale: age.stale,
+        }));
+      }),
+    )
+  ).flat();
+  return {
+    generatedAt: now.toISOString(),
+    staleDays: DIAGRAM_STALE_DAYS,
+    groups: DIAGRAM_GROUPS.map((name) => ({ name, diagrams: diagrams.filter((d) => d.group === name) })),
+  };
+}
+
+// The Mermaid browser bundle, served from node_modules (no CDN). Read when asked, so the server starts without it.
+const MERMAID_FILE = join(HERE, '..', 'node_modules', 'mermaid', 'dist', 'mermaid.min.js');
+
 // Cost Explorer bills $0.01 a call. makeCostReader keeps a good reading for 12 hours (and for the month
 // it was read in). The reading is also saved to one file outside the repo, so a restart does not call again.
 // Refresh does not clear it. This is the only file the dashboard writes.
@@ -545,6 +602,12 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
       const state = await getState(url.searchParams.get('refresh') === '1');
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       response.end(JSON.stringify({ ...state, restartAvailable: RESTART_ON_CHANGE }));
+    } else if (url.pathname === '/api/diagrams') {
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      response.end(JSON.stringify(await loadDiagrams()));
+    } else if (url.pathname === '/vendor/mermaid.min.js') {
+      const script = await readFile(MERMAID_FILE);
+      response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=86400' }).end(script);
     } else {
       response.writeHead(404).end('Not found');
     }

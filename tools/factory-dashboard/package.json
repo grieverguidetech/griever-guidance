@@ -4,5 +4,8 @@
   "private": true,
   "nx": {
     "name": "factory-dashboard"
+  },
+  "dependencies": {
+    "mermaid": "12.2.0"
   }
 }

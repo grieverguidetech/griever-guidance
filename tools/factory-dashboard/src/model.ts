@@ -2098,3 +2098,67 @@ export function costErrorMessage(raw: string): string {
     .slice(0, 120);
   return safe === '' ? 'Could not read AWS cost.' : `Could not read AWS cost. ${safe}`;
 }
+
+// ---- Architecture tab: the Mermaid blocks in the docs ----
+export type DiagramGroupName = 'System' | 'User flows' | 'Data';
+export const DIAGRAM_GROUPS: DiagramGroupName[] = ['System', 'User flows', 'Data'];
+export const DIAGRAM_STALE_DAYS = 30;
+
+export type DiagramBlock = { file: string; line: number; title: string; kind: string; source: string };
+
+// Every ```mermaid block in one doc. `line` is the line of the opening fence (1-based). The title is the
+// nearest heading above it (a `#` line outside any code fence), else the file name.
+export function extractMermaidBlocks(file: string, text: string): DiagramBlock[] {
+  const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
+  const blocks: DiagramBlock[] = [];
+  let heading = file.replace(/\.md$/, '');
+  let fence: string | null = null;
+  let current: { line: number; title: string; body: string[] } | null = null;
+  lines.forEach((line, index) => {
+    const open = /^\s*(`{3,}|~{3,})\s*(\S*)/.exec(line);
+    if (fence === null) {
+      if (open) {
+        fence = open[1] ?? '```';
+        if ((open[2] ?? '').toLowerCase() === 'mermaid') {
+          current = { line: index + 1, title: heading, body: [] };
+        }
+      } else {
+        const found = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+        if (found) {
+          heading = (found[1] ?? heading).trim();
+        }
+      }
+      return;
+    }
+    if (open && line.trim().startsWith(fence) && (open[2] ?? '') === '') {
+      fence = null;
+      if (current) {
+        const source = current.body.join('\n').trim();
+        const kind = /^(\S+)/.exec(source)?.[1] ?? 'diagram';
+        blocks.push({ file, line: current.line, title: current.title, kind, source });
+        current = null;
+      }
+      return;
+    }
+    current?.body.push(line);
+  });
+  return blocks;
+}
+
+// docs/frontend.md is User flows, docs/learnings is Data, everything else (backend-services.md, ADRs, any other doc) is System.
+export function diagramGroup(file: string): DiagramGroupName {
+  if (file === 'docs/frontend.md') {
+    return 'User flows';
+  }
+  return file.startsWith('docs/learnings/') ? 'Data' : 'System';
+}
+
+// Whole days since the last commit that touched the file. null when git gave no date.
+export function diagramAge(lastChanged: string | null, now: Date): { days: number | null; stale: boolean } {
+  const time = lastChanged === null ? NaN : Date.parse(lastChanged);
+  if (Number.isNaN(time)) {
+    return { days: null, stale: false };
+  }
+  const days = Math.max(0, Math.floor((now.getTime() - time) / 86_400_000));
+  return { days, stale: days > DIAGRAM_STALE_DAYS };
+}
