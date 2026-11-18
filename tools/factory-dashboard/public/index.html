@@ -1724,7 +1724,7 @@ function renderLinks(parent, b) {
   s.appendChild(g);
 }
 
-// Linear: GRI. Open issues from Linear, 10 rows a page. The key stays on the server.
+// User stories: open GRI issues in Linear. Open issues from Linear, 10 rows a page. The key stays on the server.
 function linearTable(rows) {
   var box = scrollBox("Linear GRI open issues table");
   var table = el("table", null, "plain");
@@ -1760,7 +1760,7 @@ function linearTable(rows) {
 }
 
 function renderLinear(parent) {
-  var s = kitSection(parent, "Linear: GRI", null);
+  var s = kitSection(parent, "User stories", null);
   var src = state.sources.linear;
   if (src && !src.ok) {
     s.appendChild(el("p", src.error, src.error === "Linear key not set. See the README." ? "muted" : "error"));
@@ -1818,9 +1818,11 @@ function renderBusinessPanel(parent) {
   var b = state.business;
   if (!b) {
     businessMissing(parent);
+    // The Linear list does not need business.json, so it still shows.
+    safely(parent, renderLinear);
     return;
   }
-  [renderBusinessTiles, renderOpenDecisionLines, renderSteps, renderCosts, renderLinks].forEach(function (part) {
+  [renderBusinessTiles, renderOpenDecisionLines, renderSteps, renderLinear, renderCosts, renderLinks].forEach(function (part) {
     safely(parent, function (box) {
       part(box, b);
     });
@@ -2119,7 +2121,6 @@ function renderCto() {
     var p = panel(box, "Business", "business.json");
     allAreasNote(p);
     safely(p, renderBusinessPanel);
-    safely(p, renderLinear);
   });
 }
 
