@@ -185,6 +185,9 @@ additive: an older list loads, and the file keeps its key and shape.
   take over as the person the app reopens.
 - The `flowId` given to an old session is stable only once the save succeeds. If storage is full
   or unavailable, the next load makes a new one.
+- `flowId` is in the web URL (`/people/:flowId`, REQUIREMENTS.md §6 "Web routes"), so it ends up in
+  history, bookmarks and shared links. It is **not a secret**: knowing it gives no access ("Shared
+  people" below says what it allows). The local `id` is never in a URL.
 
 ### 2.0b Section fields on the local session
 
@@ -593,6 +596,27 @@ touched (C8). A second route, `POST /internal/delete-user`, is the service path 
 deletion (§7). It takes no user token: it needs the shared secret in `x-gg-service-secret`, and it
 answers 404 when `DATA_SERVICE_SECRET` is empty. Its rule, `deleteUser`, is the only one that does
 not run as a caller.
+
+**A known `flowId` is not a key.** `flowId` is in web URLs (REQUIREMENTS.md §6 "Web routes"), so
+treat it as known to anyone who sees a link, a history list or a screen. Every flow action checks
+the caller on every call, in `libs/data-access/src/rules/flows.ts`:
+
+- **Read:** there is no read-by-id action. `listFlows` returns only the caller's own people and, for a
+  member, their owner's. Nobody else ever sees that person.
+- **Change:** `updateFlow` finds the person only in the caller's partition or their owner's. A stranger,
+  a removed member, an unknown id and a deleted person all get the same `not_found` (404), so the
+  answer does not say whether the id exists.
+- **Delete:** `deleteFlow` builds the key from the caller, so only the owner can. Anyone else gets `not_found`.
+- **Create with that id:** `createFlow` fails with `conflict` (409) when the id is taken (the
+  `FLOW#<id>` guard, kept until the purge). That answer does say the id exists on the server, but it
+  shows nothing about the person. An id that is not on the server yet (a person kept only on the device,
+  or not pushed yet) can be taken by any signed-in owner who learns it. The owner's next create then
+  gets 409, the sync switches to `PATCH`, gets `not_found`, and drops that person's pending edits
+  (see "Sync queue" below). Later edits go the same way, so that person stops syncing. The person stays
+  on the owner's device.
+
+The gateway refuses a `flowId` that is not a UUID (`isUuid`, `libs/gateway-flows/src/flowsRouter.ts`)
+before the data function is called, and every `/flows` route needs a verified Clerk token.
 
 **Where emails live.** The invitee's email is on the `INVITE#` item. A list of pending invites
 shows only `id`, `email`, `expiresAt` and `createdAt`, never the token hash. The email the member
