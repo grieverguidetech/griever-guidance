@@ -783,12 +783,19 @@ describe('navigation (#566)', () => {
     await h1('Overview');
     const back = vi.spyOn(window.history, 'back');
     try {
-      for (let press = 0; press < 2; press += 1) {
-        act(() => {
-          window.history.back();
-        });
-        await walkSettled(back);
-      }
+      // First press: wait until the app has made all its 50 moves (the test's own press is call 1). The
+      // walk starts from a popstate and a React effect, so how long it takes depends on machine load;
+      // a fixed quiet window could end before the first move and read 0.
+      act(() => {
+        window.history.back();
+      });
+      await waitFor(() => expect(back.mock.calls.length).toBeGreaterThanOrEqual(51), { timeout: 15000 });
+      await walkSettled(back);
+      // Second press: the cap must hold, so the app makes no more moves.
+      act(() => {
+        window.history.back();
+      });
+      await walkSettled(back);
       const byApp = back.mock.calls.length - 2;
       expect(byApp).toBe(50);
       expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
