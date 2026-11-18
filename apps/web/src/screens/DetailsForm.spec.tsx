@@ -48,6 +48,6 @@ describe('Service place field', () => {
 describe('Service date calendar button', () => {
   it('is named by its field', () => {
     render(<Harness />);
-    expect(screen.getByRole('button', { name: /^Service date.*, choose date from calendar$/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Service date.* Choose date from calendar$/ })).toBeInTheDocument();
   });
 });

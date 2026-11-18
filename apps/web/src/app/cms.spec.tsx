@@ -208,7 +208,7 @@ describe('editor on (#395)', () => {
     await screen.findByRole('heading', { level: 1, name: 'The person' });
     await user.click(screen.getByRole('link', { name: /^Service/ }));
     await screen.findByRole('heading', { level: 1, name: 'Service' });
-    await user.type(screen.getAllByLabelText('Date')[0], 'May 29, 2026');
+    await user.type(screen.getAllByLabelText('Date', { selector: 'input' })[0], 'May 29, 2026');
     await user.click(peopleNav());
     await expectPeople();
     expect(stored()).toHaveLength(1);
@@ -278,18 +278,18 @@ describe('editor on (#395)', () => {
     const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
     await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
-    fireEvent.change(screen.getByLabelText('Date of birth (optional)'), { target: { value: 'May 2, 1940' } });
+    fireEvent.change(screen.getByLabelText('Date of birth (optional)', { selector: 'input' }), { target: { value: 'May 2, 1940' } });
     expect(stored()[0]).toMatchObject({ birthDate: 'May 2, 1940' });
     expect(stored()[0].sectionStatus?.['person']).toBe('in_progress');
     // The person is opened from the Overview, not the side nav.
     await user.click(nav.getByRole('link', { name: /^Overview/ }));
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^The person/ }));
     await screen.findByRole('heading', { level: 1, name: 'The person' });
-    expect(screen.getByLabelText('Date of birth (optional)')).toHaveValue('May 2, 1940');
-    fireEvent.change(screen.getByLabelText('Date they passed (optional)'), { target: { value: 'June 1, 2026' } });
+    expect(screen.getByLabelText('Date of birth (optional)', { selector: 'input' })).toHaveValue('May 2, 1940');
+    fireEvent.change(screen.getByLabelText('Date they passed (optional)', { selector: 'input' }), { target: { value: 'June 1, 2026' } });
     await user.click(nav.getByRole('link', { name: /^Obituary/ }));
     await screen.findByRole('heading', { level: 1, name: 'Obituary' });
-    expect(screen.getByLabelText('Date they passed (optional)')).toHaveValue('June 1, 2026');
+    expect(screen.getByLabelText('Date they passed (optional)', { selector: 'input' })).toHaveValue('June 1, 2026');
   });
 
   it('"Your people" in the nav keeps a named person', async () => {

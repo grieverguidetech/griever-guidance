@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { parseCompleteDate } from '@griever/shared';
 import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank';
 import { screenCopy } from '@griever/copy';
@@ -55,7 +55,7 @@ interface DateInputProps {
   describedBy?: string;
   /** The id of a visible label elsewhere on the page, when there is no `<label htmlFor>`. */
   labelledBy?: string;
-  /** The id of the field's visible label. Names the calendar button ("Date, choose date from calendar"). Falls back to `labelledBy`. */
+  /** The id of the field's visible label. Prefixes the calendar button's name with the field ("Date Choose date from calendar"). Falls back to `labelledBy`. */
   labelId?: string;
   required?: boolean;
   /** A quiet, non-blocking note under the field (not an alert). Never stops saving. */
@@ -94,21 +94,8 @@ export function DateInput({
   const helpId = `${id}-help`;
   const noteId = `${id}-note`;
   const errorId = `${id}-error`;
+  const buttonId = `${id}-calendar`;
   const fieldLabelIds = labelId ?? labelledBy;
-  const [fieldName, setFieldName] = useState('');
-  // Read the visible label text so the button can be named by its field. A single aria-label
-  // (not aria-labelledby) keeps this button out of label queries for the field itself.
-  useLayoutEffect(() => {
-    const name = (fieldLabelIds ?? '')
-      .split(' ')
-      .map((labelElId) => document.getElementById(labelElId)?.textContent?.trim() ?? '')
-      .filter(Boolean)
-      .join(' ');
-    setFieldName(name);
-  });
-  const buttonName = fieldName
-    ? `${fieldName}, ${copy.dateCalendarButton.charAt(0).toLowerCase()}${copy.dateCalendarButton.slice(1)}`
-    : copy.dateCalendarButton;
 
   function openPicker() {
     const el = pickerRef.current as
@@ -170,7 +157,10 @@ export function DateInput({
       <button
         type="button"
         className="gg-datebox-trigger"
-        aria-label={buttonName}
+        id={buttonId}
+        aria-label={copy.dateCalendarButton}
+        // The field label(s), then the button's own aria-label: "Date Choose date from calendar".
+        aria-labelledby={fieldLabelIds ? `${fieldLabelIds} ${buttonId}` : undefined}
         onClick={openPicker}
       >
         <CalendarBlank size={18} weight="duotone" aria-hidden="true" />

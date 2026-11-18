@@ -41,7 +41,7 @@ describe('AccountSection', () => {
     expect(screen.getByLabelText('First name')).toHaveAccessibleDescription('Your first name is the name your messages are signed with.');
     expect(screen.getByLabelText('First name')).toHaveAttribute('aria-required', 'true');
     expect(screen.getByLabelText('Last name (optional)')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Date of birth')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Date of birth', { selector: 'input' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('ZIP code')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('First name'), 'Anna');
     await user.type(screen.getByLabelText('Last name (optional)'), 'Reyes');
@@ -208,9 +208,9 @@ describe('AccountSection personal details', () => {
     expect(screen.getByLabelText('First name')).toHaveAttribute('aria-required', 'true');
     expect(screen.getByLabelText('Last name (optional)')).not.toHaveAttribute('aria-required');
     // The date field stays off autofill: browsers fill a birthday as yyyy-mm-dd.
-    expect(screen.getByLabelText('Date of birth')).toHaveAttribute('autocomplete', 'off');
-    expect(screen.getByLabelText('Date of birth')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Date of birth, choose date from calendar' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Date of birth', { selector: 'input' })).toHaveAttribute('autocomplete', 'off');
+    expect(screen.getByLabelText('Date of birth', { selector: 'input' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Date of birth Choose date from calendar' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Address' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', SAVE)).toHaveLength(1);
   });
@@ -232,7 +232,7 @@ describe('AccountSection personal details', () => {
 
   it('shows the saved values, the date as Month D, YYYY', () => {
     withDetails({ firstName: 'Anna', lastName: 'Lee', birthDate: '1980-05-29', address });
-    expect(screen.getByLabelText('Date of birth')).toHaveValue('May 29, 1980');
+    expect(screen.getByLabelText('Date of birth', { selector: 'input' })).toHaveValue('May 29, 1980');
     expect(screen.getByLabelText('Address line 1')).toHaveValue('1 Main St');
     expect(screen.getByLabelText('Address line 2 (optional)')).toHaveValue('Apt 2');
     expect(screen.getByLabelText('City')).toHaveValue('Milltown');
@@ -245,7 +245,7 @@ describe('AccountSection personal details', () => {
     const { onSaveDetails } = withDetails({ senderName: null });
     await user.type(screen.getByLabelText('First name'), '  Anna ');
     await user.type(screen.getByLabelText('Last name (optional)'), 'Lee');
-    await user.type(screen.getByLabelText('Date of birth'), 'May 29, 1980');
+    await user.type(screen.getByLabelText('Date of birth', { selector: 'input' }), 'May 29, 1980');
     await fillAddress(user);
     await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).toHaveBeenCalledWith({
@@ -277,7 +277,7 @@ describe('AccountSection personal details', () => {
   it('accepts a numeric date', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails();
-    await user.type(screen.getByLabelText('Date of birth'), '5/29/1980');
+    await user.type(screen.getByLabelText('Date of birth', { selector: 'input' }), '5/29/1980');
     await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '1980-05-29' }));
   });
@@ -286,7 +286,7 @@ describe('AccountSection personal details', () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails({ firstName: 'Anna', lastName: 'Lee', birthDate: '1980-05-29', address });
     for (const label of ['Last name (optional)', 'Date of birth', 'Address line 1', 'Address line 2 (optional)', 'City', 'State', 'ZIP code']) {
-      await user.clear(screen.getByLabelText(label));
+      await user.clear(screen.getByLabelText(label, label === 'Date of birth' ? { selector: 'input' } : undefined));
     }
     await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).toHaveBeenCalledWith({ firstName: 'Anna', lastName: null, birthDate: null, address: null });
@@ -409,22 +409,22 @@ describe('AccountSection personal details', () => {
   it('refuses a date with no year, with calm copy next to the field, and does not save', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails();
-    await user.type(screen.getByLabelText('Date of birth'), 'May 29');
+    await user.type(screen.getByLabelText('Date of birth', { selector: 'input' }), 'May 29');
     await user.click(screen.getByRole('button', SAVE));
     expect(onSaveDetails).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Please enter the whole date, with the year. For example, May 29, 1980.');
-    expect(screen.getByLabelText('Date of birth')).toBeInvalid();
-    expect(screen.getByLabelText('Date of birth')).toHaveAccessibleDescription(/whole date/);
+    expect(screen.getByLabelText('Date of birth', { selector: 'input' })).toBeInvalid();
+    expect(screen.getByLabelText('Date of birth', { selector: 'input' })).toHaveAccessibleDescription(/whole date/);
   });
 
   it('refuses a future date and a date before 1900', async () => {
     const user = userEvent.setup();
     const { onSaveDetails } = withDetails();
-    await user.type(screen.getByLabelText('Date of birth'), 'January 1, 2999');
+    await user.type(screen.getByLabelText('Date of birth', { selector: 'input' }), 'January 1, 2999');
     await user.click(screen.getByRole('button', SAVE));
     expect(screen.getByText("Please check the date. It can't be in the future or before 1900.")).toBeInTheDocument();
-    await user.clear(screen.getByLabelText('Date of birth'));
-    await user.type(screen.getByLabelText('Date of birth'), 'January 1, 1850');
+    await user.clear(screen.getByLabelText('Date of birth', { selector: 'input' }));
+    await user.type(screen.getByLabelText('Date of birth', { selector: 'input' }), 'January 1, 1850');
     await user.click(screen.getByRole('button', SAVE));
     expect(screen.getByText("Please check the date. It can't be in the future or before 1900.")).toBeInTheDocument();
     expect(onSaveDetails).not.toHaveBeenCalled();

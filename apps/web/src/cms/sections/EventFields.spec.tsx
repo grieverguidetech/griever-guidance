@@ -25,7 +25,7 @@ describe('EventFields', () => {
   it('is a group named by its legend, holding date, time and place', () => {
     setup();
     const group = screen.getByRole('group', { name: 'Reception' });
-    expect(within(group).getByLabelText('Date')).toBeInTheDocument();
+    expect(within(group).getByLabelText('Date', { selector: 'input' })).toBeInTheDocument();
     expect(within(group).getByLabelText('Time')).toBeInTheDocument();
     expect(within(group).getByLabelText('Place')).toBeInTheDocument();
   });
@@ -66,7 +66,7 @@ describe('EventFields', () => {
 
   it('shows the values it is given', () => {
     setup({ values: { receptionDate: 'May 29, 2026', receptionTime: '2:00 PM', receptionPlace: 'Hall' } });
-    expect(screen.getByLabelText('Date')).toHaveValue('May 29, 2026');
+    expect(screen.getByLabelText('Date', { selector: 'input' })).toHaveValue('May 29, 2026');
     expect(screen.getByLabelText('Time')).toHaveValue('14:00');
     expect(screen.getByLabelText('Place')).toHaveValue('Hall');
   });
@@ -75,7 +75,7 @@ describe('EventFields', () => {
     const { onChange } = setup();
     await userEvent.type(screen.getByLabelText('Place'), 'H');
     expect(onChange).toHaveBeenLastCalledWith({ receptionPlace: 'H' });
-    await userEvent.type(screen.getByLabelText('Date'), '5');
+    await userEvent.type(screen.getByLabelText('Date', { selector: 'input' }), '5');
     expect(onChange).toHaveBeenLastCalledWith({ receptionDate: '5' });
     onChange.mockClear();
     const time = screen.getByLabelText('Time');
@@ -90,9 +90,9 @@ describe('EventFields', () => {
   it('tabs through date, time, place, then the extra slot', async () => {
     setup({ extra: <input aria-label="Extra" /> });
     await userEvent.tab();
-    expect(screen.getByLabelText('Date')).toHaveFocus();
+    expect(screen.getByLabelText('Date', { selector: 'input' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Reception Date, choose date from calendar' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Reception Date Choose date from calendar' })).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByLabelText('Time')).toHaveFocus();
     await userEvent.tab();
@@ -118,13 +118,13 @@ describe('EventFields', () => {
     await userEvent.tab();
     expect(screen.getByLabelText('Lead')).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByLabelText('Date')).toHaveFocus();
+    expect(screen.getByLabelText('Date', { selector: 'input' })).toHaveFocus();
   });
 
   it('hideFields hides date, time and place but keeps the group, lead and extra', () => {
     setup({ hideFields: true, lead: <input aria-label="Lead" />, extra: <input aria-label="Extra" /> });
     expect(screen.getByRole('group', { name: 'Reception' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Date')).toBeNull();
+    expect(screen.queryByLabelText('Date', { selector: 'input' })).toBeNull();
     expect(screen.queryByLabelText('Time')).toBeNull();
     expect(screen.queryByLabelText('Place')).toBeNull();
     expect(screen.getByLabelText('Lead')).toBeInTheDocument();
@@ -152,10 +152,10 @@ describe('EventFields', () => {
     expect(day).not.toHaveClass('gg-chip');
     expect(day.className).toBe('gg-link-button');
     expect(day.parentElement).toHaveClass('gg-field');
-    expect(day.parentElement?.contains(screen.getByLabelText('Date'))).toBe(true);
+    expect(day.parentElement?.contains(screen.getByLabelText('Date', { selector: 'input' }))).toBe(true);
     await userEvent.click(day);
     expect(onUse).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Date')).toHaveFocus();
+    expect(screen.getByLabelText('Date', { selector: 'input' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Reception Same place' })).toBeInTheDocument();
   });
 

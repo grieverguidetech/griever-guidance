@@ -53,9 +53,9 @@ describe('ObituarySection', () => {
 
   it('shows the person dates as editable fields and sends only the typed one through onPersonChange', async () => {
     const { personPatches, patches } = setup(person);
-    expect(screen.getByLabelText('Date of birth (optional)')).toHaveValue('May 2, 1940');
-    expect(screen.getByLabelText('Date they passed (optional)')).toHaveValue('June 1, 2026');
-    await userEvent.type(screen.getByLabelText('Date of birth (optional)'), '1');
+    expect(screen.getByLabelText('Date of birth (optional)', { selector: 'input' })).toHaveValue('May 2, 1940');
+    expect(screen.getByLabelText('Date they passed (optional)', { selector: 'input' })).toHaveValue('June 1, 2026');
+    await userEvent.type(screen.getByLabelText('Date of birth (optional)', { selector: 'input' }), '1');
     expect(personPatches).toEqual([{ birthDate: 'May 2, 19401' }]);
     expect(patches).toEqual([]);
   });

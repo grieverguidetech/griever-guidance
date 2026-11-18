@@ -349,7 +349,7 @@ describe('ServiceSection', () => {
   it('every group is a labelled fieldset', () => {
     setup({ receptionPlace: 'x' });
     const group = screen.getByRole('group', { name: 'Reception' });
-    expect(within(group).getByLabelText('Reception Date')).toBeInTheDocument();
+    expect(within(group).getByLabelText('Reception Date', { selector: 'input' })).toBeInTheDocument();
   });
 
   it('holds no hard-coded copy', () => {

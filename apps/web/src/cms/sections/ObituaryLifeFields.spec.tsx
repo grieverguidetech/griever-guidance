@@ -168,10 +168,17 @@ describe('ObituaryLifeFields', () => {
   });
 
   describe('shared Person dates', () => {
+    it('gives each calendar button its own field name', () => {
+      setup();
+      const birth = screen.getByRole('button', { name: `${birthLabel} Choose date from calendar` });
+      const passing = screen.getByRole('button', { name: `${passingLabel} Choose date from calendar` });
+      expect(birth).not.toBe(passing);
+    });
+
     it('shows the saved dates', () => {
       setup({ birthDate: 'June 15, 1940', dateOfPassing: 'November 2, 2026' });
-      expect(screen.getByLabelText(birthLabel)).toHaveValue('June 15, 1940');
-      expect(screen.getByLabelText(passingLabel)).toHaveValue('November 2, 2026');
+      expect(screen.getByLabelText(birthLabel, { selector: 'input' })).toHaveValue('June 15, 1940');
+      expect(screen.getByLabelText(passingLabel, { selector: 'input' })).toHaveValue('November 2, 2026');
     });
 
     it.each([
@@ -182,28 +189,28 @@ describe('ObituaryLifeFields', () => {
       ['3/3/2000', 'March 3, 2000'],
     ])('tidies a birth date typed as %s on blur', async (typed, tidy) => {
       const { personPatches } = setup({ birthDate: typed });
-      await userEvent.click(screen.getByLabelText(birthLabel));
+      await userEvent.click(screen.getByLabelText(birthLabel, { selector: 'input' }));
       await userEvent.tab();
       expect(personPatches.at(-1)).toEqual({ birthDate: tidy });
     });
 
     it('does not tidy a birth date before 1800', async () => {
       const { personPatches } = setup({ birthDate: '3/3/1750' });
-      await userEvent.click(screen.getByLabelText(birthLabel));
+      await userEvent.click(screen.getByLabelText(birthLabel, { selector: 'input' }));
       await userEvent.tab();
       expect(personPatches).toEqual([]);
     });
 
     it('tidies a date of passing before 2000 on blur', async () => {
       const { personPatches } = setup({ dateOfPassing: '5/29/1985' });
-      await userEvent.click(screen.getByLabelText(passingLabel));
+      await userEvent.click(screen.getByLabelText(passingLabel, { selector: 'input' }));
       await userEvent.tab();
       expect(personPatches.at(-1)).toEqual({ dateOfPassing: 'May 29, 1985' });
     });
 
     it('works out the age from a tidied 1940 birth date', async () => {
       const { personPatches } = setup({ birthDate: '6/15/1940', dateOfPassing: 'November 2, 2026' });
-      await userEvent.click(screen.getByLabelText(birthLabel));
+      await userEvent.click(screen.getByLabelText(birthLabel, { selector: 'input' }));
       await userEvent.tab();
       expect(personPatches.at(-1)).toEqual({ birthDate: 'June 15, 1940' });
       expect(screen.getByLabelText(copy.ageLabel)).toHaveValue('86');
@@ -211,16 +218,16 @@ describe('ObituaryLifeFields', () => {
 
     it('sends only the typed date through onPersonChange', async () => {
       const { patches, personPatches } = setup();
-      await userEvent.type(screen.getByLabelText(birthLabel), '5');
+      await userEvent.type(screen.getByLabelText(birthLabel, { selector: 'input' }), '5');
       expect(personPatches).toEqual([{ birthDate: '5' }]);
-      await userEvent.type(screen.getByLabelText(passingLabel), '6');
+      await userEvent.type(screen.getByLabelText(passingLabel, { selector: 'input' }), '6');
       expect(personPatches.at(-1)).toEqual({ dateOfPassing: '6' });
       expect(patches).toEqual([]);
     });
 
     it('saves a complete date in the format The person uses', async () => {
       const { personPatches } = setup();
-      await userEvent.type(screen.getByLabelText(birthLabel), '6/15/2001');
+      await userEvent.type(screen.getByLabelText(birthLabel, { selector: 'input' }), '6/15/2001');
       await userEvent.tab();
       expect(personPatches.at(-1)).toEqual({ birthDate: 'June 15, 2001' });
     });
@@ -237,7 +244,7 @@ describe('ObituaryLifeFields', () => {
 
     it('shows the unreadable note only after leaving the field', async () => {
       setup();
-      await userEvent.type(screen.getByLabelText(passingLabel), 'last tuesday');
+      await userEvent.type(screen.getByLabelText(passingLabel, { selector: 'input' }), 'last tuesday');
       expect(screen.queryByText(personCopy.dateUnreadable)).toBeNull();
       await userEvent.tab();
       expect(screen.getByText(personCopy.dateUnreadable)).toBeInTheDocument();
@@ -247,7 +254,7 @@ describe('ObituaryLifeFields', () => {
       setup();
       expect(screen.getAllByText(copy.personSharedHint)).toHaveLength(1);
       for (const label of [birthLabel, passingLabel]) {
-        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(expect.stringContaining(copy.personSharedHint));
+        expect(screen.getByLabelText(label, { selector: 'input' })).toHaveAccessibleDescription(expect.stringContaining(copy.personSharedHint));
       }
     });
   });
@@ -635,10 +642,10 @@ describe('ObituaryLifeFields', () => {
         visitationTime: '6:00 PM',
       });
       expect(screen.getByLabelText(`${service} Place`)).toHaveValue('Oak Chapel');
-      expect(screen.getByLabelText(`${service} Date`)).toHaveValue('June 5, 2026');
+      expect(screen.getByLabelText(`${service} Date`, { selector: 'input' })).toHaveValue('June 5, 2026');
       expect(screen.getByLabelText(`${service} Time`)).toHaveValue('14:00');
       expect(screen.getByLabelText(`${visitation} Place`)).toHaveValue('Hall');
-      expect(screen.getByLabelText(`${visitation} Date`)).toHaveValue('June 4, 2026');
+      expect(screen.getByLabelText(`${visitation} Date`, { selector: 'input' })).toHaveValue('June 4, 2026');
       expect(screen.getByLabelText(`${visitation} Time`)).toHaveValue('18:00');
     });
 
@@ -653,7 +660,7 @@ describe('ObituaryLifeFields', () => {
 
     it('saves a typed date in the Service display format', async () => {
       const { servicePatches } = setup();
-      const date = screen.getByLabelText(`${service} Date`);
+      const date = screen.getByLabelText(`${service} Date`, { selector: 'input' });
       await userEvent.type(date, '6/5/2026');
       await userEvent.tab();
       expect(servicePatches.at(-1)).toEqual({ serviceDate: 'June 5, 2026' });
@@ -662,7 +669,7 @@ describe('ObituaryLifeFields', () => {
 
     it('shows the quiet note when the service date is before the date of passing', () => {
       setup({ serviceDate: 'May 1, 2026', dateOfPassing: 'June 1, 2026' });
-      expect(screen.getByLabelText(`${service} Date`)).toHaveAccessibleDescription(
+      expect(screen.getByLabelText(`${service} Date`, { selector: 'input' })).toHaveAccessibleDescription(
         new RegExp(serviceCopy.beforePassing.slice(0, 20)),
       );
     });

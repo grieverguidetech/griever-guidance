@@ -189,11 +189,11 @@ describe('PersonSection', () => {
     await userEvent.tab();
     expect(screen.getByLabelText(/Date of birth/, { selector: 'input' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: /^Date of birth.*, choose date from calendar$/ })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Date of birth.* Choose date from calendar$/ })).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByLabelText(/Date they passed/, { selector: 'input' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: /^Date they passed.*, choose date from calendar$/ })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Date they passed.* Choose date from calendar$/ })).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
   });
