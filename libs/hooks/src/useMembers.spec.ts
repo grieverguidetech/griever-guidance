@@ -20,6 +20,7 @@ function stub(over: Partial<MembersClient> = {}) {
     revokeInvite: vi.fn(async () => ({ ok: true as const })),
     removeMember: vi.fn(async () => ({ ok: true as const })),
     acceptInvite: vi.fn(async () => ({ ok: true as const, ownerId: 'o1' })),
+    leaveMembership: vi.fn(async () => ({ ok: true as const })),
     ...over,
   };
   return client satisfies MembersClient;
@@ -43,6 +44,7 @@ describe('useMembers loading', () => {
       await result.current.revoke('i1');
       await result.current.remove('m1');
       await result.current.accept('t');
+      await result.current.leave();
     });
     expect(result.current.status).toBe('idle');
     for (const fn of Object.values(client)) expect(fn).not.toHaveBeenCalled();
@@ -181,6 +183,85 @@ describe('useMembers actions', () => {
     });
     expect(client.removeMember).not.toHaveBeenCalled();
     expect(result.current.status).toBe('signed_out');
+  });
+});
+
+describe('useMembers leave', () => {
+  const memberView: MembersView = { role: 'member', owner: { id: 'o1', name: 'Ada' } };
+  const emptyOwner: MembersView = { role: 'owner', members: [], invites: [] };
+
+  it('on success reloads /members and the view is an empty owner view', async () => {
+    let calls = 0;
+    const client = stub({
+      getMembers: vi.fn(async () => ({ ok: true as const, view: calls++ === 0 ? memberView : emptyOwner })),
+    });
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.view).toEqual(memberView));
+    await act(async () => {
+      expect(await result.current.leave()).toBe(true);
+    });
+    expect(client.leaveMembership).toHaveBeenCalledWith('tok');
+    expect(client.getMembers).toHaveBeenCalledTimes(2);
+    expect(result.current.view).toEqual(emptyOwner);
+  });
+
+  it('is an empty owner view even if the reload after leaving fails', async () => {
+    let calls = 0;
+    const client = stub({
+      getMembers: vi.fn(async () =>
+        calls++ === 0 ? { ok: true as const, view: memberView } : { ok: false as const, reason: 'offline' as const },
+      ),
+    });
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.view).toEqual(memberView));
+    await act(async () => {
+      expect(await result.current.leave()).toBe(true);
+    });
+    expect(result.current.view).toEqual(emptyOwner);
+  });
+
+  it('offline gives the calm offline message and keeps the view', async () => {
+    const client = stub({
+      getMembers: vi.fn(async () => ({ ok: true as const, view: memberView })),
+      leaveMembership: fail('offline'),
+    });
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.view).toEqual(memberView));
+    await act(async () => {
+      expect(await result.current.leave()).toBe(false);
+    });
+    expect(result.current.message).toBe(MEMBERS_MESSAGES.offline);
+    expect(result.current.view).toEqual(memberView);
+  });
+
+  it('a refusal (not a member) gives the calm not-a-member message, without a mark', async () => {
+    const client = stub({ leaveMembership: fail('failed') });
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      expect(await result.current.leave()).toBe(false);
+    });
+    expect(result.current.message).toBe(MEMBERS_MESSAGES.not_a_member);
+    expect(MEMBERS_MESSAGES.not_a_member).not.toContain('!');
+  });
+
+  it('a busy answer reads as unavailable', async () => {
+    const client = stub({ leaveMembership: fail('unavailable') });
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      expect(await result.current.leave()).toBe(false);
+    });
+    expect(result.current.message).toBe(MEMBERS_MESSAGES.unavailable);
+  });
+
+  it('makes no call when disabled', async () => {
+    const client = stub();
+    const { result } = setup(client, false);
+    await act(async () => {
+      expect(await result.current.leave()).toBe(false);
+    });
+    expect(client.leaveMembership).not.toHaveBeenCalled();
   });
 });
 

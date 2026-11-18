@@ -28,6 +28,7 @@ function stubRules() {
     revokeInvite: vi.fn(async () => ok),
     listMembers: vi.fn(async () => ({ role: 'owner' })),
     removeMember: vi.fn(async () => ok),
+    leaveFamily: vi.fn(async () => ok),
     acceptInvite: vi.fn(async () => ok),
   };
 }
@@ -52,6 +53,7 @@ const GOOD: Record<(typeof DATA_ACTIONS)[number], Record<string, unknown>> = {
   revokeInvite: { id: ID },
   listMembers: {},
   removeMember: { memberId: 'user_b' },
+  leaveFamily: {},
   acceptInvite: { tokenHash: HASH },
 };
 
@@ -113,6 +115,7 @@ describe('args validation (C8)', () => {
     ['removeMember id has a #', 'removeMember', { memberId: 'user#b' }],
     ['removeMember id is empty', 'removeMember', { memberId: '' }],
     ['removeMember id is too long', 'removeMember', { memberId: 'u'.repeat(65) }],
+    ['leaveFamily has a memberId key', 'leaveFamily', { memberId: 'user_b' }],
     ['acceptInvite hash is not hex', 'acceptInvite', { tokenHash: 'z'.repeat(64) }],
     ['acceptInvite hash is a number', 'acceptInvite', { tokenHash: 1 }],
   ] as const)('refuses: %s', (_name, action, args) => {

@@ -5,7 +5,7 @@ import { encodeProfile } from '../items/profileItem.js';
 import { acceptInvite } from '../rules/acceptInvite.js';
 import { createFlow, deleteFlow, listFlows, updateFlow } from '../rules/flows.js';
 import { createInvite, revokeInvite } from '../rules/invites.js';
-import { listMembers, removeMember } from '../rules/members.js';
+import { leaveFamily, listMembers, removeMember } from '../rules/members.js';
 import { getProfile, putProfile } from '../rules/profiles.js';
 import { createTables, doc, dropTables, rawPut, table, up } from '../testing/localTable.js';
 import type { Caller } from '../caller.js';
@@ -40,6 +40,7 @@ const rules: DataRules = {
   revokeInvite,
   listMembers,
   removeMember,
+  leaveFamily,
   acceptInvite,
 };
 const guardRules: DataRules = { ...rules, acceptInvite: acceptStub };
@@ -254,9 +255,15 @@ describe.runIf(up)('data app on DynamoDB Local', () => {
       expect(await act('acceptInvite', { tokenHash: ACCEPT_HASH }, JOINER_TOKEN)).toEqual({ ok: false, code: 'unusable' });
     });
 
+    it('leaveFamily: the joiner leaves, then is an owner again; an owner is not_found', async () => {
+      expect(await act('leaveFamily', {}, JOINER_TOKEN)).toEqual({ ok: true, data: null });
+      expect(await act('listMembers', {}, JOINER_TOKEN)).toMatchObject({ ok: true, data: { role: 'owner' } });
+      expect(await act('leaveFamily', {})).toEqual({ ok: false, code: 'not_found' });
+    });
+
     it('has a happy path for every action in DATA_ACTIONS', () => {
       // Keep in step with the tests above: a new action needs a path here.
-      const covered = ['getProfile', 'putProfile', 'createFlow', 'listFlows', 'updateFlow', 'deleteFlow', 'createInvite', 'listMembers', 'revokeInvite', 'removeMember', 'acceptInvite'];
+      const covered = ['getProfile', 'putProfile', 'createFlow', 'listFlows', 'updateFlow', 'deleteFlow', 'createInvite', 'listMembers', 'revokeInvite', 'removeMember', 'leaveFamily', 'acceptInvite'];
       expect([...covered].sort()).toEqual([...DATA_ACTIONS].sort());
     });
   });

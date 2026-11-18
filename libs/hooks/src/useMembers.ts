@@ -3,6 +3,7 @@ import {
   acceptInvite,
   createInvite,
   getMembers,
+  leaveMembership,
   removeMember,
   revokeInvite,
 } from '@griever/api-client';
@@ -10,6 +11,7 @@ import type {
   AcceptInviteResult,
   CreateInviteResult,
   GetMembersResult,
+  LeaveMembershipResult,
   MembersFailure,
   MembersFailureReason,
   RemoveMemberResult,
@@ -27,9 +29,10 @@ export interface MembersClient {
   revokeInvite: (accessToken: string, inviteId: string) => Promise<RevokeInviteResult>;
   removeMember: (accessToken: string, memberId: string) => Promise<RemoveMemberResult>;
   acceptInvite: (accessToken: string, inviteToken: string) => Promise<AcceptInviteResult>;
+  leaveMembership: (accessToken: string) => Promise<LeaveMembershipResult>;
 }
 
-const defaultClient: MembersClient = { getMembers, createInvite, revokeInvite, removeMember, acceptInvite };
+const defaultClient: MembersClient = { getMembers, createInvite, revokeInvite, removeMember, acceptInvite, leaveMembership };
 
 export interface UseMembersOptions {
   getAccessToken: () => Promise<string | null>;
@@ -54,10 +57,12 @@ export interface UseMembersResult {
   remove: (memberId: string) => Promise<boolean>;
   /** Joins the account the invitation came from. The token is used for one call and not kept. */
   accept: (inviteToken: string) => Promise<boolean>;
+  /** Leaves the account the signed-in person helps. On success the view becomes an empty owner view. */
+  leave: () => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
-export type MembersAction = 'load' | 'create' | 'revoke' | 'remove' | 'accept';
+export type MembersAction = 'load' | 'create' | 'revoke' | 'remove' | 'accept' | 'leave';
 
 export const MEMBERS_MESSAGES = {
   offline: 'You need a connection to do this. Nothing else is affected.',
@@ -68,6 +73,7 @@ export const MEMBERS_MESSAGES = {
   rate_limited: "You've sent a lot of invitations today. You can send more tomorrow.",
   conflict_create: 'That person is already invited or already helping.',
   conflict_accept: "You already have people you're helping, so this invitation can't be joined from this account.",
+  not_a_member: "You aren't helping on anyone's account right now.",
   unusable: "This invitation can't be used. Ask the person who sent it for a new one.",
   unavailable: "This isn't available right now. Please try again in a moment.",
 } as const;
@@ -89,10 +95,15 @@ export function membersErrorMessage(reason: MembersFailureReason, action: Member
       return action === 'accept' ? MEMBERS_MESSAGES.conflict_accept : MEMBERS_MESSAGES.conflict_create;
     case 'unusable':
       return MEMBERS_MESSAGES.unusable;
+    case 'failed':
+      // A refused leave means the person is not a member (the gateway answers 404).
+      return action === 'leave' ? MEMBERS_MESSAGES.not_a_member : MEMBERS_MESSAGES.unavailable;
     default:
       return MEMBERS_MESSAGES.unavailable;
   }
 }
+
+const EMPTY_OWNER_VIEW: MembersView = { role: 'owner', members: [], invites: [] };
 
 export function useMembers({ getAccessToken, enabled, client }: UseMembersOptions): UseMembersResult {
   const [view, setView] = useState<MembersView | null>(null);
@@ -213,5 +224,14 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     [act],
   );
 
-  return { view, status, message, invite, revoke, remove, accept, refresh: load };
+  const leave = useCallback(async () => {
+    const left = await act('leave', (c, token) => c.leaveMembership(token));
+    if (left && isLive()) {
+      // Even if the reload inside act failed, the old family list must not stay on screen.
+      setView(EMPTY_OWNER_VIEW);
+    }
+    return left;
+  }, [act]);
+
+  return { view, status, message, invite, revoke, remove, accept, leave, refresh: load };
 }

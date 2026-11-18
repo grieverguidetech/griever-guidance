@@ -35,6 +35,7 @@ export type CreateInviteResult =
   | MembersFailure;
 export type RevokeInviteResult = { ok: true } | MembersFailure;
 export type RemoveMemberResult = { ok: true } | MembersFailure;
+export type LeaveMembershipResult = { ok: true } | MembersFailure;
 export type AcceptInviteResult =
   | { ok: true; ownerId: string }
   | MembersFailure;
@@ -133,6 +134,11 @@ export function removeMember(
   return callNoBody(accessToken, `/members/${segment(memberId)}`, {
     method: 'DELETE',
   });
+}
+
+/** The signed-in person leaves the account they help. Sends no body. */
+export function leaveMembership(accessToken: string): Promise<LeaveMembershipResult> {
+  return callNoBody(accessToken, '/membership', { method: 'DELETE' });
 }
 
 /** The invite token goes in the JSON body only, never in the URL. */

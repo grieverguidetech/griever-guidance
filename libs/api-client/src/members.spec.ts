@@ -2,6 +2,7 @@ import {
   acceptInvite,
   createInvite,
   getMembers,
+  leaveMembership,
   removeMember,
   revokeInvite,
 } from './members.js';
@@ -40,6 +41,7 @@ const calls: Array<[string, () => Promise<unknown>, string, string]> = [
   ['revokeInvite', () => revokeInvite(ACCESS, ID), 'DELETE', `/invites/${ID}`],
   ['removeMember', () => removeMember(ACCESS, ID), 'DELETE', `/members/${ID}`],
   ['acceptInvite', () => acceptInvite(ACCESS, INVITE), 'POST', '/invites/accept'],
+  ['leaveMembership', () => leaveMembership(ACCESS), 'DELETE', '/membership'],
 ];
 
 describe.each(calls)('%s', (name, run, method, path) => {
@@ -128,6 +130,14 @@ describe('results', () => {
     expect(await revokeInvite(ACCESS, ID)).toEqual({ ok: false, reason: 'failed' });
     fetchMock.mockResolvedValue(json(200, { ok: true }));
     expect(await removeMember(ACCESS, ID)).toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('leaveMembership sends no body, succeeds on 204 and reads a 404 as failed', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: true });
+    expect(firstCall().init.body).toBeUndefined();
+    fetchMock.mockResolvedValue(json(404, { error: 'x' }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'failed' });
   });
 
   it('a malformed 200 body from getMembers is failed, not offline', async () => {

@@ -17,6 +17,7 @@ describe('dataApi', () => {
       'revokeInvite',
       'listMembers',
       'removeMember',
+      'leaveFamily',
       'acceptInvite',
     ]);
   });
