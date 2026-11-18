@@ -25,6 +25,7 @@ export const DATA_ACTIONS = [
   'revokeInvite',
   'listMembers',
   'removeMember',
+  'leaveFamily',
   'acceptInvite',
 ] as const;
 

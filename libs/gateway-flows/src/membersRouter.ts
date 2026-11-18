@@ -41,6 +41,7 @@ export const SEND_FAILED = "The invitation couldn't be sent right now. Please tr
 export const UNUSABLE = "This invitation can't be used. Ask the person who sent it for a new one.";
 export const BAD_EMAIL = 'Enter a valid email address.';
 export const BAD_BODY = 'Send the invitation as a JSON object with an email address.';
+export const NOT_A_MEMBER = "You aren't helping on anyone's account right now.";
 export const BAD_ID = 'That request could not be understood.';
 
 type Failure = { status: 400 | 401 | 403 | 404 | 409 | 429 | 503; error: string };
@@ -87,14 +88,14 @@ export function createMembersRouter(config: MembersRouterConfig) {
   const router = new Hono<Env>();
   const call = config.callData ?? callData;
 
-  for (const path of ['/members', '/members/*', '/invites', '/invites/*']) {
+  for (const path of ['/members', '/members/*', '/membership', '/invites', '/invites/*']) {
     router.use(path, clerkAuth(config.getAuthConfig));
   }
 
   /** Runs one action as the caller. Returns the result, or null if the data function is unreachable. */
   async function run<T>(
     userToken: string,
-    action: 'createInvite' | 'revokeInvite' | 'listMembers' | 'removeMember' | 'acceptInvite' | 'getProfile',
+    action: 'createInvite' | 'revokeInvite' | 'listMembers' | 'removeMember' | 'leaveFamily' | 'acceptInvite' | 'getProfile',
     args: Record<string, unknown>,
   ): Promise<DataResult<T> | null> {
     const data = config.getDataConfig();
@@ -238,6 +239,22 @@ export function createMembersRouter(config: MembersRouterConfig) {
       }
       return c.body(null, 204);
     };
+
+  // The caller leaves the account they help. No body is read: the caller's token is the only input (C8).
+  router.delete('/membership', async (c) => {
+    const result = await run<null>(c.get('accessToken'), 'leaveFamily', {});
+    if (!result) {
+      return c.json({ error: UNAVAILABLE }, 503);
+    }
+    if (!result.ok) {
+      if (result.code === 'not_found') {
+        return c.json({ error: NOT_A_MEMBER }, 404);
+      }
+      const { status, error } = failureFor(result.code);
+      return c.json({ error }, status);
+    }
+    return c.body(null, 204);
+  });
 
   router.delete('/invites/:id', remove('revokeInvite', 'id'));
   router.delete('/members/:memberId', remove('removeMember', 'memberId'));

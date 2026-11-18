@@ -2,6 +2,7 @@ import {
   acceptInvite,
   createInvite,
   getMembers,
+  leaveMembership,
   removeMember,
   revokeInvite,
 } from './members.js';
@@ -40,6 +41,7 @@ const calls: Array<[string, () => Promise<unknown>, string, string]> = [
   ['revokeInvite', () => revokeInvite(ACCESS, ID), 'DELETE', `/invites/${ID}`],
   ['removeMember', () => removeMember(ACCESS, ID), 'DELETE', `/members/${ID}`],
   ['acceptInvite', () => acceptInvite(ACCESS, INVITE), 'POST', '/invites/accept'],
+  ['leaveMembership', () => leaveMembership(ACCESS), 'DELETE', '/membership'],
 ];
 
 describe.each(calls)('%s', (name, run, method, path) => {
@@ -70,7 +72,7 @@ describe.each(calls)('%s', (name, run, method, path) => {
     [500, 'unavailable'],
     [503, 'unavailable'],
     [418, 'failed'],
-    [404, name === 'acceptInvite' ? 'unusable' : 'failed'],
+    [404, name === 'acceptInvite' ? 'unusable' : name === 'leaveMembership' ? 'not_a_member' : 'failed'],
     [410, name === 'acceptInvite' ? 'unusable' : 'failed'],
   ])('maps status %i to %s', async (status, reason) => {
     fetchMock.mockResolvedValue(json(status, { error: 'x' }));
@@ -128,6 +130,21 @@ describe('results', () => {
     expect(await revokeInvite(ACCESS, ID)).toEqual({ ok: false, reason: 'failed' });
     fetchMock.mockResolvedValue(json(200, { ok: true }));
     expect(await removeMember(ACCESS, ID)).toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('leaveMembership sends no body, succeeds on 204 and reads a 404 as failed', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: true });
+    expect(firstCall().init.body).toBeUndefined();
+    fetchMock.mockResolvedValue(json(404, { error: 'x' }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'not_a_member' });
+  });
+
+  it('leaveMembership: only a 404 is not_a_member; 418 and a 200 with a body are failed', async () => {
+    fetchMock.mockResolvedValue(json(418, { error: 'x' }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'failed' });
+    fetchMock.mockResolvedValue(json(200, { ok: true }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'failed' });
   });
 
   it('a malformed 200 body from getMembers is failed, not offline', async () => {

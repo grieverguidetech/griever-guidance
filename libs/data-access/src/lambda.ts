@@ -6,7 +6,7 @@ import { createTokenVerifier } from '@griever/gateway-auth/verify-token';
 import { acceptInvite } from './rules/acceptInvite.js';
 import { createFlow, deleteFlow, listFlows, updateFlow } from './rules/flows.js';
 import { createInvite, revokeInvite } from './rules/invites.js';
-import { listMembers, removeMember } from './rules/members.js';
+import { leaveFamily, listMembers, removeMember } from './rules/members.js';
 import { deleteUser } from './rules/deleteUser.js';
 import { getProfile, putProfile } from './rules/profiles.js';
 
@@ -28,6 +28,7 @@ export const wiredRules: DataRules = {
   revokeInvite,
   listMembers,
   removeMember,
+  leaveFamily,
   acceptInvite,
 };
 

@@ -3,6 +3,7 @@ import {
   acceptInvite,
   createInvite,
   getMembers,
+  leaveMembership,
   removeMember,
   revokeInvite,
 } from '@griever/api-client';
@@ -10,6 +11,7 @@ import type {
   AcceptInviteResult,
   CreateInviteResult,
   GetMembersResult,
+  LeaveMembershipResult,
   MembersFailure,
   MembersFailureReason,
   RemoveMemberResult,
@@ -27,9 +29,10 @@ export interface MembersClient {
   revokeInvite: (accessToken: string, inviteId: string) => Promise<RevokeInviteResult>;
   removeMember: (accessToken: string, memberId: string) => Promise<RemoveMemberResult>;
   acceptInvite: (accessToken: string, inviteToken: string) => Promise<AcceptInviteResult>;
+  leaveMembership: (accessToken: string) => Promise<LeaveMembershipResult>;
 }
 
-const defaultClient: MembersClient = { getMembers, createInvite, revokeInvite, removeMember, acceptInvite };
+const defaultClient: MembersClient = { getMembers, createInvite, revokeInvite, removeMember, acceptInvite, leaveMembership };
 
 export interface UseMembersOptions {
   getAccessToken: () => Promise<string | null>;
@@ -54,10 +57,12 @@ export interface UseMembersResult {
   remove: (memberId: string) => Promise<boolean>;
   /** Joins the account the invitation came from. The token is used for one call and not kept. */
   accept: (inviteToken: string) => Promise<boolean>;
+  /** Leaves the account the signed-in person helps. On success the view becomes an empty owner view. */
+  leave: () => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
-export type MembersAction = 'load' | 'create' | 'revoke' | 'remove' | 'accept';
+export type MembersAction = 'load' | 'create' | 'revoke' | 'remove' | 'accept' | 'leave';
 
 export const MEMBERS_MESSAGES = {
   offline: 'You need a connection to do this. Nothing else is affected.',
@@ -68,6 +73,7 @@ export const MEMBERS_MESSAGES = {
   rate_limited: "You've sent a lot of invitations today. You can send more tomorrow.",
   conflict_create: 'That person is already invited or already helping.',
   conflict_accept: "You already have people you're helping, so this invitation can't be joined from this account.",
+  not_a_member: "You aren't helping on anyone's account right now.",
   unusable: "This invitation can't be used. Ask the person who sent it for a new one.",
   unavailable: "This isn't available right now. Please try again in a moment.",
 } as const;
@@ -89,10 +95,14 @@ export function membersErrorMessage(reason: MembersFailureReason, action: Member
       return action === 'accept' ? MEMBERS_MESSAGES.conflict_accept : MEMBERS_MESSAGES.conflict_create;
     case 'unusable':
       return MEMBERS_MESSAGES.unusable;
+    case 'not_a_member':
+      return MEMBERS_MESSAGES.not_a_member;
     default:
       return MEMBERS_MESSAGES.unavailable;
   }
 }
+
+const EMPTY_OWNER_VIEW: MembersView = { role: 'owner', members: [], invites: [] };
 
 export function useMembers({ getAccessToken, enabled, client }: UseMembersOptions): UseMembersResult {
   const [view, setView] = useState<MembersView | null>(null);
@@ -111,30 +121,32 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
   /** True while this hook is still mounted and switched on. Late results are dropped otherwise. */
   const isLive = () => mounted.current && enabledRef.current;
 
-  const load = useCallback(async () => {
-    if (!enabledRef.current) return;
+  /** Resolves true only when the list was fetched and shown. */
+  const load = useCallback(async (): Promise<boolean> => {
+    if (!enabledRef.current) return false;
     const g = ++loadGen.current;
     setStatus((s) => (s === 'ready' ? s : 'loading'));
     const token = await tokenRef.current();
-    if (!mounted.current || g !== loadGen.current) return;
+    if (!mounted.current || g !== loadGen.current) return false;
     if (!token) {
       setMessage(MEMBERS_MESSAGES.signed_out);
       setStatus('signed_out');
-      return;
+      return false;
     }
     const result = await clientRef.current.getMembers(token);
-    if (!mounted.current || g !== loadGen.current) return;
+    if (!mounted.current || g !== loadGen.current) return false;
     if (result.ok) {
       setView(result.view);
       setStatus('ready');
       setMessage(null);
-      return;
+      return true;
     }
     // The last list stays on screen.
     setMessage(membersErrorMessage(result.reason, 'load'));
     setStatus(
       result.reason === 'offline' ? 'offline' : result.reason === 'signed_out' ? 'signed_out' : 'unavailable',
     );
+    return false;
   }, []);
 
   // Tracks real unmount only, not `enabled` toggles.
@@ -162,6 +174,7 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     async (
       action: MembersAction,
       run: (c: MembersClient, token: string) => Promise<{ ok: true } | MembersFailure>,
+      onDone?: (reloaded: boolean) => void,
     ): Promise<boolean> => {
       if (!enabledRef.current) return false;
       setMessage(null);
@@ -181,7 +194,10 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
         }
         return false;
       }
-      if (isLive()) await load();
+      if (isLive()) {
+        const reloaded = await load();
+        onDone?.(reloaded);
+      }
       return true;
     },
     [load],
@@ -213,5 +229,33 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     [act],
   );
 
-  return { view, status, message, invite, revoke, remove, accept, refresh: load };
+  const leave = useCallback(
+    () =>
+      act(
+        'leave',
+        (c, token) => c.leaveMembership(token),
+        (reloaded) => {
+          // The leave worked. If the reload failed, do not keep the old family list or its error.
+          if (!reloaded && isLive()) {
+            setView(EMPTY_OWNER_VIEW);
+            setStatus('ready');
+            setMessage(null);
+          }
+        },
+      ),
+    [act],
+  );
+
+  return {
+    view,
+    status,
+    message,
+    invite,
+    revoke,
+    remove,
+    accept,
+    leave, refresh: async () => {
+      await load();
+    },
+  };
 }

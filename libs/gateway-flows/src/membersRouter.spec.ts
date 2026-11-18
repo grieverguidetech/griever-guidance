@@ -6,6 +6,7 @@ import {
   BAD_BODY,
   BAD_EMAIL,
   BAD_ID,
+  NOT_A_MEMBER,
   SEND_FAILED,
   UNAVAILABLE,
   UNUSABLE,
@@ -62,6 +63,7 @@ describe('members router', () => {
       revokeInvite: { ok: true, data: null },
       listMembers: { ok: true, data: OWNER_VIEW },
       removeMember: { ok: true, data: null },
+      leaveFamily: { ok: true, data: null },
       acceptInvite: { ok: true, data: { ownerId: OWNER_ID } },
       getProfile: { ok: true, data: { userId: OWNER_ID, senderName: 'Ada', accountType: 'owner' } },
       ...overrides,
@@ -367,9 +369,47 @@ describe('members router', () => {
     });
   });
 
+  describe('DELETE /membership', () => {
+    it('is 401 without a token, and makes no data call', async () => {
+      expect((await send('DELETE', '/membership', undefined, false)).status).toBe(401);
+      expect(callData).not.toHaveBeenCalled();
+    });
+    it('answers 204 with an empty body, calling leaveFamily with no args', async () => {
+      const res = await send('DELETE', '/membership');
+      expect(res.status).toBe(204);
+      expect(await res.text()).toBe('');
+      expect(callData).toHaveBeenCalledWith(DATA, token, 'leaveFamily', {});
+    });
+    it('ignores any body (C8): the same call and answer, even with invalid JSON', async () => {
+      for (const body of [{ memberId: 'someone_else' }, '{not json', [1, 2]]) {
+        callData.mockClear();
+        const res = await send('DELETE', '/membership', body);
+        expect(res.status).toBe(204);
+        expect(callData).toHaveBeenCalledTimes(1);
+        expect(callData).toHaveBeenCalledWith(DATA, token, 'leaveFamily', {});
+      }
+    });
+    it('is 404 with one calm body when the caller is not a member', async () => {
+      answer({ leaveFamily: { ok: false, code: 'not_found' } });
+      const res = await send('DELETE', '/membership');
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: NOT_A_MEMBER });
+      expect(NOT_A_MEMBER).not.toContain('!');
+    });
+    it('is 503 when the data function is busy, throws, or is not configured', async () => {
+      answer({ leaveFamily: { ok: false, code: 'busy' } });
+      expect((await send('DELETE', '/membership')).status).toBe(503);
+      answer({ leaveFamily: new DataFunctionError(null, 'x') });
+      expect((await send('DELETE', '/membership')).status).toBe(503);
+      answer();
+      dataConfig = null;
+      expect((await send('DELETE', '/membership')).status).toBe(503);
+    });
+  });
+
   it('has no exclamation point in any message (C7)', async () => {
     const codes = ['invalid', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'already_invited', 'rate_limited', 'busy'];
-    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, SEND_FAILED, UNAVAILABLE, UNUSABLE];
+    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, NOT_A_MEMBER, SEND_FAILED, UNAVAILABLE, UNUSABLE];
     for (const code of codes) {
       copy.push(failureFor(code).error);
     }

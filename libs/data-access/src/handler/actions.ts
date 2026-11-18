@@ -15,7 +15,7 @@ import { parseFlowInput } from '../items/flowItem.js';
 import type { acceptInvite } from '../rules/acceptInvite.js';
 import type { createFlow, deleteFlow, listFlows, updateFlow } from '../rules/flows.js';
 import type { createInvite, revokeInvite } from '../rules/invites.js';
-import type { listMembers, removeMember } from '../rules/members.js';
+import type { leaveFamily, listMembers, removeMember } from '../rules/members.js';
 import { parseProfileFields, type getProfile, type putProfile } from '../rules/profiles.js';
 
 /**
@@ -33,6 +33,7 @@ export interface DataRules {
   revokeInvite: typeof revokeInvite;
   listMembers: typeof listMembers;
   removeMember: typeof removeMember;
+  leaveFamily: typeof leaveFamily;
   acceptInvite: typeof acceptInvite;
 }
 
@@ -158,6 +159,12 @@ const PREPARE: Record<DataAction, Prepare> = {
       return null;
     }
     return async (c) => toResult(await c.rules.removeMember(c.doc, c.table, c.caller, memberId, c.clock));
+  },
+  leaveFamily: (args) => {
+    if (!hasExactKeys(args, [])) {
+      return null;
+    }
+    return async (c) => toResult(await c.rules.leaveFamily(c.doc, c.table, c.caller, c.clock));
   },
   acceptInvite: (args) => {
     const tokenHash = args['tokenHash'];
