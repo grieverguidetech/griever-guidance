@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import type { RouteObject } from 'react-router';
 import App from '../app/app';
+import { captureJoinLink } from '../lib/joinLink';
 import { NotFound } from './NotFound';
 import { SECTIONS } from './paths';
 
@@ -36,5 +37,7 @@ export const routes: RouteObject[] = [
 ];
 
 export function createAppRouter() {
+  // Before the router reads the URL: an invitation token in `/join#t=` must never reach its state (#128).
+  captureJoinLink();
   return createBrowserRouter(routes);
 }

@@ -19,8 +19,8 @@ import {
   readRemovedFlows,
 } from '@griever/hooks';
 import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
-import { deleteFlow, getProfile } from '@griever/api-client';
-import type { ProfileResult } from '@griever/api-client';
+import { acceptInvite, deleteFlow, getProfile } from '@griever/api-client';
+import type { AcceptInviteResult, ProfileResult } from '@griever/api-client';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
 import { contactStore } from '@griever/data-local';
 import { screenCopy } from '@griever/copy';
@@ -50,8 +50,11 @@ import { isSignInPath, rememberNext, rememberedNext, requireAccount } from '../r
 import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
+import { JOIN_PATH, captureJoinLink, clearJoinToken, savedJoinToken } from '../lib/joinLink';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
 import { Profile } from '../screens/Profile';
+import { Join } from '../screens/Join';
+import type { JoinPhase } from '../screens/Join';
 import { Settings } from '../screens/Settings';
 import { PeopleHelping } from '../screens/PeopleHelping';
 import { RemoveMember } from '../screens/RemoveMember';
@@ -90,6 +93,8 @@ type AppView =
   | 'obituary'
   | 'cms'
   | 'people'
+  /** An invitation link waiting to be used (#128): the Join screen, or its result. */
+  | 'join'
   /** A section or the Overview with nobody saved: a calm page with one next step (#597). */
   | 'noOne';
 
@@ -247,6 +252,15 @@ function AuthGate({
 const REMOVED_MESSAGE = 'Everything has been removed from this device.';
 
 export function App() {
+  // The invitation link leaves the address bar before anything else (router.tsx does it first in the
+  // real app). With sharing off it is not wanted, so it is forgotten and the normal app shows.
+  useState(() => {
+    captureJoinLink();
+    if (!(AUTH_ENABLED && SHARING_ENABLED)) {
+      clearJoinToken();
+    }
+    return null;
+  });
   // Bumped after "Remove everything from this device": the key remounts every hook, so each
   // reads the now-empty storage and starts from the first screen.
   const [removals, setRemovals] = useState(0);
@@ -331,6 +345,33 @@ async function accountLacksName(getAccessToken: () => Promise<string | null>): P
   }
 }
 
+/** The longest the Joining screen waits; past it, the link is kept and the app opens (C5: no blocking on the network). */
+const JOIN_WAIT_MS = 15000;
+
+/**
+ * Accepts the invitation, or null when no token could be read or no answer came in time (treated as
+ * offline: the link stays saved). The invitation token goes only into acceptInvite's request body.
+ */
+async function acceptWithin(
+  getAccessToken: () => Promise<string | null>,
+  inviteToken: string,
+  waitMs: number,
+): Promise<AcceptInviteResult | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), waitMs);
+  });
+  const attempt = (async () => {
+    const access = await getAccessToken().catch(() => null);
+    return access ? acceptInvite(access, inviteToken) : null;
+  })();
+  try {
+    return await Promise.race([attempt, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Views that need a person to be open; with nobody open Home is shown instead. */
 const NEEDS_PERSON: AppView[] = ['pathLanding', 'flow', 'setup', 'gate', 'shareObituary', 'obituary', 'cms'];
 
@@ -392,9 +433,9 @@ function entryState(): unknown {
 }
 
 /** The App paths that are not editor pages: the landing target replaces them once per load. */
-// `/join` keeps today's behavior (the App lands from any of its paths); the join ticket must remove it.
 // The sign-in paths are not here: the sign-in guard sends a signed-in visitor on to `next` (#851).
-const LANDING_PATHS = ['/', '/join'];
+// `/join` is not either: it shows the Join screen, and goes to `/` once nothing is waiting there (#128).
+const LANDING_PATHS = ['/'];
 /** The paths Back walks past while signed in (Clerk's sign-in steps live there, `/sign-in/...`), as #566 did. */
 function isWalkPath(pathname: string): boolean {
   return pathname === '/' || pathname === '/sign-up' || isSignInPath(pathname);
@@ -531,8 +572,26 @@ function AppBody({
   const personPath = pathSpot?.flowId ? pathSpot : null;
   const pathPerson = personPath ? (sessionList.find((s) => s.flowId === personPath.flowId) ?? null) : null;
   // The sign-in screen is a path (#851): `/sign-in` and Clerk's steps under it, while nobody is signed in.
-  // `/join` is public and keeps the sign-in it showed before (its fragment stays; #128 changes it).
-  const showSignIn = auth !== null && !auth.isSignedIn && (isSignInPath(shown.pathname) || shown.pathname === '/join');
+  const showSignIn = auth !== null && !auth.isSignedIn && isSignInPath(shown.pathname);
+  // Joining from an invitation link (#128). The token is in state so using it up re-renders; it is only
+  // ever passed to acceptInvite. `joinPhase` is the screen once accepting has started; 'done' shows nothing.
+  const joinOn = AUTH_ENABLED && SHARING_ENABLED;
+  const [joinToken, setJoinToken] = useState<string | null>(() => (joinOn ? savedJoinToken() : null));
+  const [joinPhase, setJoinPhase] = useState<JoinPhase | 'done' | null>(null);
+  const joinStarted = useRef(false);
+  const joinSignedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
+  const joinScreen: JoinPhase | null =
+    !joinOn || joinPhase === 'done'
+      ? null
+      : joinPhase !== null
+        ? joinPhase
+        : joinToken === null
+          ? null
+          : offline || !!auth?.isSignedIn
+            ? 'joining'
+            : joinSignedOut && shown.pathname === JOIN_PATH
+              ? 'invited'
+              : null;
   const startPath = pathSpot !== null && pathSpot.flowId === null;
   // /account is one path with two versions: the signed-in one, and Settings when nobody is signed in.
   const accountView: AppView = auth?.isSignedIn ? 'profile' : 'settings';
@@ -547,7 +606,7 @@ function AppBody({
           : startPath
             ? 'noOne'
             : baseView;
-  const view: AppView = showSignIn ? 'signIn' : editorView;
+  const view: AppView = showSignIn ? 'signIn' : joinScreen !== null ? 'join' : editorView;
   const cmsSection: CmsSection = pathSpot?.section ?? 'overview';
   // An item is in the path (guide URLs).
   const pathItem = ITEM_IDS.find((id) => id === pathSpot?.item) ?? null;
@@ -899,11 +958,79 @@ function AppBody({
   async function removeEverything() {
     // Local only: ending the Clerk session deletes nothing on a server.
     await removeEverythingFromDevice(window.localStorage, endSession);
+    clearJoinToken();
     // The fresh app starts from `/`, as after a load, rather than on the screen this was pressed on.
     if (CMS_ENABLED) {
       navigate('/', { replace: true });
     }
     onRemoved();
+  }
+
+  // True from the app's own move off `/join` until the router shows the new page (its move renders later
+  // than the state change that ends the Join screen), so `/join` is not sent to `/` meanwhile.
+  const leavingJoin = useRef(false);
+  useEffect(() => {
+    if (location.pathname !== JOIN_PATH) {
+      leavingJoin.current = false;
+    }
+  }, [location.pathname]);
+  // Signed in (or local work only) with an invitation waiting: accept it once per load (#128). A
+  // connection problem keeps the link for a later load; any other answer uses it up, with one message.
+  const reloadProfile = auth?.reloadProfile;
+  const refreshMembers = members.refresh;
+  useEffect(() => {
+    if (!joinOn || joinToken === null || joinStarted.current) {
+      return;
+    }
+    if (offline) {
+      joinStarted.current = true;
+      setJoinPhase('offline');
+      return;
+    }
+    if (!signedIn || !getAccessToken) {
+      return;
+    }
+    joinStarted.current = true;
+    setJoinPhase('joining');
+    void (async () => {
+      const result = await acceptWithin(getAccessToken, joinToken, JOIN_WAIT_MS);
+      if (result === null || (!result.ok && result.reason === 'offline')) {
+        setJoinPhase('offline');
+        return;
+      }
+      clearJoinToken();
+      setJoinToken(null);
+      if (!result.ok) {
+        setJoinPhase('unusable');
+        return;
+      }
+      // Now a member: the profile says so (no "Create a new one"), and the list shows whose people these are.
+      reloadProfile?.();
+      void refreshMembers();
+      leavingJoin.current = true;
+      setJoinPhase('done');
+      if (CMS_ENABLED) {
+        void navigate(paths.people(), { replace: true });
+      } else {
+        setView('home');
+        void navigate(paths.landing(), { replace: true });
+      }
+    })();
+  }, [joinOn, joinToken, offline, signedIn, getAccessToken, reloadProfile, refreshMembers, navigate]);
+
+  /** From the Join screen to Clerk's sign-in (sign-up is on the same screen), coming back to `/join`. */
+  function joinThroughSignIn() {
+    rememberNext(JOIN_PATH);
+    navigate(paths.signIn(JOIN_PATH), { replace: true });
+  }
+
+  /** Continue after a refused or offline join: the normal app, from the start. */
+  function leaveJoin() {
+    setJoinPhase('done');
+    if (location.pathname === JOIN_PATH) {
+      leavingJoin.current = true;
+      void navigate(paths.landing(), { replace: true });
+    }
   }
 
   const canCreate = !(sharingOn && auth?.profile?.accountType === 'member');
@@ -1680,6 +1807,26 @@ function AppBody({
         <Loading />
       </Shell>
     );
+  }
+
+  if (joinScreen !== null) {
+    return (
+      <Shell notice={endedNote}>
+        <Join phase={joinScreen} onCreateAccount={joinThroughSignIn} onSignIn={joinThroughSignIn} onContinue={leaveJoin} />
+      </Shell>
+    );
+  }
+
+  // `/join` with nothing waiting (no link, sharing off, or already used): the normal app.
+  if (shown.pathname === JOIN_PATH) {
+    if (leavingJoin.current) {
+      return (
+        <Shell>
+          <Loading />
+        </Shell>
+      );
+    }
+    return <Navigate to={paths.landing()} replace />;
   }
 
   // ---- Flow D: account + contacts onboarding ----

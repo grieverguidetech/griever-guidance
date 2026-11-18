@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the Join screen (an invitation link)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["heading", "body", "createAccount", "signIn", "joining", "unusableHeading", "unusableBody", "offlineHeading", "offlineBody", "continue"],
+  "properties": {
+    "heading": { "type": "string", "minLength": 1 },
+    "body": { "type": "string", "minLength": 1 },
+    "createAccount": { "type": "string", "minLength": 1 },
+    "signIn": { "type": "string", "minLength": 1 },
+    "joining": { "type": "string", "minLength": 1 },
+    "unusableHeading": { "type": "string", "minLength": 1 },
+    "unusableBody": { "type": "string", "minLength": 1 },
+    "offlineHeading": { "type": "string", "minLength": 1 },
+    "offlineBody": { "type": "string", "minLength": 1 },
+    "continue": { "type": "string", "minLength": 1 }
+  }
+}

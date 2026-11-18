@@ -1,0 +1,12 @@
+{
+  "heading": "You've been asked to help",
+  "body": "Create an account, or sign in, to help let people know.",
+  "createAccount": "Create an account",
+  "signIn": "I already have an account",
+  "joining": "Joining…",
+  "unusableHeading": "This invitation can't be used",
+  "unusableBody": "Ask the person who sent it for a new one.",
+  "offlineHeading": "You need a connection to join",
+  "offlineBody": "Your link is saved; open the app again when you're connected.",
+  "continue": "Continue"
+}
