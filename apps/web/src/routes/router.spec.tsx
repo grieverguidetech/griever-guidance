@@ -61,3 +61,44 @@ describe('route warnings', () => {
     },
   );
 });
+
+describe('scroll restoration (#852)', () => {
+  function scrolledTo(y: number) {
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: y });
+  }
+
+  afterEach(() => {
+    scrolledTo(0);
+    vi.restoreAllMocks();
+  });
+
+  it('sends a new page to the top and puts Back where it was', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo');
+    const router = createMemoryRouter(routes, { initialEntries: ['/people'] });
+    render(<RouterProvider router={router} />);
+
+    // Halfway down Your people, open a person: the new page starts at the top.
+    scrolledTo(640);
+    scrollTo.mockClear();
+    await act(() => router.navigate('/people/3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10'));
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+
+    // Back: Your people comes back at 640, not at the top.
+    scrolledTo(0);
+    scrollTo.mockClear();
+    await act(() => router.navigate(-1));
+    expect(router.state.location.pathname).toBe('/people');
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 640);
+  });
+
+  it('a page not found also starts at the top', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo');
+    const router = createMemoryRouter(routes, { initialEntries: ['/people'] });
+    render(<RouterProvider router={router} />);
+    scrolledTo(300);
+    scrollTo.mockClear();
+    await act(() => router.navigate('/nope'));
+    expect(screen.getByRole('heading', { level: 1, name: "We couldn't find that page." })).toBeInTheDocument();
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+  });
+});

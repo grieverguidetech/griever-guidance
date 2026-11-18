@@ -49,6 +49,7 @@ import { parsePath, paths } from '../routes/paths';
 import { isSignInPath, rememberNext, rememberedNext, requireAccount } from '../routes/RequireAccount';
 import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
+import { NOT_FOUND_TITLE, titleForPath, useDocumentTitle } from '../routes/useDocumentTitle';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import { JOIN_PATH, captureJoinLink, clearJoinToken, joinOutcome, savedJoinToken } from '../lib/joinLink';
 import type { JoinOutcome } from '../lib/joinLink';
@@ -693,6 +694,9 @@ function AppBody({
   const notFound =
     editorPath &&
     (!CMS_ENABLED || (pathSpot === null && !peoplePath && !accountPath) || (pathSpot !== null && pathSpot.item !== null && pathItem === null));
+  // The tab title follows the path shown, never the person on it (#852). Set here, not only in NotFound,
+  // because this effect runs after NotFound's and would otherwise overwrite it.
+  useDocumentTitle(notFound ? NOT_FOUND_TITLE : titleForPath(shown.pathname));
 
   // Shown once, on the first screen after a removal; leaving it ends it for good. The first screen is
   // the first one shown, not a loading moment or a guard move before it (see `firstView` below).
@@ -1756,7 +1760,8 @@ function AppBody({
       const heading = document.querySelector('h1');
       if (heading) {
         heading.setAttribute('tabindex', '-1');
-        heading.focus();
+        // ScrollRestoration owns the scroll position (#852).
+        heading.focus({ preventScroll: true });
       }
     } else if (view !== 'home') {
       focusAfterLanding.current = false;

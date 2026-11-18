@@ -32,6 +32,19 @@ describe('useFocusHeadingOnChange', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it('moves focus without scrolling, so it never undoes the restored scroll position (#852)', () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
+      const { rerender } = render(<Screen view="a" headingFrom={0} tick={0} />);
+      fireEvent.click(document.body);
+      rerender(<Screen view="b" headingFrom={0} tick={1} />);
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
   it('stays put when the view changes before the person has done anything', () => {
     const { rerender } = render(<Screen view="a" headingFrom={0} tick={0} />);
     rerender(<Screen view="b" headingFrom={0} tick={1} />);

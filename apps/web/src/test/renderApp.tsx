@@ -2,14 +2,9 @@ import type { ReactElement, ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import type { RenderResult } from '@testing-library/react';
 import { createBrowserRouter, RouterProvider } from 'react-router';
-import { routes } from '../routes/router';
+import { routesWith } from '../routes/router';
 
 type RenderAppOptions = { path?: string };
-
-/** The real route table, with the layout route's element swapped for the one under test. */
-function routesWith(ui: ReactElement) {
-  return routes.map((route, index) => (index === 0 ? { ...route, element: ui } : route));
-}
 
 /**
  * Renders `ui` (normally `<App />`) as the layout of the real route table, at `path`.

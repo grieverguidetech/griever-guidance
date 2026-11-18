@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the browser tab title of each web route. Generic words only: never a person's name",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["app", "signIn", "people", "overview", "person", "announcement", "service", "obituary", "thanks", "guide", "account", "join"],
+  "properties": {
+    "app": { "type": "string", "minLength": 1 },
+    "signIn": { "type": "string", "minLength": 1 },
+    "people": { "type": "string", "minLength": 1 },
+    "overview": { "type": "string", "minLength": 1 },
+    "person": { "type": "string", "minLength": 1 },
+    "announcement": { "type": "string", "minLength": 1 },
+    "service": { "type": "string", "minLength": 1 },
+    "obituary": { "type": "string", "minLength": 1 },
+    "thanks": { "type": "string", "minLength": 1 },
+    "guide": { "type": "string", "minLength": 1 },
+    "account": { "type": "string", "minLength": 1 },
+    "join": { "type": "string", "minLength": 1 }
+  }
+}

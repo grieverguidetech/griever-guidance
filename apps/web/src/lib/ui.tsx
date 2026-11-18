@@ -114,6 +114,8 @@ export function useFocusHeadingOnChange(key: string | undefined) {
     if (!heading) return;
     pending.current = false;
     heading.setAttribute('tabindex', '-1');
-    heading.focus();
+    // The router's ScrollRestoration already put the page at the top (a new page) or back where it
+    // was (Back): focus must not scroll it again (#852).
+    heading.focus({ preventScroll: true });
   });
 }

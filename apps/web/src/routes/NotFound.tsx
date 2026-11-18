@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { screenCopy } from '@griever/copy';
 import { paths } from './paths';
+import { NOT_FOUND_TITLE, useDocumentTitle } from './useDocumentTitle';
 
 const copy = screenCopy('notFound');
 
@@ -12,13 +13,9 @@ const copy = screenCopy('notFound');
  */
 export function NotFound() {
   const heading = useRef<HTMLHeadingElement>(null);
+  useDocumentTitle(NOT_FOUND_TITLE);
   useEffect(() => {
     heading.current?.focus();
-    const previous = document.title;
-    document.title = copy.title;
-    return () => {
-      document.title = previous;
-    };
   }, []);
   return (
     <main className="mx-auto flex max-w-[480px] flex-col gap-3 px-5 pt-[52px]">

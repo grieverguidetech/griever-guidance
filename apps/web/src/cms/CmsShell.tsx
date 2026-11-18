@@ -103,7 +103,8 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
 
   // The menu closes on a choice, so focus moves to the heading rather than a hidden button.
   function select(key: CmsNavKey) {
-    heading.current?.focus();
+    // No scroll: this runs before the move, and a jump here would be saved as the page's Back position (#852).
+    heading.current?.focus({ preventScroll: true });
     if (key === 'people') {
       onPeople();
       return;
