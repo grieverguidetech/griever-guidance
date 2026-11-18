@@ -1130,7 +1130,7 @@ function AppBody({
   // Stop helping (#223). Once the server says this person is not a member (or already was not), the
   // shared people and their drafts leave this device straight away, without waiting on a pull: an empty
   // list drops 'member' sessions only, never 'owner' ones. The pull then brings the account's own
-  // list, and the profile reload brings back "Create a new one". A failure changes nothing.
+  // list, and the profile reload brings back "Create a new one". Offline or other failures change nothing.
   const membersLeave = members.leave;
   const applyRemoteFlows = sessions.applyRemoteFlows;
   const heldFor = sessions.heldFor;

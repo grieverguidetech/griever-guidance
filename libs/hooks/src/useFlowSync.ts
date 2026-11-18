@@ -294,8 +294,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     let running = false;
     let again = false;
     let needPull = true;
-    // Bumped by each request for a pull. A pull that was already running when one came in does not
-    // count for it: its answer may be older than the reason for the request (#223, leaving a family).
+    // Bumped by each request for a pull (a wake). See pull(): an answer to an older request is not used.
     let pullAsks = 0;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -319,12 +318,21 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     };
     const client = () => latest.current.client ?? defaultClient;
 
-    const pull = async (accessToken: string): Promise<boolean> => {
+    /**
+     * 'done' once the answer is applied. 'stale' when a pull was asked for while this one was out: the
+     * answer may be older than the reason for asking (a leave, #223), so it is not applied at all and
+     * the cycle pulls again. 'failed' backs off.
+     */
+    const pull = async (accessToken: string): Promise<'done' | 'stale' | 'failed'> => {
+      const asked = pullAsks;
       const result = await withTimeout((signal) => client().listFlows(accessToken, signal), offline, inFlight);
-      if (!alive) return false;
+      if (!alive) return 'failed';
       if (!result.ok) {
         fail(result.reason);
-        return false;
+        return 'failed';
+      }
+      if (asked !== pullAsks) {
+        return 'stale';
       }
       const state = getState();
       // Sync lag: a person removed here (removeSession) that the server still lists is left out. Once a clean pull no longer
@@ -367,7 +375,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       writeStored(latest.current.storage, state);
       latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
       setPulledFor(userId);
-      return true;
+      return 'done';
     };
 
     /** Sends every queued flow. Returns false when a retryable failure means "stop and back off". */
@@ -451,20 +459,16 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
           if (!ok) fail('signed_out'); // no token yet: back off and ask again
           softFailure = false;
           if (accessToken && needPull) {
-            const asked = pullAsks;
             const pulled = await pull(accessToken);
-            if (pulled && asked === pullAsks) needPull = false;
-            else if (!pulled) ok = false;
+            if (pulled === 'done') needPull = false;
+            else if (pulled === 'failed') ok = false;
           }
           if (alive && ok && accessToken) ok = await flush(accessToken);
           // A 403/404 asks for a pull straight away.
           if (alive && ok && needPull && accessToken) {
-            const asked = pullAsks;
-            if (await pull(accessToken)) {
-              if (asked === pullAsks) needPull = false;
-            } else {
-              ok = false;
-            }
+            const pulled = await pull(accessToken);
+            if (pulled === 'done') needPull = false;
+            else if (pulled === 'failed') ok = false;
           }
           if (!alive) break;
           if (ok) {

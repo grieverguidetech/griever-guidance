@@ -282,6 +282,17 @@ describe('PeopleHelping: stop helping (#223)', () => {
     expect(screen.getByText(CONFIRM)).toBeInTheDocument();
   });
 
+  it('after a leave, a later hook message is announced again', async () => {
+    const user = userEvent.setup();
+    const props = renderMember(leaves('ok'));
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    props.update({ view: emptyOwner });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("You've stopped helping Anna."));
+    props.update({ view: emptyOwner, message: MEMBERS_MESSAGES.unavailable });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(MEMBERS_MESSAGES.unavailable));
+  });
+
   it.each<LeaveOutcome>(['ok', 'not_a_member'])(
     '%s: focus moves to the owner heading, then "You\'ve stopped helping Anna." is announced',
     async (outcome) => {

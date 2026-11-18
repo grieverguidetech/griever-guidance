@@ -123,6 +123,8 @@ export function PeopleHelping({
       focusAfterConfirm.current = null;
       headingRef.current?.focus();
       say(LEFT_FAMILY.replace('{owner}', ownerNameRef.current));
+      // The leave is over: later messages (a failed reload of the list) are announced as usual.
+      lastAction.current = 'other';
     }
   }, [view, confirming]);
 

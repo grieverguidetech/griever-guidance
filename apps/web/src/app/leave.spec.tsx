@@ -215,7 +215,7 @@ describe('stop helping (#223)', () => {
     expect(await screen.findByRole('button', { name: CREATE })).toBeInTheDocument();
   });
 
-  it('takes the shared people off the device while a pull is still out, and an older answer does not bring them back', async () => {
+  it('takes the shared people off the device while a pull is still out, and its older answer never brings them back', async () => {
     const user = userEvent.setup();
     renderApp(<App />);
     const button = await openAccount(user);
@@ -233,10 +233,15 @@ describe('stop helping (#223)', () => {
     await waitFor(() => expect(stored().some((s) => s.role === 'member')).toBe(false));
     expect(mocks.listFlows.mock.calls.length).toBe(calls + 1);
 
+    // Every pull after this one fails, so nothing fresh can tidy up after an applied old answer.
+    mocks.listFlows.mockImplementation(async () => {
+      throw new TypeError('Failed to fetch');
+    });
     answer({ ok: true, flows: [SHARED], dropped: 0 });
-    // The wake from the leave runs one more pull, which has nobody shared.
+    // The wake from the leave asks for one more pull.
     await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBe(calls + 2));
-    await waitFor(() => expect(stored().some((s) => s.role === 'member')).toBe(false));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stored().some((s) => s.role === 'member')).toBe(false);
     await openYourPeople(user);
     expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
   });
