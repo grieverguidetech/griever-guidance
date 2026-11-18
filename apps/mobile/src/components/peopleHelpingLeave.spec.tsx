@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { AccessibilityInfo, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { GetMembersResult, LeaveMembershipResult } from '@griever/api-client';
 import type { MembersView } from '@griever/shared';
+import { membersErrorMessage } from '@griever/hooks';
 import { onLeftFamily } from '../lib/leftFamily';
 import { PeopleHelping } from './PeopleHelping';
 
@@ -38,8 +40,12 @@ const lastFocusLines = () => {
 };
 const tick = () => act(async () => new Promise((resolve) => setTimeout(resolve, 5)));
 
-const left = jest.fn<(userId: string) => void>();
+const calls: string[] = [];
+const left = jest.fn<(userId: string) => void>((): void => {
+  calls.push('left');
+});
 let reloadProfile: jest.Mock<() => void>;
+const announced = jest.fn<(message: string, options: { queue: boolean }) => void>();
 let stopListening: () => void = () => undefined;
 
 async function renderMember(afterLeave: GetMembersResult = { ok: true, view: emptyOwner }) {
@@ -52,14 +58,19 @@ async function renderMember(afterLeave: GetMembersResult = { ok: true, view: emp
 beforeEach(() => {
   jest.clearAllMocks();
   mockLeave.mockResolvedValue({ ok: true });
-  reloadProfile = jest.fn();
+  calls.length = 0;
+  reloadProfile = jest.fn(() => {
+    calls.push('reload');
+  });
+  Platform.OS = 'ios';
+  AccessibilityInfo.announceForAccessibilityWithOptions = announced as never;
   stopListening = onLeftFamily(left);
 });
 
 afterEach(() => stopListening());
 
 describe('PeopleHelping: stop helping (#224)', () => {
-  it('shows a member the button, and an owner nothing', async () => {
+  it('shows a member the Stop helping button, with no confirm step until it is pressed', async () => {
     await renderMember();
     expect(opener()).toBeTruthy();
     expect(screen.queryByText(CONFIRM)).toBeNull();
@@ -105,6 +116,8 @@ describe('PeopleHelping: stop helping (#224)', () => {
     fireEvent.press(stop);
     fireEvent.press(stop);
     expect(screen.getByText('Stopping…')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Stopping…' }).props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+    expect(screen.getByRole('button', { name: 'Keep helping' }).props.accessibilityState).toMatchObject({ disabled: true });
     await waitFor(() => expect(mockLeave).toHaveBeenCalledTimes(1));
     await tick();
     expect(mockLeave).toHaveBeenCalledTimes(1);
@@ -121,6 +134,9 @@ describe('PeopleHelping: stop helping (#224)', () => {
     expect(left).toHaveBeenCalledTimes(1);
     expect(left).toHaveBeenCalledWith('u1');
     expect(reloadProfile).toHaveBeenCalledTimes(1);
+    // The shared people go from the device before the profile reload.
+    expect(calls).toEqual(['left', 'reload']);
+    expect(announced).toHaveBeenCalledWith("You've stopped helping Anna.", { queue: true });
     await waitFor(() => expect(lastFocusText()).toBe('People helping you'));
   });
 
@@ -140,6 +156,7 @@ describe('PeopleHelping: stop helping (#224)', () => {
     fireEvent.press(opener());
     fireEvent.press(screen.getByRole('button', { name: 'Stop helping' }));
     expect(await screen.findByText('You need a connection to stop helping. Nothing has changed.')).toBeTruthy();
+    expect(announced).toHaveBeenCalledWith('You need a connection to stop helping. Nothing has changed.', { queue: true });
     expect(screen.getByText(CONFIRM)).toBeTruthy();
     expect(screen.getByText("You're helping Anna.")).toBeTruthy();
     expect(left).not.toHaveBeenCalled();
@@ -155,5 +172,24 @@ describe('PeopleHelping: stop helping (#224)', () => {
     await tick();
     expect(screen.getByText(CONFIRM)).toBeTruthy();
     expect(left).not.toHaveBeenCalled();
+  });
+
+  it('Keep clears the offline line, and a later different message from the hook shows as it is', async () => {
+    mockLeave.mockResolvedValue({ ok: false, reason: 'offline' });
+    await renderMember();
+    fireEvent.press(opener());
+    fireEvent.press(screen.getByRole('button', { name: 'Stop helping' }));
+    await screen.findByText('You need a connection to stop helping. Nothing has changed.');
+    fireEvent.press(screen.getByRole('button', { name: 'Keep helping' }));
+    await waitFor(() => expect(screen.queryByText('You need a connection to stop helping. Nothing has changed.')).toBeNull());
+    expect(screen.queryByText(/You need a connection/)).toBeNull();
+
+    mockLeave.mockResolvedValue({ ok: false, reason: 'unusable' });
+    fireEvent.press(opener());
+    fireEvent.press(screen.getByRole('button', { name: 'Stop helping' }));
+    await waitFor(() => expect(mockLeave).toHaveBeenCalledTimes(2));
+    await tick();
+    expect(screen.queryByText('You need a connection to stop helping. Nothing has changed.')).toBeNull();
+    expect(screen.getByText(membersErrorMessage('unusable', 'leave'))).toBeTruthy();
   });
 });

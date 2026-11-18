@@ -3,7 +3,7 @@ import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { fill, screenCopy } from '@griever/copy';
-import { useMembers } from '@griever/hooks';
+import { membersErrorMessage, useMembers } from '@griever/hooks';
 import type { LeaveOutcome } from '@griever/hooks';
 import { parseInviteEmail } from '@griever/shared';
 import { spacing } from '@griever/tokens';
@@ -73,7 +73,7 @@ function PeopleHelpingSection({
     ownerName.current = view.owner.name ?? copy.someone;
   }
   // The leave's own failure line: offline says so in our words instead of the hook's.
-  const [leaveOffline, setLeaveOffline] = useState(false);
+  const [leaveNote, setLeaveNote] = useState<'offline' | 'dismissed' | null>(null);
   const sendingRef = useRef(false);
   const cancelling = useRef(new Set<string>());
   const emailInput = useRef<ComponentRef<typeof TextInput> | null>(null);
@@ -120,9 +120,17 @@ function PeopleHelpingSection({
     return () => clearTimeout(timer);
   }, [leftPending, isOwner]);
 
+  // The offline line stands only until Keep, or until a different message arrives from the hook (the hook's own
+  // offline message for the leave is the one the line replaces).
+  useEffect(() => {
+    if (message && message !== membersErrorMessage('offline', 'leave')) {
+      setLeaveNote(null);
+    }
+  }, [message]);
+
   async function leaveFamily(): Promise<LeaveOutcome> {
     setNotice(null);
-    setLeaveOffline(false);
+    setLeaveNote(null);
     leftSaid.current = false;
     setLeftPending(false);
     const outcome = await leave();
@@ -132,7 +140,7 @@ function PeopleHelpingSection({
       announceLeftFamily(userId);
       reloadProfile?.();
     } else if (outcome === 'offline') {
-      setLeaveOffline(true);
+      setLeaveNote('offline');
     }
     return outcome;
   }
@@ -190,7 +198,9 @@ function PeopleHelpingSection({
   }
 
   // Both lines show: a sent or cancelled notice and a failed reload can be true together.
-  const statusLine = (leaveOffline ? copy.leaveOffline : [notice, message].filter(Boolean).join(' ')) || undefined;
+  // After Keep, the hook's offline message for the leave is stale (nothing changed), so it is not shown.
+  const shownMessage = leaveNote === 'dismissed' && message === membersErrorMessage('offline', 'leave') ? null : message;
+  const statusLine = (leaveNote === 'offline' ? copy.leaveOffline : [notice, shownMessage].filter(Boolean).join(' ')) || undefined;
 
   return (
     <View style={styles.group}>
@@ -206,6 +216,7 @@ function PeopleHelpingSection({
             leaving: copy.leaving,
           }}
           onLeave={leaveFamily}
+          onKeep={() => setLeaveNote((note) => (note === 'offline' ? 'dismissed' : note))}
         />
       ) : null}
       {owner ? (

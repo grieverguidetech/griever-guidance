@@ -31,8 +31,10 @@ const mockGetProfile = jest.fn<() => Promise<ProfileResult>>();
 type ProfileUpdate = { senderName?: string | null; firstName?: string | null; lastName?: string | null; birthDate?: string | null; address?: Address | null };
 const mockUpdateProfile = jest.fn<(token: string, u: ProfileUpdate) => Promise<ProfileResult>>();
 const mockGetMembers = jest.fn<(token: string) => Promise<GetMembersResult>>();
+const mockLeave = jest.fn<() => Promise<{ ok: true }>>();
 jest.mock('@griever/api-client', () => ({
   ...jest.requireActual<object>('@griever/api-client'),
+  leaveMembership: () => mockLeave(),
   getMembers: (token: string) => mockGetMembers(token),
   getProfile: () => mockGetProfile(),
   updateProfile: (token: string, u: ProfileUpdate) => mockUpdateProfile(token, u),
@@ -794,6 +796,25 @@ describe('sign-in details and support (#718)', () => {
     await waitFor(() => expect(mockGetMembers).toHaveBeenCalledWith('t'));
     await screen.findByRole('heading', { name: 'People helping you' });
     expect(headingNames()).toEqual(['Your account', 'Profile', 'Address', 'Sign-in and security', 'People helping you', 'Sign out', 'Help and support']);
+  });
+
+  it('after a member stops helping, the profile reloads quietly: no waiting line while the old details stay (#224)', async () => {
+    mockFlags.sharing = true;
+    mockLeave.mockResolvedValue({ ok: true });
+    mockGetProfile.mockResolvedValueOnce(profileWith('Sam'));
+    mockGetMembers.mockResolvedValueOnce({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
+    mockGetMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
+    renderAccount(true);
+    await screen.findByDisplayValue('Sam');
+    await screen.findByText("You're helping Anna.");
+    // The reload never answers, so the waiting line would show if nothing hid it.
+    mockGetProfile.mockReturnValue(new Promise<ProfileResult>(() => undefined));
+    press('Stop helping Anna');
+    press('Stop helping');
+    await screen.findByText("You've stopped helping Anna.");
+    await waitFor(() => expect(mockGetProfile).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Loading your details.')).toBeNull();
+    expect(screen.getByDisplayValue('Sam')).toBeTruthy();
   });
 
   it('with sharing off, never asks for members', async () => {

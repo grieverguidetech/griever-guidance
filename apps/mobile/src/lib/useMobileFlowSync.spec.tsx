@@ -161,4 +161,18 @@ describe('useMobileFlowSync: after a member leaves (#224)', () => {
     expect(applyRemoteFlows).toHaveBeenCalledWith({ flows: [] }, 'user_1');
     expect(onWake).toHaveBeenCalledTimes(1);
   });
+
+  it('stops listening when the hook unmounts', async () => {
+    mockAuth = signedIn;
+    mockFlags.auth = true;
+    mockFlags.sync = true;
+    const applyRemoteFlows = jest.fn();
+    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, storage }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    view.unmount();
+    announceLeftFamily('user_1');
+    expect(applyRemoteFlows).not.toHaveBeenCalled();
+  });
 });

@@ -24,6 +24,8 @@ interface Props {
   copy: LeaveFamilyCopy;
   /** Stops helping. 'ok' and 'not_a_member' both mean this person is not a member now. */
   onLeave: () => Promise<LeaveOutcome>;
+  /** Keep was pressed and the step closed. */
+  onKeep?: () => void;
 }
 
 /**
@@ -32,7 +34,7 @@ interface Props {
  * button. Keep is the primary button. A failed leave keeps the step open (the parent says why). After a
  * leave that worked the member block is gone, so the parent moves focus and says so. Members only (C11).
  */
-export function LeaveFamilyPanel({ copy, onLeave }: Props) {
+export function LeaveFamilyPanel({ copy, onLeave, onKeep }: Props) {
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const opener = useRef<ButtonNode>(null);
@@ -73,6 +75,7 @@ export function LeaveFamilyPanel({ copy, onLeave }: Props) {
       return;
     }
     setOpen(false);
+    onKeep?.();
   }
 
   if (!open) {
