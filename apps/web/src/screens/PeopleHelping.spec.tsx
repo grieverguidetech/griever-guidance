@@ -1,8 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { MembersView } from '@griever/shared';
+import { MEMBERS_MESSAGES } from '@griever/hooks';
+import type { LeaveOutcome } from '@griever/hooks';
 import { formatDate } from '../lib/format';
-import { PeopleHelping } from './PeopleHelping';
+import { LEAVE_OFFLINE, PeopleHelping } from './PeopleHelping';
 
 const owner: MembersView = {
   role: 'owner',
@@ -157,6 +159,155 @@ describe('PeopleHelping as a member', () => {
     setup({ view: { role: 'member', owner: { id: 'o1', name: null } } });
     expect(screen.getByText("You're helping someone.")).toBeInTheDocument();
   });
+});
+
+describe('PeopleHelping: stop helping (#223)', () => {
+  const member: MembersView = { role: 'member', owner: { id: 'o1', name: 'Anna' } };
+  const emptyOwner: MembersView = { role: 'owner', members: [], invites: [] };
+  const CONFIRM =
+    "You'll stop seeing the people Anna shares with you, and anything you started writing for them will be removed from this device. You can then add someone yourself.";
+  const leaves = (outcome: LeaveOutcome) => vi.fn(async (): Promise<LeaveOutcome> => outcome);
+
+  /** Renders a member, with a rerender that keeps the same props unless told otherwise. */
+  function renderMember(onLeave: ReturnType<typeof leaves>) {
+    const props = {
+      view: member,
+      status: 'ready' as const,
+      message: null as string | null,
+      onInvite: vi.fn(async () => true),
+      onRevoke: vi.fn(async () => true),
+      onLeave,
+    };
+    const result = render(<PeopleHelping {...props} />);
+    const update = (over: Partial<typeof props>) => result.rerender(<PeopleHelping {...props} {...over} />);
+    return { ...props, update };
+  }
+
+  it('shows "Stop helping Anna" under the member line, as a 44px button', () => {
+    setup({ view: member, onLeave: leaves('ok') });
+    const button = screen.getByRole('button', { name: 'Stop helping Anna' });
+    expect(button).toHaveClass('gg-btn');
+    // The button comes after the "You're helping" line.
+    const line = screen.getByText("You're helping Anna.");
+    expect(line.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('never shows the button to an owner', () => {
+    setup({ view: owner, onLeave: leaves('ok') });
+    expect(screen.queryByRole('button', { name: /Stop helping/ })).not.toBeInTheDocument();
+    setup({ view: emptyOwner, onLeave: leaves('ok') });
+    expect(screen.queryByRole('button', { name: /Stop helping/ })).not.toBeInTheDocument();
+  });
+
+  it('opens a confirm step with the exact copy, focus on its h2 heading, and no exclamation points', async () => {
+    const user = userEvent.setup();
+    const { onLeave } = setup({ view: member, onLeave: leaves('ok') });
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    // An h2, like "People helping you": it sits beside the account page's other h2 sections.
+    const heading = screen.getByRole('heading', { level: 2, name: 'Stop helping Anna?' });
+    expect(heading).toHaveFocus();
+    expect(screen.getByText(CONFIRM)).toBeInTheDocument();
+    const stop = screen.getByRole('button', { name: 'Stop helping' });
+    const keep = screen.getByRole('button', { name: 'Keep helping' });
+    expect(stop).toHaveClass('gg-btn');
+    expect(keep).toHaveClass('gg-btn');
+    expect(document.body.textContent).not.toContain('!');
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('"Keep helping" closes the step, leaves nothing changed and puts focus back on the button', async () => {
+    const user = userEvent.setup();
+    const { onLeave } = setup({ view: member, onLeave: leaves('ok') });
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Keep helping' }));
+    expect(screen.queryByText(CONFIRM)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop helping Anna' })).toHaveFocus();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('while leaving: one call for a double tap, "Stopping…", and "Keep helping" is held', async () => {
+    const user = userEvent.setup();
+    let resolve: (outcome: LeaveOutcome) => void = () => undefined;
+    const onLeave = vi.fn(() => new Promise<LeaveOutcome>((r) => (resolve = r)));
+    setup({ view: member, onLeave });
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    const stop = screen.getByRole('button', { name: 'Stop helping' });
+    await user.click(stop);
+    await user.click(stop);
+    expect(stop).toHaveAttribute('aria-disabled', 'true');
+    expect(stop).toHaveTextContent('Stopping…');
+    const keep = screen.getByRole('button', { name: 'Keep helping' });
+    expect(keep).toHaveAttribute('aria-disabled', 'true');
+    await user.click(keep);
+    expect(screen.getByText(CONFIRM)).toBeInTheDocument();
+    resolve('ok');
+    await waitFor(() => expect(screen.queryByText(CONFIRM)).not.toBeInTheDocument());
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it('offline: keeps the step open and says so in its own words, not the general offline copy', async () => {
+    const user = userEvent.setup();
+    const props = renderMember(leaves('offline'));
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    // The hook sets its general offline copy before the leave resolves.
+    props.onLeave.mockImplementation(async () => {
+      props.update({ message: MEMBERS_MESSAGES.offline });
+      return 'offline';
+    });
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(LEAVE_OFFLINE));
+    expect(LEAVE_OFFLINE).toBe('You need a connection to stop helping. Nothing has changed.');
+    expect(screen.getByText(CONFIRM)).toBeInTheDocument();
+    expect(screen.getByText("You're helping Anna.")).toBeInTheDocument();
+    expect(screen.getByRole('status')).not.toHaveTextContent(MEMBERS_MESSAGES.offline);
+    expect(screen.getByRole('button', { name: 'Stop helping' })).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('offline, when the hook message renders only after the leave resolved: still the leave line', async () => {
+    const user = userEvent.setup();
+    const props = renderMember(leaves('offline'));
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    props.update({ message: MEMBERS_MESSAGES.offline });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(LEAVE_OFFLINE));
+  });
+
+  it('any other failure keeps the step open with the hook copy', async () => {
+    const user = userEvent.setup();
+    const props = renderMember(leaves('other'));
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    props.update({ message: MEMBERS_MESSAGES.unavailable });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(MEMBERS_MESSAGES.unavailable));
+    expect(screen.getByText(CONFIRM)).toBeInTheDocument();
+  });
+
+  it('after a leave, a later hook message is announced again', async () => {
+    const user = userEvent.setup();
+    const props = renderMember(leaves('ok'));
+    await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    props.update({ view: emptyOwner });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("You've stopped helping Anna."));
+    props.update({ view: emptyOwner, message: MEMBERS_MESSAGES.unavailable });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(MEMBERS_MESSAGES.unavailable));
+  });
+
+  it.each<LeaveOutcome>(['ok', 'not_a_member'])(
+    '%s: focus moves to the owner heading, then "You\'ve stopped helping Anna." is announced',
+    async (outcome) => {
+      const user = userEvent.setup();
+      const props = renderMember(leaves(outcome));
+      await user.click(screen.getByRole('button', { name: 'Stop helping Anna' }));
+      await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+      props.update({ view: emptyOwner });
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'People helping you' })).toHaveFocus());
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("You've stopped helping Anna."));
+      expect(screen.queryByText(CONFIRM)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Stop helping/ })).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toContain('!');
+    },
+  );
 });
 
 describe('SHARING_ENABLED', () => {

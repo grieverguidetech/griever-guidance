@@ -2031,31 +2031,30 @@ function renderDecisionsPanel(parent) {
 function renderCto() {
   var panelNode = document.getElementById("panel-cto");
   safely(panelNode, renderNeedsYou);
+  safely(panelNode, renderDecisionsPanel);
   safely(panelNode, renderProductPanel);
-  var pairs = [
-    [function (box) { renderEngineeringPanel(box); }, function (box) { renderInfraPanel(box); }],
-    [function (box) {
-      var p = panel(box, "Business", "business.json");
-      allAreasNote(p);
-      safely(p, renderBusinessPanel);
-    }, function (box) {
+  safely(panelNode, renderEngineeringPanel);
+  var g = grid("cols-2");
+  g.className += " spaced";
+  [
+    function (box) { renderInfraPanel(box); },
+    function (box) {
       var p = panel(box, "Usage", "business.json");
       allAreasNote(p);
       safely(p, renderUsagePanel);
-    }]
-  ];
-  pairs.forEach(function (pair) {
-    var g = grid("cols-2");
-    g.className += " spaced";
-    pair.forEach(function (draw) {
-      var cell = el("div");
-      cell.style.minWidth = "0";
-      g.appendChild(cell);
-      safely(cell, draw);
-    });
-    panelNode.appendChild(g);
+    }
+  ].forEach(function (draw) {
+    var cell = el("div");
+    cell.style.minWidth = "0";
+    g.appendChild(cell);
+    safely(cell, draw);
   });
-  safely(panelNode, renderDecisionsPanel);
+  panelNode.appendChild(g);
+  safely(panelNode, function (box) {
+    var p = panel(box, "Business", "business.json");
+    allAreasNote(p);
+    safely(p, renderBusinessPanel);
+  });
 }
 
 // ---- Architecture tab: the Mermaid blocks of the docs, drawn by the local Mermaid bundle ----

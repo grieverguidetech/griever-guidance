@@ -57,10 +57,17 @@ export interface UseMembersResult {
   remove: (memberId: string) => Promise<boolean>;
   /** Joins the account the invitation came from. The token is used for one call and not kept. */
   accept: (inviteToken: string) => Promise<boolean>;
-  /** Leaves the account the signed-in person helps. On success the view becomes an empty owner view. */
-  leave: () => Promise<boolean>;
+  /**
+   * Leaves the account the signed-in person helps. 'ok' and 'not_a_member' (already left, for example
+   * on another device) both mean "not a member now": the list is reloaded, no message is set, and the
+   * view becomes an empty owner view if the reload fails. 'offline' and 'other' set `message` and keep the view.
+   */
+  leave: () => Promise<LeaveOutcome>;
   refresh: () => Promise<void>;
 }
+
+/** What a leave came to. 'other' covers every remaining failure, and a disabled hook. */
+export type LeaveOutcome = 'ok' | 'offline' | 'not_a_member' | 'other';
 
 export type MembersAction = 'load' | 'create' | 'revoke' | 'remove' | 'accept' | 'leave';
 
@@ -229,22 +236,37 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     [act],
   );
 
-  const leave = useCallback(
-    () =>
-      act(
-        'leave',
-        (c, token) => c.leaveMembership(token),
-        (reloaded) => {
-          // The leave worked. If the reload failed, do not keep the old family list or its error.
-          if (!reloaded && isLive()) {
-            setView(EMPTY_OWNER_VIEW);
-            setStatus('ready');
-            setMessage(null);
-          }
-        },
-      ),
-    [act],
-  );
+  const leave = useCallback(async (): Promise<LeaveOutcome> => {
+    // Filled by the call below. An object, so TypeScript does not narrow it to its first value.
+    const seen: { failure: MembersFailureReason | null; alreadyLeft: boolean } = { failure: null, alreadyLeft: false };
+    const ok = await act(
+      'leave',
+      async (c, token) => {
+        const result = await c.leaveMembership(token);
+        if (!result.ok && result.reason === 'not_a_member') {
+          // Already not a member: the same end state as a leave that worked.
+          seen.alreadyLeft = true;
+          return { ok: true as const };
+        }
+        if (!result.ok) {
+          seen.failure = result.reason;
+        }
+        return result;
+      },
+      (reloaded) => {
+        // Not a member now. If the reload failed, do not keep the old family list or its error.
+        if (!reloaded && isLive()) {
+          setView(EMPTY_OWNER_VIEW);
+          setStatus('ready');
+          setMessage(null);
+        }
+      },
+    );
+    if (ok) {
+      return seen.alreadyLeft ? 'not_a_member' : 'ok';
+    }
+    return seen.failure === 'offline' ? 'offline' : 'other';
+  }, [act]);
 
   return {
     view,
