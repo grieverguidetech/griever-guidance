@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { diagramAge, diagramGroup, extractMermaidBlocks, isOpenLinearState, linearReason, makeLinearReader, toLinearRows, LINEAR_AUTH_MESSAGE } from './model';
+import { diagramAge, diagramGroup, extractMermaidBlocks, isOpenLinearState, linearReason, makeLinearReader, toLinearRows, LINEAR_AUTH_MESSAGE, LINEAR_MAX_PAGES } from './model';
 
 const FENCE = '```';
 const block = (body = 'flowchart TD\n  A --> B'): string => `${FENCE}mermaid\n${body}\n${FENCE}`;
@@ -201,9 +201,9 @@ describe('makeLinearReader', () => {
   });
 
   it('marks the read truncated at the page cap', async () => {
-    const { post, reader } = setup(Array.from({ length: 10 }, (_, n) => ok([`A-${n}`], 'more')));
+    const { post, reader } = setup(Array.from({ length: LINEAR_MAX_PAGES }, (_, n) => ok([`A-${n}`], 'more')));
     const result = await reader();
-    expect(post).toHaveBeenCalledTimes(10);
+    expect(post).toHaveBeenCalledTimes(LINEAR_MAX_PAGES);
     expect(result.truncated).toBe(true);
   });
 
