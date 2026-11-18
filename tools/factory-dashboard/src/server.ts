@@ -1,4 +1,4 @@
-// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It writes only one cache file (the AWS cost reading).
+// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It also makes one read-only Linear GraphQL query (key from the macOS Keychain, never sent to the page). It writes only one cache file (the AWS cost reading).
 import { execFile } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -38,6 +38,8 @@ import {
   GIT_LOG_FORMAT,
   COMMITS_SHOWN,
   costErrorMessage,
+  makeLinearReader,
+  type LinearReading,
   makeCostReader,
   validateCostReading,
   parseAdr,
@@ -459,9 +461,51 @@ const readCost = makeCostReader({
   },
 });
 
+// Linear (team GRI): one read-only GraphQL query. The personal API key is read from the macOS Keychain on each
+// call and kept only in a local variable. It is never logged, never sent to the page and never written anywhere.
+const LINEAR_URL = 'https://api.linear.app/graphql';
+const LINEAR_NO_KEY = 'Linear key not set. See the README.';
+const LINEAR_QUERY = `query ($after: String) {
+  teams(first: 1, filter: { key: { eq: "GRI" } }) {
+    nodes {
+      issues(first: 50, after: $after, filter: { state: { type: { nin: ["completed", "canceled", "duplicate"] } } }) {
+        nodes { identifier title url state { name type } priority priorityLabel assignee { name } updatedAt }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`;
+
+const readLinear = makeLinearReader({
+  now: () => Date.now(),
+  // Exit code 44 means the item is not in the Keychain. Any other failure is a different problem.
+  readKey: async () => {
+    try {
+      const { stdout } = await run('security', ['find-generic-password', '-s', 'gg-dashboard-linear', '-w'], { timeout: 10_000 });
+      if (stdout.trim() !== '') {
+        return stdout.trim();
+      }
+    } catch (error) {
+      if ((error as { code?: number }).code !== 44) {
+        throw new Error('Could not read the Linear key from the Keychain.');
+      }
+    }
+    throw new Error(LINEAR_NO_KEY);
+  },
+  post: async (key, variables, signal) => {
+    const response = await fetch(LINEAR_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: key },
+      body: JSON.stringify({ query: LINEAR_QUERY, variables }),
+      signal,
+    });
+    return { status: response.status, body: await response.json().catch(() => null) };
+  },
+});
+
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead, milestones] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead, milestones, linear] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 500)),
@@ -479,6 +523,7 @@ async function buildState() {
     guarded('awsCost', sources, null as CostReading | null, readCost),
     guarded('prLeadInputs', sources, { prs: [], truncated: false } as LeadResult, loadPrLeadInputs),
     guarded('milestones', sources, [] as Milestone[], loadMilestones),
+    guarded('linear', sources, null as LinearReading | null, readLinear),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
@@ -542,6 +587,7 @@ async function buildState() {
       costReading === null
         ? null
         : { dollars: costReading.dollars, estimated: costReading.estimated, budget: COST_BUDGET_USD, checkedAt: new Date(costReading.at).toISOString() },
+    linear: linear === null ? null : { rows: linear.rows, checkedAt: new Date(linear.at).toISOString(), truncated: linear.truncated, note: linear.note },
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

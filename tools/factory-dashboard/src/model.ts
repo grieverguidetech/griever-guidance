@@ -2174,3 +2174,179 @@ export function diagramAge(lastChanged: string | null, now: Date): { days: numbe
   const days = Math.max(0, Math.floor((now.getTime() - time) / 86_400_000));
   return { days, stale: days > DIAGRAM_STALE_DAYS };
 }
+
+// ---- Linear (team GRI), read-only ----
+
+export type LinearRow = {
+  identifier: string;
+  title: string;
+  url: string;
+  status: string;
+  priority: number;
+  priorityLabel: string;
+  assignee: string;
+  updatedAt: string;
+};
+
+type RawLinearIssue = {
+  identifier?: unknown;
+  title?: unknown;
+  url?: unknown;
+  state?: { name?: unknown; type?: unknown } | null;
+  priority?: unknown;
+  priorityLabel?: unknown;
+  assignee?: { name?: unknown } | null;
+  updatedAt?: unknown;
+};
+
+// Linear state types that mean the work is over.
+const LINEAR_CLOSED_TYPES = ['completed', 'canceled', 'duplicate'];
+
+export function isOpenLinearState(type: unknown): boolean {
+  return typeof type === 'string' && !LINEAR_CLOSED_TYPES.includes(type);
+}
+
+// Priority 1 (urgent) to 4 (low) first; 0 means no priority and goes last. Then the newest update first.
+export function sortLinearRows(rows: LinearRow[]): LinearRow[] {
+  const rank = (priority: number): number => (priority === 0 ? 5 : priority);
+  const time = (iso: string): number => Date.parse(iso) || 0;
+  return [...rows].sort((a, b) => {
+    if (rank(a.priority) !== rank(b.priority)) {
+      return rank(a.priority) - rank(b.priority);
+    }
+    return time(b.updatedAt) - time(a.updatedAt);
+  });
+}
+
+// Maps the issue nodes of the GraphQL reply to rows. Closed states are dropped again here as a second guard.
+export function toLinearRows(nodes: unknown): LinearRow[] {
+  if (!Array.isArray(nodes)) {
+    throw new Error('Unreadable reply');
+  }
+  const rows: LinearRow[] = [];
+  for (const node of nodes as RawLinearIssue[]) {
+    if (!node || typeof node.identifier !== 'string' || typeof node.title !== 'string' || !isOpenLinearState(node.state?.type)) {
+      continue;
+    }
+    const priority = typeof node.priority === 'number' ? node.priority : 0;
+    rows.push({
+      identifier: node.identifier,
+      title: node.title,
+      url: typeof node.url === 'string' ? node.url : '',
+      status: typeof node.state?.name === 'string' ? node.state.name : 'Unknown',
+      priority,
+      priorityLabel: typeof node.priorityLabel === 'string' && node.priorityLabel !== '' ? node.priorityLabel : 'No priority',
+      assignee: typeof node.assignee?.name === 'string' && node.assignee.name !== '' ? node.assignee.name : 'Unassigned',
+      updatedAt: typeof node.updatedAt === 'string' ? node.updatedAt : '',
+    });
+  }
+  return sortLinearRows(rows);
+}
+
+// A plain reason for the page. The key is cut out if it ever appears, and the text is cut short.
+export function linearReason(raw: string, key: string): string {
+  let text = (raw.split('\n').find((line) => line.trim() !== '') ?? '').trim();
+  if (key !== '') {
+    text = text.split(key).join('[removed]');
+  }
+  text = text.replace(/lin_api_[A-Za-z0-9]+/g, '[removed]').slice(0, 120);
+  return text === '' ? 'unknown error' : text;
+}
+
+export const LINEAR_AUTH_MESSAGE = 'Linear did not accept the key. Store a new key (see the README).';
+export const LINEAR_CACHE_MS = 10 * 60 * 1000;
+export const LINEAR_TIMEOUT_MS = 8_000;
+export const LINEAR_MAX_PAGES = 20;
+
+export type LinearReading = { rows: LinearRow[]; at: number; truncated: boolean; note: string | null };
+type LinearReply = { status: number; body: unknown };
+export interface LinearReaderDeps {
+  readKey: () => Promise<string>;
+  post: (key: string, variables: { after: string | null }, signal: AbortSignal) => Promise<LinearReply>;
+  now: () => number;
+}
+
+type LinearBody = {
+  errors?: { message?: string; extensions?: { code?: string } }[];
+  data?: { teams?: { nodes?: { issues?: { nodes?: unknown[]; pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } }[] } };
+};
+
+// A failure with its reason ready for the page. plain = shown as is, otherwise after "Could not read Linear: ".
+class LinearFailure extends Error {
+  constructor(message: string, readonly plain: boolean) {
+    super(message);
+  }
+}
+
+// One reader per server. Keeps a good read for 10 minutes, shares one call between concurrent requests, never
+// caches a failure, and falls back to the last good read (with a note) when a refresh fails. One 8 second
+// timeout covers all pages. The key is passed to post and never returned or put in a message.
+export function makeLinearReader(deps: LinearReaderDeps): () => Promise<LinearReading> {
+  let memory: LinearReading | null = null;
+  let inFlight: Promise<LinearReading> | null = null;
+
+  async function fetchAll(key: string): Promise<{ rows: LinearRow[]; truncated: boolean }> {
+    const signal = AbortSignal.timeout(LINEAR_TIMEOUT_MS);
+    const nodes: unknown[] = [];
+    let after: string | null = null;
+    let more = false;
+    for (let page = 0; page < LINEAR_MAX_PAGES; page += 1) {
+      const reply = await deps.post(key, { after }, signal);
+      const body = (reply.body ?? {}) as LinearBody;
+      const first = body.errors?.[0];
+      if (reply.status === 401 || first?.extensions?.code === 'AUTHENTICATION_ERROR') {
+        throw new LinearFailure(LINEAR_AUTH_MESSAGE, true);
+      }
+      if (first) {
+        throw new LinearFailure(linearReason(first.message ?? '', key), false);
+      }
+      if (reply.status < 200 || reply.status > 299) {
+        throw new LinearFailure(`Linear answered ${reply.status}`, false);
+      }
+      const issues = body.data?.teams?.nodes?.[0]?.issues;
+      if (!issues) {
+        throw new LinearFailure('Team GRI not found', false);
+      }
+      nodes.push(...(issues.nodes ?? []));
+      more = Boolean(issues.pageInfo?.hasNextPage && issues.pageInfo.endCursor);
+      if (!more) {
+        break;
+      }
+      after = issues.pageInfo?.endCursor ?? null;
+    }
+    return { rows: toLinearRows(nodes), truncated: more };
+  }
+
+  async function load(): Promise<LinearReading> {
+    const now = deps.now();
+    if (memory && now - memory.at < LINEAR_CACHE_MS) {
+      return memory;
+    }
+    let key = '';
+    try {
+      key = await deps.readKey();
+      const { rows, truncated } = await fetchAll(key);
+      memory = { rows, truncated, at: now, note: null };
+      return memory;
+    } catch (error) {
+      const failure =
+        error instanceof LinearFailure
+          ? error
+          : new LinearFailure(linearReason(error instanceof Error ? error.message : '', key), key === '');
+      if (memory) {
+        const reason = failure.message.replace(/\.$/, '');
+        return { ...memory, note: `Could not refresh Linear: ${reason}. Showing the last good read.` };
+      }
+      throw new Error(failure.plain ? failure.message : `Could not read Linear: ${failure.message}`);
+    }
+  }
+
+  return () => {
+    if (!inFlight) {
+      inFlight = load().finally(() => {
+        inFlight = null;
+      });
+    }
+    return inFlight;
+  };
+}
