@@ -20,6 +20,8 @@ import {
   DEPLOY_FETCHED,
   DEPLOY_FETCH_DAYS,
   parseFeatureFlags,
+  parseMilestones,
+  type Milestone,
   buildProduct,
   openBoardItems,
   summarizeIssue,
@@ -109,7 +111,7 @@ async function guarded<T>(
   }
 }
 
-type RawIssue = { number: number; title: string; url: string; updatedAt: string; createdAt?: string; closedAt?: string; stateReason?: string; labels: { name: string }[]; body?: string };
+type RawIssue = { number: number; title: string; url: string; updatedAt: string; createdAt?: string; closedAt?: string; stateReason?: string; labels: { name: string }[]; body?: string; assignees?: { login: string }[] };
 
 function toIssue(raw: RawIssue): Issue {
   return {
@@ -118,6 +120,7 @@ function toIssue(raw: RawIssue): Issue {
     url: raw.url,
     updatedAt: raw.updatedAt,
     labels: raw.labels.map((label) => label.name),
+    ...(raw.assignees === undefined ? {} : { assignee: raw.assignees[0]?.login ?? null }),
     ...(raw.createdAt === undefined || raw.closedAt === undefined ? {} : { createdAt: raw.createdAt, closedAt: raw.closedAt, stateReason: raw.stateReason }),
     // Only the one-line summary is kept. The body is dropped here.
     ...(raw.body === undefined ? {} : { summary: summarizeIssue(raw.body), dependsOn: dependsOn(raw.body) }),
@@ -126,7 +129,7 @@ function toIssue(raw: RawIssue): Issue {
 
 function loadIssues(state: 'open' | 'closed', limit: number): Promise<Issue[]> {
   // Bodies only for open issues: they feed the one-line summaries. Closed issues are many, so they stay light.
-  const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body' : 'number,title,labels,url,updatedAt,createdAt,closedAt,stateReason';
+  const fields = state === 'open' ? 'number,title,labels,url,updatedAt,body,assignees' : 'number,title,labels,url,updatedAt,createdAt,closedAt,stateReason';
   const base =
     state === 'closed'
       ? closedIssueArgs(new Date(), REPO, limit)
@@ -244,6 +247,11 @@ function loadRecentClosedIssues(): Promise<Issue[]> {
   return ghJson([...args, '--json', 'number,title,labels,url,updatedAt,body']).then((data) =>
     (data as RawIssue[]).map(toIssue),
   );
+}
+
+// Open milestones. REST, read-only. 100 is the page maximum and far more than this repo has.
+async function loadMilestones(): Promise<Milestone[]> {
+  return parseMilestones(await ghJson(['api', `repos/${REPO}/milestones?state=open&per_page=100`]));
 }
 
 async function loadBoard(): Promise<BoardResult> {
@@ -384,7 +392,7 @@ const readCost = makeCostReader({
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead, milestones] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 500)),
@@ -401,6 +409,7 @@ async function buildState() {
     guarded('adrs', sources, [] as AdrInfo[], loadAdrs),
     guarded('awsCost', sources, null as CostReading | null, readCost),
     guarded('prLeadInputs', sources, { prs: [], truncated: false } as LeadResult, loadPrLeadInputs),
+    guarded('milestones', sources, [] as Milestone[], loadMilestones),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
@@ -453,6 +462,7 @@ async function buildState() {
       board,
       labelsFor,
       issueSummaryFor: summaryFor,
+      milestones,
       now: generatedAt,
     }),
     engineering: buildEngineering(sources, { board: openBoard, ciMainRuns, openIssues, deployRuns, mergedPrs }, generatedAt),
