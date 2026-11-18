@@ -1,6 +1,7 @@
 import type { PendingInvite } from '@griever/shared';
-import { inviteKey, refGsi, tokenKey } from '../keys.js';
+import { inviteKey, refGsi, tokenKey, tokenRefGsi } from '../keys.js';
 import { type Item } from '../read.js';
+import type { TransactItem } from '../transact.js';
 
 export interface InviteItem {
   id: string;
@@ -13,6 +14,29 @@ export interface InviteItem {
   acceptedAt?: string;
   acceptedBy?: string;
   revokedAt?: string;
+  /** Epoch seconds. DynamoDB deletes the item some time after this (see inviteTtl). Not read back. */
+  ttl?: number;
+}
+
+/** Invite items, and the email on them, are kept this long after the invite closes (#146). */
+export const INVITE_RETENTION_DAYS = 30;
+const SECONDS_PER_DAY = 24 * 60 * 60;
+
+/** The ttl (epoch seconds) that deletes an invite 30 days after `fromMs`. */
+export function inviteTtl(fromMs: number): number {
+  return Math.floor(fromMs / 1000) + INVITE_RETENTION_DAYS * SECONDS_PER_DAY;
+}
+
+/**
+ * The ttl for an invite that closes at `closedAtMs` (revoke or accept): 30 days after the close, or
+ * 30 days after expiry when that comes first. The earlier one wins, so an invite revoked after it
+ * expired keeps its expiry-based ttl.
+ */
+export function closedInviteTtl(expiresAt: string, closedAtMs: number): number {
+  if (Number.isNaN(Date.parse(expiresAt)) || !Number.isFinite(closedAtMs)) {
+    throw new Error('closedInviteTtl needs a valid expiry and close time.');
+  }
+  return Math.min(inviteTtl(Date.parse(expiresAt)), inviteTtl(closedAtMs));
 }
 
 /**
@@ -32,6 +56,7 @@ export function encodeInvite(invite: InviteItem): Item {
     ...(invite.acceptedAt ? { acceptedAt: invite.acceptedAt } : {}),
     ...(invite.acceptedBy ? { acceptedBy: invite.acceptedBy } : {}),
     ...(invite.revokedAt ? { revokedAt: invite.revokedAt } : {}),
+    ...(invite.ttl === undefined ? {} : { ttl: invite.ttl }),
     ...(invite.acceptedBy ? refGsi(invite.acceptedBy, 'INVITE', invite.id) : {}),
   };
 }
@@ -44,7 +69,8 @@ export function decodeInvite(item: Item): InviteItem {
     typeof email !== 'string' ||
     typeof tokenHash !== 'string' ||
     typeof createdAt !== 'string' ||
-    typeof expiresAt !== 'string'
+    typeof expiresAt !== 'string' ||
+    Number.isNaN(Date.parse(expiresAt))
   ) {
     throw new Error('Invite item is broken.');
   }
@@ -86,5 +112,22 @@ export function encodeToken(hash: string, ownerId: string, inviteId: string): It
     entity: 'TOKEN',
     ownerId,
     inviteId,
+    // Lets account deletion find a guard whose INVITE# item has expired and been deleted.
+    ...tokenRefGsi(ownerId, hash),
+  };
+}
+
+/**
+ * Run when an invite closes (revoke or accept). The guard stays so the hash stays used, but it no
+ * longer names the owner or the invite, so nothing is left to find once the INVITE# item is deleted.
+ */
+export function closeTokenGuard(table: string, hash: string): TransactItem {
+  return {
+    Update: {
+      TableName: table,
+      Key: tokenKey(hash),
+      UpdateExpression: 'REMOVE ownerId, inviteId, gsi1pk, gsi1sk',
+      ConditionExpression: 'attribute_exists(pk)',
+    },
   };
 }

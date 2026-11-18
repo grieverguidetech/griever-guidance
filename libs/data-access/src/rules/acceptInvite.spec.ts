@@ -458,7 +458,7 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       const joiner = uid('joiner');
       await profile(owner);
       await profile(joiner);
-      for (let i = 0; i < 94; i += 1) {
+      for (let i = 0; i < 93; i += 1) {
         await seedInvite(joiner, `friend${i}@example.test`);
       }
       const invite = await seedInvite(owner, `${joiner}@example.test`);
@@ -473,7 +473,7 @@ describe.runIf(up)('acceptInvite on DynamoDB Local', () => {
       const joiner = uid('joiner');
       await profile(owner);
       await profile(joiner);
-      for (let i = 0; i < 95; i += 1) {
+      for (let i = 0; i < 94; i += 1) {
         await seedInvite(joiner, `friend${i}@example.test`);
       }
       const invite = await seedInvite(owner, `${joiner}@example.test`);

@@ -3,7 +3,7 @@ import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { isUuid, parseInviteEmail, type PendingInvite } from '@griever/shared';
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
-import { decodeInvite, encodeInvite, encodeToken, isOpen, toPendingInvite, type InviteItem } from '../items/inviteItems.js';
+import { closeTokenGuard, closedInviteTtl, decodeInvite, encodeInvite, encodeToken, inviteTtl, isOpen, toPendingInvite, type InviteItem } from '../items/inviteItems.js';
 import { decodeMember } from '../items/memberItems.js';
 import { getProfile } from '../items/profileItem.js';
 import { INVITE_PREFIX, MEMBER_PREFIX, inviteKey, memberOfKey } from '../keys.js';
@@ -75,13 +75,16 @@ export async function createInvite(
         if (invites.some((invite) => invite.email === address && live(invite))) {
           throw new Refusal('already_invited');
         }
+        const expiresAt = new Date(nowDate.getTime() + INVITE_LIFETIME_DAYS * DAY_MS).toISOString();
         const invite: InviteItem = {
           id: randomUUID(),
           ownerId: caller.userId,
           email: address,
           tokenHash,
           createdAt: now,
-          expiresAt: new Date(nowDate.getTime() + INVITE_LIFETIME_DAYS * DAY_MS).toISOString(),
+          expiresAt,
+          // An open invite is deleted 30 days after it expires, unless a revoke or accept sets an earlier ttl.
+          ttl: inviteTtl(Date.parse(expiresAt)),
         };
         const items: TransactItem[] = [
           profileWrite(table, caller.userId, profile, now),
@@ -95,9 +98,10 @@ export async function createInvite(
             Update: {
               TableName: table,
               Key: inviteKey(caller.userId, expired.id),
-              UpdateExpression: 'SET revokedAt = :now',
+              UpdateExpression: 'SET revokedAt = :now, #ttl = :ttl',
               ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt)',
-              ExpressionAttributeValues: { ':now': now },
+              ExpressionAttributeNames: { '#ttl': 'ttl' },
+              ExpressionAttributeValues: { ':now': now, ':ttl': closedInviteTtl(expired.expiresAt, nowDate.getTime()) },
             },
           });
           retryOn.push(CREATE_RETIRE_EXPIRED);
@@ -151,17 +155,21 @@ export async function revokeInvite(
           throw new Refusal('not_found');
         }
         const now = clock.now().toISOString();
+        const open = decodeInvite(item);
+        const ttl = closedInviteTtl(open.expiresAt, clock.now().getTime());
         return {
           items: [
             {
               Update: {
                 TableName: table,
                 Key: inviteKey(caller.userId, id),
-                UpdateExpression: 'SET revokedAt = :now',
+                UpdateExpression: 'SET revokedAt = :now, #ttl = :ttl',
                 ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt)',
-                ExpressionAttributeValues: { ':now': now },
+                ExpressionAttributeNames: { '#ttl': 'ttl' },
+                ExpressionAttributeValues: { ':now': now, ':ttl': ttl },
               },
             },
+            closeTokenGuard(table, open.tokenHash),
             bumpOwnerVersion(table, caller.userId, now),
           ],
           value: null,

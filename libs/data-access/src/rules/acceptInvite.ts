@@ -2,7 +2,7 @@ import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { parseInviteEmail } from '@griever/shared';
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
-import { decodeInvite, isOpen, type InviteItem } from '../items/inviteItems.js';
+import { closeTokenGuard, closedInviteTtl, decodeInvite, isOpen, type InviteItem } from '../items/inviteItems.js';
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
 import {
   encodeProfile,
@@ -25,8 +25,8 @@ import { Refusal, type FlowResult } from './flows.js';
 
 const TOKEN_HASH = /^[0-9a-f]{64}$/;
 
-/** One Tx may hold 100 items. Six are fixed (positions 0 to 5); the rest retire the joiner's own live invites. */
-const FIXED_ITEMS = 6;
+/** One Tx may hold 100 items. Seven are fixed (positions 0 to 6); the rest retire the joiner's own live invites. */
+const FIXED_ITEMS = 7;
 const MAX_OWN_OPEN_INVITES = 100 - FIXED_ITEMS;
 
 // Positions in the acceptInvite transaction. A failed condition reports its position.
@@ -39,7 +39,8 @@ const ACCEPT_MEMBER = 1;
  *   2 the invite, marked accepted (must still be open and unexpired)
  *   3 the caller's profile, set to member (version check, or a new profile)
  *   4 the owner's profile, version bump (must still be an owner)
- *   5 the owner has no MEMBER_OF          6.. the caller's own live open invites, revoked
+ *   5 the owner has no MEMBER_OF          6 the token guard, stripped of the owner and invite ids
+ *   7.. the caller's own live open invites, revoked
  * These conditions take the place of the row locks in the old SQL accept_invite. Any failed condition
  * means the reads were stale, so the whole action runs again: the new reads then give the right
  * answer. A caller who owns people, has members or is already a member gets invite_conflict, but
@@ -124,7 +125,7 @@ export async function acceptInvite(
               ConditionExpression: 'attribute_not_exists(pk)',
             },
           },
-          acceptedInviteUpdate(table, invite, caller.userId, now),
+          acceptedInviteUpdate(table, invite, caller.userId, now, nowDate.getTime()),
           memberProfileWrite(table, caller.userId, profile, now),
           ownerProfileBump(table, invite.ownerId, now),
           {
@@ -134,15 +135,20 @@ export async function acceptInvite(
               ConditionExpression: 'attribute_not_exists(pk)',
             },
           },
+          closeTokenGuard(table, invite.tokenHash),
           ...own.map(
             (item): TransactItem => ({
               Update: {
                 TableName: table,
                 Key: inviteKey(caller.userId, item.id),
-                UpdateExpression: 'SET revokedAt = :now',
+                UpdateExpression: 'SET revokedAt = :now, #ttl = :ttl',
                 ConditionExpression:
                   'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt)',
-                ExpressionAttributeValues: { ':now': now },
+                ExpressionAttributeNames: { '#ttl': 'ttl' },
+                ExpressionAttributeValues: {
+                  ':now': now,
+                  ':ttl': closedInviteTtl(item.expiresAt, nowDate.getTime()),
+                },
               },
             }),
           ),
@@ -226,6 +232,7 @@ function acceptedInviteUpdate(
   invite: InviteItem,
   userId: string,
   now: string,
+  nowMs: number,
 ): TransactItem {
   const ref = refGsi(userId, 'INVITE', invite.id);
   return {
@@ -233,12 +240,13 @@ function acceptedInviteUpdate(
       TableName: table,
       Key: inviteKey(invite.ownerId, invite.id),
       UpdateExpression:
-        'SET acceptedAt = :now, acceptedBy = :by, #gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk',
+        'SET acceptedAt = :now, acceptedBy = :by, #ttl = :ttl, #gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk',
       ConditionExpression:
         'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt) AND expiresAt > :now',
-      ExpressionAttributeNames: { '#gsi1pk': 'gsi1pk', '#gsi1sk': 'gsi1sk' },
+      ExpressionAttributeNames: { '#gsi1pk': 'gsi1pk', '#gsi1sk': 'gsi1sk', '#ttl': 'ttl' },
       ExpressionAttributeValues: {
         ':now': now,
+        ':ttl': closedInviteTtl(invite.expiresAt, nowMs),
         ':by': userId,
         ':gsi1pk': ref.gsi1pk,
         ':gsi1sk': ref.gsi1sk,

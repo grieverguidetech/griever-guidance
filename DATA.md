@@ -597,8 +597,9 @@ not run as a caller.
 **Where emails live.** The invitee's email is on the `INVITE#` item. A list of pending invites
 shows only `id`, `email`, `expiresAt` and `createdAt`, never the token hash. The email the member
 accepted with is copied onto `MEMBER#<memberId>`, and it is deleted with that item when the member
-is removed. The `INVITE#` item, with its email, has no expiry today: it is kept until #146. Account
-deletion removes it. The profile holds no email (the email lives in Clerk).
+is removed. The `INVITE#` item, with its email, is kept for 30 days after the invite closes, then
+DynamoDB deletes it (#146, "Invite emails" in §7). Account deletion removes it sooner. The profile holds
+no email (the email lives in Clerk).
 
 **What syncs** (the six facts, plus the detail fields from DS-7 once #517 to #522 ship):
 
@@ -720,6 +721,24 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict`) until DynamoDB
   purges both items after 90 days. A joiner who owns only a deleted person is still refused (C11).
   The owner's other devices keep the person for now. Account deletion (below) still removes everything.
+- **Invite emails (#146, settled 2026-10-21).** An invite carries the email of a third party who
+  never agreed to anything, so the `INVITE#` item is deleted after 30 days: 30 days after it expires
+  or is revoked, whichever is first, and 30 days after it is accepted. The access rules set the
+  `ttl` attribute (epoch seconds) on the item: at create time to expiry + 30 days, in the revoke
+  write to revoke time + 30 days (or the expiry-based ttl, when the invite had already expired),
+  and in the accept transaction to acceptance time + 30 days. The same goes for the joiner's own
+  open invites that the accept revokes. An open invite keeps only its expiry-based ttl. DynamoDB
+  deletes an expired item some time after the ttl passes, not at the exact second, so the rule is
+  "about 30 days", and every read ignores an invite whose ttl has passed but which is not yet deleted
+  (`getLive` and `queryLive`, `libs/data-access/src/read.ts`). The `TOKEN#` guard holds no email and
+  has no ttl; it stays so a used hash is never used again. When an invite closes (revoke or accept),
+  the same write strips `ownerId` and `inviteId` from its guard, so the guard names nobody. A guard for
+  an invite that only expires keeps them, plus a `gsi1` ref to the owner, so account deletion
+  (`deleteUser`) still finds and removes it after the `INVITE#` item has gone. No membership or
+  profile item has a ttl. There is no backfill: invites written before the data function is
+  redeployed with #146 have no ttl and are kept. Sharing is off in production, so none are expected.
+  Nothing else reads a closed invite: the members list shows open invites, the rate limit looks back
+  24 hours, and "one open invite per email" covers open invites.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe
   action on a session row. A mis-swipe here is unforgivable in a way it isn't in a mail app.
 

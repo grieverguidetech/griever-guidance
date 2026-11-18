@@ -62,3 +62,8 @@ export const refPk = (id: string): string => `REF#${userId(id)}`;
 export function refGsi(id: string, kind: 'FLOW' | 'INVITE', itemId: string): { gsi1pk: string; gsi1sk: string } {
   return { gsi1pk: refPk(id), gsi1sk: `${kind}#${uuid(kind.toLowerCase(), itemId)}` };
 }
+
+/** gsi1 keys on a TOKEN# guard: a ref to the invite's owner, so account deletion finds a guard whose INVITE# item is gone. */
+export function tokenRefGsi(ownerId: string, hash: string): { gsi1pk: string; gsi1sk: string } {
+  return { gsi1pk: refPk(ownerId), gsi1sk: `TOKEN#${tokenHash(hash)}` };
+}
