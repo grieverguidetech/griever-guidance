@@ -14,6 +14,7 @@ import { Heading } from '../ui/Heading';
 import { Status } from '../ui/Status';
 import { Body } from '../ui/Text';
 import { LabelledInput } from './AddressFields';
+import { RemoveMemberPanel } from './RemoveMemberPanel';
 
 const copy = screenCopy('phonePeopleHelping');
 
@@ -37,7 +38,7 @@ export function PeopleHelping({ sessionEnded }: { sessionEnded: boolean }) {
 
 function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | null> }) {
   const statusId = useId();
-  const { view, status, message, invite, revoke } = useMembers({ getAccessToken: getToken, enabled: true });
+  const { view, status, message, invite, revoke, remove } = useMembers({ getAccessToken: getToken, enabled: true });
   const owner = view?.role === 'owner' ? view : null;
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
@@ -45,6 +46,7 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
   // What this section says itself (sent, cancelled). A failure shows the hook's own message.
   const [notice, setNotice] = useState<string | null>(null);
   const [cancelCount, setCancelCount] = useState(0);
+  const [removeCount, setRemoveCount] = useState(0);
   const [cancellingIds, setCancellingIds] = useState<string[]>([]);
   const sendingRef = useRef(false);
   const cancelling = useRef(new Set<string>());
@@ -60,6 +62,15 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
     const timer = setTimeout(() => focusNode(invitedHeading.current ?? sectionHeading.current), 0);
     return () => clearTimeout(timer);
   }, [cancelCount]);
+
+  // After a removal the list has reloaded: focus goes to the section heading (the row may be gone).
+  useEffect(() => {
+    if (removeCount === 0) {
+      return;
+    }
+    const timer = setTimeout(() => focusNode(sectionHeading.current), 0);
+    return () => clearTimeout(timer);
+  }, [removeCount]);
 
   async function send() {
     if (sendingRef.current) {
@@ -100,6 +111,16 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
       setNotice(copy.cancelled);
       setCancelCount((count) => count + 1);
     }
+  }
+
+  async function removeMember(member: { id: string; name: string | null; email: string }): Promise<boolean> {
+    setNotice(null);
+    const ok = await remove(member.id);
+    if (ok) {
+      setNotice(fill(copy.removed, { name: member.name ?? member.email }));
+      setRemoveCount((count) => count + 1);
+    }
+    return ok;
   }
 
   // Both lines show: a sent or cancelled notice and a failed reload can be true together.
@@ -143,11 +164,24 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
         <View style={styles.list}>
           <Heading level={3}>{copy.helpingHeading}</Heading>
           <View style={styles.list} role="list">
-            {owner.members.map((member) => (
-              <View key={member.id} role="listitem">
-                <Body>{member.name ?? member.email}</Body>
-              </View>
-            ))}
+            {owner.members.map((member) => {
+              const name = member.name ?? member.email;
+              return (
+                <View key={member.id} style={styles.invite} role="listitem">
+                  <Body>{name}</Body>
+                  <RemoveMemberPanel
+                    copy={{
+                      openLabel: fill(copy.removeButton, { name }),
+                      confirmBody: fill(copy.removeConfirm, { name }),
+                      confirmAction: copy.removeAction,
+                      keep: copy.removeKeep,
+                      removing: copy.removing,
+                    }}
+                    onRemove={() => removeMember(member)}
+                  />
+                </View>
+              );
+            })}
           </View>
         </View>
       ) : null}

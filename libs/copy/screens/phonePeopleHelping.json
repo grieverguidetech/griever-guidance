@@ -15,5 +15,11 @@
   "cancelled": "Invitation cancelled.",
   "cancelling": "Cancelling…",
   "cancelButton": "Cancel this invitation",
-  "cancelLabel": "Cancel this invitation for {email}"
+  "cancelLabel": "Cancel this invitation for {email}",
+  "removeButton": "Remove {name}",
+  "removeConfirm": "{name} won't see the people you're writing about any more.",
+  "removeAction": "Remove",
+  "removeKeep": "Keep",
+  "removing": "Removing…",
+  "removed": "{name} has been removed."
 }
