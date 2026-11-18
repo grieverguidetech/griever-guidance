@@ -199,7 +199,7 @@ describe('useMembers leave', () => {
     const { result } = setup(client);
     await waitFor(() => expect(result.current.view).toEqual(memberView));
     await act(async () => {
-      expect(await result.current.leave()).toBe(true);
+      expect(await result.current.leave()).toBe('ok');
     });
     expect(client.leaveMembership).toHaveBeenCalledWith('tok');
     expect(getMembers).toHaveBeenCalledTimes(2);
@@ -228,7 +228,7 @@ describe('useMembers leave', () => {
     const { result } = setup(stub({ getMembers }));
     await waitFor(() => expect(result.current.view).toEqual(memberView));
     await act(async () => {
-      expect(await result.current.leave()).toBe(true);
+      expect(await result.current.leave()).toBe('ok');
     });
     expect(result.current.view).toEqual(emptyOwner);
     expect(result.current.message).toBeNull();
@@ -243,21 +243,41 @@ describe('useMembers leave', () => {
     const { result } = setup(client);
     await waitFor(() => expect(result.current.view).toEqual(memberView));
     await act(async () => {
-      expect(await result.current.leave()).toBe(false);
+      expect(await result.current.leave()).toBe('offline');
     });
     expect(result.current.message).toBe(MEMBERS_MESSAGES.offline);
     expect(result.current.view).toEqual(memberView);
   });
 
-  it('a refusal (not a member) gives the calm not-a-member message, without a mark', async () => {
-    const client = stub({ leaveMembership: fail('not_a_member') });
+  it('not a member (already left) counts as left: reloads, sets no message, says not_a_member (#223)', async () => {
+    const getMembers = vi
+      .fn<MembersClient['getMembers']>()
+      .mockResolvedValueOnce({ ok: true, view: memberView })
+      .mockResolvedValueOnce({ ok: true, view: emptyOwner });
+    const client = stub({ getMembers, leaveMembership: fail('not_a_member') });
     const { result } = setup(client);
-    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(result.current.view).toEqual(memberView));
     await act(async () => {
-      expect(await result.current.leave()).toBe(false);
+      expect(await result.current.leave()).toBe('not_a_member');
     });
-    expect(result.current.message).toBe(MEMBERS_MESSAGES.not_a_member);
+    expect(getMembers).toHaveBeenCalledTimes(2);
+    expect(result.current.view).toEqual(emptyOwner);
+    expect(result.current.message).toBeNull();
     expect(MEMBERS_MESSAGES.not_a_member).not.toContain('!');
+  });
+
+  it('not a member with a failed reload still shows an empty owner view and no error', async () => {
+    const getMembers = vi
+      .fn<MembersClient['getMembers']>()
+      .mockResolvedValueOnce({ ok: true, view: memberView })
+      .mockResolvedValueOnce({ ok: false, reason: 'offline' });
+    const { result } = setup(stub({ getMembers, leaveMembership: fail('not_a_member') }));
+    await waitFor(() => expect(result.current.view).toEqual(memberView));
+    await act(async () => {
+      expect(await result.current.leave()).toBe('not_a_member');
+    });
+    expect(result.current.view).toEqual(emptyOwner);
+    expect(result.current.message).toBeNull();
   });
 
   it('any other failure reads as unavailable, not not-a-member', async () => {
@@ -265,7 +285,7 @@ describe('useMembers leave', () => {
     const { result } = setup(client);
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => {
-      expect(await result.current.leave()).toBe(false);
+      expect(await result.current.leave()).toBe('other');
     });
     expect(result.current.message).toBe(MEMBERS_MESSAGES.unavailable);
   });
@@ -275,7 +295,7 @@ describe('useMembers leave', () => {
     const { result } = setup(client);
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => {
-      expect(await result.current.leave()).toBe(false);
+      expect(await result.current.leave()).toBe('other');
     });
     expect(result.current.message).toBe(MEMBERS_MESSAGES.unavailable);
   });
@@ -284,7 +304,7 @@ describe('useMembers leave', () => {
     const client = stub();
     const { result } = setup(client, false);
     await act(async () => {
-      expect(await result.current.leave()).toBe(false);
+      expect(await result.current.leave()).toBe('other');
     });
     expect(client.leaveMembership).not.toHaveBeenCalled();
   });

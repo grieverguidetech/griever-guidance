@@ -18,7 +18,7 @@ import {
   useFlowSync,
   readRemovedFlows,
 } from '@griever/hooks';
-import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
+import type { LeaveOutcome, Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { acceptInvite, deleteFlow, getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
@@ -534,13 +534,28 @@ function AppBody({
   const [deletingAccount, setDeletingAccount] = useState(false);
   const syncOn = CMS_ENABLED && SYNC_ENABLED && AUTH_ENABLED && !offline && !!getAccessToken && !!auth?.isSignedIn && !deletingAccount;
   // Sync waits until the device's list is kept for this account, so another account's person is never sent under this token.
+  // The sync's wake listeners, so the app can ask for a pull straight away (after leaving a family, #223).
+  const syncWakers = useRef(new Set<() => void>());
+  const subscribeSync = useCallback((onWake: () => void) => {
+    const stop = subscribeToWake(onWake);
+    syncWakers.current.add(onWake);
+    return () => {
+      syncWakers.current.delete(onWake);
+      stop();
+    };
+  }, []);
+  const pullNow = useCallback(() => {
+    for (const wake of [...syncWakers.current]) {
+      wake();
+    }
+  }, []);
   const flowSync = useFlowSync({
     sessions: sessionList,
     userId: auth?.userId ?? '',
     getAccessToken: memberToken,
     enabled: syncOn && sessions.heldFor === auth?.userId,
     storage: browserStorage,
-    subscribe: subscribeToWake,
+    subscribe: subscribeSync,
     applyRemoteFlows: sessions.applyRemoteFlows,
   });
 
@@ -1111,6 +1126,27 @@ function AppBody({
       }
     })();
   }, [joinOn, joinToken, offline, signedIn, getAccessToken, reloadProfile, refreshMembers, navigate, leaveJoinPath]);
+
+  // Stop helping (#223). Once the server says this person is not a member (or already was not), the
+  // shared people and their drafts leave this device straight away, without waiting on a pull: an empty
+  // list drops 'member' sessions only, never 'owner' ones. The pull then brings the account's own
+  // list, and the profile reload brings back "Create a new one". Offline or other failures change nothing.
+  const membersLeave = members.leave;
+  const applyRemoteFlows = sessions.applyRemoteFlows;
+  const heldFor = sessions.heldFor;
+  const leaveFamily = useCallback(async (): Promise<LeaveOutcome> => {
+    const outcome = await membersLeave();
+    if (outcome === 'ok' || outcome === 'not_a_member') {
+      const userId = auth?.userId ?? '';
+      // Only while the list is this account's, so another account's shared people are never touched.
+      if (userId !== '' && heldFor === userId) {
+        applyRemoteFlows({ flows: [] }, userId);
+      }
+      pullNow();
+      reloadProfile?.();
+    }
+    return outcome;
+  }, [membersLeave, applyRemoteFlows, heldFor, auth?.userId, pullNow, reloadProfile]);
 
   // The joined note: filled a moment after the owner's name is known, so the region is in the page first
   // and the words are announced. It ends once the person has seen it and moved to another page.
@@ -1990,6 +2026,7 @@ function AppBody({
               message={members.message}
               onInvite={members.invite}
               onRevoke={members.revoke}
+              onLeave={leaveFamily}
             />
           ) : undefined
         }
@@ -2030,6 +2067,7 @@ function AppBody({
                 message={members.message}
                 onInvite={members.invite}
                 onRevoke={members.revoke}
+                onLeave={leaveFamily}
               />
             ) : undefined
           }
