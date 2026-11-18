@@ -149,7 +149,8 @@ export async function removeMember(
   throw new Error(`removeMember: unexpected failed condition at ${result.failedIndex}.`);
 }
 
-// Positions in the leaveFamily transaction.
+// Positions in the leaveFamily transaction. Items 1 (MEMBER# delete) and 3 (owner version bump) have
+// no condition, so they can never be the failed index.
 const LEAVE_MEMBER_OF = 0;
 const LEAVE_PROFILE = 2;
 
@@ -202,6 +203,7 @@ export async function leaveFamily(
     if (result.status === 'busy') {
       return { ok: false, code: 'busy' };
     }
+    // Both conditioned items (LEAVE_MEMBER_OF, LEAVE_PROFILE) re-run, so a failure never reaches here.
     throw new Error(`leaveFamily: unexpected failed condition at ${result.failedIndex}.`);
   } catch (error) {
     if (error instanceof Refusal) {

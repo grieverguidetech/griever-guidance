@@ -9,7 +9,7 @@ import { getLive } from '../read.js';
 import { conflictDouble } from '../testing/conflictDouble.js';
 import { createTables, doc, dropTables, rawPut, table, up } from '../testing/localTable.js';
 import { createFlow, listFlows } from './flows.js';
-import { leaveFamily } from './members.js';
+import { leaveFamily, removeMember } from './members.js';
 
 // Far in the real future, so no ttl can fall due while DynamoDB Local's sweeper runs (see deleteFlow.spec).
 const clock = fixedClock('2099-10-24T12:00:00.000Z');
@@ -77,6 +77,7 @@ describe.runIf(up)('leaveFamily on DynamoDB Local', () => {
     expect(await getLive(doc, table, memberOfKey(member), clock)).toBeUndefined();
     expect(await getLive(doc, table, memberKey(owner, member), clock)).toBeUndefined();
     expect(await getProfile(doc, table, member, clock)).toMatchObject({ accountType: 'owner', version: 2 });
+    expect(await getProfile(doc, table, owner, clock)).toMatchObject({ accountType: 'owner', version: 2 });
   });
 
   it('shows 0 of the former owner flows afterwards and lets them create their own', async () => {
@@ -143,7 +144,7 @@ describe.runIf(up)('leaveFamily on DynamoDB Local', () => {
     expect(await getProfile(doc, table, member, clock)).toMatchObject({ accountType: 'owner', version: 3 });
   });
 
-  it('answers not a member when the owner removed them before the commit', async () => {
+  it('answers not a member when the owner removes them before the commit', async () => {
     const owner = uid('owner');
     const member = uid('member');
     await seedFamily(owner, member);
@@ -151,12 +152,26 @@ describe.runIf(up)('leaveFamily on DynamoDB Local', () => {
       ...noSleep,
       beforeCommit: async (attempt) => {
         if (attempt === 1) {
-          await leaveFamily(doc, table, caller(member), clock);
+          expect(await removeMember(doc, table, caller(owner), member, clock)).toEqual({ ok: true, value: null });
         }
       },
     });
     expect(result).toEqual(NOT_A_MEMBER);
+    expect(await getLive(doc, table, memberOfKey(member), clock)).toBeUndefined();
+    expect(await getLive(doc, table, memberKey(owner, member), clock)).toBeUndefined();
     expect(await getProfile(doc, table, member, clock)).toMatchObject({ accountType: 'owner', version: 2 });
+  });
+
+  it('creates an owner profile when the member has none', async () => {
+    const owner = uid('owner');
+    const member = uid('member');
+    await profile(owner);
+    await rawPut(encodeMember({ ownerId: owner, memberId: member, email: `${member}@example.test`, createdAt: at(-HOUR) }));
+    await rawPut(encodeMemberOf({ memberId: member, ownerId: owner, createdAt: at(-HOUR) }));
+    expect(await leaveFamily(doc, table, caller(member), clock)).toEqual({ ok: true, value: null });
+    expect(await getProfile(doc, table, member, clock)).toMatchObject({ accountType: 'owner', version: 1 });
+    expect(await getLive(doc, table, memberOfKey(member), clock)).toBeUndefined();
+    expect(await getLive(doc, table, memberKey(owner, member), clock)).toBeUndefined();
   });
 
   it('answers busy after three transaction conflicts and writes nothing', async () => {
