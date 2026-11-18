@@ -13,6 +13,26 @@ export interface InviteItem {
   acceptedAt?: string;
   acceptedBy?: string;
   revokedAt?: string;
+  /** Epoch seconds. DynamoDB deletes the item some time after this (see inviteTtl). Not read back. */
+  ttl?: number;
+}
+
+/** Invite items, and the email on them, are kept this long after the invite closes (#146). */
+export const INVITE_RETENTION_DAYS = 30;
+const SECONDS_PER_DAY = 24 * 60 * 60;
+
+/** The ttl (epoch seconds) that deletes an invite 30 days after `fromMs`. */
+export function inviteTtl(fromMs: number): number {
+  return Math.floor(fromMs / 1000) + INVITE_RETENTION_DAYS * SECONDS_PER_DAY;
+}
+
+/**
+ * The ttl for an invite that closes at `closedAtMs` (revoke or accept): 30 days after the close, or
+ * 30 days after expiry when that comes first. The earlier one wins, so an invite revoked after it
+ * expired keeps its expiry-based ttl.
+ */
+export function closedInviteTtl(expiresAt: string, closedAtMs: number): number {
+  return Math.min(inviteTtl(Date.parse(expiresAt)), inviteTtl(closedAtMs));
 }
 
 /**
@@ -32,6 +52,7 @@ export function encodeInvite(invite: InviteItem): Item {
     ...(invite.acceptedAt ? { acceptedAt: invite.acceptedAt } : {}),
     ...(invite.acceptedBy ? { acceptedBy: invite.acceptedBy } : {}),
     ...(invite.revokedAt ? { revokedAt: invite.revokedAt } : {}),
+    ...(invite.ttl === undefined ? {} : { ttl: invite.ttl }),
     ...(invite.acceptedBy ? refGsi(invite.acceptedBy, 'INVITE', invite.id) : {}),
   };
 }

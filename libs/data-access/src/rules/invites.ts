@@ -3,7 +3,7 @@ import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { isUuid, parseInviteEmail, type PendingInvite } from '@griever/shared';
 import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
-import { decodeInvite, encodeInvite, encodeToken, isOpen, toPendingInvite, type InviteItem } from '../items/inviteItems.js';
+import { closedInviteTtl, decodeInvite, encodeInvite, encodeToken, inviteTtl, isOpen, toPendingInvite, type InviteItem } from '../items/inviteItems.js';
 import { decodeMember } from '../items/memberItems.js';
 import { getProfile } from '../items/profileItem.js';
 import { INVITE_PREFIX, MEMBER_PREFIX, inviteKey, memberOfKey } from '../keys.js';
@@ -83,6 +83,8 @@ export async function createInvite(
           createdAt: now,
           expiresAt: new Date(nowDate.getTime() + INVITE_LIFETIME_DAYS * DAY_MS).toISOString(),
         };
+        // An open invite is deleted 30 days after it expires, unless a revoke or accept sets an earlier ttl.
+        invite.ttl = inviteTtl(Date.parse(invite.expiresAt));
         const items: TransactItem[] = [
           profileWrite(table, caller.userId, profile, now),
           { Put: { TableName: table, Item: encodeToken(tokenHash, caller.userId, invite.id), ConditionExpression: 'attribute_not_exists(pk)' } },
@@ -95,9 +97,10 @@ export async function createInvite(
             Update: {
               TableName: table,
               Key: inviteKey(caller.userId, expired.id),
-              UpdateExpression: 'SET revokedAt = :now',
+              UpdateExpression: 'SET revokedAt = :now, #ttl = :ttl',
               ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt)',
-              ExpressionAttributeValues: { ':now': now },
+              ExpressionAttributeNames: { '#ttl': 'ttl' },
+              ExpressionAttributeValues: { ':now': now, ':ttl': closedInviteTtl(expired.expiresAt, nowDate.getTime()) },
             },
           });
           retryOn.push(CREATE_RETIRE_EXPIRED);
@@ -151,15 +154,17 @@ export async function revokeInvite(
           throw new Refusal('not_found');
         }
         const now = clock.now().toISOString();
+        const ttl = closedInviteTtl(decodeInvite(item).expiresAt, clock.now().getTime());
         return {
           items: [
             {
               Update: {
                 TableName: table,
                 Key: inviteKey(caller.userId, id),
-                UpdateExpression: 'SET revokedAt = :now',
+                UpdateExpression: 'SET revokedAt = :now, #ttl = :ttl',
                 ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(revokedAt) AND attribute_not_exists(acceptedAt)',
-                ExpressionAttributeValues: { ':now': now },
+                ExpressionAttributeNames: { '#ttl': 'ttl' },
+                ExpressionAttributeValues: { ':now': now, ':ttl': ttl },
               },
             },
             bumpOwnerVersion(table, caller.userId, now),
