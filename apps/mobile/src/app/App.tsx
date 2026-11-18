@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
-import { AccessibilityInfo, BackHandler, Platform, View } from 'react-native';
+import { AccessibilityInfo, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { colors } from '@griever/tokens';
 import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
+import { useMembers, useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import { obituaryLink, sendPrefill } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
@@ -16,7 +16,7 @@ import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
-import { AccountScreen } from '../screens/AccountScreen';
+import { AccountScreen, AccountStartModeContext } from '../screens/AccountScreen';
 import { AccountProvider, useAccount, useLaunchState, useSyncAuth } from '../lib/AccountProvider';
 import { useAccountSenderName } from '../lib/accountName';
 import { useCanCreate } from '../lib/canCreate';
@@ -42,7 +42,7 @@ import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
-import { SerifReadyContext, SerifText as Text } from '../ui';
+import { Body, SerifReadyContext, SerifText as Text } from '../ui';
 import { useSerifFonts } from '../lib/serifFonts';
 import { screenTransition } from '../lib/useReduceMotion';
 import { useNoFade } from '../lib/useScreenReader';
@@ -978,10 +978,19 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
   const getToken = useSyncAuth()?.getToken;
   const [token, setToken] = useState<string | null>(null);
   const [phase, setPhase] = useState<JoinPhase | 'done' | null>(null);
-  // The person chose to create an account or sign in: the app shows its sign-in until they are signed in.
+  // The person chose to create an account or sign in: the app shows its sign-in (or sign-up) until they are signed in.
   const [askedSignIn, setAskedSignIn] = useState(false);
+  const [startMode, setStartMode] = useState<'signIn' | 'signUp'>('signIn');
+  // Joined just now: the note "You're helping {owner} now." is shown once the owner's name is known.
+  const [joinedNote, setJoinedNote] = useState(false);
+  // Counts each wish to try again, so the same token can be tried once more (a repeat link).
+  const [tries, setTries] = useState(0);
   const started = useRef(false);
   const running = useRef(false);
+  const held = useRef<string | null>(null);
+  // A token that arrives while a join runs: started after it, never lost.
+  const pending = useRef<string | null>(null);
+  const endNote = useCallback(() => setJoinedNote(false), []);
   const signedIn = !!account?.isSignedIn;
   const offline = !!account?.offline;
   const reloadProfile = account?.reloadProfile;
@@ -990,12 +999,20 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
     () =>
       watchJoinLink((found) => {
         if (running.current) {
+          if (found !== held.current) {
+            pending.current = found;
+          }
           return;
         }
+        if (found !== held.current) {
+          setAskedSignIn(false);
+          setStartMode('signIn');
+        }
+        held.current = found;
         started.current = false;
         setToken(found);
         setPhase(null);
-        setAskedSignIn(false);
+        setTries((n) => n + 1);
       }),
     [],
   );
@@ -1013,26 +1030,41 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
       return;
     }
     started.current = true;
+    running.current = true;
     setPhase('joining');
     void (async () => {
-      running.current = true;
       const outcome = await runJoin(getToken, token);
-      running.current = false;
-      if (outcome === 'offline' || outcome === 'later') {
-        setPhase(outcome);
-        return;
+      const keep = outcome === 'offline' || outcome === 'later';
+      if (!keep) {
+        // Only this token: a newer link saved meanwhile stays.
+        await clearJoinToken(token);
       }
-      await clearJoinToken();
-      setToken(null);
+      const next = pending.current;
+      pending.current = null;
       if (outcome === 'member' || outcome === 'joined') {
         // Now a member: the profile says so, so the app shows no "Create a new one".
         reloadProfile?.();
-        setPhase('done');
-        return;
       }
-      setPhase(outcome);
+      if (outcome === 'joined') {
+        setJoinedNote(true);
+      }
+      if (next !== null) {
+        held.current = next;
+        started.current = false;
+        setToken(next);
+        setPhase(null);
+        setTries((n) => n + 1);
+      } else if (keep) {
+        setPhase(outcome);
+      } else {
+        held.current = null;
+        setToken(null);
+        setPhase(outcome === 'member' || outcome === 'joined' ? 'done' : outcome);
+      }
+      running.current = false;
     })();
-  }, [token, offline, signedIn, getToken, reloadProfile]);
+    // `tries` restarts the effect for a repeat of the same link.
+  }, [token, tries, offline, signedIn, getToken, reloadProfile]);
 
   const signedOut = !!account && !account.isLoading && !signedIn && !offline;
   let screen: JoinPhase | null = null;
@@ -1045,13 +1077,64 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
       screen = 'invited';
     }
   }
-  if (screen === null) {
-    return <>{children}</>;
-  }
+  const chooseAccount = (mode: 'signIn' | 'signUp') => {
+    setStartMode(mode);
+    setAskedSignIn(true);
+  };
+  // The app stays mounted under the Join screen, so what the person had open is still there after it.
+  const hidden = screen !== null;
   return (
-    <ScreenFrame>
-      <JoinScreen phase={screen} onCreateAccount={() => setAskedSignIn(true)} onSignIn={() => setAskedSignIn(true)} onContinue={() => setPhase('done')} />
-    </ScreenFrame>
+    <View style={{ flex: 1 }}>
+      {joinedNote && getToken ? <JoinedNote getToken={getToken} onDone={endNote} /> : null}
+      <AccountStartModeContext.Provider value={startMode}>
+        <View style={{ flex: 1 }} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={hidden}>
+          {children}
+        </View>
+      </AccountStartModeContext.Provider>
+      {screen !== null ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ScreenFrame>
+            <JoinScreen phase={screen} onCreateAccount={() => chooseAccount('signUp')} onSignIn={() => chooseAccount('signIn')} onContinue={() => setPhase('done')} />
+          </ScreenFrame>
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+/**
+ * "You're helping {owner} now." after a join, as web: said once the members list names the owner. The line
+ * is in the page (a polite live region) a moment before its words, so it is read; iOS announces it too.
+ * It goes away by itself after a while.
+ */
+const JoinedNote = ({ getToken, onDone }: { getToken: () => Promise<string | null>; onDone: () => void }) => {
+  const { view } = useMembers({ getAccessToken: getToken, enabled: true });
+  const owner = view?.role === 'member' ? (view.owner.name ?? screenCopy('phonePeopleHelping').someone) : null;
+  const [text, setText] = useState('');
+  useEffect(() => {
+    if (owner === null || text !== '') {
+      return;
+    }
+    const timer = setTimeout(() => setText(fill(screenCopy('join').joinedNote, { owner })), 100);
+    return () => clearTimeout(timer);
+  }, [owner, text]);
+  useEffect(() => {
+    if (text === '') {
+      return;
+    }
+    announce(text);
+  }, [text]);
+  useEffect(() => {
+    if (text === '') {
+      return;
+    }
+    const timer = setTimeout(onDone, 10000);
+    return () => clearTimeout(timer);
+  }, [text, onDone]);
+  return (
+    <View style={{ paddingHorizontal: 24 }}>
+      <Body live>{text}</Body>
+    </View>
   );
 };
 

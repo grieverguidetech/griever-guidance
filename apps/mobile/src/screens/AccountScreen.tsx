@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { colors } from '@griever/tokens';
@@ -33,11 +33,15 @@ export function resetUnsavedName() {
 function AccountBody({
   identity,
   onBack,
+  initialMode = 'signIn',
 }: {
   identity: UseAccountResult;
   onBack: () => void;
+  initialMode?: 'signIn' | 'signUp';
 }) {
-  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [mode, setMode] = useState<'signIn' | 'signUp'>(initialMode);
+  // The invitation screen's "Create an account" can arrive after this screen is already open on sign-in.
+  useEffect(() => setMode(initialMode), [initialMode]);
   const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
   const [ended, setEnded] = useState(false);
   const explicitSignOut = useRef(false);
@@ -163,8 +167,12 @@ function LoadingOrUnavailable({ text, onBack }: { text: string; onBack: () => vo
   );
 }
 
+/** Which form signed-out people see first. The invitation screen sets it to sign-up for "Create an account". */
+export const AccountStartModeContext = createContext<'signIn' | 'signUp'>('signIn');
+
 export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSignedIn?: () => void }) {
   const identity = useAccount();
+  const startMode = useContext(AccountStartModeContext);
   // Opened as the first screen: leave once signed in and the profile call has answered (or failed), with or without a name.
   // Not before: a slow load must not drop the person onto a half-ready Home.
   // profileAnswered, not profileLoaded: a name save right after sign-up supersedes the first load, which then never sets profileLoaded.
@@ -187,7 +195,7 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
         automaticallyAdjustKeyboardInsets
       >
         {identity ? (
-          <AccountBody identity={identity} onBack={onBack} />
+          <AccountBody identity={identity} onBack={onBack} initialMode={startMode} />
         ) : (
           <LoadingOrUnavailable text={UNAVAILABLE} onBack={onBack} />
         )}

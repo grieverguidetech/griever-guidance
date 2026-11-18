@@ -37,6 +37,11 @@ describe('joinTokenFromUrl', () => {
     expect(joinTokenFromUrl(`http://web.grieversguidance.com/join#t=${TOKEN}`)).toBeNull();
   });
 
+  it('ignores an encoded key and an upper-case host', () => {
+    expect(joinTokenFromUrl(`${base}#%74=${TOKEN}`)).toBeNull();
+    expect(joinTokenFromUrl(`https://WEB.grieversguidance.com/join#t=${TOKEN}`)).toBeNull();
+  });
+
   it('ignores the custom schemes', () => {
     expect(joinTokenFromUrl(`grieversguidance://join#t=${TOKEN}`)).toBeNull();
     expect(joinTokenFromUrl(`mobile://join#t=${TOKEN}`)).toBeNull();

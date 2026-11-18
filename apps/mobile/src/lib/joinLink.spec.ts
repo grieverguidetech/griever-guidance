@@ -35,6 +35,14 @@ describe('saved token', () => {
     expect(await AsyncStorage.getItem(JOIN_STORAGE_KEY)).toBeNull();
   });
 
+  it('clear with an expected token leaves a different stored token alone', async () => {
+    await AsyncStorage.setItem(JOIN_STORAGE_KEY, JSON.stringify({ token: TOKEN, savedAt: Date.now() }));
+    await clearJoinToken('X'.repeat(43));
+    expect(await savedJoinToken()).toBe(TOKEN);
+    await clearJoinToken(TOKEN);
+    expect(await savedJoinToken()).toBeNull();
+  });
+
   it('is taken once: after clear nothing is left', async () => {
     await AsyncStorage.setItem(JOIN_STORAGE_KEY, JSON.stringify({ token: TOKEN, savedAt: Date.now() }));
     await clearJoinToken();

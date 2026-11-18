@@ -48,9 +48,19 @@ async function saveJoinToken(token: string, now: number): Promise<void> {
   }
 }
 
-/** The token is used up (joined, or refused) or not wanted (sharing off): forget it. */
-export async function clearJoinToken(): Promise<void> {
+/**
+ * The token is used up (joined, or refused) or not wanted (sharing off): forget it. With `expected`,
+ * only that token is removed: a newer link saved meanwhile stays.
+ */
+export async function clearJoinToken(expected?: string): Promise<void> {
   try {
+    if (expected !== undefined) {
+      const raw = await AsyncStorage.getItem(JOIN_STORAGE_KEY);
+      const stored = raw === null ? null : (JSON.parse(raw) as { token?: unknown }).token;
+      if (stored !== undefined && stored !== expected && raw !== null) {
+        return;
+      }
+    }
     await AsyncStorage.removeItem(JOIN_STORAGE_KEY);
   } catch {
     // Nothing to remove.

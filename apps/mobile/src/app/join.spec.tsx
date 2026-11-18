@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { AccessibilityInfo, Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UseAccountResult } from '@griever/hooks';
 import { START_FIRST } from '../screens/HomeScreen';
@@ -39,10 +39,12 @@ jest.mock('expo-auth-session', () => ({ makeRedirectUri: () => 'grieversguidance
 
 const mockAccept = jest.fn<(access: string, invite: string) => Promise<unknown>>();
 const mockGetProfile = jest.fn<(access: string) => Promise<unknown>>();
+const mockGetMembers = jest.fn<(access: string) => Promise<unknown>>();
 jest.mock('@griever/api-client', () => ({
   ...jest.requireActual<object>('@griever/api-client'),
   acceptInvite: (access: string, invite: string) => mockAccept(access, invite),
   getProfile: (access: string) => mockGetProfile(access),
+  getMembers: (access: string) => mockGetMembers(access),
 }));
 
 const { App } = require('./App') as typeof import('./App');
@@ -81,6 +83,8 @@ beforeEach(() => {
   mockLaunch = { hydrated: true, signedIn: false };
   mockAccept.mockReset();
   mockGetProfile.mockReset();
+  mockGetMembers.mockReset();
+  mockGetMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
   reload.mockReset();
   logged.mockReset();
   for (const method of ['log', 'info', 'warn', 'error'] as const) {
@@ -229,5 +233,86 @@ describe('joining from an invitation link (#232)', () => {
     render(<App />);
     await screen.findByRole('heading', { name: "This invitation can't be used" });
     expect(JSON.stringify(logged.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it('"Create an account" opens sign-up and "I already have an account" opens sign-in', async () => {
+    const { unmount } = render(<App />);
+    // The app is under the Join screen but hidden from screen readers.
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
+    fireEvent.press(await screen.findByRole('button', { name: 'Create an account' }));
+    expect(await screen.findByRole('heading', { name: 'Create an account' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull();
+    unmount();
+    mockAccount = signedOut;
+    render(<App />);
+    fireEvent.press(await screen.findByRole('button', { name: 'I already have an account' }));
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
+  });
+
+  it('keeps the app mounted under the Join screen: what was typed is still there afterwards', async () => {
+    jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(null);
+    const listeners: ((event: { url: string }) => void)[] = [];
+    jest.spyOn(Linking, 'addEventListener').mockImplementation(((_type: string, fn: (event: { url: string }) => void) => {
+      listeners.push(fn);
+      return { remove: () => undefined };
+    }) as never);
+    signInAs(signedIn);
+    mockAccept.mockResolvedValue({ ok: false, reason: 'unusable' });
+    render(<App />);
+    fireEvent.press(await screen.findByText(START_FIRST));
+    fireEvent.changeText(await screen.findByLabelText('Their name, required'), 'Ben');
+    await act(async () => listeners.forEach((fn) => fn({ url: LINK })));
+    expect(await screen.findByRole('heading', { name: "This invitation can't be used" })).toBeTruthy();
+    // Hidden from screen readers while the Join screen shows.
+    expect(screen.queryByLabelText('Their name, required')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByLabelText('Their name, required')).toHaveProp('value', 'Ben');
+  });
+
+  it('a second link during a join is not lost: the first clears only its own token, then the second is accepted', async () => {
+    jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(LINK);
+    const listeners: ((event: { url: string }) => void)[] = [];
+    jest.spyOn(Linking, 'addEventListener').mockImplementation(((_type: string, fn: (event: { url: string }) => void) => {
+      listeners.push(fn);
+      return { remove: () => undefined };
+    }) as never);
+    const SECOND = 'Yw9-' + 'm'.repeat(39);
+    let first: (r: unknown) => void = () => undefined;
+    let second: (r: unknown) => void = () => undefined;
+    mockAccept.mockImplementationOnce(() => new Promise((resolve) => (first = resolve)));
+    mockAccept.mockImplementationOnce(() => new Promise((resolve) => (second = resolve)));
+    signInAs(signedIn);
+    render(<App />);
+    await waitFor(() => expect(mockAccept).toHaveBeenCalledTimes(1));
+    await act(async () => listeners.forEach((fn) => fn({ url: `https://web.grieversguidance.com/join#t=${SECOND}` })));
+    expect(JSON.parse((await stored()) ?? 'null').token).toBe(SECOND);
+    await act(async () => first({ ok: false, reason: 'unusable' }));
+    await waitFor(() => expect(mockAccept).toHaveBeenCalledTimes(2));
+    expect(mockAccept).toHaveBeenLastCalledWith('access-token', SECOND);
+    expect(JSON.parse((await stored()) ?? 'null').token).toBe(SECOND);
+    await act(async () => second({ ok: true, ownerId: 'o1' }));
+    await waitFor(async () => expect(await stored()).toBeNull());
+  });
+
+  it('after a join says "You\'re helping Anna now." in a live region and announces it on iOS', async () => {
+    const ios = jest.replaceProperty(Platform, 'OS', 'ios');
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    announce.mockClear();
+    signInAs(signedIn);
+    mockAccept.mockResolvedValue({ ok: true, ownerId: 'o1' });
+    render(<App />);
+    const note = await screen.findByText("You're helping Anna now.", undefined, { timeout: 4000 });
+    expect(note.props.accessibilityLiveRegion).toBe('polite');
+    expect(announce).toHaveBeenCalledWith("You're helping Anna now.");
+    expect(announce.mock.calls.filter(([text]) => text === "You're helping Anna now.")).toHaveLength(1);
+    ios.restore();
+  });
+
+  it('says nothing about helping when the account was a member already', async () => {
+    signInAs(signedIn);
+    mockGetProfile.mockResolvedValue({ ok: true, profile: member });
+    render(<App />);
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    expect(screen.queryByText(/You're helping/)).toBeNull();
   });
 });

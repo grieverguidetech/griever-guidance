@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { spacing } from '@griever/tokens';
+import { announce } from '../components/authForm';
 import { Button, Heading } from '../ui';
 import { focusNode } from '../ui/focusNode';
 import { Body } from '../ui/Text';
@@ -29,11 +30,17 @@ const MESSAGES: Record<MessagePhase, { heading: string; body: string }> = {
   later: { heading: copy.laterHeading, body: copy.laterBody },
 };
 
-/** "Joining…" in a polite live region that is already on the screen, filled a moment later so it is read. */
+/**
+ * "Joining…" in a polite live region that is already on the screen, filled a moment later so it is read
+ * (Android). iOS ignores live regions, so it is announced there too (`announce` is iOS only).
+ */
 function JoiningStatus() {
   const [text, setText] = useState('');
   useEffect(() => {
-    const timer = setTimeout(() => setText(copy.joining), 50);
+    const timer = setTimeout(() => {
+      setText(copy.joining);
+      announce(copy.joining);
+    }, 50);
     return () => clearTimeout(timer);
   }, []);
   return (
@@ -72,7 +79,7 @@ export function JoinScreen({
   }
   const { heading: title, body } = phase === 'invited' ? { heading: copy.heading, body: copy.body } : MESSAGES[phase];
   return (
-    <View style={styles.screen}>
+    <ScrollView style={styles.flex} contentContainerStyle={styles.screen}>
       <Heading level={1} headingRef={heading}>
         {title}
       </Heading>
@@ -85,10 +92,11 @@ export function JoinScreen({
       ) : (
         <Button label={copy.continue} variant="secondary" onPress={onContinue} />
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 24, paddingTop: 20, gap: spacing[3] },
+  flex: { flex: 1 },
+  screen: { padding: 24, paddingTop: 20, gap: spacing[3] },
 });
