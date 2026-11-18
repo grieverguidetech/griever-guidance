@@ -111,6 +111,33 @@ describe('PersonSection', () => {
     expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: '6' });
   });
 
+  it.each([
+    ['3/3/1900', 'March 3, 1900'],
+    ['3/3/1925', 'March 3, 1925'],
+    ['3/3/1940', 'March 3, 1940'],
+    ['3/3/1999', 'March 3, 1999'],
+    ['3/3/2000', 'March 3, 2000'],
+  ])('tidies a birth date typed as %s on blur', async (typed, tidy) => {
+    const { onChange } = setup({ birthDate: typed });
+    await userEvent.click(screen.getByLabelText(/Date of birth/));
+    await userEvent.tab();
+    expect(onChange).toHaveBeenLastCalledWith({ birthDate: tidy });
+  });
+
+  it('tidies a date they passed before 2000 on blur', async () => {
+    const { onChange } = setup({ dateOfPassing: '5/29/1985' });
+    await userEvent.click(screen.getByLabelText(/Date they passed/));
+    await userEvent.tab();
+    expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: 'May 29, 1985' });
+  });
+
+  it('does not tidy a birth date before 1800', async () => {
+    const { onChange } = setup({ birthDate: '3/3/1750' });
+    await userEvent.click(screen.getByLabelText(/Date of birth/));
+    await userEvent.tab();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('tidies a typed date on blur', async () => {
     const { onChange } = setup({ dateOfPassing: '5/29/2020' });
     const field = screen.getByLabelText(/Date they passed/);

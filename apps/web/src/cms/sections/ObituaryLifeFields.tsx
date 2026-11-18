@@ -20,6 +20,9 @@ import {
   type SessionDetails,
 } from '@griever/shared';
 
+/** Birth and passing dates run far before 2000, so the field's default years would not tidy them. */
+const LIFE_YEARS = { minYear: 1800, maxYear: 2100 };
+
 const copy = screenCopy('cmsObituary');
 // The shared controls use Service's own labels, so the same value has the same name on both pages.
 const serviceCopy = screenCopy('cmsService');
@@ -372,6 +375,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
             id={`${id}-birthDate`}
             value={values.birthDate ?? ''}
             max={todayISO()}
+            years={LIFE_YEARS}
             visibleHelp
             describedBy={personHintId}
             {...noteProps(birthNote)}
@@ -384,6 +388,7 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
             id={`${id}-dateOfPassing`}
             value={values.dateOfPassing ?? ''}
             max={todayISO()}
+            years={LIFE_YEARS}
             visibleHelp
             describedBy={personHintId}
             {...noteProps(passingNote)}
