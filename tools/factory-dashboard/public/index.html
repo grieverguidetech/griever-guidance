@@ -121,8 +121,8 @@ h2.panel-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.0
 .panel .kpi { background: var(--bg); }
 .panel ul.list li { background: transparent; }
 progress.bar { display: block; width: 100%; height: 8px; margin: 4px 0; accent-color: var(--chart-1); }
-.panel-lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-table.plain td.text { text-align: left; }
+.panel-lines { overflow-wrap: anywhere; margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+table.plain td.text, table.plain th.text { text-align: left; font-weight: 400; }
 </style>
 </head>
 <body>
@@ -277,8 +277,8 @@ function agoText(iso) {
   if (isNaN(seconds)) {
     return "time unknown";
   }
-  if (seconds < 90) {
-    return Math.max(seconds, 0) + " s ago";
+  if (seconds < 60) {
+    return "less than a minute ago";
   }
   if (seconds < 5400) {
     return Math.round(seconds / 60) + " min ago";
@@ -289,18 +289,33 @@ function agoText(iso) {
   return Math.round(seconds / 86400) + " days ago";
 }
 
-function panel(parent, title, source) {
+// readAt and prefix are for a panel whose data was read at another time than the page (the AWS cost cache).
+function panel(parent, title, source, readAt, prefix) {
   var p = el("section", null, "panel");
   var head = el("div", null, "panel-head");
-  head.appendChild(el("h2", title, "panel-title"));
+  var h = el("h2", title, "panel-title");
+  h.id = nextId("panel");
+  p.setAttribute("aria-labelledby", h.id);
+  head.appendChild(h);
   var meta = el("span", null, "panel-meta muted");
   meta.appendChild(el("span", source, "tag"));
-  meta.appendChild(document.createTextNode(agoText(state.generatedAt)));
+  meta.appendChild(document.createTextNode(", " + (prefix || "updated") + " "));
+  var iso = readAt || state.generatedAt;
+  var t = el("time", agoText(iso));
+  t.setAttribute("datetime", iso);
+  meta.appendChild(t);
   head.appendChild(meta);
   p.appendChild(head);
   parent.appendChild(p);
   return p;
 }
+
+// The ages on the panels move forward every minute without a new fetch.
+setInterval(function () {
+  Array.prototype.forEach.call(document.querySelectorAll(".panel-meta time[datetime]"), function (t) {
+    t.textContent = agoText(t.getAttribute("datetime"));
+  });
+}, 60000);
 
 var NEEDS_YOU_LINES = {
   "pr-green": "Review PR #",
@@ -323,7 +338,7 @@ function renderNeedsYou(parent) {
     var ul = el("ul", null, "panel-lines");
     pageItems.forEach(function (item) {
       var li = el("li");
-      li.appendChild(link((NEEDS_YOU_LINES[item.kind] || "Do #") + item.number, item.url));
+      li.appendChild(link((NEEDS_YOU_LINES[item.kind] || "#") + item.number, item.url));
       li.appendChild(document.createTextNode(": " + item.title));
       ul.appendChild(li);
     });
@@ -983,15 +998,15 @@ function renderFactory() {
   var panel = document.getElementById("panel-factory");
   safely(panel, renderDora);
   var stages = [
-    ["Plan", [renderBoard, renderDrift, function (p) {
+    ["Plan", [renderBoard, renderRoadmap, renderDrift, function (p) {
       closedParts(p, [["Backlog review", backlogReviewBody, "backlogReview"]]);
     }]],
     ["Build", [renderCycleTime, function (p) {
       closedParts(p, [["Worktrees", worktreesBody, "worktrees"]]);
     }]],
-    ["Review", [renderThroughput]],
+    ["Review", [renderThroughput, renderHeadline, renderShipped]],
     ["Test", [renderHealthStrip, renderCiRuns]],
-    ["Release", [renderDeploysPerWeek, renderLeadTime, function (p) {
+    ["Release", [renderDeploysPerWeek, renderLeadTime, renderFlags, function (p) {
       closedParts(p, [["Deploys", deploysBody, "deploys"], ["Recent runs", runsBody, "runs"]]);
     }]],
     ["Operate", [function (p) {
@@ -1862,21 +1877,32 @@ function renderAdrs(parent) {
 }
 
 // Product panel: milestones with progress and days left, then the open issues table (10 rows a page), then launch blockers.
+function daysText(days) {
+  if (days === 0) {
+    return "due today";
+  }
+  var n = Math.abs(days);
+  return n + (n === 1 ? " day " : " days ") + (days < 0 ? "late" : "left");
+}
+
 function milestoneLine(m) {
   var li = el("li");
   li.appendChild(m.url ? link(m.title, m.url) : el("span", m.title));
   var when = m.dueDate ? "due " + m.dueDate : "no due date";
   var left = "";
   if (m.daysLeft !== null) {
-    left = m.daysLeft < 0 ? ", " + (0 - m.daysLeft) + " days late" : ", " + m.daysLeft + " days left";
+    left = ", " + daysText(m.daysLeft);
   }
   li.appendChild(el("span", " " + when + left, "muted"));
   var bar = el("progress", null, "bar");
   bar.max = Math.max(m.total, 1);
   bar.value = m.done;
-  bar.setAttribute("aria-label", m.title + ": " + m.done + " of " + m.total + " done");
+  bar.setAttribute("aria-label", m.title);
+  bar.setAttribute("aria-valuetext", m.done + " of " + m.total + " done");
   li.appendChild(bar);
-  li.appendChild(el("span", m.done + " of " + m.total + " done", "muted"));
+  var count = el("span", m.done + " of " + m.total + " done", "muted");
+  count.setAttribute("aria-hidden", "true");
+  li.appendChild(count);
   return li;
 }
 
@@ -1898,7 +1924,7 @@ function renderMilestones(parent) {
 }
 
 function issueTable(rows) {
-  var box = scrollBox("Open issues");
+  var box = scrollBox("Open issues table");
   var table = el("table", null, "plain");
   table.appendChild(el("caption", "Open issues", "sr-only"));
   var head = el("tr");
@@ -1910,11 +1936,13 @@ function issueTable(rows) {
   table.appendChild(head);
   rows.forEach(function (row) {
     var tr = el("tr");
-    var id = el("th");
-    id.scope = "row";
+    var id = el("td", null, "text");
     id.appendChild(link("#" + row.number, row.url));
     tr.appendChild(id);
-    tr.appendChild(el("td", row.title, "text"));
+    var title = el("th", row.title);
+    title.scope = "row";
+    title.className = "text";
+    tr.appendChild(title);
     tr.appendChild(el("td", row.owner, "text"));
     tr.appendChild(el("td", row.state, "text"));
     tr.appendChild(el("td", row.priority, "text"));
@@ -1958,8 +1986,10 @@ function renderLastCiRuns(parent) {
   var recent = h.strip.slice(-5).reverse();
   var c = card();
   c.appendChild(listOf(recent, function (li, mark) {
-    li.appendChild(ciDot(mark.result === "pass" ? "green" : mark.result === "fail" ? "red" : "none"));
-    li.appendChild(document.createTextNode(" " + mark.text + " "));
+    var dot = el("span", null, "dot " + (mark.result === "pass" ? "green" : mark.result === "fail" ? "red" : ""));
+    dot.setAttribute("aria-hidden", "true");
+    li.appendChild(dot);
+    li.appendChild(document.createTextNode(mark.text + " "));
     li.appendChild(link(when(mark.createdAt), mark.url));
   }, "No CI runs on main."));
   s.appendChild(c);
@@ -1973,7 +2003,8 @@ function renderEngineeringPanel(parent) {
 }
 
 function renderInfraPanel(parent) {
-  var p = panel(parent, "Infra and cost", "AWS, API health, GitHub Actions");
+  var read = state.cost && state.cost.checkedAt ? state.cost.checkedAt : null;
+  var p = panel(parent, "Infra and cost", "AWS, API health, GitHub Actions", read, read ? "AWS cost read" : "updated");
   allAreasNote(p);
   safely(p, renderInfra);
 }
@@ -2011,7 +2042,10 @@ function renderCto() {
     var g = grid("cols-2");
     g.className += " spaced";
     pair.forEach(function (draw) {
-      safely(g, draw);
+      var cell = el("div");
+      cell.style.minWidth = "0";
+      g.appendChild(cell);
+      safely(cell, draw);
     });
     panelNode.appendChild(g);
   });

@@ -1321,6 +1321,11 @@ export interface MilestoneView {
   percent: number;
 }
 
+// Today's date in America/Chicago. A milestone's due_on is a UTC time (about 07:00), so its UTC date is compared with this.
+function chicagoDay(now: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(now);
+}
+
 function dayNumber(isoDate: string): number {
   return Math.floor(Date.parse(isoDate.slice(0, 10) + 'T00:00:00Z') / DAY_MS);
 }
@@ -1333,7 +1338,7 @@ export function buildMilestones(list: Milestone[], now: Date): MilestoneView[] {
       title: m.title,
       url: m.url,
       dueDate: m.dueOn,
-      daysLeft: m.dueOn === null ? null : dayNumber(m.dueOn) - dayNumber(localDay(now)),
+      daysLeft: m.dueOn === null ? null : dayNumber(m.dueOn) - dayNumber(chicagoDay(now)),
       done: m.closed,
       total,
       percent: total === 0 ? 0 : Math.round((100 * m.closed) / total),
@@ -1372,7 +1377,7 @@ export function buildIssueRows(openIssues: Issue[], board: BoardItem[], boardLoa
       url: issue.url,
       owner: issue.assignee || 'Unassigned',
       state: boardLoaded ? (statuses.get(issue.number) ?? NO_STATUS) : 'Unknown',
-      priority: capitalize(issue.labels.find((label) => label.startsWith('priority:'))?.slice('priority:'.length) ?? 'none'),
+      priority: capitalize(issue.labels.find((label) => label.startsWith('priority:'))?.slice('priority:'.length) ?? 'not set'),
     }))
     .sort((a, b) => rank(a) - rank(b) || a.number - b.number);
 }
