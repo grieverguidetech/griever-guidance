@@ -5,7 +5,7 @@ import { join } from 'node:path';
 type IntentFilter = {
   action?: string;
   autoVerify?: boolean;
-  data?: { scheme?: string; host?: string; pathPrefix?: string }[];
+  data?: { scheme?: string; host?: string; path?: string }[];
   category?: string[];
 };
 
@@ -29,7 +29,7 @@ describe('app links for invite links (#231)', () => {
     expect(match).toBeDefined();
     expect(match?.action).toBe('VIEW');
     expect(match?.autoVerify).toBe(true);
-    expect(match?.data).toEqual([{ scheme: 'https', host: 'web.grieversguidance.com', pathPrefix: '/join' }]);
+    expect(match?.data).toEqual([{ scheme: 'https', host: 'web.grieversguidance.com', path: '/join' }]);
     expect(match?.category).toEqual(expect.arrayContaining(['BROWSABLE', 'DEFAULT']));
   });
 });

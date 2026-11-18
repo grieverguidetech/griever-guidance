@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
-import { AccessibilityInfo, BackHandler, Platform, View } from 'react-native';
+import { AccessibilityInfo, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { colors } from '@griever/tokens';
 import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
+import { useMembers, useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
 import { obituaryLink, sendPrefill } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
@@ -17,10 +17,13 @@ import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
-import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
+import { AccountProvider, useAccount, useLaunchState, useSyncAuth } from '../lib/AccountProvider';
 import { useAccountSenderName } from '../lib/accountName';
 import { useCanCreate } from '../lib/canCreate';
-import { AUTH_ENABLED } from '../lib/features';
+import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
+import { clearJoinToken, runJoin, watchJoinLink } from '../lib/joinLink';
+import { JoinScreen } from '../screens/JoinScreen';
+import type { JoinPhase } from '../screens/JoinScreen';
 import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
 import { sendNote } from '../lib/sendNote';
@@ -39,7 +42,7 @@ import { CATEGORY_BY_MOMENT, HubScreen } from '../screens/HubScreen';
 import { SetupScreen } from '../screens/SetupScreen';
 import { announce } from '../components/authForm';
 import { ContactsStepScreen } from '../screens/ContactsStepScreen';
-import { SerifReadyContext, SerifText as Text } from '../ui';
+import { Body, SerifReadyContext, SerifText as Text } from '../ui';
 import { useSerifFonts } from '../lib/serifFonts';
 import { screenTransition } from '../lib/useReduceMotion';
 import { useNoFade } from '../lib/useScreenReader';
@@ -961,6 +964,216 @@ const SendAppWhenReady = () => {
   );
 };
 
+/** An invitation link is used only with accounts and sharing both on; with either off it is discarded. */
+const JOIN_ON = AUTH_ENABLED && SHARING_ENABLED;
+
+/**
+ * Joining from an invitation link (#232), as web's Join (#128). Stands in front of the app while a
+ * saved link waits: signed out it offers sign-in; signed in it accepts the invitation once, then the
+ * app opens as a member. A refusal says so and drops the link; no connection keeps it. The token
+ * is only ever passed to acceptInvite (see lib/joinLink).
+ */
+const JoinGate = ({ children }: { children: ReactNode }) => {
+  const account = useAccount();
+  const getToken = useSyncAuth()?.getToken;
+  const [token, setToken] = useState<string | null>(null);
+  const [phase, setPhase] = useState<JoinPhase | 'done' | null>(null);
+  // The person chose to create an account or sign in: the app shows its sign-in (or sign-up) until they are signed in.
+  const [askedSignIn, setAskedSignIn] = useState(false);
+  const [startMode, setStartMode] = useState<'signIn' | 'signUp'>('signIn');
+  // Joined just now: the note "You're helping {owner} now." is shown once the owner's name is known.
+  const [joinedNote, setJoinedNote] = useState(false);
+  // Counts each wish to try again, so the same token can be tried once more (a repeat link).
+  const [tries, setTries] = useState(0);
+  const started = useRef(false);
+  const running = useRef(false);
+  const held = useRef<string | null>(null);
+  // A token that arrives while a join runs: started after it, never lost.
+  const pending = useRef<string | null>(null);
+  const endNote = useCallback(() => setJoinedNote(false), []);
+  const signedIn = !!account?.isSignedIn;
+  const offline = !!account?.offline;
+  const reloadProfile = account?.reloadProfile;
+
+  /** Starts over with a link: one place for the listener and the pending path. A different token drops the sign-in choice. */
+  const adopt = useCallback((found: string) => {
+    if (found !== held.current) {
+      setAskedSignIn(false);
+      setStartMode('signIn');
+    }
+    held.current = found;
+    started.current = false;
+    setToken(found);
+    setPhase(null);
+    setTries((n) => n + 1);
+  }, []);
+
+  useEffect(
+    () =>
+      watchJoinLink((found) => {
+        if (running.current) {
+          if (found !== held.current) {
+            pending.current = found;
+          }
+          return;
+        }
+        adopt(found);
+      }),
+    [adopt],
+  );
+
+  // Signed in: the sign-in choice is spent, so a later sign-out opens sign-in.
+  useEffect(() => {
+    if (signedIn) {
+      setAskedSignIn(false);
+      setStartMode('signIn');
+    }
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (token === null || started.current) {
+      return;
+    }
+    if (offline) {
+      started.current = true;
+      setPhase('offline');
+      return;
+    }
+    if (!signedIn || !getToken) {
+      return;
+    }
+    started.current = true;
+    running.current = true;
+    setPhase('joining');
+    void (async () => {
+      const outcome = await runJoin(getToken, token);
+      const keep = outcome === 'offline' || outcome === 'later';
+      if (!keep) {
+        // Only this token: a newer link saved meanwhile stays.
+        await clearJoinToken(token);
+      }
+      const next = pending.current;
+      pending.current = null;
+      if (outcome === 'member' || outcome === 'joined') {
+        // Now a member: the profile says so, so the app shows no "Create a new one".
+        reloadProfile?.();
+      }
+      if (outcome === 'joined') {
+        setJoinedNote(true);
+      }
+      if (next !== null) {
+        adopt(next);
+      } else if (keep) {
+        setPhase(outcome);
+      } else {
+        held.current = null;
+        setToken(null);
+        setPhase(outcome === 'member' || outcome === 'joined' ? 'done' : outcome);
+      }
+      running.current = false;
+    })();
+    // `tries` restarts the effect for a repeat of the same link.
+  }, [token, tries, offline, signedIn, getToken, reloadProfile, adopt]);
+
+  const signedOut = !!account && !account.isLoading && !signedIn && !offline;
+  let screen: JoinPhase | null = null;
+  if (phase !== null && phase !== 'done') {
+    screen = phase;
+  } else if (phase === null && token !== null) {
+    if (signedIn && !offline) {
+      screen = 'joining';
+    } else if (signedOut && !askedSignIn) {
+      screen = 'invited';
+    }
+  }
+  const chooseAccount = (mode: 'signIn' | 'signUp') => {
+    setStartMode(mode);
+    setAskedSignIn(true);
+  };
+  // After the choice, the sign-in or sign-up form shows here, whatever the app underneath is on (it may be on Home).
+  const accountOverlay = phase === null && token !== null && signedOut && askedSignIn;
+  // The app stays mounted under the overlay, so what the person had open is still there after it.
+  const hidden = screen !== null || accountOverlay;
+  // Android Back must not reach the hidden app: it steps back inside the overlay, or does nothing.
+  useEffect(() => {
+    if (!hidden) {
+      return;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (accountOverlay) {
+        setAskedSignIn(false);
+      } else if (screen !== null && screen !== 'invited' && screen !== 'joining') {
+        setPhase('done');
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [hidden, accountOverlay, screen]);
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={hidden}>
+        {children}
+      </View>
+      {accountOverlay ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ScreenFrame>
+            <AccountScreen initialMode={startMode} onBack={() => setAskedSignIn(false)} />
+          </ScreenFrame>
+        </View>
+      ) : null}
+      {screen !== null ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ScreenFrame>
+            <JoinScreen phase={screen} onCreateAccount={() => chooseAccount('signUp')} onSignIn={() => chooseAccount('signIn')} onContinue={() => setPhase('done')} />
+          </ScreenFrame>
+        </View>
+      ) : null}
+      {joinedNote && getToken ? <JoinedNote getToken={getToken} onDone={endNote} /> : null}
+    </View>
+  );
+};
+
+/**
+ * "You're helping {owner} now." after a join, as web: said once the members list names the owner. The line
+ * is in the page (a polite live region) a moment before its words, so it is read; iOS announces it too.
+ * It goes away by itself after a while.
+ */
+const JoinedNote = ({ getToken, onDone }: { getToken: () => Promise<string | null>; onDone: () => void }) => {
+  const { view, status } = useMembers({ getAccessToken: getToken, enabled: true });
+  const insets = useSafeAreaInsets();
+  const someone = screenCopy('phonePeopleHelping').someone;
+  // The owner's name, or the plain fallback when the list cannot be read.
+  const failed = status === 'offline' || status === 'unavailable' || status === 'signed_out';
+  const owner = view?.role === 'member' ? (view.owner.name ?? someone) : failed ? someone : null;
+  const [text, setText] = useState('');
+  useEffect(() => {
+    if (owner === null || text !== '') {
+      return;
+    }
+    const timer = setTimeout(() => setText(fill(screenCopy('join').joinedNote, { owner })), 100);
+    return () => clearTimeout(timer);
+  }, [owner, text]);
+  useEffect(() => {
+    if (text !== '') {
+      announce(text);
+    }
+  }, [text]);
+  // Ends 10 seconds after the join, whether or not the words ever arrived.
+  useEffect(() => {
+    const timer = setTimeout(onDone, 10000);
+    return () => clearTimeout(timer);
+  }, [onDone]);
+  // A banner over the top of the app: it never moves the app. Empty until its words arrive, so the live region is there first.
+  return (
+    <View
+      pointerEvents="none"
+      style={[{ position: 'absolute', top: 0, left: 0, right: 0 }, text !== '' && { backgroundColor: colors.bg, paddingTop: insets.top + 8, paddingBottom: 8, paddingHorizontal: 24 }]}
+    >
+      <Body live>{text}</Body>
+    </View>
+  );
+};
+
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
   const fontsSettled = useSerifFonts();
@@ -1003,12 +1216,18 @@ export const App = () => {
   ) : (
     <SendAppWhenReady />
   );
+  // Accounts or sharing off: a saved invitation link is thrown away and the app is as it was.
+  useEffect(() => {
+    if (!JOIN_ON) {
+      void clearJoinToken();
+    }
+  }, []);
   // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
     <SafeAreaProvider>
       <SerifReadyContext.Provider value={fontsSettled}>
         {AUTH_ENABLED ? (
-          <AccountProvider>{content}</AccountProvider>
+          <AccountProvider>{JOIN_ON ? <JoinGate>{content}</JoinGate> : content}</AccountProvider>
         ) : (
           content
         )}

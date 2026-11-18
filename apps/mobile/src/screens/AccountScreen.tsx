@@ -33,11 +33,13 @@ export function resetUnsavedName() {
 function AccountBody({
   identity,
   onBack,
+  initialMode = 'signIn',
 }: {
   identity: UseAccountResult;
   onBack: () => void;
+  initialMode?: 'signIn' | 'signUp';
 }) {
-  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [mode, setMode] = useState<'signIn' | 'signUp'>(initialMode);
   const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
   const [ended, setEnded] = useState(false);
   const explicitSignOut = useRef(false);
@@ -163,7 +165,8 @@ function LoadingOrUnavailable({ text, onBack }: { text: string; onBack: () => vo
   );
 }
 
-export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSignedIn?: () => void }) {
+/** `initialMode` is the form signed-out people see first; the invitation screen asks for sign-up. */
+export function AccountScreen({ onBack, onSignedIn, initialMode }: { onBack: () => void; onSignedIn?: () => void; initialMode?: 'signIn' | 'signUp' }) {
   const identity = useAccount();
   // Opened as the first screen: leave once signed in and the profile call has answered (or failed), with or without a name.
   // Not before: a slow load must not drop the person onto a half-ready Home.
@@ -187,7 +190,7 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
         automaticallyAdjustKeyboardInsets
       >
         {identity ? (
-          <AccountBody identity={identity} onBack={onBack} />
+          <AccountBody identity={identity} onBack={onBack} initialMode={initialMode} />
         ) : (
           <LoadingOrUnavailable text={UNAVAILABLE} onBack={onBack} />
         )}
