@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="1024" height="1024">
+  <rect width="64" height="64" fill="#ffffff"/>
+  <!-- Brand mark from apps/web/public/brand/mark.svg (light colors). -->
+  <g transform="translate(8.00 3.50) scale(0.75)">
+    <path fill="#006786" d="M12 40a20 20 0 0 1 40 0z"/>
+    <path d="M6 46h52M18 54h28" fill="none" stroke="#201e1d" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>
