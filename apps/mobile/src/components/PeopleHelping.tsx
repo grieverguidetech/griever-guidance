@@ -4,16 +4,19 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { fill, screenCopy } from '@griever/copy';
 import { useMembers } from '@griever/hooks';
+import type { LeaveOutcome } from '@griever/hooks';
 import { parseInviteEmail } from '@griever/shared';
 import { spacing } from '@griever/tokens';
 import { SHARING_ENABLED } from '../lib/features';
 import { useSyncAuth } from '../lib/AccountProvider';
+import { announceLeftFamily } from '../lib/leftFamily';
 import { Button } from '../ui/Button';
 import { focusNode } from '../ui/focusNode';
 import { Heading } from '../ui/Heading';
 import { Status } from '../ui/Status';
 import { Body } from '../ui/Text';
 import { LabelledInput } from './AddressFields';
+import { LeaveFamilyPanel } from './LeaveFamilyPanel';
 import { RemoveMemberPanel } from './RemoveMemberPanel';
 
 const copy = screenCopy('phonePeopleHelping');
@@ -28,17 +31,25 @@ function formatDate(iso: string): string {
  * on, sharing is on, the person is signed in and the session has not ended. Emails are typed or
  * shown, never picked from contacts (C3, C6).
  */
-export function PeopleHelping({ sessionEnded }: { sessionEnded: boolean }) {
+export function PeopleHelping({ sessionEnded, reloadProfile }: { sessionEnded: boolean; reloadProfile?: () => void }) {
   const auth = useSyncAuth();
   if (!SHARING_ENABLED || sessionEnded || !auth || auth.status !== 'signed_in') {
     return null;
   }
-  return <PeopleHelpingSection key={auth.userId ?? ''} getToken={auth.getToken} />;
+  return <PeopleHelpingSection key={auth.userId ?? ''} userId={auth.userId ?? ''} getToken={auth.getToken} reloadProfile={reloadProfile} />;
 }
 
-function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | null> }) {
+function PeopleHelpingSection({
+  userId,
+  getToken,
+  reloadProfile,
+}: {
+  userId: string;
+  getToken: () => Promise<string | null>;
+  reloadProfile?: () => void;
+}) {
   const statusId = useId();
-  const { view, status, message, invite, revoke, remove } = useMembers({ getAccessToken: getToken, enabled: true });
+  const { view, status, message, invite, revoke, remove, leave } = useMembers({ getAccessToken: getToken, enabled: true });
   const owner = view?.role === 'owner' ? view : null;
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
@@ -53,6 +64,16 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const visibleMembers = owner ? owner.members.filter((member) => !removedIds.includes(member.id)) : [];
   const [cancellingIds, setCancellingIds] = useState<string[]>([]);
+  // True from a leave that worked until the owner's view arrives; then focus moves and the line is said.
+  const [leftPending, setLeftPending] = useState(false);
+  const leftSaid = useRef(false);
+  // The owner's name, kept after the view turns owner for the line said once the leave worked.
+  const ownerName = useRef('');
+  if (view?.role === 'member') {
+    ownerName.current = view.owner.name ?? copy.someone;
+  }
+  // The leave's own failure line: offline says so in our words instead of the hook's.
+  const [leaveOffline, setLeaveOffline] = useState(false);
   const sendingRef = useRef(false);
   const cancelling = useRef(new Set<string>());
   const emailInput = useRef<ComponentRef<typeof TextInput> | null>(null);
@@ -85,6 +106,36 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
     // Only when a removal finishes, not when the list changes later.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [removeCount]);
+
+  // Once the owner's view is there the member block is gone: focus the section heading and say it worked.
+  const isOwner = owner !== null;
+  useEffect(() => {
+    if (!leftPending || !isOwner || leftSaid.current) {
+      return;
+    }
+    // A ref, not state: changing state here would run this effect's cleanup and cancel the focus timer.
+    leftSaid.current = true;
+    setNotice(fill(copy.left, { owner: ownerName.current }));
+    const timer = setTimeout(() => focusNode(sectionHeading.current), 0);
+    return () => clearTimeout(timer);
+  }, [leftPending, isOwner]);
+
+  async function leaveFamily(): Promise<LeaveOutcome> {
+    setNotice(null);
+    setLeaveOffline(false);
+    leftSaid.current = false;
+    setLeftPending(false);
+    const outcome = await leave();
+    if (outcome === 'ok' || outcome === 'not_a_member') {
+      setLeftPending(true);
+      // The shared people go from the device first; then a pull is asked for and the profile reloaded (role decides C11).
+      announceLeftFamily(userId);
+      reloadProfile?.();
+    } else if (outcome === 'offline') {
+      setLeaveOffline(true);
+    }
+    return outcome;
+  }
 
   async function send() {
     if (sendingRef.current) {
@@ -139,11 +190,24 @@ function PeopleHelpingSection({ getToken }: { getToken: () => Promise<string | n
   }
 
   // Both lines show: a sent or cancelled notice and a failed reload can be true together.
-  const statusLine = [notice, message].filter(Boolean).join(' ') || undefined;
+  const statusLine = (leaveOffline ? copy.leaveOffline : [notice, message].filter(Boolean).join(' ')) || undefined;
 
   return (
     <View style={styles.group}>
       {view?.role === 'member' ? <Body>{fill(copy.memberLine, { owner: view.owner.name ?? copy.someone })}</Body> : null}
+      {view?.role === 'member' ? (
+        <LeaveFamilyPanel
+          copy={{
+            openLabel: fill(copy.leaveButton, { owner: ownerName.current }),
+            heading: fill(copy.leaveHeading, { owner: ownerName.current }),
+            body: fill(copy.leaveConfirm, { owner: ownerName.current }),
+            action: copy.leaveAction,
+            keep: copy.leaveKeep,
+            leaving: copy.leaving,
+          }}
+          onLeave={leaveFamily}
+        />
+      ) : null}
       {owner ? (
         <>
           <Heading level={2} headingRef={sectionHeading}>

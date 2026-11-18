@@ -3,7 +3,7 @@
   "title": "Copy for People helping you on the phone's Your account (the same words as web)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["heading", "intro", "helpingHeading", "invitedHeading", "invitedLine", "memberLine", "someone", "loading", "emailLabel", "sendButton", "sending", "emailInvalid", "sent", "cancelled", "cancelling", "cancelButton", "cancelLabel", "removeButton", "removeConfirm", "removeAction", "removeKeep", "removing", "removed", "removeKeepLabel"],
+  "required": ["heading", "intro", "helpingHeading", "invitedHeading", "invitedLine", "memberLine", "someone", "loading", "emailLabel", "sendButton", "sending", "emailInvalid", "sent", "cancelled", "cancelling", "cancelButton", "cancelLabel", "removeButton", "removeConfirm", "removeAction", "removeKeep", "removing", "removed", "removeKeepLabel", "leaveButton", "leaveHeading", "leaveConfirm", "leaveAction", "leaveKeep", "leaving", "leaveOffline", "left"],
   "properties": {
     "heading": { "$ref": "#/$defs/text" },
     "intro": { "$ref": "#/$defs/text" },
@@ -28,7 +28,15 @@
     "removeKeep": { "$ref": "#/$defs/text" },
     "removing": { "$ref": "#/$defs/text" },
     "removed": { "$ref": "#/$defs/text" },
-    "removeKeepLabel": { "$ref": "#/$defs/text" }
+    "removeKeepLabel": { "$ref": "#/$defs/text" },
+    "leaveButton": { "$ref": "#/$defs/text" },
+    "leaveHeading": { "$ref": "#/$defs/text" },
+    "leaveConfirm": { "$ref": "#/$defs/text" },
+    "leaveAction": { "$ref": "#/$defs/text" },
+    "leaveKeep": { "$ref": "#/$defs/text" },
+    "leaving": { "$ref": "#/$defs/text" },
+    "leaveOffline": { "$ref": "#/$defs/text" },
+    "left": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }
