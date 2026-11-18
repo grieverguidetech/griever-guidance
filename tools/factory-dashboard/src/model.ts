@@ -25,6 +25,8 @@ export interface Issue {
   summary?: string;
   // Issue numbers from the "### Depends on" section. Only the numbers are kept, never the body.
   dependsOn?: number[];
+  // Login of the first assignee. Only on open issues.
+  assignee?: string | null;
 }
 
 export interface Pr {
@@ -1252,6 +1254,7 @@ export interface ProductInput {
   board: BoardItem[];
   labelsFor: (issue: number | null) => string[];
   issueSummaryFor: (issue: number | null) => string;
+  milestones: Milestone[];
   now: Date;
 }
 
@@ -1277,8 +1280,101 @@ export function buildProduct(input: ProductInput) {
     launchBlockers,
     roadmap,
     roadmapStacks: roadmap === null ? null : roadmapStacks(roadmap),
+    milestones: input.sources['milestones']?.ok ? buildMilestones(input.milestones, input.now) : null,
+    issueRows: input.sources['openIssues']?.ok ? buildIssueRows(input.openIssues, input.board, !!input.sources['board']?.ok) : null,
     blockedBy,
   };
+}
+
+export interface Milestone {
+  title: string;
+  url: string;
+  dueOn: string | null;
+  open: number;
+  closed: number;
+}
+
+// Reads `gh api repos/.../milestones` (REST). A reply that is not a list is an error, not an empty list.
+export function parseMilestones(raw: unknown): Milestone[] {
+  if (!Array.isArray(raw)) {
+    throw new Error('Milestones reply was not a list');
+  }
+  return raw.map((entry) => {
+    const m = entry as { title?: string; html_url?: string; due_on?: string | null; open_issues?: number; closed_issues?: number };
+    return {
+      title: String(m.title ?? ''),
+      url: String(m.html_url ?? ''),
+      dueOn: typeof m.due_on === 'string' ? m.due_on.slice(0, 10) : null,
+      open: Number(m.open_issues ?? 0),
+      closed: Number(m.closed_issues ?? 0),
+    };
+  });
+}
+
+export interface MilestoneView {
+  title: string;
+  url: string;
+  dueDate: string | null;
+  daysLeft: number | null;
+  done: number;
+  total: number;
+  percent: number;
+}
+
+function dayNumber(isoDate: string): number {
+  return Math.floor(Date.parse(isoDate.slice(0, 10) + 'T00:00:00Z') / DAY_MS);
+}
+
+// Days from today (local date) to the due date. Negative means late. Soonest due date first, no date last.
+export function buildMilestones(list: Milestone[], now: Date): MilestoneView[] {
+  const views = list.map((m) => {
+    const total = m.open + m.closed;
+    return {
+      title: m.title,
+      url: m.url,
+      dueDate: m.dueOn,
+      daysLeft: m.dueOn === null ? null : dayNumber(m.dueOn) - dayNumber(localDay(now)),
+      done: m.closed,
+      total,
+      percent: total === 0 ? 0 : Math.round((100 * m.closed) / total),
+    };
+  });
+  return views.sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
+}
+
+export interface IssueRow {
+  number: number;
+  title: string;
+  url: string;
+  owner: string;
+  state: string;
+  priority: string;
+}
+
+const PRIORITY_ORDER = ['high', 'medium', 'low'];
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Open issues for the Product table: assignee (else Unassigned), board status and the priority:* label.
+// If the board did not load, the state is Unknown (the rest of the row is still right).
+export function buildIssueRows(openIssues: Issue[], board: BoardItem[], boardLoaded: boolean): IssueRow[] {
+  const statuses = statusByNumber(board);
+  const rank = (row: IssueRow): number => {
+    const found = PRIORITY_ORDER.indexOf(row.priority.toLowerCase());
+    return found < 0 ? PRIORITY_ORDER.length : found;
+  };
+  return openIssues
+    .map((issue) => ({
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      owner: issue.assignee || 'Unassigned',
+      state: boardLoaded ? (statuses.get(issue.number) ?? NO_STATUS) : 'Unknown',
+      priority: capitalize(issue.labels.find((label) => label.startsWith('priority:'))?.slice('priority:'.length) ?? 'none'),
+    }))
+    .sort((a, b) => rank(a) - rank(b) || a.number - b.number);
 }
 
 export const CI_HEALTH_RUNS = 30;

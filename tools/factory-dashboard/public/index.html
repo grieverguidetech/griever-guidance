@@ -111,6 +111,18 @@ svg.strip { display: block; width: 100%; height: auto; max-height: 56px; overflo
 .strip-ends { display: flex; justify-content: space-between; font-size: 13px; margin-top: 2px; }
 .pr-summary { color: var(--muted); font-size: 13px; }
 ul.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); font-size: 13px; }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 12px; min-width: 0; }
+.grid > .panel { margin-top: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
+h2.panel-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0; }
+.panel-meta { font-size: 13px; }
+.panel section { margin-top: 12px; }
+.panel .card:not(.kpi) { border: 0; padding: 0; }
+.panel .kpi { background: var(--bg); }
+.panel ul.list li { background: transparent; }
+progress.bar { display: block; width: 100%; height: 8px; margin: 4px 0; accent-color: var(--chart-1); }
+.panel-lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+table.plain td.text { text-align: left; }
 </style>
 </head>
 <body>
@@ -259,9 +271,45 @@ function lowerSection(parent, title, key) {
   return d;
 }
 
+// A panel: uppercase title, source tag and "N min ago" (the time the server read its data). The h2 holds only the title.
+function agoText(iso) {
+  var seconds = Math.round((Date.now() - Date.parse(iso)) / 1000);
+  if (isNaN(seconds)) {
+    return "time unknown";
+  }
+  if (seconds < 90) {
+    return Math.max(seconds, 0) + " s ago";
+  }
+  if (seconds < 5400) {
+    return Math.round(seconds / 60) + " min ago";
+  }
+  if (seconds < 172800) {
+    return Math.round(seconds / 3600) + " h ago";
+  }
+  return Math.round(seconds / 86400) + " days ago";
+}
+
+function panel(parent, title, source) {
+  var p = el("section", null, "panel");
+  var head = el("div", null, "panel-head");
+  head.appendChild(el("h2", title, "panel-title"));
+  var meta = el("span", null, "panel-meta muted");
+  meta.appendChild(el("span", source, "tag"));
+  meta.appendChild(document.createTextNode(agoText(state.generatedAt)));
+  head.appendChild(meta);
+  p.appendChild(head);
+  parent.appendChild(p);
+  return p;
+}
+
+var NEEDS_YOU_LINES = {
+  "pr-green": "Review PR #",
+  blocked: "Unblock #",
+  "ready-for-human": "Do #"
+};
+
 function renderNeedsYou(parent) {
-  var s = kitSection(parent, "Needs you", "prs", "h2");
-  var labels = { "pr-green": "Ready for G2", blocked: "Blocked", "ready-for-human": "Ready for human" };
+  var s = panel(parent, "Needs you", "GitHub");
   if (state.needsYou === null) {
     couldNotCheck(s, state.needsYouBlockedBy);
     return;
@@ -272,17 +320,14 @@ function renderNeedsYou(parent) {
     return;
   }
   s.appendChild(paged("needs-you", "items that need you", items, function (pageItems) {
-    var g = grid("cols-2");
+    var ul = el("ul", null, "panel-lines");
     pageItems.forEach(function (item) {
-      var c = card();
-      var line = el("div");
-      line.appendChild(el("span", labels[item.kind], "tag"));
-      line.appendChild(link("#" + item.number + " " + item.title, item.url));
-      c.appendChild(line);
-      c.appendChild(summaryLine(item));
-      g.appendChild(c);
+      var li = el("li");
+      li.appendChild(link((NEEDS_YOU_LINES[item.kind] || "Do #") + item.number, item.url));
+      li.appendChild(document.createTextNode(": " + item.title));
+      ul.appendChild(li);
     });
-    return g;
+    return ul;
   }));
 }
 
@@ -734,9 +779,9 @@ function groupTitle(parent, title) {
   parent.appendChild(el("h2", title, "group-title"));
 }
 
-// Under the Product and Business groups: the area filter does not narrow them.
+// Under a panel the area filter does not narrow.
 function allAreasNote(parent) {
-  parent.appendChild(el("p", "All areas. The area filter does not change this group.", "muted"));
+  parent.appendChild(el("p", "All areas. The area filter does not change this panel.", "muted"));
 }
 
 // Closed-by-default parts of a stage. The note says "it" for 1 part and "them" for 2 or more, and each part stays isolated.
@@ -1658,27 +1703,83 @@ function renderLinks(parent, b) {
   s.appendChild(g);
 }
 
-function renderBusiness(parent) {
-  var b = state.business;
-  if (!b) {
-    var s = el("section");
-    var src = state.sources.business;
-    if (src && src.missing) {
-      s.appendChild(el("p", "No business.json yet. Copy business.example.json to business.json and fill it in.", "muted"));
-    } else if (src && !src.ok) {
-      s.appendChild(el("p", "Could not load: " + src.error, "error"));
-    } else {
-      s.appendChild(el("p", "The business numbers are not available.", "muted"));
-    }
-    parent.appendChild(s);
+function businessMissing(parent) {
+  var src = state.sources.business;
+  if (src && src.missing) {
+    parent.appendChild(el("p", "No business.json yet. Copy business.example.json to business.json and fill it in.", "muted"));
+  } else if (src && !src.ok) {
+    parent.appendChild(el("p", "Could not load: " + src.error, "error"));
+  } else {
+    parent.appendChild(el("p", "The business numbers are not available.", "muted"));
+  }
+}
+
+// Business panel: key numbers, open decisions in one line each, next steps, cost chart, links.
+function renderOpenDecisionLines(parent, b) {
+  var s = kitSection(parent, "Open decisions", "business");
+  if (b.openDecisions.length === 0) {
+    s.appendChild(el("p", "No decisions are open.", "muted"));
     return;
   }
-  [renderDecisions, renderSteps, renderBusinessTiles, renderCosts, renderLinks].forEach(function (part) {
+  var ul = el("ul", null, "panel-lines");
+  b.openDecisions.forEach(function (d) {
+    ul.appendChild(el("li", d.question + " (" + d.owner + ")"));
+  });
+  s.appendChild(ul);
+}
+
+function renderBusinessPanel(parent) {
+  var b = state.business;
+  if (!b) {
+    businessMissing(parent);
+    return;
+  }
+  [renderBusinessTiles, renderOpenDecisionLines, renderSteps, renderCosts, renderLinks].forEach(function (part) {
     safely(parent, function (box) {
       part(box, b);
     });
   });
   parent.appendChild(el("p", "business.json updated " + b.updatedAt + ".", "muted"));
+}
+
+// Usage panel: a value with no source says "not yet" and why. Only the users count has a source today.
+var NOT_YET = "not yet";
+
+function usageRows() {
+  var b = state.business;
+  var users = b && b.users.count !== null
+    ? { value: String(b.users.count), note: b.users.date ? "as of " + b.users.date : "" }
+    : { value: NOT_YET, note: b ? "no user count in business.json yet" : "no business.json" };
+  return [
+    ["Users", users],
+    ["Sign-ups this week", { value: NOT_YET, note: "no sign-up source is connected" }],
+    ["Active families", { value: NOT_YET, note: "no usage events are collected yet" }],
+    ["Entries written", { value: NOT_YET, note: "no usage events are collected yet" }],
+    ["App installs", { value: NOT_YET, note: "no install source is connected" }]
+  ];
+}
+
+function renderUsagePanel(parent) {
+  var box = scrollBox("Usage");
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", "Usage", "sr-only"));
+  usageRows().forEach(function (row) {
+    var tr = el("tr");
+    var th = el("th", row[0]);
+    th.scope = "row";
+    tr.appendChild(th);
+    var td = el("td", row[1].value, "text");
+    if (row[1].value === NOT_YET) {
+      td.className = "text muted";
+    }
+    if (row[1].note) {
+      td.textContent = row[1].value + " (" + row[1].note + ")";
+    }
+    tr.appendChild(td);
+    table.appendChild(tr);
+  });
+  box.appendChild(table);
+  parent.appendChild(box);
 }
 
 function renderCommits(parent) {
@@ -1760,26 +1861,161 @@ function renderAdrs(parent) {
   s.appendChild(c);
 }
 
-function renderCto() {
-  var panel = document.getElementById("panel-cto");
-  safely(panel, renderNeedsYou);
-  groupTitle(panel, "Product");
-  allAreasNote(panel);
-  [renderHeadline, renderBlockers, renderShipped, renderRoadmap, renderFlags].forEach(function (part) {
-    safely(panel, part);
+// Product panel: milestones with progress and days left, then the open issues table (10 rows a page), then launch blockers.
+function milestoneLine(m) {
+  var li = el("li");
+  li.appendChild(m.url ? link(m.title, m.url) : el("span", m.title));
+  var when = m.dueDate ? "due " + m.dueDate : "no due date";
+  var left = "";
+  if (m.daysLeft !== null) {
+    left = m.daysLeft < 0 ? ", " + (0 - m.daysLeft) + " days late" : ", " + m.daysLeft + " days left";
+  }
+  li.appendChild(el("span", " " + when + left, "muted"));
+  var bar = el("progress", null, "bar");
+  bar.max = Math.max(m.total, 1);
+  bar.value = m.done;
+  bar.setAttribute("aria-label", m.title + ": " + m.done + " of " + m.total + " done");
+  li.appendChild(bar);
+  li.appendChild(el("span", m.done + " of " + m.total + " done", "muted"));
+  return li;
+}
+
+function renderMilestones(parent) {
+  var s = kitSection(parent, "Milestones", "milestones");
+  var list = state.product.milestones;
+  if (list === null) {
+    return;
+  }
+  if (list.length === 0) {
+    s.appendChild(el("p", "No milestones yet. Add one on GitHub.", "muted"));
+    return;
+  }
+  var ul = el("ul", null, "panel-lines");
+  list.forEach(function (m) {
+    ul.appendChild(milestoneLine(m));
   });
-  groupTitle(panel, "Engineering");
-  safely(panel, renderPrs);
-  safely(panel, renderCommits);
-  groupTitle(panel, "Infra and cost");
-  allAreasNote(panel);
-  safely(panel, renderInfra);
-  groupTitle(panel, "Business");
-  allAreasNote(panel);
-  safely(panel, renderBusiness);
-  groupTitle(panel, "Decisions");
-  allAreasNote(panel);
-  safely(panel, renderAdrs);
+  s.appendChild(ul);
+}
+
+function issueTable(rows) {
+  var box = scrollBox("Open issues");
+  var table = el("table", null, "plain");
+  table.appendChild(el("caption", "Open issues", "sr-only"));
+  var head = el("tr");
+  ["ID", "Issue", "Owner", "State", "Priority"].forEach(function (name) {
+    var th = el("th", name);
+    th.scope = "col";
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  rows.forEach(function (row) {
+    var tr = el("tr");
+    var id = el("th");
+    id.scope = "row";
+    id.appendChild(link("#" + row.number, row.url));
+    tr.appendChild(id);
+    tr.appendChild(el("td", row.title, "text"));
+    tr.appendChild(el("td", row.owner, "text"));
+    tr.appendChild(el("td", row.state, "text"));
+    tr.appendChild(el("td", row.priority, "text"));
+    table.appendChild(tr);
+  });
+  box.appendChild(table);
+  return box;
+}
+
+function renderIssueTable(parent) {
+  var s = kitSection(parent, "Open issues", "openIssues");
+  var rows = state.product.issueRows;
+  if (rows === null) {
+    return;
+  }
+  if (sourceFailed("board")) {
+    s.appendChild(el("p", "The board did not load, so State shows Unknown.", "error"));
+  }
+  if (rows.length === 0) {
+    s.appendChild(el("p", "No open issues.", "muted"));
+    return;
+  }
+  s.appendChild(paged("open-issues", "open issues", rows, issueTable));
+}
+
+function renderProductPanel(parent) {
+  var p = panel(parent, "Product", "GitHub milestones and issues");
+  allAreasNote(p);
+  [renderMilestones, renderIssueTable, renderBlockers].forEach(function (part) {
+    safely(p, part);
+  });
+}
+
+// Engineering panel: open PRs with CI, the last 5 CI runs on main, recent commits.
+function renderLastCiRuns(parent) {
+  var s = kitSection(parent, "Last 5 CI runs on main", "ciMain");
+  var h = state.engineering.ciHealth;
+  if (!h) {
+    return;
+  }
+  var recent = h.strip.slice(-5).reverse();
+  var c = card();
+  c.appendChild(listOf(recent, function (li, mark) {
+    li.appendChild(ciDot(mark.result === "pass" ? "green" : mark.result === "fail" ? "red" : "none"));
+    li.appendChild(document.createTextNode(" " + mark.text + " "));
+    li.appendChild(link(when(mark.createdAt), mark.url));
+  }, "No CI runs on main."));
+  s.appendChild(c);
+}
+
+function renderEngineeringPanel(parent) {
+  var p = panel(parent, "Engineering", "grieverguidetech/griever-guidance");
+  [renderPrs, renderLastCiRuns, renderCommits].forEach(function (part) {
+    safely(p, part);
+  });
+}
+
+function renderInfraPanel(parent) {
+  var p = panel(parent, "Infra and cost", "AWS, API health, GitHub Actions");
+  allAreasNote(p);
+  safely(p, renderInfra);
+}
+
+function renderDecisionsPanel(parent) {
+  var p = panel(parent, "Decisions", "docs/adr, business.json");
+  allAreasNote(p);
+  safely(p, function (box) {
+    if (state.business) {
+      renderDecisions(box, state.business);
+    } else {
+      businessMissing(box);
+    }
+  });
+  safely(p, renderAdrs);
+}
+
+function renderCto() {
+  var panelNode = document.getElementById("panel-cto");
+  safely(panelNode, renderNeedsYou);
+  safely(panelNode, renderProductPanel);
+  var pairs = [
+    [function (box) { renderEngineeringPanel(box); }, function (box) { renderInfraPanel(box); }],
+    [function (box) {
+      var p = panel(box, "Business", "business.json");
+      allAreasNote(p);
+      safely(p, renderBusinessPanel);
+    }, function (box) {
+      var p = panel(box, "Usage", "business.json");
+      allAreasNote(p);
+      safely(p, renderUsagePanel);
+    }]
+  ];
+  pairs.forEach(function (pair) {
+    var g = grid("cols-2");
+    g.className += " spaced";
+    pair.forEach(function (draw) {
+      safely(g, draw);
+    });
+    panelNode.appendChild(g);
+  });
+  safely(panelNode, renderDecisionsPanel);
 }
 
 function currentTab() {
