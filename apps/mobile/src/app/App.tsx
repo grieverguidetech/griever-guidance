@@ -17,10 +17,13 @@ import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
 import { AccountScreen } from '../screens/AccountScreen';
-import { AccountProvider, useLaunchState } from '../lib/AccountProvider';
+import { AccountProvider, useAccount, useLaunchState, useSyncAuth } from '../lib/AccountProvider';
 import { useAccountSenderName } from '../lib/accountName';
 import { useCanCreate } from '../lib/canCreate';
-import { AUTH_ENABLED } from '../lib/features';
+import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
+import { clearJoinToken, runJoin, watchJoinLink } from '../lib/joinLink';
+import { JoinScreen } from '../screens/JoinScreen';
+import type { JoinPhase } from '../screens/JoinScreen';
 import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
 import { sendNote } from '../lib/sendNote';
@@ -961,6 +964,97 @@ const SendAppWhenReady = () => {
   );
 };
 
+/** An invitation link is used only with accounts and sharing both on; with either off it is discarded. */
+const JOIN_ON = AUTH_ENABLED && SHARING_ENABLED;
+
+/**
+ * Joining from an invitation link (#232), as web's Join (#128). Stands in front of the app while a
+ * saved link waits: signed out it offers sign-in; signed in it accepts the invitation once, then the
+ * app opens as a member. A refusal says so and drops the link; no connection keeps it. The token
+ * is only ever passed to acceptInvite (see lib/joinLink).
+ */
+const JoinGate = ({ children }: { children: ReactNode }) => {
+  const account = useAccount();
+  const getToken = useSyncAuth()?.getToken;
+  const [token, setToken] = useState<string | null>(null);
+  const [phase, setPhase] = useState<JoinPhase | 'done' | null>(null);
+  // The person chose to create an account or sign in: the app shows its sign-in until they are signed in.
+  const [askedSignIn, setAskedSignIn] = useState(false);
+  const started = useRef(false);
+  const running = useRef(false);
+  const signedIn = !!account?.isSignedIn;
+  const offline = !!account?.offline;
+  const reloadProfile = account?.reloadProfile;
+
+  useEffect(
+    () =>
+      watchJoinLink((found) => {
+        if (running.current) {
+          return;
+        }
+        started.current = false;
+        setToken(found);
+        setPhase(null);
+        setAskedSignIn(false);
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    if (token === null || started.current) {
+      return;
+    }
+    if (offline) {
+      started.current = true;
+      setPhase('offline');
+      return;
+    }
+    if (!signedIn || !getToken) {
+      return;
+    }
+    started.current = true;
+    setPhase('joining');
+    void (async () => {
+      running.current = true;
+      const outcome = await runJoin(getToken, token);
+      running.current = false;
+      if (outcome === 'offline' || outcome === 'later') {
+        setPhase(outcome);
+        return;
+      }
+      await clearJoinToken();
+      setToken(null);
+      if (outcome === 'member' || outcome === 'joined') {
+        // Now a member: the profile says so, so the app shows no "Create a new one".
+        reloadProfile?.();
+        setPhase('done');
+        return;
+      }
+      setPhase(outcome);
+    })();
+  }, [token, offline, signedIn, getToken, reloadProfile]);
+
+  const signedOut = !!account && !account.isLoading && !signedIn && !offline;
+  let screen: JoinPhase | null = null;
+  if (phase !== null && phase !== 'done') {
+    screen = phase;
+  } else if (phase === null && token !== null) {
+    if (signedIn && !offline) {
+      screen = 'joining';
+    } else if (signedOut && !askedSignIn) {
+      screen = 'invited';
+    }
+  }
+  if (screen === null) {
+    return <>{children}</>;
+  }
+  return (
+    <ScreenFrame>
+      <JoinScreen phase={screen} onCreateAccount={() => setAskedSignIn(true)} onSignIn={() => setAskedSignIn(true)} onContinue={() => setPhase('done')} />
+    </ScreenFrame>
+  );
+};
+
 // With the flag off this is exactly the send flow; no account code runs.
 export const App = () => {
   const fontsSettled = useSerifFonts();
@@ -1003,12 +1097,18 @@ export const App = () => {
   ) : (
     <SendAppWhenReady />
   );
+  // Accounts or sharing off: a saved invitation link is thrown away and the app is as it was.
+  useEffect(() => {
+    if (!JOIN_ON) {
+      void clearJoinToken();
+    }
+  }, []);
   // Mobile UI components (apps/mobile/src/ui) switch from the system font to the serif when it arrives.
   return (
     <SafeAreaProvider>
       <SerifReadyContext.Provider value={fontsSettled}>
         {AUTH_ENABLED ? (
-          <AccountProvider>{content}</AccountProvider>
+          <AccountProvider>{JOIN_ON ? <JoinGate>{content}</JoinGate> : content}</AccountProvider>
         ) : (
           content
         )}
