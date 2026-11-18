@@ -96,10 +96,11 @@ describe('Linear helpers', () => {
     updatedAt,
   });
 
-  it('keeps open state types and drops completed and canceled', () => {
+  it('keeps open state types and drops completed, canceled and duplicate', () => {
     expect(['backlog', 'unstarted', 'started', 'triage'].every(isOpenLinearState)).toBe(true);
     expect(isOpenLinearState('completed')).toBe(false);
     expect(isOpenLinearState('canceled')).toBe(false);
+    expect(isOpenLinearState('duplicate')).toBe(false);
     expect(isOpenLinearState(undefined)).toBe(false);
   });
 

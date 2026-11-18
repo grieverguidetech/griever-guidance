@@ -2200,7 +2200,7 @@ type RawLinearIssue = {
 };
 
 // Linear state types that mean the work is over.
-const LINEAR_CLOSED_TYPES = ['completed', 'canceled'];
+const LINEAR_CLOSED_TYPES = ['completed', 'canceled', 'duplicate'];
 
 export function isOpenLinearState(type: unknown): boolean {
   return typeof type === 'string' && !LINEAR_CLOSED_TYPES.includes(type);
@@ -2256,7 +2256,7 @@ export function linearReason(raw: string, key: string): string {
 export const LINEAR_AUTH_MESSAGE = 'Linear did not accept the key. Store a new key (see the README).';
 export const LINEAR_CACHE_MS = 10 * 60 * 1000;
 export const LINEAR_TIMEOUT_MS = 8_000;
-export const LINEAR_MAX_PAGES = 10;
+export const LINEAR_MAX_PAGES = 20;
 
 export type LinearReading = { rows: LinearRow[]; at: number; truncated: boolean; note: string | null };
 type LinearReply = { status: number; body: unknown };

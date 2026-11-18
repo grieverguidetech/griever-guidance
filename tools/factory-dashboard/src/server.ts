@@ -466,9 +466,9 @@ const readCost = makeCostReader({
 const LINEAR_URL = 'https://api.linear.app/graphql';
 const LINEAR_NO_KEY = 'Linear key not set. See the README.';
 const LINEAR_QUERY = `query ($after: String) {
-  teams(filter: { key: { eq: "GRI" } }) {
+  teams(first: 1, filter: { key: { eq: "GRI" } }) {
     nodes {
-      issues(first: 100, after: $after, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+      issues(first: 50, after: $after, filter: { state: { type: { nin: ["completed", "canceled", "duplicate"] } } }) {
         nodes { identifier title url state { name type } priority priorityLabel assignee { name } updatedAt }
         pageInfo { hasNextPage endCursor }
       }

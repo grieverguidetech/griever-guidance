@@ -50,7 +50,7 @@ A missing or invalid file shows its reason in the section and does not break the
 
 ## Linear: GRI
 
-The Business panel on the CTO tab lists the open issues of the Linear team with key GRI (completed and canceled are left out): ID (a link), title, status, priority, assignee ('Unassigned' when none) and last updated. Rows sort by priority (no priority last), then newest update first, 10 per page.
+The Business panel on the CTO tab lists the open issues of the Linear team with key GRI (completed, canceled and duplicate are left out): ID (a link), title, status, priority, assignee ('Unassigned' when none) and last updated. Rows sort by priority (no priority last), then newest update first, 10 per page.
 
 One-time setup: create a personal API key in Linear (Settings, Security and access) and store it in the macOS Keychain. The command asks for the key without echoing it:
 
