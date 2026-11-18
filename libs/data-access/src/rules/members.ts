@@ -4,11 +4,11 @@ import type { Caller } from '../caller.js';
 import type { Clock } from '../clock.js';
 import { decodeInvite, isOpen, toPendingInvite } from '../items/inviteItems.js';
 import { decodeMember, decodeMemberOf } from '../items/memberItems.js';
-import { getProfile } from '../items/profileItem.js';
+import { encodeProfile, getProfile, type Profile } from '../items/profileItem.js';
 import { INVITE_PREFIX, MEMBER_PREFIX, memberKey, memberOfKey, profileKey } from '../keys.js';
 import { getLive, queryLive } from '../read.js';
 import { runAction, type RunOptions, type TransactItem } from '../transact.js';
-import type { FlowResult } from './flows.js';
+import { Refusal, type FlowResult } from './flows.js';
 
 const byCreatedAt = (a: { createdAt: string }, b: { createdAt: string }) => a.createdAt.localeCompare(b.createdAt);
 
@@ -147,4 +147,89 @@ export async function removeMember(
     return { ok: false, code: 'not_found' };
   }
   throw new Error(`removeMember: unexpected failed condition at ${result.failedIndex}.`);
+}
+
+// Positions in the leaveFamily transaction.
+const LEAVE_MEMBER_OF = 0;
+const LEAVE_PROFILE = 2;
+
+/**
+ * The caller stops being a member and becomes an owner with no members. One transaction deletes both
+ * membership items, sets their profile to owner with a version bump (conditional on the version
+ * read, so a stale read runs the action again), and bumps the former owner's version. An owner or a
+ * non-member gets not_found with nothing written. The former owner's other members and flows are
+ * not touched.
+ */
+export async function leaveFamily(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  caller: Caller,
+  clock: Clock,
+  options: RunOptions = {},
+): Promise<FlowResult<null>> {
+  try {
+    const result = await runAction(
+      doc,
+      async () => {
+        const now = clock.now().toISOString();
+        const memberOf = await getLive(doc, table, memberOfKey(caller.userId), clock);
+        if (!memberOf) {
+          throw new Refusal('not_found');
+        }
+        const { ownerId } = decodeMemberOf(memberOf);
+        const profile = await getProfile(doc, table, caller.userId, clock);
+        const items: TransactItem[] = [
+          {
+            Delete: {
+              TableName: table,
+              Key: memberOfKey(caller.userId),
+              ConditionExpression: 'ownerId = :owner',
+              ExpressionAttributeValues: { ':owner': ownerId },
+            },
+          },
+          // No condition: a MEMBER_OF with no MEMBER# (left by a half-finished write) can still be left.
+          { Delete: { TableName: table, Key: memberKey(ownerId, caller.userId) } },
+          ownerProfileOnLeave(table, caller.userId, profile, now),
+          bumpOwnerVersion(table, ownerId, now),
+        ];
+        return { items, value: null, retryOn: [LEAVE_MEMBER_OF, LEAVE_PROFILE] };
+      },
+      options,
+    );
+    if (result.status === 'ok') {
+      return { ok: true, value: null };
+    }
+    if (result.status === 'busy') {
+      return { ok: false, code: 'busy' };
+    }
+    throw new Error(`leaveFamily: unexpected failed condition at ${result.failedIndex}.`);
+  } catch (error) {
+    if (error instanceof Refusal) {
+      return { ok: false, code: error.code };
+    }
+    throw error;
+  }
+}
+
+/** Sets the leaver to owner if nobody changed their profile since the read. With no profile, creates one as owner. */
+function ownerProfileOnLeave(table: string, userId: string, profile: Profile | undefined, now: string): TransactItem {
+  if (!profile) {
+    return {
+      Put: {
+        TableName: table,
+        Item: encodeProfile({ userId, accountType: 'owner', version: 1, createdAt: now, updatedAt: now }),
+        ConditionExpression: 'attribute_not_exists(pk)',
+      },
+    };
+  }
+  return {
+    Update: {
+      TableName: table,
+      Key: profileKey(userId),
+      UpdateExpression: 'SET accountType = :owner, #version = #version + :one, updatedAt = :now',
+      ConditionExpression: '#version = :seen',
+      ExpressionAttributeNames: { '#version': 'version' },
+      ExpressionAttributeValues: { ':owner': 'owner', ':one': 1, ':now': now, ':seen': profile.version },
+    },
+  };
 }
