@@ -1,4 +1,4 @@
-import { parseCompleteDate, parseLooseDate } from './dates.js';
+import { LIFE_YEARS, parseCompleteDate, parseLooseDate } from './dates.js';
 
 /** What a date field should quietly mention. Never a reason to block saving. */
 export type DateNoteKind = 'unreadable' | 'beforePassing' | 'futurePassing' | 'birthAfterPassing';
@@ -22,7 +22,7 @@ function dayNumber(date: Date): number {
  * parser would fill in a year while the family is still typing.
  */
 function completeDay(text: string | null | undefined): number | null {
-  const date = parseCompleteDate(text);
+  const date = parseCompleteDate(text, LIFE_YEARS);
   return date ? dayNumber(date) : null;
 }
 

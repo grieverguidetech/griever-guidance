@@ -16,6 +16,9 @@ const MONTHS = [
   'july', 'august', 'september', 'october', 'november', 'december',
 ];
 
+/** Years accepted for the dates of a life (birth, passing). Matches `ageFrom` and the obituary draft. */
+export const LIFE_YEARS = { minYear: 1800, maxYear: 2100 };
+
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2100;
 

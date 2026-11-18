@@ -41,6 +41,11 @@ describe('dateNote', () => {
     expect(dateNote('March 3, 1950', { field: 'birth', dateOfPassing: 'May 29, 2026' })).toBeNull();
   });
 
+  it('flags a birth date after the date of passing when both are before 2000', () => {
+    expect(dateNote('June 1, 1990', { field: 'birth', dateOfPassing: 'May 29, 1985' })).toBe('birthAfterPassing');
+    expect(dateNote('June 1, 1950', { field: 'birth', dateOfPassing: 'May 29, 1985' })).toBeNull();
+  });
+
   it('skips the ordering checks when the date of passing is missing or unreadable', () => {
     expect(dateNote('May 20, 2026', { field: 'event' })).toBeNull();
     expect(dateNote('May 20, 2026', { field: 'event', dateOfPassing: 'unknown' })).toBeNull();

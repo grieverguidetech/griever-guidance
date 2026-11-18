@@ -73,6 +73,11 @@ describe('Home', () => {
     expect(screen.getByRole('button', { name: 'Walter Hale, passed April 20, 2026' })).toBeTruthy();
   });
 
+  it('formats a date of passing before 2000', () => {
+    setup({ sessions: [make('a', 'Ruth Hale', '2026-06-01T00:00:00.000Z', '1985-05-29')] });
+    expect(screen.getByRole('button', { name: 'Ruth Hale, passed May 29, 1985' })).toBeTruthy();
+  });
+
   it('shows a date that is not complete exactly as typed', () => {
     setup({ sessions: [make('a', 'Ruth Hale', '2026-06-01T00:00:00.000Z', 'late May')] });
     expect(screen.getByRole('button', { name: 'Ruth Hale, passed late May' }).textContent).toContain('late May');

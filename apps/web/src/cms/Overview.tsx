@@ -1,7 +1,7 @@
 import { fill, screenCopy } from '@griever/copy';
 import { computeChecklist, computeSections } from '@griever/hooks';
 import type { OverviewStatus } from '@griever/hooks';
-import { FLOW_DETAIL_TEXT_KEYS, parseCompleteDate, SECTION_ORDER } from '@griever/shared';
+import { FLOW_DETAIL_TEXT_KEYS, LIFE_YEARS, parseCompleteDate, SECTION_ORDER } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { navTitle } from './SideNav';
 
@@ -52,8 +52,8 @@ const CARD =
 const NEXT_BAR = ' shadow-[inset_3px_0_0_var(--color-accent-700)]';
 
 /** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
-function dateLabel(value: string): string {
-  const date = parseCompleteDate(value);
+function dateLabel(value: string, years?: { minYear: number; maxYear: number }): string {
+  const date = parseCompleteDate(value, years);
   if (!date) {
     return value;
   }
@@ -67,7 +67,7 @@ function present(value: string | null | undefined): string {
 function personSummary(session: OverviewSession): string {
   const name = present(session.personName);
   const passedDate = present(session.dateOfPassing);
-  const passed = passedDate ? fill(shell.summaryPassed, { date: dateLabel(passedDate) }) : '';
+  const passed = passedDate ? fill(shell.summaryPassed, { date: dateLabel(passedDate, LIFE_YEARS) }) : '';
   if (name && passed) {
     return fill(shell.summaryPersonJoin, { name, passed });
   }

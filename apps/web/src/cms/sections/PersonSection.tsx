@@ -1,12 +1,9 @@
 import { useId } from 'react';
 import { screenCopy } from '@griever/copy';
-import { dateNote, type SectionFields, SectionKey, SessionDetails } from '@griever/shared';
+import { dateNote, LIFE_YEARS, type SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { DateField, todayISO } from '../../lib/DateField';
 import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { MarkReady } from './MarkReady';
-
-/** Birth and passing dates run far before 2000, so the field's default years would not tidy them. */
-const LIFE_YEARS = { minYear: 1800, maxYear: 2100 };
 
 const copy = screenCopy('cmsPerson');
 

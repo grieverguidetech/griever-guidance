@@ -1,7 +1,7 @@
 import type { Session } from '@griever/hooks';
 import { listableSessionsByRecent } from '@griever/hooks';
 import { fill, screenCopy } from '@griever/copy';
-import { parseCompleteDate } from '@griever/shared';
+import { LIFE_YEARS, parseCompleteDate } from '@griever/shared';
 import { CaretRight } from '@phosphor-icons/react/CaretRight';
 
 const copy = screenCopy('cmsShell');
@@ -18,7 +18,7 @@ interface Props {
 
 /** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
 function passingLabel(value: string | null | undefined): string {
-  const date = parseCompleteDate(value);
+  const date = parseCompleteDate(value, LIFE_YEARS);
   if (!date) {
     return value?.trim() ?? '';
   }

@@ -97,6 +97,11 @@ describe('PeopleList', () => {
     expect(card.querySelector('.gg-meta')).toHaveTextContent('May 29, 2026');
   });
 
+  it('formats a date of passing before 2000', () => {
+    render(<PeopleList sessions={[person('x', 'Ruth Hale', '2026-06-01T00:00:00.000Z', '1985-05-29')]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
+    expect(screen.getByRole('button', { name: 'Ruth Hale, passed May 29, 1985' })).toBeTruthy();
+  });
+
   it('keeps all hover and press motion behind motion-safe', () => {
     render(<PeopleList sessions={[older]} onOpen={vi.fn()} onCreate={vi.fn()} canCreate />);
     const card = screen.getByRole('button', { name: 'Margaret Hayes, passed May 29, 2026' });
