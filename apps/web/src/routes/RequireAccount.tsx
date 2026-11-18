@@ -33,11 +33,49 @@ export function isAuthRoute(pathname: string): boolean {
   );
 }
 
+/** This tab's copy of `next`, for sign-ins that come back on a URL Clerk builds itself (SSO, email links). */
+export const SIGN_IN_NEXT_KEY = 'gg.signin.next.v1';
+
+/** Keeps `next` for this tab. Only a `safeNext` path other than "/" is ever stored; anything else clears it. */
+export function rememberNext(path: string | null | undefined): void {
+  const safe = safeNext(path);
+  try {
+    if (safe === '/') {
+      window.sessionStorage.removeItem(SIGN_IN_NEXT_KEY);
+    } else {
+      window.sessionStorage.setItem(SIGN_IN_NEXT_KEY, safe);
+    }
+  } catch {
+    // No session storage (private mode, blocked): the URL's `next` still works.
+  }
+}
+
+/** The stored `next`, checked again with `safeNext`, or null. */
+export function rememberedNext(): string | null {
+  try {
+    const safe = safeNext(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY));
+    return safe === '/' ? null : safe;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The path to replace the current entry with, or null to stay. `next` only ever holds a path from the
  * table (ids, no names): `paths.signIn` and `safeNext` refuse anything else and fall back to `/`.
+ * `remembered` (see `rememberedNext`) is used after sign-in when the URL has no usable `next`.
  */
-export function requireAccount({ pathname, search, account }: { pathname: string; search: string; account: AccountState }): string | null {
+export function requireAccount({
+  pathname,
+  search,
+  account,
+  remembered = null,
+}: {
+  pathname: string;
+  search: string;
+  account: AccountState;
+  remembered?: string | null;
+}): string | null {
   const next = new URLSearchParams(search).get('next') ?? undefined;
   if (pathname === '/sign-up') {
     return account === 'off' ? '/' : paths.signIn(next);
@@ -47,7 +85,8 @@ export function requireAccount({ pathname, search, account }: { pathname: string
       return '/';
     }
     if (account === 'signed_in' || account === 'local') {
-      return safeNext(next);
+      const target = safeNext(next);
+      return target === '/' ? safeNext(remembered) : target;
     }
     return null;
   }

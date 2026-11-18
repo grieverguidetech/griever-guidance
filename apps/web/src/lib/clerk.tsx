@@ -14,6 +14,7 @@ import type { AccountAuth, AccountTokenResult } from '@griever/shared';
 import { DeleteCancelledError, hasSignedInMarker } from './authClient';
 import type { ClerkAccountState } from './authClient';
 import { SIGN_OUT_PENDING_KEY, markSignOutPending } from './removeFromDevice';
+import { safeNext } from '../routes/paths';
 
 /** Clerk not loaded after this long: a device with the signed-in marker opens for local work. */
 export const CLERK_GIVE_UP_MS = 6000;
@@ -277,29 +278,46 @@ function AccountBridge({ children }: { children: (state: ClerkAccountState) => R
 // hash: the app reacts to the session itself (the sign-in guard sends the person to `next`). Replace,
 // never push; the entry's state is kept because the app records its own there.
 function stayHere(): void {
+  // Same path and query, so React Router's location does not change and it does not re-render.
   window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
 }
 
 /**
  * Where Clerk's own move goes, or null to stay here. Only its sign-in steps (`/sign-in/...`, path
- * routing) move the page. The current `next` is carried over when Clerk leaves it off, so the
- * return-to survives every step.
+ * routing) move the page. `to` may be relative to the current page. The current `next` is carried
+ * over when Clerk leaves it off, so the return-to survives every step; only a `safeNext` path, never "/".
  */
 export function clerkStepTarget(to: string, currentSearch: string): string | null {
   let url: URL;
   try {
-    url = new URL(to, window.location.origin);
+    url = new URL(to, window.location.href);
   } catch {
     return null;
   }
   if (url.origin !== window.location.origin || (url.pathname !== '/sign-in' && !url.pathname.startsWith('/sign-in/'))) {
     return null;
   }
-  const next = new URLSearchParams(currentSearch).get('next');
-  if (next !== null && !url.searchParams.has('next')) {
+  const next = safeNext(new URLSearchParams(currentSearch).get('next'));
+  if (next !== '/' && !url.searchParams.has('next')) {
     url.searchParams.set('next', next);
   }
   return url.pathname + url.search;
+}
+
+/** The move Clerk is given as `routerPush` and `routerReplace`: its steps replace the entry, so they leave nothing for Back. */
+export function useClerkRouter(): (to: string) => Promise<void> | void {
+  const navigate = useNavigate();
+  return useCallback(
+    (to: string) => {
+      const target = clerkStepTarget(to, window.location.search);
+      if (target === null) {
+        stayHere();
+        return;
+      }
+      return navigate(target, { replace: true });
+    },
+    [navigate],
+  );
 }
 
 /**
@@ -319,19 +337,7 @@ export const appearance = {
 } as const;
 
 export function ClerkAccount({ children }: { children: (state: ClerkAccountState) => ReactNode }) {
-  const navigate = useNavigate();
-  // Clerk's steps replace the entry (push and replace alike), so they leave nothing for Back.
-  const moveClerk = useCallback(
-    (to: string) => {
-      const target = clerkStepTarget(to, window.location.search);
-      if (target === null) {
-        stayHere();
-        return;
-      }
-      return navigate(target, { replace: true });
-    },
-    [navigate],
-  );
+  const moveClerk = useClerkRouter();
   const publishableKey = String(import.meta.env['VITE_CLERK_PUBLISHABLE_KEY'] ?? '').trim();
   if (!publishableKey) {
     return <>{children({ unavailable: true })}</>;

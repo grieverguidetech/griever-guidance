@@ -388,8 +388,19 @@ describe('Clerk sign-in steps (#851)', () => {
     expect(clerkStepTarget(`${window.location.origin}/sign-in/create#x`, '')).toBe('/sign-in/create');
     expect(clerkStepTarget('/sign-in?next=%2Faccount', '?next=%2Fpeople')).toBe('/sign-in?next=%2Faccount');
     expect(clerkStepTarget('/', '?next=%2Fpeople')).toBeNull();
+    // Only a safeNext path is carried, and never "/".
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=https%3A%2F%2Fevil.example')).toBe('/sign-in/factor-one');
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=%2Fsign-up')).toBe('/sign-in/factor-one');
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=%2F')).toBe('/sign-in/factor-one');
     expect(clerkStepTarget('/sign-inx', '')).toBeNull();
     expect(clerkStepTarget('https://accounts.example.com/sign-in/factor-one', '')).toBeNull();
+  });
+
+  it('resolves a relative step against the current page, not the origin', () => {
+    window.history.replaceState(null, '', '/sign-in/factor-one?next=%2Fpeople');
+    expect(clerkStepTarget('factor-two', window.location.search)).toBe('/sign-in/factor-two?next=%2Fpeople');
+    window.history.replaceState(null, '', '/sign-in/');
+    expect(clerkStepTarget('create', '')).toBe('/sign-in/create');
   });
 
   it('points Clerk at /sign-in and replaces the entry on every step, push or replace', async () => {

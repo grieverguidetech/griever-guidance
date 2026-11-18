@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { useAccount } from '@griever/hooks';
 import type { AccountAuth } from '@griever/shared';
 import type { ClerkAccountState, ClerkLoadResult } from './lib/authClient';
+import { useClerkRouter } from './lib/clerk';
 
 export interface FakeClerkOptions {
   /** Signed in as this user at load; omit for signed out. */
@@ -19,6 +20,8 @@ export interface FakeClerkOptions {
   deleteAccount?: () => Promise<void>;
   /** The given and family name on the Clerk user, as filled in at sign-up. */
   names?: { firstName: string | null; lastName: string | null };
+  /** A step the sign-in button moves to first, through the real `routerPush` the app gives Clerk (e.g. "/sign-in/factor-one"). */
+  stepBeforeSignIn?: string;
 }
 
 export interface FakeClerk {
@@ -92,10 +95,17 @@ export function fakeClerk(options: FakeClerkOptions = {}): FakeClerk {
   }
 
   function SignInScreen() {
+    const routerPush = useClerkRouter();
+    const signIn = async () => {
+      if (options.stepBeforeSignIn) {
+        await routerPush(options.stepBeforeSignIn);
+      }
+      setUser('u1');
+    };
     return (
       <div>
         <h1>Grievers Guidance</h1>
-        <button type="button" onClick={() => setUser('u1')}>
+        <button type="button" onClick={() => void signIn()}>
           Sign in with the test provider
         </button>
       </div>

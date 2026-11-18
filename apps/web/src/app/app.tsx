@@ -46,7 +46,7 @@ import { ThanksSection } from '../cms/sections/ThanksSection';
 import type { CmsNavKey } from '../cms/SideNav';
 import { pathForSpot, spotFromPath } from '../routes/editorLocation';
 import { parsePath, paths } from '../routes/paths';
-import { isSignInPath, requireAccount } from '../routes/RequireAccount';
+import { isSignInPath, rememberNext, rememberedNext, requireAccount } from '../routes/RequireAccount';
 import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
@@ -624,9 +624,9 @@ function AppBody({
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
   // True when the session ended while someone was using the app, other than with the Sign out button.
-  // They stay where they are, with the note, until they sign in again or open the sign-in screen; only
-  // an entry (a cold load, or a move after that) goes to sign-in (#851). Written during render so the
-  // guard below knows in the same render.
+  // Until they sign in again or open the sign-in screen, the guard leaves them on any page they move to,
+  // with the note. Only a cold load, or a move after the sign-in screen, goes to sign-in (#851). Written
+  // during render so the guard below knows in the same render.
   const hadSession = useRef(false);
   const ended = useRef(false);
   if (signedIn) {
@@ -654,7 +654,23 @@ function AppBody({
               ? 'left'
               : 'signed_out';
   // The sign-in guard. Not during the Back walk (#566): that walk moves through history on its own.
-  const guardTo = walking ? null : requireAccount({ pathname: location.pathname, search: location.search, account: accountState });
+  const guardTo = walking
+    ? null
+    : requireAccount({ pathname: location.pathname, search: location.search, account: accountState, remembered: rememberedNext() });
+  // The guard's `next` is also kept in this tab, for a sign-in that returns on a URL without it (SSO,
+  // email links). A bare /sign-in clears it. It is used up once a signed-in page is shown, not while
+  // the guard is still moving there (a re-render then would lose the target).
+  const inApp = accountState === 'signed_in' || accountState === 'local' || accountState === 'off';
+  useEffect(() => {
+    if (isSignInPath(location.pathname)) {
+      return;
+    }
+    if (guardTo !== null) {
+      rememberNext(new URLSearchParams(guardTo.split('?')[1] ?? '').get('next'));
+    } else if (inApp) {
+      rememberNext(null);
+    }
+  }, [guardTo, location.pathname, inApp]);
   const screenShown = guardTo === null && !auth?.isLoading;
   useEffect(() => {
     if (!screenShown) {
@@ -835,7 +851,10 @@ function AppBody({
           <p className="m-0">You've been signed out. Your work on this device is safe. Sign in again when you're ready.</p>
           <button
             type="button"
-            onClick={() => navigate(paths.signIn(location.pathname), { replace: true })}
+            onClick={() => {
+              rememberNext(location.pathname);
+              navigate(paths.signIn(location.pathname), { replace: true });
+            }}
             className="gg-btn gg-btn-ghost self-start !px-0"
           >
             Sign in

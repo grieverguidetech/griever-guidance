@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import type { ClerkLoadResult } from '../lib/authClient';
 import { fakeClerk } from '../test-clerk';
 import { renderApp } from '../test/renderApp';
-import { isAuthRoute, isSignInPath, requireAccount } from './RequireAccount';
+import { SIGN_IN_NEXT_KEY, isAuthRoute, isSignInPath, rememberNext, rememberedNext, requireAccount } from './RequireAccount';
 import type { AccountState } from './RequireAccount';
 
 const mocks = vi.hoisted(() => ({
@@ -96,6 +96,30 @@ describe('requireAccount', () => {
     expect(at('/sign-up', 'off')).toBe('/');
   });
 
+  it('after sign-in with no usable next in the URL, uses the remembered one', () => {
+    const after = (search: string, remembered: string | null) => requireAccount({ pathname: '/sign-in/sso-callback', search, account: 'signed_in', remembered });
+    expect(after('', '/people/f1/service')).toBe('/people/f1/service');
+    expect(after('?next=%2Fnope', '/people/f1')).toBe('/people/f1');
+    expect(after('?next=%2Faccount', '/people/f1')).toBe('/account');
+    expect(after('', 'https://evil.example')).toBe('/');
+    expect(after('', null)).toBe('/');
+  });
+
+  it('stores only a safeNext path, never "/" or anything else', () => {
+    window.sessionStorage.clear();
+    rememberNext('/people/f1/service');
+    expect(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY)).toBe('/people/f1/service');
+    rememberNext('https://evil.example');
+    expect(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY)).toBeNull();
+    rememberNext('/people/f1');
+    rememberNext('/');
+    expect(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY)).toBeNull();
+    // A value put there by hand is checked again on the way out.
+    window.sessionStorage.setItem(SIGN_IN_NEXT_KEY, '//evil.example');
+    expect(rememberedNext()).toBeNull();
+    window.sessionStorage.clear();
+  });
+
   it('knows its paths', () => {
     expect(isSignInPath('/sign-in')).toBe(true);
     expect(isSignInPath('/sign-in/create/verify')).toBe(true);
@@ -144,6 +168,7 @@ beforeEach(() => {
   mocks.getProfile.mockReset();
   mocks.getProfile.mockResolvedValue({ ok: false, reason: 'offline' });
   window.localStorage.clear();
+  window.sessionStorage.clear();
   window.localStorage.setItem('gg.sessions.v1', JSON.stringify([person('s1', 'f1', 'Margaret Hayes')]));
   window.localStorage.setItem('gg.sessionsAccount.v1', 'u1');
 });
@@ -158,6 +183,41 @@ describe('the guard on the App', () => {
     await h1('Service');
     expect(here()).toBe(PAGE);
     expect(window.history.length).toBe(entries);
+  });
+
+  it('a Clerk step before sign-in still returns to next, with no new entries', async () => {
+    useClerk({ stepBeforeSignIn: '/sign-in/factor-one' });
+    const user = userEvent.setup();
+    renderApp(<App />, { path: PAGE });
+    await screen.findByRole('button', { name: SIGN_IN_BUTTON });
+    const entries = window.history.length;
+    await user.click(screen.getByRole('button', { name: SIGN_IN_BUTTON }));
+    await h1('Service');
+    expect(here()).toBe(PAGE);
+    expect(window.history.length).toBe(entries);
+  });
+
+  it('a sign-in that returns on a URL with no next (SSO, email link) still lands on the page', async () => {
+    useClerk();
+    const first = renderApp(<App />, { path: PAGE });
+    await screen.findByRole('button', { name: SIGN_IN_BUTTON });
+    expect(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY)).toBe(PAGE);
+    first.unmount();
+    // The provider sends the browser back to a callback Clerk built itself: a new load, signed in.
+    useClerk({ userId: 'u1' });
+    renderApp(<App />, { path: '/sign-in/sso-callback' });
+    await h1('Service');
+    expect(here()).toBe(PAGE);
+    expect(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY)).toBeNull();
+  });
+
+  it('a bare /sign-in clears a remembered next', async () => {
+    window.sessionStorage.setItem(SIGN_IN_NEXT_KEY, PAGE);
+    useClerk();
+    renderApp(<App />);
+    await screen.findByRole('button', { name: SIGN_IN_BUTTON });
+    expect(here()).toBe('/sign-in');
+    expect(window.sessionStorage.getItem(SIGN_IN_NEXT_KEY)).toBeNull();
   });
 
   it('shows the sign-in screen at /sign-in?next=, replacing the entry', async () => {
@@ -303,6 +363,38 @@ describe('the guard on the App', () => {
     expect(await h1('Overview')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: SIGN_IN_BUTTON })).toBeNull();
     back.mockRestore();
+  });
+});
+
+describe('focus after the guard moves (a11y)', () => {
+  it('signing in from /sign-in?next=<person page> moves focus to that page\'s h1', async () => {
+    useClerk();
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/sign-in?next=%2Fpeople%2Ff1%2Fservice' });
+    await user.click(await screen.findByRole('button', { name: SIGN_IN_BUTTON }));
+    const heading = await h1('Service');
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it('the note\'s Sign in ends with the sign-in h1 focused', async () => {
+    const clerk = useClerk({ userId: 'u1' });
+    const user = userEvent.setup();
+    renderApp(<App />, { path: PAGE });
+    await h1('Service');
+    act(() => clerk.endElsewhere());
+    await user.click(await screen.findByRole('button', { name: 'Sign in' }));
+    const heading = await h1('Grievers Guidance');
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it('Sign out ends with the sign-in h1 focused', async () => {
+    useClerk({ userId: 'u1' });
+    const user = userEvent.setup();
+    renderApp(<App />, { path: '/account' });
+    await h1('Account');
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    const heading = await h1('Grievers Guidance');
+    await waitFor(() => expect(heading).toHaveFocus());
   });
 });
 
