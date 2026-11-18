@@ -50,7 +50,7 @@ Counts from the code:
 | Gateway libraries | 5 (`gateway-auth`, `identity`, `gateway-flows`, `gateway-messages`, `gateway-places`) | `libs/` |
 | Data function user actions | 12 | `DATA_ACTIONS` in `libs/shared/src/dataApi.ts` |
 | DynamoDB tables | 2 (`gg-data` with index `gsi1`, `gg-content`) | `infra/aws/data.yml` |
-| Access-rule modules | 7 | `libs/data-access/src/rules/*.ts` (not counting specs) |
+| Access-rule modules | 6 | `libs/data-access/src/rules/*.ts` (not counting specs) |
 
 ---
 
@@ -172,9 +172,10 @@ marketing site, tokenless `/me/profile` gives 401, tokenless `POST /invites` giv
 **What it does.** Limits write requests (POST, PUT, PATCH, DELETE) under `/flows*` and `/me*` to
 **120 per 60 seconds per signed-in user**. Reads are not counted. The middleware runs right after
 `clerkAuth`, so the key is the verified Clerk user id (`user:<id>`). If a request somehow has no user,
-it is not counted (it already got a 401 from `clerkAuth`). `/members*` and `/invites*` are not covered by this middleware. Only invite creation
-has a limit of its own (in the data function). The count is per user, so it is shared across all of that
-user's tabs and devices (web and phone together).
+it is not counted (it already got a 401 from `clerkAuth`). `/members*` and `/invites*` are not
+covered by this middleware. Only invite creation has a limit of its own (in the data function). The
+count is per user, so it is shared across all of that user's tabs and devices (web and phone
+together).
 
 | Item | Detail |
 |---|---|
@@ -183,7 +184,11 @@ user's tabs and devices (web and phone together).
 | No binding | Local dev (`apps/gateway/src/main.ts`) and tests have no binding, so the middleware passes through |
 | Limiter error | Passes through. A broken limiter must not block someone saving their work |
 | Accuracy | Counts are per Cloudflare location and eventually consistent. This stops runaway clients; it is not an exact quota |
-| Client | `libs/api-client` maps 429 to `rate_limited` (flows, profile). `useFlowSync` keeps the edit queued, stops the cycle and retries with backoff of 5, 10, 20, 40 s and on (capped at 5 min); it ignores `Retry-After`, and edits made during the wait do not restart the timer. For flows, nothing local is dropped. A profile save that gets a 429 shows its own calm message and the entered text stays on screen. Copy stays calm (C7) |
+| Client | `libs/api-client` maps 429 to `rate_limited`. See the note below the table |
+
+Client note. `useFlowSync` keeps the edit queued and retries after 5, 10, 20, 40 s and on, up to
+5 minutes. It ignores `Retry-After`, and edits during the wait do not restart the timer. Nothing
+local is dropped. A profile save that gets a 429 shows a calm message and keeps the text (C7).
 
 **Why 120.** The web autosaves one PATCH after 1 s without typing (`EDIT_DEBOUNCE_MS` in
 `libs/hooks/src/useFlowSync.ts`). Writes in one cycle run one after another. Even if someone paused
@@ -208,7 +213,7 @@ verified `user.deleted` event.
 
 | Item | Detail |
 |---|---|
-| Fields accepted | `senderName` (string up to 100 characters, or null), `contactSource` (`import`, `manual`, or null), `firstName` and `lastName` (each up to 100 characters or null; blank becomes null; no line breaks, tabs or hidden characters), `birthDate` (`yyyy-mm-dd` or null; a real date from 1900 on, not after today), `address` (null, or `{ line1, line2, city, state, zip }`: line 1, city, 2-letter state and ZIP of 5 or 5+4 digits are required when any part is filled). `senderName` is set from `firstName` on save. `fullName` is still accepted from older clients and is split into first and last name; the response also carries a derived read-only `fullName`. `firstName`, `lastName`, `birthDate` and `address` are private to the account and never shown to members. Any other key gives 400 |
+| Fields accepted | `senderName` (string up to 100 characters, or null), `contactSource` (`import`, `manual`, or null), `firstName` and `lastName` (each up to 100 characters or null; blank becomes null; no line breaks, tabs or hidden characters), `birthDate` (`yyyy-mm-dd` or null; a real date from 1900 on, not after today), `address` (null, or `{ line1, line2, city, state, zip }`: line 1, city, 2-letter state and ZIP of 5 or 5+4 digits are required when any part is filled). `senderName` is set from `firstName` on save. `fullName` is still accepted from older clients; the gateway passes it on and the data function splits it into first and last name; the response also carries a derived read-only `fullName`. `firstName`, `lastName`, `birthDate` and `address` are private to the account and never shown to members. Any other key gives 400 |
 | Data calls | `getProfile` and `putProfile`. The profile item is `USER#<id>` / `PROFILE` in `gg-data`. The email is not stored |
 | Errors | The data function unreachable or busy gives a calm 503 (C7) |
 | Webhook | Svix signature check, then `callDeleteUser`. With no service secret set the delete path is off and the webhook answers 503 |
@@ -223,7 +228,7 @@ Every read and write is one data action run as the caller.
 |---|---|---|
 | `GET /members` | `listMembers` | |
 | `POST /invites` | `createInvite`, then `getProfile`, then Resend | Email failure → `revokeInvite` (one retry), 503 |
-| `POST /invites/accept` | `acceptInvite` | Conflict or already a member → 409. Every other failure → 404 "can't be used" |
+| `POST /invites/accept` | `acceptInvite` | Conflict or already a member → 409. Bad token → 401 sign in again. Busy or no result → 503. Every other failure → 404 "can't be used" |
 | `DELETE /invites/:id` | `revokeInvite` | 204 |
 | `DELETE /members/:memberId` | `removeMember` | 204 |
 | `DELETE /membership` | `leaveFamily` | Not a member → 404 |
@@ -249,7 +254,7 @@ No contact, message or deceased-person data.
 |---|---|
 | Lambda | `gg-app-data`, Node 22, arm64, `us-east-2`, 14-day log group |
 | Entry | Function URL with `AWS_IAM`. An unsigned call gets 403 from AWS |
-| `POST /v1` | Checks `x-gg-user-token` against Clerk's JWKS, then the envelope `{action, args}`, then the args. 401 on a bad token, 400 on a bad body. Domain outcomes answer 200 with a `DataResult` |
+| `POST /v1` | Checks `x-gg-user-token` against Clerk's JWKS, then the envelope `{action, args}`, then the args. 401 on a bad token, 400 on a bad body, 500 `internal` with no detail on an unexpected error. Domain outcomes answer 200 with a `DataResult` |
 | `POST /internal/delete-user` | No user token. Needs SigV4 and `x-gg-service-secret` (constant-time compare). 404 when no secret is set |
 | Access rules | `libs/data-access/src/rules/*`: profiles, flows, invites, acceptInvite, members, deleteUser. They enforce C11 |
 | Worker IAM user | `gg-app-data-worker`: may invoke this function through its URL only. It cannot read the tables |
@@ -318,7 +323,7 @@ answers 500 in production. A key set by hand on the Worker: not verified.
 | Workflow | Trigger | Jobs |
 |---|---|---|
 | `ci.yml` | Push to `main`, every PR | `Typecheck, unit + integration tests, build` (Nx affected; forbids `.only`, `.skip`, `.todo`); `AWS local stack` (DynamoDB Local and the SES stand-in; tests `data-aws`, `data-access`, `gateway-flows`); `e2e` (Playwright desktop, then the web editor with the flag on) |
-| `deploy.yml` | CI success on a push to `main`, or manual | `gate` → `check-accounts-config` → `deploy-gateway`, `deploy-web`, `deploy-marketing` (parallel) → `smoke` |
+| `deploy.yml` | CI success on a push to `main`, or manual | `gate` → `deploy-marketing`, and `gate` → `check-accounts-config` → `deploy-gateway`, `deploy-web` (parallel) → `smoke` (waits for all three deploys) |
 | `e2e-stress.yml` | Not read in detail | Repeat e2e runs (AGENTS.md) |
 | `mobile-bundle.yml` | Not read in detail | Mobile bundle check (not verified) |
 
@@ -335,7 +340,7 @@ All diagrams are Mermaid. GitHub renders them. They show the code on `main` at `
 ### 4.1 Component diagram: current system
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph Clients["Clients"]
     WEB["Web app"]
     MOB["Mobile app"]
@@ -370,7 +375,7 @@ flowchart LR
   ID --> AUTH
   FLOWS --> AUTH
   AUTH -->|"JWKS"| CLERK
-  AUTH -->|"SigV4 POST /v1"| DATA
+  AUTH -->|"SigV4 /v1, /internal/delete-user"| DATA
   DATA -->|"JWKS"| CLERK
   DATA --> DDB
   FLOWS -->|"invite email"| RESEND
@@ -495,6 +500,12 @@ sequenceDiagram
   alt Joiner already has people or is a member
     D-->>G: Conflict
     G-->>W: 409 account already has people
+  else Token not accepted
+    D-->>G: Unauthorized
+    G-->>W: 401 sign in again
+  else Busy or no result
+    D-->>G: Busy, or no answer
+    G-->>W: 503 try again
   else Any other failure
     D-->>G: Not usable
     G-->>W: 404 invitation cannot be used
@@ -560,14 +571,13 @@ sequenceDiagram
   end
   CI-->>GH: CI completed
   GH->>DP: workflow_run, only if CI succeeded on a push
-  DP->>DP: gate, then check-accounts-config
-  par deploy-gateway
-    DP->>CF: wrangler deploy with CLERK_ISSUER, DATA_FUNCTION_URL
-    DP->>CF: wrangler secret put for the Worker secrets
-  and deploy-web
-    DP->>CF: Build web, wrangler pages deploy
-  and deploy-marketing
+  DP->>DP: gate
+  par deploy-marketing, needs only gate
     DP->>CF: Build marketing, wrangler pages deploy
+  and gateway and web
+    DP->>DP: check-accounts-config
+    DP->>CF: deploy-gateway - wrangler deploy and Worker secrets
+    DP->>CF: deploy-web - build web, wrangler pages deploy
   end
   DP->>CF: smoke - /health, web, marketing, 401 checks
   Note over P,AWS: Separate and by hand
@@ -614,13 +624,15 @@ classDiagram
     +string obituaryUrl
     +string obituaryPublisher
     +boolean serviceReady
+    +string createdAt
+    +string updatedAt
     +string updatedBy
     +string deletedAt
     +number ttl
   }
 
   class FlowGuard {
-    +uuid flowId
+    +string ownerId
   }
 
   class MemberOf {
@@ -641,6 +653,7 @@ classDiagram
     +string ownerId
     +string email
     +string tokenHash
+    +string createdAt
     +string expiresAt
     +string acceptedAt
     +string acceptedBy
