@@ -33,7 +33,7 @@ async function reachServiceDateField(user: User) {
   await user.click(screen.getByRole('button', { name: /Share the service/ }));
   await user.click(await screen.findByRole('button', { name: /Yes, we've set a date/ }));
   await user.click(screen.getByRole('button', { name: 'Continue' }));
-  return screen.findByLabelText('Service date');
+  return screen.findByLabelText('Service date', { selector: 'input' });
 }
 
 describe('contact retention while a service date is being typed (#79)', () => {

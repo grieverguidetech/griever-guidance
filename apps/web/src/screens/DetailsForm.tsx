@@ -43,7 +43,7 @@ export function DetailsForm({ flow }: Props) {
         const isTime = field.key === 'serviceTime';
         return (
           <div key={field.key} className="gg-field">
-            <label htmlFor={`field-${field.key}`}>
+            <label id={`field-${field.key}-label`} htmlFor={`field-${field.key}`}>
               {field.label}
               {!field.required && (
                 <span style={{ color: 'var(--text-eyebrow)' }}> (optional)</span>
@@ -53,6 +53,7 @@ export function DetailsForm({ flow }: Props) {
             {isDate ? (
               <DateInput
                 id={`field-${field.key}`}
+                labelId={`field-${field.key}-label`}
                 value={fields[field.key] ?? ''}
                 required={field.required}
                 onChange={(v) => setField(field.key, v)}

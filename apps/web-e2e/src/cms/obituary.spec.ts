@@ -91,13 +91,13 @@ async function fillFieldsAndAddMemorial(page: Page) {
 test.describe('Obituary section (WEB-6)', () => {
   test('birth date and date of passing are the same values as on The person', async ({ page }) => {
     await openObituary(page);
-    await page.getByLabel('Date of birth (optional)', { exact: true }).fill('May 2, 1940');
-    await page.getByLabel('Date they passed (optional)', { exact: true }).fill('June 1, 2026');
+    await page.getByRole('textbox', { name: 'Date of birth (optional)', exact: true }).fill('May 2, 1940');
+    await page.getByRole('textbox', { name: 'Date they passed (optional)', exact: true }).fill('June 1, 2026');
     await page.getByRole('navigation').getByRole('link', { name: /^Overview/ }).click();
     await page.getByRole('main').getByRole('button', { name: /^The person/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'The person' })).toBeVisible();
-    await expect(page.getByLabel('Date of birth (optional)', { exact: true })).toHaveValue('May 2, 1940');
-    await expect(page.getByLabel('Date they passed (optional)', { exact: true })).toHaveValue('June 1, 2026');
+    await expect(page.getByRole('textbox', { name: 'Date of birth (optional)', exact: true })).toHaveValue('May 2, 1940');
+    await expect(page.getByRole('textbox', { name: 'Date they passed (optional)', exact: true })).toHaveValue('June 1, 2026');
   });
 
   test('fields fill the text, the memorial is added, and Ready is refused until no placeholder is left', async ({ page }) => {
@@ -199,7 +199,7 @@ test.describe('Obituary section (WEB-6)', () => {
     const serviceGroup = page.locator('fieldset', {
       has: page.getByText('Funeral or memorial service', { exact: true }),
     });
-    const serviceDate = serviceGroup.getByLabel('Date', { exact: true });
+    const serviceDate = serviceGroup.getByRole('textbox', { name: 'Funeral or memorial service Date', exact: true });
     const serviceTime = serviceGroup.getByLabel('Time', { exact: true });
     await expect(serviceDate).toBeVisible();
     await expect(serviceTime).toBeVisible();

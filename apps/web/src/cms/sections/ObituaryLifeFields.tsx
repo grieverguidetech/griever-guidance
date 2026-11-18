@@ -370,9 +370,10 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
       </p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="gg-field">
-          <label htmlFor={`${id}-birthDate`}>{`${personCopy.dateOfBirthLabel} ${personCopy.optional}`}</label>
+          <label id={`${id}-birthDate-label`} htmlFor={`${id}-birthDate`}>{`${personCopy.dateOfBirthLabel} ${personCopy.optional}`}</label>
           <DateInput
             id={`${id}-birthDate`}
+            labelId={`${id}-birthDate-label`}
             value={values.birthDate ?? ''}
             max={todayISO()}
             years={LIFE_YEARS}
@@ -383,9 +384,10 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           />
         </div>
         <div className="gg-field">
-          <label htmlFor={`${id}-dateOfPassing`}>{`${personCopy.dateOfPassingLabel} ${personCopy.optional}`}</label>
+          <label id={`${id}-dateOfPassing-label`} htmlFor={`${id}-dateOfPassing`}>{`${personCopy.dateOfPassingLabel} ${personCopy.optional}`}</label>
           <DateInput
             id={`${id}-dateOfPassing`}
+            labelId={`${id}-dateOfPassing-label`}
             value={values.dateOfPassing ?? ''}
             max={todayISO()}
             years={LIFE_YEARS}

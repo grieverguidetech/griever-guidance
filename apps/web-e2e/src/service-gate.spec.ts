@@ -19,5 +19,5 @@ test('"Yes" moves on to the service details', async ({ page }) => {
   await page.getByRole('button', { name: /^Yes, we've set a date/ }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Have the arrangements been made?' })).toHaveCount(0);
-  await expect(page.getByLabel(/Service date/)).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Service date/ })).toBeVisible();
 });

@@ -81,7 +81,7 @@ describe('one draft per moment (#83)', () => {
     await user.click(screen.getByRole('button', { name: /Share the service/ }));
     await user.click(screen.getByRole('button', { name: /Yes, we've set a date/ }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await screen.findByLabelText('Service date');
+    await screen.findByLabelText('Service date', { selector: 'input' });
     expect(savedDrafts()['service']).toMatchObject({ step: 'details', templateCategory: 'service' });
     expect(savedDrafts()['announcement']).toMatchObject(kept);
 

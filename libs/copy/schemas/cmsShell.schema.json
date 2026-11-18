@@ -72,6 +72,7 @@
     "emptyHolding",
     "arrivedNote",
     "loadingTitle",
+    "dateCalendarButton",
     "personMissing"
   ],
   "properties": {
@@ -277,6 +278,9 @@
       "$ref": "#/$defs/text"
     },
     "loadingTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "dateCalendarButton": {
       "$ref": "#/$defs/text"
     },
     "personMissing": {

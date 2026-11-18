@@ -16,14 +16,14 @@ describe('DateInput notes', () => {
     render(<DateField id="d" label="Date" value="x" note="A note" onChange={() => undefined} />);
     const note = screen.getByText('A note');
     expect(note).toHaveAttribute('id', 'd-note');
-    expect(screen.getByLabelText('Date')).toHaveAttribute('aria-describedby', 'd-help d-note');
+    expect(screen.getByLabelText('Date', { selector: 'input' })).toHaveAttribute('aria-describedby', 'd-help d-note');
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('keeps the visible help screen-reader-only until the field has focus', async () => {
     render(<DateField id="d" label="Date" value="" visibleHelp onChange={() => undefined} />);
     const help = screen.getByText(/Type a date such as/);
-    const input = screen.getByLabelText('Date');
+    const input = screen.getByLabelText('Date', { selector: 'input' });
     expect(help).toHaveClass('sr-only');
     expect(input).toHaveAttribute('aria-describedby', 'd-help');
     await userEvent.click(input);
@@ -35,9 +35,9 @@ describe('DateInput notes', () => {
   it('keeps the help visible when focus moves to the calendar button, and hides it on leaving', async () => {
     render(<DateField id="d" label="Date" value="" visibleHelp onChange={() => undefined} />);
     const help = screen.getByText(/Type a date such as/);
-    await userEvent.click(screen.getByLabelText('Date'));
+    await userEvent.click(screen.getByLabelText('Date', { selector: 'input' }));
     await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Choose date from calendar' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Date Choose date from calendar' })).toHaveFocus();
     expect(help).not.toHaveClass('sr-only');
     await userEvent.tab();
     expect(help).toHaveClass('sr-only');
@@ -49,6 +49,32 @@ describe('DateInput notes', () => {
   });
 });
 
+describe('calendar button name', () => {
+  it('names each calendar button by its own field, so two on a page differ', () => {
+    render(
+      <>
+        <DateField id="a" label="Date of birth" value="" onChange={() => undefined} />
+        <DateField id="b" label="Date of passing" value="" onChange={() => undefined} />
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Date of birth Choose date from calendar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Date of passing Choose date from calendar' })).toBeInTheDocument();
+  });
+
+  it('uses labelledBy (for example a legend plus label) when there is no labelId', () => {
+    render(
+      <>
+        <span id="lg">Funeral or memorial service</span>
+        <span id="lb">Date</span>
+        <DateInput id="x" labelledBy="lg lb" value="" onChange={() => undefined} />
+      </>,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Funeral or memorial service Date Choose date from calendar' }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('DateInput noteOnBlur', () => {
   function Harness() {
     const [value, setValue] = useState('');
@@ -57,7 +83,7 @@ describe('DateInput noteOnBlur', () => {
 
   it('stays hidden while typing, shows after blur, and hides again when the text changes', async () => {
     render(<Harness />);
-    const input = screen.getByLabelText('Date');
+    const input = screen.getByLabelText('Date', { selector: 'input' });
     await userEvent.type(input, 'Ma');
     expect(screen.queryByText('Blur note')).toBeNull();
     await userEvent.tab();
@@ -69,7 +95,7 @@ describe('DateInput noteOnBlur', () => {
 
   it('shows nothing after blur from an empty field', async () => {
     render(<Harness />);
-    await userEvent.click(screen.getByLabelText('Date'));
+    await userEvent.click(screen.getByLabelText('Date', { selector: 'input' }));
     await userEvent.tab();
     expect(screen.queryByText('Blur note')).toBeNull();
   });
@@ -83,7 +109,7 @@ describe('DateInput blur normalization', () => {
 
   async function blurWith(text: string) {
     render(<Harness start="" />);
-    const input = screen.getByLabelText('Date');
+    const input = screen.getByLabelText('Date', { selector: 'input' });
     await userEvent.click(input);
     await userEvent.type(input, text);
     await userEvent.tab();
@@ -111,5 +137,12 @@ describe('dateToISO', () => {
     expect(dateToISO('Oct 28')).toBe('');
     expect(dateToISO('5/29')).toBe('');
     expect(dateToISO('2026')).toBe('');
+  });
+});
+
+describe('calendar button fallback', () => {
+  it('uses the plain button text when no label id is given', () => {
+    render(<DateInput id="solo" value="" onChange={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Choose date from calendar' })).toBeInTheDocument();
   });
 });

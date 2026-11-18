@@ -67,7 +67,7 @@ describe('App onboarding', () => {
     await user.type(screen.getByLabelText('Their name'), 'Margaret Hayes');
     // Date of death is optional (#21): a name alone is enough to continue.
     expect(cont).not.toHaveAttribute('aria-disabled', 'true');
-    await user.type(screen.getByLabelText('Date they passed (optional)'), 'May 29, 2026');
+    await user.type(screen.getByLabelText('Date they passed (optional)', { selector: 'input' }), 'May 29, 2026');
     await user.click(cont);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Who should we be able to reach?' })).toBeInTheDocument();

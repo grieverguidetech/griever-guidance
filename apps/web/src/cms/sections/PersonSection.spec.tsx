@@ -17,8 +17,8 @@ describe('PersonSection', () => {
   it('shows each field with a visible label and no heading or save button', () => {
     setup({ personName: 'Margaret Hayes' });
     expect(screen.getByLabelText('Their name')).toHaveValue('Margaret Hayes');
-    expect(screen.getByLabelText(/Date of birth/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Date they passed/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Date of birth/, { selector: 'input' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Date they passed/, { selector: 'input' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
     expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
   });
@@ -32,7 +32,7 @@ describe('PersonSection', () => {
 
   it('adds a quiet note, linked to the input and not an alert, for an unreadable birth date after blur', async () => {
     setup({ birthDate: 'long ago' });
-    const input = screen.getByLabelText(/Date of birth/);
+    const input = screen.getByLabelText(/Date of birth/, { selector: 'input' });
     expect(screen.queryByText(/couldn't read/)).toBeNull();
     await userEvent.click(input);
     await userEvent.tab();
@@ -49,14 +49,14 @@ describe('PersonSection', () => {
   it('notes a date they passed that is still ahead, and still saves what is typed', async () => {
     const { onChange } = setup({ dateOfPassing: 'December 25, 2099' });
     expect(screen.getByText('This date is still ahead. You can keep it.')).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/Date they passed/), '1');
+    await userEvent.type(screen.getByLabelText(/Date they passed/, { selector: 'input' }), '1');
     expect(onChange).toHaveBeenCalledWith({ dateOfPassing: 'December 25, 20991' });
   });
 
   it('shows the date format help only while a date field has focus, and always describes it', async () => {
     setup();
     const helps = screen.getAllByText('Type a date such as May 29, 2026, or use the calendar button.');
-    const birth = screen.getByLabelText(/Date of birth/);
+    const birth = screen.getByLabelText(/Date of birth/, { selector: 'input' });
     expect(helps[0]).toHaveClass('sr-only');
     expect(birth.getAttribute('aria-describedby')).toContain(helps[0].id);
     await userEvent.click(birth);
@@ -66,9 +66,9 @@ describe('PersonSection', () => {
 
   it('puts the two dates in a grid: one column on a phone, two from sm up', () => {
     setup();
-    const grid = screen.getByLabelText(/Date of birth/).closest('.grid');
+    const grid = screen.getByLabelText(/Date of birth/, { selector: 'input' }).closest('.grid');
     expect(grid).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
-    expect(grid).toContainElement(screen.getByLabelText(/Date they passed/));
+    expect(grid).toContainElement(screen.getByLabelText(/Date they passed/, { selector: 'input' }));
     expect(grid).not.toContainElement(screen.getByLabelText('Their name'));
   });
 
@@ -105,9 +105,9 @@ describe('PersonSection', () => {
 
   it('dates go through DateField and send only their own field', async () => {
     const { onChange } = setup();
-    await userEvent.type(screen.getByLabelText(/Date of birth/), '5');
+    await userEvent.type(screen.getByLabelText(/Date of birth/, { selector: 'input' }), '5');
     expect(onChange).toHaveBeenLastCalledWith({ birthDate: '5' });
-    await userEvent.type(screen.getByLabelText(/Date they passed/), '6');
+    await userEvent.type(screen.getByLabelText(/Date they passed/, { selector: 'input' }), '6');
     expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: '6' });
   });
 
@@ -119,28 +119,28 @@ describe('PersonSection', () => {
     ['3/3/2000', 'March 3, 2000'],
   ])('tidies a birth date typed as %s on blur', async (typed, tidy) => {
     const { onChange } = setup({ birthDate: typed });
-    await userEvent.click(screen.getByLabelText(/Date of birth/));
+    await userEvent.click(screen.getByLabelText(/Date of birth/, { selector: 'input' }));
     await userEvent.tab();
     expect(onChange).toHaveBeenLastCalledWith({ birthDate: tidy });
   });
 
   it('tidies a date they passed before 2000 on blur', async () => {
     const { onChange } = setup({ dateOfPassing: '5/29/1985' });
-    await userEvent.click(screen.getByLabelText(/Date they passed/));
+    await userEvent.click(screen.getByLabelText(/Date they passed/, { selector: 'input' }));
     await userEvent.tab();
     expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: 'May 29, 1985' });
   });
 
   it('does not tidy a birth date before 1800', async () => {
     const { onChange } = setup({ birthDate: '3/3/1750' });
-    await userEvent.click(screen.getByLabelText(/Date of birth/));
+    await userEvent.click(screen.getByLabelText(/Date of birth/, { selector: 'input' }));
     await userEvent.tab();
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it('tidies a typed date on blur', async () => {
     const { onChange } = setup({ dateOfPassing: '5/29/2020' });
-    const field = screen.getByLabelText(/Date they passed/);
+    const field = screen.getByLabelText(/Date they passed/, { selector: 'input' });
     await userEvent.click(field);
     await userEvent.tab();
     expect(onChange).toHaveBeenLastCalledWith({ dateOfPassing: 'May 29, 2020' });
@@ -187,13 +187,13 @@ describe('PersonSection', () => {
     await userEvent.tab();
     expect(screen.getByLabelText('Their name')).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByLabelText(/Date of birth/)).toHaveFocus();
+    expect(screen.getByLabelText(/Date of birth/, { selector: 'input' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getAllByRole('button', { name: 'Choose date from calendar' })[0]).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Date of birth.* Choose date from calendar$/ })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByLabelText(/Date they passed/)).toHaveFocus();
+    expect(screen.getByLabelText(/Date they passed/, { selector: 'input' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getAllByRole('button', { name: 'Choose date from calendar' })[1]).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Date they passed.* Choose date from calendar$/ })).toHaveFocus();
     await userEvent.tab();
     expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveFocus();
   });
