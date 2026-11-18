@@ -1,7 +1,7 @@
-// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It also makes one read-only Linear GraphQL query (key from the macOS Keychain, never sent to the page). It writes only one cache file (the AWS cost reading).
+// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It also makes one read-only Linear GraphQL query (key from the macOS Keychain, never sent to the page). It runs `pnpm nx graph` (read-only; it writes its JSON into a temp folder that is deleted right after) and reads .github/workflows/*.yml. It writes only one cache file (the AWS cost reading).
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,10 @@ import {
   extractMermaidBlocks,
   diagramGroup,
   diagramAge,
+  buildProjectMermaid,
+  buildPipelineMermaid,
+  parseWorkflow,
+  type NxGraph,
   DIAGRAM_GROUPS,
   DIAGRAM_STALE_DAYS,
   parseCostExplorer,
@@ -374,6 +378,96 @@ async function mermaidVersion(): Promise<string> {
   }
 }
 
+// "From the code" diagrams. The project graph comes from `nx graph --file` (no shell, no Nx daemon, 60 s limit) and is kept for
+// 1 hour; a failed read is not kept. Two calls at once share one read. The page waits at most GRAPH_WAIT_MS for it: if the read
+// is slower (a cold start), the card says "Reading the project graph." and the doc diagrams are not held up. The workflows are
+// read on each call.
+const GRAPH_CACHE_MS = 3_600_000;
+const GRAPH_WAIT_MS = 5_000;
+const GRAPH_TIMEOUT_MS = 60_000;
+type GraphRead = { at: number; mermaid: string };
+let graphCache: GraphRead | null = null;
+let graphInFlight: Promise<GraphRead> | null = null;
+
+async function runGraphRead(root: string): Promise<GraphRead> {
+  const dir = await mkdtemp(join(tmpdir(), 'factory-nx-graph-'));
+  try {
+    const file = join(dir, 'graph.json');
+    await run('pnpm', ['nx', 'graph', `--file=${file}`], {
+      cwd: root,
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: GRAPH_TIMEOUT_MS,
+      env: { ...process.env, NX_DAEMON: 'false' },
+    });
+    const graph = (JSON.parse(await readFile(file, 'utf8')) as { graph: NxGraph }).graph;
+    return { at: Date.now(), mermaid: buildProjectMermaid(graph) };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+function readProjectMermaid(root: string): Promise<GraphRead> {
+  if (graphCache && Date.now() - graphCache.at < GRAPH_CACHE_MS) {
+    return Promise.resolve(graphCache);
+  }
+  if (!graphInFlight) {
+    graphInFlight = runGraphRead(root)
+      .then((read) => {
+        graphCache = read;
+        return read;
+      })
+      .finally(() => {
+        graphInFlight = null;
+      });
+  }
+  return graphInFlight;
+}
+
+// The last non-empty line of the error output (what the tool said last), else the message.
+function graphErrorReason(error: unknown): string {
+  const e = error as { killed?: boolean; stderr?: unknown; message?: unknown };
+  if (e.killed) {
+    return 'nx graph took over 1 minute.';
+  }
+  const lines = (typeof e.stderr === 'string' ? e.stderr : '').split('\n').map((line) => line.trim()).filter((line) => line !== '');
+  const message = typeof e.message === 'string' ? (e.message.split('\n')[0] ?? '') : '';
+  return (lines[lines.length - 1] ?? message).slice(0, 200);
+}
+
+type CodeDiagram = {
+  group: string; fromCode: boolean; file: string; line: number; url: string; lastChanged: string | null; daysAgo: number | null;
+  stale: boolean; title: string; source: string; readMinutesAgo: number; error: string;
+};
+
+async function loadCodeDiagrams(root: string): Promise<CodeDiagram[]> {
+  const base = { group: 'From the code', fromCode: true, file: '', line: 0, url: '', lastChanged: null, daysAgo: null, stale: false, readMinutesAgo: 0, error: '' };
+  const projects: CodeDiagram = { ...base, title: 'Apps and libs', source: '' };
+  const pending = Symbol('pending');
+  try {
+    const wait = new Promise<typeof pending>((resolve) => setTimeout(() => resolve(pending), GRAPH_WAIT_MS).unref());
+    const read = await Promise.race([readProjectMermaid(root), wait]);
+    if (read === pending) {
+      projects.error = 'Reading the project graph. This can take a minute on a cold start; reload then.';
+    } else {
+      projects.source = read.mermaid;
+      projects.readMinutesAgo = Math.floor((Date.now() - read.at) / 60_000);
+    }
+  } catch (error) {
+    projects.error = `Could not read the project graph. ${graphErrorReason(error)}`.trim();
+  }
+  const dir = join(root, '.github', 'workflows');
+  const names = (await readdir(dir).catch(() => [] as string[])).filter((name) => /\.ya?ml$/.test(name)).sort();
+  const parsed = await Promise.all(names.map(async (name) => {
+    try {
+      return parseWorkflow(name, await readFile(join(dir, name), 'utf8'));
+    } catch {
+      return null;
+    }
+  }));
+  const workflows = parsed.filter((wf) => wf !== null);
+  return [projects, { ...base, title: 'CI and deploy pipeline', source: buildPipelineMermaid(workflows) }];
+}
+
 async function loadDiagrams() {
   const root = await mainRepoRoot();
   const now = new Date();
@@ -405,11 +499,12 @@ async function loadDiagrams() {
       }),
     )
   ).flat();
+  const all = [...(await loadCodeDiagrams(root)), ...diagrams];
   return {
     generatedAt: now.toISOString(),
     staleDays: DIAGRAM_STALE_DAYS,
     mermaidVersion: await mermaidVersion(),
-    groups: DIAGRAM_GROUPS.map((name) => ({ name, diagrams: diagrams.filter((d) => d.group === name) })),
+    groups: DIAGRAM_GROUPS.map((name) => ({ name, diagrams: all.filter((d) => d.group === name) })),
   };
 }
 

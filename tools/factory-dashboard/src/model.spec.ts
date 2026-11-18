@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { diagramAge, diagramGroup, extractMermaidBlocks, isOpenLinearState, linearReason, makeLinearReader, toLinearRows, LINEAR_AUTH_MESSAGE, LINEAR_MAX_PAGES } from './model';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { mermaidLabel, buildPipelineMermaid, buildProjectMermaid, parseWorkflow, safeMermaidId, diagramAge, diagramGroup, extractMermaidBlocks, isOpenLinearState, linearReason, makeLinearReader, toLinearRows, LINEAR_AUTH_MESSAGE, LINEAR_MAX_PAGES } from './model';
 
 const FENCE = '```';
 const block = (body = 'flowchart TD\n  A --> B'): string => `${FENCE}mermaid\n${body}\n${FENCE}`;
@@ -240,5 +242,173 @@ describe('makeLinearReader', () => {
     const result = await reader();
     expect(result.rows).toHaveLength(1);
     expect(result.note).toBe('Could not refresh Linear: Linear answered 500. Showing the last good read.');
+  });
+});
+
+describe('mermaidLabel', () => {
+  it('writes quotes and hash signs as entity codes and leaves braces alone', () => {
+    expect(mermaidLabel('say "hi" #1')).toBe('"say #quot;hi#quot; #35;1"');
+    expect(mermaidLabel('Playwright e2e x${{ inputs.repeat_each }} (desktop)')).toBe('"Playwright e2e x${{ inputs.repeat_each }} (desktop)"');
+  });
+});
+
+describe('buildProjectMermaid', () => {
+  const node = (type: string, root: string) => ({ type, data: { root } });
+  const graph = {
+    nodes: {
+      web: node('app', 'apps/web'),
+      'web-e2e': node('app', 'apps/web-e2e'),
+      'api-client': node('lib', 'libs/api-client'),
+      'a-b': node('lib', 'libs/a-b'),
+      a_b: node('lib', 'libs/a_b'),
+      'factory-dashboard': node('lib', 'tools/factory-dashboard'),
+      'npm:react': { type: 'npm' },
+    },
+    dependencies: {
+      web: [{ target: 'api-client', type: 'static' }, { target: 'npm:react', type: 'static' }, { target: 'api-client', type: 'implicit' }, { target: 'a-b', type: 'dynamic' }],
+      'web-e2e': [{ target: 'web', type: 'implicit' }],
+      'a-b': [{ target: 'web', type: 'implicit' }],
+      'api-client': [{ target: 'a-b', type: 'implicit' }, { target: 'a-b', type: 'implicit' }],
+    },
+  };
+  const text = buildProjectMermaid(graph);
+
+  it('orders the subgraphs Apps, Libs, Tools by folder, with e2e in Apps, and drops npm nodes', () => {
+    const apps = text.indexOf('subgraph Apps');
+    const libs = text.indexOf('subgraph Libs');
+    const tools = text.indexOf('subgraph Tools');
+    expect(apps).toBeLessThan(libs);
+    expect(libs).toBeLessThan(tools);
+    expect(text.slice(apps, libs)).toContain('"web-e2e"');
+    expect(text.slice(libs, tools)).toContain('"api-client"');
+    expect(text.slice(tools)).toContain('"factory-dashboard"');
+    expect(text).toContain('direction LR');
+    expect(text).not.toContain('npm');
+  });
+
+  it('draws the strongest type once per pair: implicit dotted, static and dynamic solid', () => {
+    expect(text.match(/p_web --> p_api_client/g)).toHaveLength(1);
+    expect(text).not.toContain('p_web -.');
+    expect(text).toContain('p_web --> p_a_b');
+    expect(text).toContain('p_web_e2e -.->|"implicit"| p_web');
+    expect(text.match(/p_api_client -\.->\|"implicit"\| p_a_b/g)).toHaveLength(1);
+  });
+
+  it('writes a lib-to-app dependency from the app side so the apps stay on top', () => {
+    expect(text).toContain('p_web <-.-|"implicit"| p_a_b');
+  });
+
+  it('keeps ids unique when names clean to the same id', () => {
+    expect(text).toContain('p_a_b["a-b"]');
+    expect(text).toContain('p_a_b_2["a_b"]');
+  });
+
+  it('makes ids that are safe for Mermaid', () => {
+    expect(safeMermaidId('p', 'end', new Set())).toBe('p_end');
+    expect(safeMermaidId('p', '@org/x y', new Set())).toBe('p__org_x_y');
+  });
+});
+
+describe('parseWorkflow', () => {
+  it('reads a name, push with branches, pull_request and jobs with quoted names, comments and needs', () => {
+    const yaml = [
+      '# CI file',
+      'name: "CI" # the name',
+      'on:',
+      '  push:',
+      '    branches:',
+      '      - main',
+      '  pull_request:',
+      'jobs:',
+      '  check:',
+      "    name: 'Typecheck, tests'",
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - run: echo "a: b" # not a key',
+      '  e2e:',
+      '    needs: [check, lint]',
+      '  deploy:',
+      '    needs:',
+      '      - e2e',
+    ].join('\n');
+    const wf = parseWorkflow('ci.yml', yaml);
+    expect(wf.name).toBe('CI');
+    expect(wf.triggers.map((t) => [t.event, t.branches])).toEqual([['push', ['main']], ['pull_request', []]]);
+    expect(wf.jobs.map((j) => [j.id, j.name, j.needs])).toEqual([
+      ['check', 'Typecheck, tests', []],
+      ['e2e', 'e2e', ['check', 'lint']],
+      ['deploy', 'deploy', ['e2e']],
+    ]);
+  });
+
+  it('reads workflow_run with workflows, types and branches, workflow_dispatch with inputs, and a job if', () => {
+    const yaml = [
+      'on:',
+      '  workflow_run:',
+      '    workflows: [CI]',
+      '    types: [completed]',
+      '    branches: [main]',
+      '  workflow_dispatch:',
+      '    inputs:',
+      '      repeat:',
+      '        type: number',
+      'jobs:',
+      '  gate:',
+      '    if: >-',
+      "      github.event_name == 'workflow_dispatch' ||",
+      "      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')",
+    ].join('\n');
+    const wf = parseWorkflow('deploy.yml', yaml);
+    expect(wf.name).toBe('deploy');
+    expect(wf.triggers[0]).toMatchObject({ event: 'workflow_run', workflows: ['CI'], types: ['completed'], branches: ['main'] });
+    expect(wf.triggers[1]?.event).toBe('workflow_dispatch');
+    expect(wf.jobs[0]?.condition).toContain("conclusion == 'success'");
+  });
+
+  it('reads schedule entries and the short form of on', () => {
+    const cron = parseWorkflow('n.yml', ['on:', '  schedule:', "    - cron: '0 3 * * *'", "    - cron: '0 4 * * *'", 'jobs: {}'].join('\n'));
+    expect(cron.triggers[0]).toMatchObject({ event: 'schedule', crons: 2 });
+    expect(parseWorkflow('s.yml', 'on: [push, pull_request]').triggers.map((t) => t.event)).toEqual(['push', 'pull_request']);
+  });
+});
+
+describe('buildPipelineMermaid', () => {
+  const ci = parseWorkflow('ci.yml', ['name: CI', 'on:', '  push:', '    branches: [main]', '  pull_request:', 'jobs:', '  check:', '    name: Check', '  e2e:', '    needs: check'].join('\n'));
+  const deploy = parseWorkflow(
+    'deploy.yml',
+    ['name: Deploy', 'on:', '  workflow_run:', '    workflows: [CI]', '    types: [completed]', '    branches: [main]', '  workflow_dispatch:', 'jobs:', '  gate:', "    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')", '  later:', '    needs: gate', "    if: github.event.workflow_run.conclusion == 'failure'"].join('\n'),
+  );
+  const text = buildPipelineMermaid([ci, deploy]);
+
+  it('draws a subgraph per workflow with job arrows from needs', () => {
+    expect(text.startsWith('flowchart LR')).toBe(true);
+    expect(text).toContain('subgraph w_ci["CI (ci.yml)"]');
+    expect(text).toContain('subgraph w_deploy["Deploy (deploy.yml)"]');
+    expect(text).toContain('j_w_ci_check --> j_w_ci_e2e');
+  });
+
+  it('draws trigger nodes into the workflows, shared between workflows', () => {
+    expect(text).toContain('t_pull_request("pull request") --> w_ci');
+    expect(text).toContain('("push to main") --> w_ci');
+    expect(text).toContain('("manual, skips the CI check") --> w_deploy');
+  });
+
+  it('shows that deploy runs only after CI completes on main, with the conditions its job checks', () => {
+    expect(text).toContain('w_ci -->|"after CI completes on main, if it passed on a push"| w_deploy');
+  });
+
+  it('adds a node for a workflow it waits on that is not in the list', () => {
+    expect(buildPipelineMermaid([deploy])).toContain('("CI") -->|"after CI completes on main, if it passed on a push"| w_deploy');
+  });
+});
+
+describe('the real deploy.yml', () => {
+  const text = readFileSync(join(__dirname, '../../../.github/workflows/deploy.yml'), 'utf8');
+  const ci = parseWorkflow('ci.yml', 'name: CI\non:\n  push:\n    branches: [main]\njobs:\n  check:\n    name: Check');
+  const diagram = buildPipelineMermaid([ci, parseWorkflow('deploy.yml', text)]);
+
+  it('shows deploy after CI on main, if it passed on a push, and a manual run that skips the CI check', () => {
+    expect(diagram).toContain('w_ci -->|"after CI completes on main, if it passed on a push"| w_deploy');
+    expect(diagram).toContain('("manual, skips the CI check") --> w_deploy');
   });
 });

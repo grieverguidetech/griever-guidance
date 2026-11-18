@@ -2161,9 +2161,18 @@ function ageLine(d) {
 function diagramCard(parent, d) {
   var c = card(d.title);
   var meta = el("p", null, "diagram-meta muted");
-  meta.appendChild(link(d.file + ", line " + d.line, d.url));
-  meta.appendChild(document.createTextNode(". " + ageLine(d)));
+  if (d.fromCode) {
+    meta.appendChild(document.createTextNode("Drawn from the code. " + (d.readMinutesAgo < 1 ? "Read just now." : "Read " + d.readMinutesAgo + " min ago.")));
+  } else {
+    meta.appendChild(link(d.file + ", line " + d.line, d.url));
+    meta.appendChild(document.createTextNode(". " + ageLine(d)));
+  }
   c.appendChild(meta);
+  if (d.error) {
+    c.appendChild(el("p", d.error, "error"));
+    parent.appendChild(c);
+    return null;
+  }
   var region = scrollBox("Diagram: " + d.title);
   var drawing = el("div", null, "diagram");
   drawing.appendChild(el("p", "Drawing the diagram.", "muted"));
@@ -2275,7 +2284,10 @@ function renderArchitecture() {
       }
       group.diagrams.forEach(function (d) {
         safely(s, function (box) {
-          slots.push(diagramCard(box, d));
+          var slot = diagramCard(box, d);
+          if (slot) {
+            slots.push(slot);
+          }
         });
       });
       p.appendChild(s);
