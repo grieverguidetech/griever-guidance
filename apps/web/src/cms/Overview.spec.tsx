@@ -80,6 +80,11 @@ describe('Overview', () => {
     expect(screen.getByRole('button', { name: /^The person/ })).toHaveTextContent('The person Not started passed May 29, 2026');
   });
 
+  it('person summary formats a date of passing before 2000', () => {
+    setup({ dateOfPassing: '1985-05-29' });
+    expect(screen.getByRole('button', { name: /^The person/ })).toHaveTextContent('passed May 29, 1985');
+  });
+
   it('service summary falls back to "Service" and omits missing parts', () => {
     const { unmount } = setup({ serviceDate: '2026-06-03' });
     expect(screen.getByRole('button', { name: /^Service/ })).toHaveTextContent('Service, June 3, 2026');

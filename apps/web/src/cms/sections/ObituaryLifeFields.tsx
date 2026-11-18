@@ -13,15 +13,13 @@ import {
   WORSHIP_PLACE_TYPES,
   ageFrom,
   cityPick,
+  LIFE_YEARS,
   dateNote,
   splitPersonName,
   type SectionFields,
   type ServiceEventFields,
   type SessionDetails,
 } from '@griever/shared';
-
-/** Birth and passing dates run far before 2000, so the field's default years would not tidy them. */
-const LIFE_YEARS = { minYear: 1800, maxYear: 2100 };
 
 const copy = screenCopy('cmsObituary');
 // The shared controls use Service's own labels, so the same value has the same name on both pages.
