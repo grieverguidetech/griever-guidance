@@ -24,6 +24,7 @@ export type MembersFailureReason =
   | 'conflict'
   | 'rate_limited'
   | 'unusable'
+  | 'not_a_member'
   | 'unavailable'
   | 'failed';
 
@@ -136,9 +137,21 @@ export function removeMember(
   });
 }
 
-/** The signed-in person leaves the account they help. Sends no body. */
-export function leaveMembership(accessToken: string): Promise<LeaveMembershipResult> {
-  return callNoBody(accessToken, '/membership', { method: 'DELETE' });
+/** The signed-in person leaves the account they help. Sends no body. Only a 404 is `not_a_member`. */
+export async function leaveMembership(accessToken: string): Promise<LeaveMembershipResult> {
+  try {
+    await apiFetchNoContent('/membership', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return { ok: true };
+  } catch (error) {
+    // Only a 404 means the person is not a member; every other refusal keeps its usual reason.
+    if (error instanceof ApiError && error.status === 404) {
+      return { ok: false, reason: 'not_a_member' };
+    }
+    return failure(error);
+  }
 }
 
 /** The invite token goes in the JSON body only, never in the URL. */

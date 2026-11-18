@@ -190,34 +190,49 @@ describe('useMembers leave', () => {
   const memberView: MembersView = { role: 'member', owner: { id: 'o1', name: 'Ada' } };
   const emptyOwner: MembersView = { role: 'owner', members: [], invites: [] };
 
-  it('on success reloads /members and the view is an empty owner view', async () => {
-    let calls = 0;
-    const client = stub({
-      getMembers: vi.fn(async () => ({ ok: true as const, view: calls++ === 0 ? memberView : emptyOwner })),
-    });
+  it('on success reloads /members and shows the server answer', async () => {
+    const getMembers = vi
+      .fn<MembersClient['getMembers']>()
+      .mockResolvedValueOnce({ ok: true, view: memberView })
+      .mockResolvedValueOnce({ ok: true, view: emptyOwner });
+    const client = stub({ getMembers });
     const { result } = setup(client);
     await waitFor(() => expect(result.current.view).toEqual(memberView));
     await act(async () => {
       expect(await result.current.leave()).toBe(true);
     });
     expect(client.leaveMembership).toHaveBeenCalledWith('tok');
-    expect(client.getMembers).toHaveBeenCalledTimes(2);
+    expect(getMembers).toHaveBeenCalledTimes(2);
     expect(result.current.view).toEqual(emptyOwner);
+    expect(result.current.status).toBe('ready');
   });
 
-  it('is an empty owner view even if the reload after leaving fails', async () => {
-    let calls = 0;
-    const client = stub({
-      getMembers: vi.fn(async () =>
-        calls++ === 0 ? { ok: true as const, view: memberView } : { ok: false as const, reason: 'offline' as const },
-      ),
+  it('uses the server answer, not the empty view, when the reload succeeds', async () => {
+    const getMembers = vi
+      .fn<MembersClient['getMembers']>()
+      .mockResolvedValueOnce({ ok: true, view: memberView })
+      .mockResolvedValueOnce({ ok: true, view: { ...emptyOwner, invites: [{ id: 'i1', email: 'a@b.co', createdAt: 'x', expiresAt: 'y' }] } });
+    const { result } = setup(stub({ getMembers }));
+    await waitFor(() => expect(result.current.view).toEqual(memberView));
+    await act(async () => {
+      await result.current.leave();
     });
-    const { result } = setup(client);
+    expect(result.current.view).toMatchObject({ role: 'owner', invites: [{ id: 'i1' }] });
+  });
+
+  it('if the reload fails, shows an empty owner view with no error or stale status', async () => {
+    const getMembers = vi
+      .fn<MembersClient['getMembers']>()
+      .mockResolvedValueOnce({ ok: true, view: memberView })
+      .mockResolvedValueOnce({ ok: false, reason: 'offline' });
+    const { result } = setup(stub({ getMembers }));
     await waitFor(() => expect(result.current.view).toEqual(memberView));
     await act(async () => {
       expect(await result.current.leave()).toBe(true);
     });
     expect(result.current.view).toEqual(emptyOwner);
+    expect(result.current.message).toBeNull();
+    expect(result.current.status).toBe('ready');
   });
 
   it('offline gives the calm offline message and keeps the view', async () => {
@@ -235,7 +250,7 @@ describe('useMembers leave', () => {
   });
 
   it('a refusal (not a member) gives the calm not-a-member message, without a mark', async () => {
-    const client = stub({ leaveMembership: fail('failed') });
+    const client = stub({ leaveMembership: fail('not_a_member') });
     const { result } = setup(client);
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => {
@@ -243,6 +258,16 @@ describe('useMembers leave', () => {
     });
     expect(result.current.message).toBe(MEMBERS_MESSAGES.not_a_member);
     expect(MEMBERS_MESSAGES.not_a_member).not.toContain('!');
+  });
+
+  it('any other failure reads as unavailable, not not-a-member', async () => {
+    const client = stub({ leaveMembership: fail('failed') });
+    const { result } = setup(client);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      expect(await result.current.leave()).toBe(false);
+    });
+    expect(result.current.message).toBe(MEMBERS_MESSAGES.unavailable);
   });
 
   it('a busy answer reads as unavailable', async () => {

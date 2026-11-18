@@ -72,7 +72,7 @@ describe.each(calls)('%s', (name, run, method, path) => {
     [500, 'unavailable'],
     [503, 'unavailable'],
     [418, 'failed'],
-    [404, name === 'acceptInvite' ? 'unusable' : 'failed'],
+    [404, name === 'acceptInvite' ? 'unusable' : name === 'leaveMembership' ? 'not_a_member' : 'failed'],
     [410, name === 'acceptInvite' ? 'unusable' : 'failed'],
   ])('maps status %i to %s', async (status, reason) => {
     fetchMock.mockResolvedValue(json(status, { error: 'x' }));
@@ -137,6 +137,13 @@ describe('results', () => {
     expect(await leaveMembership(ACCESS)).toEqual({ ok: true });
     expect(firstCall().init.body).toBeUndefined();
     fetchMock.mockResolvedValue(json(404, { error: 'x' }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'not_a_member' });
+  });
+
+  it('leaveMembership: only a 404 is not_a_member; 418 and a 200 with a body are failed', async () => {
+    fetchMock.mockResolvedValue(json(418, { error: 'x' }));
+    expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'failed' });
+    fetchMock.mockResolvedValue(json(200, { ok: true }));
     expect(await leaveMembership(ACCESS)).toEqual({ ok: false, reason: 'failed' });
   });
 

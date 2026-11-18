@@ -95,9 +95,8 @@ export function membersErrorMessage(reason: MembersFailureReason, action: Member
       return action === 'accept' ? MEMBERS_MESSAGES.conflict_accept : MEMBERS_MESSAGES.conflict_create;
     case 'unusable':
       return MEMBERS_MESSAGES.unusable;
-    case 'failed':
-      // A refused leave means the person is not a member (the gateway answers 404).
-      return action === 'leave' ? MEMBERS_MESSAGES.not_a_member : MEMBERS_MESSAGES.unavailable;
+    case 'not_a_member':
+      return MEMBERS_MESSAGES.not_a_member;
     default:
       return MEMBERS_MESSAGES.unavailable;
   }
@@ -122,30 +121,32 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
   /** True while this hook is still mounted and switched on. Late results are dropped otherwise. */
   const isLive = () => mounted.current && enabledRef.current;
 
-  const load = useCallback(async () => {
-    if (!enabledRef.current) return;
+  /** Resolves true only when the list was fetched and shown. */
+  const load = useCallback(async (): Promise<boolean> => {
+    if (!enabledRef.current) return false;
     const g = ++loadGen.current;
     setStatus((s) => (s === 'ready' ? s : 'loading'));
     const token = await tokenRef.current();
-    if (!mounted.current || g !== loadGen.current) return;
+    if (!mounted.current || g !== loadGen.current) return false;
     if (!token) {
       setMessage(MEMBERS_MESSAGES.signed_out);
       setStatus('signed_out');
-      return;
+      return false;
     }
     const result = await clientRef.current.getMembers(token);
-    if (!mounted.current || g !== loadGen.current) return;
+    if (!mounted.current || g !== loadGen.current) return false;
     if (result.ok) {
       setView(result.view);
       setStatus('ready');
       setMessage(null);
-      return;
+      return true;
     }
     // The last list stays on screen.
     setMessage(membersErrorMessage(result.reason, 'load'));
     setStatus(
       result.reason === 'offline' ? 'offline' : result.reason === 'signed_out' ? 'signed_out' : 'unavailable',
     );
+    return false;
   }, []);
 
   // Tracks real unmount only, not `enabled` toggles.
@@ -173,6 +174,7 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     async (
       action: MembersAction,
       run: (c: MembersClient, token: string) => Promise<{ ok: true } | MembersFailure>,
+      onDone?: (reloaded: boolean) => void,
     ): Promise<boolean> => {
       if (!enabledRef.current) return false;
       setMessage(null);
@@ -192,7 +194,10 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
         }
         return false;
       }
-      if (isLive()) await load();
+      if (isLive()) {
+        const reloaded = await load();
+        onDone?.(reloaded);
+      }
       return true;
     },
     [load],
@@ -224,14 +229,33 @@ export function useMembers({ getAccessToken, enabled, client }: UseMembersOption
     [act],
   );
 
-  const leave = useCallback(async () => {
-    const left = await act('leave', (c, token) => c.leaveMembership(token));
-    if (left && isLive()) {
-      // Even if the reload inside act failed, the old family list must not stay on screen.
-      setView(EMPTY_OWNER_VIEW);
-    }
-    return left;
-  }, [act]);
+  const leave = useCallback(
+    () =>
+      act(
+        'leave',
+        (c, token) => c.leaveMembership(token),
+        (reloaded) => {
+          // The leave worked. If the reload failed, do not keep the old family list or its error.
+          if (!reloaded && isLive()) {
+            setView(EMPTY_OWNER_VIEW);
+            setStatus('ready');
+            setMessage(null);
+          }
+        },
+      ),
+    [act],
+  );
 
-  return { view, status, message, invite, revoke, remove, accept, leave, refresh: load };
+  return {
+    view,
+    status,
+    message,
+    invite,
+    revoke,
+    remove,
+    accept,
+    leave, refresh: async () => {
+      await load();
+    },
+  };
 }

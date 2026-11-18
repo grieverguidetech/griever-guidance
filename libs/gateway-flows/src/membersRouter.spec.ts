@@ -409,7 +409,7 @@ describe('members router', () => {
 
   it('has no exclamation point in any message (C7)', async () => {
     const codes = ['invalid', 'unauthorized', 'forbidden', 'not_found', 'conflict', 'already_invited', 'rate_limited', 'busy'];
-    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, SEND_FAILED, UNAVAILABLE, UNUSABLE];
+    const copy = [BAD_BODY, BAD_EMAIL, BAD_ID, NOT_A_MEMBER, SEND_FAILED, UNAVAILABLE, UNUSABLE];
     for (const code of codes) {
       copy.push(failureFor(code).error);
     }
