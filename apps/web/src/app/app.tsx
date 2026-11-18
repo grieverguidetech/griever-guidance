@@ -1,7 +1,7 @@
 import { useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useLocation, useNavigate, useNavigationType } from 'react-router';
+import { Navigate, useLocation, useNavigate, useNavigationType } from 'react-router';
 import type { Location } from 'react-router';
 import {
   useContacts,
@@ -46,6 +46,8 @@ import { ThanksSection } from '../cms/sections/ThanksSection';
 import type { CmsNavKey } from '../cms/SideNav';
 import { pathForSpot, spotFromPath } from '../routes/editorLocation';
 import { parsePath, paths } from '../routes/paths';
+import { isSignInPath, rememberNext, rememberedNext, requireAccount } from '../routes/RequireAccount';
+import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import type { ClerkAccountReady, ClerkLoadResult, ClerkModules } from '../lib/authClient';
@@ -391,15 +393,14 @@ function entryState(): unknown {
 
 /** The App paths that are not editor pages: the landing target replaces them once per load. */
 // `/join` keeps today's behavior (the App lands from any of its paths); the join ticket must remove it.
-const LANDING_PATHS = ['/', '/sign-in', '/sign-up', '/join'];
-/** The paths Back walks past while signed in (Clerk's sign-in steps live there), as #566 did. */
-const WALK_PATHS = ['/', '/sign-in', '/sign-up'];
+// The sign-in paths are not here: the sign-in guard sends a signed-in visitor on to `next` (#851).
+const LANDING_PATHS = ['/', '/join'];
+/** The paths Back walks past while signed in (Clerk's sign-in steps live there, `/sign-in/...`), as #566 did. */
+function isWalkPath(pathname: string): boolean {
+  return pathname === '/' || pathname === '/sign-up' || isSignInPath(pathname);
+}
 /** Most automatic Back moves in a row, so an odd history can never loop. */
 const MAX_WALK = 50;
-
-function isAccountView(view: AppView): boolean {
-  return view === 'signIn';
-}
 
 function AppBody({
   auth,
@@ -465,14 +466,10 @@ function AppBody({
     applyRemoteFlows: sessions.applyRemoteFlows,
   });
 
-  // The screen for everything the URL does not decide: sign-in, the old flows (editor off), and the
-  // moment before the editor's landing. In the editor build the history entry decides the rest.
-  const [baseView, setView] = useState<AppView>(() => {
-    if (offline) return 'home';
-    if (AUTH_ENABLED) return 'signIn';
-    // Home is always the first screen, with or without people (A2b); contacts come later in the walk.
-    return 'home';
-  });
+  // The screen for everything the URL does not decide: the old flows (editor off) and the moment before
+  // the editor's landing. In the editor build the history entry decides the rest; sign-in is a path (#851).
+  // Home is always the first screen, with or without people (A2b); contacts come later in the walk.
+  const [baseView, setView] = useState<AppView>('home');
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
@@ -510,7 +507,7 @@ function AppBody({
       const spot = spotFromPath(entryLocation.pathname);
       return !spot?.flowId || !sessionList.some((s) => s.flowId === spot.flowId);
     }
-    if (WALK_PATHS.includes(entryLocation.pathname)) {
+    if (isWalkPath(entryLocation.pathname)) {
       return true;
     }
     return false;
@@ -533,11 +530,13 @@ function AppBody({
   const accountPath = screenRoute?.name === 'account';
   const personPath = pathSpot?.flowId ? pathSpot : null;
   const pathPerson = personPath ? (sessionList.find((s) => s.flowId === personPath.flowId) ?? null) : null;
-  const editorDecides = CMS_ENABLED && baseView !== 'signIn';
+  // The sign-in screen is a path (#851): `/sign-in` and Clerk's steps under it, while nobody is signed in.
+  // `/join` is public and keeps the sign-in it showed before (its fragment stays; #128 changes it).
+  const showSignIn = auth !== null && !auth.isSignedIn && (isSignInPath(shown.pathname) || shown.pathname === '/join');
   const startPath = pathSpot !== null && pathSpot.flowId === null;
   // /account is one path with two versions: the signed-in one, and Settings when nobody is signed in.
   const accountView: AppView = auth?.isSignedIn ? 'profile' : 'settings';
-  const view: AppView = !editorDecides
+  const editorView: AppView = !CMS_ENABLED
     ? baseView
     : peoplePath
       ? 'people'
@@ -548,6 +547,7 @@ function AppBody({
           : startPath
             ? 'noOne'
             : baseView;
+  const view: AppView = showSignIn ? 'signIn' : editorView;
   const cmsSection: CmsSection = pathSpot?.section ?? 'overview';
   // An item is in the path (guide URLs).
   const pathItem = ITEM_IDS.find((id) => id === pathSpot?.item) ?? null;
@@ -565,12 +565,10 @@ function AppBody({
     editorPath &&
     (!CMS_ENABLED || (pathSpot === null && !peoplePath && !accountPath) || (pathSpot !== null && pathSpot.item !== null && pathItem === null));
 
-  const firstView = useRef(view);
-  // Shown once, on the first screen after a removal; leaving it ends it for good.
+  // Shown once, on the first screen after a removal; leaving it ends it for good. The first screen is
+  // the first one shown, not a loading moment or a guard move before it (see `firstView` below).
+  const firstView = useRef<AppView | null>(null);
   const [showRemoved, setShowRemoved] = useState(removed);
-  useEffect(() => {
-    if (view !== firstView.current) setShowRemoved(false);
-  }, [view]);
   // The open person with the editor off. With it on, the URL names the person (see `active` below).
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which moment's draft the flow opens with. Undefined (a returning visit) means the one
@@ -625,6 +623,65 @@ function AppBody({
 
   const signedIn = auth?.isSignedIn ?? false;
   const signedOut = auth !== null && !auth.isLoading && !auth.isSignedIn;
+  // True when the session ended while someone was using the app, other than with the Sign out button.
+  // Until they sign in again or open the sign-in screen, the guard leaves them on any page they move to,
+  // with the note. Only a cold load, or a move after the sign-in screen, goes to sign-in (#851). Written
+  // during render so the guard below knows in the same render.
+  const hadSession = useRef(false);
+  const ended = useRef(false);
+  if (signedIn) {
+    hadSession.current = true;
+    ended.current = false;
+  } else if (signedOut && hadSession.current) {
+    hadSession.current = false;
+    ended.current = !leftOnPurpose;
+  }
+  if (showSignIn) {
+    ended.current = false;
+  }
+  const endedHere = signedOut && ended.current;
+  const accountState: AccountState = !AUTH_ENABLED
+    ? 'off'
+    : !auth
+      ? 'local'
+      : auth.isLoading
+        ? 'loading'
+        : auth.isSignedIn
+          ? 'signed_in'
+          : endedHere || deletingAccount
+            ? 'stay'
+            : leftOnPurpose
+              ? 'left'
+              : 'signed_out';
+  // The sign-in guard. Not during the Back walk (#566): that walk moves through history on its own.
+  const guardTo = walking
+    ? null
+    : requireAccount({ pathname: location.pathname, search: location.search, account: accountState, remembered: rememberedNext() });
+  // The guard's `next` is also kept in this tab, for a sign-in that returns on a URL without it (SSO,
+  // email links). A bare /sign-in clears it. It is used up once a signed-in page is shown, not while
+  // the guard is still moving there (a re-render then would lose the target).
+  const inApp = accountState === 'signed_in' || accountState === 'local' || accountState === 'off';
+  useEffect(() => {
+    if (isSignInPath(location.pathname)) {
+      return;
+    }
+    if (guardTo !== null) {
+      rememberNext(new URLSearchParams(guardTo.split('?')[1] ?? '').get('next'));
+    } else if (inApp) {
+      rememberNext(null);
+    }
+  }, [guardTo, location.pathname, inApp]);
+  const screenShown = guardTo === null && !auth?.isLoading;
+  useEffect(() => {
+    if (!screenShown) {
+      return;
+    }
+    if (firstView.current === null) {
+      firstView.current = view;
+    } else if (view !== firstView.current) {
+      setShowRemoved(false);
+    }
+  }, [view, screenShown]);
   // The editor's sections share one view, so the section is part of the key: a change moves focus to the h1.
   // Someone arriving on the empty page keeps the same key, so focus does not jump mid-read (they hear a polite note instead).
   const [arrivedQuietly, setArrivedQuietly] = useState(false);
@@ -730,8 +787,15 @@ function AppBody({
 
   // Sign-in resolves asynchronously (the boot-time session check, or the Clerk form), so the
   // next view can't be decided in useState's initializer. Everyone lands on Home.
+  // True until the first sign-in of this load, and again whenever the sign-in screen shows.
+  const awaitingSignIn = useRef(true);
   useEffect(() => {
-    if (!signedIn || !isAccountView(baseView)) return;
+    if (view === 'signIn') {
+      awaitingSignIn.current = true;
+      return;
+    }
+    if (!signedIn || !awaitingSignIn.current) return;
+    awaitingSignIn.current = false;
     setFlowCategory(undefined);
     setView('home');
     // Ask in the background whether the account has a name. It never holds anyone back, and it
@@ -744,7 +808,7 @@ function AppBody({
         if (generation === accountGeneration.current) setNeedsName(lacks);
       });
     }
-  }, [signedIn, baseView, getAccessToken]);
+  }, [signedIn, view, getAccessToken]);
 
   // Orphan unnamed people from the old flow would otherwise sit on the device; tidy them once.
   const pruneEmpty = sessions.pruneEmpty;
@@ -756,7 +820,7 @@ function AppBody({
   // An account with no name (a failed save at sign-up, or a sign-in to one): ask for it, then
   // return to wherever this interrupted.
   useEffect(() => {
-    if (signedIn && needsName && !isAccountView(view) && view !== 'profile') openProfile(true, view);
+    if (signedIn && needsName && view !== 'signIn' && view !== 'profile') openProfile(true, view);
   }, [signedIn, needsName, view, openProfile]);
 
   // No session, no prompt: it would be stale by the next sign-in.
@@ -766,20 +830,19 @@ function AppBody({
     if (needsName) setNeedsName(false);
   }, [signedOut, needsName]);
 
-  // Only the Sign out button sends the person back to sign-in. A session that ended some other
-  // way keeps them where they are (C5), with a note.
+  // Only the Sign out button sends the person back to sign-in (the guard moves them to `/sign-in`). A
+  // session that ended some other way keeps them where they are, with a note. The next sign-in lands on Home.
   useEffect(() => {
-    if (signedOut && leftOnPurpose && !isAccountView(view)) {
-      setLeftOnPurpose(false);
+    if (signedOut && leftOnPurpose) {
       setFlowCategory(undefined);
-      setView('signIn');
-      // The sign-in sits on `/`, so the next sign-in lands afresh instead of reopening Your account.
-      if (CMS_ENABLED) {
-        navigate('/', { replace: true });
-      }
+      setView('home');
+    }
+    // Cleared once the sign-in screen is reached, so the guard never sends them twice.
+    if (leftOnPurpose && view === 'signIn') {
+      setLeftOnPurpose(false);
     }
   }, [signedOut, leftOnPurpose, view]);
-  const sessionEnded = signedOut && !leftOnPurpose && !isAccountView(view) && !deletingAccount;
+  const sessionEnded = endedHere && view !== 'signIn' && !deletingAccount;
   // One polite region that is always there, so the note is announced when its text appears.
   const signedOutNote = auth ? (
     <div role="status" aria-live="polite" className="text-[13px]">
@@ -788,7 +851,10 @@ function AppBody({
           <p className="m-0">You've been signed out. Your work on this device is safe. Sign in again when you're ready.</p>
           <button
             type="button"
-            onClick={() => setView('signIn')}
+            onClick={() => {
+              rememberNext(location.pathname);
+              navigate(paths.signIn(location.pathname), { replace: true });
+            }}
             className="gg-btn gg-btn-ghost self-start !px-0"
           >
             Sign in
@@ -1012,7 +1078,7 @@ function AppBody({
       if (walkMoves.current >= MAX_WALK) {
         return;
       }
-      if (WALK_PATHS.includes(window.location.pathname)) {
+      if (isWalkPath(window.location.pathname)) {
         walkedPastSignIn.current = true;
       }
       walkMoves.current += 1;
@@ -1601,6 +1667,10 @@ function AppBody({
 
   if (notFound) {
     return <NotFound />;
+  }
+
+  if (guardTo !== null) {
+    return <Navigate to={guardTo} replace />;
   }
 
   // While Clerk is loading or a stored session is being checked, show nothing but the quiet status.

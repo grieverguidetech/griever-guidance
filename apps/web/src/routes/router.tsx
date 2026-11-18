@@ -18,6 +18,8 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: null },
       { path: 'sign-in', element: null },
+      // Clerk's own sign-in steps (path routing, #851).
+      { path: 'sign-in/*', element: null },
       { path: 'sign-up', element: null },
       { path: 'join', element: null },
       { path: 'people/:flowId', element: null },

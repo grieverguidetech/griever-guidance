@@ -41,8 +41,9 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 });
 
 import { ClerkRuntimeError } from '@clerk/react/errors';
+import { MemoryRouter, RouterProvider, createMemoryRouter } from 'react-router';
 import { DeleteCancelledError } from './authClient';
-import { CLERK_GIVE_UP_MS, ClerkAccount, deleteClerkAccount, localization, useClerkAuth } from './clerk';
+import { CLERK_GIVE_UP_MS, ClerkAccount, clerkStepTarget, deleteClerkAccount, localization, useClerkAuth } from './clerk';
 
 function setAuth(overrides: Partial<Auth> = {}) {
   mocks.auth = {
@@ -330,7 +331,7 @@ describe('ClerkAccount', () => {
       </ClerkAccount>
     );
     mocks.clerkLoaded = false;
-    const { rerender } = render(view('a'));
+    const { rerender } = render(view('a'), { wrapper: MemoryRouter });
     await screen.findByText('signed_in');
     expect(seen.email).toBe('anna@example.com');
     expect(seen.open).toBeUndefined();
@@ -343,7 +344,7 @@ describe('ClerkAccount', () => {
 
   it('reports unavailable without a publishable key, and mounts no Clerk', () => {
     vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', '');
-    render(<ClerkAccount>{(state) => <p>{state.unavailable ? 'unavailable' : 'ready'}</p>}</ClerkAccount>);
+    render(<ClerkAccount>{(state) => <p>{state.unavailable ? 'unavailable' : 'ready'}</p>}</ClerkAccount>, { wrapper: MemoryRouter });
     expect(screen.getByText('unavailable')).toBeInTheDocument();
     expect(mocks.providerProps).toBeNull();
   });
@@ -363,6 +364,7 @@ describe('ClerkAccount', () => {
           return <p>{state.unavailable ? 'unavailable' : state.account.status}</p>;
         }}
       </ClerkAccount>,
+      { wrapper: MemoryRouter },
     );
     expect(await screen.findByText('signed_in')).toBeInTheDocument();
     await act(async () => {});
@@ -377,6 +379,53 @@ describe('ClerkAccount', () => {
       },
     });
     expect(window.localStorage.getItem('gg.signedIn.v1')).toBe('user_1');
+  });
+});
+
+describe('Clerk sign-in steps (#851)', () => {
+  it('moves only to its own steps under /sign-in, keeps next, and drops a hash', () => {
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=%2Fpeople')).toBe('/sign-in/factor-one?next=%2Fpeople');
+    expect(clerkStepTarget(`${window.location.origin}/sign-in/create#x`, '')).toBe('/sign-in/create');
+    expect(clerkStepTarget('/sign-in?next=%2Faccount', '?next=%2Fpeople')).toBe('/sign-in?next=%2Faccount');
+    expect(clerkStepTarget('/', '?next=%2Fpeople')).toBeNull();
+    // Only a safeNext path is carried, and never "/".
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=https%3A%2F%2Fevil.example')).toBe('/sign-in/factor-one');
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=%2Fsign-up')).toBe('/sign-in/factor-one');
+    expect(clerkStepTarget('/sign-in/factor-one', '?next=%2F')).toBe('/sign-in/factor-one');
+    expect(clerkStepTarget('/sign-inx', '')).toBeNull();
+    expect(clerkStepTarget('https://accounts.example.com/sign-in/factor-one', '')).toBeNull();
+  });
+
+  it('resolves a relative step against the current page, not the origin', () => {
+    window.history.replaceState(null, '', '/sign-in/factor-one?next=%2Fpeople');
+    expect(clerkStepTarget('factor-two', window.location.search)).toBe('/sign-in/factor-two?next=%2Fpeople');
+    window.history.replaceState(null, '', '/sign-in/');
+    expect(clerkStepTarget('create', '')).toBe('/sign-in/create');
+  });
+
+  it('points Clerk at /sign-in and replaces the entry on every step, push or replace', async () => {
+    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_abc');
+    mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
+    window.history.replaceState(null, '', '/sign-in?next=%2Fpeople');
+    const router = createMemoryRouter(
+      [{ path: '*', element: <ClerkAccount>{(state) => <p>{state.unavailable ? 'unavailable' : 'ready'}</p>}</ClerkAccount> }],
+      { initialEntries: ['/sign-in?next=%2Fpeople'] },
+    );
+    render(<RouterProvider router={router} />);
+    await screen.findByText('ready');
+    expect(mocks.providerProps).toMatchObject({ signInUrl: '/sign-in', signUpUrl: '/sign-in' });
+    const push = mocks.providerProps?.['routerPush'] as (to: string) => unknown;
+    await act(async () => {
+      await push('/sign-in/factor-one');
+    });
+    expect(router.state.location.pathname).toBe('/sign-in/factor-one');
+    expect(router.state.location.search).toBe('?next=%2Fpeople');
+    expect(router.state.historyAction).toBe('REPLACE');
+    // After sign-in or sign-out Clerk asks for another page: the app stays, and its guard decides.
+    await act(async () => {
+      await push('/');
+    });
+    expect(router.state.location.pathname).toBe('/sign-in/factor-one');
   });
 });
 
@@ -439,6 +488,7 @@ describe('deleteClerkAccount', () => {
           return <p>{state.unavailable ? 'unavailable' : state.account.status}</p>;
         }}
       </ClerkAccount>,
+      { wrapper: MemoryRouter },
     );
     await screen.findByText('signed_in');
     await expect(remove?.()).rejects.toBeInstanceOf(DeleteCancelledError);
