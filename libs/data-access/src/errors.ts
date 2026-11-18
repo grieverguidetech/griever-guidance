@@ -6,6 +6,8 @@ export type DataErrorCode =
   | 'not_found'
   | 'forbidden'
   | 'conflict'
+  /** createFlow only: the id is held by another account's person (#942). Same 409 as conflict. */
+  | 'taken'
   | 'already_invited'
   | 'invite_conflict'
   | 'unusable'
@@ -19,6 +21,7 @@ export const HTTP_STATUS: Record<DataErrorCode, number> = {
   not_found: 404,
   forbidden: 403,
   conflict: 409,
+  taken: 409,
   already_invited: 409,
   invite_conflict: 409,
   unusable: 404,

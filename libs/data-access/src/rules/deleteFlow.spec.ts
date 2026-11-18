@@ -191,13 +191,15 @@ describe.runIf(up)('deleteFlow on DynamoDB Local', () => {
       }
     });
 
-    it('gives createFlow with the same id a conflict', async () => {
+    it('gives createFlow with the same id conflict for the owner and taken for anyone else (#942)', async () => {
       const { owner, id } = await seedOwnerWithPerson();
       await deleteFlow(doc, table, caller(owner), id, clock);
+      // The guard outlives the delete. The owner gets conflict, so their client never makes a new id
+      // and brings the deleted person back.
       expect(await createFlow(doc, table, caller(owner), id, FACTS, clock)).toEqual({ ok: false, code: 'conflict' });
       expect(await createFlow(doc, table, caller(uid('other')), id, FACTS, clock)).toEqual({
         ok: false,
-        code: 'conflict',
+        code: 'taken',
       });
     });
 

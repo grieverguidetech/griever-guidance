@@ -33,7 +33,9 @@ export function parseSyncedPatch(input: unknown): Partial<SyncedFields> | null {
 /**
  * Expected failures are values, never exceptions.
  * - `offline`: the request never reached a server. Sync retries later (C5).
- * - `conflict` 409: on create, the id already exists, so switch to `patchFlow`.
+ * - `conflict` 409: on create, the id already exists and is the caller's own, so switch to `patchFlow`.
+ * - `taken` 409 with `code: 'taken'`: on create, another account holds the id (#942). Sync gives the
+ *   person a new id if the PATCH that follows gets 404.
  * - `signed_out` 401, `forbidden` 403, `not_found` 404, `invalid` 400/422 (or a bad id, never sent).
  * - `rate_limited` 429: too many saves in a minute. A soft failure: the edit stays queued and sync tries again later.
  * - `unavailable`: a 5xx. `failed`: anything else, including a reply that is not a valid record.
@@ -44,6 +46,7 @@ export type FlowsFailureReason =
   | 'forbidden'
   | 'not_found'
   | 'conflict'
+  | 'taken'
   | 'invalid'
   | 'rate_limited'
   | 'unavailable'
@@ -72,8 +75,12 @@ function reasonForStatus(status: number): FlowsFailureReason {
 
 function failure(error: unknown): FlowsFailure {
   // Only the status is kept; the message could echo request text.
-  if (error instanceof ApiError)
+  if (error instanceof ApiError) {
+    if (error.status === 409 && error.code === 'taken') {
+      return { ok: false, reason: 'taken' };
+    }
     return { ok: false, reason: reasonForStatus(error.status) };
+  }
   return {
     ok: false,
     reason: error instanceof TypeError ? 'offline' : 'failed',

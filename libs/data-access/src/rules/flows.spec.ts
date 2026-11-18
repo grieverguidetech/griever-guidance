@@ -179,7 +179,7 @@ describe.runIf(up)('createFlow on DynamoDB Local', () => {
     await expectNothingWritten('user_c_typeonly', id);
   });
 
-  it('gives conflict when another owner already has the id', async () => {
+  it('gives taken when another owner already has the id (#942)', async () => {
     const id = randomUUID();
     expect(
       (await createFlow(doc, table, caller('user_c_first'), id, facts, clock))
@@ -193,10 +193,19 @@ describe.runIf(up)('createFlow on DynamoDB Local', () => {
       facts,
       clock,
     );
-    expect(result).toEqual({ ok: false, code: 'conflict' });
+    expect(result).toEqual({ ok: false, code: 'taken' });
     expect(
       await getLive(doc, table, flowKey('user_c_second', id), clock),
     ).toBeUndefined();
+  });
+
+  it('gives conflict, never taken, when the caller already has the id (#942)', async () => {
+    const id = randomUUID();
+    expect((await createFlow(doc, table, caller('user_c_again'), id, facts, clock)).ok).toBe(true);
+    expect(await createFlow(doc, table, caller('user_c_again'), id, facts, clock)).toEqual({
+      ok: false,
+      code: 'conflict',
+    });
   });
 
   it('gives invalid for bad facts or a bad id', async () => {

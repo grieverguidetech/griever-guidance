@@ -185,6 +185,16 @@ describe('createFlow and patchFlow', () => {
 });
 
 describe('round 2 behaviour', () => {
+  it('create reports a 409 with code taken as taken, and any other 409 as conflict (#942)', async () => {
+    fetchMock.mockResolvedValueOnce(json(409, { error: 'That person already exists.', code: 'taken' }));
+    expect(await createFlow(ACCESS, ID, facts)).toEqual({ ok: false, reason: 'taken' });
+    fetchMock.mockResolvedValueOnce(json(409, { error: 'That person already exists.', code: 'other' }));
+    expect(await createFlow(ACCESS, ID, facts)).toEqual({ ok: false, reason: 'conflict' });
+    // The code means nothing on another status.
+    fetchMock.mockResolvedValueOnce(json(404, { error: 'That could not be found.', code: 'taken' }));
+    expect(await createFlow(ACCESS, ID, facts)).toEqual({ ok: false, reason: 'not_found' });
+  });
+
   it('create reports a 409 as conflict', async () => {
     fetchMock.mockResolvedValue(json(409, { error: 'exists' }));
     expect(await createFlow(ACCESS, ID, facts)).toEqual({

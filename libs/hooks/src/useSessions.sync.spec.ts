@@ -256,3 +256,47 @@ describe('the emailed-obituary marker stays on the device (C2, C3)', () => {
     expect(payload).toEqual(toSyncedFields(local() as never));
   });
 });
+
+describe('moveFlowId (#942)', () => {
+  const B = '44444444-4444-4444-8444-444444444444';
+
+  it("gives an owner's person the new id and keeps the local id, drafts and the old id", () => {
+    const storage = mem([local({ ownerId: null, drafts: { announcement: { templateCategory: 'announcement' } as never } })]);
+    const { result } = renderHook(() => useSessions(storage));
+    act(() => result.current.moveFlowId(A, B));
+    const moved = result.current.sessions[0];
+    expect(moved.id).toBe('local-1');
+    expect(moved.flowId).toBe(B);
+    expect(moved.formerFlowIds).toEqual([A]);
+    expect(moved.drafts.announcement).toBeDefined();
+    expect(Object.keys(toSyncedFields(moved))).not.toContain('formerFlowIds');
+    expect(JSON.parse(storage.getItem('gg.sessions.v1') ?? '[]')[0].flowId).toBe(B);
+  });
+
+  it("never moves a member's person", () => {
+    const { result } = renderHook(() => useSessions(mem([local({ role: 'member', ownerId: OTHER })])));
+    act(() => result.current.moveFlowId(A, B));
+    expect(result.current.sessions[0].flowId).toBe(A);
+    expect(result.current.sessions[0].formerFlowIds).toBeUndefined();
+  });
+
+  it('keeps the same list when no session holds the old id, so a repeat ask re-renders nothing', () => {
+    const { result } = renderHook(() => useSessions(mem([local()])));
+    const before = result.current.sessions;
+    act(() => result.current.moveFlowId(B, A));
+    expect(result.current.sessions).toBe(before);
+  });
+
+  it('keeps only strings from a saved formerFlowIds, and drops one that is not a list', () => {
+    const { result } = renderHook(() =>
+      useSessions(
+        mem([
+          local({ formerFlowIds: [B, 7, null, 'x'] as never }),
+          local({ id: 'local-2', flowId: B, formerFlowIds: 'not a list' as never }),
+        ]),
+      ),
+    );
+    expect(result.current.sessions[0].formerFlowIds).toEqual([B, 'x']);
+    expect(result.current.sessions[1].formerFlowIds).toBeUndefined();
+  });
+});

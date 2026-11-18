@@ -680,7 +680,23 @@ Rules:
   person this account owns and the server hasn't seen is created with `POST /flows`; anything else
   is edited with `PATCH /flows/:id` carrying only the pending keys. No upserts. A `409` on create
   switches to `PATCH`. `400/422`, `403` and `404` drop that person's pending edits (`403/404` also
-  pull). Offline, `5xx` and timeouts stop the queue and retry after 5 s doubling to 5 min, or on
+  pull).
+- **An id someone else took first (#942).** A person's flowId is in their page URL before it reaches
+  the server, so another account can create a flow with it first. `createFlow` tells the two `409`s
+  apart by who holds the `FLOW#<id>` guard: the caller (their own person, live or deleted) gets
+  `conflict`; another account gets `taken`. The gateway sends both as `409` with the same copy;
+  `taken` adds `code: "taken"` to the body, and the api-client maps it to the reason `taken`. Nothing
+  about the other account is returned. On `taken` the client marks the id known and saves it in
+  `conflicted` (with the queue). If the `PATCH` that follows gets `404` and the person is the
+  caller's own (`role: 'owner'`), the client makes a new UUID, moves the queue entry and last-seen
+  facts to it, creates it with all current facts and details, and calls `moveFlowId`: the session
+  takes the new id and keeps the old one in `formerFlowIds` (device-only, never sent). The web app
+  opens `/people/<old id>` as that person and replaces the URL with the new id. A `conflict` then
+  `404` keeps the plain drop-and-pull above, so an owner's deleted person never comes back. An id
+  that a re-mint made is never re-minted again (`reminted`, saved): a second `taken` then `404`
+  drops and pulls. The old-to-new map (`moved`) is saved too, so after a restart that lost the
+  sessions save, the person is moved before the first pull and stays one person. People who got
+  stuck before this shipped (known id, no `taken` record) are not recovered. Offline, `5xx` and timeouts stop the queue and retry after 5 s doubling to 5 min, or on
   wake. A missing access token also backs off and retries. Any other failure (for example `413`)
   keeps that person's edits, and the queue carries on with the next person; they are tried again
   on the next edit, wake or pull. After a send, only keys unchanged since sending are cleared.
@@ -742,7 +758,8 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   member, a stranger, an unknown id, an already-deleted person and an expired one all get `not_found`,
   and nothing changes. The action sets `deletedAt` and `ttl` (now + 90 days, epoch seconds) on the flow,
   and the same `ttl` on the `FLOW#<id>` guard, in one transaction. A deleted person is hidden from the person reads
-  (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict`) until DynamoDB
+  (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict` for the owner and
+  `taken` for anyone else, #942) until DynamoDB
   purges both items after 90 days. A joiner who owns only a deleted person is still refused (C11).
   The owner's other devices keep the person for now. Account deletion (below) still removes everything.
 - **Invite emails (#146, settled 2026-10-21).** An invite carries the email of a third party who

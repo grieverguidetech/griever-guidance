@@ -44,7 +44,11 @@ export const FLOWS_FORBIDDEN = "You can't change this person's details.";
 export const FLOWS_NOT_FOUND = 'That could not be found.';
 export const FLOWS_CANNOT_ADD = 'Only the person who owns this account can add someone.';
 
-type Failure = { status: 400 | 401 | 403 | 404 | 409 | 503; error: string };
+/**
+ * `code` is set only where the client must tell two answers with the same status apart: `taken` (another
+ * account holds the id, so the app gives its person a new one, #942) from `conflict` (the caller's own).
+ */
+type Failure = { status: 400 | 401 | 403 | 404 | 409 | 503; error: string; code?: 'taken' };
 
 /** What each data function failure says to the caller. Unknown codes and busy are 503. */
 export function flowsFailureFor(code: string): Failure {
@@ -59,6 +63,8 @@ export function flowsFailureFor(code: string): Failure {
       return { status: 404, error: FLOWS_NOT_FOUND };
     case 'conflict':
       return { status: 409, error: 'That person already exists.' };
+    case 'taken':
+      return { status: 409, error: 'That person already exists.', code: 'taken' };
     default:
       return { status: 503, error: FLOWS_UNAVAILABLE };
   }
@@ -121,8 +127,8 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
       return c.json({ error: FLOWS_UNAVAILABLE }, 503);
     }
     if (!result.ok) {
-      const { status, error } = flowsFailureFor(result.code);
-      return c.json({ error: result.code === 'forbidden' ? forbiddenCopy : error }, status);
+      const { status, error, code } = flowsFailureFor(result.code);
+      return c.json({ error: result.code === 'forbidden' ? forbiddenCopy : error, ...(code ? { code } : {}) }, status);
     }
     return c.json(result.data, okStatus);
   };

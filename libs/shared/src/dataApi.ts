@@ -42,6 +42,7 @@ export const DATA_ERROR_CODES = [
   'not_found',
   'forbidden',
   'conflict',
+  'taken',
   'already_invited',
   'invite_conflict',
   'busy',

@@ -1,4 +1,4 @@
-import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import {
   isUuid,
   parseFlowFacts,
@@ -155,6 +155,27 @@ export function profileWrite(
 }
 
 /**
+ * Why a create's id guard already exists (#942). `taken` when another account holds it: the client
+ * then gives its person a new id. `conflict` when the caller holds it (their own person, live or
+ * soft-deleted, since the guard outlives a delete) or the guard is gone by now: the client edits
+ * instead and never makes a new id. The guard is read whatever its ttl, because DynamoDB purges late
+ * and an expired guard still blocks the create. Nothing about the other account is returned.
+ */
+async function guardHolder(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  id: string,
+  callerId: string,
+): Promise<'taken' | 'conflict'> {
+  const { Item } = await doc.send(new GetCommand({ TableName: table, Key: flowGuardKey(id), ConsistentRead: true }));
+  const ownerId = Item?.['ownerId'];
+  if (typeof ownerId === 'string' && ownerId !== callerId) {
+    return 'taken';
+  }
+  return 'conflict';
+}
+
+/**
  * Creates a person for the caller, as owner. A member can never create one (C11).
  * One transaction writes the id guard and the flow, checks there is no MEMBER_OF item,
  * and bumps the profile version.
@@ -228,7 +249,7 @@ export async function createFlow(
       return { ok: false, code: 'busy' };
     }
     if (result.failedIndex === CREATE_GUARD) {
-      return { ok: false, code: 'conflict' };
+      return { ok: false, code: await guardHolder(doc, table, id, caller.userId) };
     }
     if (result.failedIndex === CREATE_MEMBERSHIP) {
       return { ok: false, code: 'forbidden' };

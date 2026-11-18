@@ -464,6 +464,11 @@ function pagePathFor(person: Session, section: CmsSection): string | null {
   return pathForSpot({ flowId: person.flowId, section, item: null });
 }
 
+/** The person a path's flowId names: by their id, or by an id they had before sync gave them a new one (#942). */
+function findByFlowId(list: readonly Session[], flowId: string): Session | null {
+  return list.find((s) => s.flowId === flowId) ?? list.find((s) => s.formerFlowIds?.includes(flowId) === true) ?? null;
+}
+
 /** The state this app stored on the current history entry (React Router keeps it under `usr`). */
 function entryState(): unknown {
   const raw: unknown = window.history.state;
@@ -558,6 +563,7 @@ function AppBody({
     storage: browserStorage,
     subscribe: subscribeSync,
     applyRemoteFlows: sessions.applyRemoteFlows,
+    moveFlowId: sessions.moveFlowId,
   });
 
   // The screen for everything the URL does not decide: the old flows (editor off) and the moment before
@@ -599,7 +605,7 @@ function AppBody({
     // who is here stops the walk there. (Your people, Account and the empty pages are not news after a walk.)
     if (walkedPastSignIn.current) {
       const spot = spotFromPath(entryLocation.pathname);
-      return !spot?.flowId || !sessionList.some((s) => s.flowId === spot.flowId);
+      return !spot?.flowId || findByFlowId(sessionList, spot.flowId) === null;
     }
     if (isWalkPath(entryLocation.pathname)) {
       return true;
@@ -623,7 +629,11 @@ function AppBody({
   const peoplePath = screenRoute?.name === 'people';
   const accountPath = screenRoute?.name === 'account';
   const personPath = pathSpot?.flowId ? pathSpot : null;
-  const pathPerson = personPath ? (sessionList.find((s) => s.flowId === personPath.flowId) ?? null) : null;
+  const pathFlowId = personPath?.flowId ?? null;
+  const pathPerson = pathFlowId ? findByFlowId(sessionList, pathFlowId) : null;
+  // The person's page under an id they no longer have (#942): the same page under their new id.
+  const movedPath =
+    personPath && pathPerson && pathPerson.flowId !== pathFlowId ? pathForSpot({ ...personPath, flowId: pathPerson.flowId }) : null;
   // The sign-in screen is a path (#851): `/sign-in` and Clerk's steps under it, while nobody is signed in.
   const showSignIn = auth !== null && !auth.isSignedIn && isSignInPath(shown.pathname);
   // Joining from an invitation link (#128). The token is in state so using it up re-renders; it is only
@@ -859,7 +869,8 @@ function AppBody({
     view === 'noOne' || (view === 'cms' && arrivedQuietly)
       ? `empty:${cmsSection}:${cmsItem ?? ''}`
       : view === 'cms'
-        ? `cms:${pathPerson?.flowId ?? ''}:${cmsSection}:${cmsItem ?? ''}`
+        ? // The local id, not the flowId: sync can give a person a new flowId while they type (#942).
+          `cms:${pathPerson?.id ?? ''}:${cmsSection}:${cmsItem ?? ''}`
         : accountPath
           ? 'account'
           : view,
@@ -1334,6 +1345,15 @@ function AppBody({
     const removedHere = seenFlows.current.has(flowId) || (readRemovedFlows(browserStorage) ?? []).some((mark) => mark.id === flowId);
     go({ view: 'people', missing: !removedHere }, { replace: true });
   });
+  // A person given a new id by sync (#942), or an old link to them: replace the entry, so Back does not
+  // return to the old id. The entry's state (openedHere), query and hash move with it.
+  useEffect(() => {
+    if (movedPath === null || walking) {
+      return;
+    }
+    navigate({ pathname: movedPath, search: location.search, hash: location.hash }, { replace: true, state: location.state });
+  }, [movedPath, walking, navigate, location.search, location.hash, location.state]);
+
   // Every person this load has shown, so a page of one who is gone since reads as removed, not unknown.
   const seenFlows = useRef(new Set<string>());
   useEffect(() => {
