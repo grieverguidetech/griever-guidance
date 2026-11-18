@@ -5,6 +5,9 @@ import { DateField, todayISO } from '../../lib/DateField';
 import { dateNoteProps as noteProps } from '../../lib/dateNoteProps';
 import { MarkReady } from './MarkReady';
 
+/** Birth and passing dates run far before 2000, so the field's default years would not tidy them. */
+const LIFE_YEARS = { minYear: 1000, maxYear: 9999 };
+
 const copy = screenCopy('cmsPerson');
 
 type PersonValues = Partial<Pick<SessionDetails, 'personName' | 'dateOfPassing'>> &
@@ -48,6 +51,7 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
           label={`${copy.dateOfBirthLabel} ${copy.optional}`}
           value={values.birthDate ?? ''}
           max={todayISO()}
+          years={LIFE_YEARS}
           visibleHelp
           {...noteProps(birthNote)}
           onChange={(birthDate) => onChange({ birthDate })}
@@ -57,6 +61,7 @@ export function PersonSection({ values, onChange, onReadyChange, nextSection, on
           label={`${copy.dateOfPassingLabel} ${copy.optional}`}
           value={values.dateOfPassing ?? ''}
           max={todayISO()}
+          years={LIFE_YEARS}
           visibleHelp
           {...noteProps(passingNote)}
           onChange={(dateOfPassing) => onChange({ dateOfPassing })}
