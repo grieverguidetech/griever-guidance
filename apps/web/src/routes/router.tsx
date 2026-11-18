@@ -1,20 +1,30 @@
 import { createBrowserRouter, Outlet, ScrollRestoration } from 'react-router';
 import type { ReactElement } from 'react';
-import type { RouteObject } from 'react-router';
+import type { Location, RouteObject } from 'react-router';
 import App from '../app/app';
 import { captureJoinLink } from '../lib/joinLink';
 import { NotFound } from './NotFound';
 import { SECTIONS } from './paths';
 
 /**
+ * The key a scroll position is saved under. Entries the router did not make (the page load, Clerk's
+ * own steps) all have the key "default", so they would share one position: those use the path instead.
+ */
+export function scrollKey(location: Pick<Location, 'key' | 'pathname'>): string {
+  return location.key === 'default' ? location.pathname : location.key;
+}
+
+/**
  * Wraps every route (#852). `<ScrollRestoration/>` sends a new page to the top and puts Back and
- * Forward where they were. It scrolls in a layout effect, before the screens move focus to their h1;
- * those moves use `preventScroll`, so focus never undoes the restored position.
+ * Forward where they were. It scrolls in a layout effect, before the screens move focus (see
+ * `focusHeading` in lib/ui.tsx): after a new page the h1 is focused without scrolling; after Back or
+ * Forward only an h1 (or the side nav's current link) already in view is focused, so the restored
+ * position stays.
  */
 function RouteShell() {
   return (
     <>
-      <ScrollRestoration />
+      <ScrollRestoration getKey={scrollKey} />
       <Outlet />
     </>
   );

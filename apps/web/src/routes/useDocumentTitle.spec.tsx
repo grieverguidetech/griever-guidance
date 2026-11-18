@@ -3,18 +3,30 @@
  * the integration half renders the real App over the real route table with a person named Margaret
  * saved on this device, at every route, and reads `document.title`.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { ClerkLoadResult } from '../lib/authClient';
+import { fakeClerk } from '../test-clerk';
 import { renderApp } from '../test/renderApp';
 import { titleForPath, useDocumentTitle } from './useDocumentTitle';
 
-const mocks = vi.hoisted(() => ({ cms: true }));
+const mocks = vi.hoisted(() => ({
+  cms: true,
+  auth: false,
+  loadClerk: vi.fn<() => Promise<ClerkLoadResult>>(),
+}));
 
 vi.mock('../lib/features', () => ({
-  AUTH_ENABLED: false,
+  get AUTH_ENABLED() {
+    return mocks.auth;
+  },
   OBITUARY_DRAFTING_ENABLED: false,
   PAYMENTS_ENABLED: false,
   SHARING_ENABLED: false,
 }));
+vi.mock('../lib/authClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/authClient')>();
+  return { ...actual, loadClerk: mocks.loadClerk };
+});
 vi.mock('../lib/cmsFlag', () => ({
   get CMS_ENABLED() {
     return mocks.cms;
@@ -30,7 +42,7 @@ describe('titleForPath', () => {
     ['/', 'Grievers Guidance'],
     ['/sign-in', 'Sign in · Grievers Guidance'],
     ['/sign-in/factor-one', 'Sign in · Grievers Guidance'],
-    ['/sign-up', 'Sign in · Grievers Guidance'],
+    ['/sign-up', 'Create an account · Grievers Guidance'],
     ['/people', 'Your people · Grievers Guidance'],
     [`/people/${FLOW}`, 'Overview · Grievers Guidance'],
     [`/people/${FLOW}/person`, 'The person · Grievers Guidance'],
@@ -91,49 +103,85 @@ function seedMargaret() {
   );
 }
 
-const EVERY_ROUTE = [
-  '/',
-  '/sign-in',
-  '/sign-up',
-  '/join',
-  '/people',
-  `/people/${FLOW}`,
-  `/people/${FLOW}/person`,
-  `/people/${FLOW}/announcement`,
-  `/people/${FLOW}/service`,
-  `/people/${FLOW}/obituary`,
-  `/people/${FLOW}/thanks`,
-  `/people/${FLOW}/guide/officiant`,
-  '/start',
-  '/start/service',
-  '/start/guide/officiant',
-  '/account',
-  '/nope',
+const PERSON = `/people/${FLOW}`;
+const OVERVIEW = 'Overview · Grievers Guidance';
+const NOT_FOUND = 'Page not found · Grievers Guidance';
+
+/** [path opened, path it settles on, title]. With the editor on, `/` and the sign-in paths land on the latest person. */
+const EDITOR_ON: [string, string, string][] = [
+  ['/', PERSON, OVERVIEW],
+  ['/sign-in', PERSON, OVERVIEW],
+  ['/sign-up', PERSON, OVERVIEW],
+  ['/join', PERSON, OVERVIEW],
+  ['/people', '/people', 'Your people · Grievers Guidance'],
+  [PERSON, PERSON, OVERVIEW],
+  [`${PERSON}/person`, `${PERSON}/person`, 'The person · Grievers Guidance'],
+  [`${PERSON}/announcement`, `${PERSON}/announcement`, 'Announcement · Grievers Guidance'],
+  [`${PERSON}/service`, `${PERSON}/service`, 'Service · Grievers Guidance'],
+  [`${PERSON}/obituary`, `${PERSON}/obituary`, 'Obituary · Grievers Guidance'],
+  [`${PERSON}/thanks`, `${PERSON}/thanks`, 'Thank-yous · Grievers Guidance'],
+  [`${PERSON}/guide/officiant`, `${PERSON}/guide/officiant`, 'Checklist · Grievers Guidance'],
+  // Someone is saved, so the empty pages walk on to them.
+  ['/start', PERSON, OVERVIEW],
+  ['/start/service', `${PERSON}/service`, 'Service · Grievers Guidance'],
+  ['/start/guide/officiant', PERSON, OVERVIEW],
+  ['/account', '/account', 'Your account · Grievers Guidance'],
+  ['/nope', '/nope', NOT_FOUND],
 ];
+
+/** With the editor off, the editor's paths show NotFound and the rest show Home at `/`. */
+const EDITOR_OFF: [string, string, string][] = EDITOR_ON.map(([path]) => {
+  const home = ['/', '/sign-in', '/sign-up', '/join'].includes(path);
+  return [path, home ? '/' : path, home ? 'Grievers Guidance' : NOT_FOUND];
+});
+
+async function settlesOn(path: string, title: string) {
+  await waitFor(() => {
+    expect(window.location.pathname).toBe(path);
+    expect(document.title).toBe(title);
+  });
+  await screen.findByRole('heading', { level: 1 });
+}
 
 describe('no title ever holds a person\'s name (#852)', () => {
   beforeEach(() => {
+    mocks.auth = false;
     seedMargaret();
   });
 
-  it.each(EVERY_ROUTE)('editor on: %s', async (path) => {
+  it.each(EDITOR_ON)('editor on: %s settles on %s as "%s"', async (path, shown, title) => {
     mocks.cms = true;
     renderApp(<App />, { path });
-    await screen.findByRole('heading', { level: 1 });
-    // Let the App's own replace moves (`/` to the latest person, sign-in to `/`) settle.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settlesOn(shown, title);
     expect(document.title).not.toMatch(/Margaret|Hayes/);
-    // The title is set for the page actually shown, so this is not passing on an empty title.
-    expect(document.title).toContain('Grievers Guidance');
   });
 
-  it.each(EVERY_ROUTE)('editor off: %s', async (path) => {
+  it.each(EDITOR_OFF)('editor off: %s settles on %s as "%s"', async (path, shown, title) => {
     mocks.cms = false;
     renderApp(<App />, { path });
-    await screen.findByRole('heading', { level: 1 });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settlesOn(shown, title);
     expect(document.title).not.toMatch(/Margaret|Hayes/);
-    expect(document.title).toContain('Grievers Guidance');
+  });
+
+  it('accounts on, working locally on this device: the person\'s page keeps a generic title', async () => {
+    mocks.cms = true;
+    mocks.auth = true;
+    mocks.loadClerk.mockResolvedValue({ available: false });
+    window.localStorage.setItem('gg.signedIn.v1', 'u1');
+    renderApp(<App />, { path: '/people' });
+    await settlesOn('/people', 'Your people · Grievers Guidance');
+    // The person is on the page, so a title built from the page would show the name.
+    expect(await screen.findByText(/Margaret Hayes/)).toBeInTheDocument();
+    expect(document.title).not.toMatch(/Margaret|Hayes/);
+  });
+
+  it('accounts on, signed out: a person\'s page goes to Sign in, titled Sign in', async () => {
+    mocks.cms = true;
+    mocks.auth = true;
+    mocks.loadClerk.mockResolvedValue(fakeClerk().load);
+    renderApp(<App />, { path: `${PERSON}/service` });
+    await settlesOn('/sign-in', 'Sign in · Grievers Guidance');
+    expect(document.title).not.toMatch(/Margaret|Hayes/);
   });
 
   it('Your people names them on screen, while the title stays generic', async () => {

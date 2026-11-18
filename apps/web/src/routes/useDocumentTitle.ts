@@ -33,8 +33,9 @@ export function titleForPath(pathname: string): string {
     case 'landing':
       return titles.app;
     case 'signIn':
-    case 'signUp':
       return titles.signIn;
+    case 'signUp':
+      return titles.signUp;
     case 'people':
       return titles.people;
     case 'person':

@@ -3,10 +3,11 @@
   "title": "Copy for the browser tab title of each web route. Generic words only: never a person's name",
   "type": "object",
   "additionalProperties": false,
-  "required": ["app", "signIn", "people", "overview", "person", "announcement", "service", "obituary", "thanks", "guide", "account", "join"],
+  "required": ["app", "signIn", "signUp", "people", "overview", "person", "announcement", "service", "obituary", "thanks", "guide", "account", "join"],
   "properties": {
     "app": { "type": "string", "minLength": 1 },
     "signIn": { "type": "string", "minLength": 1 },
+    "signUp": { "type": "string", "minLength": 1 },
     "people": { "type": "string", "minLength": 1 },
     "overview": { "type": "string", "minLength": 1 },
     "person": { "type": "string", "minLength": 1 },

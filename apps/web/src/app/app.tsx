@@ -1,4 +1,4 @@
-import { useFocusHeadingOnChange } from '../lib/ui';
+import { focusHeading, useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate, useNavigationType } from 'react-router';
@@ -863,6 +863,7 @@ function AppBody({
         : accountPath
           ? 'account'
           : view,
+    { locationKey: location.key, type: navigationType },
   );
   // Must stay declared after the heading hook above: effects run in order, so this one lands
   // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
@@ -1759,9 +1760,8 @@ function AppBody({
       focusAfterLanding.current = false;
       const heading = document.querySelector('h1');
       if (heading) {
-        heading.setAttribute('tabindex', '-1');
-        // ScrollRestoration owns the scroll position (#852).
-        heading.focus({ preventScroll: true });
+        // The landing always replaces the entry, so the router has put the page at the top (#852).
+        focusHeading(heading, 'new');
       }
     } else if (view !== 'home') {
       focusAfterLanding.current = false;
