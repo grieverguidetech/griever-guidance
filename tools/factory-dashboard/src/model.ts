@@ -2174,3 +2174,80 @@ export function diagramAge(lastChanged: string | null, now: Date): { days: numbe
   const days = Math.max(0, Math.floor((now.getTime() - time) / 86_400_000));
   return { days, stale: days > DIAGRAM_STALE_DAYS };
 }
+
+// ---- Linear (team GRI), read-only ----
+
+export type LinearRow = {
+  identifier: string;
+  title: string;
+  url: string;
+  status: string;
+  priority: number;
+  priorityLabel: string;
+  assignee: string;
+  updatedAt: string;
+};
+
+type RawLinearIssue = {
+  identifier?: unknown;
+  title?: unknown;
+  url?: unknown;
+  state?: { name?: unknown; type?: unknown } | null;
+  priority?: unknown;
+  priorityLabel?: unknown;
+  assignee?: { name?: unknown } | null;
+  updatedAt?: unknown;
+};
+
+// Linear state types that mean the work is over.
+const LINEAR_CLOSED_TYPES = ['completed', 'canceled'];
+
+export function isOpenLinearState(type: unknown): boolean {
+  return typeof type === 'string' && !LINEAR_CLOSED_TYPES.includes(type);
+}
+
+// Priority 1 (urgent) to 4 (low) first; 0 means no priority and goes last. Then the newest update first.
+export function sortLinearRows(rows: LinearRow[]): LinearRow[] {
+  const rank = (priority: number): number => (priority === 0 ? 5 : priority);
+  return [...rows].sort((a, b) => {
+    if (rank(a.priority) !== rank(b.priority)) {
+      return rank(a.priority) - rank(b.priority);
+    }
+    return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+  });
+}
+
+// Maps the issue nodes of the GraphQL reply to rows. Closed states are dropped again here as a second guard.
+export function toLinearRows(nodes: unknown): LinearRow[] {
+  if (!Array.isArray(nodes)) {
+    throw new Error('Unreadable reply');
+  }
+  const rows: LinearRow[] = [];
+  for (const node of nodes as RawLinearIssue[]) {
+    if (!node || typeof node.identifier !== 'string' || typeof node.title !== 'string' || !isOpenLinearState(node.state?.type)) {
+      continue;
+    }
+    const priority = typeof node.priority === 'number' ? node.priority : 0;
+    rows.push({
+      identifier: node.identifier,
+      title: node.title,
+      url: typeof node.url === 'string' ? node.url : '',
+      status: typeof node.state?.name === 'string' ? node.state.name : 'Unknown',
+      priority,
+      priorityLabel: typeof node.priorityLabel === 'string' && node.priorityLabel !== '' ? node.priorityLabel : 'No priority',
+      assignee: typeof node.assignee?.name === 'string' && node.assignee.name !== '' ? node.assignee.name : 'Unassigned',
+      updatedAt: typeof node.updatedAt === 'string' ? node.updatedAt : '',
+    });
+  }
+  return sortLinearRows(rows);
+}
+
+// A plain reason for the page. The key is cut out if it ever appears, and the text is cut short.
+export function linearErrorMessage(raw: string, key: string): string {
+  let text = (raw.split('\n').find((line) => line.trim() !== '') ?? '').trim();
+  if (key !== '') {
+    text = text.split(key).join('[removed]');
+  }
+  text = text.replace(/lin_api_[A-Za-z0-9]+/g, '[removed]').slice(0, 120);
+  return `Could not read Linear: ${text === '' ? 'unknown error' : text}`;
+}

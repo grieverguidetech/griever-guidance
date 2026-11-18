@@ -1,4 +1,4 @@
-// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It writes only one cache file (the AWS cost reading).
+// Read-only factory dashboard server. Runs only `gh`, `git` and `aws ce get-cost-and-usage` read commands, and reads docs/**/*.md (Mermaid blocks) and the Mermaid bundle in node_modules. It also makes one read-only Linear GraphQL query (key from the macOS Keychain, never sent to the page). It writes only one cache file (the AWS cost reading).
 import { execFile } from 'node:child_process';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -38,6 +38,9 @@ import {
   GIT_LOG_FORMAT,
   COMMITS_SHOWN,
   costErrorMessage,
+  linearErrorMessage,
+  toLinearRows,
+  type LinearRow,
   makeCostReader,
   validateCostReading,
   parseAdr,
@@ -459,9 +462,88 @@ const readCost = makeCostReader({
   },
 });
 
+// Linear (team GRI): one read-only GraphQL query. The personal API key is read from the macOS Keychain on each
+// call and kept only in a local variable. It is never logged, never sent to the page and never written anywhere.
+const LINEAR_URL = 'https://api.linear.app/graphql';
+const LINEAR_CACHE_MS = 10 * 60 * 1000;
+const LINEAR_NO_KEY = 'Linear key not set. See the README.';
+const LINEAR_QUERY = `query ($after: String) {
+  teams(filter: { key: { eq: "GRI" } }) {
+    nodes {
+      issues(first: 100, after: $after, filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
+        nodes { identifier title url state { name type } priority priorityLabel assignee { name } updatedAt }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`;
+const LINEAR_MAX_PAGES = 10;
+
+type LinearReading = { rows: LinearRow[]; at: number };
+let linearCache: LinearReading | null = null;
+
+async function readLinearKey(): Promise<string> {
+  try {
+    const { stdout } = await run('security', ['find-generic-password', '-s', 'gg-dashboard-linear', '-w'], { timeout: 10_000 });
+    const key = stdout.trim();
+    if (key !== '') {
+      return key;
+    }
+  } catch {
+    // Not found in the Keychain: handled below.
+  }
+  throw new Error(LINEAR_NO_KEY);
+}
+
+async function fetchLinearRows(key: string): Promise<LinearRow[]> {
+  const nodes: unknown[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < LINEAR_MAX_PAGES; page += 1) {
+    const response = await fetch(LINEAR_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: key },
+      body: JSON.stringify({ query: LINEAR_QUERY, variables: { after } }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) {
+      throw new Error(`Linear answered ${response.status}`);
+    }
+    const body = (await response.json()) as {
+      errors?: { message?: string }[];
+      data?: { teams?: { nodes?: { issues?: { nodes?: unknown[]; pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } }[] } };
+    };
+    if (body.errors && body.errors.length > 0) {
+      throw new Error(body.errors[0]?.message ?? 'Linear returned an error');
+    }
+    const issues = body.data?.teams?.nodes?.[0]?.issues;
+    if (!issues) {
+      throw new Error('Team GRI not found');
+    }
+    nodes.push(...(issues.nodes ?? []));
+    if (!issues.pageInfo?.hasNextPage || !issues.pageInfo.endCursor) {
+      break;
+    }
+    after = issues.pageInfo.endCursor;
+  }
+  return toLinearRows(nodes);
+}
+
+async function readLinear(): Promise<LinearReading> {
+  if (linearCache && Date.now() - linearCache.at < LINEAR_CACHE_MS) {
+    return linearCache;
+  }
+  const key = await readLinearKey();
+  try {
+    linearCache = { rows: await fetchLinearRows(key), at: Date.now() };
+    return linearCache;
+  } catch (error) {
+    throw new Error(linearErrorMessage(error instanceof Error ? error.message : '', key));
+  }
+}
+
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
-  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead, milestones] = await Promise.all([
+  const [boardResult, openIssues, closedIssues, prs, runs, worktrees, health, flags, mergedPrs, ciMainRuns, deployRuns, recentClosed, commits, adrs, costReading, prLead, milestones, linear] = await Promise.all([
     guarded('board', sources, { items: [], truncated: null } as BoardResult, loadBoard),
     guarded('openIssues', sources, [] as Issue[], () => loadIssues('open', 300)),
     guarded('closedIssues', sources, [] as Issue[], () => loadIssues('closed', 500)),
@@ -479,6 +561,7 @@ async function buildState() {
     guarded('awsCost', sources, null as CostReading | null, readCost),
     guarded('prLeadInputs', sources, { prs: [], truncated: false } as LeadResult, loadPrLeadInputs),
     guarded('milestones', sources, [] as Milestone[], loadMilestones),
+    guarded('linear', sources, null as LinearReading | null, readLinear),
   ]);
   const reviewFile = await guarded('backlogReview', sources, null as BacklogReviewFile | null, loadBacklogReviews);
   const businessFile = await guarded('business', sources, null as BusinessFile | null, loadBusiness);
@@ -542,6 +625,7 @@ async function buildState() {
       costReading === null
         ? null
         : { dollars: costReading.dollars, estimated: costReading.estimated, budget: COST_BUDGET_USD, checkedAt: new Date(costReading.at).toISOString() },
+    linear: linear === null ? null : { rows: linear.rows, checkedAt: new Date(linear.at).toISOString() },
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

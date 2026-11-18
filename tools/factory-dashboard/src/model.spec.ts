@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diagramAge, diagramGroup, extractMermaidBlocks } from './model';
+import { diagramAge, diagramGroup, extractMermaidBlocks, isOpenLinearState, linearErrorMessage, toLinearRows } from './model';
 
 const FENCE = '```';
 const block = (body = 'flowchart TD\n  A --> B'): string => `${FENCE}mermaid\n${body}\n${FENCE}`;
@@ -81,5 +81,53 @@ describe('diagramAge', () => {
   it('has no age when git gave no date', () => {
     expect(diagramAge(null, now)).toEqual({ days: null, stale: false });
     expect(diagramAge('not a date', now)).toEqual({ days: null, stale: false });
+  });
+});
+
+describe('Linear helpers', () => {
+  const node = (id: string, type: string, priority: number, updatedAt: string, assignee: string | null = null) => ({
+    identifier: id,
+    title: `Sample ${id}`,
+    url: `https://linear.example/${id}`,
+    state: { name: type === 'started' ? 'In Progress' : type, type },
+    priority,
+    priorityLabel: ['No priority', 'Urgent', 'High', 'Medium', 'Low'][priority],
+    assignee: assignee ? { name: assignee } : null,
+    updatedAt,
+  });
+
+  it('keeps open state types and drops completed and canceled', () => {
+    expect(['backlog', 'unstarted', 'started', 'triage'].every(isOpenLinearState)).toBe(true);
+    expect(isOpenLinearState('completed')).toBe(false);
+    expect(isOpenLinearState('canceled')).toBe(false);
+    expect(isOpenLinearState(undefined)).toBe(false);
+  });
+
+  it('sorts by priority with no priority last, then newest update first', () => {
+    const rows = toLinearRows([
+      node('X-1', 'started', 0, '2026-11-17T00:00:00Z'),
+      node('X-2', 'started', 3, '2026-11-01T00:00:00Z'),
+      node('X-3', 'started', 1, '2026-11-02T00:00:00Z'),
+      node('X-4', 'started', 3, '2026-11-10T00:00:00Z'),
+    ]);
+    expect(rows.map((row) => row.identifier)).toEqual(['X-3', 'X-4', 'X-2', 'X-1']);
+  });
+
+  it('maps fields, shows Unassigned and drops closed issues', () => {
+    const rows = toLinearRows([node('X-1', 'completed', 2, '2026-11-01T00:00:00Z'), node('X-2', 'started', 2, '2026-11-01T00:00:00Z', 'Sam')]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ identifier: 'X-2', status: 'In Progress', priorityLabel: 'High', assignee: 'Sam' });
+    expect(toLinearRows([node('X-3', 'started', 0, '2026-11-01T00:00:00Z')])[0]?.assignee).toBe('Unassigned');
+  });
+
+  it('rejects a reply that is not a list', () => {
+    expect(() => toLinearRows(null)).toThrow('Unreadable reply');
+  });
+
+  it('removes the key from an error reason', () => {
+    const message = linearErrorMessage('Bad header lin_api_SECRET123 and mykey-abc', 'mykey-abc');
+    expect(message).not.toContain('mykey-abc');
+    expect(message).not.toContain('SECRET123');
+    expect(message.startsWith('Could not read Linear: ')).toBe(true);
   });
 });
