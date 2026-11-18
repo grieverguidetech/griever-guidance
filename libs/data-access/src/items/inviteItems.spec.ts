@@ -1,4 +1,4 @@
-import { decodeInvite, encodeInvite, encodeToken, toPendingInvite, type InviteItem } from './inviteItems.js';
+import { closedInviteTtl, decodeInvite, encodeInvite, encodeToken, inviteTtl, toPendingInvite, type InviteItem } from './inviteItems.js';
 import { decodeMember, decodeMemberOf, encodeMember, encodeMemberOf } from './memberItems.js';
 
 const HASH = 'a'.repeat(64);
@@ -82,5 +82,40 @@ describe('member codecs', () => {
   it('refuses broken items', () => {
     expect(() => decodeMember({ ownerId: 'x' })).toThrow('Member item is broken.');
     expect(() => decodeMemberOf({})).toThrow('Membership item is broken.');
+  });
+});
+
+describe('invite retention ttl (pure)', () => {
+  const DAY = 24 * 60 * 60;
+  const at = (iso: string) => Date.parse(iso);
+
+  it('inviteTtl is the time plus 30 days, in whole epoch seconds', () => {
+    expect(inviteTtl(at('2026-10-08T00:00:00.000Z'))).toBe(at('2026-10-08T00:00:00.000Z') / 1000 + 30 * DAY);
+    expect(inviteTtl(1_500)).toBe(1 + 30 * DAY);
+  });
+
+  it('closedInviteTtl takes the close time when the invite closes before it expires', () => {
+    expect(closedInviteTtl('2026-10-08T00:00:00.000Z', at('2026-10-02T00:00:00.000Z'))).toBe(
+      at('2026-10-02T00:00:00.000Z') / 1000 + 30 * DAY,
+    );
+  });
+
+  it('closedInviteTtl keeps the expiry time when the invite closes after it expired', () => {
+    expect(closedInviteTtl('2026-10-08T00:00:00.000Z', at('2026-10-20T00:00:00.000Z'))).toBe(
+      at('2026-10-08T00:00:00.000Z') / 1000 + 30 * DAY,
+    );
+  });
+
+  it('closedInviteTtl refuses a bad expiry instead of writing NaN', () => {
+    expect(() => closedInviteTtl('nonsense', 1)).toThrow(/valid expiry/);
+    expect(() => closedInviteTtl('2026-10-08T00:00:00.000Z', Number.NaN)).toThrow(/valid expiry/);
+  });
+
+  it('decodeInvite refuses an item whose expiresAt is not a date', () => {
+    expect(() => decodeInvite({ ...encodeInvite(invite), expiresAt: 'nonsense' })).toThrow(/broken/);
+  });
+
+  it('the token guard carries a gsi1 ref to the owner, so deleteUser can find it', () => {
+    expect(encodeToken(HASH, 'user_owner1', invite.id)).toMatchObject({ gsi1pk: 'REF#user_owner1', gsi1sk: `TOKEN#${HASH}` });
   });
 });

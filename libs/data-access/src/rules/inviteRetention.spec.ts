@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { fixedClock } from '../clock.js';
 import { encodeInvite, encodeToken, type InviteItem } from '../items/inviteItems.js';
 import { encodeProfile } from '../items/profileItem.js';
-import { inviteKey, memberKey, memberOfKey, profileKey, type Key } from '../keys.js';
+import { inviteKey, memberKey, memberOfKey, profileKey, tokenKey, type Key } from '../keys.js';
 import { createTables, doc, dropTables, rawPut, table, up } from '../testing/localTable.js';
 import { acceptInvite } from './acceptInvite.js';
+import { deleteUser } from './deleteUser.js';
 import { createInvite, revokeInvite } from './invites.js';
 import { listMembers } from './members.js';
 
@@ -180,12 +181,60 @@ describe.runIf(up)('invite retention (#146) on DynamoDB Local', () => {
       expect(await revokeInvite(doc, table, caller(owner), stale.id, clock)).toEqual({ ok: false, code: 'not_found' });
     });
 
-    it('is listed again by a clock before its ttl (the filter is the clock, not the data)', async () => {
+    it('is listed at a clock before its ttl and not at one after it: the same stored item', async () => {
       const owner = uid('owner');
       await profile(owner);
-      const invite = await seedInvite(owner, `${uid('to')}@example.test`, { ttl: NOW_SECONDS + 100 });
-      const view = await listMembers(doc, table, caller(owner), clock);
-      expect(view).toMatchObject({ invites: [{ id: invite.id }] });
+      const ttl = NOW_SECONDS + 100;
+      const invite = await seedInvite(owner, `${uid('to')}@example.test`, { ttl });
+      const before = fixedClock(new Date((ttl - 1) * 1000));
+      const after = fixedClock(new Date((ttl + 1) * 1000));
+      expect(await listMembers(doc, table, caller(owner), before)).toMatchObject({ invites: [{ id: invite.id }] });
+      expect(await listMembers(doc, table, caller(owner), after)).toMatchObject({ invites: [] });
+    });
+  });
+
+  describe('the TOKEN# guard and account deletion', () => {
+    it('revoke strips the owner and invite ids from the guard, which stays', async () => {
+      const owner = uid('owner');
+      await profile(owner);
+      const invite = await seedInvite(owner, `${uid('to')}@example.test`);
+      await revokeInvite(doc, table, caller(owner), invite.id, clock);
+      const guard = await raw(tokenKey(invite.tokenHash));
+      expect(guard).toMatchObject({ entity: 'TOKEN' });
+      for (const name of ['ownerId', 'inviteId', 'gsi1pk', 'gsi1sk']) {
+        expect(guard).not.toHaveProperty(name);
+      }
+    });
+
+    it('accept strips the owner and invite ids from the guard, which stays', async () => {
+      const owner = uid('owner');
+      const joiner = uid('joiner');
+      await profile(owner);
+      await profile(joiner);
+      const invite = await seedInvite(owner, `${joiner}@example.test`);
+      await acceptInvite(doc, table, caller(joiner), invite.tokenHash, clock);
+      const guard = await raw(tokenKey(invite.tokenHash));
+      expect(guard).toMatchObject({ entity: 'TOKEN' });
+      for (const name of ['ownerId', 'inviteId', 'gsi1pk', 'gsi1sk']) {
+        expect(guard).not.toHaveProperty(name);
+      }
+    });
+
+    it('deleteUser removes the guard of an invite whose INVITE# item is already gone', async () => {
+      const owner = uid('owner');
+      await profile(owner);
+      const tokenHash = hash();
+      const created = await createInvite(doc, table, caller(owner), `${uid('to')}@example.test`, tokenHash, clock);
+      if (!created.ok) {
+        throw new Error('create failed');
+      }
+      expect(await raw(tokenKey(tokenHash))).toMatchObject({ ownerId: owner });
+      // What DynamoDB's TTL does once the invite has expired and the 30 days have passed.
+      await doc.send(new DeleteCommand({ TableName: table, Key: inviteKey(owner, created.value.id) }));
+
+      await deleteUser(doc, table, owner, clock);
+
+      expect(await raw(tokenKey(tokenHash))).toBeUndefined();
     });
   });
 });

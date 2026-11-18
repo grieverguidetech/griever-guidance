@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { fixedClock } from '../clock.js';
-import { decodeInvite, encodeInvite, type InviteItem } from '../items/inviteItems.js';
+import { decodeInvite, encodeInvite, encodeToken, type InviteItem } from '../items/inviteItems.js';
 import { encodeMember, encodeMemberOf } from '../items/memberItems.js';
 import { encodeProfile, getProfile } from '../items/profileItem.js';
 import { INVITE_PREFIX, inviteKey, tokenKey } from '../keys.js';
@@ -39,6 +39,7 @@ const seedInvite = async (ownerId: string, overrides: Partial<InviteItem> = {}):
     ...overrides,
   };
   await rawPut(encodeInvite(invite));
+  await rawPut(encodeToken(invite.tokenHash, ownerId, invite.id));
   return invite;
 };
 const stored = async (ownerId: string) =>

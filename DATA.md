@@ -731,7 +731,12 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   deletes an expired item some time after the ttl passes, not at the exact second, so the rule is
   "about 30 days", and every read ignores an invite whose ttl has passed but which is not yet deleted
   (`getLive` and `queryLive`, `libs/data-access/src/read.ts`). The `TOKEN#` guard holds no email and
-  has no ttl; it stays so a used hash is never used again. No membership or profile item has a ttl.
+  has no ttl; it stays so a used hash is never used again. When an invite closes (revoke or accept),
+  the same write strips `ownerId` and `inviteId` from its guard, so the guard names nobody. A guard for
+  an invite that only expires keeps them, plus a `gsi1` ref to the owner, so account deletion
+  (`deleteUser`) still finds and removes it after the `INVITE#` item has gone. No membership or
+  profile item has a ttl. There is no backfill: invites written before the data function is
+  redeployed with #146 have no ttl and are kept. Sharing is off in production, so none are expected.
   Nothing else reads a closed invite: the members list shows open invites, the rate limit looks back
   24 hours, and "one open invite per email" covers open invites.
 - Deletion is never offered inside a flow — only in settings, never on C1, and never as a swipe

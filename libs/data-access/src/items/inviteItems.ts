@@ -1,6 +1,7 @@
 import type { PendingInvite } from '@griever/shared';
-import { inviteKey, refGsi, tokenKey } from '../keys.js';
+import { inviteKey, refGsi, tokenKey, tokenRefGsi } from '../keys.js';
 import { type Item } from '../read.js';
+import type { TransactItem } from '../transact.js';
 
 export interface InviteItem {
   id: string;
@@ -32,6 +33,9 @@ export function inviteTtl(fromMs: number): number {
  * expired keeps its expiry-based ttl.
  */
 export function closedInviteTtl(expiresAt: string, closedAtMs: number): number {
+  if (Number.isNaN(Date.parse(expiresAt)) || !Number.isFinite(closedAtMs)) {
+    throw new Error('closedInviteTtl needs a valid expiry and close time.');
+  }
   return Math.min(inviteTtl(Date.parse(expiresAt)), inviteTtl(closedAtMs));
 }
 
@@ -65,7 +69,8 @@ export function decodeInvite(item: Item): InviteItem {
     typeof email !== 'string' ||
     typeof tokenHash !== 'string' ||
     typeof createdAt !== 'string' ||
-    typeof expiresAt !== 'string'
+    typeof expiresAt !== 'string' ||
+    Number.isNaN(Date.parse(expiresAt))
   ) {
     throw new Error('Invite item is broken.');
   }
@@ -107,5 +112,22 @@ export function encodeToken(hash: string, ownerId: string, inviteId: string): It
     entity: 'TOKEN',
     ownerId,
     inviteId,
+    // Lets account deletion find a guard whose INVITE# item has expired and been deleted.
+    ...tokenRefGsi(ownerId, hash),
+  };
+}
+
+/**
+ * Run when an invite closes (revoke or accept). The guard stays so the hash stays used, but it no
+ * longer names the owner or the invite, so nothing is left to find once the INVITE# item is deleted.
+ */
+export function closeTokenGuard(table: string, hash: string): TransactItem {
+  return {
+    Update: {
+      TableName: table,
+      Key: tokenKey(hash),
+      UpdateExpression: 'REMOVE ownerId, inviteId, gsi1pk, gsi1sk',
+      ConditionExpression: 'attribute_exists(pk)',
+    },
   };
 }

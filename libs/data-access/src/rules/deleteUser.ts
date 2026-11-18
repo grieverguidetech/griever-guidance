@@ -150,6 +150,9 @@ export async function deleteUser(
     if (sk.startsWith(INVITE_PREFIX)) {
       // An invite this user accepted: it carries their email. The TOKEN# guard stays so the hash stays used.
       refTasks.push(remove(doc, table, key));
+    } else if (sk === 'TOKEN') {
+      // A guard for an invite this user sent, found even after the INVITE# item expired and went.
+      refTasks.push(remove(doc, table, key));
     } else if (sk.startsWith(FLOW_PREFIX)) {
       refTasks.push(async () => {
         try {
