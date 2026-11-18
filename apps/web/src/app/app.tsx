@@ -18,7 +18,7 @@ import {
   useFlowSync,
   readRemovedFlows,
 } from '@griever/hooks';
-import type { Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
+import type { LeaveOutcome, Session, SendFlowDraft, UseAccountResult } from '@griever/hooks';
 import { acceptInvite, deleteFlow, getProfile } from '@griever/api-client';
 import type { ProfileResult } from '@griever/api-client';
 import type { ChecklistItemId, MomentKey, SectionKey, SessionDetails, TemplateCategory } from '@griever/shared';
@@ -1127,20 +1127,29 @@ function AppBody({
     })();
   }, [joinOn, joinToken, offline, signedIn, getAccessToken, reloadProfile, refreshMembers, navigate, leaveJoinPath]);
 
-  // The joined note: filled a moment after the owner's name is known, so the region is in the page first
-  // and the words are announced. It ends once the person has seen it and moved to another page.
-  // Stop helping (#223): once the server agrees, a pull drops the shared people (and their drafts) from
-  // this device, and the profile reload brings back "Create a new one". A failure changes nothing.
+  // Stop helping (#223). Once the server says this person is not a member (or already was not), the
+  // shared people and their drafts leave this device straight away, without waiting on a pull: an empty
+  // list drops 'member' sessions only, never 'owner' ones. The pull then brings the account's own
+  // list, and the profile reload brings back "Create a new one". A failure changes nothing.
   const membersLeave = members.leave;
-  const leaveFamily = useCallback(async () => {
-    const ok = await membersLeave();
-    if (ok) {
+  const applyRemoteFlows = sessions.applyRemoteFlows;
+  const heldFor = sessions.heldFor;
+  const leaveFamily = useCallback(async (): Promise<LeaveOutcome> => {
+    const outcome = await membersLeave();
+    if (outcome === 'ok' || outcome === 'not_a_member') {
+      const userId = auth?.userId ?? '';
+      // Only while the list is this account's, so another account's shared people are never touched.
+      if (userId !== '' && heldFor === userId) {
+        applyRemoteFlows({ flows: [] }, userId);
+      }
       pullNow();
       reloadProfile?.();
     }
-    return ok;
-  }, [membersLeave, pullNow, reloadProfile]);
+    return outcome;
+  }, [membersLeave, applyRemoteFlows, heldFor, auth?.userId, pullNow, reloadProfile]);
 
+  // The joined note: filled a moment after the owner's name is known, so the region is in the page first
+  // and the words are announced. It ends once the person has seen it and moved to another page.
   const memberOwner = members.view?.role === 'member' ? (members.view.owner.name ?? 'someone') : null;
   useEffect(() => {
     if (!joinedNote || joinedNote.text !== null || memberOwner === null) {

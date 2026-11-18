@@ -538,6 +538,28 @@ describe('useFlowSync pulling', () => {
     expect(gets(requests).length).toBe(3);
   });
 
+  it('a wake during a pull runs one more pull, so an answer older than the wake does not stick (#223)', async () => {
+    let release: (reply: Reply) => void = () => undefined;
+    let first = true;
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET' && first) {
+        first = false;
+        return new Promise<Reply>((resolve) => (release = resolve));
+      }
+      return { status: 200, body: [] };
+    });
+    const { wake, applyRemoteFlows } = setup([session()]);
+    await advance(10);
+    expect(gets(requests).length).toBe(1);
+    // The wake comes in while the first pull is still out.
+    await wake();
+    await advance(10);
+    release({ status: 200, body: [record({}, OTHER, OTHER_OWNER_FLOW)] });
+    await advance(10);
+    expect(gets(requests).length).toBe(2);
+    expect(applyRemoteFlows.mock.calls.at(-1)?.[0]).toMatchObject({ flows: [] });
+  });
+
   it('does not let an older remote value overwrite a pending local edit', async () => {
     mockFetch((req) =>
       req.method === 'GET' ? { status: 200, body: [record({ personName: 'Old Name' })] } : 'offline',

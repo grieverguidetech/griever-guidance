@@ -294,6 +294,9 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     let running = false;
     let again = false;
     let needPull = true;
+    // Bumped by each request for a pull. A pull that was already running when one came in does not
+    // count for it: its answer may be older than the reason for the request (#223, leaving a family).
+    let pullAsks = 0;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const inFlight = new Set<Cancel>();
@@ -448,15 +451,20 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
           if (!ok) fail('signed_out'); // no token yet: back off and ask again
           softFailure = false;
           if (accessToken && needPull) {
+            const asked = pullAsks;
             const pulled = await pull(accessToken);
-            if (pulled) needPull = false;
-            else ok = false;
+            if (pulled && asked === pullAsks) needPull = false;
+            else if (!pulled) ok = false;
           }
           if (alive && ok && accessToken) ok = await flush(accessToken);
           // A 403/404 asks for a pull straight away.
           if (alive && ok && needPull && accessToken) {
-            if (await pull(accessToken)) needPull = false;
-            else ok = false;
+            const asked = pullAsks;
+            if (await pull(accessToken)) {
+              if (asked === pullAsks) needPull = false;
+            } else {
+              ok = false;
+            }
           }
           if (!alive) break;
           if (ok) {
@@ -499,6 +507,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       unsubscribe = latest.current.subscribe(() => {
         failures = 0;
         needPull = true;
+        pullAsks += 1;
         arm(0);
       });
     } catch {

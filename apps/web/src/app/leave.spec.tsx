@@ -161,7 +161,9 @@ describe('stop helping (#223)', () => {
     await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBeGreaterThan(pullsBefore));
     // The shared person and their draft are gone from this device.
     await waitFor(() => expect(stored().some((s) => s.flowId === FLOW)).toBe(false));
-    expect(await screen.findByRole('heading', { name: 'People helping you' })).toBeInTheDocument();
+    const ownerHeading = await screen.findByRole('heading', { name: 'People helping you' });
+    await waitFor(() => expect(ownerHeading).toHaveFocus());
+    expect(await screen.findByText("You've stopped helping Anna.")).toHaveAttribute('role', 'status');
     expect(screen.queryByText("You're helping Anna.")).not.toBeInTheDocument();
 
     await openYourPeople(user);
@@ -191,5 +193,81 @@ describe('stop helping (#223)', () => {
     await openYourPeople(user);
     expect(screen.getByText('Margaret Hayes')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument();
+  });
+
+  it('takes the shared people off the device even when the pull after the leave fails', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />);
+    const button = await openAccount(user);
+    mocks.listFlows.mockImplementation(async () => {
+      if (mocks.left) {
+        throw new TypeError('Failed to fetch');
+      }
+      return { ok: true, flows: [SHARED], dropped: 0 };
+    });
+    await user.click(button);
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+
+    await waitFor(() => expect(mocks.leaveMembership).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(stored().some((s) => s.role === 'member')).toBe(false));
+    await openYourPeople(user);
+    expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: CREATE })).toBeInTheDocument();
+  });
+
+  it('takes the shared people off the device while a pull is still out, and an older answer does not bring them back', async () => {
+    const user = userEvent.setup();
+    renderApp(<App />);
+    const button = await openAccount(user);
+    // The next pull hangs, started before the leave, and later answers with the list from before it.
+    let answer: (value: unknown) => void = () => undefined;
+    const calls = mocks.listFlows.mock.calls.length;
+    mocks.listFlows.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBe(calls + 1));
+
+    await user.click(button);
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+    await waitFor(() => expect(mocks.leaveMembership).toHaveBeenCalledTimes(1));
+    // Still out, and the shared person is already gone.
+    await waitFor(() => expect(stored().some((s) => s.role === 'member')).toBe(false));
+    expect(mocks.listFlows.mock.calls.length).toBe(calls + 1);
+
+    answer({ ok: true, flows: [SHARED], dropped: 0 });
+    // The wake from the leave runs one more pull, which has nobody shared.
+    await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBe(calls + 2));
+    await waitFor(() => expect(stored().some((s) => s.role === 'member')).toBe(false));
+    await openYourPeople(user);
+    expect(screen.queryByText('Margaret Hayes')).not.toBeInTheDocument();
+  });
+
+  it('already not a member (left elsewhere): treated as left, the step closes and the people leave', async () => {
+    mocks.leaveMembership.mockImplementation(async () => {
+      mocks.left = true;
+      return { ok: false, reason: 'not_a_member' };
+    });
+    const user = userEvent.setup();
+    renderApp(<App />);
+    await user.click(await openAccount(user));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+
+    expect(await screen.findByText("You've stopped helping Anna.")).toBeInTheDocument();
+    expect(screen.queryByText("You aren't helping on anyone's account right now.")).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Keep helping' })).not.toBeInTheDocument();
+    await waitFor(() => expect(stored().some((s) => s.role === 'member')).toBe(false));
+    await openYourPeople(user);
+    expect(await screen.findByRole('button', { name: CREATE })).toBeInTheDocument();
+  });
+
+  it('unavailable: the step stays open with the calm copy and nothing changes', async () => {
+    mocks.leaveMembership.mockResolvedValue({ ok: false, reason: 'unavailable' });
+    const user = userEvent.setup();
+    renderApp(<App />);
+    await user.click(await openAccount(user));
+    await user.click(screen.getByRole('button', { name: 'Stop helping' }));
+
+    expect(await screen.findByText("This isn't available right now. Please try again in a moment.")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep helping' })).toBeInTheDocument();
+    expect(stored().some((s) => s.flowId === FLOW && s.role === 'member')).toBe(true);
   });
 });

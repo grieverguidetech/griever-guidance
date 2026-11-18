@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { MEMBERS_MESSAGES } from '@griever/hooks';
-import type { MembersStatus } from '@griever/hooks';
+import type { LeaveOutcome, MembersStatus } from '@griever/hooks';
 import { parseInviteEmail } from '@griever/shared';
 import type { MembersView } from '@griever/shared';
 import { formatDate } from '../lib/format';
@@ -12,6 +11,7 @@ const INVITE_CANCELLED = 'Invitation cancelled.';
 export const LEAVE_CONFIRM =
   "You'll stop seeing the people {owner} shares with you, and anything you started writing for them will be removed from this device. You can then add someone yourself.";
 export const LEAVE_OFFLINE = 'You need a connection to stop helping. Nothing has changed.';
+export const LEFT_FAMILY = "You've stopped helping {owner}.";
 
 interface Props {
   view: MembersView | null;
@@ -22,8 +22,11 @@ interface Props {
   onInvite: (email: string) => Promise<boolean>;
   /** Resolves true when the invitation was cancelled. */
   onRevoke: (id: string) => Promise<boolean>;
-  /** Resolves true when the server took this person off the family. Members only; owners never see it. */
-  onLeave?: () => Promise<boolean>;
+  /**
+   * Stops helping. 'ok' and 'not_a_member' both mean this person is not a member now. Members only;
+   * owners never see it.
+   */
+  onLeave?: () => Promise<LeaveOutcome>;
 }
 
 /** Shown inside Profile. Emails are typed, never picked from contacts (C3, C6). */
@@ -52,12 +55,20 @@ export function PeopleHelping({
   const [live, setLive] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // The guard itself: state lags a render behind a quick second tap.
+  const leavingRef = useRef(false);
   const leaveButtonRef = useRef<HTMLButtonElement>(null);
   const confirmHeadingRef = useRef<HTMLHeadingElement>(null);
   // Where focus goes once the confirm step closes: back to its button, or to the page once the leave worked.
   const focusAfterConfirm = useRef<'button' | 'leftFamily' | null>(null);
-  // The members hook's offline copy is general. After a leave it reads as the leave's own line.
+  // Which action the hook's message belongs to, and how the last leave went (null while it runs).
   const lastAction = useRef<'leave' | 'other'>('other');
+  const leaveOutcome = useRef<LeaveOutcome | null>(null);
+  // Kept after the view turns owner, for the line said once the leave worked.
+  const ownerNameRef = useRef('');
+  if (view?.role === 'member') {
+    ownerNameRef.current = view.owner.name ?? 'someone';
+  }
 
   // Emptied first, then set after a tick, so a repeat of the same message is read out again.
   function say(text: string) {
@@ -68,18 +79,31 @@ export function PeopleHelping({
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  function shown(text: string | null): string {
-    if (text === MEMBERS_MESSAGES.offline && lastAction.current === 'leave') {
+  /**
+   * What the status region says for the hook's message. Null leaves the region as it is: while a leave
+   * runs, and once it worked (the leave says its own line after focus moves).
+   */
+  function shown(text: string | null): string | null {
+    if (lastAction.current !== 'leave') {
+      return text ?? '';
+    }
+    if (leaveOutcome.current === 'offline') {
       return LEAVE_OFFLINE;
     }
-    return text ?? '';
+    if (leaveOutcome.current === 'other') {
+      return text ?? '';
+    }
+    return null;
   }
 
   useEffect(() => {
     if (message) {
       setInvalid(false);
     }
-    say(shown(message));
+    const text = shown(message);
+    if (text !== null) {
+      say(text);
+    }
   }, [message]);
 
   useEffect(() => {
@@ -98,6 +122,7 @@ export function PeopleHelping({
     if (focusAfterConfirm.current === 'leftFamily' && view?.role === 'owner') {
       focusAfterConfirm.current = null;
       headingRef.current?.focus();
+      say(LEFT_FAMILY.replace('{owner}', ownerNameRef.current));
     }
   }, [view, confirming]);
 
@@ -111,30 +136,38 @@ export function PeopleHelping({
   }, [view, revoked]);
 
   function keepHelping() {
+    if (leavingRef.current) {
+      return;
+    }
     focusAfterConfirm.current = 'button';
     setConfirming(false);
   }
 
   async function leave() {
-    if (leaving || !onLeave) {
+    if (leavingRef.current || !onLeave) {
       return;
     }
+    leavingRef.current = true;
     lastAction.current = 'leave';
+    leaveOutcome.current = null;
     setLeaving(true);
     say('');
-    let ok = false;
+    let outcome: LeaveOutcome = 'other';
     try {
-      ok = await onLeave();
+      outcome = await onLeave();
     } finally {
+      leavingRef.current = false;
       setLeaving(false);
     }
-    if (ok) {
+    leaveOutcome.current = outcome;
+    if (outcome === 'ok' || outcome === 'not_a_member') {
       focusAfterConfirm.current = 'leftFamily';
       setConfirming(false);
       return;
     }
-    // Nothing changed: the confirm step stays open with the reason.
-    say(shown(latestMessage.current));
+    // Nothing changed: the confirm step stays open with the reason. If the hook's message has not
+    // rendered yet, the message effect says it when it does.
+    say(shown(latestMessage.current) ?? '');
   }
 
   async function submit(event: FormEvent) {
@@ -261,14 +294,14 @@ export function PeopleHelping({
           aria-labelledby={`${id}-leave`}
           className="flex flex-col gap-3"
         >
-          <h3
+          <h2
             id={`${id}-leave`}
             ref={confirmHeadingRef}
             tabIndex={-1}
-            className="text-[14px] m-0"
+            className="text-[16px] m-0"
           >
             Stop helping {ownerName}?
-          </h3>
+          </h2>
           <p className="text-[14px] leading-[1.6] m-0">
             {LEAVE_CONFIRM.replace('{owner}', ownerName)}
           </p>
@@ -279,11 +312,12 @@ export function PeopleHelping({
               aria-disabled={leaving}
               onClick={() => void leave()}
             >
-              Stop helping
+              {leaving ? 'Stopping…' : 'Stop helping'}
             </button>
             <button
               type="button"
               className="gg-btn gg-btn-secondary"
+              aria-disabled={leaving}
               onClick={keepHelping}
             >
               Keep helping
