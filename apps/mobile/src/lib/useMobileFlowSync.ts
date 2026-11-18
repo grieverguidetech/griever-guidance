@@ -34,6 +34,8 @@ function joinStorage(base: SendFlowStorage, queue: SendFlowStorage): SendFlowSto
 export interface UseMobileFlowSyncOptions {
   sessions: readonly Session[];
   applyRemoteFlows: UseSessionsResult['applyRemoteFlows'];
+  /** Gives a person a new flowId when their old one was taken on the server (#942). */
+  moveFlowId: UseSessionsResult['moveFlowId'];
   /** The device cache `useSessions` runs over. */
   storage: SendFlowStorage;
 }
@@ -42,7 +44,7 @@ export interface UseMobileFlowSyncOptions {
  * Starts background sync (useFlowSync) on the phone. Nothing shows on screen (C5). It runs only
  * when sign-in is on, sync is on, and someone is signed in; otherwise no request is made.
  */
-export function useMobileFlowSync({ sessions, applyRemoteFlows, storage }: UseMobileFlowSyncOptions): void {
+export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, storage }: UseMobileFlowSyncOptions): void {
   const auth = useSyncAuth();
   const userId = auth?.status === 'signed_in' ? (auth.userId ?? '') : '';
   const allowed = AUTH_ENABLED && SYNC_ENABLED && userId !== '';
@@ -108,5 +110,6 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, storage }: UseMo
     storage: joined,
     subscribe,
     applyRemoteFlows,
+    moveFlowId,
   });
 }

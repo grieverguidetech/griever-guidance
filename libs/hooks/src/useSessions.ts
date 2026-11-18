@@ -61,8 +61,13 @@ export interface ReminderEntry {
 export interface Session extends SessionDetails, SectionFields, ServiceEventFields, ChecklistFields {
   /** The local key. It never changes and is not what the server knows the person by. */
   id: string;
-  /** UUID v4 made on this device; the person's id on the server. Stable once set. */
+  /**
+   * UUID v4 made on this device; the person's id on the server. Stable once set, except for one case:
+   * an owner's id that someone else took on the server first gets a new one (`moveFlowId`, #942).
+   */
   flowId: string;
+  /** Device-local only, never sent: ids this person had before `moveFlowId`, so an old link still opens them. */
+  formerFlowIds?: string[];
   /** The account that owns this person. null = made on this device, not yet tied to an account. */
   ownerId: string | null;
   /**
@@ -129,6 +134,12 @@ export interface UseSessionsResult {
    */
   removeSession: (id: string) => boolean;
   pruneEmpty: () => void;
+  /**
+   * Gives an owner's person a new flowId (#942). Sync calls it when the old id is taken on the server
+   * by another account. The local id, drafts and everything else stay; the old id goes to
+   * `formerFlowIds`. A 'member' session never moves.
+   */
+  moveFlowId: (oldFlowId: string, newFlowId: string) => void;
   setServiceReady: (id: string, ready: boolean) => void;
   scheduleReminder: (id: string, momentKey: MomentKey, dueAt: string) => void;
   /** Marks a moment done and records who was notified, for dedup. */
@@ -874,6 +885,17 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     setSessions((list) => list.filter(hasAnyContent));
   }, []);
 
+  const moveFlowId = useCallback((oldFlowId: string, newFlowId: string) => {
+    setSessions((list) =>
+      list.map((s) => {
+        if (s.flowId !== oldFlowId || s.role !== 'owner') {
+          return s;
+        }
+        return { ...s, flowId: newFlowId, formerFlowIds: [...(s.formerFlowIds ?? []), oldFlowId] };
+      }),
+    );
+  }, []);
+
   const setServiceReady = useCallback((id: string, ready: boolean) => {
     setSessions((list) =>
       list.map((s) => (s.id === id ? { ...s, serviceReady: ready } : s)),
@@ -982,6 +1004,7 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
     deleteSession,
     removeSession,
     pruneEmpty,
+    moveFlowId,
     setServiceReady,
     scheduleReminder,
     recordMomentComplete,

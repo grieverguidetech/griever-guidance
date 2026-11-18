@@ -439,9 +439,9 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
 const SendApp = ({ cache }: { cache: ReturnType<typeof createSessionCache> }) => {
   // The Home and switcher create buttons show unless the profile says member (C11; the server is the guard).
   const canCreate = useCanCreate();
-  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, setChecklistItem, applyRemoteFlows, recordMomentComplete, recordObituaryEmailed } = useDeviceSessions(cache);
+  const { sessions, active, lastOpened, switchTo, addPerson, updateDraft, updateSession, setChecklistItem, applyRemoteFlows, moveFlowId, recordMomentComplete, recordObituaryEmailed } = useDeviceSessions(cache);
   // Background sync; does nothing unless accounts and sync are both on and someone is signed in.
-  useMobileFlowSync({ sessions, applyRemoteFlows, storage: cache });
+  useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, storage: cache });
   // A launch opens the last person's screen (the hub), unless they are still blank. Decided once,
   // from the device cache SendAppWhenReady already read: nothing waits on the network.
   const [resume] = useState(() => lastOpened !== null && !isBlank(lastOpened));

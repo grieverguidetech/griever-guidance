@@ -45,7 +45,7 @@ async function mount(flags: { auth: boolean; sync: boolean }, auth: SyncAuth | n
   mockAuth = auth;
   mockFlags.auth = flags.auth;
   mockFlags.sync = flags.sync;
-  const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, storage }));
+  const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, moveFlowId: jest.fn() as never, storage }));
   // Let the queue read finish.
   await new Promise((resolve) => setTimeout(resolve, 0));
   view.rerender({});
@@ -58,6 +58,13 @@ beforeEach(() => {
 });
 
 describe('useMobileFlowSync', () => {
+  it('passes moveFlowId through to the sync, so a squatted id can move (#942)', async () => {
+    mockAuth = signedIn;
+    const moveFlowId = jest.fn();
+    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, moveFlowId: moveFlowId as never, storage }));
+    expect((lastOptions() as unknown as { moveFlowId: unknown }).moveFlowId).toBe(moveFlowId);
+  });
+
   it('is enabled when sign-in and sync are on and someone is signed in', async () => {
     await mount({ auth: true, sync: true }, signedIn);
     expect(lastOptions()).toMatchObject({ enabled: true, userId: 'user_1' });
@@ -105,7 +112,7 @@ describe('useMobileFlowSync', () => {
     mockAuth = signedIn;
     mockFlags.auth = true;
     mockFlags.sync = true;
-    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, storage }));
+    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, moveFlowId: jest.fn() as never, storage }));
     expect(lastOptions().enabled).toBe(false);
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -127,7 +134,7 @@ describe('useMobileFlowSync', () => {
     mockAuth = signedIn;
     mockFlags.auth = true;
     mockFlags.sync = true;
-    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, storage: base }));
+    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, moveFlowId: jest.fn() as never, storage: base }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -145,7 +152,7 @@ describe('useMobileFlowSync: after a member leaves (#224)', () => {
     mockFlags.auth = true;
     mockFlags.sync = true;
     const applyRemoteFlows = jest.fn();
-    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, storage }));
+    renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, moveFlowId: jest.fn() as never, storage }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -167,7 +174,7 @@ describe('useMobileFlowSync: after a member leaves (#224)', () => {
     mockFlags.auth = true;
     mockFlags.sync = true;
     const applyRemoteFlows = jest.fn();
-    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, storage }));
+    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: applyRemoteFlows as never, moveFlowId: jest.fn() as never, storage }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });

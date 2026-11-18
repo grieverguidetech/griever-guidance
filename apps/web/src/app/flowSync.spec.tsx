@@ -440,4 +440,56 @@ describe('background sync in the app (#520)', () => {
     renderApp(<App />);
     await waitFor(() => expect(flowCalls().some((c) => c.method === 'POST' && c.path === '/flows')).toBe(true), { timeout: 5000 });
   });
+
+  it('a person whose id someone else took first moves to a new id, and their open page follows by replace (#942)', async () => {
+    seed();
+    // The server has someone else's flow under FLOW: create gets 409, PATCH gets 404. Any other id is free.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname;
+        const method = init?.method ?? 'GET';
+        const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+        calls.push({ method, path, body });
+        const reply = (status: number, json: unknown) =>
+          new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
+        if (method === 'GET') {
+          return reply(200, []);
+        }
+        if (method === 'POST' && body?.['id'] === FLOW) {
+          return reply(409, { error: 'exists' });
+        }
+        if (method === 'PATCH' && path === `/flows/${FLOW}`) {
+          return reply(404, { error: 'not_found' });
+        }
+        return reply(201, { id: body?.['id'], ownerId: OWNER_UUID, role: 'owner', facts: body, updatedAt: '2026-10-01T00:00:00.000Z', updatedBy: null });
+      }),
+    );
+    signedIn(true);
+    renderApp(<App />, { path: `/people/${FLOW}/service` });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Service' })).toBeInTheDocument();
+    const entries = window.history.length;
+    await waitFor(() => expect(window.location.pathname).not.toBe(`/people/${FLOW}/service`), { timeout: 5000 });
+    const saved = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]')[0];
+    expect(saved.flowId).not.toBe(FLOW);
+    expect(saved.formerFlowIds).toEqual([FLOW]);
+    expect(window.location.pathname).toBe(`/people/${saved.flowId}/service`);
+    expect(window.history.length).toBe(entries);
+    expect(screen.getByRole('heading', { level: 1, name: 'Service' })).toBeInTheDocument();
+    const creates = flowCalls().filter((c) => c.method === 'POST');
+    expect(creates.map((c) => (c.body as { id: string }).id)).toEqual([FLOW, saved.flowId]);
+    expect(creates[1].body).toMatchObject({ personName: 'Margaret Hayes' });
+  });
+
+  it("an old link to a person's former id opens that person under their new id (#942)", async () => {
+    const moved = '44444444-4444-4444-8444-444444444444';
+    const [person] = JSON.parse(window.localStorage.getItem('gg.sessions.v1') ?? '[]');
+    window.localStorage.setItem('gg.sessions.v1', JSON.stringify([{ ...person, flowId: moved, formerFlowIds: [FLOW] }]));
+    serverHasNothing = true;
+    signedIn(true);
+    renderApp(<App />, { path: `/people/${FLOW}/obituary` });
+    await waitFor(() => expect(window.location.pathname).toBe(`/people/${moved}/obituary`));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
+    expect(screen.queryByText("That page isn't here. Your people are below.")).toBeNull();
+  });
 });

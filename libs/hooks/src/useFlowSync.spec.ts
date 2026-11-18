@@ -142,6 +142,7 @@ function setup(
 ) {
   const wakes = new Set<() => void>();
   const applyRemoteFlows = vi.fn();
+  const moveFlowId = vi.fn();
   const getAccessToken = vi.fn(async () => 'tok');
   const view = renderHook(
     (props: Props) =>
@@ -156,11 +157,12 @@ function setup(
           return () => void wakes.delete(fn);
         },
         applyRemoteFlows,
+        moveFlowId,
       }),
     { initialProps: { sessions: initial, enabled: opts.enabled ?? true, userId: opts.userId ?? USER } as Props },
   );
   const wake = () => act(() => wakes.forEach((fn) => fn()));
-  return { ...view, wake, applyRemoteFlows, getAccessToken };
+  return { ...view, wake, applyRemoteFlows, moveFlowId, getAccessToken };
 }
 
 beforeEach(() => {
@@ -506,6 +508,7 @@ describe('useFlowSync failures (C5)', () => {
             return () => undefined;
           },
           applyRemoteFlows: vi.fn(),
+          moveFlowId: vi.fn(),
         }),
       ),
     ).not.toThrow();
@@ -721,6 +724,7 @@ describe('useFlowSync edits made while sync is off (B1)', () => {
             return () => void wakes.delete(fn);
           },
           applyRemoteFlows: s.applyRemoteFlows,
+          moveFlowId: s.moveFlowId,
         });
         return s;
       },
@@ -770,6 +774,7 @@ describe('useFlowSync queue behaviour', () => {
         enabled: true,
         subscribe: () => () => undefined,
         applyRemoteFlows: vi.fn(),
+        moveFlowId: vi.fn(),
       }),
     );
     await advance(10);
@@ -950,6 +955,7 @@ describe('useFlowSync removed people (#215)', () => {
         storage,
         subscribe: () => () => undefined,
         applyRemoteFlows: s.applyRemoteFlows,
+        moveFlowId: s.moveFlowId,
       });
       return s;
     });
@@ -1090,6 +1096,7 @@ describe('useFlowSync details (DS-7)', () => {
             return () => void wakes.delete(fn);
           },
           applyRemoteFlows: s.applyRemoteFlows,
+          moveFlowId: s.moveFlowId,
         });
         return s;
       },
@@ -1137,6 +1144,7 @@ describe('service keys sync as stored (real useSessions)', () => {
             return () => void wakes.delete(fn);
           },
           applyRemoteFlows: s.applyRemoteFlows,
+          moveFlowId: s.moveFlowId,
         });
         return s;
       },
@@ -1211,5 +1219,122 @@ describe('service keys sync as stored (real useSessions)', () => {
       expect(req.body).toEqual({ serviceReady: true });
     }
     expect(b.view.result.current.sessions[0].serviceReady).toBe(true);
+  });
+});
+
+describe('useFlowSync and a flowId someone else took first (#942)', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  /** The server has someone else's flow under FLOW: a create gets 409 and a PATCH gets 404. Any other id is free. */
+  const squatted = (req: Req): Reply => {
+    if (req.method === 'GET') return { status: 200, body: [] };
+    if (req.method === 'POST' && req.body?.['id'] === FLOW) return { status: 409, body: { error: 'exists' } };
+    if (req.method === 'PATCH' && req.path === `/flows/${FLOW}`) return { status: 404, body: { error: 'not_found' } };
+    if (req.method === 'POST') return { status: 201, body: record({}, USER, String(req.body?.['id'])) };
+    return { status: 200, body: record({}, USER, req.path.split('/').pop()) };
+  };
+
+  it('409 on create then 404 on the PATCH: a new id is made and created with every edit, and the old id is dropped', async () => {
+    const requests = mockFetch(squatted);
+    const storage = memoryStorage();
+    const local = session({ ownerId: null, serviceDate: 'June 3', obituaryPublisher: 'Legacy' });
+    const { moveFlowId, rerender } = setup([local], { storage });
+    await advance(10);
+
+    expect(moveFlowId).toHaveBeenCalledTimes(1);
+    const [oldId, newId] = moveFlowId.mock.calls[0] as [string, string];
+    expect(oldId).toBe(FLOW);
+    expect(newId).toMatch(UUID);
+    expect(newId).not.toBe(FLOW);
+    const sent = writes(requests);
+    expect(sent.map((r) => `${r.method} ${r.path}`)).toEqual(['POST /flows', `PATCH /flows/${FLOW}`, 'POST /flows']);
+    expect(sent[2].body).toMatchObject({
+      id: newId,
+      personName: 'Margaret Hayes',
+      serviceDate: 'June 3',
+      obituaryPublisher: 'Legacy',
+    });
+
+    // An edit made before the session shows the new id still goes to the new id.
+    rerender({ sessions: [{ ...local, serviceReady: true }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).slice(3)).toEqual([{ method: 'PATCH', path: `/flows/${newId}`, body: { serviceReady: true } }]);
+
+    // And after it does, the next edit too. The old id is nowhere in what sync keeps.
+    rerender({ sessions: [{ ...local, flowId: newId, formerFlowIds: [FLOW], serviceReady: true, dateOfPassing: 'May 1' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).slice(4)).toEqual([{ method: 'PATCH', path: `/flows/${newId}`, body: { dateOfPassing: 'May 1' } }]);
+    expect(moveFlowId).toHaveBeenCalledTimes(1);
+    expect(storage.data.get(flowQueueKey(USER))).not.toContain(FLOW);
+  });
+
+  it('a plain 404 on a flow already synced drops the edit and makes no new id', async () => {
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [record()] };
+      return { status: 404, body: { error: 'not_found' } };
+    });
+    const base = session();
+    const { moveFlowId, rerender } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([{ method: 'PATCH', path: `/flows/${FLOW}`, body: { serviceDate: 'June 3' } }]);
+    expect(moveFlowId).not.toHaveBeenCalled();
+  });
+
+  it('a 409 whose PATCH works, then a later 404, makes no new id (the flow was ours, then deleted)', async () => {
+    let gone = false;
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [] };
+      if (req.method === 'POST') return { status: 409, body: { error: 'exists' } };
+      return gone ? { status: 404, body: { error: 'not_found' } } : { status: 200, body: record() };
+    });
+    const base = session({ ownerId: null });
+    const { moveFlowId, rerender } = setup([base]);
+    await advance(10);
+    gone = true;
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests).map((r) => r.method)).toEqual(['POST', 'PATCH', 'PATCH']);
+    expect(moveFlowId).not.toHaveBeenCalled();
+  });
+
+  it("never gives a member's flow a new id, even on a 404", async () => {
+    const requests = mockFetch((req) => {
+      if (req.method === 'GET') return { status: 200, body: [record({}, OTHER)] };
+      return { status: 404, body: { error: 'not_found' } };
+    });
+    const member = session({ role: 'member', ownerId: OTHER });
+    const { moveFlowId, rerender } = setup([member]);
+    await advance(10);
+    rerender({ sessions: [{ ...member, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(writes(requests)).toEqual([{ method: 'PATCH', path: `/flows/${FLOW}`, body: { serviceDate: 'June 3' } }]);
+    expect(moveFlowId).not.toHaveBeenCalled();
+  });
+
+  it('remembers the 409 across a restart, so a PATCH that first fails offline still leads to a new id', async () => {
+    let online = true;
+    const requests = mockFetch((req) => {
+      if (!online && req.method === 'PATCH') return 'offline';
+      return squatted(req);
+    });
+    const storage = memoryStorage();
+    const local = session({ ownerId: null });
+    online = false;
+    const first = setup([local], { storage });
+    await advance(10);
+    expect(first.moveFlowId).not.toHaveBeenCalled();
+    first.unmount();
+    online = true;
+    const before = writes(requests).length;
+    const second = setup([{ ...local, serviceDate: 'June 3' }], { storage });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    expect(second.moveFlowId).toHaveBeenCalledTimes(1);
+    const newId = (second.moveFlowId.mock.calls[0] as [string, string])[1];
+    const after = writes(requests).slice(before);
+    // No second create of the old id: the saved 409 sends the PATCH, and its 404 moves the person.
+    expect(after.map((r) => `${r.method} ${r.path}`)).toEqual([`PATCH /flows/${FLOW}`, 'POST /flows']);
+    expect(after[1]).toMatchObject({ body: { id: newId, serviceDate: 'June 3' } });
   });
 });

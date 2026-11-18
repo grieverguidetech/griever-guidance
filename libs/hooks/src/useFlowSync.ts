@@ -9,7 +9,7 @@ import type {
 import { FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields, withServicePair } from '@griever/shared';
 import type { FlowRecord, SyncedFields, SyncedKey } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
-import { readRemovedFlows, writeRemovedFlows } from './useSessions.js';
+import { generateFlowId, readRemovedFlows, writeRemovedFlows } from './useSessions.js';
 import type { Session, UseSessionsResult } from './useSessions.js';
 
 /** The api-client functions the hook uses. Tests pass a stub; the default is the real module. */
@@ -37,6 +37,8 @@ export interface UseFlowSyncOptions {
   /** The app calls `onWake` when it may be online again (web: online/visibility; mobile: AppState). */
   subscribe: (onWake: () => void) => () => void;
   applyRemoteFlows: UseSessionsResult['applyRemoteFlows'];
+  /** Gives a person a new flowId when their old one was taken on the server (#942). */
+  moveFlowId: UseSessionsResult['moveFlowId'];
   client?: FlowSyncClient;
 }
 
@@ -96,6 +98,8 @@ interface Stored {
   known: string[];
   /** The facts and details last seen per person, so edits made while sync was off are still found. */
   baselines: Record<string, SyncedFields>;
+  /** Flows marked known only because a create got 409, and not yet written to (#942). */
+  conflicted?: string[];
 }
 
 interface SyncState {
@@ -108,10 +112,26 @@ interface SyncState {
   pulled: boolean;
   /** People the server refused to create; not offered again this run. */
   refused: Set<string>;
+  /**
+   * Known only because a create got 409. If the PATCH that follows gets 404, someone else took the
+   * id first (#942). Cleared by the first write that works. Saved in storage.
+   */
+  conflicted: Set<string>;
+  /** Old flowId to new, for people given a new id this run. Sessions may still carry the old one until React re-renders. */
+  moved: Map<string, string>;
 }
 
 function readStored(storage: SendFlowStorage | undefined, userId: string): SyncState {
-  const state: SyncState = { userId, queue: new Map(), known: new Set(), baselines: new Map(), pulled: false, refused: new Set() };
+  const state: SyncState = {
+    userId,
+    queue: new Map(),
+    known: new Set(),
+    baselines: new Map(),
+    pulled: false,
+    refused: new Set(),
+    conflicted: new Set(),
+    moved: new Map(),
+  };
   if (!storage) return state;
   try {
     const raw = storage.getItem(flowQueueKey(userId));
@@ -127,6 +147,11 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
       if (clean) state.baselines.set(id, clean);
     }
     for (const id of parsed.known ?? []) if (typeof id === 'string' && isUuid(id)) state.known.add(id);
+    for (const id of parsed.conflicted ?? []) {
+      if (typeof id === 'string' && isUuid(id) && state.known.has(id)) {
+        state.conflicted.add(id);
+      }
+    }
   } catch {
     // unreadable storage: start empty
   }
@@ -140,6 +165,7 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
       queue: Object.fromEntries(state.queue),
       known: [...state.known],
       baselines: Object.fromEntries(state.baselines),
+      conflicted: [...state.conflicted],
     };
     storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
@@ -154,6 +180,36 @@ const mayCreate = (s: Session, userId: string): boolean =>
 /** Someone else's account's person on this device is never sent. Keep in step with `isPrevious` in useSessions. */
 const isMine = (s: Session, userId: string): boolean =>
   s.role === 'member' || s.ownerId === null || s.ownerId === userId;
+
+/** The id sync uses for a session: its new one if it was given one this run and the session does not show it yet. */
+function flowIdOf(state: SyncState, s: Session): string {
+  let id = s.flowId;
+  for (let next = state.moved.get(id); next !== undefined; next = state.moved.get(id)) {
+    id = next;
+  }
+  return id;
+}
+
+/**
+ * Moves a person whose flowId someone else took on the server to a new id (#942). The old id leaves the
+ * queue, `known` and the baselines; the new one is queued with all the person's current facts and
+ * details, so the create that follows loses no edit. Returns the new id.
+ */
+function remint(state: SyncState, oldId: string, session: Session): string {
+  const newId = generateFlowId();
+  const baseline = state.baselines.get(oldId);
+  state.queue.delete(oldId);
+  state.known.delete(oldId);
+  state.conflicted.delete(oldId);
+  state.refused.delete(oldId);
+  state.baselines.delete(oldId);
+  if (baseline) {
+    state.baselines.set(newId, baseline);
+  }
+  state.queue.set(newId, toSyncedFields(session));
+  state.moved.set(oldId, newId);
+  return newId;
+}
 
 /** Stops one request: clears its timer and aborts it. Called on unmount. */
 type Cancel = () => void;
@@ -205,27 +261,28 @@ function scanSessions(
   let changed = false;
   let dirty = false;
   const seen = new Set<string>();
-  const present = new Set(sessions.map((s) => s.flowId));
+  const present = new Set(sessions.map((s) => flowIdOf(state, s)));
   for (const s of sessions) {
     if (!isMine(s, userId)) continue;
-    seen.add(s.flowId);
+    const flowId = flowIdOf(state, s);
+    seen.add(flowId);
     const facts = toSyncedFields(s);
-    const before = state.baselines.get(s.flowId);
-    state.baselines.set(s.flowId, facts);
+    const before = state.baselines.get(flowId);
+    state.baselines.set(flowId, facts);
     const diff = before ? diffSynced(before, facts) : {};
     if (!before || Object.keys(diff).length > 0) dirty = true;
     const unsent =
       state.pulled &&
       mayCreate(s, userId) &&
-      !state.known.has(s.flowId) &&
-      !state.refused.has(s.flowId) &&
-      !state.queue.has(s.flowId) &&
+      !state.known.has(flowId) &&
+      !state.refused.has(flowId) &&
+      !state.queue.has(flowId) &&
       facts.personName !== '';
     if (unsent) {
-      state.queue.set(s.flowId, { ...facts });
+      state.queue.set(flowId, { ...facts });
       changed = true;
     } else if (Object.keys(diff).length > 0) {
-      state.queue.set(s.flowId, coalesce([state.queue.get(s.flowId) ?? {}, diff]));
+      state.queue.set(flowId, coalesce([state.queue.get(flowId) ?? {}, diff]));
       changed = true;
     }
   }
@@ -241,6 +298,12 @@ function scanSessions(
     if (seen.has(id)) continue;
     state.baselines.delete(id);
     dirty = true;
+  }
+  for (const id of [...state.conflicted]) {
+    if (!seen.has(id)) {
+      state.conflicted.delete(id);
+      dirty = true;
+    }
   }
   return { queue: changed, dirty: dirty || changed };
 }
@@ -382,11 +445,14 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     const flush = async (accessToken: string): Promise<boolean> => {
       const state = getState();
       softFailure = false;
-      for (const id of [...state.queue.keys()]) {
+      // A person given a new id (#942) is added to the end, so they are created in this same flush.
+      const ids = [...state.queue.keys()];
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
         for (;;) {
           if (!alive) return true;
           const pending = state.queue.get(id);
-          const session = latest.current.sessions.find((s) => s.flowId === id);
+          const session = latest.current.sessions.find((s) => flowIdOf(state, s) === id);
           if (!pending || !session || !isMine(session, userId)) {
             state.queue.delete(id);
             break;
@@ -404,6 +470,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
           if (!alive) return true;
           if (result.ok) {
             state.known.add(id);
+            state.conflicted.delete(id);
             const now = state.queue.get(id) ?? {};
             // Keep only what changed while the request was in flight.
             const left: Record<string, unknown> = {};
@@ -417,7 +484,19 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
           }
           if (result.reason === 'conflict' && create) {
             state.known.add(id); // the server has it already: edit it instead
+            state.conflicted.add(id);
+            writeStored(latest.current.storage, state);
             continue;
+          }
+          // 409 on create, then 404 on the PATCH: the id is someone else's flow (#942). An owner's person
+          // moves to a new id and is created again with everything. A plain 404 (a deleted flow, lost
+          // access) never gets here: only a 409 puts an id in `conflicted`.
+          if (result.reason === 'not_found' && !create && state.conflicted.has(id) && mayCreate(session, userId)) {
+            const newId = remint(state, id, session);
+            ids.push(newId);
+            writeStored(latest.current.storage, state);
+            latest.current.moveFlowId(id, newId);
+            break;
           }
           if (result.reason === 'forbidden' || result.reason === 'not_found' || result.reason === 'invalid') {
             // This patch can never succeed. Drop it; a pull brings back what the server has.

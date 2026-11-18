@@ -256,3 +256,27 @@ describe('the emailed-obituary marker stays on the device (C2, C3)', () => {
     expect(payload).toEqual(toSyncedFields(local() as never));
   });
 });
+
+describe('moveFlowId (#942)', () => {
+  const B = '44444444-4444-4444-8444-444444444444';
+
+  it("gives an owner's person the new id and keeps the local id, drafts and the old id", () => {
+    const storage = mem([local({ ownerId: null, drafts: { announcement: { templateCategory: 'announcement' } as never } })]);
+    const { result } = renderHook(() => useSessions(storage));
+    act(() => result.current.moveFlowId(A, B));
+    const moved = result.current.sessions[0];
+    expect(moved.id).toBe('local-1');
+    expect(moved.flowId).toBe(B);
+    expect(moved.formerFlowIds).toEqual([A]);
+    expect(moved.drafts.announcement).toBeDefined();
+    expect(Object.keys(toSyncedFields(moved))).not.toContain('formerFlowIds');
+    expect(JSON.parse(storage.getItem('gg.sessions.v1') ?? '[]')[0].flowId).toBe(B);
+  });
+
+  it("never moves a member's person", () => {
+    const { result } = renderHook(() => useSessions(mem([local({ role: 'member', ownerId: OTHER })])));
+    act(() => result.current.moveFlowId(A, B));
+    expect(result.current.sessions[0].flowId).toBe(A);
+    expect(result.current.sessions[0].formerFlowIds).toBeUndefined();
+  });
+});

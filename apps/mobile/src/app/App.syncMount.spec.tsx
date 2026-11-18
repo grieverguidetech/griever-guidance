@@ -13,10 +13,12 @@ describe('App and background sync', () => {
     const options = mockUseMobileFlowSync.mock.calls[mockUseMobileFlowSync.mock.calls.length - 1][0] as {
       sessions: unknown[];
       applyRemoteFlows: unknown;
+      moveFlowId: unknown;
       storage: { getItem: unknown };
     };
     expect(Array.isArray(options.sessions)).toBe(true);
     expect(typeof options.applyRemoteFlows).toBe('function');
+    expect(typeof options.moveFlowId).toBe('function');
     expect(typeof options.storage.getItem).toBe('function');
   });
 });
