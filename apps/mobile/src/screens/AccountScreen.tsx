@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { colors } from '@griever/tokens';
@@ -40,8 +40,6 @@ function AccountBody({
   initialMode?: 'signIn' | 'signUp';
 }) {
   const [mode, setMode] = useState<'signIn' | 'signUp'>(initialMode);
-  // The invitation screen's "Create an account" can arrive after this screen is already open on sign-in.
-  useEffect(() => setMode(initialMode), [initialMode]);
   const [pendingName, setPendingNameState] = useState<Unsaved | null>(unsavedName);
   const [ended, setEnded] = useState(false);
   const explicitSignOut = useRef(false);
@@ -167,12 +165,9 @@ function LoadingOrUnavailable({ text, onBack }: { text: string; onBack: () => vo
   );
 }
 
-/** Which form signed-out people see first. The invitation screen sets it to sign-up for "Create an account". */
-export const AccountStartModeContext = createContext<'signIn' | 'signUp'>('signIn');
-
-export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSignedIn?: () => void }) {
+/** `initialMode` is the form signed-out people see first; the invitation screen asks for sign-up. */
+export function AccountScreen({ onBack, onSignedIn, initialMode }: { onBack: () => void; onSignedIn?: () => void; initialMode?: 'signIn' | 'signUp' }) {
   const identity = useAccount();
-  const startMode = useContext(AccountStartModeContext);
   // Opened as the first screen: leave once signed in and the profile call has answered (or failed), with or without a name.
   // Not before: a slow load must not drop the person onto a half-ready Home.
   // profileAnswered, not profileLoaded: a name save right after sign-up supersedes the first load, which then never sets profileLoaded.
@@ -195,7 +190,7 @@ export function AccountScreen({ onBack, onSignedIn }: { onBack: () => void; onSi
         automaticallyAdjustKeyboardInsets
       >
         {identity ? (
-          <AccountBody identity={identity} onBack={onBack} initialMode={startMode} />
+          <AccountBody identity={identity} onBack={onBack} initialMode={initialMode} />
         ) : (
           <LoadingOrUnavailable text={UNAVAILABLE} onBack={onBack} />
         )}

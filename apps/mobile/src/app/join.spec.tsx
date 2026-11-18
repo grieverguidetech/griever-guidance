@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { AccessibilityInfo, Linking, Platform } from 'react-native';
+import { AccessibilityInfo, BackHandler, Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UseAccountResult } from '@griever/hooks';
 import { START_FIRST } from '../screens/HomeScreen';
@@ -314,5 +314,108 @@ describe('joining from an invitation link (#232)', () => {
     render(<App />);
     await waitFor(() => expect(reload).toHaveBeenCalled());
     expect(screen.queryByText(/You're helping/)).toBeNull();
+  });
+
+  /** Presses Android Back the way the OS does: the newest handler first, until one takes it. */
+  function backHandlers() {
+    const handlers: (() => boolean)[] = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation(((_event: string, handler: () => boolean) => {
+      handlers.push(handler);
+      return { remove: () => handlers.splice(handlers.indexOf(handler), 1) };
+    }) as never);
+    return () => {
+      for (const handler of [...handlers].reverse()) {
+        if (handler()) {
+          return true;
+        }
+      }
+      return false;
+    };
+  }
+
+  it('Android Back does not reach the app under the Join screen', async () => {
+    const pressBack = backHandlers();
+    render(<App />);
+    await screen.findByRole('heading', { name: "You've been asked to help" });
+    await act(async () => {
+      expect(pressBack()).toBe(true);
+    });
+    expect(screen.getByRole('heading', { name: "You've been asked to help" })).toBeTruthy();
+  });
+
+  it('Android Back on a message continues, like its button', async () => {
+    const pressBack = backHandlers();
+    signInAs(signedIn);
+    mockAccept.mockResolvedValue({ ok: false, reason: 'unusable' });
+    render(<App />);
+    await screen.findByRole('heading', { name: "This invitation can't be used" });
+    await act(async () => {
+      expect(pressBack()).toBe(true);
+    });
+    expect(await screen.findByText("Who you're writing about")).toBeTruthy();
+  });
+
+  it('a signed-out person whose phone has a stale signed-in marker still gets sign-up from "Create an account"', async () => {
+    mockLaunch = { hydrated: true, signedIn: true };
+    mockAccount = signedOut;
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: "You've been asked to help" })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Create an account' }));
+    expect(await screen.findByRole('heading', { name: 'Create an account' })).toBeTruthy();
+  });
+
+  it('first join offline, a second link mid-join: the first token is kept, then the second runs and storage ends empty', async () => {
+    const listeners: ((event: { url: string }) => void)[] = [];
+    jest.spyOn(Linking, 'addEventListener').mockImplementation(((_type: string, fn: (event: { url: string }) => void) => {
+      listeners.push(fn);
+      return { remove: () => undefined };
+    }) as never);
+    const SECOND = 'Yw9-' + 'm'.repeat(39);
+    let first: (r: unknown) => void = () => undefined;
+    mockAccept.mockImplementationOnce(() => new Promise((resolve) => (first = resolve)));
+    mockAccept.mockResolvedValueOnce({ ok: true, ownerId: 'o1' });
+    signInAs(signedIn);
+    render(<App />);
+    await waitFor(() => expect(mockAccept).toHaveBeenCalledTimes(1));
+    await act(async () => listeners.forEach((fn) => fn({ url: `https://web.grieversguidance.com/join#t=${SECOND}` })));
+    await act(async () => first({ ok: false, reason: 'offline' }));
+    await waitFor(() => expect(mockAccept).toHaveBeenCalledTimes(2));
+    expect(mockAccept).toHaveBeenLastCalledWith('access-token', SECOND);
+    await waitFor(async () => expect(await stored()).toBeNull());
+  });
+
+  describe('the joined note', () => {
+    it('goes away 10 seconds after the join', async () => {
+      jest.useFakeTimers({ advanceTimers: true });
+      try {
+        signInAs(signedIn);
+        mockAccept.mockResolvedValue({ ok: true, ownerId: 'o1' });
+        render(<App />);
+        expect(await screen.findByText("You're helping Anna now.")).toBeTruthy();
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(10_500);
+        });
+        expect(screen.queryByText("You're helping Anna now.")).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('uses "someone" and still goes away when the list cannot be read', async () => {
+      jest.useFakeTimers({ advanceTimers: true });
+      try {
+        mockGetMembers.mockResolvedValue({ ok: false, reason: 'offline' });
+        signInAs(signedIn);
+        mockAccept.mockResolvedValue({ ok: true, ownerId: 'o1' });
+        render(<App />);
+        expect(await screen.findByText("You're helping someone now.")).toBeTruthy();
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(10_500);
+        });
+        expect(screen.queryByText(/You're helping/)).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

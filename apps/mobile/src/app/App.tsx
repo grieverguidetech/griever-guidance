@@ -4,7 +4,7 @@ import { AccessibilityInfo, BackHandler, Platform, StyleSheet, View } from 'reac
 import { colors } from '@griever/tokens';
 import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -16,7 +16,7 @@ import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
 import { SendingScreen } from '../screens/SendingScreen';
 import { WhatYoullNeedScreen } from '../screens/WhatYoullNeedScreen';
-import { AccountScreen, AccountStartModeContext } from '../screens/AccountScreen';
+import { AccountScreen } from '../screens/AccountScreen';
 import { AccountProvider, useAccount, useLaunchState, useSyncAuth } from '../lib/AccountProvider';
 import { useAccountSenderName } from '../lib/accountName';
 import { useCanCreate } from '../lib/canCreate';
@@ -995,6 +995,19 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
   const offline = !!account?.offline;
   const reloadProfile = account?.reloadProfile;
 
+  /** Starts over with a link: one place for the listener and the pending path. A different token drops the sign-in choice. */
+  const adopt = useCallback((found: string) => {
+    if (found !== held.current) {
+      setAskedSignIn(false);
+      setStartMode('signIn');
+    }
+    held.current = found;
+    started.current = false;
+    setToken(found);
+    setPhase(null);
+    setTries((n) => n + 1);
+  }, []);
+
   useEffect(
     () =>
       watchJoinLink((found) => {
@@ -1004,18 +1017,18 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
           }
           return;
         }
-        if (found !== held.current) {
-          setAskedSignIn(false);
-          setStartMode('signIn');
-        }
-        held.current = found;
-        started.current = false;
-        setToken(found);
-        setPhase(null);
-        setTries((n) => n + 1);
+        adopt(found);
       }),
-    [],
+    [adopt],
   );
+
+  // Signed in: the sign-in choice is spent, so a later sign-out opens sign-in.
+  useEffect(() => {
+    if (signedIn) {
+      setAskedSignIn(false);
+      setStartMode('signIn');
+    }
+  }, [signedIn]);
 
   useEffect(() => {
     if (token === null || started.current) {
@@ -1049,11 +1062,7 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
         setJoinedNote(true);
       }
       if (next !== null) {
-        held.current = next;
-        started.current = false;
-        setToken(next);
-        setPhase(null);
-        setTries((n) => n + 1);
+        adopt(next);
       } else if (keep) {
         setPhase(outcome);
       } else {
@@ -1064,7 +1073,7 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
       running.current = false;
     })();
     // `tries` restarts the effect for a repeat of the same link.
-  }, [token, tries, offline, signedIn, getToken, reloadProfile]);
+  }, [token, tries, offline, signedIn, getToken, reloadProfile, adopt]);
 
   const signedOut = !!account && !account.isLoading && !signedIn && !offline;
   let screen: JoinPhase | null = null;
@@ -1081,16 +1090,37 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
     setStartMode(mode);
     setAskedSignIn(true);
   };
-  // The app stays mounted under the Join screen, so what the person had open is still there after it.
-  const hidden = screen !== null;
+  // After the choice, the sign-in or sign-up form shows here, whatever the app underneath is on (it may be on Home).
+  const accountOverlay = phase === null && token !== null && signedOut && askedSignIn;
+  // The app stays mounted under the overlay, so what the person had open is still there after it.
+  const hidden = screen !== null || accountOverlay;
+  // Android Back must not reach the hidden app: it steps back inside the overlay, or does nothing.
+  useEffect(() => {
+    if (!hidden) {
+      return;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (accountOverlay) {
+        setAskedSignIn(false);
+      } else if (screen !== null && screen !== 'invited' && screen !== 'joining') {
+        setPhase('done');
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [hidden, accountOverlay, screen]);
   return (
     <View style={{ flex: 1 }}>
-      {joinedNote && getToken ? <JoinedNote getToken={getToken} onDone={endNote} /> : null}
-      <AccountStartModeContext.Provider value={startMode}>
-        <View style={{ flex: 1 }} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={hidden}>
-          {children}
+      <View style={{ flex: 1 }} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} accessibilityElementsHidden={hidden}>
+        {children}
+      </View>
+      {accountOverlay ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ScreenFrame>
+            <AccountScreen initialMode={startMode} onBack={() => setAskedSignIn(false)} />
+          </ScreenFrame>
         </View>
-      </AccountStartModeContext.Provider>
+      ) : null}
       {screen !== null ? (
         <View style={StyleSheet.absoluteFill}>
           <ScreenFrame>
@@ -1098,6 +1128,7 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
           </ScreenFrame>
         </View>
       ) : null}
+      {joinedNote && getToken ? <JoinedNote getToken={getToken} onDone={endNote} /> : null}
     </View>
   );
 };
@@ -1108,8 +1139,12 @@ const JoinGate = ({ children }: { children: ReactNode }) => {
  * It goes away by itself after a while.
  */
 const JoinedNote = ({ getToken, onDone }: { getToken: () => Promise<string | null>; onDone: () => void }) => {
-  const { view } = useMembers({ getAccessToken: getToken, enabled: true });
-  const owner = view?.role === 'member' ? (view.owner.name ?? screenCopy('phonePeopleHelping').someone) : null;
+  const { view, status } = useMembers({ getAccessToken: getToken, enabled: true });
+  const insets = useSafeAreaInsets();
+  const someone = screenCopy('phonePeopleHelping').someone;
+  // The owner's name, or the plain fallback when the list cannot be read.
+  const failed = status === 'offline' || status === 'unavailable' || status === 'signed_out';
+  const owner = view?.role === 'member' ? (view.owner.name ?? someone) : failed ? someone : null;
   const [text, setText] = useState('');
   useEffect(() => {
     if (owner === null || text !== '') {
@@ -1119,20 +1154,21 @@ const JoinedNote = ({ getToken, onDone }: { getToken: () => Promise<string | nul
     return () => clearTimeout(timer);
   }, [owner, text]);
   useEffect(() => {
-    if (text === '') {
-      return;
+    if (text !== '') {
+      announce(text);
     }
-    announce(text);
   }, [text]);
+  // Ends 10 seconds after the join, whether or not the words ever arrived.
   useEffect(() => {
-    if (text === '') {
-      return;
-    }
     const timer = setTimeout(onDone, 10000);
     return () => clearTimeout(timer);
-  }, [text, onDone]);
+  }, [onDone]);
+  // A banner over the top of the app: it never moves the app. Empty until its words arrive, so the live region is there first.
   return (
-    <View style={{ paddingHorizontal: 24 }}>
+    <View
+      pointerEvents="none"
+      style={[{ position: 'absolute', top: 0, left: 0, right: 0 }, text !== '' && { backgroundColor: colors.bg, paddingTop: insets.top + 8, paddingBottom: 8, paddingHorizontal: 24 }]}
+    >
       <Body live>{text}</Body>
     </View>
   );
