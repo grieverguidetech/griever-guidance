@@ -1,4 +1,4 @@
-import { useFocusHeadingOnChange } from '../lib/ui';
+import { focusHeading, useFocusHeadingOnChange } from '../lib/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate, useNavigationType } from 'react-router';
@@ -49,6 +49,7 @@ import { parsePath, paths } from '../routes/paths';
 import { isSignInPath, rememberNext, rememberedNext, requireAccount } from '../routes/RequireAccount';
 import type { AccountState } from '../routes/RequireAccount';
 import { NotFound } from '../routes/NotFound';
+import { NOT_FOUND_TITLE, titleForPath, useDocumentTitle } from '../routes/useDocumentTitle';
 import { hasSignedInMarker, loadClerk } from '../lib/authClient';
 import { JOIN_PATH, captureJoinLink, clearJoinToken, joinOutcome, savedJoinToken } from '../lib/joinLink';
 import type { JoinOutcome } from '../lib/joinLink';
@@ -693,6 +694,9 @@ function AppBody({
   const notFound =
     editorPath &&
     (!CMS_ENABLED || (pathSpot === null && !peoplePath && !accountPath) || (pathSpot !== null && pathSpot.item !== null && pathItem === null));
+  // The tab title follows the path shown, never the person on it (#852). Set here, not only in NotFound,
+  // because this effect runs after NotFound's and would otherwise overwrite it.
+  useDocumentTitle(notFound ? NOT_FOUND_TITLE : titleForPath(shown.pathname));
 
   // Shown once, on the first screen after a removal; leaving it ends it for good. The first screen is
   // the first one shown, not a loading moment or a guard move before it (see `firstView` below).
@@ -859,6 +863,7 @@ function AppBody({
         : accountPath
           ? 'account'
           : view,
+    { locationKey: location.key, type: navigationType },
   );
   // Must stay declared after the heading hook above: effects run in order, so this one lands
   // on the opener after the hook has put focus on the h1. The sheet's button is gone, so the h1 stays.
@@ -1755,8 +1760,8 @@ function AppBody({
       focusAfterLanding.current = false;
       const heading = document.querySelector('h1');
       if (heading) {
-        heading.setAttribute('tabindex', '-1');
-        heading.focus();
+        // The landing always replaces the entry, so the router has put the page at the top (#852).
+        focusHeading(heading, 'new');
       }
     } else if (view !== 'home') {
       focusAfterLanding.current = false;

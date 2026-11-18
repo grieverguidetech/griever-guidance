@@ -18,3 +18,7 @@ afterEach(() => {
   globalThis.indexedDB = new IDBFactory();
   window.history.replaceState(null, '', '/');
 });
+
+// jsdom has no layout, so `window.scrollTo` only logs "Not implemented". The router's
+// ScrollRestoration calls it on every move (#852); a no-op keeps the logs readable, and specs can spy on it.
+window.scrollTo = (() => undefined) as typeof window.scrollTo;

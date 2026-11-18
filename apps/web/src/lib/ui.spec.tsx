@@ -32,6 +32,95 @@ describe('useFocusHeadingOnChange', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it('focuses with a plain focus() when no router move is given (a flow step scrolls the h1 into view)', () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
+      const { rerender } = render(<Screen view="a" headingFrom={0} tick={0} />);
+      fireEvent.click(document.body);
+      rerender(<Screen view="b" headingFrom={0} tick={1} />);
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(focus).toHaveBeenCalledWith();
+    } finally {
+      focus.mockRestore();
+    }
+  });
+});
+
+describe('useFocusHeadingOnChange with router moves (#852)', () => {
+  type Move = { view: string; locationKey: string; type: 'POP' | 'PUSH' | 'REPLACE' };
+  function Routed({ view, locationKey, type }: Move) {
+    useFocusHeadingOnChange(view, { locationKey, type });
+    return (
+      <>
+        <nav>
+          <a href="/here" aria-current="page">
+            Here
+          </a>
+        </nav>
+        <h1>{view}</h1>
+      </>
+    );
+  }
+
+  const ABOVE = { top: -240, bottom: -200, left: 0, right: 100, width: 100, height: 40, x: 0, y: -240 } as DOMRect;
+  const BELOW = { top: 5000, bottom: 5040, left: 0, right: 100, width: 100, height: 40, x: 0, y: 5000 } as DOMRect;
+  const IN_VIEW = { top: 16, bottom: 56, left: 0, right: 100, width: 100, height: 40, x: 0, y: 16 } as DOMRect;
+
+  /** Renders view "a" at entry "k1", marks a press, then moves to view "b" with `move`. */
+  function moveTo(move: Omit<Move, 'view'>, rects: { heading?: DOMRect; link?: DOMRect } = {}) {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    const { rerender } = render(<Routed view="a" locationKey="k1" type="PUSH" />);
+    const heading = screen.getByRole('heading', { level: 1 });
+    const link = screen.getByRole('link', { name: 'Here' });
+    if (rects.heading) {
+      vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue(rects.heading);
+    }
+    if (rects.link) {
+      vi.spyOn(link, 'getBoundingClientRect').mockReturnValue(rects.link);
+    }
+    fireEvent.click(document.body);
+    rerender(<Routed view="b" {...move} />);
+    return { focus, heading, link };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('a change on the same URL is a step: plain focus, which may scroll', () => {
+    const { focus, heading } = moveTo({ locationKey: 'k1', type: 'PUSH' });
+    expect(document.activeElement).toBe(heading);
+    expect(focus).toHaveBeenCalledWith();
+  });
+
+  it.each(['PUSH', 'REPLACE'] as const)('%s: the h1, without scrolling (the page is already at the top)', (type) => {
+    const { focus, heading } = moveTo({ locationKey: 'k2', type }, { heading: BELOW });
+    expect(document.activeElement).toBe(heading);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it('POP with the h1 in view: the h1, without scrolling', () => {
+    const { focus, heading } = moveTo({ locationKey: 'k0', type: 'POP' }, { heading: IN_VIEW });
+    expect(document.activeElement).toBe(heading);
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it("POP with the h1 above the view: the side nav's current link, if it is in view", () => {
+    const { focus, link } = moveTo({ locationKey: 'k0', type: 'POP' }, { heading: ABOVE, link: IN_VIEW });
+    expect(document.activeElement).toBe(link);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it('POP with neither in view: focus stays where it was, so the restored scroll stays', () => {
+    const { focus } = moveTo({ locationKey: 'k0', type: 'POP' }, { heading: ABOVE, link: BELOW });
+    expect(focus).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
+describe('useFocusHeadingOnChange, before any press', () => {
   it('stays put when the view changes before the person has done anything', () => {
     const { rerender } = render(<Screen view="a" headingFrom={0} tick={0} />);
     rerender(<Screen view="b" headingFrom={0} tick={1} />);

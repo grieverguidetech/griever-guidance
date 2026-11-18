@@ -26,6 +26,7 @@ import phoneReady from '../screens/phoneReady.json';
 import phoneSwitcher from '../screens/phoneSwitcher.json';
 import phoneTexting from '../screens/phoneTexting.json';
 import review from '../screens/review.json';
+import routeTitles from '../screens/routeTitles.json';
 import sending from '../screens/sending.json';
 import shareObituary from '../screens/shareObituary.json';
 import signIn from '../screens/signIn.json';
@@ -33,6 +34,6 @@ import signUp from '../screens/signUp.json';
 import whoShouldKnow from '../screens/whoShouldKnow.json';
 
 /** Every screen's copy. To add a screen: JSON in screens/, schema in schemas/, one line here. */
-export const screens = { account, announce, cmsAnnouncement, cmsChecklist, cmsObituary, cmsPerson, cmsService, cmsShell, cmsThanks, join, notFound, obituaryDraft, pathLanding, personSetup, paywall, phoneAccount, phoneChecklist, phoneDetails, phoneHub, phoneNudge, phoneObituary, phonePeople, phonePeopleHelping, phonePerson, phoneReady, phoneSwitcher, phoneTexting, review, sending, shareObituary, signIn, signUp, whoShouldKnow } as const;
+export const screens = { account, announce, cmsAnnouncement, cmsChecklist, cmsObituary, cmsPerson, cmsService, cmsShell, cmsThanks, join, notFound, obituaryDraft, pathLanding, personSetup, paywall, phoneAccount, phoneChecklist, phoneDetails, phoneHub, phoneNudge, phoneObituary, phonePeople, phonePeopleHelping, phonePerson, phoneReady, phoneSwitcher, phoneTexting, review, routeTitles, sending, shareObituary, signIn, signUp, whoShouldKnow } as const;
 
 export type ScreenName = keyof typeof screens;

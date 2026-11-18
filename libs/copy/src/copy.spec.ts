@@ -200,3 +200,12 @@ describe('sendLabel', () => {
     expect(sendLabel(0, copy)).toBe('Text these people');
   });
 });
+
+describe('route titles (#852)', () => {
+  it('have no placeholders, so nothing (a name above all) can be filled into a tab title', () => {
+    for (const title of Object.values(screenCopy('routeTitles'))) {
+      expect(title, title).not.toMatch(/[{}]/);
+      expect(title, title).toContain('Grievers Guidance');
+    }
+  });
+});
