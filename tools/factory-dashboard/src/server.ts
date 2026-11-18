@@ -38,9 +38,8 @@ import {
   GIT_LOG_FORMAT,
   COMMITS_SHOWN,
   costErrorMessage,
-  linearErrorMessage,
-  toLinearRows,
-  type LinearRow,
+  makeLinearReader,
+  type LinearReading,
   makeCostReader,
   validateCostReading,
   parseAdr,
@@ -465,7 +464,6 @@ const readCost = makeCostReader({
 // Linear (team GRI): one read-only GraphQL query. The personal API key is read from the macOS Keychain on each
 // call and kept only in a local variable. It is never logged, never sent to the page and never written anywhere.
 const LINEAR_URL = 'https://api.linear.app/graphql';
-const LINEAR_CACHE_MS = 10 * 60 * 1000;
 const LINEAR_NO_KEY = 'Linear key not set. See the README.';
 const LINEAR_QUERY = `query ($after: String) {
   teams(filter: { key: { eq: "GRI" } }) {
@@ -477,69 +475,33 @@ const LINEAR_QUERY = `query ($after: String) {
     }
   }
 }`;
-const LINEAR_MAX_PAGES = 10;
 
-type LinearReading = { rows: LinearRow[]; at: number };
-let linearCache: LinearReading | null = null;
-
-async function readLinearKey(): Promise<string> {
-  try {
-    const { stdout } = await run('security', ['find-generic-password', '-s', 'gg-dashboard-linear', '-w'], { timeout: 10_000 });
-    const key = stdout.trim();
-    if (key !== '') {
-      return key;
+const readLinear = makeLinearReader({
+  now: () => Date.now(),
+  // Exit code 44 means the item is not in the Keychain. Any other failure is a different problem.
+  readKey: async () => {
+    try {
+      const { stdout } = await run('security', ['find-generic-password', '-s', 'gg-dashboard-linear', '-w'], { timeout: 10_000 });
+      if (stdout.trim() !== '') {
+        return stdout.trim();
+      }
+    } catch (error) {
+      if ((error as { code?: number }).code !== 44) {
+        throw new Error('Could not read the Linear key from the Keychain.');
+      }
     }
-  } catch {
-    // Not found in the Keychain: handled below.
-  }
-  throw new Error(LINEAR_NO_KEY);
-}
-
-async function fetchLinearRows(key: string): Promise<LinearRow[]> {
-  const nodes: unknown[] = [];
-  let after: string | null = null;
-  for (let page = 0; page < LINEAR_MAX_PAGES; page += 1) {
+    throw new Error(LINEAR_NO_KEY);
+  },
+  post: async (key, variables, signal) => {
     const response = await fetch(LINEAR_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: key },
-      body: JSON.stringify({ query: LINEAR_QUERY, variables: { after } }),
-      signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({ query: LINEAR_QUERY, variables }),
+      signal,
     });
-    if (!response.ok) {
-      throw new Error(`Linear answered ${response.status}`);
-    }
-    const body = (await response.json()) as {
-      errors?: { message?: string }[];
-      data?: { teams?: { nodes?: { issues?: { nodes?: unknown[]; pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } }[] } };
-    };
-    if (body.errors && body.errors.length > 0) {
-      throw new Error(body.errors[0]?.message ?? 'Linear returned an error');
-    }
-    const issues = body.data?.teams?.nodes?.[0]?.issues;
-    if (!issues) {
-      throw new Error('Team GRI not found');
-    }
-    nodes.push(...(issues.nodes ?? []));
-    if (!issues.pageInfo?.hasNextPage || !issues.pageInfo.endCursor) {
-      break;
-    }
-    after = issues.pageInfo.endCursor;
-  }
-  return toLinearRows(nodes);
-}
-
-async function readLinear(): Promise<LinearReading> {
-  if (linearCache && Date.now() - linearCache.at < LINEAR_CACHE_MS) {
-    return linearCache;
-  }
-  const key = await readLinearKey();
-  try {
-    linearCache = { rows: await fetchLinearRows(key), at: Date.now() };
-    return linearCache;
-  } catch (error) {
-    throw new Error(linearErrorMessage(error instanceof Error ? error.message : '', key));
-  }
-}
+    return { status: response.status, body: await response.json().catch(() => null) };
+  },
+});
 
 async function buildState() {
   const sources: Record<string, SourceStatus> = {};
@@ -625,7 +587,7 @@ async function buildState() {
       costReading === null
         ? null
         : { dollars: costReading.dollars, estimated: costReading.estimated, budget: COST_BUDGET_USD, checkedAt: new Date(costReading.at).toISOString() },
-    linear: linear === null ? null : { rows: linear.rows, checkedAt: new Date(linear.at).toISOString() },
+    linear: linear === null ? null : { rows: linear.rows, checkedAt: new Date(linear.at).toISOString(), truncated: linear.truncated, note: linear.note },
     areas: listAreas(allIssues.map((issue) => issue.labels)),
   };
 }

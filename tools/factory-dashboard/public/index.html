@@ -1729,13 +1729,17 @@ function linearTable(rows) {
   var box = scrollBox("Linear GRI open issues table");
   var table = el("table", null, "plain");
   table.appendChild(el("caption", "Linear GRI open issues", "sr-only"));
+  var thead = el("thead");
   var head = el("tr");
   ["ID", "Title", "Status", "Priority", "Assignee", "Last updated"].forEach(function (name) {
     var th = el("th", name);
     th.scope = "col";
     head.appendChild(th);
   });
-  table.appendChild(head);
+  thead.appendChild(head);
+  table.appendChild(thead);
+  var tbody = el("tbody");
+  table.appendChild(tbody);
   rows.forEach(function (row) {
     var tr = el("tr");
     var id = el("td", null, "text");
@@ -1749,7 +1753,7 @@ function linearTable(rows) {
     tr.appendChild(el("td", row.priorityLabel, "text"));
     tr.appendChild(el("td", row.assignee, "text"));
     tr.appendChild(el("td", row.updatedAt ? agoText(row.updatedAt) : "Unknown", "text"));
-    table.appendChild(tr);
+    tbody.appendChild(tr);
   });
   box.appendChild(table);
   return box;
@@ -1759,18 +1763,30 @@ function renderLinear(parent) {
   var s = kitSection(parent, "Linear: GRI", null);
   var src = state.sources.linear;
   if (src && !src.ok) {
-    s.appendChild(el("p", src.error, "error"));
+    s.appendChild(el("p", src.error, src.error === "Linear key not set. See the README." ? "muted" : "error"));
     return;
   }
   if (!state.linear) {
     return;
   }
-  s.appendChild(el("p", "Linear read " + agoText(state.linear.checkedAt) + ". It is read at most once every 10 minutes.", "muted"));
+  var meta = el("p", null, "panel-meta muted");
+  meta.appendChild(document.createTextNode("Linear read "));
+  var t = el("time", agoText(state.linear.checkedAt));
+  t.setAttribute("datetime", state.linear.checkedAt);
+  meta.appendChild(t);
+  meta.appendChild(document.createTextNode(". It is read at most once every 10 minutes."));
+  s.appendChild(meta);
+  if (state.linear.note) {
+    s.appendChild(el("p", state.linear.note, "error"));
+  }
   if (state.linear.rows.length === 0) {
     s.appendChild(el("p", "No open Linear issues.", "muted"));
     return;
   }
   s.appendChild(paged("linear", "Linear issues", state.linear.rows, linearTable));
+  if (state.linear.truncated) {
+    s.appendChild(el("p", "Showing the first 1000.", "muted"));
+  }
 }
 
 function businessMissing(parent) {

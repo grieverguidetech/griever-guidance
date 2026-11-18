@@ -58,7 +58,7 @@ One-time setup: create a personal API key in Linear (Settings, Security and acce
 security add-generic-password -a "$USER" -s gg-dashboard-linear -w
 ```
 
-The server reads the key from the Keychain on each call (`security find-generic-password -s gg-dashboard-linear -w`), sends one read-only GraphQL query to `https://api.linear.app/graphql`, and keeps the result in memory for 10 minutes. The key is never logged, never sent to the page or `/api/state`, and never written to a file. Without the key the section says "Linear key not set. See the README." If the call fails it says "Could not read Linear: <reason>". The rest of the page loads either way.
+The server reads the key from the Keychain on each call (`security find-generic-password -s gg-dashboard-linear -w`), sends one read-only GraphQL query to `https://api.linear.app/graphql`, and keeps the result in memory for 10 minutes. The key is never logged, never sent to the page or `/api/state`, and never written to a file. Without the key the section says "Linear key not set. See the README." If the call fails it says "Could not read Linear: <reason>". If a refresh fails after a good read, the last good rows stay with a note. One read has an 8 second limit and shows at most 1000 issues. The rest of the page loads either way.
 
 ## Read-only
 
