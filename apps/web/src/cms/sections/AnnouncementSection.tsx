@@ -1,6 +1,6 @@
 import { useId, useRef } from 'react';
 import { screenCopy } from '@griever/copy';
-import { type SectionFields, type SectionKey, type SessionDetails } from '@griever/shared';
+import type { SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { MarkReady } from './MarkReady';
 import { announcementPrefill } from './messagePrefill';
 
