@@ -56,6 +56,12 @@ export interface SendFlowState {
    * of the field drops its key. Mobile only: web never sets it. Absent on drafts saved before it existed.
    */
   webFields?: Record<string, string>;
+  /**
+   * The web wording the phone last put in the message (#958). While the message is the template's (no override) and nothing
+   * is typed, mobile applies the web wording only when it differs from this, so a tone change or "Use the suggested
+   * wording" is not undone on the next visit. Mobile only: web never sets it.
+   */
+  webMessageSeen?: string;
   /** Start each text with the recipient's first name. On by default; the griever can turn it off. */
   greeting: boolean;
   /** Thank-you only: one optional line per person, by contact id. Never synced (C2). Cleared when the send finishes. */
@@ -527,7 +533,7 @@ export function useSendFlow(
   }, []);
 
   const setWebMessage = useCallback((value: string | null) => {
-    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null }));
+    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null, webMessageSeen: value ?? s.webMessageSeen }));
   }, []);
 
   const setGreeting = useCallback((value: boolean) => {

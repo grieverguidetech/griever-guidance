@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
@@ -184,3 +184,69 @@ describe('service form fields follow the web until typed on the phone (#958)', (
     expect(saved.servicePlace ?? '').toBe('');
   });
 });
+
+// The announcement with the web's wording: the family's choice to use the template's wording (or a tone) stays (#958).
+describe('the web wording and a phone choice of the suggested wording (#958)', () => {
+  const WEB = 'Anna passed away peacefully.';
+  const person = () => anna({ sectionStatus: { announcement: 'ready' }, announcementMessage: WEB });
+  const ANNOUNCE = /^Announce the passing, .*Continue$/;
+  const value = async () => (await screen.findByLabelText('Your message')).props.value as string;
+  const start = async () => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person()]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+    fireEvent.press(await screen.findByRole('button', { name: ANNOUNCE }));
+  };
+  const nextVisit = async () => {
+    screen.unmount();
+    render(<App />);
+    await screen.findByText('For Anna', {}, { timeout: 10000 });
+    fireEvent.press(await screen.findByRole('button', { name: ANNOUNCE }));
+  };
+  const useSuggested = async () => {
+    expect(await value()).toBe(WEB);
+    fireEvent.press(await screen.findByRole('button', { name: 'Use the suggested wording' }));
+    return value();
+  };
+
+  it('keeps a tone chosen on the phone on the next visit', async () => {
+    await start();
+    const plain = await useSuggested();
+    expect(plain).not.toBe(WEB);
+    fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
+    const softer = await value();
+    expect(softer).not.toBe(plain);
+    await nextVisit();
+    await waitFor(async () => expect(await value()).toBe(softer));
+    expect(screen.queryByDisplayValue(WEB)).toBeNull();
+  });
+
+  it('keeps the suggested wording on the next visit', async () => {
+    await start();
+    const plain = await useSuggested();
+    await nextVisit();
+    await waitFor(async () => expect(await value()).toBe(plain));
+    expect(screen.queryByDisplayValue(WEB)).toBeNull();
+  });
+
+  it('shows new web wording after the family chose the suggested wording', async () => {
+    await start();
+    await useSuggested();
+    await nextVisit();
+    act(() => {
+      syncOptions?.applyRemoteFlows(
+        {
+          flows: [{
+            id: 'flow-a', ownerId: 'user_me', role: 'owner', updatedAt: '2026-10-02T00:00:00.000Z', updatedBy: null,
+            facts: { personName: 'Anna', dateOfPassing: null, serviceDate: null, obituaryUrl: null, obituaryPublisher: null, serviceReady: false },
+            details: { announcementStatus: 'ready', announcementMessage: 'Anna died on Tuesday.' },
+          }],
+        },
+        'user_me',
+      );
+    });
+    expect(await screen.findByDisplayValue('Anna died on Tuesday.')).toBeTruthy();
+  });
+});
+

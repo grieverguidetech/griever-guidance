@@ -270,18 +270,15 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // never throws away wording the family edited by hand.
   const inVisit = onForm || flow.step === 'review';
   const prefilled = useRef(false);
-  // The web's message wording as last seen this visit, so a later arrival is applied once and a phone change to the wording is not undone.
-  const seenWebMessage = useRef<string | null | undefined>(undefined);
   // The signed-in account's name, for the thank-you's sender field. On-device only (DS-7).
   const accountName = useAccountSenderName();
   const senderTyped = flow.fields['senderName'] ?? '';
-  const { setMessageOverride, setWebMessage, setWebField, templateCategory: category, messageOverride, messageFromWeb, fields, webFields } = flow;
+  const { setMessageOverride, setWebMessage, setWebField, templateCategory: category, messageOverride, messageFromWeb, fields, webFields, webMessageSeen } = flow;
   // Fields follow the web until typed on the phone (#958). This runs on every change of the session during the visit,
   // so details that arrive after the form opened fill in. It sets state only when a value differs, so it settles.
   useEffect(() => {
     if (!inVisit) {
       prefilled.current = false;
-      seenWebMessage.current = undefined;
       return;
     }
     const firstPass = !prefilled.current;
@@ -348,20 +345,19 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
     // The family's edited wording (synced from the web) starts a message that is still the template's: nothing
     // typed on the phone (web fields do not count, nor old values about to be taken as web's) and no wording chosen.
-    // Applied when it first shows, or when it changes later; so a tone change or "Use the suggested wording" is not
-    // undone by the next pass. Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
+    // Applied when it first shows, or when it differs from the wording the draft last took (webMessageSeen); so a tone
+    // change or "Use the suggested wording" is not undone by the next pass or the next visit. Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
     const phoneTyped = Object.entries(fields).some(([key, value]) => value.trim() !== '' && webFields?.[key] !== value && !untypedKeys.has(key));
     if (
       planned &&
       messageOverride === null &&
       !phoneTyped &&
       planned.messageOverride !== null &&
-      planned.messageOverride !== seenWebMessage.current
+      planned.messageOverride !== webMessageSeen
     ) {
       setWebMessage(planned.messageOverride);
     }
-    seenWebMessage.current = planned ? planned.messageOverride : undefined;
-  }, [inVisit, onForm, selectedTemplate, setMessageOverride, setWebMessage, setWebField, messageOverride, messageFromWeb, category, session, accountName, senderTyped, fields, webFields]);
+  }, [inVisit, onForm, selectedTemplate, setMessageOverride, setWebMessage, setWebField, messageOverride, messageFromWeb, category, session, accountName, senderTyped, fields, webFields, webMessageSeen]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not

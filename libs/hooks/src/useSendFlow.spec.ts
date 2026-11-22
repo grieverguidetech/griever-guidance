@@ -557,4 +557,16 @@ describe('useSendFlow: fields that came from the web (#958)', () => {
     const restored = renderHook(() => useSendFlow({ session, skipDetails: true, draft: last }));
     expect(restored.result.current.webFields).toEqual({ serviceTime: '2:00 PM' });
   });
+
+  it('setWebMessage records the web wording taken, and a phone change to the message keeps the record', () => {
+    const { result } = service();
+    act(() => result.current.setWebMessage('Web wording.'));
+    expect(result.current.webMessageSeen).toBe('Web wording.');
+    act(() => result.current.setMessageOverride(null));
+    act(() => result.current.setTone('softer'));
+    expect(result.current.messageOverride).toBeNull();
+    expect(result.current.webMessageSeen).toBe('Web wording.');
+    act(() => result.current.setWebMessage(null));
+    expect(result.current.webMessageSeen).toBe('Web wording.');
+  });
 });
