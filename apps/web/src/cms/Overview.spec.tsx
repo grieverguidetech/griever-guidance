@@ -8,14 +8,10 @@ import { CHECKLIST_PHASES } from '@griever/shared';
 import type { ChecklistFields } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
 import { Overview } from './Overview';
-import { announcementPrefill, thanksPrefill } from './sections/messagePrefill';
+import { announcementPrefill, summaryLine, thanksPrefill } from './sections/messagePrefill';
 
 const shell = screenCopy('cmsShell');
 const CHECKLIST_ITEM_LABEL = 'Get a legal pronouncement of death';
-function firstLine(text: string): string {
-  const line = text.split('\n').map((part) => part.trim()).find(Boolean) ?? '';
-  return line.length > 80 ? `${line.slice(0, 80).trimEnd()}…` : line;
-}
 const allIds = CHECKLIST_PHASES.flatMap((phase) => [...phase.itemIds]);
 const allDone: ChecklistFields = { checklist: Object.fromEntries(allIds.map((id) => [id, 'done'])) };
 
@@ -69,10 +65,10 @@ describe('Overview', () => {
     expect(rows).toHaveLength(5);
     expect(rows).toEqual([
       'The person Ready Margaret Hayes · passed May 29, 2026',
-      `Announcement Not started ${firstLine(announcementPrefill({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29' }))} Continue`,
+      `Announcement Not started ${summaryLine(announcementPrefill({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29' }))} Continue`,
       'Service In progress Funeral, June 3, 2026 at St. Mark Church',
       `Obituary Not started ${shell.summaryObituaryEmpty}`,
-      `Thank-yous Not started ${firstLine(thanksPrefill({ personName: 'Margaret Hayes' }))}`,
+      `Thank-yous Not started ${summaryLine(thanksPrefill({ personName: 'Margaret Hayes' }))}`,
     ]);
   });
 
@@ -127,9 +123,9 @@ describe('Overview', () => {
     'announcement card shows the prefilled first line when nothing is saved (%s)',
     (status) => {
       const prefill = announcementPrefill({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29' });
-      setup({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29', sectionStatus: { announcement: status } });
+      setup({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29', sectionStatus: status === 'not_started' ? {} : { announcement: status } });
       const card = screen.getByRole('button', { name: /^Announcement/ });
-      expect(card).toHaveTextContent(firstLine(prefill));
+      expect(card).toHaveTextContent(summaryLine(prefill));
       expect(card).not.toHaveTextContent(shell.summaryAnnouncementEmpty);
     },
   );

@@ -1,4 +1,4 @@
-import { announcementPrefill, thanksPrefill } from './messagePrefill';
+import { announcementPrefill, summaryLine, thanksPrefill } from './messagePrefill';
 
 describe('messagePrefill', () => {
   it('the announcement prefill fills in the name and the date', () => {
@@ -26,5 +26,30 @@ describe('messagePrefill', () => {
     expect(thanksPrefill({ personName: 'Margaret Hayes' })).toBe(
       'Thank you for your kindness and support after the passing of Margaret Hayes. Your presence and thoughtfulness have meant more than words can express.',
     );
+  });
+
+  describe('summaryLine', () => {
+    it('returns the first non-empty line, trimmed', () => {
+      expect(summaryLine('\n  Hello there.\nSecond')).toBe('Hello there.');
+      expect(summaryLine('  \n ')).toBe('');
+    });
+
+    it('cuts at the last space within 80 characters (literal expected)', () => {
+      const text = 'Thank you for your kindness and support after the passing of Margaret Hayes. Your presence matters.';
+      expect(summaryLine(text)).toBe('Thank you for your kindness and support after the passing of Margaret Hayes…');
+    });
+
+    it('never ends mid-word', () => {
+      const words = Array.from({ length: 40 }, (_, i) => `word${i}`);
+      const text = words.join(' ');
+      const out = summaryLine(text);
+      expect(out.endsWith('…')).toBe(true);
+      expect(out.length).toBeLessThanOrEqual(81);
+      expect(words).toContain(out.slice(0, -1).split(' ').pop());
+    });
+
+    it('hard-cuts a line with no space', () => {
+      expect(summaryLine('x'.repeat(200))).toBe(`${'x'.repeat(80)}…`);
+    });
   });
 });
