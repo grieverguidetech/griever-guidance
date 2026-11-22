@@ -1,7 +1,8 @@
 import { useId, useRef } from 'react';
-import { fill, screenCopy } from '@griever/copy';
+import { screenCopy } from '@griever/copy';
 import type { SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { MarkReady } from './MarkReady';
+import { thanksPrefill } from './messagePrefill';
 
 const copy = screenCopy('cmsThanks');
 
@@ -24,8 +25,7 @@ interface Props {
 export function ThanksSection({ values, onChange, onReadyChange, nextSection, onNext }: Props) {
   const id = useId();
   const messageRef = useRef<HTMLTextAreaElement>(null);
-  const name = values.personName?.trim() || copy.nameFallback;
-  const prefill = fill(copy.template, { deceasedName: name });
+  const prefill = thanksPrefill(values);
   const edited = values.thanksMessage !== undefined;
 
   return (
