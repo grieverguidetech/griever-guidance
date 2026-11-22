@@ -50,6 +50,18 @@ export interface SendFlowState {
    * phone edit. It does not count as a draft under way (#949). Absent or false otherwise; any phone edit clears it.
    */
   messageFromWeb?: boolean;
+  /**
+   * Fields whose value came from the web (the prefill), by key, with the value last set from it (#958). A field in
+   * this record with that value is not phone content, and the phone updates it when the web changes. Any phone edit
+   * of the field drops its key. Mobile only: web never sets it. Absent on drafts saved before it existed.
+   */
+  webFields?: Record<string, string>;
+  /**
+   * The web wording the phone last put in the message (#958). While the message is the template's (no override) and nothing
+   * is typed, mobile applies the web wording only when it differs from this, so a tone change or "Use the suggested
+   * wording" is not undone on the next visit. Mobile only: web never sets it.
+   */
+  webMessageSeen?: string;
   /** Start each text with the recipient's first name. On by default; the griever can turn it off. */
   greeting: boolean;
   /** Thank-you only: one optional line per person, by contact id. Never synced (C2). Cleared when the send finishes. */
@@ -71,6 +83,8 @@ export interface SendFlowActions {
   setTemplateCategory: (category: TemplateCategory) => void;
   setTemplate: (template: Template) => void;
   setField: (key: string, value: string) => void;
+  /** Sets a field to the web's value and records it as web's (#958). Leaves the message alone. */
+  setWebField: (key: string, value: string) => void;
   toggleContact: (contactId: string) => void;
   selectContacts: (contactIds: string[]) => void;
   setIncludeFlowers: (value: boolean) => void;
@@ -191,10 +205,14 @@ export function resumeDraft(draft: SendFlowDraft, skipDetails = false): SendFlow
  * (the obituary), so people carried in from elsewhere never make an empty form look written.
  */
 export function draftHasContent(
-  draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds' | 'templateCategory'> & { messageFromWeb?: boolean },
+  draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds' | 'templateCategory'> & {
+    messageFromWeb?: boolean;
+    webFields?: Record<string, string>;
+  },
 ): boolean {
   return (
-    Object.values(draft.fields).some((value) => value.trim() !== '') ||
+    // A field still holding the value that came from the web is the web's, not typed words (#958).
+    Object.entries(draft.fields).some(([key, value]) => value.trim() !== '' && draft.webFields?.[key] !== value) ||
     (!!draft.messageOverride && !draft.messageFromWeb) ||
     (draft.templateCategory === 'obituary' && draft.selectedContactIds.length > 0)
   );
@@ -458,7 +476,19 @@ export function useSendFlow(
   }, [startedState]);
 
   const setField = useCallback((key: string, value: string) => {
-    setState((s) => ({ ...s, fields: { ...s.fields, [key]: value }, messageOverride: null, messageFromWeb: false }));
+    setState((s) => {
+      const next: SendFlowState = { ...s, fields: { ...s.fields, [key]: value }, messageOverride: null, messageFromWeb: false };
+      if (s.webFields && key in s.webFields) {
+        const { [key]: _typed, ...rest } = s.webFields;
+        next.webFields = rest;
+      }
+      return next;
+    });
+  }, []);
+
+  // Unlike setField, the message is left as it is: a field from the web is not a phone edit (#958).
+  const setWebField = useCallback((key: string, value: string) => {
+    setState((s) => ({ ...s, fields: { ...s.fields, [key]: value }, webFields: { ...s.webFields, [key]: value } }));
   }, []);
 
   const toggleContact = useCallback((contactId: string) => {
@@ -503,7 +533,7 @@ export function useSendFlow(
   }, []);
 
   const setWebMessage = useCallback((value: string | null) => {
-    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null }));
+    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null, webMessageSeen: value ?? s.webMessageSeen }));
   }, []);
 
   const setGreeting = useCallback((value: boolean) => {
@@ -606,6 +636,7 @@ export function useSendFlow(
     setTemplateCategory,
     setTemplate,
     setField,
+    setWebField,
     toggleContact,
     selectContacts,
     setIncludeFlowers,

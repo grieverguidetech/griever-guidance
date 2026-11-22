@@ -326,7 +326,8 @@ function copyServiceDraftFields(session: Session): Session {
   const copied: Partial<SectionFields> = {};
   for (const [from, to] of SERVICE_DRAFT_COPIES) {
     const value = draftFields[from]?.trim();
-    if (value && session[to] === undefined) {
+    // A value that only came from the web is not typed words: when the web has cleared it, it must not come back (#958).
+    if (value && session[to] === undefined && session.drafts.service?.webFields?.[from] !== draftFields[from]) {
       copied[to] = value;
     }
   }

@@ -65,8 +65,10 @@ const openAnna = async (person: Session = anna) => {
 
 // An announcement resumed with no edited wording: the message follows the form, so the tone and the Details row work.
 // A fresh form with web wording starts from that wording instead (edited), and with none shows the nudge (#824).
+// A draft with only the name filled counts as fresh (#958), so this person has no web wording either.
 const annaWithoutEditedWords = {
   ...anna,
+  announcementMessage: undefined,
   drafts: {
     announcement: {
       step: 'contacts', templateCategory: 'announcement', templateOverrideId: null, fields: { deceasedName: 'Anna' },
