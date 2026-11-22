@@ -45,6 +45,11 @@ export interface SendFlowState {
   tone: MessageTone;
   /** Set when the griever hand-edits the wording; pins the draft. */
   messageOverride: string | null;
+  /**
+   * True when `messageOverride` is only the family's own wording from the web (the prefill), not a
+   * phone edit. It does not count as a draft under way (#949). Absent or false otherwise; any phone edit clears it.
+   */
+  messageFromWeb?: boolean;
   /** Start each text with the recipient's first name. On by default; the griever can turn it off. */
   greeting: boolean;
   /** Thank-you only: one optional line per person, by contact id. Never synced (C2). Cleared when the send finishes. */
@@ -73,6 +78,8 @@ export interface SendFlowActions {
   setFlowerDeliveryTarget: (target: 'service' | 'home') => void;
   setTone: (tone: MessageTone) => void;
   setMessageOverride: (value: string | null) => void;
+  /** Sets the message to the web's own wording and marks it so (#949). `null` clears it. */
+  setWebMessage: (value: string | null) => void;
   setGreeting: (value: boolean) => void;
   /** Sets or clears (empty text) the line for one person. Only the thank-you adds it to the message. */
   setRecipientNote: (contactId: string, value: string) => void;
@@ -184,11 +191,11 @@ export function resumeDraft(draft: SendFlowDraft, skipDetails = false): SendFlow
  * (the obituary), so people carried in from elsewhere never make an empty form look written.
  */
 export function draftHasContent(
-  draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds' | 'templateCategory'>,
+  draft: Pick<SendFlowDraft, 'fields' | 'messageOverride' | 'selectedContactIds' | 'templateCategory'> & { messageFromWeb?: boolean },
 ): boolean {
   return (
     Object.values(draft.fields).some((value) => value.trim() !== '') ||
-    !!draft.messageOverride ||
+    (!!draft.messageOverride && !draft.messageFromWeb) ||
     (draft.templateCategory === 'obituary' && draft.selectedContactIds.length > 0)
   );
 }
@@ -492,7 +499,11 @@ export function useSendFlow(
   }, []);
 
   const setMessageOverride = useCallback((value: string | null) => {
-    setState((s) => ({ ...s, messageOverride: value }));
+    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: false }));
+  }, []);
+
+  const setWebMessage = useCallback((value: string | null) => {
+    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null }));
   }, []);
 
   const setGreeting = useCallback((value: boolean) => {
@@ -602,6 +613,7 @@ export function useSendFlow(
     setFlowerDeliveryTarget,
     setTone,
     setMessageOverride,
+    setWebMessage,
     setGreeting,
     startSendJob,
     markActiveSent,

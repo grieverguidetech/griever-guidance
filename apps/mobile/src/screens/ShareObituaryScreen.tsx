@@ -12,7 +12,7 @@ import { colors } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
-import { hasWebContent } from '../lib/hasWebContent';
+import { isMarkedReady } from '../lib/isMarkedReady';
 import { requestFlowPull } from '../lib/requestFlowPull';
 import { obituaryShareTextFor, obituaryTextFor } from '../lib/obituaryText';
 
@@ -64,7 +64,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [copyFailed, setCopyFailed] = useState(false);
   const [pasteMessage, setPasteMessage] = useState<string | undefined>(undefined);
   // Whether the nudge was showing when the screen opened. Ready at open never brings the nudge back this visit, so an un-mark arriving by sync does not unmount Step 2 under the person's finger. A pull bringing Ready still clears it. The screen is keyed by person.
-  const [nudgeAtOpen] = useState(() => !hasWebContent(session, 'obituary'));
+  const [nudgeAtOpen] = useState(() => !isMarkedReady(session, 'obituary'));
   // What the user typed in the obituary box. null until they type, so the box follows the details until then.
   const [editValue, setEditValue] = useState<string | null>(null);
   // The publisher's address is typed here and kept on this phone only, per person (never part of the session, so it never syncs: DS-7).
@@ -272,7 +272,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ShareObituary
           copy={copy}
-          nudge={nudgeAtOpen && !hasWebContent(session, 'obituary') ? { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) } : undefined}
+          nudge={nudgeAtOpen && !isMarkedReady(session, 'obituary') ? { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) } : undefined}
           eyebrow={fill(copy.forName, { name })}
           eyebrowTone="accent2"
           link={session.obituaryUrl}

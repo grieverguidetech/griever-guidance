@@ -14,7 +14,7 @@ const STATUS_KEY: Record<TemplateCategory, SectionKey> = {
   obituary: 'obituary',
 };
 
-export function hasWebContent(person: WebContentSource, category: TemplateCategory): boolean {
+export function isMarkedReady(person: WebContentSource, category: TemplateCategory): boolean {
   const status = (person as { sectionStatus?: Partial<Record<SectionKey, string>> }).sectionStatus;
   return status?.[STATUS_KEY[category]] === 'ready';
 }

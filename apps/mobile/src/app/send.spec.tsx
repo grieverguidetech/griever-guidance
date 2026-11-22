@@ -186,8 +186,8 @@ describe('a moment with nothing written on the web (#824)', () => {
   });
 
   describe('while the saved people are still loading (the flow is on its people step)', () => {
-    // Web wording is written, so there is no nudge and Ready to send itself is under the loading people step.
-    const written = { ...empty, serviceMessage: 'Come as you are.' } as unknown as Session;
+    // The step is Ready on the web, so there is no nudge and Ready to send itself is under the loading people step.
+    const written = { ...empty, serviceMessage: 'Come as you are.', sectionStatus: { service: 'ready' } } as unknown as Session;
     const openLoading = async (person: Session = written, ready: () => Promise<unknown> = () => screen.findByLabelText('Your message')) => {
       const real = AsyncStorage.getItem.bind(AsyncStorage);
       await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));

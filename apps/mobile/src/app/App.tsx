@@ -274,7 +274,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // The signed-in account's name, for the thank-you's sender field. On-device only (DS-7).
   const accountName = useAccountSenderName();
   const senderTyped = flow.fields['senderName'] ?? '';
-  const { hasDraftContent, setMessageOverride, templateCategory: category, messageOverride } = flow;
+  const { hasDraftContent, setMessageOverride, setWebMessage, templateCategory: category, messageOverride, messageFromWeb } = flow;
   useEffect(() => {
     if (!inVisit) {
       prefilled.current = false;
@@ -291,6 +291,14 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     // so a name never appears under a family that has started typing.
     if (accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
       setField('senderName', accountName);
+    }
+    // The message is still the web's own wording (never hand-edited on the phone): follow the web's current
+    // wording, so an old copy saved earlier never counts as a phone edit (#949).
+    if (messageFromWeb && category) {
+      const current = sendPrefill(session, category).messageOverride;
+      if (current !== messageOverride) {
+        setWebMessage(current);
+      }
     }
     // A draft resumed straight on Ready to send is not a first-form arrival: nothing else to prefill.
     if (!onForm) return;
@@ -314,10 +322,10 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       }
       // Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
       if (planned.messageOverride !== null) {
-        setMessageOverride(planned.messageOverride);
+        setWebMessage(planned.messageOverride);
       }
     }
-  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, hasDraftContent, messageOverride, category, session, accountName, senderTyped]);
+  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, setWebMessage, hasDraftContent, messageOverride, messageFromWeb, category, session, accountName, senderTyped]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not
