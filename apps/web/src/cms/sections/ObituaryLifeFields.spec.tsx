@@ -145,11 +145,47 @@ describe('ObituaryLifeFields', () => {
       expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('');
     });
 
-    it('shows the split name again when all three parts are blank again', async () => {
-      setup({ personName: 'Mom' });
+    it('keeps a cleared name cleared so a new name can be typed', async () => {
+      const { patches } = setup({ personName: 'Mom' });
+      const given = screen.getByLabelText(copy.givenNameLabel);
+      await userEvent.clear(given);
+      expect(given).toHaveValue('');
+      patches.length = 0;
+      await userEvent.type(given, 'M');
+      expect(given).toHaveValue('M');
+      expect(patches).toEqual([{ obituaryGivenName: 'M' }]);
+    });
+
+    it('does not bring the surname back after both parts are cleared and one is retyped', async () => {
+      const { patches } = setup({ personName: 'Ann Lee' });
       await userEvent.clear(screen.getByLabelText(copy.givenNameLabel));
+      await userEvent.clear(screen.getByLabelText(copy.surnameLabel));
+      patches.length = 0;
+      await userEvent.type(screen.getByLabelText(copy.givenNameLabel), 'J');
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('J');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('');
+      expect(patches).toEqual([{ obituaryGivenName: 'J' }]);
+    });
+
+    it('shows the split name again when the page is opened again with blank parts', () => {
+      const values = { personName: 'Mom', obituaryGivenName: '', obituaryMiddleName: '', obituarySurname: '' };
+      const first = render(<ObituaryLifeFields values={values} onChange={() => {}} onServiceChange={() => {}} onPersonChange={() => {}} />);
+      first.unmount();
+      setup(values);
       expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Mom');
-      expect(screen.getByText(copy.nameFromPersonHint)).toBeVisible();
+    });
+
+    it('replaces space-only parts with the split parts on the first keystroke', async () => {
+      const { patches } = setup({
+        personName: 'Sally Sadness',
+        obituaryGivenName: '  ',
+        obituaryMiddleName: ' ',
+        obituarySurname: '   ',
+      });
+      await userEvent.type(screen.getByLabelText(copy.givenNameLabel), 'x');
+      expect(patches).toEqual([
+        { obituaryGivenName: 'Sallyx', obituaryMiddleName: '', obituarySurname: 'Sadness' },
+      ]);
     });
 
     it('shows the split name when the three parts synced back as empty strings', () => {
