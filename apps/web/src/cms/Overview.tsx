@@ -4,6 +4,7 @@ import type { OverviewStatus } from '@griever/hooks';
 import { FLOW_DETAIL_TEXT_KEYS, LIFE_YEARS, parseCompleteDate, SECTION_ORDER } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { navTitle } from './SideNav';
+import { announcementPrefill, summaryLine, thanksPrefill } from './sections/messagePrefill';
 
 const shell = screenCopy('cmsShell');
 const checklist = screenCopy('cmsChecklist');
@@ -86,18 +87,10 @@ function serviceSummary(session: OverviewSession): string {
   return place ? fill(shell.summaryServicePlace, { summary: withDate, place }) : withDate;
 }
 
-const SUMMARY_MAX = 80;
-
-/** First non-empty line of the message, cut short so a card stays one line. */
+/** Not saved yet (undefined) shows the prefill the section shows; cleared ('') keeps the prompt. */
 function announcementSummary(session: OverviewSession): string {
-  const line = present(session.announcementMessage)
-    .split('\n')
-    .map((part) => part.trim())
-    .find(Boolean);
-  if (!line) {
-    return shell.summaryAnnouncementEmpty;
-  }
-  return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX).trimEnd()}…` : line;
+  const text = session.announcementMessage ?? announcementPrefill(session);
+  return summaryLine(text) || shell.summaryAnnouncementEmpty;
 }
 
 function obituarySummary(session: OverviewSession): string {
@@ -110,7 +103,8 @@ function obituarySummary(session: OverviewSession): string {
 }
 
 function thanksSummary(session: OverviewSession): string {
-  return present(session.thanksMessage) ? shell.summaryThanksDraft : shell.summaryThanksEmpty;
+  const text = session.thanksMessage ?? thanksPrefill(session);
+  return summaryLine(text) || shell.summaryThanksEmpty;
 }
 
 function summaryFor(key: SectionKey, session: OverviewSession): string {

@@ -1,7 +1,8 @@
 import { useId, useRef } from 'react';
 import { screenCopy } from '@griever/copy';
-import { announcePassing, type SectionFields, type SectionKey, type SessionDetails } from '@griever/shared';
+import type { SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { MarkReady } from './MarkReady';
+import { announcementPrefill } from './messagePrefill';
 
 const copy = screenCopy('cmsAnnouncement');
 
@@ -24,10 +25,7 @@ interface Props {
 export function AnnouncementSection({ values, onChange, onReadyChange, nextSection, onNext }: Props) {
   const id = useId();
   const messageRef = useRef<HTMLTextAreaElement>(null);
-  const prefill = announcePassing.renderMessage({
-    deceasedName: values.personName ?? '',
-    dateOfPassing: values.dateOfPassing ?? '',
-  });
+  const prefill = announcementPrefill(values);
   const edited = values.announcementMessage !== undefined;
 
   return (

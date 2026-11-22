@@ -8,6 +8,7 @@ import { CHECKLIST_PHASES } from '@griever/shared';
 import type { ChecklistFields } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
 import { Overview } from './Overview';
+import { announcementPrefill, summaryLine, thanksPrefill } from './sections/messagePrefill';
 
 const shell = screenCopy('cmsShell');
 const CHECKLIST_ITEM_LABEL = 'Get a legal pronouncement of death';
@@ -64,10 +65,10 @@ describe('Overview', () => {
     expect(rows).toHaveLength(5);
     expect(rows).toEqual([
       'The person Ready Margaret Hayes · passed May 29, 2026',
-      `Announcement Not started ${shell.summaryAnnouncementEmpty} Continue`,
+      `Announcement Not started ${summaryLine(announcementPrefill({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29' }))} Continue`,
       'Service In progress Funeral, June 3, 2026 at St. Mark Church',
       `Obituary Not started ${shell.summaryObituaryEmpty}`,
-      `Thank-yous Not started ${shell.summaryThanksEmpty}`,
+      `Thank-yous Not started ${summaryLine(thanksPrefill({ personName: 'Margaret Hayes' }))}`,
     ]);
   });
 
@@ -118,6 +119,40 @@ describe('Overview', () => {
     expect(screen.getByRole('button', { name: /^Announcement/ })).toHaveTextContent(`${'x'.repeat(80)}…`);
   });
 
+  it.each(['not_started', 'in_progress', 'ready'] as const)(
+    'announcement card shows the prefilled first line when nothing is saved (%s)',
+    (status) => {
+      const prefill = announcementPrefill({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29' });
+      setup({ personName: 'Margaret Hayes', dateOfPassing: '2026-05-29', sectionStatus: status === 'not_started' ? {} : { announcement: status } });
+      const card = screen.getByRole('button', { name: /^Announcement/ });
+      expect(card).toHaveTextContent(summaryLine(prefill));
+      expect(card).not.toHaveTextContent(shell.summaryAnnouncementEmpty);
+    },
+  );
+
+  it('announcement card keeps the prompt when the family cleared the message', () => {
+    setup({ personName: 'Margaret Hayes', announcementMessage: '' });
+    expect(screen.getByRole('button', { name: /^Announcement/ })).toHaveTextContent(shell.summaryAnnouncementEmpty);
+  });
+
+  it('thank-yous card shows the prefilled first line when nothing is saved', () => {
+    setup({ personName: 'Margaret Hayes' });
+    const card = screen.getByRole('button', { name: /^Thank-yous/ });
+    expect(card).toHaveTextContent(thanksPrefill({ personName: 'Margaret Hayes' }).trim().slice(0, 40));
+    expect(card).not.toHaveTextContent(shell.summaryThanksEmpty);
+  });
+
+  it('thank-yous card keeps the prompt when cleared, and shows the first line of a saved message', () => {
+    const { unmount } = setup({ thanksMessage: '' });
+    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent(shell.summaryThanksEmpty);
+    unmount();
+    setup({ thanksMessage: '\n Thank you all.\nSecond line' });
+    const card = screen.getByRole('button', { name: /^Thank-yous/ });
+    expect(card).toHaveTextContent('Thank you all.');
+    expect(card).not.toHaveTextContent('Second line');
+    expect(card).not.toHaveTextContent('Draft started');
+  });
+
   it('obituary summary: template, draft started, then the publisher', () => {
     const { unmount } = setup();
     expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Start with a draft');
@@ -135,12 +170,11 @@ describe('Overview', () => {
     expect(screen.getByRole('button', { name: /^Obituary/ })).toHaveTextContent('Published in The Daily News');
   });
 
-  it('thank-yous summary: template, then draft started once the message is edited', () => {
-    const { unmount } = setup();
-    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Start with a draft');
-    unmount();
-    setup({ thanksMessage: 'Thank you all.' });
-    expect(screen.getByRole('button', { name: /^Thank-yous/ })).toHaveTextContent('Draft started');
+  it('thank-yous summary: the prefill with no name falls back to the loved one', () => {
+    setup();
+    const card = screen.getByRole('button', { name: /^Thank-yous/ });
+    expect(card).toHaveTextContent('our loved one');
+    expect(card).not.toHaveTextContent(shell.summaryThanksEmpty);
   });
 
   it('a row calls onOpen with its key', async () => {
