@@ -29,7 +29,7 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 }));
 
 const anna = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', sectionStatus: { announcement: 'ready', service: 'ready', thanks: 'ready', obituary: 'ready' },
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -83,7 +83,7 @@ const startMoment = async (title: string) =>
   );
 
 describe('a moment with nothing written on the web (#824)', () => {
-  const empty = { ...anna, announcementMessage: undefined, serviceMessage: '  ', serviceType: '', thanksMessage: '' } as unknown as Session;
+  const empty = { ...anna, announcementMessage: undefined, serviceMessage: '  ', serviceType: '', thanksMessage: '', sectionStatus: {} } as unknown as Session;
 
   it('shows the nudge instead of the message and send controls, and Got it returns to the hub', async () => {
     await openAnna(empty);
@@ -99,17 +99,18 @@ describe('a moment with nothing written on the web (#824)', () => {
     expect(await screen.findByRole('button', { name: /^Announce the passing, .*Continue$/ })).toBeTruthy();
   });
 
-  it('a flow with web wording still opens the message', async () => {
-    await openAnna({ ...empty, serviceMessage: 'Come as you are.' } as unknown as Session);
+  it('a flow marked Ready on the web opens the message', async () => {
+    await openAnna({ ...empty, sectionStatus: { service: 'ready' } } as unknown as Session);
     await startMoment('Share the service');
     expect(await screen.findByLabelText('Your message')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
   });
 
-  it('a service with only a date shows the message box (the web Overview counts it as started)', async () => {
-    await openAnna({ ...empty, serviceDate: 'June 14' } as unknown as Session);
+  it('a service with details typed on the web but no Ready status still shows the nudge (#949)', async () => {
+    await openAnna({ ...empty, serviceType: 'Funeral', serviceDate: 'June 14', servicePlace: 'Oak Chapel', sectionStatus: { service: 'in_progress' } } as unknown as Session);
     await startMoment('Share the service');
-    expect(await screen.findByLabelText('Your message')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Add the service details on the web first' })).toBeTruthy();
+    expect(screen.queryByLabelText('Your message')).toBeNull();
   });
 
   it('does not strand a draft in progress: edited words with no web wording keep the message box', async () => {

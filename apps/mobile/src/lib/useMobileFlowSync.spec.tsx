@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import type { SyncAuth } from './AccountProvider';
 import { announceLeftFamily } from './leftFamily';
+import { requestFlowPull } from './requestFlowPull';
 import { useMobileFlowSync } from './useMobileFlowSync';
 
 const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null }));
@@ -181,5 +182,34 @@ describe('useMobileFlowSync: after a member leaves (#224)', () => {
     view.unmount();
     announceLeftFamily('user_1');
     expect(applyRemoteFlows).not.toHaveBeenCalled();
+  });
+});
+
+describe('useMobileFlowSync: a send screen asks for a pull (#949)', () => {
+  it('wakes the sync when allowed, and stops after unmount', async () => {
+    const view = await mount({ auth: true, sync: true }, signedIn);
+    const onWake = jest.fn();
+    lastOptions().subscribe(onWake);
+    requestFlowPull();
+    expect(onWake).toHaveBeenCalledTimes(1);
+    view.unmount();
+    requestFlowPull();
+    expect(onWake).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes no request when sync is off or no one is signed in', async () => {
+    const off = await mount({ auth: true, sync: false }, signedIn);
+    const offWake = jest.fn();
+    lastOptions().subscribe(offWake);
+    requestFlowPull();
+    expect(offWake).not.toHaveBeenCalled();
+    off.unmount();
+
+    const out = await mount({ auth: true, sync: true }, { status: 'signed_out' } as SyncAuth);
+    const outWake = jest.fn();
+    lastOptions().subscribe(outWake);
+    requestFlowPull();
+    expect(outWake).not.toHaveBeenCalled();
+    out.unmount();
   });
 });

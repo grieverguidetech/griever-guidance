@@ -24,7 +24,7 @@ const openPeople = async () => {
 };
 
 const base = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', sectionStatus: { announcement: 'ready', service: 'ready', thanks: 'ready', obituary: 'ready' },
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -123,7 +123,7 @@ describe('send flow starts from the planned details', () => {
 
   it('drops an old obituary draft whose message is the obituary text', async () => {
     await openMoment(
-      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
+      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', sectionStatus: { announcement: 'ready', service: 'ready', thanks: 'ready', obituary: 'ready' }, obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Anna loved the garden.') } } as unknown as Session,
       /Share the obituary/,
     );
     await toConfirmFromObituary();
@@ -134,7 +134,7 @@ describe('send flow starts from the planned details', () => {
 
   it('keeps a hand edit on the obituary message through to Confirm', async () => {
     await openMoment(
-      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
+      { ...base, obituaryUrl: 'https://legacy.com/anna', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', sectionStatus: { announcement: 'ready', service: 'ready', thanks: 'ready', obituary: 'ready' }, obituaryText: 'Anna loved the garden.', drafts: { obituary: obituaryDraft('Here is her obituary, with love.') } } as unknown as Session,
       /Share the obituary/,
     );
     await toConfirmFromObituary();

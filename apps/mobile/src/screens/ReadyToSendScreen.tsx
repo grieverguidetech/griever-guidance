@@ -12,6 +12,7 @@ import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
 import { hasWebContent } from '../lib/hasWebContent';
+import { requestFlowPull } from '../lib/requestFlowPull';
 import { shareMessage } from '../lib/shareSheet';
 
 const copy = screenCopy('review');
@@ -48,6 +49,11 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   const peopleButton = useRef<ButtonNode>(null);
   // Set when the person opens the people sheet, so focus goes back to the button they pressed.
   const openedSheet = useRef(false);
+
+  // Ask the sync for a pull once on open, so the web's Ready status is current (#949). Silent (C5); a no-op when sync is off.
+  useEffect(() => {
+    requestFlowPull();
+  }, []);
 
   // The heading takes screen-reader focus when the screen opens. Deferred a tick so the screen reader takes it after it has drawn.
   useEffect(() => {

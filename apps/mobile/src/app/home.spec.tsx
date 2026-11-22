@@ -16,7 +16,7 @@ const openPeople = async () => {
 
 const person = (id: string, personName: string, lastOpenedAt: string, dateOfPassing = ''): Session =>
   ({
-    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing, senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', createdAt: lastOpenedAt, lastOpenedAt,
+    id, flowId: `flow-${id}`, ownerId: null, role: 'owner', personName, dateOfPassing, senderName: '', obituaryUrl: '', announcementMessage: 'Anna passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', sectionStatus: { announcement: 'ready', service: 'ready', thanks: 'ready', obituary: 'ready' }, createdAt: lastOpenedAt, lastOpenedAt,
     drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
   }) as Session;
 

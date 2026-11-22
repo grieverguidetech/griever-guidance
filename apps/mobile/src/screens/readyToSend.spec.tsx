@@ -6,10 +6,12 @@ import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SectionFields, SessionDetails } from '@griever/shared';
 import { ReadyToSendScreen } from './ReadyToSendScreen';
 import { SendingScreen } from './SendingScreen';
+import { onFlowPullRequest } from '../lib/requestFlowPull';
 
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '',
-  // The family has written something on the web for every flow (without it the phone shows the nudge, #824).
-  announcementMessage: 'Margaret passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Margaret loved the garden.' } as SessionDetails;
+  // The family has marked every step Ready on the web (without it the phone shows the nudge, #824, #949).
+  announcementMessage: 'Margaret passed away peacefully.', serviceType: 'Funeral', thanksMessage: 'Thank you for being there.', obituaryText: 'Margaret loved the garden.',
+  sectionStatus: { announcement: 'ready', service: 'ready', thanks: 'ready', obituary: 'ready' } } as SessionDetails & SectionFields;
 const contacts = {
   contacts: [
     { contactId: 'c0', name: 'Dee', phone: '+15555550100' },
@@ -416,7 +418,7 @@ describe('the people-button focus hook (#673)', () => {
 
 // #824: nothing written on the web for the flow, so the phone shows a nudge instead of the message and send controls.
 describe('Ready to send with nothing written on the web (#824)', () => {
-  const EMPTY = { announcementMessage: undefined, serviceMessage: '   ', serviceType: '', thanksMessage: '', obituaryText: '' };
+  const EMPTY = { announcementMessage: undefined, serviceMessage: '   ', serviceType: '', thanksMessage: '', obituaryText: '', sectionStatus: {} };
   const cases = [
     ['service', {}, 'Share the service', 'Add the service details on the web first'],
     ['thanks', { thanks: true }, 'Send thank-yous', 'Write the thank-you note on the web first'],
@@ -485,9 +487,36 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
   });
 
-  it('shows the message box when only a different flow is empty', () => {
-    render(<Harness web={{ ...EMPTY, serviceMessage: 'Come as you are.' }} />);
+  it('shows the message box when only a different flow is not Ready', () => {
+    render(<Harness web={{ ...EMPTY, sectionStatus: { service: 'ready' } }} />);
     expect(screen.getByLabelText('Your message')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Add the service details on the web first' })).toBeNull();
+  });
+
+  it('keeps the nudge when words were edited on the web but the step is not Ready', () => {
+    render(<Harness web={{ ...EMPTY, serviceMessage: 'Come as you are.', sectionStatus: { service: 'in_progress' } }} />);
+    expect(screen.getByRole('heading', { name: 'Add the service details on the web first' })).toBeTruthy();
+  });
+
+  it('shows the nudge again when the step is un-marked, and drops it when the step becomes Ready', () => {
+    function Live({ ready }: { ready: boolean }) {
+      const flow = useSendFlow({ session: { ...session, ...EMPTY, sectionStatus: ready ? { service: 'ready' } : {} } as SessionDetails, draft: freshDraft({ templateCategory: 'service', templateOverrideId: 'share-service', step: 'review', fields: {} }) });
+      return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} onGotIt={() => undefined} />;
+    }
+    const view = render(<Live ready={false} />);
+    expect(screen.getByRole('button', { name: 'Got it' })).toBeTruthy();
+    view.rerender(<Live ready />);
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    view.rerender(<Live ready={false} />);
+    expect(screen.getByRole('button', { name: 'Got it' })).toBeTruthy();
+  });
+
+  it('asks the sync for a pull when the screen opens, once, and shows nothing for it', () => {
+    const heard = jest.fn();
+    const stop = onFlowPullRequest(heard);
+    render(<Harness web={EMPTY} />);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/sync|pull|refresh/i)).toBeNull();
+    stop();
   });
 });

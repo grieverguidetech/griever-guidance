@@ -27,7 +27,7 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 }));
 
 const anna = {
-  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', obituaryText: 'Anna loved the garden.',
+  id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', obituaryText: 'Anna loved the garden.', sectionStatus: { obituary: 'ready' },
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
 } as unknown as Session;
@@ -144,7 +144,7 @@ describe('sharing the obituary on mobile', () => {
   });
 
   it('Got it on the nudge lands on the hub with focus on the heading', async () => {
-    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: '', obituaryUrl: '' }]));
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: '', obituaryUrl: '', sectionStatus: {} }]));
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
     render(<App />);
@@ -162,7 +162,7 @@ describe('sharing the obituary on mobile', () => {
   });
 
   it('shows no Done on arrival; emailing then Done lands on the hub with the obituary row done and focus on the heading', async () => {
-    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: 'Anna loved the garden.' }]));
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([{ ...anna, obituaryText: 'Anna loved the garden.', sectionStatus: { obituary: 'ready' } }]));
     await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);

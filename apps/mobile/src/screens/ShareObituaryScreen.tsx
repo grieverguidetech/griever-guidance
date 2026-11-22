@@ -13,6 +13,7 @@ import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
 import { hasWebContent } from '../lib/hasWebContent';
+import { requestFlowPull } from '../lib/requestFlowPull';
 import { obituaryShareTextFor, obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
@@ -49,6 +50,10 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   // The Android focus return waits one tick; an unmount before it runs cancels it.
   const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(focusTimer.current), []);
+  // Ask the sync for a pull once on open, so the web's Ready status is current (#949). Silent (C5); a no-op when sync is off.
+  useEffect(() => {
+    requestFlowPull();
+  }, []);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [emailFailed, setEmailFailed] = useState(false);
   // Set only by a mail or share result in this visit, so leaving and coming back does not show Done again.
@@ -58,7 +63,7 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [pasteMessage, setPasteMessage] = useState<string | undefined>(undefined);
-  // Whether the nudge was showing when the screen opened. Content present at open never brings the nudge back this visit, so clearing the link or publisher does not unmount Step 2 under the person's finger. Sync bringing content still clears it. The screen is keyed by person.
+  // Whether the nudge was showing when the screen opened. Ready at open never brings the nudge back this visit, so an un-mark arriving by sync does not unmount Step 2 under the person's finger. A pull bringing Ready still clears it. The screen is keyed by person.
   const [nudgeAtOpen] = useState(() => !hasWebContent(session, 'obituary'));
   // What the user typed in the obituary box. null until they type, so the box follows the details until then.
   const [editValue, setEditValue] = useState<string | null>(null);
