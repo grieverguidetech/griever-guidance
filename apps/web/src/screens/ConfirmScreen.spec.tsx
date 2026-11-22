@@ -21,9 +21,9 @@ const CONTACTS: Contact[] = [
 ];
 
 /** The real flow on "Review your message" for Share the service, then on to sending. */
-function Harness() {
+function Harness({ details = session }: { details?: typeof session } = {}) {
   const flow = useSendFlow({
-    session,
+    session: details,
     draft: freshDraft({
       templateCategory: 'service',
       templateOverrideId: 'share-service',
@@ -57,6 +57,14 @@ describe('Review your message (Share the service)', () => {
     render(<Harness />);
     expect(screen.getByLabelText('Your message')).toHaveValue(
       "Margaret Hayes' service will be held June 14 at 2:00 PM at Oak Chapel.",
+    );
+  });
+
+  it('includes the visitation from the session when the wording is not edited (#961)', () => {
+    const details = { ...session, visitationPlace: 'Oak Funeral Home', visitationDate: 'June 13' } as typeof session;
+    render(<Harness details={details} />);
+    expect(screen.getByLabelText('Your message')).toHaveValue(
+      "Margaret Hayes' service will be held June 14 at 2:00 PM at Oak Chapel. Visitation will be held at Oak Funeral Home on June 13.",
     );
   });
 

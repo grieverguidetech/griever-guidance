@@ -257,7 +257,9 @@ describe('the web wording and a phone choice of the suggested wording (#958)', (
     };
     await openService({ ...fullSession(), ...events } as Session);
     const web = defaultServiceEventsMessage({ personName: 'Anna', serviceDate: 'June 14', ...DETAILS, ...events });
-    expect(await messageOf()).toBe(web);
+    const message = await messageOf();
+    expect(message).toBe(web);
+    expect(message).toContain('Visitation will be held at Oak Funeral Home on June 13 at 6 PM.');
   });
 
   it('keeps text typed on the phone (#961)', async () => {

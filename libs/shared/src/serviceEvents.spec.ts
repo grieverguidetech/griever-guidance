@@ -195,6 +195,7 @@ describe('the share-service template follows the web wording (#961)', () => {
 
   it('renders the same text as the web builder', () => {
     expect(shareService.renderMessage(fields())).toBe(defaultServiceEventsMessage(details));
+    expect(shareService.renderMessage(fields())).toContain('Visitation will be held at Oak Funeral Home on June 13 at 6 PM.');
     expect(defaultServiceEventsMessage(details)).toContain('A reception will be held at The parish hall.');
   });
 

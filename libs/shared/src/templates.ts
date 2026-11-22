@@ -220,10 +220,6 @@ export const obituaryLink: Template = {
   },
 };
 
-/**
- * Flow A — Share the service. Logistics in one message, with an optional
- * florist line appended (exactly one sentence) when the griever opts in.
- */
 function eventText(value: string | undefined): string {
   return (value?.trim() ?? '').replace(/\.$/, '').trim();
 }
@@ -257,6 +253,10 @@ function serviceEventSentences(fields: Record<string, string>): string[] {
   ].filter(Boolean);
 }
 
+/**
+ * Flow A — Share the service. Logistics in one message, with an optional
+ * florist line appended (exactly one sentence) when the griever opts in.
+ */
 export const shareService: Template = {
   id: 'share-service',
   name: 'Share the service',
