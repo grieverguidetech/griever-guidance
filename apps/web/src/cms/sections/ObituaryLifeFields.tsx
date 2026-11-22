@@ -177,8 +177,9 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
   }
   const personName = values.personName?.trim() ?? '';
   const nameKeys = ['obituaryGivenName', 'obituaryMiddleName', 'obituarySurname'] as const;
-  // Only while no part was ever saved (all undefined). A cleared part is '' and stays cleared.
-  const derivedParts = nameKeys.every((k) => values[k] === undefined) && personName !== '' ? splitPersonName(personName) : null;
+  // Blank (never saved, or synced back as '') shows the split name. A cleared part stays cleared while another part has a value.
+  const allPartsBlank = nameKeys.every((k) => (values[k] ?? '').trim() === '');
+  const derivedParts = allPartsBlank && personName !== '' ? splitPersonName(personName) : null;
   const derivedName: Record<string, string> = derivedParts
     ? {
         obituaryGivenName: derivedParts.given,

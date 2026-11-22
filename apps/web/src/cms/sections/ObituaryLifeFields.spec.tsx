@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { buildObituaryDraft, fill, findHardCodedCopy, screenCopy } from '@griever/copy';
-import { FLOW_DETAIL_MAX_LENGTH } from '@griever/shared';
+import { FLOW_DETAIL_MAX_LENGTH, flowDetailsToSessionFields } from '@griever/shared';
 import { PlacesProvider } from '../../lib/places/PlacesContext';
 import type { PlacesClient } from '../../lib/places/placesClient';
 import {
@@ -126,22 +126,78 @@ describe('ObituaryLifeFields', () => {
       expect(patches).toEqual([{ obituarySurname: 'L' }]);
     });
 
-    it('keeps a cleared part cleared and does not bring the person name back', async () => {
-      setup({ personName: 'Mom' });
+    it('keeps a cleared part cleared while another part has a value', async () => {
+      setup({ personName: 'Ann Lee' });
       const given = screen.getByLabelText(copy.givenNameLabel);
-      expect(given).toHaveValue('Mom');
       await userEvent.clear(given);
       expect(given).toHaveValue('');
       await userEvent.tab();
       expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Lee');
     });
 
-    it('keeps two cleared parts cleared', async () => {
-      setup({ personName: 'Ann Lee' });
+    it('keeps two cleared parts cleared while a third has a value', async () => {
+      setup({ personName: 'Ann Marie Lee' });
       await userEvent.clear(screen.getByLabelText(copy.givenNameLabel));
       await userEvent.clear(screen.getByLabelText(copy.surnameLabel));
       expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('');
+      expect(screen.getByLabelText(copy.middleNameLabel)).toHaveValue('Marie');
       expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('');
+    });
+
+    it('shows the split name again when all three parts are blank again', async () => {
+      setup({ personName: 'Mom' });
+      await userEvent.clear(screen.getByLabelText(copy.givenNameLabel));
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Mom');
+      expect(screen.getByText(copy.nameFromPersonHint)).toBeVisible();
+    });
+
+    it('shows the split name when the three parts synced back as empty strings', () => {
+      const { patches } = setup({
+        personName: 'Sally Sadness',
+        obituaryGivenName: '',
+        obituaryMiddleName: '',
+        obituarySurname: '',
+      });
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Sally');
+      expect(screen.getByLabelText(copy.middleNameLabel)).toHaveValue('');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Sadness');
+      expect(screen.getByText(copy.nameFromPersonHint)).toBeVisible();
+      for (const label of [copy.givenNameLabel, copy.middleNameLabel, copy.surnameLabel]) {
+        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(copy.nameFromPersonHint);
+      }
+      expect(patches).toEqual([]);
+    });
+
+    it('shows the split name for values decoded from a sync with nulls', () => {
+      const decoded = flowDetailsToSessionFields({
+        obituaryGivenName: null,
+        obituaryMiddleName: null,
+        obituarySurname: null,
+      });
+      setup({ personName: 'Sally Sadness', ...decoded });
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Sally');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Sadness');
+    });
+
+    it('counts parts with only spaces as blank', () => {
+      setup({ personName: 'Sally Sadness', obituaryGivenName: '  ', obituaryMiddleName: ' ', obituarySurname: '   ' });
+      expect(screen.getByLabelText(copy.givenNameLabel)).toHaveValue('Sally');
+      expect(screen.getByLabelText(copy.surnameLabel)).toHaveValue('Sadness');
+    });
+
+    it('saves all three parts on the first edit after a blank sync', async () => {
+      const { patches, personPatches } = setup({
+        personName: 'Sally Sadness',
+        obituaryGivenName: '',
+        obituaryMiddleName: '',
+        obituarySurname: '',
+      });
+      await userEvent.type(screen.getByLabelText(copy.givenNameLabel), 'x');
+      expect(patches).toEqual([
+        { obituaryGivenName: 'Sallyx', obituaryMiddleName: '', obituarySurname: 'Sadness' },
+      ]);
+      expect(personPatches).toEqual([]);
     });
 
     it('shows a hint tied to the three name parts only while they show the person name', async () => {

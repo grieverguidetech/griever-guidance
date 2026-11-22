@@ -195,6 +195,16 @@ describe('buildObituaryDraft: older values', () => {
     expect(text).toContain('Anna Lee is survived by');
   });
 
+  it('uses the name from The person when the three parts synced back as empty strings', () => {
+    const text = build({
+      personName: 'Anna Lee',
+      obituaryGivenName: '',
+      obituaryMiddleName: '',
+      obituarySurname: '',
+    });
+    expect(text.startsWith('Anna Lee, ')).toBe(true);
+  });
+
   it('uses the given name for [NAME] and the typed parts for the full name', () => {
     const [p1, , p3] = paragraphs({ ...filled, personName: 'Maggie Hayes' });
     expect(p1.startsWith('Margaret Ellen Hayes, 84')).toBe(true);
