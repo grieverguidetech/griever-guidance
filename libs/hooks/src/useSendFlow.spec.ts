@@ -473,3 +473,25 @@ describe('useSendFlow — skipDetails: start again and started drafts', () => {
     expect(isDraftStarted(freshDraft({ templateCategory: 'service', step: 'review' }), true)).toBe(true);
   });
 });
+
+describe('useSendFlow: the message that came from the web (#949)', () => {
+  it('is not draft content, and a phone edit clears the web mark', () => {
+    const { result } = announcement();
+    act(() => result.current.setWebMessage('Web words.'));
+    expect(result.current).toMatchObject({ messageOverride: 'Web words.', messageFromWeb: true, hasDraftContent: false });
+    act(() => result.current.setMessageOverride('Web words, edited.'));
+    expect(result.current).toMatchObject({ messageFromWeb: false, hasDraftContent: true });
+  });
+
+  it('is cleared by editing a field or changing the tone', () => {
+    const fieldEdit = announcement();
+    act(() => fieldEdit.result.current.setWebMessage('Web words.'));
+    act(() => fieldEdit.result.current.setField('personalNote', 'hi'));
+    expect(fieldEdit.result.current).toMatchObject({ messageOverride: null, messageFromWeb: false });
+
+    const toneEdit = announcement();
+    act(() => toneEdit.result.current.setWebMessage('Web words.'));
+    act(() => toneEdit.result.current.setTone('softer'));
+    expect(toneEdit.result.current).toMatchObject({ messageOverride: null, messageFromWeb: false });
+  });
+});

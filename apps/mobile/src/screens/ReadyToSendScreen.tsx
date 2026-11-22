@@ -11,7 +11,8 @@ import { focusNode, ReadyToSend } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
-import { hasWebContent } from '../lib/hasWebContent';
+import { isMarkedReady } from '../lib/isMarkedReady';
+import { requestFlowPull } from '../lib/requestFlowPull';
 import { shareMessage } from '../lib/shareSheet';
 
 const copy = screenCopy('review');
@@ -48,6 +49,11 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   const peopleButton = useRef<ButtonNode>(null);
   // Set when the person opens the people sheet, so focus goes back to the button they pressed.
   const openedSheet = useRef(false);
+
+  // Ask the sync for a pull once on open, so the web's Ready status is current (#949). Silent (C5); a no-op when sync is off.
+  useEffect(() => {
+    requestFlowPull();
+  }, []);
 
   // The heading takes screen-reader focus when the screen opens. Deferred a tick so the screen reader takes it after it has drawn.
   useEffect(() => {
@@ -134,13 +140,14 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   }
 
   // Nothing started on the web for this step: a nudge replaces the message and the send controls (#824).
-  // A draft already in progress (edited words, or a send under way) keeps the normal screen, so it is never stranded.
+  // A draft already in progress (words edited on the phone, or a send under way) keeps the normal screen, so it is never stranded.
+  // The web's own wording is not a phone edit (#949).
   const showNudge =
     flow.templateCategory !== null &&
     flow.session !== null &&
     flow.session !== undefined &&
-    !hasWebContent(flow.session, flow.templateCategory) &&
-    !flow.messageOverride?.trim() &&
+    !isMarkedReady(flow.session, flow.templateCategory) &&
+    (flow.messageFromWeb || !flow.messageOverride?.trim()) &&
     !flow.sendJob;
   let nudge: ComponentProps<typeof ReadyToSend>['nudge'];
   if (showNudge && flow.templateCategory) {

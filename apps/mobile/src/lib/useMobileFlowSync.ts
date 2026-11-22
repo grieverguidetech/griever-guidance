@@ -6,6 +6,7 @@ import { useSyncAuth } from './AccountProvider';
 import { createDeviceCache } from './deviceCache';
 import { AUTH_ENABLED, SYNC_ENABLED } from './features';
 import { onLeftFamily } from './leftFamily';
+import { onFlowPullRequest } from './requestFlowPull';
 
 /** The phone's wake source: the app coming back to the foreground. Returns the unsubscribe. */
 export function subscribeAppActive(onWake: () => void): () => void {
@@ -101,6 +102,18 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, stor
       }
     });
   }, [userId, applyRemoteFlows]);
+
+  // A send screen opened: pull now, so the web's Ready status is current (#949). Only while sync is allowed.
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
+    return onFlowPullRequest(() => {
+      for (const wake of [...wakers.current]) {
+        wake();
+      }
+    });
+  }, [allowed]);
 
   useFlowSync({
     sessions,

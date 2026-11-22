@@ -12,6 +12,7 @@ import { obituaryTextFor } from '../lib/obituaryText';
 import * as MailComposer from 'expo-mail-composer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { publisherEmailKey } from '../lib/mailCompose';
+import { onFlowPullRequest } from '../lib/requestFlowPull';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
@@ -46,9 +47,11 @@ const base = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
   createdAt: '2026-10-01T00:00:00.000Z', lastOpenedAt: '2026-10-01T00:00:00.000Z',
   drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [],
+  // The obituary step is marked Ready on the web; without it the phone shows the nudge (#824, #949).
+  sectionStatus: { obituary: 'ready' },
 } as unknown as Session;
+const notReady = { ...base, sectionStatus: {} } as Session;
 
-// Nothing started on the web shows the nudge (#824). These tests need the screen itself, so the person has a link.
 const linked = { ...base, obituaryUrl: 'https://legacy.com/anna' } as Session;
 
 const BUTTON = 'Email it to the paper or funeral home';
@@ -970,19 +973,20 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
   });
 });
 
-// #824: no obituary text and no link on the person, so the phone shows a nudge instead of the box and the buttons.
-describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
-  const nudgeSetup = (session: Session, onBack = jest.fn()) =>
-    render(
-      <SerifReadyContext.Provider value>
-        <ShareObituaryScreen session={session} onChange={jest.fn()} onSetItem={jest.fn()} onBack={onBack} onContinue={jest.fn()} onEmailed={jest.fn()} />
-      </SerifReadyContext.Provider>,
-    );
+// #824, #949: the obituary step is not Ready on the web, so the phone shows a nudge instead of the box and the buttons.
+describe('ShareObituaryScreen when the web has not marked the step Ready (#824, #949)', () => {
+  const ui = (session: Session, onBack = jest.fn()) => (
+    <SerifReadyContext.Provider value>
+      <ShareObituaryScreen session={session} onChange={jest.fn()} onSetItem={jest.fn()} onBack={onBack} onContinue={jest.fn()} onEmailed={jest.fn()} />
+    </SerifReadyContext.Provider>
+  );
+  const nudgeSetup = (session: Session, onBack = jest.fn()) => render(ui(session, onBack));
 
   it('shows the nudge under the heading, with no text box, Email, Copy or Step 2 (#889)', () => {
-    nudgeSetup({ ...base, obituaryText: '  ', obituaryUrl: ' ' } as Session);
+    nudgeSetup(notReady);
     expect(screen.getByRole('heading', { name: 'Share the obituary' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
+    expect(screen.getByText(/mark it Ready/)).toBeTruthy();
     expect(screen.getByText(/web\.grieversguidance\.com/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.queryByLabelText(BOX)).toBeNull();
@@ -1000,50 +1004,55 @@ describe('ShareObituaryScreen with nothing written on the web (#824)', () => {
 
   it('Got it goes where Back goes (the hub)', () => {
     const onBack = jest.fn();
-    nudgeSetup(base, onBack);
+    nudgeSetup(notReady, onBack);
     fireEvent.press(screen.getByRole('button', { name: 'Got it' }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it('focuses the heading on arrival', async () => {
     const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus');
-    nudgeSetup(base);
+    nudgeSetup(notReady);
     await waitFor(() => expect(focusedNode(focus)?.props?.children).toBe('Share the obituary'));
   });
 
-  it('shows the normal screen with only a detail or a publisher, as the web Overview counts them', () => {
-    nudgeSetup({ ...base, obituaryCity: 'Tulsa' } as Session);
-    expect(screen.getByLabelText(BOX)).toBeTruthy();
-    screen.unmount();
-    nudgeSetup({ ...base, obituaryPublisher: 'The Tulsa Times' } as Session);
-    expect(screen.getByLabelText(BOX)).toBeTruthy();
+  it('keeps the nudge with edited text, a link, a publisher or a detail but no Ready status', () => {
+    nudgeSetup({ ...notReady, obituaryText: 'Anna loved the garden.', obituaryUrl: 'https://legacy.com/anna', obituaryPublisher: 'The Tulsa Times', obituaryCity: 'Tulsa' } as Session);
+    expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
+    expect(screen.queryByLabelText(BOX)).toBeNull();
   });
 
-  it('shows the normal screen with a link only, and with text only', () => {
-    nudgeSetup({ ...base, obituaryUrl: 'https://legacy.com/anna' } as Session);
+  it('shows the normal screen when the step is Ready, with Step 2', () => {
+    nudgeSetup(base);
     expect(screen.getByLabelText(BOX)).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
-    // With web content, Step 2 is present (#889).
     expect(screen.getByText(/Step 2/)).toBeTruthy();
     expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Paste link' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Choose who to send it to' })).toBeTruthy();
-    screen.unmount();
-    nudgeSetup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
-    expect(screen.getByLabelText(BOX)).toBeTruthy();
   });
 
-  it('keeps Step 2 when the only content, a link, is cleared on screen (#889)', () => {
-    const screenSession = { ...base, obituaryText: '', obituaryUrl: 'https://legacy.com/anna' } as Session;
-    const ui = (session: Session) => (
-      <SerifReadyContext.Provider value>
-        <ShareObituaryScreen session={session} onChange={jest.fn()} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={jest.fn()} />
-      </SerifReadyContext.Provider>
-    );
-    const view = render(ui(screenSession));
-    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
-    view.rerender(ui({ ...screenSession, obituaryUrl: '' } as Session));
-    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+  it('drops the nudge when a pull brings Ready while the screen is open', () => {
+    const view = render(ui(notReady));
+    expect(screen.getByRole('heading', { name: 'Write the obituary on the web first' })).toBeTruthy();
+    view.rerender(ui(base));
     expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    expect(screen.getByLabelText(BOX)).toBeTruthy();
+    expect(screen.getByText(/Step 2/)).toBeTruthy();
+  });
+
+  it('keeps the screen when Ready is taken away while it is open (no unmount under the finger)', () => {
+    const view = render(ui(base));
+    view.rerender(ui(notReady));
+    expect(screen.queryByRole('heading', { name: 'Write the obituary on the web first' })).toBeNull();
+    expect(screen.getByLabelText('Link to the obituary')).toBeTruthy();
+  });
+
+  it('asks the sync for a pull when the screen opens, once, and shows nothing for it', () => {
+    const heard = jest.fn();
+    const stop = onFlowPullRequest(heard);
+    nudgeSetup(notReady);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/sync|pull|refresh/i)).toBeNull();
+    stop();
   });
 });
