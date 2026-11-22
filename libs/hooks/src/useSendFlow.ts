@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { templates, composeMessage, firstName, withGreeting } from '@griever/shared';
+import { templates, composeMessage, firstName, withGreeting, serviceEventFieldMap } from '@griever/shared';
 import type {
   Template,
   TemplateCategory,
   MessageTone,
   RecipientDeliveryStatus,
   SessionDetails,
+  ServiceEventFields,
 } from '@griever/shared';
 
 export type SendFlowStep =
@@ -346,6 +347,11 @@ function buildComposedFields(
     if (session.dateOfPassing) fields['dateOfPassing'] = session.dateOfPassing;
     if (session.senderName) fields['senderName'] = session.senderName;
     if (session.obituaryUrl) fields['obituaryUrl'] = session.obituaryUrl;
+    // The other service events come from the session, so the message follows them and a phone edit still shows.
+    // They never enter state.fields, so none of this is stored as typed text.
+    if (state.templateCategory === 'service') {
+      Object.assign(fields, serviceEventFieldMap(session as ServiceEventFields));
+    }
   }
 
   fields['tone'] = state.tone;
