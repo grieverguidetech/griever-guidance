@@ -458,7 +458,7 @@ export function useSendFlow(
   }, [startedState]);
 
   const setField = useCallback((key: string, value: string) => {
-    setState((s) => ({ ...s, fields: { ...s.fields, [key]: value }, messageOverride: null }));
+    setState((s) => ({ ...s, fields: { ...s.fields, [key]: value }, messageOverride: null, messageFromWeb: false }));
   }, []);
 
   const toggleContact = useCallback((contactId: string) => {
@@ -495,7 +495,7 @@ export function useSendFlow(
   }, []);
 
   const setTone = useCallback((tone: MessageTone) => {
-    setState((s) => ({ ...s, tone, messageOverride: null }));
+    setState((s) => ({ ...s, tone, messageOverride: null, messageFromWeb: false }));
   }, []);
 
   const setMessageOverride = useCallback((value: string | null) => {

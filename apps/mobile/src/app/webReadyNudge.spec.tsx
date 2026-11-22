@@ -25,6 +25,13 @@ const anna = (over: object = {}) =>
     announcementMessage: 'Anna passed away peacefully.', ...over,
   }) as unknown as Session;
 
+// A draft saved earlier with the web's old wording.
+const staleDraft = {
+  step: 'review', templateCategory: 'announcement', templateOverrideId: null, fields: {},
+  serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
+  flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: 'Old web wording.', messageFromWeb: true, greeting: true, recipientNotes: {}, toldIds: [],
+};
+
 const open = async (person: Session) => {
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
   await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
@@ -80,13 +87,26 @@ describe('the web Ready status and the announcement send screen (#949)', () => {
   });
 
   it('keeps the nudge when an old saved draft holds earlier web wording and the web has changed it', async () => {
-    const stale = {
-      step: 'review', templateCategory: 'announcement', templateOverrideId: null, fields: {},
-      serviceDetailsKnown: null, selectedContactIds: [], includeFlowers: false, customFlorist: '',
-      flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: 'Old web wording.', messageFromWeb: true, greeting: true, recipientNotes: {}, toldIds: [],
-    };
-    await open(anna({ sectionStatus: {}, announcementMessage: 'New web wording.', drafts: { announcement: stale } }));
+    await open(anna({ sectionStatus: {}, announcementMessage: 'New web wording.', drafts: { announcement: staleDraft } }));
     expect(await screen.findByRole('heading', { name: NUDGE })).toBeTruthy();
+  });
+
+  it('shows the web\'s current wording, not the old saved copy, when Ready is on', async () => {
+    await open(anna({ sectionStatus: { announcement: 'ready' }, announcementMessage: 'New web wording.', drafts: { announcement: staleDraft } }));
+    expect(await screen.findByDisplayValue('New web wording.')).toBeTruthy();
+    expect(screen.queryByDisplayValue('Old web wording.')).toBeNull();
+  });
+
+  it('treats an old saved draft equal to the web wording, with no flag, as web text: the nudge shows', async () => {
+    const { messageFromWeb: _flag, ...legacy } = { ...staleDraft, messageOverride: 'Anna passed away peacefully.' };
+    await open(anna({ sectionStatus: {}, drafts: { announcement: legacy } }));
+    expect(await screen.findByRole('heading', { name: NUDGE })).toBeTruthy();
+  });
+
+  it('keeps an old saved draft that differs from the web wording, with no flag, as a phone edit', async () => {
+    const { messageFromWeb: _flag, ...legacy } = { ...staleDraft, messageOverride: 'My own words.' };
+    await open(anna({ sectionStatus: {}, drafts: { announcement: legacy } }));
+    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
   });
 
   it('keeps the send screen when the words were edited on the phone, even after Ready is removed', async () => {

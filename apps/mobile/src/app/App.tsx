@@ -294,10 +294,13 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     }
     // The message is still the web's own wording (never hand-edited on the phone): follow the web's current
     // wording, so an old copy saved earlier never counts as a phone edit (#949).
-    if (messageFromWeb && category) {
+    // A draft saved before the flag existed holds the web wording with no flag: when it equals the web's wording, it is web text too.
+    if (category && messageOverride !== null) {
       const current = sendPrefill(session, category).messageOverride;
-      if (current !== messageOverride) {
+      if (messageFromWeb && current !== messageOverride) {
         setWebMessage(current);
+      } else if (!messageFromWeb && current === messageOverride) {
+        setWebMessage(messageOverride);
       }
     }
     // A draft resumed straight on Ready to send is not a first-form arrival: nothing else to prefill.
