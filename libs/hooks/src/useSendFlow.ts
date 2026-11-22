@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { templates, composeMessage, firstName, withGreeting } from '@griever/shared';
+import { templates, composeMessage, firstName, withGreeting, serviceEventFieldMap } from '@griever/shared';
 import type {
   Template,
   TemplateCategory,
   MessageTone,
   RecipientDeliveryStatus,
   SessionDetails,
+  ServiceEventFields,
 } from '@griever/shared';
 
 export type SendFlowStep =
@@ -30,6 +31,9 @@ export interface SendJob {
   id: string;
   recipients: RecipientProgress[];
 }
+
+/** The person's details plus the service events the web syncs. */
+export type WithEvents = SessionDetails & ServiceEventFields;
 
 export interface SendFlowState {
   step: SendFlowStep;
@@ -114,7 +118,7 @@ export interface SendFlowActions {
 export interface SendFlowDerived {
   selectedTemplate: Template | null;
   steps: SendFlowStep[];
-  session: SessionDetails | null;
+  session: WithEvents | null;
   composedFields: Record<string, string>;
   composedMessage: string;
   /**
@@ -337,7 +341,7 @@ function stepsFor(state: SendFlowState, template: Template | null, skipDetails: 
 function buildComposedFields(
   state: SendFlowState,
   floristName: string,
-  session: SessionDetails | null | undefined,
+  session: WithEvents | null | undefined,
 ): Record<string, string> {
   const fields: Record<string, string> = { ...state.fields };
 
@@ -346,6 +350,11 @@ function buildComposedFields(
     if (session.dateOfPassing) fields['dateOfPassing'] = session.dateOfPassing;
     if (session.senderName) fields['senderName'] = session.senderName;
     if (session.obituaryUrl) fields['obituaryUrl'] = session.obituaryUrl;
+    // The other service events come from the session, so the message follows them and a phone edit still shows.
+    // They never enter state.fields, so none of this is stored as typed text.
+    if (state.templateCategory === 'service') {
+      Object.assign(fields, serviceEventFieldMap(session));
+    }
   }
 
   fields['tone'] = state.tone;
@@ -366,7 +375,7 @@ function buildComposedFields(
 
 /** Build the field map for a resolved florist name (used by the review step). */
 export function composedFieldsWithFlorist(
-  state: SendFlowState & { session?: SessionDetails | null },
+  state: SendFlowState & { session?: WithEvents | null },
   floristName: string,
 ): Record<string, string> {
   return buildComposedFields(state, floristName, state.session ?? null);
@@ -374,7 +383,7 @@ export function composedFieldsWithFlorist(
 
 export interface UseSendFlowOptions {
   /** The person every message in this flow is about. */
-  session?: SessionDetails | null;
+  session?: WithEvents | null;
   /** Draft to restore (from the session). Overrides `storage` when present. */
   draft?: SendFlowDraft | null;
   /**

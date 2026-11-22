@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
+import { defaultServiceEventsMessage } from '@griever/shared';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 import { onFlowPullRequest } from '../lib/requestFlowPull';
 
@@ -248,5 +249,23 @@ describe('the web wording and a phone choice of the suggested wording (#958)', (
     });
     expect(await screen.findByDisplayValue('Anna died on Tuesday.')).toBeTruthy();
   });
-});
 
+  it('shows the web preview text when the web wording is not edited (#961)', async () => {
+    const events = {
+      obituaryUrl: 'legacy.com/a', visitationPlace: 'Oak Funeral Home', visitationDate: 'June 13', visitationTime: '6 PM',
+      burialPlace: 'Hillside Cemetery', receptionPlace: 'The parish hall',
+    };
+    await openService({ ...fullSession(), ...events } as Session);
+    const web = defaultServiceEventsMessage({ personName: 'Anna', serviceDate: 'June 14', ...DETAILS, ...events });
+    const message = await messageOf();
+    expect(message).toBe(web);
+    expect(message).toContain('Visitation will be held at Oak Funeral Home on June 13 at 6 PM.');
+  });
+
+  it('keeps text typed on the phone (#961)', async () => {
+    await openService({ ...fullSession(), visitationPlace: 'Oak Funeral Home' } as Session);
+    fireEvent.changeText(await screen.findByLabelText('Your message'), 'My own words');
+    webSends({ ...DETAILS, visitationPlace: 'Elm Hall' });
+    await waitFor(() => expect(screen.getByDisplayValue('My own words')).toBeTruthy());
+  });
+});

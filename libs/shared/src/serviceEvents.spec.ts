@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultServiceEventsMessage, defaultServiceMessage } from './index.js';
+import { defaultServiceEventsMessage, defaultServiceMessage, serviceEventFieldMap, shareService } from './index.js';
 
 const base = {
   personName: 'Margaret Hale',
@@ -163,5 +163,49 @@ describe('defaultServiceEventsMessage with little else', () => {
 
   it('is empty, with no stray full stop', () => {
     expect(defaultServiceEventsMessage({ personName: 'Margaret Hale', obituaryUrl: '' })).toBe('');
+  });
+});
+
+describe('the share-service template follows the web wording (#961)', () => {
+  const details = {
+    personName: 'Margaret Hale',
+    serviceDate: 'June 14',
+    serviceTime: '2:00 PM',
+    servicePlace: 'St. Mary',
+    serviceAddress: '12 Main St',
+    serviceNotes: 'Reception follows',
+    visitationPlace: 'Oak Funeral Home',
+    visitationDate: 'June 13',
+    visitationTime: '6 PM',
+    burialPlace: 'Hillside Cemetery',
+    burialTime: '11 AM',
+    receptionPlace: 'The parish hall',
+    obituaryUrl: 'legacy.com/a',
+  };
+  const fields = (over: Record<string, string> = {}) => ({
+    deceasedName: details.personName,
+    serviceDate: details.serviceDate,
+    serviceTime: details.serviceTime,
+    serviceLocation: 'St. Mary, 12 Main St',
+    serviceNotes: details.serviceNotes,
+    obituaryUrl: details.obituaryUrl,
+    ...serviceEventFieldMap(details),
+    ...over,
+  });
+
+  it('renders the same text as the web builder', () => {
+    expect(shareService.renderMessage(fields())).toBe(defaultServiceEventsMessage(details));
+    expect(shareService.renderMessage(fields())).toContain('Visitation will be held at Oak Funeral Home on June 13 at 6 PM.');
+    expect(defaultServiceEventsMessage(details)).toContain('A reception will be held at The parish hall.');
+  });
+
+  it('updates when a phone detail changes', () => {
+    expect(shareService.renderMessage(fields({ serviceTime: '3:30 PM' }))).toContain('at 3:30 PM');
+  });
+
+  it('closes the notes with a full stop when nothing else follows', () => {
+    expect(shareService.renderMessage({ deceasedName: 'Anna', serviceNotes: 'Reception follows' })).toBe(
+      'Reception follows.',
+    );
   });
 });

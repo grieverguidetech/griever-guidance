@@ -220,6 +220,39 @@ export const obituaryLink: Template = {
   },
 };
 
+function eventText(value: string | undefined): string {
+  return (value?.trim() ?? '').replace(/\.$/, '').trim();
+}
+
+/** "<lead> at <place> on <date> at <time>." with only the parts that are set, or '' if none. */
+function eventSentence(lead: string, place?: string, date?: string, time?: string): string {
+  const parts = [
+    eventText(place) && `at ${eventText(place)}`,
+    eventText(date) && `on ${eventText(date)}`,
+    eventText(time) && `at ${eventText(time)}`,
+  ].filter(Boolean);
+  if (parts.length === 0) {
+    return '';
+  }
+  return `${lead} ${parts.join(' ')}.`;
+}
+
+/** An empty text stays empty, so no stray full stop is added. */
+function closeSentence(text: string): string {
+  return text && !/[.?]$/.test(text) ? `${text}.` : text;
+}
+
+/** The visitation, burial and reception sentences, in that order, from the template's field map. */
+function serviceEventSentences(fields: Record<string, string>): string[] {
+  return [
+    eventSentence('Visitation will be held', fields['visitationPlace'], fields['visitationDate'], fields['visitationTime']),
+    fields['burialPrivate'] === 'true'
+      ? 'The burial will be private.'
+      : eventSentence('The burial will be held', fields['burialPlace'], fields['burialDate'], fields['burialTime']),
+    eventSentence('A reception will be held', fields['receptionPlace'], fields['receptionDate'], fields['receptionTime']),
+  ].filter(Boolean);
+}
+
 /**
  * Flow A — Share the service. Logistics in one message, with an optional
  * florist line appended (exactly one sentence) when the griever opts in.
@@ -276,6 +309,13 @@ export const shareService: Template = {
       sentences.push(notes);
     }
     let core = sentences.join(' ');
+    // Visitation, burial and reception follow the service, as on the web preview. The service part is closed first.
+    const events = serviceEventSentences(fields);
+    if (events.length > 0) {
+      core = [closeSentence(core), ...events].filter(Boolean).join(' ');
+    } else {
+      core = closeSentence(core);
+    }
 
     const florist = fields['floristName']?.trim();
     if (florist) {
