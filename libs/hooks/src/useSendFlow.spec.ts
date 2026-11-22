@@ -495,3 +495,66 @@ describe('useSendFlow: the message that came from the web (#949)', () => {
     expect(toneEdit.result.current).toMatchObject({ messageOverride: null, messageFromWeb: false });
   });
 });
+
+describe('useSendFlow: fields that came from the web (#958)', () => {
+  const service = (patch: Partial<SendFlowDraft> = {}) =>
+    renderHook(() => useSendFlow({ session, skipDetails: true, draft: freshDraft({ templateCategory: 'service', step: 'contacts', ...patch }) }));
+
+  it('setWebField sets the field and records the web value, leaving the message alone', () => {
+    const { result } = service({ messageOverride: 'Web wording.', messageFromWeb: true });
+    act(() => result.current.setWebField('serviceTime', '2:00 PM'));
+    expect(result.current.fields['serviceTime']).toBe('2:00 PM');
+    expect(result.current.webFields).toEqual({ serviceTime: '2:00 PM' });
+    expect(result.current.messageOverride).toBe('Web wording.');
+    expect(result.current.messageFromWeb).toBe(true);
+  });
+
+  it('a phone edit drops the key from the record, keeps the other keys and clears the web message', () => {
+    const { result } = service({ messageOverride: 'Web wording.', messageFromWeb: true });
+    act(() => result.current.setWebField('serviceTime', '2:00 PM'));
+    act(() => result.current.setWebField('serviceLocation', 'St. Mary'));
+    act(() => result.current.setField('serviceTime', '3:00 PM'));
+    expect(result.current.fields['serviceTime']).toBe('3:00 PM');
+    expect(result.current.webFields).toEqual({ serviceLocation: 'St. Mary' });
+    expect(result.current.messageOverride).toBeNull();
+  });
+
+  it('a phone edit on a draft with no record adds no record', () => {
+    const { result } = service();
+    act(() => result.current.setField('serviceTime', '3:00 PM'));
+    expect(result.current.webFields).toBeUndefined();
+  });
+
+  it('web fields are not draft content, a phone-typed field is', () => {
+    const { result } = service();
+    act(() => result.current.setWebField('serviceTime', '2:00 PM'));
+    expect(result.current.hasDraftContent).toBe(false);
+    act(() => result.current.setField('serviceLocation', 'Our home'));
+    expect(result.current.hasDraftContent).toBe(true);
+  });
+
+  it('a web field edited on the phone counts as content again', () => {
+    const { result } = service();
+    act(() => result.current.setWebField('serviceTime', '2:00 PM'));
+    act(() => result.current.setField('serviceTime', '2:30 PM'));
+    expect(result.current.hasDraftContent).toBe(true);
+  });
+
+  it('a draft with only web fields is not started', () => {
+    const draft = freshDraft({ templateCategory: 'service', step: 'contacts', fields: { serviceTime: '2:00 PM' }, webFields: { serviceTime: '2:00 PM' } });
+    expect(isDraftStarted(draft, true)).toBe(false);
+    expect(isDraftStarted({ ...draft, webFields: undefined }, true)).toBe(true);
+  });
+
+  it('the record is saved and restored with the draft', () => {
+    const saved: SendFlowDraft[] = [];
+    const { result } = renderHook(() =>
+      useSendFlow({ session, skipDetails: true, draft: freshDraft({ templateCategory: 'service', step: 'contacts' }), onDraftChange: (d) => saved.push(d) }),
+    );
+    act(() => result.current.setWebField('serviceTime', '2:00 PM'));
+    const last = saved[saved.length - 1];
+    expect(last.webFields).toEqual({ serviceTime: '2:00 PM' });
+    const restored = renderHook(() => useSendFlow({ session, skipDetails: true, draft: last }));
+    expect(restored.result.current.webFields).toEqual({ serviceTime: '2:00 PM' });
+  });
+});

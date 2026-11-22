@@ -26,6 +26,7 @@ import { JoinScreen } from '../screens/JoinScreen';
 import type { JoinPhase } from '../screens/JoinScreen';
 import { mobileContactStore } from '../lib/contactStore';
 import { defaultPicked, startsFresh } from '../lib/defaultRecipients';
+import { requestFlowPull } from '../lib/requestFlowPull';
 import { sendNote } from '../lib/sendNote';
 import type { SentNoteText } from '../lib/sendNote';
 import { createSessionCache, isBlank, useDeviceSessions } from '../lib/useDeviceSessions';
@@ -255,8 +256,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     if (Object.keys(changed).length > 0) onDetails(id, changed);
   }, [flow.step, id, name, passed, service, onDetails, session]);
 
-  // The name and date typed at setup are already in the first form when it opens. Once per visit to
-  // the form, so clearing a field is never filled back in.
+  // The details the web has are in the first form when it opens, and follow the web until typed on the phone (#958).
   // For every other moment the first form is Who should know? (the contacts step), so it counts as a form too.
   const onForm =
     flow.step === 'announce' ||
@@ -270,65 +270,90 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // never throws away wording the family edited by hand.
   const inVisit = onForm || flow.step === 'review';
   const prefilled = useRef(false);
-  const { personName, dateOfPassing } = session;
+  // The web's message wording as last seen this visit, so a later arrival is applied once and a phone change to the wording is not undone.
+  const seenWebMessage = useRef<string | null | undefined>(undefined);
+  // True when this visit began on the first form. A draft resumed straight on Ready to send is not an arrival, so its message is left as saved.
+  const arrivedOnForm = useRef(false);
   // The signed-in account's name, for the thank-you's sender field. On-device only (DS-7).
   const accountName = useAccountSenderName();
   const senderTyped = flow.fields['senderName'] ?? '';
-  const { hasDraftContent, setMessageOverride, setWebMessage, templateCategory: category, messageOverride, messageFromWeb } = flow;
+  const { hasDraftContent, setMessageOverride, setWebMessage, setWebField, templateCategory: category, messageOverride, messageFromWeb, fields, webFields } = flow;
+  // Fields follow the web until typed on the phone (#958). This runs on every change of the session during the visit,
+  // so details that arrive after the form opened fill in. It sets state only when a value differs, so it settles.
   useEffect(() => {
     if (!inVisit) {
       prefilled.current = false;
+      seenWebMessage.current = undefined;
+      arrivedOnForm.current = false;
       return;
     }
-    if (prefilled.current) return;
+    const firstPass = !prefilled.current;
     prefilled.current = true;
+    if (firstPass) {
+      arrivedOnForm.current = onForm;
+    }
     const has = (key: string) => selectedTemplate?.fields.some((f) => f.key === key);
-    // The account name starts the sender field when the person has none and nothing is typed. Never
-    // over a typed name, and never when the family hand-edited the message: setField clears the
-    // override, so that wording would be lost. Runs before setMessageOverride below,
-    // and also for a draft resumed on Ready to send (the hub counts the account name, so that screen
-    // must not block on it). Once per visit: a profile that arrives later does not fill, on purpose,
-    // so a name never appears under a family that has started typing.
-    if (accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
-      setField('senderName', accountName);
+    if (firstPass && onForm) {
+      // Opening a moment's first form asks for a pull, so the web's latest details are on the way. Silent (C5).
+      requestFlowPull();
     }
     // The message is still the web's own wording (never hand-edited on the phone): follow the web's current
     // wording, so an old copy saved earlier never counts as a phone edit (#949).
     // A draft saved before the flag existed holds the web wording with no flag: when it equals the web's wording, it is web text too.
-    if (category && messageOverride !== null) {
-      const current = sendPrefill(session, category).messageOverride;
+    const planned = category ? sendPrefill(session, category) : null;
+    if (planned && messageOverride !== null) {
+      const current = planned.messageOverride;
       if (messageFromWeb && current !== messageOverride) {
         setWebMessage(current);
       } else if (!messageFromWeb && current === messageOverride) {
         setWebMessage(messageOverride);
       }
     }
-    // A draft resumed straight on Ready to send is not a first-form arrival: nothing else to prefill.
-    if (!onForm) return;
     // Older drafts saved obituaryText as the message. The obituary send texts the link template now
     // (MOB-9, #559 Decision 4), so drop that copy; a hand-edited message stays.
-    if (category === 'obituary' && messageOverride && messageOverride === session.obituaryText) {
+    if (firstPass && onForm && category === 'obituary' && messageOverride && messageOverride === session.obituaryText) {
       setMessageOverride(null);
     }
-    const fresh = !hasDraftContent && messageOverride === null;
-    if (!name && personName && has('deceasedName')) setField('deceasedName', personName);
-    if (!passed && dateOfPassing && has('dateOfPassing')) setField('dateOfPassing', dateOfPassing);
-    // The planned details and edited wording (synced from the web) start a fresh form. A form with
-    // anything typed, or a hand-edited message (even an empty one), is never touched. setField
-    // clears the override, so every field is set first and the override is the last call.
-    if (fresh && category) {
-      const planned = sendPrefill(session, category);
+    // Each field the phone has not typed shows the web's current value: when it is absent, when it still holds the
+    // value last recorded from the web, or (a draft saved before the record existed) when it is empty or equals it.
+    // A field the phone typed is never touched, on this visit or later ones. Web fields do not touch the message.
+    if (planned) {
       for (const [key, value] of Object.entries(planned.fields)) {
-        if (has(key)) {
-          setField(key, value);
+        if (!has(key)) {
+          continue;
+        }
+        const current = fields[key];
+        const recorded = webFields?.[key];
+        const legacy = webFields === undefined && (current === '' || current === value);
+        const untyped = current === undefined || current === recorded || legacy;
+        if (untyped && (current !== value || recorded !== value)) {
+          setWebField(key, value);
         }
       }
-      // Kept untrimmed on purpose: it is the family's own wording, and '' is a real choice.
-      if (planned.messageOverride !== null) {
-        setWebMessage(planned.messageOverride);
-      }
     }
-  }, [inVisit, onForm, name, passed, personName, dateOfPassing, selectedTemplate, setField, setMessageOverride, setWebMessage, hasDraftContent, messageOverride, messageFromWeb, category, session, accountName, senderTyped]);
+    // The account name starts the sender field when the person has none and nothing is typed. Once per visit: a
+    // profile that arrives later does not fill, on purpose, so a name never appears under a family that has started typing.
+    // Never when the family hand-edited the message. Also for a draft resumed on Ready to send (the hub counts the
+    // account name, so that screen must not block on it).
+    if (firstPass && accountName && !senderTyped && !session.senderName && messageOverride === null && has('senderName')) {
+      setWebField('senderName', accountName);
+    }
+    // The family's edited wording (synced from the web) starts a message that is still the template's: nothing
+    // typed on the phone (web fields do not count) and no wording chosen. Applied when it first shows, or when it
+    // changes later; so a tone change or a cleared field is not undone by the next pass. Kept untrimmed on
+    // purpose: it is the family's own wording, and '' is a real choice.
+    if (
+      planned &&
+      arrivedOnForm.current &&
+      messageOverride === null &&
+      !hasDraftContent &&
+      planned.messageOverride !== null &&
+      planned.messageOverride !== seenWebMessage.current
+    ) {
+      setWebMessage(planned.messageOverride);
+    }
+    seenWebMessage.current = planned ? planned.messageOverride : undefined;
+  }, [inVisit, onForm, selectedTemplate, setMessageOverride, setWebMessage, setWebField, hasDraftContent, messageOverride, messageFromWeb, category, session, accountName, senderTyped, fields, webFields]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not
