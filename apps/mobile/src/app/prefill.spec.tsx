@@ -241,7 +241,10 @@ describe('the thank-you name from the account (#695)', () => {
   const NAME_LABEL = /^Your name or family name/;
   // Resumed on Ready to send with no edited wording: the message follows the form, and the Details row is there.
   // (A fresh form with web wording starts from that wording and hides the row; with none it shows the nudge, #824.)
-  const toThanks = async (session: Session = { ...base, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session) => {
+  // The person has no web wording for the thank-you: a draft with no edited wording resumed on Ready to send now takes the
+  // web wording when there is one (#958), and these tests are about the form that shows when there is none.
+  const noWording = { ...base, thanksMessage: undefined };
+  const toThanks = async (session: Session = { ...noWording, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session) => {
     await openMoment(session, /Send thank-yous/);
     return screen.findByLabelText(NAME_LABEL);
   };
@@ -298,7 +301,7 @@ describe('the thank-you name from the account (#695)', () => {
 
   it('fills the name on a draft resumed on Ready to send, so sending is not blocked', async () => {
     mockProfile = account({ senderName: 'Sam' });
-    await openMoment({ ...base, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session, /Send thank-yous/);
+    await openMoment({ ...noWording, drafts: { aftercare: thanksDraft({}, null) } } as unknown as Session, /Send thank-yous/);
     // The row opens by itself at first (the name was empty), so the field is there without a press.
     expect((await screen.findByLabelText(NAME_LABEL)).props.value).toBe('Sam');
     const send = screen.getByRole('button', { name: /^Text 1 person/ });

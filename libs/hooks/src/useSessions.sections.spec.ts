@@ -142,6 +142,14 @@ describe('useSessions section fields', () => {
       expect(get().sectionStatus).toBeUndefined();
     });
 
+    it('does not copy back a value that only came from the web (#958), but copies one typed on the phone', () => {
+      const fromWeb = { ...draft, webFields: { serviceTime: ' 2:00 pm ', serviceLocation: 'St. Mary' } };
+      const { get } = setup([{ ...OLD, drafts: { service: fromWeb } }]);
+      expect(get().serviceTime).toBeUndefined();
+      expect(get().servicePlace).toBeUndefined();
+      expect(get().serviceNotes).toBe('Flowers welcome');
+    });
+
     it('ignores blank draft values', () => {
       const { get } = setup([{ ...OLD, drafts: { service: serviceDraft({ serviceTime: '   ' }) } }]);
       expect(get().serviceTime).toBeUndefined();

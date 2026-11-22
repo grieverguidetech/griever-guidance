@@ -141,4 +141,46 @@ describe('service form fields follow the web until typed on the phone (#958)', (
     off();
     expect(pulls).toHaveBeenCalled();
   });
+
+  const savedDraft = (over: object) => ({
+    step: 'contacts', templateCategory: 'service', templateOverrideId: null, fields: {},
+    serviceDetailsKnown: null, selectedContactIds: ['c1'], includeFlowers: false, customFlorist: '',
+    flowerDeliveryTarget: 'service', tone: 'plain', messageOverride: null, greeting: true, recipientNotes: {}, toldIds: [], ...over,
+  });
+  const reopen = async (person: Session) => {
+    await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify([person]));
+    await AsyncStorage.setItem('gg.contacts.v1', JSON.stringify(contacts));
+    render(<App />);
+    fireEvent.press(await screen.findByLabelText('Anna', {}, { timeout: 10000 }));
+    fireEvent.press(await screen.findByRole('button', { name: SHARE }));
+  };
+  const WORDING = 'Please join us at two.';
+
+  it('shows the web wording for an old draft whose fields were filled from the web, with no record', async () => {
+    const fields = { deceasedName: 'Anna', serviceDate: 'June 14', serviceTime: '2:00 PM', serviceLocation: 'St. Mary, 12 Main St', serviceNotes: 'Reception follows.' };
+    await reopen({ ...fullSession(), serviceMessage: WORDING, drafts: { service: savedDraft({ fields }) } } as Session);
+    expect(await screen.findByDisplayValue(WORDING, {}, { timeout: 10000 })).toBeTruthy();
+  });
+
+  it('shows the web wording when resumed on Ready to send with nothing typed', async () => {
+    await reopen({ ...fullSession(), serviceMessage: WORDING, drafts: { service: savedDraft({ step: 'review', fields: { deceasedName: 'Anna' } }) } } as Session);
+    expect(await screen.findByDisplayValue(WORDING, {}, { timeout: 10000 })).toBeTruthy();
+  });
+
+  it('keeps an old draft\'s empty field untyped, so a later web value fills it', async () => {
+    await reopen({ ...noPlace(), drafts: { service: savedDraft({ fields: { deceasedName: 'Anna', serviceLocation: '' } }) } } as Session);
+    await screen.findByLabelText(/^Location/, {}, { timeout: 10000 });
+    webSends({ serviceTime: '2:00 PM', servicePlace: 'Oak Chapel' });
+    expect(await screen.findByDisplayValue(/Oak Chapel/)).toBeTruthy();
+  });
+
+  it('does not bring a value the web cleared back into the saved details', async () => {
+    await openService(fullSession());
+    expect(await messageOf()).toContain('St. Mary');
+    webSends({ serviceTime: '2:00 PM', servicePlace: '', serviceAddress: '' });
+    // The phone keeps what it last showed; the saved person is not written with it again.
+    expect(await messageOf()).toContain('St. Mary');
+    const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]')[0] as { servicePlace?: string };
+    expect(saved.servicePlace ?? '').toBe('');
+  });
 });
