@@ -177,8 +177,16 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
   }
   const personName = values.personName?.trim() ?? '';
   const nameKeys = ['obituaryGivenName', 'obituaryMiddleName', 'obituarySurname'] as const;
-  // Only while no part was ever saved (all undefined). A cleared part is '' and stays cleared.
-  const derivedParts = nameKeys.every((k) => values[k] === undefined) && personName !== '' ? splitPersonName(personName) : null;
+  // Blank (never saved, or synced back as '') shows the split name on arrival or when the person name changes.
+  // After the first edit of a name part here, the boxes never re-derive: a cleared box stays cleared.
+  const [nameEdited, setNameEdited] = useState(false);
+  const [seenPersonName, setSeenPersonName] = useState(personName);
+  if (seenPersonName !== personName) {
+    setSeenPersonName(personName);
+    setNameEdited(false);
+  }
+  const allPartsBlank = nameKeys.every((k) => (values[k] ?? '').trim() === '');
+  const derivedParts = allPartsBlank && !nameEdited && personName !== '' ? splitPersonName(personName) : null;
   const derivedName: Record<string, string> = derivedParts
     ? {
         obituaryGivenName: derivedParts.given,
@@ -261,9 +269,12 @@ export function ObituaryLifeFields({ values, onChange, onServiceChange, onPerson
           value={showsDerived ? derivedAge : typed}
           onFocus={isAge ? () => setAgeFocused(true) : undefined}
           onBlur={isAge ? () => setAgeFocused(false) : undefined}
-          onChange={(e) =>
-            onChange(derivedParts ? { ...derivedName, [spec.key]: e.target.value } : { [spec.key]: e.target.value })
-          }
+          onChange={(e) => {
+            if (isNamePart) {
+              setNameEdited(true);
+            }
+            onChange(derivedParts ? { ...derivedName, [spec.key]: e.target.value } : { [spec.key]: e.target.value });
+          }}
         />
       </div>
     );
