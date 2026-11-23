@@ -17,8 +17,14 @@ async function violations(page: Page, { contrastOnly = false } = {}) {
   } else {
     builder.withTags(WCAG).disableRules(['color-contrast']);
   }
+  if (contrastOnly) {
+    // Measure settled colours: the swirl drift and entrance fades would be read mid-motion.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+  }
   const { violations } = await builder.analyze();
-  return violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.length} node(s) — ${v.help}`);
+  return violations.map(
+    (v) => `${v.id} (${v.impact}): ${v.nodes.length} node(s) [${v.nodes.map((n) => n.target.join(' ')).join(', ')}] — ${v.help}`,
+  );
 }
 
 /** Auth is off in this build; with nobody saved, starting a person opens The person. */
