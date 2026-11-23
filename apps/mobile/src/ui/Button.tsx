@@ -26,8 +26,6 @@ const BUTTON_RADIUS = 10;
 /** Primary and secondary are the v2 swirl buttons: a sliding gradient fill, drawn from the recipes. */
 const RECIPES = { primary: v2.recipes.button.primary, secondary: v2.recipes.button.secondary } as const;
 const PAGE = v2.roles.page.color;
-// An unavailable primary has no swirl. v2 has no "disabled" role yet, so it is solid ink with page-coloured text.
-const UNAVAILABLE_FILL = v2.roles.ink;
 
 type Recipe = (typeof RECIPES)[keyof typeof RECIPES];
 
@@ -162,13 +160,12 @@ export function Button({
     // Only when the work starts, not when the words change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [working]);
-  const unavailableFill = ariaDisabled && variant === 'primary';
   const recipe = variant === 'primary' || variant === 'secondary' ? RECIPES[variant] : undefined;
   const swirled = recipe !== undefined && !ariaDisabled;
-  // An unavailable secondary has no swirl: a flat page fill with a dashed border, so it reads as different yet keeps its text colour.
-  const unavailableOutline = ariaDisabled && variant === 'secondary';
+  // An unavailable primary or secondary is quiet (matches web): no swirl, a flat page fill, a dashed recipe border, no shadow.
+  const unavailableOutline = ariaDisabled && recipe !== undefined;
   // The recipe colour in every state: plain roles.muted was under 4.5:1 on the soft ocean swirl.
-  const labelColor = unavailableFill ? PAGE : recipe?.text.color;
+  const labelColor = recipe?.text.color;
   const text = (
     <Phrasing>
       <Text
@@ -212,7 +209,6 @@ export function Button({
         styles[variant],
         recipe && recipeFrame(recipe),
         swirled && styles.swirlFrame,
-        unavailableFill && styles.unavailableFill,
         unavailableOutline && styles.unavailableOutline,
         minHeight !== undefined && { minHeight },
         pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : recipe ? styles.pressedSwirl : styles.pressed),
@@ -281,8 +277,7 @@ const styles = StyleSheet.create({
   // roles.link on roles.wash is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedWash: { backgroundColor: v2.roles.wash },
   // Unavailable is a solid look, not a fade: opacity would drop the label below 4.5:1.
-  // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: roles.muted text.
-  unavailableFill: { backgroundColor: UNAVAILABLE_FILL },
+  // Primary and secondary: flat page, dashed recipe border, recipe text. The rest: roles.muted text.
   unavailableOutline: { backgroundColor: PAGE, borderStyle: 'dashed', boxShadow: 'none' },
   // The swirl fills the frame and carries the padding, so the whole button is gradient. The first stop shows behind it for the shadow.
   swirlFrame: { paddingVertical: 0, paddingHorizontal: 0, alignItems: 'stretch' },

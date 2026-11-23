@@ -193,11 +193,34 @@ describe('Button (mobile)', () => {
       });
     });
 
-    it('aria-disabled primary has no swirl, a solid ink fill and page-coloured text', () => {
+    it('aria-disabled primary is quiet: page fill, no swirl, no shadow, a dashed recipe edge and the recipe label colour', () => {
       render(<Button label="Save" onPress={jest.fn()} ariaDisabled />);
       expect(screen.UNSAFE_queryAllByType(LinearSwirl)).toHaveLength(0);
-      expect(flat(screen.getByRole('button', { name: 'Save' })).backgroundColor).toBe(v2.roles.ink);
-      expect(StyleSheet.flatten(screen.getByText('Save').props.style).color).toBe(v2.roles.page.color);
+      const frame = flat(screen.getByRole('button', { name: 'Save' }));
+      expect(frame).toMatchObject({
+        backgroundColor: v2.roles.page.color,
+        borderStyle: 'dashed',
+        borderWidth: recipes.primary.border.width,
+        borderColor: recipes.primary.border.color,
+        boxShadow: 'none',
+      });
+      expect(StyleSheet.flatten(screen.getByText('Save').props.style).color).toBe(recipes.primary.text.color);
+    });
+
+    it('aria-disabled primary edge is 3:1 and label 4.5:1 on the page and both glows', () => {
+      const hex = (value: string) => [0, 1, 2].map((k) => channel(value, k));
+      const grounds = [v2.roles.page.color, v2.roles.page.glows.topRight, v2.roles.page.glows.bottomLeft];
+      for (const ground of grounds) {
+        expect(ratio(hex(recipes.primary.border.color), hex(ground))).toBeGreaterThanOrEqual(3);
+        expect(ratio(hex(recipes.primary.text.color), hex(ground))).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it('aria-disabled primary keeps its state: focusable, and unavailable only on native when announced', () => {
+      const { rerender } = render(<Button label="Save" onPress={jest.fn()} ariaDisabled />);
+      expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState?.disabled).toBeFalsy();
+      rerender(<Button label="Save" onPress={jest.fn()} ariaDisabled announceDisabled />);
+      expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState).toMatchObject({ disabled: true });
     });
 
     it('aria-disabled primary still calls onPress, so the caller can explain', () => {
