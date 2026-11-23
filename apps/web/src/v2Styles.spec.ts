@@ -79,7 +79,8 @@ describe('styles.css type roles', () => {
 
   it('uses no weight above 500 and no serif var', () => {
     expect(css).not.toMatch(/font-weight:\s*(6|7|8|9)00/);
-    expect(css).not.toContain('var(--font-serif)');
+    expect(css).not.toContain('--font-serif');
+    expect(theme).not.toContain('--font-serif');
   });
 
   it('defines every var the type rules use (theme.generated.css or the :root block)', () => {

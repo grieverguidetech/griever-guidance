@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { colors, v2 } from './index.js';
+import { v2 } from './index.js';
 import { buildRecipes } from './v2/recipes.js';
 import { buildRoles } from './v2/roles.js';
 import { primitives } from './v2/primitives.js';
@@ -97,25 +97,23 @@ describe('v2 tokens: layers', () => {
     expect(Object.keys(v2.recipes.button).sort()).toEqual(['primary', 'secondary']);
   });
 
-  it('leaves the v1 colours alone', () => {
-    expect(colors.bg).toBe('#f3f2f2');
-  });
 });
 
-describe('v2 tokens: copied from the v1 look', () => {
-  it('copies the v1 value for each control and state role', () => {
+describe('v2 tokens: values kept from the old v1 look', () => {
+  // v1 is deleted (#1010); the table pins the values it held, now read from v2 alone.
+  it('keeps the value for each control and state role', () => {
     const table: [string, string, string][] = [
-      ['accent-700', colors['accent-700'], v2.roles.link],
-      ['accent-100', colors['accent-100'], v2.roles.wash],
-      ['neutral-700', colors['neutral-700'], v2.roles.muted],
-      ['neutral-800', colors['neutral-800'], v2.roles.mutedStrong],
-      ['neutral-600', colors['neutral-600'], v2.recipes.field.edge],
-      ['surface', colors.surface, v2.recipes.field.fill],
-      ['accent-700 (ring)', colors['accent-700'], v2.recipes.field.focusRing],
-      ['success-700', colors['success-700'], v2.roles.success],
+      ['link (was accent-700)', '#006786', v2.roles.link],
+      ['wash (was accent-100)', '#e9f8ff', v2.roles.wash],
+      ['muted (was neutral-700)', '#605d5d', v2.roles.muted],
+      ['mutedStrong (was neutral-800)', '#444141', v2.roles.mutedStrong],
+      ['field edge (was neutral-600)', '#7d7979', v2.recipes.field.edge],
+      ['field fill (was surface)', '#eae9e9', v2.recipes.field.fill],
+      ['field focus ring (was accent-700)', '#006786', v2.recipes.field.focusRing],
+      ['success (was success-700)', '#2a7048', v2.roles.success],
     ];
-    for (const [name, v1, v2Value] of table) {
-      expect(v2Value, name).toBe(v1);
+    for (const [name, expected, actual] of table) {
+      expect(actual, name).toBe(expected);
     }
   });
 

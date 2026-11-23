@@ -5,16 +5,16 @@
 /* ──────────────────────────────────────────────────────────────────────
    Broadsheet — design tokens, ported from
    design_handoff_griever_wizard/design-system/styles.css.
-   The colours, the serif face, --space-* and --radius-* are generated from
+   The v2 vars and --space-* are generated from
    @griever/tokens into theme.generated.css (do not edit it; run
    `pnpm nx run tokens:generate-css`). Tailwind emits the @theme values as :root
    custom properties and as utilities (bg-v2-page, text-v2-link, …).
    ────────────────────────────────────────────────────────────────────── */
 @import './theme.generated.css';
 
-/* Web-only aliases for the component layer below. --space-* and --radius-* come from
-   theme.generated.css: plain custom properties (Broadsheet's 1.25× spacing / near-square radii
-   don't map to Tailwind's single-multiplier scales). */
+/* Web-only aliases for the component layer below. --space-* comes from
+   theme.generated.css: plain custom properties (Broadsheet's 1.25× spacing
+   doesn't map to Tailwind's single-multiplier scales). Corners use --v2-radius. */
 :root {
   --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
@@ -141,7 +141,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     white-space: nowrap;
     color: var(--color-v2-page);
     background: var(--color-text);
-    border-radius: var(--radius-md);
+    border-radius: var(--v2-radius);
     pointer-events: none;
     opacity: 0;
     transition: opacity 120ms ease;
@@ -167,7 +167,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     color: var(--color-text);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border-radius: var(--v2-radius);
     cursor: pointer;
     transition: background 120ms ease, color 120ms ease;
   }
@@ -361,7 +361,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     caret-color: var(--color-v2-focus);
     background: var(--color-v2-field-fill);
     border: 1px solid var(--color-v2-field-edge);
-    border-radius: var(--radius-md);
+    border-radius: var(--v2-radius);
   }
   .gg-input::placeholder {
     color: color-mix(in srgb, var(--color-text) 68%, transparent);
@@ -385,7 +385,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     border: 0;
     cursor: pointer;
     color: var(--color-v2-link);
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    border-radius: 0 var(--v2-radius) var(--v2-radius) 0;
   }
   .gg-datebox-trigger:hover {
     background: color-mix(in srgb, var(--color-v2-focus) 12%, transparent);
@@ -421,7 +421,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     opacity: 0.55;
     cursor: pointer;
     padding: 4px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--v2-radius);
   }
   .gg-time::-webkit-calendar-picker-indicator:hover {
     opacity: 0.9;
@@ -433,7 +433,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     display: inline-flex;
     overflow: hidden;
     border: 1px solid var(--color-v2-divider);
-    border-radius: var(--radius-md);
+    border-radius: var(--v2-radius);
   }
   .gg-seg-opt {
     display: inline-flex;
@@ -460,7 +460,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     font-size: 11px;
     letter-spacing: 0.02em;
     padding: 3px 10px;
-    border-radius: calc(var(--radius-md) * 0.75);
+    border-radius: var(--v2-radius);
   }
   .gg-tag-accent { background: var(--color-v2-wash); color: var(--color-v2-heading); }
   /* Same look as .gg-tag-accent since v1 left (#1006): v2 has no second accent. */
@@ -624,7 +624,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     color: var(--color-text);
     background: transparent;
     border: 0;
-    border-radius: var(--radius-md);
+    border-radius: var(--v2-radius);
     cursor: pointer;
     transition: background var(--dur-1) ease;
   }
@@ -643,7 +643,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     color: var(--color-text);
     background: transparent;
     border: 0;
-    border-radius: var(--radius-md);
+    border-radius: var(--v2-radius);
     cursor: pointer;
     transition: background var(--dur-1) ease, box-shadow var(--dur-1) ease;
   }
@@ -693,7 +693,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     height: 18px;
     flex: 0 0 auto;
     border: 2px solid var(--color-v2-muted);
-    border-radius: var(--radius-md);
+    border-radius: 2px;
   }
   .gg-chip[aria-pressed='true'] .gg-check-box { border-color: var(--color-v2-link); }
   .gg-hint { font-size: 13px; color: var(--text-hint); }
