@@ -11,6 +11,8 @@ import { join, relative } from 'node:path';
  */
 const SRC = import.meta.dirname;
 const CSS = readFileSync(join(SRC, 'styles.css'), 'utf8');
+// The colour tokens live in the generated theme file (from @griever/tokens).
+const THEME = readFileSync(join(SRC, 'theme.generated.css'), 'utf8');
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -23,8 +25,8 @@ function sourceFiles(dir: string): string[] {
 const INLINE_OUTLINE_NONE = /outline\s*:\s*['"`]none['"`]|\boutline-none\b/;
 
 function token(name: string): string {
-  const match = CSS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6})`, 'i'));
-  if (!match) throw new Error(`token --color-${name} not found in styles.css`);
+  const match = THEME.match(new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6})`, 'i'));
+  if (!match) throw new Error(`token --color-${name} not found in theme.generated.css`);
   return match[1];
 }
 
@@ -56,7 +58,7 @@ function over(fg: string, alpha: number, bg: string): string {
 function rule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = CSS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
-  if (!match) throw new Error(`rule ${selector} not found in styles.css`);
+  if (!match) throw new Error(`rule ${selector} not found in theme.generated.css`);
   return match[1];
 }
 
@@ -128,7 +130,7 @@ describe('visible focus (#162)', () => {
 
   it('an input on a panel gets a border that clears 3:1 against the panel and its fill (#514)', () => {
     const match = CSS.match(/\.gg-panel \.gg-input\s*\{([^}]*)\}/);
-    if (!match) throw new Error('rule .gg-panel .gg-input not found in styles.css');
+    if (!match) throw new Error('rule .gg-panel .gg-input not found in theme.generated.css');
     const border = token(colourIn(match[1], 'border-color'));
     const fillName = colourIn(match[1], 'background');
     expect(fillName).toBe('bg');
