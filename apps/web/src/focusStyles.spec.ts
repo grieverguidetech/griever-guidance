@@ -11,6 +11,8 @@ import { join, relative } from 'node:path';
  */
 const SRC = import.meta.dirname;
 const CSS = readFileSync(join(SRC, 'styles.css'), 'utf8');
+// The colour tokens live in the generated theme file (from @griever/tokens).
+const THEME = readFileSync(join(SRC, 'theme.generated.css'), 'utf8');
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -23,8 +25,8 @@ function sourceFiles(dir: string): string[] {
 const INLINE_OUTLINE_NONE = /outline\s*:\s*['"`]none['"`]|\boutline-none\b/;
 
 function token(name: string): string {
-  const match = CSS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6})`, 'i'));
-  if (!match) throw new Error(`token --color-${name} not found in styles.css`);
+  const match = THEME.match(new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6})`, 'i'));
+  if (!match) throw new Error(`token --color-${name} not found in theme.generated.css`);
   return match[1];
 }
 
